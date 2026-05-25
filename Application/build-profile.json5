@@ -1,0 +1,99 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "emberrelease",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "C:/Users/USER/.ohos/config/emberrelease.p12",
+          "storePassword": "REDACTED_SIGNING_SECRET",
+          "keyAlias": "emberrelease",
+          "keyPassword": "REDACTED_SIGNING_SECRET",
+          "signAlg": "SHA256withECDSA",
+          "profile": "C:/Users/USER/.ohos/config/emberreleaseRelease.p7b",
+          "certpath": "C:/Users/USER/.ohos/config/emberrelease.cer"
+        }
+      },
+      {
+        "name": "pc",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\dyzxp\\.ohos\\config\\pc_YourPipe_VaTYoZfZfLxNpiC6KGxT6OJOW-8GeuTJHs9kGJZSpzg=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "REDACTED_SIGNING_SECRET",
+          "profile": "C:\\Users\\dyzxp\\.ohos\\config\\pc_YourPipe_VaTYoZfZfLxNpiC6KGxT6OJOW-8GeuTJHs9kGJZSpzg=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\dyzxp\\.ohos\\config\\pc_YourPipe_VaTYoZfZfLxNpiC6KGxT6OJOW-8GeuTJHs9kGJZSpzg=.p12",
+          "storePassword": "REDACTED_SIGNING_SECRET"
+        }
+      },
+      {
+        "name": "macos",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/USER/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "REDACTED_SIGNING_SECRET",
+          "profile": "/Users/USER/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/USER/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.p12",
+          "storePassword": "REDACTED_SIGNING_SECRET"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "macos",
+        "targetSdkVersion": "6.1.0(23)",
+        "compatibleSdkVersion": "6.1.0(23)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          },
+          "nativeCompiler": "BiSheng"
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mediaservice",
+      "srcPath": "./mediaservice",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "youtube_core",
+      "srcPath": "./youtube_core"
+    }
+  ]
+}

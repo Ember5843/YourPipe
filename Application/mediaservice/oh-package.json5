@@ -1,0 +1,13 @@
+{
+  "name": "mediaservice",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "youtube_core": "file:../youtube_core",
+    "@sj/mediacache": "^1.2.0"
+  },
+  "devDependencies": {}
+}

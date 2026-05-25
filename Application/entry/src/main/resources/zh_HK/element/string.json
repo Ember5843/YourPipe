@@ -1,0 +1,984 @@
+{
+  "string": [
+    {
+      "name": "yt_tab_home",
+      "value": "首頁"
+    },
+    {
+      "name": "yt_tab_playlists",
+      "value": "播放清單"
+    },
+    {
+      "name": "yt_tab_subscriptions",
+      "value": "訂閱"
+    },
+    {
+      "name": "yt_tab_favorites",
+      "value": "收藏"
+    },
+    {
+      "name": "yt_option_title",
+      "value": "選項"
+    },
+    {
+      "name": "yt_option_group_settings",
+      "value": "設定"
+    },
+    {
+      "name": "yt_option_group_others",
+      "value": "其他"
+    },
+    {
+      "name": "yt_option_language",
+      "value": "語言調整"
+    },
+    {
+      "name": "yt_option_color",
+      "value": "顏色調整"
+    },
+    {
+      "name": "yt_option_color_subtitle",
+      "value": "主題色與強調色"
+    },
+    {
+      "name": "yt_option_log",
+      "value": "日誌"
+    },
+    {
+      "name": "yt_option_log_subtitle",
+      "value": "查看最近執行記錄"
+    },
+    {
+      "name": "yt_option_about",
+      "value": "關於"
+    },
+    {
+      "name": "yt_option_about_subtitle",
+      "value": "版本與致謝資訊"
+    },
+    {
+      "name": "yt_option_in_development",
+      "value": "功能開發中"
+    },
+    {
+      "name": "yt_option_in_development_color",
+      "value": "顏色主題選項將顯示於此"
+    },
+    {
+      "name": "yt_lang_follow_system",
+      "value": "跟隨系統"
+    },
+    {
+      "name": "yt_lang_simplified",
+      "value": "簡體中文"
+    },
+    {
+      "name": "yt_lang_simplified_subtitle",
+      "value": "簡體中文"
+    },
+    {
+      "name": "yt_lang_traditional_hk",
+      "value": "繁體中文（香港）"
+    },
+    {
+      "name": "yt_lang_traditional_hk_subtitle",
+      "value": "繁體中文（香港）"
+    },
+    {
+      "name": "yt_lang_traditional_tw",
+      "value": "繁體中文（台灣）"
+    },
+    {
+      "name": "yt_lang_traditional_tw_subtitle",
+      "value": "繁體中文（台灣）"
+    },
+    {
+      "name": "yt_lang_english",
+      "value": "英語"
+    },
+    {
+      "name": "yt_lang_english_subtitle",
+      "value": "English"
+    },
+    {
+      "name": "yt_log_session_active",
+      "value": "記錄中"
+    },
+    {
+      "name": "yt_log_session_saved",
+      "value": "已儲存"
+    },
+    {
+      "name": "yt_log_no_sessions",
+      "value": "暫無日誌工作階段"
+    },
+    {
+      "name": "yt_log_delete_all_confirm",
+      "value": "刪除所有日誌記錄？"
+    },
+    {
+      "name": "yt_log_delete_confirm_yes",
+      "value": "刪除"
+    },
+    {
+      "name": "yt_log_delete_confirm_no",
+      "value": "取消"
+    },
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "label"
+    },
+    {
+      "name": "HOME_EXIT_TOAST",
+      "value": "再按一次返回鍵退出應用"
+    },
+    {
+      "name": "LIVING_LEFT_TEXT",
+      "value": "共 "
+    },
+    {
+      "name": "LIVING_RIGHT_TEXT",
+      "value": " 條評論"
+    },
+    {
+      "name": "LIVING_WRITE",
+      "value": "寫評論"
+    },
+    {
+      "name": "number_of_viewers",
+      "value": "738,600 人正在觀看"
+    },
+    {
+      "name": "store_name",
+      "value": "官方直播間"
+    },
+    {
+      "name": "yt_tab_local",
+      "value": "本地"
+    },
+    {
+      "name": "yt_option_appearance",
+      "value": "外觀"
+    },
+    {
+      "name": "yt_dark_mode_title",
+      "value": "深色模式"
+    },
+    {
+      "name": "yt_dark_mode_system",
+      "value": "跟隨系統"
+    },
+    {
+      "name": "yt_dark_mode_system_subtitle",
+      "value": "根據系統設定自動切換"
+    },
+    {
+      "name": "yt_dark_mode_light",
+      "value": "淺色模式"
+    },
+    {
+      "name": "yt_dark_mode_light_subtitle",
+      "value": "始終使用淺色主題"
+    },
+    {
+      "name": "yt_dark_mode_dark",
+      "value": "深色模式"
+    },
+    {
+      "name": "yt_dark_mode_dark_subtitle",
+      "value": "始終使用深色主題"
+    },
+    {
+      "name": "yt_log_title",
+      "value": "日誌"
+    },
+    {
+      "name": "yt_log_enable",
+      "value": "開啟日誌記錄"
+    },
+    {
+      "name": "yt_log_enable_subtitle",
+      "value": "啟動後將擷取應用執行記錄"
+    },
+    {
+      "name": "yt_log_disabled_hint",
+      "value": "日誌記錄未開啟\n在上方打開開關以開始擷取"
+    },
+    {
+      "name": "yt_log_empty",
+      "value": "暫無日誌記錄"
+    },
+    {
+      "name": "internet_reason",
+      "value": "請求網絡數據"
+    },
+    {
+      "name": "reason_background",
+      "value": "保持影片在背景運行"
+    },
+    {
+      "name": "share",
+      "value": "分享"
+    },
+    {
+      "name": "comment",
+      "value": "評論"
+    },
+    {
+      "name": "recommends",
+      "value": "推薦"
+    },
+    {
+      "name": "play_count",
+      "value": "120k"
+    },
+    {
+      "name": "favor_count",
+      "value": "70k"
+    },
+    {
+      "name": "send_barrage",
+      "value": "發送彈幕"
+    },
+    {
+      "name": "video_name0",
+      "value": "@Cat"
+    },
+    {
+      "name": "video_name1",
+      "value": "@Mountaineer"
+    },
+    {
+      "name": "video_name2",
+      "value": "@Nice To Meet You"
+    },
+    {
+      "name": "video_name3",
+      "value": "@Tick"
+    },
+    {
+      "name": "video_name4",
+      "value": "@Faery"
+    },
+    {
+      "name": "video_description0",
+      "value": "#1 #本地影片 #色彩斑斕的世界，生活不只有眼前的苟且，還有詩和遠方"
+    },
+    {
+      "name": "video_description1",
+      "value": "#2 #線上影片 #夢想"
+    },
+    {
+      "name": "video_description3",
+      "value": "#4 #線上影片 #色彩斑斕的世界，生活不只有眼前的苟且，還有詩和遠方"
+    },
+    {
+      "name": "video_description4",
+      "value": "#5 #線上影片 #色彩斑斕的世界，生活不只有眼前的苟且，還有詩和遠方"
+    },
+    {
+      "name": "yt_section_language_region",
+      "value": "語言與地區"
+    },
+    {
+      "name": "yt_section_playback",
+      "value": "播放"
+    },
+    {
+      "name": "yt_section_language",
+      "value": "語言設定"
+    },
+    {
+      "name": "yt_setting_ui_language",
+      "value": "應用 UI 語言"
+    },
+    {
+      "name": "yt_setting_content_language",
+      "value": "內容語言"
+    },
+    {
+      "name": "yt_setting_content_region",
+      "value": "內容地區"
+    },
+    {
+      "name": "yt_section_video",
+      "value": "影片設定"
+    },
+    {
+      "name": "yt_setting_default_quality",
+      "value": "預設影片清晰度"
+    },
+    {
+      "name": "yt_setting_live_quality_cap",
+      "value": "直播清晰度上限"
+    },
+    {
+      "name": "yt_setting_show_high_res",
+      "value": "顯示高解析度（1440p / 4K）"
+    },
+    {
+      "name": "yt_setting_show_high_res_subtitle",
+      "value": "在清晰度選擇器中顯示 4K 選項，效能要求較高"
+    },
+    {
+      "name": "yt_setting_video_codec",
+      "value": "影片編碼格式"
+    },
+    {
+      "name": "yt_section_audio",
+      "value": "音訊設定"
+    },
+    {
+      "name": "yt_setting_audio_quality",
+      "value": "音訊質量上限"
+    },
+    {
+      "name": "yt_section_decoder",
+      "value": "解碼器設定"
+    },
+    {
+      "name": "yt_setting_hwdec_mode",
+      "value": "硬件解碼模式"
+    },
+    {
+      "name": "yt_setting_decoder_fallback",
+      "value": "解碼器回退"
+    },
+    {
+      "name": "yt_setting_decoder_fallback_subtitle",
+      "value": "硬解失敗時自動回退到軟解，避免黑屏"
+    },
+    {
+      "name": "yt_section_buffer",
+      "value": "緩衝策略"
+    },
+    {
+      "name": "yt_setting_readahead",
+      "value": "前向緩衝時長"
+    },
+    {
+      "name": "yt_setting_cache_pause",
+      "value": "緩衝不足恢復等待時長"
+    },
+    {
+      "name": "yt_setting_max_back_bytes",
+      "value": "後向緩衝大小 (向後 Seek 不重拉流)"
+    },
+    {
+      "name": "yt_section_other",
+      "value": "其他"
+    },
+    {
+      "name": "yt_setting_pip",
+      "value": "畫中畫（PiP）"
+    },
+    {
+      "name": "yt_setting_pip_subtitle",
+      "value": "按 Home 鍵時自動進入畫中畫模式"
+    },
+    {
+      "name": "yt_quality_best",
+      "value": "最高畫質"
+    },
+    {
+      "name": "yt_codec_h264_first",
+      "value": "自動（H.264 優先）"
+    },
+    {
+      "name": "yt_codec_force_h264",
+      "value": "強制 H.264"
+    },
+    {
+      "name": "yt_audio_high",
+      "value": "最高（≈256kbps AAC）"
+    },
+    {
+      "name": "yt_audio_medium",
+      "value": "中等（≈128kbps AAC）"
+    },
+    {
+      "name": "yt_audio_low",
+      "value": "省流（≈48kbps）"
+    },
+    {
+      "name": "yt_hwdec_auto",
+      "value": "自動（推薦）"
+    },
+    {
+      "name": "yt_hwdec_auto_safe",
+      "value": "強制硬解"
+    },
+    {
+      "name": "yt_hwdec_no",
+      "value": "僅軟解"
+    },
+    {
+      "name": "yt_recommended_suffix",
+      "value": "（推薦）"
+    },
+    {
+      "name": "yt_unit_seconds",
+      "value": "秒"
+    },
+    {
+      "name": "yt_unit_mb",
+      "value": "MB"
+    },
+    {
+      "name": "yt_placeholder_search",
+      "value": "搜尋..."
+    },
+    {
+      "name": "yt_action_favorite",
+      "value": "收藏"
+    },
+    {
+      "name": "yt_action_unfavorite",
+      "value": "取消收藏"
+    },
+    {
+      "name": "yt_action_subscribe",
+      "value": "訂閱"
+    },
+    {
+      "name": "yt_action_unsubscribe",
+      "value": "取消訂閱"
+    },
+    {
+      "name": "yt_action_share",
+      "value": "分享"
+    },
+    {
+      "name": "yt_action_retry",
+      "value": "重試"
+    },
+    {
+      "name": "yt_action_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "yt_action_confirm",
+      "value": "確定"
+    },
+    {
+      "name": "yt_action_delete",
+      "value": "刪除"
+    },
+    {
+      "name": "yt_action_clear",
+      "value": "清空"
+    },
+    {
+      "name": "yt_action_view_author",
+      "value": "查看作者"
+    },
+    {
+      "name": "yt_action_clear_all",
+      "value": "全部清空"
+    },
+    {
+      "name": "yt_search_youtube",
+      "value": "YouTube搜尋"
+    },
+    {
+      "name": "yt_search_youtube_music",
+      "value": "YouTube Music搜尋"
+    },
+    {
+      "name": "yt_filter_all",
+      "value": "全部"
+    },
+    {
+      "name": "yt_filter_videos",
+      "value": "影片"
+    },
+    {
+      "name": "yt_filter_channels",
+      "value": "頻道"
+    },
+    {
+      "name": "yt_filter_playlists",
+      "value": "播放清單"
+    },
+    {
+      "name": "yt_filter_songs",
+      "value": "歌曲"
+    },
+    {
+      "name": "yt_filter_albums",
+      "value": "專輯"
+    },
+    {
+      "name": "yt_search_history",
+      "value": "搜尋記錄"
+    },
+    {
+      "name": "yt_action_clear_search_history",
+      "value": "清空搜尋記錄"
+    },
+    {
+      "name": "yt_empty_no_search_history",
+      "value": "暫無搜尋記錄"
+    },
+    {
+      "name": "yt_search_no_results",
+      "value": "沒有找到相關內容"
+    },
+    {
+      "name": "yt_error_search_failed",
+      "value": "搜尋失敗，請稍後重試"
+    },
+    {
+      "name": "yt_dialog_delete_search_record",
+      "value": "刪除搜尋記錄"
+    },
+    {
+      "name": "yt_confirm_clear_search_history",
+      "value": "確定要清空所有搜尋記錄嗎？"
+    },
+    {
+      "name": "yt_toast_cleared",
+      "value": "已清空"
+    },
+    {
+      "name": "yt_placeholder_search_content",
+      "value": "搜尋內容"
+    },
+    {
+      "name": "yt_empty_no_content",
+      "value": "暫無內容"
+    },
+    {
+      "name": "yt_video_details",
+      "value": "影片詳情"
+    },
+    {
+      "name": "yt_error_invalid_video",
+      "value": "無有效影片資訊"
+    },
+    {
+      "name": "yt_notice_direct_link_removed",
+      "value": "直鏈功能已移除，後續統一處理。"
+    },
+    {
+      "name": "yt_dialog_select_quality",
+      "value": "選擇清晰度"
+    },
+    {
+      "name": "yt_label_video_track",
+      "value": "影片軌道"
+    },
+    {
+      "name": "yt_warn_high_resolution",
+      "value": "此清晰度超過 1440p，在部分裝置上可能出現效能問題或播放卡頓"
+    },
+    {
+      "name": "yt_label_audio_quality",
+      "value": "音訊質量"
+    },
+    {
+      "name": "yt_player_syncing_buffer",
+      "value": "正在同步雙軌道緩衝..."
+    },
+    {
+      "name": "yt_error_playback_failed",
+      "value": "播放失敗"
+    },
+    {
+      "name": "yt_error_load_video_info",
+      "value": "影片資訊獲取失敗"
+    },
+    {
+      "name": "yt_error_load_video",
+      "value": "影片載入失敗"
+    },
+    {
+      "name": "yt_error_load_exception",
+      "value": "載入發生異常"
+    },
+    {
+      "name": "yt_error_unknown",
+      "value": "未知錯誤"
+    },
+    {
+      "name": "yt_error_invalid_video_id",
+      "value": "無效的影片ID"
+    },
+    {
+      "name": "yt_error_play_error_retry",
+      "value": "播放出錯，請重試"
+    },
+    {
+      "name": "yt_empty_no_comments",
+      "value": "暫無評論"
+    },
+    {
+      "name": "yt_label_pinned",
+      "value": "置頂"
+    },
+    {
+      "name": "yt_error_load_comments",
+      "value": "載入評論失敗"
+    },
+    {
+      "name": "yt_label_reply",
+      "value": "回覆"
+    },
+    {
+      "name": "yt_error_load_replies",
+      "value": "載入回覆失敗"
+    },
+    {
+      "name": "yt_label_like",
+      "value": "讚"
+    },
+    {
+      "name": "yt_tab_videos",
+      "value": "影片"
+    },
+    {
+      "name": "yt_tab_shorts",
+      "value": "短片"
+    },
+    {
+      "name": "yt_tab_live",
+      "value": "直播"
+    },
+    {
+      "name": "yt_tab_about",
+      "value": "關於"
+    },
+    {
+      "name": "yt_empty_no_videos",
+      "value": "暫無影片"
+    },
+    {
+      "name": "yt_empty_no_shorts",
+      "value": "暫無短片"
+    },
+    {
+      "name": "yt_empty_no_live",
+      "value": "暫無直播"
+    },
+    {
+      "name": "yt_channel_info",
+      "value": "頻道資訊"
+    },
+    {
+      "name": "yt_channel_id",
+      "value": "頻道 ID"
+    },
+    {
+      "name": "yt_channel_subscribers",
+      "value": "訂閱數"
+    },
+    {
+      "name": "yt_channel_video_count",
+      "value": "影片數"
+    },
+    {
+      "name": "yt_channel_description",
+      "value": "簡介"
+    },
+    {
+      "name": "yt_error_load_user_videos",
+      "value": "載入用戶影片失敗"
+    },
+    {
+      "name": "yt_error_load_shorts",
+      "value": "載入短片失敗"
+    },
+    {
+      "name": "yt_error_load_live",
+      "value": "載入直播失敗"
+    },
+    {
+      "name": "yt_label_user",
+      "value": "用戶"
+    },
+    {
+      "name": "yt_local_history",
+      "value": "觀看歷史"
+    },
+    {
+      "name": "yt_dialog_clear_history",
+      "value": "清空歷史"
+    },
+    {
+      "name": "yt_confirm_clear_history",
+      "value": "確定要清空全部觀看記錄嗎？"
+    },
+    {
+      "name": "yt_empty_no_history",
+      "value": "暫無觀看記錄"
+    },
+    {
+      "name": "yt_empty_history_hint",
+      "value": "看過的影片會出現在這裡"
+    },
+    {
+      "name": "yt_time_just_now",
+      "value": "剛剛"
+    },
+    {
+      "name": "yt_action_delete_record",
+      "value": "刪除記錄"
+    },
+    {
+      "name": "yt_sub_manage_title",
+      "value": "我訂閱的作者"
+    },
+    {
+      "name": "yt_empty_no_subs",
+      "value": "暫無訂閱用戶"
+    },
+    {
+      "name": "yt_empty_subs_hint",
+      "value": "請在\"訂閱管理\"中添加"
+    },
+    {
+      "name": "yt_empty_subs_hint_alt",
+      "value": "在搜尋頁訂閱感興趣的作者"
+    },
+    {
+      "name": "yt_error_load_subs",
+      "value": "載入訂閱失敗"
+    },
+    {
+      "name": "yt_fav_videos_title",
+      "value": "我收藏的影片"
+    },
+    {
+      "name": "yt_fav_playlists_title",
+      "value": "我收藏的播放清單"
+    },
+    {
+      "name": "yt_empty_no_fav_videos",
+      "value": "暫無收藏的影片"
+    },
+    {
+      "name": "yt_empty_no_fav_playlists",
+      "value": "暫無收藏的播放清單"
+    },
+    {
+      "name": "yt_empty_fav_playlists_hint",
+      "value": "在搜尋頁收藏感興趣的播放清單"
+    },
+    {
+      "name": "yt_empty_playlists_hint",
+      "value": "在搜尋頁收藏感興趣的播放清單"
+    },
+    {
+      "name": "yt_about_current_version",
+      "value": "當前版本"
+    },
+    {
+      "name": "yt_about_description",
+      "value": "基於鴻蒙 HarmonyOS NEXT 的開源 YouTube 客戶端\n無廣告 · 無追蹤 · 完全本地解析"
+    },
+    {
+      "name": "yt_about_qq_group",
+      "value": "QQ 群組"
+    },
+    {
+      "name": "yt_about_tg_group",
+      "value": "Telegram 群組"
+    },
+    {
+      "name": "yt_about_project_info",
+      "value": "專案資訊"
+    },
+    {
+      "name": "yt_about_open_source",
+      "value": "使用的開源項目"
+    },
+    {
+      "name": "yt_about_ai_models",
+      "value": "開發輔助 AI 模型"
+    },
+    {
+      "name": "yt_about_changelog",
+      "value": "更新日誌"
+    },
+    {
+      "name": "yt_error_load_failed",
+      "value": "載入失敗"
+    },
+    {
+      "name": "yt_error_play_failed_title",
+      "value": "播放失敗"
+    },
+    {
+      "name": "yt_label_live",
+      "value": "直播"
+    },
+    {
+      "name": "yt_error_load_playlists",
+      "value": "載入播放清單失敗"
+    },
+    {
+      "name": "yt_error_load_channel_info",
+      "value": "頻道資訊獲取失敗"
+    },
+    {
+      "name": "yt_tab_description",
+      "value": "簡介"
+    },
+    {
+      "name": "yt_tab_comments",
+      "value": "評論"
+    },
+    {
+      "name": "yt_tab_recommended",
+      "value": "推薦"
+    },
+    {
+      "name": "yt_home_search_empty",
+      "value": "自動搜尋無結果，請手動搜尋"
+    },
+    {
+      "name": "yt_home_kiosk_error",
+      "value": "Kiosk 請求失敗，請稍後重試"
+    },
+    {
+      "name": "yt_home_load_error",
+      "value": "主頁載入失敗，請稍後重試"
+    },
+    {
+      "name": "yt_player_mode_progressive",
+      "value": "漸進式 (Progressive)"
+    },
+    {
+      "name": "yt_player_mode_hls",
+      "value": "HLS 串流"
+    },
+    {
+      "name": "yt_player_mode_dash_manifest",
+      "value": "DASH 串流 (Manifest)"
+    },
+    {
+      "name": "yt_player_mode_dash_track",
+      "value": "DASH 軌道 (音視頻分離)"
+    },
+    {
+      "name": "yt_player_default",
+      "value": "預設 (Default)"
+    },
+    {
+      "name": "yt_player_step1_select_mode",
+      "value": "1. 選擇播放模式"
+    },
+    {
+      "name": "yt_player_step2_select_quality",
+      "value": "2. 選擇清晰度"
+    },
+    {
+      "name": "yt_player_video_quality",
+      "value": "影片清晰度"
+    },
+    {
+      "name": "yt_player_step2_select_manifest",
+      "value": "2. 選擇資源清單"
+    },
+    {
+      "name": "yt_player_step2_select_track",
+      "value": "2. 選擇音視頻軌道"
+    },
+    {
+      "name": "yt_player_audio_language_type",
+      "value": "音訊語言 / 類型"
+    },
+    {
+      "name": "yt_log_saved_to_downloads",
+      "value": "已儲存至下載目錄"
+    },
+    {
+      "name": "yt_feed_popular",
+      "value": "熱門"
+    },
+    {
+      "name": "yt_feed_recommended",
+      "value": "推薦"
+    },
+    {
+      "name": "yt_feed_featured",
+      "value": "精選"
+    },
+    {
+      "name": "yt_feed_trending",
+      "value": "趨勢"
+    },
+    {
+      "name": "yt_feed_latest",
+      "value": "最新"
+    },
+    {
+      "name": "yt_feed_topics",
+      "value": "話題"
+    },
+    {
+      "name": "yt_suffix_videos",
+      "value": "影片"
+    },
+    {
+      "name": "yt_suffix_shorts",
+      "value": "短片"
+    },
+    {
+      "name": "yt_suffix_collections",
+      "value": "合集"
+    },
+    {
+      "name": "yt_suffix_live",
+      "value": "直播"
+    },
+    {
+      "name": "yt_suffix_music",
+      "value": "音樂"
+    },
+    {
+      "name": "yt_suffix_movies",
+      "value": "電影"
+    },
+    {
+      "name": "yt_error_no_playable_stream",
+      "value": "未找到可播放的流"
+    },
+    {
+      "name": "yt_error_no_supported_stream",
+      "value": "沒有找到可支援的影片流"
+    },
+    {
+      "name": "new_app_name",
+      "value": "YourPipe"
+    },
+    {
+      "name": "yt_empty_no_playlists",
+      "value": "暫無播放清單"
+    },
+    {
+      "name": "yt_search_results_from",
+      "value": "來自 \"%s\" 的搜尋結果"
+    },
+    {
+      "name": "yt_setting_stream_buffer",
+      "value": "TCP 流緩衝大小"
+    },
+    {
+      "name": "yt_setting_seek_keyframe",
+      "value": "快速跳轉（關鍵幀）"
+    },
+    {
+      "name": "yt_setting_seek_keyframe_subtitle",
+      "value": "跳轉到最近的關鍵幀以加快回應速度"
+    }
+  ]
+}

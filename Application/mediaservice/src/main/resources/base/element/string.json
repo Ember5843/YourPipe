@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "page_show",
+      "value": "page from package"
+    },
+    {
+      "name": "reason_background",
+      "value": "keep video background running"
+    },
+    {
+      "name": "module_desc",
+      "value": "YourPipe media service"
+    }
+  ]
+}

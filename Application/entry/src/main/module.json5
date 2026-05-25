@@ -1,0 +1,87 @@
+{
+  "module": {
+    "name": "entry",
+    "type": "entry",
+    "description": "$string:module_desc",
+    "mainElement": "EntryAbility",
+    "requestPermissions": [
+      {
+        "name": "ohos.permission.INTERNET",
+        //"reason": "In", // 说明权限使用原因（可选，用于向用户解释）
+        "usedScene": {
+          "when": "always" // 权限使用场景，"always" 表示始终需要
+        }
+      },
+      {
+        "name": "ohos.permission.VIBRATE",
+        "usedScene": {
+          "when": "always"
+        }
+      },
+      {
+        "name": "ohos.permission.GET_NETWORK_INFO",
+        "usedScene": {
+          "when": "always"
+        }
+      },
+      {
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING",
+        "reason": "$string:reason_background",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility"
+          ],
+          "when": "always"
+        }
+      }
+    ],
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "abilities": [
+      {
+        "name": "EntryAbility",
+        "srcEntry": "./ets/entryability/EntryAbility.ets",
+        "description": "$string:EntryAbility_desc",
+        "icon": "$media:app_icon",
+        "label": "$string:EntryAbility_label",
+        "startWindowIcon": "$media:app_icon",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": true,
+        "orientation": "auto_rotation_restricted",
+        "backgroundModes": [
+          "audioPlayback"
+        ],
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home"
+            ],
+            "actions": [
+              "ohos.want.action.home"
+            ]
+          }
+        ]
+      }
+    ],
+    "extensionAbilities": [
+      {
+        "name": "EntryBackupAbility",
+        "srcEntry": "./ets/entrybackupability/EntryBackupAbility.ets",
+        "type": "backup",
+        "exported": false,
+        "metadata": [
+          {
+            "name": "ohos.extension.backup",
+            "resource": "$profile:backup_config"
+          }
+        ],
+      }
+    ]
+  }
+}

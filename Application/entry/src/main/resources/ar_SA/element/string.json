@@ -1,0 +1,984 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "label"
+    },
+    {
+      "name": "HOME_EXIT_TOAST",
+      "value": "اضغط مرة أخرى للخروج"
+    },
+    {
+      "name": "LIVING_LEFT_TEXT",
+      "value": "إجمالي "
+    },
+    {
+      "name": "LIVING_RIGHT_TEXT",
+      "value": " تعليقات"
+    },
+    {
+      "name": "LIVING_WRITE",
+      "value": "كتابة تعليق"
+    },
+    {
+      "name": "number_of_viewers",
+      "value": "738,600 مشاهد"
+    },
+    {
+      "name": "store_name",
+      "value": "غرفة البث المباشر الرسمية"
+    },
+    {
+      "name": "yt_tab_home",
+      "value": "الرئيسية"
+    },
+    {
+      "name": "yt_tab_playlists",
+      "value": "قوائم التشغيل"
+    },
+    {
+      "name": "yt_tab_subscriptions",
+      "value": "الاشتراكات"
+    },
+    {
+      "name": "yt_tab_favorites",
+      "value": "المفضلة"
+    },
+    {
+      "name": "yt_tab_local",
+      "value": "محلي"
+    },
+    {
+      "name": "yt_option_title",
+      "value": "الخيارات"
+    },
+    {
+      "name": "yt_option_group_settings",
+      "value": "الإعدادات"
+    },
+    {
+      "name": "yt_option_group_others",
+      "value": "أخرى"
+    },
+    {
+      "name": "yt_option_language",
+      "value": "اللغة"
+    },
+    {
+      "name": "yt_option_color",
+      "value": "اللون"
+    },
+    {
+      "name": "yt_option_color_subtitle",
+      "value": "السمة والألوان المميزة"
+    },
+    {
+      "name": "yt_option_appearance",
+      "value": "المظهر"
+    },
+    {
+      "name": "yt_dark_mode_title",
+      "value": "الوضع الداكن"
+    },
+    {
+      "name": "yt_dark_mode_system",
+      "value": "اتباع النظام"
+    },
+    {
+      "name": "yt_dark_mode_system_subtitle",
+      "value": "التبديل التلقائي وفقًا لإعدادات النظام"
+    },
+    {
+      "name": "yt_dark_mode_light",
+      "value": "السمة الفاتحة"
+    },
+    {
+      "name": "yt_dark_mode_light_subtitle",
+      "value": "استخدام السمة الفاتحة دائمًا"
+    },
+    {
+      "name": "yt_dark_mode_dark",
+      "value": "السمة الداكنة"
+    },
+    {
+      "name": "yt_dark_mode_dark_subtitle",
+      "value": "استخدام السمة الداكنة دائمًا"
+    },
+    {
+      "name": "yt_option_log",
+      "value": "السجلات"
+    },
+    {
+      "name": "yt_option_log_subtitle",
+      "value": "عرض سجلات التشغيل الأخيرة"
+    },
+    {
+      "name": "yt_log_title",
+      "value": "السجلات"
+    },
+    {
+      "name": "yt_log_enable",
+      "value": "تفعيل تسجيل السجلات"
+    },
+    {
+      "name": "yt_log_enable_subtitle",
+      "value": "بعد التشغيل، سيتم التقاط سجلات تشغيل التطبيق"
+    },
+    {
+      "name": "yt_log_disabled_hint",
+      "value": "تسجيل السجلات معطل\nقم بتفعيل المفتاح أعلاه للبدء"
+    },
+    {
+      "name": "yt_log_empty",
+      "value": "لا توجد سجلات"
+    },
+    {
+      "name": "yt_log_session_active",
+      "value": "جارٍ التسجيل"
+    },
+    {
+      "name": "yt_log_session_saved",
+      "value": "تم الحفظ"
+    },
+    {
+      "name": "yt_log_no_sessions",
+      "value": "لا توجد جلسات سجلات"
+    },
+    {
+      "name": "yt_log_delete_all_confirm",
+      "value": "حذف جميع السجلات؟"
+    },
+    {
+      "name": "yt_log_delete_confirm_yes",
+      "value": "حذف"
+    },
+    {
+      "name": "yt_log_delete_confirm_no",
+      "value": "إلغاء"
+    },
+    {
+      "name": "yt_option_about",
+      "value": "حول"
+    },
+    {
+      "name": "yt_option_about_subtitle",
+      "value": "الإصدار والشكر"
+    },
+    {
+      "name": "yt_option_in_development",
+      "value": "قيد التطوير"
+    },
+    {
+      "name": "yt_option_in_development_color",
+      "value": "خيارات سمة اللون ستظهر هنا"
+    },
+    {
+      "name": "yt_lang_follow_system",
+      "value": "اتباع النظام"
+    },
+    {
+      "name": "yt_lang_simplified",
+      "value": "الصينية (المبسطة)"
+    },
+    {
+      "name": "yt_lang_simplified_subtitle",
+      "value": "简体中文"
+    },
+    {
+      "name": "yt_lang_traditional_hk",
+      "value": "الصينية (التقليدية، هونغ كونغ)"
+    },
+    {
+      "name": "yt_lang_traditional_hk_subtitle",
+      "value": "繁體中文（香港）"
+    },
+    {
+      "name": "yt_lang_traditional_tw",
+      "value": "الصينية (التقليدية، تايوان)"
+    },
+    {
+      "name": "yt_lang_traditional_tw_subtitle",
+      "value": "繁體中文（台灣）"
+    },
+    {
+      "name": "yt_lang_english",
+      "value": "الإنجليزية"
+    },
+    {
+      "name": "yt_lang_english_subtitle",
+      "value": "English"
+    },
+    {
+      "name": "internet_reason",
+      "value": "طلب بيانات الشبكة"
+    },
+    {
+      "name": "reason_background",
+      "value": "تشغيل الفيديو في الخلفية"
+    },
+    {
+      "name": "share",
+      "value": "مشاركة"
+    },
+    {
+      "name": "comment",
+      "value": "تعليق"
+    },
+    {
+      "name": "recommends",
+      "value": "التوصيات"
+    },
+    {
+      "name": "play_count",
+      "value": "120 ألف"
+    },
+    {
+      "name": "favor_count",
+      "value": "70 ألف"
+    },
+    {
+      "name": "send_barrage",
+      "value": "دانماكو"
+    },
+    {
+      "name": "video_name0",
+      "value": "@Cat"
+    },
+    {
+      "name": "video_name1",
+      "value": "@Mountaineer"
+    },
+    {
+      "name": "video_name2",
+      "value": "@Nice To Meet You"
+    },
+    {
+      "name": "video_name3",
+      "value": "@Tick"
+    },
+    {
+      "name": "video_name4",
+      "value": "@Faery"
+    },
+    {
+      "name": "video_description0",
+      "value": "#1 #فيديو محلي #عالم مليء بالألوان، الحياة ليست مجرد ما هو أمامنا، بل أيضًا الشعر والبعيد"
+    },
+    {
+      "name": "video_description1",
+      "value": "#2 #فيديو عبر الإنترنت #حلم"
+    },
+    {
+      "name": "video_description3",
+      "value": "#4 #فيديو عبر الإنترنت #عالم مليء بالألوان، الحياة ليست مجرد ما هو أمامنا، بل أيضًا الشعر والبعيد"
+    },
+    {
+      "name": "video_description4",
+      "value": "#5 #فيديو عبر الإنترنت #عالم مليء بالألوان، الحياة ليست مجرد ما هو أمامنا، بل أيضًا الشعر والبعيد"
+    },
+    {
+      "name": "yt_section_language_region",
+      "value": "اللغة والمنطقة"
+    },
+    {
+      "name": "yt_section_playback",
+      "value": "التشغيل"
+    },
+    {
+      "name": "yt_section_language",
+      "value": "إعدادات اللغة"
+    },
+    {
+      "name": "yt_setting_ui_language",
+      "value": "لغة التطبيق"
+    },
+    {
+      "name": "yt_setting_content_language",
+      "value": "لغة المحتوى"
+    },
+    {
+      "name": "yt_setting_content_region",
+      "value": "منطقة المحتوى"
+    },
+    {
+      "name": "yt_section_video",
+      "value": "إعدادات الفيديو"
+    },
+    {
+      "name": "yt_setting_default_quality",
+      "value": "جودة الفيديو الافتراضية"
+    },
+    {
+      "name": "yt_setting_live_quality_cap",
+      "value": "الحد الأقصى لجودة البث المباشر"
+    },
+    {
+      "name": "yt_setting_show_high_res",
+      "value": "عرض الدقة العالية (1440p / 4K)"
+    },
+    {
+      "name": "yt_setting_show_high_res_subtitle",
+      "value": "عرض خيار 4K في محدد الجودة، يتطلب أداءً عاليًا"
+    },
+    {
+      "name": "yt_setting_video_codec",
+      "value": "ترميز الفيديو"
+    },
+    {
+      "name": "yt_section_audio",
+      "value": "إعدادات الصوت"
+    },
+    {
+      "name": "yt_setting_audio_quality",
+      "value": "الحد الأقصى لجودة الصوت"
+    },
+    {
+      "name": "yt_section_decoder",
+      "value": "إعدادات فك التشفير"
+    },
+    {
+      "name": "yt_setting_hwdec_mode",
+      "value": "وضع فك التشفير بالأجهزة"
+    },
+    {
+      "name": "yt_setting_decoder_fallback",
+      "value": "الرجوع إلى فك التشفير البرمجي"
+    },
+    {
+      "name": "yt_setting_decoder_fallback_subtitle",
+      "value": "الرجوع التلقائي إلى فك التشفير البرمجي عند فشل الأجهزة"
+    },
+    {
+      "name": "yt_section_buffer",
+      "value": "استراتيجية التخزين المؤقت"
+    },
+    {
+      "name": "yt_setting_readahead",
+      "value": "مدة التخزين المؤقت المسبق"
+    },
+    {
+      "name": "yt_setting_cache_pause",
+      "value": "وقت الانتظار عند نقص التخزين المؤقت"
+    },
+    {
+      "name": "yt_setting_max_back_bytes",
+      "value": "حجم التخزين المؤقت الخلفي (لا إعادة التحميل عند التراجع)"
+    },
+    {
+      "name": "yt_section_other",
+      "value": "أخرى"
+    },
+    {
+      "name": "yt_setting_pip",
+      "value": "صورة داخل صورة (PiP)"
+    },
+    {
+      "name": "yt_setting_pip_subtitle",
+      "value": "الدخول التلقائي إلى وضع PiP عند الضغط على Home"
+    },
+    {
+      "name": "yt_quality_best",
+      "value": "أفضل جودة"
+    },
+    {
+      "name": "yt_codec_h264_first",
+      "value": "تلقائي (H.264 أولوية)"
+    },
+    {
+      "name": "yt_codec_force_h264",
+      "value": "إجبار H.264"
+    },
+    {
+      "name": "yt_audio_high",
+      "value": "الحد الأقصى (≈256 كيلوبت/ث AAC)"
+    },
+    {
+      "name": "yt_audio_medium",
+      "value": "متوسطة (≈128 كيلوبت/ث AAC)"
+    },
+    {
+      "name": "yt_audio_low",
+      "value": "توفير البيانات (≈48 كيلوبت/ث)"
+    },
+    {
+      "name": "yt_hwdec_auto",
+      "value": "تلقائي (موصى به)"
+    },
+    {
+      "name": "yt_hwdec_auto_safe",
+      "value": "إجبار الأجهزة"
+    },
+    {
+      "name": "yt_hwdec_no",
+      "value": "برمجي فقط"
+    },
+    {
+      "name": "yt_recommended_suffix",
+      "value": " (موصى به)"
+    },
+    {
+      "name": "yt_unit_seconds",
+      "value": "ثانية"
+    },
+    {
+      "name": "yt_unit_mb",
+      "value": "ميغابايت"
+    },
+    {
+      "name": "yt_placeholder_search",
+      "value": "بحث..."
+    },
+    {
+      "name": "yt_action_favorite",
+      "value": "إضافة إلى المفضلة"
+    },
+    {
+      "name": "yt_action_unfavorite",
+      "value": "إزالة من المفضلة"
+    },
+    {
+      "name": "yt_action_subscribe",
+      "value": "اشتراك"
+    },
+    {
+      "name": "yt_action_unsubscribe",
+      "value": "إلغاء الاشتراك"
+    },
+    {
+      "name": "yt_action_share",
+      "value": "مشاركة"
+    },
+    {
+      "name": "yt_action_retry",
+      "value": "إعادة المحاولة"
+    },
+    {
+      "name": "yt_action_cancel",
+      "value": "إلغاء"
+    },
+    {
+      "name": "yt_action_confirm",
+      "value": "تأكيد"
+    },
+    {
+      "name": "yt_action_delete",
+      "value": "حذف"
+    },
+    {
+      "name": "yt_action_clear",
+      "value": "مسح"
+    },
+    {
+      "name": "yt_action_view_author",
+      "value": "عرض المؤلف"
+    },
+    {
+      "name": "yt_action_clear_all",
+      "value": "مسح الكل"
+    },
+    {
+      "name": "yt_search_youtube",
+      "value": "البحث في YouTube"
+    },
+    {
+      "name": "yt_search_youtube_music",
+      "value": "البحث في YouTube Music"
+    },
+    {
+      "name": "yt_filter_all",
+      "value": "الكل"
+    },
+    {
+      "name": "yt_filter_videos",
+      "value": "فيديوهات"
+    },
+    {
+      "name": "yt_filter_channels",
+      "value": "قنوات"
+    },
+    {
+      "name": "yt_filter_playlists",
+      "value": "قوائم"
+    },
+    {
+      "name": "yt_filter_songs",
+      "value": "أغاني"
+    },
+    {
+      "name": "yt_filter_albums",
+      "value": "ألبومات"
+    },
+    {
+      "name": "yt_search_history",
+      "value": "سجل البحث"
+    },
+    {
+      "name": "yt_action_clear_search_history",
+      "value": "مسح سجل البحث"
+    },
+    {
+      "name": "yt_empty_no_search_history",
+      "value": "لا يوجد سجل بحث"
+    },
+    {
+      "name": "yt_search_no_results",
+      "value": "لم يتم العثور على نتائج"
+    },
+    {
+      "name": "yt_error_search_failed",
+      "value": "فشل البحث، يرجى المحاولة لاحقًا"
+    },
+    {
+      "name": "yt_dialog_delete_search_record",
+      "value": "حذف سجل البحث"
+    },
+    {
+      "name": "yt_confirm_clear_search_history",
+      "value": "هل تريد مسح كل سجل البحث؟"
+    },
+    {
+      "name": "yt_toast_cleared",
+      "value": "تم المسح"
+    },
+    {
+      "name": "yt_placeholder_search_content",
+      "value": "البحث عن محتوى"
+    },
+    {
+      "name": "yt_empty_no_content",
+      "value": "لا يوجد محتوى"
+    },
+    {
+      "name": "yt_video_details",
+      "value": "تفاصيل الفيديو"
+    },
+    {
+      "name": "yt_error_invalid_video",
+      "value": "لا توجد معلومات فيديو صالحة"
+    },
+    {
+      "name": "yt_notice_direct_link_removed",
+      "value": "تمت إزالة ميزة الرابط المباشر، سيتم المعالجة بشكل موحد لاحقًا."
+    },
+    {
+      "name": "yt_dialog_select_quality",
+      "value": "اختيار الجودة"
+    },
+    {
+      "name": "yt_label_video_track",
+      "value": "مسار الفيديو"
+    },
+    {
+      "name": "yt_warn_high_resolution",
+      "value": "هذه الدقة تتجاوز 1440p، قد تسبب مشاكل في الأداء على بعض الأجهزة"
+    },
+    {
+      "name": "yt_label_audio_quality",
+      "value": "جودة الصوت"
+    },
+    {
+      "name": "yt_player_syncing_buffer",
+      "value": "جارٍ مزامنة التخزين المؤقت المزدوج..."
+    },
+    {
+      "name": "yt_error_playback_failed",
+      "value": "فشل التشغيل"
+    },
+    {
+      "name": "yt_error_load_video_info",
+      "value": "فشل في الحصول على معلومات الفيديو"
+    },
+    {
+      "name": "yt_error_load_video",
+      "value": "فشل في تحميل الفيديو"
+    },
+    {
+      "name": "yt_error_load_exception",
+      "value": "حدث خطأ أثناء التحميل"
+    },
+    {
+      "name": "yt_error_unknown",
+      "value": "خطأ غير معروف"
+    },
+    {
+      "name": "yt_error_invalid_video_id",
+      "value": "معرف الفيديو غير صالح"
+    },
+    {
+      "name": "yt_error_play_error_retry",
+      "value": "خطأ في التشغيل، يرجى إعادة المحاولة"
+    },
+    {
+      "name": "yt_empty_no_comments",
+      "value": "لا توجد تعليقات"
+    },
+    {
+      "name": "yt_label_pinned",
+      "value": "مثبت"
+    },
+    {
+      "name": "yt_error_load_comments",
+      "value": "فشل في تحميل التعليقات"
+    },
+    {
+      "name": "yt_label_reply",
+      "value": "رد"
+    },
+    {
+      "name": "yt_error_load_replies",
+      "value": "فشل في تحميل الردود"
+    },
+    {
+      "name": "yt_label_like",
+      "value": "إعجاب"
+    },
+    {
+      "name": "yt_tab_videos",
+      "value": "فيديوهات"
+    },
+    {
+      "name": "yt_tab_shorts",
+      "value": "Shorts"
+    },
+    {
+      "name": "yt_tab_live",
+      "value": "بث مباشر"
+    },
+    {
+      "name": "yt_tab_about",
+      "value": "حول"
+    },
+    {
+      "name": "yt_empty_no_videos",
+      "value": "لا توجد فيديوهات"
+    },
+    {
+      "name": "yt_empty_no_shorts",
+      "value": "لا يوجد Shorts"
+    },
+    {
+      "name": "yt_empty_no_live",
+      "value": "لا توجد بثوث مباشرة"
+    },
+    {
+      "name": "yt_channel_info",
+      "value": "معلومات القناة"
+    },
+    {
+      "name": "yt_channel_id",
+      "value": "معرف القناة"
+    },
+    {
+      "name": "yt_channel_subscribers",
+      "value": "المشتركون"
+    },
+    {
+      "name": "yt_channel_video_count",
+      "value": "عدد الفيديوهات"
+    },
+    {
+      "name": "yt_channel_description",
+      "value": "الوصف"
+    },
+    {
+      "name": "yt_error_load_user_videos",
+      "value": "فشل في تحميل فيديوهات المستخدم"
+    },
+    {
+      "name": "yt_error_load_shorts",
+      "value": "فشل في تحميل Shorts"
+    },
+    {
+      "name": "yt_error_load_live",
+      "value": "فشل في تحميل البثوث المباشرة"
+    },
+    {
+      "name": "yt_label_user",
+      "value": "المستخدم"
+    },
+    {
+      "name": "yt_local_history",
+      "value": "سجل المشاهدة"
+    },
+    {
+      "name": "yt_dialog_clear_history",
+      "value": "مسح السجل"
+    },
+    {
+      "name": "yt_confirm_clear_history",
+      "value": "هل تريد مسح كل سجل المشاهدة؟"
+    },
+    {
+      "name": "yt_empty_no_history",
+      "value": "لا يوجد سجل مشاهدة"
+    },
+    {
+      "name": "yt_empty_history_hint",
+      "value": "ستظهر الفيديوهات المشاهدة هنا"
+    },
+    {
+      "name": "yt_time_just_now",
+      "value": "الآن"
+    },
+    {
+      "name": "yt_action_delete_record",
+      "value": "حذف السجل"
+    },
+    {
+      "name": "yt_sub_manage_title",
+      "value": "اشتراكاتي"
+    },
+    {
+      "name": "yt_empty_no_subs",
+      "value": "لا توجد اشتراكات"
+    },
+    {
+      "name": "yt_empty_subs_hint",
+      "value": "يرجى الإضافة في \"إدارة الاشتراكات\""
+    },
+    {
+      "name": "yt_empty_subs_hint_alt",
+      "value": "اشترك بمؤلفين مثيرين للاهتمام في صفحة البحث"
+    },
+    {
+      "name": "yt_error_load_subs",
+      "value": "فشل في تحميل الاشتراكات"
+    },
+    {
+      "name": "yt_fav_videos_title",
+      "value": "فيديوهاتي المفضلة"
+    },
+    {
+      "name": "yt_fav_playlists_title",
+      "value": "قوائمي المفضلة"
+    },
+    {
+      "name": "yt_empty_no_fav_videos",
+      "value": "لا توجد فيديوهات مفضلة"
+    },
+    {
+      "name": "yt_empty_no_fav_playlists",
+      "value": "لا توجد قوائم مفضلة"
+    },
+    {
+      "name": "yt_empty_fav_playlists_hint",
+      "value": "أضف قوائم إلى المفضلة من صفحة البحث"
+    },
+    {
+      "name": "yt_empty_playlists_hint",
+      "value": "أضف قوائم إلى المفضلة من صفحة البحث"
+    },
+    {
+      "name": "yt_about_current_version",
+      "value": "الإصدار الحالي"
+    },
+    {
+      "name": "yt_about_description",
+      "value": "عميل YouTube مفتوح المصدر基于 HarmonyOS NEXT\nبدون إعلانات · بدون تتبع · تحليل محلي بالكامل"
+    },
+    {
+      "name": "yt_about_qq_group",
+      "value": "مجموعة QQ"
+    },
+    {
+      "name": "yt_about_tg_group",
+      "value": "مجموعة Telegram"
+    },
+    {
+      "name": "yt_about_project_info",
+      "value": "معلومات المشروع"
+    },
+    {
+      "name": "yt_about_open_source",
+      "value": "المشاريع مفتوحة المصدر المستخدمة"
+    },
+    {
+      "name": "yt_about_ai_models",
+      "value": "نماذج الذكاء الاصطناعي للتطوير"
+    },
+    {
+      "name": "yt_about_changelog",
+      "value": "سجل التغييرات"
+    },
+    {
+      "name": "yt_error_load_failed",
+      "value": "فشل التحميل"
+    },
+    {
+      "name": "yt_error_play_failed_title",
+      "value": "فشل التشغيل"
+    },
+    {
+      "name": "yt_label_live",
+      "value": "مباشر"
+    },
+    {
+      "name": "yt_error_load_playlists",
+      "value": "فشل في تحميل القوائم"
+    },
+    {
+      "name": "yt_error_load_channel_info",
+      "value": "فشل في الحصول على معلومات القناة"
+    },
+    {
+      "name": "yt_tab_description",
+      "value": "الوصف"
+    },
+    {
+      "name": "yt_tab_comments",
+      "value": "التعليقات"
+    },
+    {
+      "name": "yt_tab_recommended",
+      "value": "موصى به"
+    },
+    {
+      "name": "yt_home_search_empty",
+      "value": "البحث التلقائي لم ينتج نتائج، يرجى البحث يدويًا"
+    },
+    {
+      "name": "yt_home_kiosk_error",
+      "value": "فشل طلب Kiosk، يرجى المحاولة لاحقًا"
+    },
+    {
+      "name": "yt_home_load_error",
+      "value": "فشل تحميل الصفحة الرئيسية، يرجى المحاولة لاحقًا"
+    },
+    {
+      "name": "yt_player_mode_progressive",
+      "value": "تدريجي"
+    },
+    {
+      "name": "yt_player_mode_hls",
+      "value": "بث HLS"
+    },
+    {
+      "name": "yt_player_mode_dash_manifest",
+      "value": "بث DASH (Manifest)"
+    },
+    {
+      "name": "yt_player_mode_dash_track",
+      "value": "مسارات DASH (فصل الصوت/الفيديو)"
+    },
+    {
+      "name": "yt_player_default",
+      "value": "افتراضي (Default)"
+    },
+    {
+      "name": "yt_player_step1_select_mode",
+      "value": "1. اختر وضع التشغيل"
+    },
+    {
+      "name": "yt_player_step2_select_quality",
+      "value": "2. اختر الجودة"
+    },
+    {
+      "name": "yt_player_video_quality",
+      "value": "جودة الفيديو"
+    },
+    {
+      "name": "yt_player_step2_select_manifest",
+      "value": "2. اختر البيان"
+    },
+    {
+      "name": "yt_player_step2_select_track",
+      "value": "2. اختر المسار"
+    },
+    {
+      "name": "yt_player_audio_language_type",
+      "value": "لغة الصوت / النوع"
+    },
+    {
+      "name": "yt_log_saved_to_downloads",
+      "value": "تم الحفظ في مجلد التنزيلات"
+    },
+    {
+      "name": "yt_feed_popular",
+      "value": "شائع"
+    },
+    {
+      "name": "yt_feed_recommended",
+      "value": "موصى به"
+    },
+    {
+      "name": "yt_feed_featured",
+      "value": "مميز"
+    },
+    {
+      "name": "yt_feed_trending",
+      "value": "الأكثر تداولًا"
+    },
+    {
+      "name": "yt_feed_latest",
+      "value": "الأحدث"
+    },
+    {
+      "name": "yt_feed_topics",
+      "value": "المواضيع"
+    },
+    {
+      "name": "yt_suffix_videos",
+      "value": "فيديوهات"
+    },
+    {
+      "name": "yt_suffix_shorts",
+      "value": "Shorts"
+    },
+    {
+      "name": "yt_suffix_collections",
+      "value": "مجموعات"
+    },
+    {
+      "name": "yt_suffix_live",
+      "value": "بثوث مباشرة"
+    },
+    {
+      "name": "yt_suffix_music",
+      "value": "موسيقى"
+    },
+    {
+      "name": "yt_suffix_movies",
+      "value": "أفلام"
+    },
+    {
+      "name": "yt_error_no_playable_stream",
+      "value": "لم يتم العثور على بثوث قابلة للتشغيل"
+    },
+    {
+      "name": "yt_error_no_supported_stream",
+      "value": "لم يتم العثور على بثوث فيديو مدعومة"
+    },
+    {
+      "name": "new_app_name",
+      "value": "YourPipe"
+    },
+    {
+      "name": "yt_empty_no_playlists",
+      "value": "لا توجد قوائم تشغيل"
+    },
+    {
+      "name": "yt_search_results_from",
+      "value": "نتائج البحث عن \"%s\""
+    },
+    {
+      "name": "yt_setting_stream_buffer",
+      "value": "TCP Stream Buffer"
+    },
+    {
+      "name": "yt_setting_seek_keyframe",
+      "value": "Fast Seek (Keyframe)"
+    },
+    {
+      "name": "yt_setting_seek_keyframe_subtitle",
+      "value": "Jump to nearest keyframe for faster seek response"
+    }
+  ]
+}

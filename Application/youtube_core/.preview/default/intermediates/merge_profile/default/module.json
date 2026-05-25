@@ -1,0 +1,29 @@
+{
+	"app": {
+		"bundleName": "com.example.yourtube",
+		"debug": true,
+		"versionCode": 1000000,
+		"versionName": "1.0.0",
+		"minAPIVersion": 60000020,
+		"targetAPIVersion": 60002022,
+		"apiReleaseType": "Release",
+		"targetMinorAPIVersion": 0,
+		"targetPatchAPIVersion": 0,
+		"compileSdkVersion": "6.0.2.130",
+		"compileSdkType": "HarmonyOS",
+		"appEnvironments": [],
+		"bundleType": "app",
+		"buildMode": "debug"
+	},
+	"module": {
+		"name": "youtube_core",
+		"type": "har",
+		"deviceTypes": [
+			"default",
+			"tablet",
+			"2in1"
+		],
+		"packageName": "youtube_core",
+		"installationFree": false
+	}
+}

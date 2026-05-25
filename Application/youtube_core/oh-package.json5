@@ -1,0 +1,11 @@
+{
+  "name": "youtube_core",
+  "version": "1.0.0",
+  "description": "YouTube Core API and Extractor library",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "libyoutubecore.so": "file:./src/main/cpp/types/libyoutubecore"
+  }
+}

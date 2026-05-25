@@ -1,0 +1,242 @@
+import { YTCoreLogger } from './YTCoreLogger';
+
+const logger = YTCoreLogger.getInstance('YoutubeParsingHelper');
+
+/**
+ * Fix thumbnail URL: ensure https:// prefix and handle // shorthand.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.fixThumbnailUrl
+ */
+export function fixThumbnailUrl(url: string | undefined): string {
+  if (!url) {
+    return '';
+  }
+  let fixed = url;
+  if (fixed.startsWith('//')) {
+    fixed = 'https:' + fixed;
+  } else if (fixed.startsWith('http://')) {
+    fixed = fixed.replace('http://', 'https://');
+  }
+  return fixed;
+}
+
+/**
+ * Extract text from a JSON object that may contain simpleText or runs.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.getTextFromObject
+ */
+export function getTextFromObject(obj: Record<string, Object> | undefined, returnHtml: boolean = false): string {
+  if (!obj) {
+    return '';
+  }
+  if (obj.simpleText) {
+    return obj.simpleText as string;
+  }
+  if (obj.runs && Array.isArray(obj.runs)) {
+    if (returnHtml) {
+      // HTML mode: preserve formatting from navigationEndpoint if present
+      return (obj.runs as Record<string, Object>[]).map((run: Record<string, Object>): string => {
+        let text = run.text as string || '';
+        const navEndpoint = run.navigationEndpoint as Record<string, Object>;
+        if (navEndpoint) {
+          const cmdMeta = navEndpoint.commandMetadata as Record<string, Object>;
+          if (cmdMeta) {
+            const webCmdMeta = cmdMeta.webCommandMetadata as Record<string, Object>;
+            if (webCmdMeta) {
+              const url = webCmdMeta.url as string;
+              if (url) {
+                text = `<a href="${url}">${text}</a>`;
+              }
+            }
+          }
+        }
+        return text;
+      }).join('');
+    }
+    return (obj.runs as Record<string, Object>[]).map((run: Record<string, Object>): string => run.text as string || '').join('');
+  }
+  return '';
+}
+
+/**
+ * Parse duration string in HH:MM:SS or MM:SS format.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.parseDurationString
+ */
+export function parseDurationString(text: string): number {
+  if (!text) {
+    return 0;
+  }
+  const parts = text.split(':').map(p => parseInt(p.trim(), 10) || 0);
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+  return parts[0] || 0;
+}
+
+/**
+ * Generate a Content Playback Nonce (CPN).
+ * YouTube uses a 16-character base64url-like string.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.generateContentPlaybackNonce
+ */
+export function generateContentPlaybackNonce(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let result = '';
+  for (let i = 0; i < 16; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Generate a random t-parameter for InnerTube requests.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.generateTParameter
+ */
+export function generateTParameter(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 12; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Validate JSON response body from HTTP response.
+ * Throws if response is HTML error page or non-200.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.getValidJsonResponseBody
+ */
+export interface JsonResponse {
+  responseCode: number;
+  result: string | ArrayBuffer;
+}
+
+function arrayBufferToString(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let result = '';
+  for (let i = 0; i < bytes.length; i++) {
+    result += String.fromCharCode(bytes[i]);
+  }
+  return result;
+}
+
+export function getValidJsonResponseBody(response: JsonResponse): string {
+  if (response.responseCode !== 200) {
+    throw new Error(`HTTP ${response.responseCode}`);
+  }
+  const body = typeof response.result === 'string'
+    ? response.result
+    : arrayBufferToString(response.result as ArrayBuffer);
+  if (body.trim().startsWith('<')) {
+    throw new Error('Response is HTML, not JSON');
+  }
+  return body;
+}
+
+/**
+ * Check for default alerts in InnerTube response and throw if error.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.defaultAlertsCheck
+ */
+export function defaultAlertsCheck(response: Record<string, Object>): void {
+  const alerts = response.alerts as Array<Record<string, Object>>;
+  if (!alerts || !Array.isArray(alerts)) {
+    return;
+  }
+  for (const alert of alerts) {
+    const alertObj = alert as Record<string, Object>;
+    const alertRenderer = alertObj.alertRenderer || alertObj.alertModelRenderer;
+    if (alertRenderer) {
+      const rendererObj = alertRenderer as Record<string, Object>;
+      const text = getTextFromObject(rendererObj.text as Record<string, Object>);
+      const type = rendererObj.type as string;
+      if (type === 'ERROR') {
+        throw new Error(`InnerTube alert: ${text}`);
+      }
+    }
+  }
+}
+
+/**
+ * Check if a channel is verified from badges array.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.isVerified
+ */
+export function isVerified(badges: Array<Record<string, Object>>): boolean {
+  if (!badges || !Array.isArray(badges)) {
+    return false;
+  }
+  return badges.some((badge: Record<string, Object>): boolean => {
+    const renderer = badge.metadataBadgeRenderer as Record<string, Object>;
+    if (!renderer) return false;
+    const style = renderer.style as string || '';
+    return style.includes('VERIFIED');
+  });
+}
+
+/**
+ * Extract a value from a nested JSON object by dot-separated path.
+ */
+export function getNestedValue(obj: Object, path: string): Object | null {
+  const keys = path.split('.');
+  let current: Object = obj;
+  for (const key of keys) {
+    if (current && typeof current === 'object') {
+      const currentRecord = current as Record<string, Object>;
+      const next = currentRecord[key];
+      if (next !== undefined && next !== null) {
+        current = next;
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+  return current;
+}
+
+/**
+ * Parse a number string that may contain K/M/B suffixes or commas.
+ */
+export function parseMixedNumber(text: string | undefined): number {
+  if (!text) return 0;
+  const cleanText = text.replace(/,/g, '').match(/(\d+(\.\d+)?)\s*([KMBkmb]?)/);
+  if (!cleanText) return 0;
+
+  let value = parseFloat(cleanText[1]);
+  const unit = cleanText[3].toLowerCase();
+
+  let multiplier = 1;
+  if (unit === 'k') multiplier = 1000;
+  else if (unit === 'm') multiplier = 1000000;
+  else if (unit === 'b') multiplier = 1000000000;
+
+  return Math.floor(value * multiplier);
+}
+
+/**
+ * Parse subscriber count text (e.g. "1.2M subscribers").
+ * Ported from org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
+ */
+export function parseSubscriberCount(text: string | undefined): number {
+  if (!text) return -1;
+  const m = text.match(/([\d,.]+)\s*([KMBkmb]?)/);
+  if (!m) return -1;
+  const num = parseFloat(m[1].replace(/,/g, ''));
+  const suffix = m[2].toUpperCase();
+  if (suffix === 'K') return Math.round(num * 1000);
+  if (suffix === 'M') return Math.round(num * 1000000);
+  if (suffix === 'B') return Math.round(num * 1000000000);
+  return Math.round(num);
+}
+
+/**
+ * Parse duration text in HH:MM:SS or MM:SS format.
+ * Ported from org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
+ */
+export function parseDurationText(text: string | undefined): number {
+  if (!text) return 0;
+  const parts = text.split(':').map(p => parseInt(p) || 0);
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] || 0;
+}
