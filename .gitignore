@@ -1,6 +1,6 @@
 # HarmonyOS
-/node_modules
-/oh_modules
+**/node_modules
+**/oh_modules
 /local.properties
 /.idea
 **/build
@@ -10,11 +10,9 @@
 /.clang-format
 /.clang-tidy
 **/.test
-.DS_Store
 
-# CloudProgram
-CloudProgram/node_modules
-CloudProgram/build
+# Claude Code
+.claude/
 
 # OS
 .DS_Store

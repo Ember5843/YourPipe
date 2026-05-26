@@ -985,6 +985,9 @@ export class YouTubeExtractor {
    * Mirrors PipePipe exactly: unlogged → Android only, logged in (cookie) → Safari only.
    */
   private async fetchInnertubePlayer(html: string, videoId: string): Promise<InnertubePlayerResult> {
+    // 必须先准备 player.js,后续所有 sig/n 解密(包括本函数内的 getLatestPlayer)都依赖这一步
+    await YoutubeJavaScriptPlayerManager.ensurePlayer(html, this.client);
+
     const htmlVisitorData = this.parseYtcfgValue(html, 'VISITOR_DATA');
     const androidVisitor = await this.getAndroidVisitorData();
     const visitorData = androidVisitor || htmlVisitorData;
