@@ -8,3 +8,5 @@ export { NativePlaybackEngine, PlaybackState } from './src/main/ets/engine/Nativ
 export { PlayerModel, StreamCategories, CurrentStreams } from './src/main/ets/model/PlayerModel';
 export { VideoData, StreamInfo, SelectOption, SubtitleTrackInfo } from './src/main/ets/model/VideoData';
 export { BackgroundTaskManager } from './src/main/ets/common/BackgroundTaskManager';
+export { PlayerState, isValidTransition, describeState } from './src/main/ets/state/PlayerState';
+export { PlayerStateMachine, StateChangeListener } from './src/main/ets/state/PlayerStateMachine';

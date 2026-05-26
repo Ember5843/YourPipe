@@ -19,7 +19,7 @@ import { DownloadManager, DownloadTask } from '../common/DownloadManager';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
 import { AppLogStore } from '../common/AppLogStore';
 import { VideoSearchResult } from '../features/home/SearchService';
-import { LocalMediaProxy } from 'mediaservice';
+import { LocalMediaProxy, PlayerState } from 'mediaservice';
 import { KioskPageResult } from '../features/home/HomeFeedService';
 import { ChannelInfoService } from '../features/user/ChannelInfoService';
 import { VideoCard } from '../common/components/VideoCard';
@@ -200,7 +200,6 @@ struct Index {
   // 视频播放器状态
   @State isPlayerFullLandscapeScreen: boolean = false;
   @State isRepliesOpen: boolean = false;
-  private isPipRestoring: boolean = false;
 
   // 语言与地区选项数据
   @State private appLangItems: LanguagePickerItem[] = [];
@@ -552,8 +551,9 @@ struct Index {
       const topIndex = this.navPathStack.size() - 1;
       if (playerIndex.length > 0 && playerIndex[0] === topIndex) {
         const session = PlayerSession.getInstance();
-        const alreadyInPip = session.pipController?.curState === 'STARTED' ||
-                             session.pipController?.curState === 'ABOUT_TO_START';
+        const state = session.playerState;
+        const alreadyInPip = state === PlayerState.PIP_ACTIVE
+          || state === PlayerState.PIP_ENTERING;
         if (!alreadyInPip) {
           this.ensurePlayerSessionPipRestore();
           try {
@@ -628,12 +628,17 @@ struct Index {
   private ensurePlayerSessionPipRestore(): void {
     const session = PlayerSession.getInstance();
     session.onPipRestore = () => {
-      if (this.isPipRestoring) {
+      const state = session.playerState;
+      if (state === PlayerState.PIP_RESTORING) {
         logger.info('PiP restore already in progress, skipping duplicate');
         return;
       }
-      this.isPipRestoring = true;
-      session.isRestoringFromPip = true;
+
+      const stateMachine = session.controller.getPlayerStateMachine();
+      if (!stateMachine.transition(PlayerState.PIP_RESTORING)) {
+        logger.info(`PiP restore skipped: cannot transition from ${state}`);
+        return;
+      }
 
       const playerIndices = this.navPathStack.getIndexByName('PlayerPage');
       const topIndex = this.navPathStack.size() - 1;
@@ -646,9 +651,11 @@ struct Index {
         this.navPathStack.pushPath({ name: 'PlayerPage' });
       }
 
+      // 等待页面重建完成后，恢复状态并重建 PiP controller
       setTimeout(() => {
-        this.isPipRestoring = false;
-        session.isRestoringFromPip = false;
+        if (session.playerState === PlayerState.PIP_RESTORING) {
+          stateMachine.transition(PlayerState.PLAYING);
+        }
         session.recreatePipControllerIfNeeded();
       }, 600);
     };
@@ -871,8 +878,8 @@ struct Index {
 
   private async openVideoDetail(video: VideoItem): Promise<void> {
     const session = PlayerSession.getInstance();
-    const pipActive = session.pipController?.curState === 'STARTED' ||
-                      session.pipController?.curState === 'ABOUT_TO_START';
+    const state = session.playerState;
+    const pipActive = state === PlayerState.PIP_ACTIVE || state === PlayerState.PIP_ENTERING;
 
     if (pipActive) {
       if (session.currentVideo?.videoId === video.videoId) {

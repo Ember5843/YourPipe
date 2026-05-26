@@ -8,6 +8,7 @@ import { PlayerModel, StreamCategories, CurrentStreams } from '../model/PlayerMo
 import { NativePlaybackEngine, PlaybackState } from '../engine/NativePlaybackEngine';
 import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
+import { PlayerStateMachine, PlayerState, StateChangeListener } from '../state/PlayerStateMachine';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 
@@ -52,6 +53,7 @@ export class AvPlayerController {
   private curSource: VideoData;
   private nativeEngine: NativePlaybackEngine = new NativePlaybackEngine();
   private avSessionManager: AvSessionManager = AvSessionManager.getInstance();
+  private stateMachine: PlayerStateMachine = new PlayerStateMachine();
 
   private isPlayingListeners: ((isPlaying: boolean) => void)[] = [];
   private isBufferingListeners: ((isBuffering: boolean) => void)[] = [];
@@ -62,8 +64,6 @@ export class AvPlayerController {
   private isSeekingListeners: ((isSeeking: boolean) => void)[] = [];
   private isEndedListeners: (() => void)[] = [];
 
-  private destroyed: boolean = false;
-  private engineInitialized: boolean = false;
   private currentLocalMediaSessionId: string = '';
   private pendingStartFromSec: number = 0;
   private lastUpdateTimestamp: number = 0;
@@ -75,6 +75,27 @@ export class AvPlayerController {
   private lastKnownGoodPosition: number = 0;
   public onRequestRefreshStreams?: (videoId: string, resumePos: number) => Promise<VideoData | null>;
   public onErrorNeedsUserAction?: (errorMsg: string) => void;
+
+  get playerState(): PlayerState {
+    return this.stateMachine.currentState;
+  }
+
+  getPlayerStateMachine(): PlayerStateMachine {
+    return this.stateMachine;
+  }
+
+  addStateListener(listener: StateChangeListener): void {
+    this.stateMachine.addListener(listener);
+  }
+
+  removeStateListener(listener: StateChangeListener): void {
+    this.stateMachine.removeListener(listener);
+  }
+
+  isActive(): boolean {
+    return this.stateMachine.currentState !== PlayerState.RELEASED
+      && this.stateMachine.currentState !== PlayerState.IDLE;
+  }
 
   constructor(curSource: VideoData) {
     this.curSource = curSource;
@@ -117,8 +138,15 @@ export class AvPlayerController {
   }
 
   public async initAVPlayer(): Promise<void> {
-    if (this.destroyed || this.engineInitialized) return;
-    Logger.debug(TAG, 'initAVPlayer (NativePlaybackEngine/AVPlayer)');
+    if (!this.stateMachine.transition(PlayerState.INITIALIZING)) {
+      if (this.stateMachine.isOneOf(PlayerState.INITIALIZING, PlayerState.LOADING, PlayerState.READY,
+        PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.PIP_ACTIVE)) {
+        Logger.debug(TAG, 'initAVPlayer skipped: engine already initialized');
+        return;
+      }
+      Logger.warn(TAG, `initAVPlayer skipped: invalid state ${this.stateMachine.currentState}`);
+      return;
+    }
 
     await this.avSessionManager.init();
     this.avSessionManager.onPlayCommand = () => {
@@ -162,6 +190,7 @@ export class AvPlayerController {
 
     const ok = await this.nativeEngine.initialize({});
     if (ok) {
+      this.stateMachine.forceTransition(PlayerState.INITIALIZING);
       this.nativeEngine.setStateCallback((state: PlaybackState) => this.onPlaybackStateChange(state));
       this.nativeEngine.setSubtitleCallback((text: string, _startTime: number, _duration: number) => {
         this.subtitleText = text;
@@ -170,11 +199,13 @@ export class AvPlayerController {
         this.nativeEngine.attachSurface(this.surfaceID);
       }
     }
-    this.engineInitialized = ok;
+    if (!ok) {
+      this.stateMachine.transition(PlayerState.ERROR);
+    }
   }
 
   public async updateVideoSource(newSource: VideoData): Promise<void> {
-    if (this.destroyed) return;
+    if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
     const now = Date.now();
     if (now - this.lastUpdateTimestamp < 500) {
       Logger.warn(TAG, 'updateVideoSource ignored duplicate call');
@@ -213,7 +244,9 @@ export class AvPlayerController {
     }
 
     await this.initAVPlayer();
-    if (!this.engineInitialized || this.destroyed) return;
+    if (this.stateMachine.isOneOf(PlayerState.RELEASED, PlayerState.IDLE)) return;
+
+    this.stateMachine.forceTransition(PlayerState.LOADING);
 
     // Live streams: use HLS manifest URL directly, skip local proxy
     if (newSource.isLive && newSource.hlsUrl) {
@@ -263,7 +296,7 @@ export class AvPlayerController {
   }
 
   public async switchQuality(videoStream: StreamInfo, audioStream?: StreamInfo): Promise<void> {
-    if (this.destroyed || !videoStream) return;
+    if (!this.isActive() || !videoStream) return;
     const wasPlaying = this.isPlaying;
     const resumePos = this.currentTime;
     const effectiveAudio = this.isSeparatedDash(videoStream, audioStream) ? this.ensureCompatibleAudio(videoStream, audioStream) : undefined;
@@ -285,24 +318,24 @@ export class AvPlayerController {
   }
 
   public setPlaybackSpeed(speed: number): void {
-    if (this.destroyed || speed <= 0) return;
+    if (!this.isActive() || speed <= 0) return;
     this.playbackSpeed = speed;
     this.nativeEngine.setPlaybackSpeed(speed);
   }
 
   public resizeSurface(widthPx: number, heightPx: number): void {
-    if (!this.destroyed) this.nativeEngine.resizeSurface(widthPx, heightPx);
+    if (this.isActive()) this.nativeEngine.resizeSurface(widthPx, heightPx);
   }
 
   public setSurfaceID(surfaceID: string): void {
-    if (this.destroyed) return;
+    if (!this.isActive()) return;
     if (surfaceID === this.surfaceID) return;
     this.surfaceID = surfaceID;
     this.nativeEngine.attachSurface(surfaceID);
   }
 
   public syncPlay(): void {
-    if (this.destroyed) return;
+    if (!this.isActive()) return;
     if (this.isEnded) {
       this.nativeEngine.seek(0, true);
       this.isEnded = false;
@@ -311,27 +344,27 @@ export class AvPlayerController {
   }
 
   public syncPause(): void {
-    if (!this.destroyed) this.nativeEngine.pause();
+    if (this.isActive()) this.nativeEngine.pause();
   }
 
   public syncStop(): void {
-    if (!this.destroyed) this.nativeEngine.stop();
+    if (this.isActive()) this.nativeEngine.stop();
   }
 
   public syncSeek(seekTime: number): void {
-    if (!this.destroyed) this.nativeEngine.seek(seekTime / 1000, false);
+    if (this.isActive()) this.nativeEngine.seek(seekTime / 1000, false);
   }
 
   public syncSeekFast(seekTime: number): void {
-    if (!this.destroyed) this.nativeEngine.seek(seekTime / 1000, true);
+    if (this.isActive()) this.nativeEngine.seek(seekTime / 1000, true);
   }
 
   public syncSeekExact(seekTime: number): void {
-    if (!this.destroyed) this.nativeEngine.seek(seekTime / 1000, false);
+    if (this.isActive()) this.nativeEngine.seek(seekTime / 1000, false);
   }
 
   public setVideoOutputEnabled(enabled: boolean): void {
-    if (!this.destroyed) this.nativeEngine.setVideoOutputEnabled(enabled);
+    if (this.isActive()) this.nativeEngine.setVideoOutputEnabled(enabled);
   }
 
   public async checkCastState(): Promise<void> {
@@ -339,8 +372,8 @@ export class AvPlayerController {
   }
 
   public releaseVideo(_index: number): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
+    if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
+    this.stateMachine.forceTransition(PlayerState.RELEASED);
     Logger.debug(TAG, 'releaseVideo: destroy AVPlayer engine and LocalMediaProxy session');
     this.nativeEngine.destroy();
     this.destroyCurrentLocalSession();
@@ -709,7 +742,7 @@ export class AvPlayerController {
   }
 
   private onPlaybackStateChange(state: PlaybackState): void {
-    if (this.destroyed) return;
+    if (!this.isActive()) return;
     const playingChanged = this.isPlaying !== state.isPlaying;
     const bufferingChanged = this.isBuffering !== state.isBuffering;
     const readyChanged = this.isReady !== state.isReady;
@@ -722,7 +755,6 @@ export class AvPlayerController {
       this.errorRetryCount = 0;
     }
 
-    // 在错误覆盖 currentTime 之前，保存最后已知的有效播放位置
     if (state.currentTime > 0) {
       this.lastKnownGoodPosition = state.currentTime;
     } else if (this.currentTime > 0 && state.errorMsg) {
@@ -743,8 +775,24 @@ export class AvPlayerController {
     this.cachedPercent = state.bufferingPercent;
     this.errorMsg = state.errorMsg;
 
-    // 当引擎首次解析出真实时长后，重新推送 AVMetadata，
-    // 使系统播控中心能够显示进度条、播放时间和快进快退按钮。
+    // 状态机同步：引擎状态 → 应用层状态
+    if (readyChanged && state.isReady && this.stateMachine.isOneOf(PlayerState.LOADING)) {
+      this.stateMachine.transition(PlayerState.READY);
+    }
+    if (endedChanged && state.isEnded) {
+      this.stateMachine.transition(PlayerState.COMPLETED);
+    }
+    if (bufferingChanged && state.isBuffering && this.stateMachine.isOneOf(PlayerState.PLAYING, PlayerState.READY)) {
+      this.stateMachine.forceTransition(PlayerState.BUFFERING);
+    }
+    if (playingChanged && state.isPlaying && !state.isBuffering
+      && this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.PIP_RESTORING)) {
+      this.stateMachine.transition(PlayerState.PLAYING);
+    }
+    if (errorChanged && state.errorMsg && this.stateMachine.isOneOf(PlayerState.LOADING, PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING)) {
+      this.stateMachine.transition(PlayerState.ERROR);
+    }
+
     if (prevDuration === 0 && this.durationTime > 0) {
       this.updateAvSessionMetadata();
     }
@@ -801,7 +849,7 @@ export class AvPlayerController {
   }
 
   private async handlePlaybackError(state: PlaybackState): Promise<void> {
-    if (this.destroyed || this.isRecovering) return;
+    if (!this.isActive() || this.isRecovering) return;
     const category = state.errorCategory || 'unknown';
     // 使用 lastKnownGoodPosition 而非 this.currentTime，
     // 因为 error 回调中 player.reset() 会将 currentTime 清零
@@ -814,7 +862,7 @@ export class AvPlayerController {
       this.errorRetryCount++;
       try {
         await this.sleep(800);
-        if (this.destroyed) return;
+        if (!this.isActive()) return;
         if (category === 'url_expired') {
           await this.refreshAndReplay(resumePos);
         } else if (this.errorRetryCount > 1) {

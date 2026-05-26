@@ -31,7 +31,7 @@ import { CommentList } from './components/CommentList';
 import { CommentReplyPage } from './components/CommentReplyPage';
 import { CommentNavWrapper } from './components/CommentNavWrapper';
 import { WatchHistoryStore } from '../../common/WatchHistoryStore';
-import { AvPlayerController } from 'mediaservice';
+import { AvPlayerController, PlayerState } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
 
 const logger = AppLog.getInstance('PlayerPage');
@@ -225,7 +225,7 @@ export struct VideoPlayerPage {
 
     // PiP 恢复期间：session 仍在播放，只需同步 controller 引用，不触发 play
     if (session.isRestoringFromPip) {
-      logger.info(`${TAG} onVideoChange skipped: PiP restore in progress`);
+      logger.info(`${TAG} onVideoChange skipped: PiP restore in progress (state=${session.playerState})`);
       this.controller = session.controller;
       if (session.cachedVideoSource) {
         this.videoSource = session.cachedVideoSource;
@@ -282,14 +282,11 @@ export struct VideoPlayerPage {
     this.isPageShow = true;
 
     const session = PlayerSession.getInstance();
-    // 如果 PiP 还在运行或正在恢复，说明视频仍在播放，不需要重载
-    const pipActive = session.pipController?.curState === 'STARTED' ||
-                      session.pipController?.curState === 'ABOUT_TO_START' ||
-                      session.pipController?.curState === 'ABOUT_TO_RESTORE';
+    const pipActive = session.playerState === PlayerState.PIP_ACTIVE
+      || session.playerState === PlayerState.PIP_ENTERING
+      || session.playerState === PlayerState.PIP_RESTORING;
 
     if (session.isReleased && this.video && !pipActive) {
-      // PiP 被用户关闭后，如果用户从其他页面返回到播放页，
-      // session 已被释放，需要重新加载视频以避免黑屏。
       logger.info(`${TAG} Session was released while hidden, reloading video`);
       this.onVideoChange();
     }

@@ -17,7 +17,7 @@ import { componentUtils } from '@kit.ArkUI';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
-import { AvPlayerController, VideoData, StreamInfo } from 'mediaservice';
+import { AvPlayerController, VideoData, StreamInfo, PlayerState } from 'mediaservice';
 import { ResolutionDialog } from './ResolutionDialog';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
@@ -314,9 +314,9 @@ export struct VideoPlayer {
 
   onPageVisibilityChange(): void {
     const session = PlayerSession.getInstance();
-    const pipActive = session.pipController?.curState === 'STARTED' ||
-                      session.pipController?.curState === 'ABOUT_TO_START';
+    const state = session.playerState;
 
+    const pipActive = state === PlayerState.PIP_ACTIVE || state === PlayerState.PIP_ENTERING;
     const isVisible = this.isPageShow && !this.isAppBackground;
 
     if (!isVisible && !pipActive) {
@@ -327,7 +327,7 @@ export struct VideoPlayer {
         session.invalidatePipController();
       }
 
-      if (!session.pipController && !session.isReleased) {
+      if (!session.pipController && session.playerState !== PlayerState.RELEASED) {
         session.attachSurface(this.xComponentController).catch(() => {});
       }
 
