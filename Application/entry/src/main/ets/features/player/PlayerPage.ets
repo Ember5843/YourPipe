@@ -74,7 +74,6 @@ export struct VideoPlayerPage {
   @State videoDescriptionError: string | null = null;
   @State isRetrying: boolean = false;
   @State isLoading: boolean = false;
-  @State isManualRotated: boolean = false;
   private windowUtil: WindowUtil = WindowUtil.getInstance();
   /** 当前播放视频的 videoId，用于历史记录 */
   private watchVideoId: string = '';
@@ -82,10 +81,20 @@ export struct VideoPlayerPage {
   private watchSaveTimerId: number = -1;
 
   private getVideoHeightVp(): number {
+    // 宽布局（折叠屏展开/平板横屏）或全屏 → 撑满
+    if (this.isWideLayout || this.isFullLandscapeScreen) {
+      return this.getUIContext().px2vp(Math.max(this.deviceWidth, this.deviceHeight));
+    }
     const shortSide = Math.min(this.deviceWidth, this.deviceHeight);
-    const aspectRatio = this.videoSource.width && this.videoSource.height
-      ? this.videoSource.width / this.videoSource.height : Const.ASPECT;
-    return this.getUIContext().px2vp(shortSide / aspectRatio);
+    const maxHeight = this.getUIContext().px2vp(Math.max(this.deviceWidth, this.deviceHeight) * 0.45);
+    // 视频尺寸已知时，按实际比例计算容器高度
+    if (this.videoSource.width && this.videoSource.height) {
+      const aspectRatio = this.videoSource.width / this.videoSource.height;
+      const rawHeight = this.getUIContext().px2vp(shortSide / aspectRatio);
+      return Math.max(200, Math.min(maxHeight, rawHeight));
+    }
+    // 视频尺寸未知时（加载中），使用适中的占位高度
+    return 250;
   }
 
   /**
@@ -172,6 +181,7 @@ export struct VideoPlayerPage {
         if (!result.success || !result.videoInfo) {
           return null;
         }
+        const refreshVideoStream = result.videoInfo.streams?.find((s) => s.hasVideo && s.width && s.height);
         const refreshed: VideoData = {
           name: this.videoSource.name,
           description: result.videoInfo.title || '',
@@ -187,8 +197,8 @@ export struct VideoPlayerPage {
           play: true,
           videoId: videoId,
           index: this.videoSource.index,
-          width: result.videoInfo.streams?.[0]?.width || 1280,
-          height: result.videoInfo.streams?.[0]?.height || 720,
+          width: refreshVideoStream?.width || 0,
+          height: refreshVideoStream?.height || 0,
           error: undefined,
           streams: result.playerStreams ?? [],
           subtitleTracks: result.subtitleTracks ?? [],
@@ -356,6 +366,8 @@ export struct VideoPlayerPage {
         this.isWideLayout = true;
       }
     });
+    // 退出全屏：解除方向锁，交还给系统（受系统旋转锁开关控制）
+    this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
     this.notifyFullScreenChange();
   }
 
@@ -420,7 +432,7 @@ export struct VideoPlayerPage {
       }
     }
     .width('100%')
-    .aspectRatio(16 / 9)
+    .height('100%')
     .backgroundColor(Color.Black)
     .transition(TransitionEffect.OPACITY.animation({ duration: 300, curve: Curve.EaseInOut }))
   }
@@ -483,26 +495,25 @@ export struct VideoPlayerPage {
       VideoPlayer({
         controller: $controller,
         isFullLandscapeScreen: this.isFullLandscapeScreen,
-        onFullScreenClick: (isLandscape?: boolean) => {
-          if (isLandscape) {
-            this.isImmersive = true;
-            this.windowUtil.disableWindowSystemBar();
-            animateTo({ duration: 300, curve: Curve.EaseInOut }, () => {
-              this.isManualFullscreen = true;
-              this.isWideLayout = false;
-              this.isFullLandscapeScreen = true;
-            });
-          } else {
+        onFullScreenClick: () => {
+          // Toggle guard: 当前已是全屏 → 退出
+          if (this.isFullLandscapeScreen) {
             this.handleFullScreenExit();
+            return;
           }
-        },
-        onRotateClick: () => {
-          if (this.isManualRotated) {
-            this.windowUtil.setMainWindowOrientation(window.Orientation.PORTRAIT);
-          } else {
-            this.windowUtil.setMainWindowOrientation(window.Orientation.LANDSCAPE);
-          }
-          this.isManualRotated = !this.isManualRotated;
+          // 根据视频内容决定全屏方向并锁定
+          const isLandscapeVideo = this.videoSource.width && this.videoSource.height
+            && this.videoSource.width > this.videoSource.height;
+          this.windowUtil.setMainWindowOrientation(
+            isLandscapeVideo ? window.Orientation.LANDSCAPE : window.Orientation.PORTRAIT
+          );
+          this.isImmersive = true;
+          this.windowUtil.disableWindowSystemBar();
+          animateTo({ duration: 300, curve: Curve.EaseInOut }, () => {
+            this.isManualFullscreen = true;
+            this.isWideLayout = false;
+            this.isFullLandscapeScreen = true;
+          });
         },
         onRetry: () => {
           this.retryLoadVideo();
@@ -534,7 +545,7 @@ export struct VideoPlayerPage {
           .height(this.isFullLandscapeScreen ? Const.HEIGHT_FULL_PERCENT :
             this.isWideLayout ? Const.HEIGHT_FULL_PERCENT :
             this.getVideoHeightVp())
-          .animation(null)
+          .animation({ duration: 300, curve: Curve.EaseInOut })
 
           this.InfoPanel()
         }

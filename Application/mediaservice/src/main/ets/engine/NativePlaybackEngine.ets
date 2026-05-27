@@ -374,6 +374,13 @@ export class NativePlaybackEngine {
         return;
       }
 
+      // prepared 之后设置 videoScaleType。SCALED_ASPECT = 保持原始比例，短边留黑边。
+      try {
+        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_SCALED_ASPECT;
+      } catch (_e) {
+        // 部分设备可能不支持，忽略
+      }
+
       if (startMs > 0 && !this.isLive) {
         this.seek(startMs / 1000, false);
       } else if (this.playWhenPrepared && !this.pendingSeekBeforePlay) {

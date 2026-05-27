@@ -196,7 +196,6 @@ export struct VideoPlayer {
   private panStartTime: number = 0;
 
   onFullScreenClick: (isLandscape?: boolean) => void = () => {};
-  onRotateClick: () => void = () => {};
   /** 当播放器内部发生不可恢复错误时，通知父组件重新获取流信息 */
   onRetry: () => void = () => {};
 
@@ -581,8 +580,9 @@ export struct VideoPlayer {
             this.controller.resizeSurface(pxWidth, pxHeight);
           }
         })
-        // aspectRatio 保持视频比例，外层容器高度变化驱动全屏膨胀
-        .aspectRatio(this.curSource.width && this.curSource.height ? this.curSource.width / this.curSource.height : 16 / 9)
+        // 撑满父容器，由 AVPlayer 的 VIDEO_SCALE_TYPE_SCALED_ASPECT 负责等比缩放+留黑边
+        .width('100%')
+        .height('100%')
         .zIndex(CommonConstants.Z_INDEX_BASE)
 
       // 加载中/缓冲提示层（包括双轨道缓存等待）
@@ -880,15 +880,8 @@ export struct VideoPlayer {
 
       Blank()
 
-      // 右侧操作栏 (旋转 + 字幕 + 清晰度 + 播放速度)
+      // 右侧操作栏 (字幕 + 清晰度 + 播放速度)
       Row({ space: 20 }) {
-        // 旋转按钮：手动切换屏幕方向（竖屏↔横屏）
-        SymbolGlyph($r('sys.symbol.rotate_left'))
-          .width(24)
-          .height(24)
-          .fontColor([Color.White])
-          .onClick(() => { this.onRotateClick?.(); })
-
         // 清晰度图标（直播时隐藏）
         if (!this.curSource.isLive) {
           SymbolGlyph($r('sys.symbol.resolution_video'))

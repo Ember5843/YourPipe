@@ -62,8 +62,8 @@ export class PipWindowController {
           context: this.context!,
           componentController: this.xComponentController!,
           templateType: PiPWindow.PiPTemplateType.VIDEO_PLAY,
-          contentWidth: contentWidth || 1280,
-          contentHeight: contentHeight || 720,
+          contentWidth: contentWidth || 0,
+          contentHeight: contentHeight || 0,
         };
         this.pipController = await PiPWindow.create(config);
       } catch (e) {

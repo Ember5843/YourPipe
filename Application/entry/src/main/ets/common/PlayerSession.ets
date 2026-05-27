@@ -189,8 +189,8 @@ export class PlayerSession {
   private async setupPipController(xComponentController: XComponentController): Promise<void> {
     this._pipController = new PipWindowController(xComponentController);
     const delegate = new SessionPipDelegate(this._controller);
-    const pipW = this._defaultSource.width || 1280;
-    const pipH = this._defaultSource.height || 720;
+    const pipW = this._defaultSource.width || 0;
+    const pipH = this._defaultSource.height || 0;
     await this._pipController.createPipController(delegate, pipW, pipH);
 
     // READY 后启用 PiP autoStart
@@ -277,6 +277,7 @@ export class PlayerSession {
       }
 
       if (result.success && result.videoInfo) {
+        const videoStream = result.videoInfo.streams?.find((s) => s.hasVideo && s.width && s.height);
         const videoSource: VideoData = {
           name: this._defaultSource.name,
           description: result.videoInfo.title || '',
@@ -291,8 +292,8 @@ export class PlayerSession {
           videoDescription: result.videoInfo.description || '',
           play: true,
           index: 0,
-          width: result.videoInfo.streams?.[0]?.width || 1280,
-          height: result.videoInfo.streams?.[0]?.height || 720,
+          width: videoStream?.width || 0,
+          height: videoStream?.height || 0,
           error: undefined,
           streams: result.playerStreams ?? [],
           subtitleTracks: result.subtitleTracks ?? [],
@@ -311,9 +312,9 @@ export class PlayerSession {
         this._watchVideoId = videoId;
         this._controller.updateVideoSource(videoSource);
 
-        const videoWidth = result.videoInfo.streams?.[0]?.width || 1280;
-        const videoHeight = result.videoInfo.streams?.[0]?.height || 720;
-        this._pipController?.updatePipContentSize(videoWidth, videoHeight);
+        if (videoStream && videoStream.width && videoStream.height) {
+          this._pipController?.updatePipContentSize(videoStream.width, videoStream.height);
+        }
 
         const resumeSec: number = WatchHistoryStore.getProgress(videoId);
         if (resumeSec > 0) {
