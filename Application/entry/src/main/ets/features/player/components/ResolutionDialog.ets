@@ -466,13 +466,6 @@ export struct ResolutionDialog {
         result.push({ id: id, label: label });
       }
     }
-    if (result.length <= 1) {
-      // 调试：打印每条音频流的 audioTrackId/audioTrackName/audioLanguage
-      const details = streams.map((s: StreamInfo, i: number) =>
-        `[${i}] itag=${s.itag} trackId="${s.audioTrackId}" name="${s.audioTrackName}" lang="${s.audioLanguage}"`
-      ).join(' | ');
-      console.info(`[ResolutionDialog] audioTracks=${result.length} streams=${streams.length}: ${details}`);
-    }
     return result;
   }
 
