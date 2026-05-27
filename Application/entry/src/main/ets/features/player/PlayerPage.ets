@@ -93,8 +93,9 @@ export struct VideoPlayerPage {
       const rawHeight = this.getUIContext().px2vp(shortSide / aspectRatio);
       return Math.max(200, Math.min(maxHeight, rawHeight));
     }
-    // 视频尺寸未知时（加载中），使用适中的占位高度
-    return 250;
+    // 视频尺寸未知时（加载中），按 16:9 预占高度（最常见比例）
+    const defaultHeight = this.getUIContext().px2vp(shortSide / (16 / 9));
+    return Math.max(200, Math.min(maxHeight, defaultHeight));
   }
 
   /**
