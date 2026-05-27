@@ -43,7 +43,12 @@ function getStringResultFromRegexArray(input: string, regexArray: string[], grou
   return '';
 }
 
+let cachedClientVersion: string | null = null;
+
 async function getClientVersion(localization: Localization): Promise<string> {
+  if (cachedClientVersion && cachedClientVersion.length > 0) {
+    return cachedClientVersion;
+  }
   const url: string = "https://www.youtube.com/sw.js";
   const urlList = ["https://www.youtube.com"];
   const referrerHeaders = {
@@ -57,7 +62,8 @@ async function getClientVersion(localization: Localization): Promise<string> {
     REGEX_PATTERNS['INNERTUBE_CONTEXT_CLIENT_VERSION_REGEXES'],
     1
   );
-  return clientVersion === '' ? "2.20251212.01.00" : clientVersion;
+  cachedClientVersion = clientVersion === '' ? "2.20251212.01.00" : clientVersion;
+  return cachedClientVersion;
 }
 
 async function getClientInfoHeaders(localization: Localization): Promise<Record<string, string[]>> {

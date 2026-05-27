@@ -111,7 +111,9 @@ export struct VideoDetails {
           '#CCCCCC'
         );
       } else {
-        this.fetchChannelInfo();
+        // 延迟加载频道信息，避免与视频提取竞争带宽
+        // 频道信息仅在详情 Tab 中展示，非首屏关键路径
+        setTimeout(() => { this.fetchChannelInfo(); }, 1500);
       }
     }
     this.classifyStreamsForDownload();

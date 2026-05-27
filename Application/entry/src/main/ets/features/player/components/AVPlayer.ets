@@ -874,7 +874,7 @@ export struct VideoPlayer {
         .height(24)
         .fontColor([Color.White])
         .onClick(() => {
-          this.controller.releaseVideo(0);
+          PlayerSession.getInstance().release();
           this.actionHub.closePage();
         })
 

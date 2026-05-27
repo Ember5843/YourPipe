@@ -67,6 +67,12 @@ export interface InnertubePlayerResult {
   webEmbedCpn: string | undefined;
 }
 
+/** Cached manifest n-decryption result */
+interface ManifestNDecodeResult {
+  original: string;
+  decoded: string;
+}
+
 /**
  * Android visitor ID request context
  */
@@ -594,6 +600,7 @@ export class YouTubeExtractor {
   private cachedVideoStreams: StreamInfo[] = [];
   private cachedVideoOnlyStreams: StreamInfo[] = [];
   private streamsCachedVideoId: string = '';
+  private cachedManifestNResult: ManifestNDecodeResult | null = null;
 
   // Multi-client streaming data cache (aligned with PipePipe)
   private safariStreamingData: StreamingData | undefined;
@@ -615,6 +622,8 @@ export class YouTubeExtractor {
     if (this.streamsCachedVideoId === videoId && this.cachedAudioStreams.length + this.cachedVideoOnlyStreams.length > 0) {
       return;
     }
+
+    this.cachedManifestNResult = null;
 
     const innertubePlayers = await this.fetchInnertubePlayer(html, videoId);
 
@@ -776,6 +785,10 @@ export class YouTubeExtractor {
     // 先提取元数据（确保即使后续流程失败，元数据也已就绪）
     const videoInfo = this.extractMetadata(videoId, watchPlayerResponse);
 
+    // 提前启动非关键请求：next 端点 + RYD 点踩数，与流提取并行
+    const nextPromise = this.fetchNextResponse(videoId);
+    const dislikePromise = this.fetchDislikeCount(videoId);
+
     // Extract streams using ensureStreamsAreCached() pattern (multi-client, batch deobfuscation)
     await this.ensureStreamsAreCached(videoId, html, watchPlayerResponse);
     videoInfo.streams = [
@@ -794,11 +807,8 @@ export class YouTubeExtractor {
       videoInfo.dashMpdUrl = await this.deobfuscateManifestUrl(dashRaw);
     }
 
-    // 并发：next 端点 + RYD 点踩数
-    const settledResults = await Promise.allSettled([
-      this.fetchNextResponse(videoId),
-      this.fetchDislikeCount(videoId),
-    ]);
+    // 等待提前启动的非关键请求完成
+    const settledResults = await Promise.allSettled([nextPromise, dislikePromise]);
     const nextResult = settledResults[0];
     const rydResult = settledResults[1];
 
@@ -1824,7 +1834,13 @@ export class YouTubeExtractor {
       }
     }
 
-    logger.info(`[DEOBF] total=${itagInfoList.length} uniqueSigs=${uniqueSigs.size} uniqueNs=${uniqueNs.size}`);
+    // 同时收集 manifest URL 的 n 参数，避免后续单独调用 decodeBatch
+    const manifestN = this.collectManifestNParams();
+    if (manifestN) {
+      uniqueNs.add(manifestN);
+    }
+
+    logger.info(`[DEOBF] total=${itagInfoList.length} uniqueSigs=${uniqueSigs.size} uniqueNs=${uniqueNs.size} manifestN=${manifestN ? 'present' : 'none'}`);
 
     if (uniqueSigs.size === 0 && uniqueNs.size === 0) {
       logger.info('[DEOBF] no sig/n to deobfuscate, all URLs are direct');
@@ -1876,9 +1892,26 @@ export class YouTubeExtractor {
         logger.debug(`[DEOBF] #${info.streamIndex} sigApplied=${sigApplied} nApplied=${nApplied} finalUrl=${updatedUrl.substring(0, 120)}`);
         itagInfo.setContent(updatedUrl);
       }
+
+      // 保存 manifest n 解密结果，供 deobfuscateManifestUrl 复用
+      if (manifestN && result.n[manifestN]) {
+        const decoded: string = result.n[manifestN]!;
+        this.cachedManifestNResult = { original: manifestN, decoded: decoded } as ManifestNDecodeResult;
+      }
     } catch (e) {
       logger.warn('batchDeobfuscateItagUrls failed:', e);
     }
+  }
+
+  /** 收集 streaming data 中 manifest URL 的 n 参数（路径格式 /n/XXXXX），统一到批量解密 */
+  private collectManifestNParams(): string | undefined {
+    const hlsUrl = this.getHlsManifestUrlFromStreamingData();
+    const dashUrl = this.getDashManifestUrlFromStreamingData();
+    const url = hlsUrl || dashUrl;
+    if (!url) return undefined;
+    // manifest URL 的 n 参数在路径中：/n/XXXXX，与 itag URL 的 n=XXXXX 格式不同
+    const matcher = /\/n\/([^/]+)/.exec(url);
+    return matcher ? matcher[1] : undefined;
   }
 
   private getThrottlingParamFromUrl(url: string): string | undefined {
@@ -2020,6 +2053,13 @@ export class YouTubeExtractor {
     const matcher = /\/n\/([^/]+)/.exec(manifestUrl);
     if (matcher) {
       const encryptedN = matcher[1];
+
+      // 优先使用批量解密时已缓存的结果
+      if (this.cachedManifestNResult && this.cachedManifestNResult.original === encryptedN) {
+        return manifestUrl.replace('/n/' + encryptedN, '/n/' + this.cachedManifestNResult.decoded);
+      }
+
+      // 未命中缓存（极少见：manifest n 与 itag n 完全无交集），单独请求
       try {
         const result = await YoutubeJavaScriptPlayerManager.deobfuscateBatch(
           [], [encryptedN]

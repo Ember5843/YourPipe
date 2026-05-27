@@ -659,6 +659,16 @@ struct Index {
         session.recreatePipControllerIfNeeded();
       }, 600);
     };
+
+    // PiP 窗口被用户关闭（非 restore）时，清理 NavStack 中的 PlayerPage
+    // 避免返回后显示已销毁的死页面
+    session.onSessionReleased = () => {
+      const playerIndices = this.navPathStack.getIndexByName('PlayerPage');
+      if (playerIndices.length > 0) {
+        logger.info('PiP closed: removing dead PlayerPage from nav stack');
+        this.navPathStack.removeByIndexes(playerIndices);
+      }
+    };
   }
 
   private isSubscribed(channelId: string): boolean {
@@ -914,14 +924,37 @@ struct Index {
     }
   }
 
-  private openUserPage(channel: SearchChannelItem): void {
+  /** 如果当前 PlayerPage 在栈顶且正在播放，先进入 PiP 再导航离开 */
+  private async maybeEnterPipBeforeNavigate(): Promise<void> {
+    const playerIndices = this.navPathStack.getIndexByName('PlayerPage');
+    const topIndex = this.navPathStack.size() - 1;
+    if (playerIndices.length === 0 || playerIndices[0] !== topIndex) {
+      return;
+    }
+    const session = PlayerSession.getInstance();
+    const alreadyInPip = session.playerState === PlayerState.PIP_ACTIVE
+      || session.playerState === PlayerState.PIP_ENTERING;
+    if (alreadyInPip || !session.controller.isReady || session.isReleased) {
+      return;
+    }
+    this.ensurePlayerSessionPipRestore();
+    try {
+      await session.enterPip();
+    } catch (_e) {
+      // PiP 失败不影响导航
+    }
+  }
+
+  private async openUserPage(channel: SearchChannelItem): Promise<void> {
     this.showOptions = false;
+    await this.maybeEnterPipBeforeNavigate();
     this.selectedChannel = channel;
     this.navPathStack.pushPath({ name: 'UserPage' });
   }
 
   private async openChannelById(channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string): Promise<void> {
     this.showOptions = false;
+    await this.maybeEnterPipBeforeNavigate();
     // 只创建基本的频道对象，只填写ID和名称，其他信息由UserPage后期填充
     const channel = new SearchChannelItem(0, channelId, channelName, '', '', channelAvatarUrl, '', '#CCCCCC', channelHandle);
     

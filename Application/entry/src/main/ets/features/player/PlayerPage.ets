@@ -227,6 +227,12 @@ export struct VideoPlayerPage {
     this.windowUtil.registerOffWindowSizeChange();
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN);
     this.controller.onCastStateChange = undefined;
+
+    // 防御性清理：如果 session 已释放（X 按钮关闭），确保 PiP 不会残留
+    const session = PlayerSession.getInstance();
+    if (session.isReleased || session.playerState === PlayerState.IDLE) {
+      session.invalidatePipController();
+    }
   }
 
   private async onVideoChange(): Promise<void> {

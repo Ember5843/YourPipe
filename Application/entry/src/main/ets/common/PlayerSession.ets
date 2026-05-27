@@ -75,6 +75,8 @@ export class PlayerSession {
 
   /** PIP 恢复时由外部（Index.ets）设置的回调 */
   onPipRestore?: () => void;
+  /** PlayerSession 被 release 销毁时由外部（Index.ets）设置的回调，用于清理 NavStack */
+  onSessionReleased?: () => void;
 
   static getInstance(): PlayerSession {
     if (!PlayerSession.instance) {
@@ -218,6 +220,7 @@ export class PlayerSession {
         this._controller.syncPause();
       } else {
         logger.info(`${TAG} onPipStop while foreground → releasing session`);
+        this.onSessionReleased?.();
         this.release();
       }
     };
