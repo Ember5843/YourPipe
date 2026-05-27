@@ -331,8 +331,11 @@ export struct VideoPlayer {
         session.attachSurface(this.xComponentController).catch(() => {});
       }
 
-      Logger.info(TAG, 'Page shown and App foreground → restore video output');
-      this.controller.setVideoOutputEnabled(true);
+      Logger.info(TAG, 'Page shown and App foreground → restore playback');
+      // 不调用 setVideoOutputEnabled（会触发 setMediaMuted 在未就绪时崩溃），直接恢复播放
+      if (this.isReady && !this.isPlaying) {
+        this.controller.syncPlay();
+      }
 
       try {
         const surfaceId = this.xComponentController.getXComponentSurfaceId();
@@ -398,8 +401,10 @@ export struct VideoPlayer {
     this.envService.subscribeScreenEvents(
       () => { /* screen off — globally disabled */ },
       () => {
-        Logger.info(TAG, 'Screen on → enable video output');
-        this.controller.setVideoOutputEnabled(true);
+        Logger.info(TAG, 'Screen on → restore playback');
+        if (this.isReady && !this.isPlaying) {
+          this.controller.syncPlay();
+        }
       }
     );
   }

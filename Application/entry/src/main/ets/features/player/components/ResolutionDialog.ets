@@ -33,6 +33,11 @@ enum PlaybackType {
   DASH_TRACKS = 'DASH_TRACKS'
 }
 
+interface AudioTrackEntry {
+  id: string;
+  label: string;
+}
+
 @CustomDialog
 export struct ResolutionDialog {
   controller: CustomDialogController;
@@ -49,12 +54,15 @@ export struct ResolutionDialog {
   @State selectedDashVideo: string = '';
   @State selectedDashAudio: string = '';
   @State selectedAudioTrack: ResourceStr = '';
+  // 当前选中的音轨 ID（用于过滤音频质量选项，对齐 PipePipe 的 audioTrackId 分组逻辑）
+  private selectedAudioTrackId: string = '';
   @State showHighResWarning: boolean = false;
   @State selectedDashVideoHeight: number = 0;
 
   // 辅助变量：存储当前可用的音轨语言列表
   @State audioTrackOptions: SelectOption[] = [];
   @State filteredAudioStreams: StreamInfo[] = [];
+  @State audioTrackList: AudioTrackEntry[] = [];
 
   // 传入的数据
   streamCategories?: StreamCategories;
@@ -89,6 +97,7 @@ export struct ResolutionDialog {
       }
       if (streams.audio) {
         this.selectedDashAudio = PlayerModel.getFriendlyQuality(streams.audio);
+        this.selectedAudioTrackId = streams.audio.audioTrackId || '';
         this.selectedAudioTrack = streams.audio.audioTrackName || streams.audio.audioLanguage || this.getDefaultTrackLabel();
       }
       if (streams.manifest) {
@@ -151,10 +160,11 @@ export struct ResolutionDialog {
                     this.selectedDashVideo = this.getVideoDisplayLabel(this.streamCategories.video[0]);
                   }
                   if (this.streamCategories?.audio?.length) {
-                    const tracks = this.getAudioTracks(this.streamCategories.audio);
-                    const currentTrackStr = this.resourceToString(this.selectedAudioTrack);
-                    if (!currentTrackStr || !tracks.some(t => t === currentTrackStr)) {
-                      this.selectedAudioTrack = tracks[0];
+                    this.audioTrackList = this.computeAudioTrackList(this.streamCategories.audio);
+                    if (this.audioTrackList.length > 0 &&
+                      !this.audioTrackList.some(t => t.id === this.selectedAudioTrackId)) {
+                      this.selectedAudioTrackId = this.audioTrackList[0].id;
+                      this.selectedAudioTrack = this.audioTrackList[0].label;
                     }
                     this.updateFilteredAudioStreams();
                     if (this.filteredAudioStreams.length > 0) {
@@ -234,11 +244,14 @@ export struct ResolutionDialog {
               }.width('100%')
             }
             if (this.streamCategories?.audio && this.streamCategories.audio.length > 0) {
-              if (this.getAudioTracks(this.streamCategories.audio).length > 1) {
-                this.SimpleSelector($r('app.string.yt_player_audio_language_type'), this.getAudioTracks(this.streamCategories.audio), this.selectedAudioTrack, (val) => {
+              if (this.audioTrackList.length > 1) {
+                this.SimpleSelector($r('app.string.yt_player_audio_language_type'),
+                  this.audioTrackList.map(t => t.label),
+                  this.selectedAudioTrack, (val) => {
                   this.selectedAudioTrack = val;
-                  // 先同步计算出新列表，再赋值给 State，两者共用同一份本地变量
-                  const freshFiltered = this.getFilteredAudioStreams(this.streamCategories!.audio, val);
+                  this.selectedAudioTrackId = this.findTrackIdByLabel(val);
+                  // 按 audioTrackId 过滤（对齐 PipePipe 的 trackId 分组逻辑）
+                  const freshFiltered = this.getFilteredAudioStreams(this.streamCategories!.audio, this.selectedAudioTrackId);
                   this.filteredAudioStreams = freshFiltered;
                   if (freshFiltered.length > 0) {
                     this.selectedDashAudio = PlayerModel.getFriendlyQuality(freshFiltered[0]);
@@ -357,10 +370,6 @@ export struct ResolutionDialog {
     return this.resourceToString($r('app.string.yt_player_default'));
   }
 
-  private getAudioTrackLabel(stream: StreamInfo): string {
-    return stream.audioTrackName || stream.audioLanguage || this.getDefaultTrackLabel();
-  }
-
   private getAvailableTypeEnums(): PlaybackType[] {
     const types: PlaybackType[] = [];
     if (this.streamCategories?.progressive?.length) types.push(PlaybackType.PROGRESSIVE);
@@ -443,20 +452,47 @@ export struct ResolutionDialog {
     return streams.find(s => PlayerModel.getFriendlyQuality(s) === quality);
   }
 
-  private getAudioTracks(streams: StreamInfo[]): ResourceStr[] {
-    const tracks = new Set<string>();
-    streams.forEach(s => tracks.add(this.getAudioTrackLabel(s)));
-    return Array.from(tracks);
+  /**
+   * 获取所有唯一音轨的列表（按 audioTrackId 去重，对齐 PipePipe）。
+   */
+  private computeAudioTrackList(streams: StreamInfo[]): AudioTrackEntry[] {
+    const seen = new Set<string>();
+    const result: AudioTrackEntry[] = [];
+    for (const s of streams) {
+      const id = s.audioTrackId || '';
+      if (!seen.has(id)) {
+        seen.add(id);
+        const label = s.audioTrackName || s.audioLanguage || this.getDefaultTrackLabel();
+        result.push({ id: id, label: label });
+      }
+    }
+    if (result.length <= 1) {
+      // 调试：打印每条音频流的 audioTrackId/audioTrackName/audioLanguage
+      const details = streams.map((s: StreamInfo, i: number) =>
+        `[${i}] itag=${s.itag} trackId="${s.audioTrackId}" name="${s.audioTrackName}" lang="${s.audioLanguage}"`
+      ).join(' | ');
+      console.info(`[ResolutionDialog] audioTracks=${result.length} streams=${streams.length}: ${details}`);
+    }
+    return result;
   }
 
-  private getFilteredAudioStreams(streams: StreamInfo[], overrideTrack?: ResourceStr): StreamInfo[] {
-    const trackStr = this.resourceToString(overrideTrack || this.selectedAudioTrack) || this.getDefaultTrackLabel();
-    return streams.filter(s => this.getAudioTrackLabel(s) === trackStr);
+  /** 根据展示标签查找对应的 audioTrackId */
+  private findTrackIdByLabel(label: ResourceStr): string {
+    const labelStr = this.resourceToString(label);
+    const found = this.audioTrackList.find(t => t.label === labelStr);
+    return found ? found.id : '';
   }
 
-  private updateFilteredAudioStreams(overrideTrack?: ResourceStr): void {
+  /** 按 audioTrackId 过滤音频流（对齐 PipePipe 的 trackId 分组） */
+  private getFilteredAudioStreams(streams: StreamInfo[], overrideTrackId?: string): StreamInfo[] {
+    const trackId = overrideTrackId || this.selectedAudioTrackId || '';
+    return streams.filter(s => (s.audioTrackId || '') === trackId);
+  }
+
+  private updateFilteredAudioStreams(): void {
     if (this.streamCategories?.audio) {
-      this.filteredAudioStreams = this.getFilteredAudioStreams(this.streamCategories.audio, overrideTrack);
+      this.audioTrackList = this.computeAudioTrackList(this.streamCategories.audio);
+      this.filteredAudioStreams = this.getFilteredAudioStreams(this.streamCategories.audio);
     }
   }
 }

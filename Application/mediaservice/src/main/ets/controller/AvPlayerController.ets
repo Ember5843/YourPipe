@@ -8,7 +8,8 @@ import { PlayerModel, StreamCategories, CurrentStreams } from '../model/PlayerMo
 import { NativePlaybackEngine, PlaybackState } from '../engine/NativePlaybackEngine';
 import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
-import { PlayerStateMachine, PlayerState, StateChangeListener } from '../state/PlayerStateMachine';
+import { PlayerStateMachine, StateChangeListener } from '../state/PlayerStateMachine';
+import { PlayerState } from '../state/PlayerState';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 
@@ -138,12 +139,13 @@ export class AvPlayerController {
   }
 
   public async initAVPlayer(): Promise<void> {
+    // 先检查引擎是否已初始化，避免从 LOADING 等状态尝试非法转换
+    if (this.stateMachine.isOneOf(PlayerState.INITIALIZING, PlayerState.LOADING, PlayerState.READY,
+      PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.PIP_ACTIVE)) {
+      Logger.debug(TAG, 'initAVPlayer skipped: engine already initialized');
+      return;
+    }
     if (!this.stateMachine.transition(PlayerState.INITIALIZING)) {
-      if (this.stateMachine.isOneOf(PlayerState.INITIALIZING, PlayerState.LOADING, PlayerState.READY,
-        PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.PIP_ACTIVE)) {
-        Logger.debug(TAG, 'initAVPlayer skipped: engine already initialized');
-        return;
-      }
       Logger.warn(TAG, `initAVPlayer skipped: invalid state ${this.stateMachine.currentState}`);
       return;
     }
@@ -364,7 +366,11 @@ export class AvPlayerController {
   }
 
   public setVideoOutputEnabled(enabled: boolean): void {
-    if (this.isActive()) this.nativeEngine.setVideoOutputEnabled(enabled);
+    // 只在 AVPlayer 支持 setMediaMuted 的状态下调用 (prepared/playing/paused/completed)
+    if (this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING, PlayerState.PAUSED,
+      PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.PIP_ACTIVE)) {
+      this.nativeEngine.setVideoOutputEnabled(enabled);
+    }
   }
 
   public async checkCastState(): Promise<void> {

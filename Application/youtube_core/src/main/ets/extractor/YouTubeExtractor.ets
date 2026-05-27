@@ -497,7 +497,9 @@ export class YouTubeExtractor {
     }
     
     videoInfo.viewCount = this.parseIntSafe(vd.viewCount) || this.parseIntSafe(micro.viewCount);
-    videoInfo.isLive = !!(vd.isLiveContent || micro.liveBroadcastDetails);
+    // 使用 liveBroadcastDetails.isLiveNow 区分直播与回放
+    // vd.isLiveContent 对回放也返回 true，只有 isLiveNow 代表真正在直播
+    videoInfo.isLive = micro.liveBroadcastDetails?.isLiveNow === true;
     videoInfo.description = vd.shortDescription || this.extractTextFromRuns(micro.description) || '';
 
     const thumbs = vd.thumbnail?.thumbnails || micro.thumbnail?.thumbnails || [];

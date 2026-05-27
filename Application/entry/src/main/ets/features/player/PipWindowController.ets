@@ -131,7 +131,7 @@ export class PipWindowController {
   // Internal helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  private syncPipPlayState(): void {
+  public syncPipPlayState(): void {
     if (!this.pipController) return;
     const status: PiPWindow.PiPControlStatus = this.playerDelegate?.isPlaying
       ? PiPWindow.PiPControlStatus.PLAY

@@ -255,12 +255,13 @@ export class NativePlaybackEngine {
         }
         this.emitCurrentState();
       } else if (info.hintType === audio.InterruptHint.INTERRUPT_HINT_STOP) {
-        // 强制停止
+        // 视频播放器：STOP 和 PAUSE 一样处理，只暂停不停止
+        // 调 stop() 会让 AVPlayer 进入 stopped 状态，之后无法通过 play() 恢复
         this.playWhenPrepared = false;
         const p = this.player;
-        if (p && this.canStop(p.state)) {
-          p.stop().catch((e: BusinessError) => {
-            Logger.warn(TAG, `stop on interrupt failed: ${this.describeError(e)}`);
+        if (p && p.state === 'playing') {
+          p.pause().catch((e: BusinessError) => {
+            Logger.warn(TAG, `pause on interrupt stop failed: ${this.describeError(e)}`);
           });
         }
         this.emitCurrentState();
@@ -617,7 +618,7 @@ export class NativePlaybackEngine {
 
   setVideoOutputEnabled(enabled: boolean): void {
     const player = this.player;
-    if (!player || player.state === 'released') {
+    if (!player || !this.canSeek(player.state)) {
       return;
     }
     try {

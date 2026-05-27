@@ -1,31 +1,27 @@
-import { YTCoreLogger } from '../../common/YTCoreLogger';
+﻿import { YTCoreLogger } from '../../common/YTCoreLogger';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
-import { CipherSolverApiDecoder, PlayerMetadata, SolveResult } from './CipherSolverApiDecoder';
+import { PipePipeApiDecoder, PlayerMetadata, SolveResult } from './PipePipeApiDecoder';
 
 const logger = YTCoreLogger.getInstance('YoutubeJavaScriptPlayerManager');
 
-/**
- * Manager for YouTube player signature/throttling deobfuscation.
- * Backed by the AGC cloud function `cipher-solver` (trigger `test1`).
- *
- * 调用顺序约束:必须先在 fetchWatchPage 之后调用 ensurePlayer(html, client),
- * 才能调用 getLatestPlayer / deobfuscateBatch。
- */
 export class YoutubeJavaScriptPlayerManager {
-  static async ensurePlayer(html: string, client: YouTubeHttpClient): Promise<PlayerMetadata> {
-    return CipherSolverApiDecoder.ensurePlayer(html, client);
+  /**
+   * PipePipe API 无需预处理 player JS，直接拉取远端已缓存的 player 元数据。
+   */
+  static async ensurePlayer(_html: string, _client: YouTubeHttpClient): Promise<PlayerMetadata> {
+    return PipePipeApiDecoder.getLatestPlayer();
   }
 
-  static async deobfuscateBatch(sigs: string[], nParams: string[]): Promise<SolveResult> {
-    const meta = await CipherSolverApiDecoder.getLatestPlayer();
-    return CipherSolverApiDecoder.decodeBatch(meta.playerId, sigs, nParams);
+  static async deobfuscateBatch(
+    sigs: string[],
+    nParams: string[]
+  ): Promise<SolveResult> {
+    const meta = await PipePipeApiDecoder.getLatestPlayer();
+    const result = await PipePipeApiDecoder.decodeBatch(meta.playerId, sigs, nParams);
+    return result;
   }
 
   static async getLatestPlayer(): Promise<PlayerMetadata> {
-    return CipherSolverApiDecoder.getLatestPlayer();
-  }
-
-  static clearCaches(): void {
-    CipherSolverApiDecoder.clearCaches();
+    return PipePipeApiDecoder.getLatestPlayer();
   }
 }

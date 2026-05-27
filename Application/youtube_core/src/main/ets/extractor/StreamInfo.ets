@@ -64,6 +64,8 @@ export function equalStats(a: StreamInfo, b: StreamInfo): boolean {
   if (a.codec !== b.codec) return false;
   if (a.width !== b.width) return false;
   if (a.height !== b.height) return false;
+  // 不同语言的音频流（audioTrackId 不同）不应被视为相同
+  if (a.audioTrackId !== b.audioTrackId) return false;
   return true;
 }
 

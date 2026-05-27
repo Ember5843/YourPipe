@@ -11,7 +11,7 @@ export * from './src/main/ets/extractor/PlayerResponseTypes';
 export * from './src/main/ets/extractor/CommentItem';
 export * from './src/main/ets/extractor/HlsManifestParser';
 export * from './src/main/ets/extractor/clients/ClientTypes';
-export * from './src/main/ets/extractor/cipher/CipherSolverApiDecoder';
+export * from './src/main/ets/extractor/cipher/PipePipeApiDecoder';
 export * from './src/main/ets/extractor/cipher/YoutubeJavaScriptPlayerManager';
 export * from './src/main/ets/common/YoutubeParsingHelper';
 

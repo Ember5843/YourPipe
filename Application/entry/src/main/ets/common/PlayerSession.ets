@@ -193,16 +193,18 @@ export class PlayerSession {
     const pipH = this._defaultSource.height || 720;
     await this._pipController.createPipController(delegate, pipW, pipH);
 
-    // 状态机驱动：READY 后启用 PiP autoStart
-    const stateMachine = this._controller.getPlayerStateMachine();
-    stateMachine.addListener({
-      onStateChange: (from: PlayerState, to: PlayerState) => {
-        if (to === PlayerState.READY && this._pipController) {
-          const pbCfg = AppStorage.get('playbackConfig') as Record<string, Object> | undefined;
-          const enablePip = (pbCfg?.enablePip as boolean) ?? true;
-          this._pipController.updateAutoStart(enablePip);
-        }
+    // READY 后启用 PiP autoStart
+    this._controller.addIsReadyListener((ready: boolean) => {
+      if (ready && this._pipController) {
+        const pbCfg = AppStorage.get('playbackConfig') as Record<string, Object> | undefined;
+        const enablePip = (pbCfg?.enablePip as boolean) ?? true;
+        this._pipController.updateAutoStart(enablePip);
       }
+    });
+
+    // 播放状态变更时同步 PiP 面板的播放/暂停状态
+    this._controller.addIsPlayingListener((_isPlaying: boolean) => {
+      this._pipController?.syncPipPlayState();
     });
 
     this._pipController.onPipStop = () => {
