@@ -1,3 +1,5 @@
+import { VideoItem } from 'youtube_core';
+
 export class PlaylistItem {
   playlistId: string;
   title: string;
@@ -8,4 +10,12 @@ export class PlaylistItem {
     this.title = title;
     this.coverUrl = coverUrl;
   }
+}
+
+/** A locally saved play queue (non-YouTube playlist). */
+export interface StoredLocalQueue {
+  id: string;
+  name: string;
+  videos: VideoItem[];
+  createdAt: number;
 }

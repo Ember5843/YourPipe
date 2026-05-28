@@ -88,6 +88,21 @@ export class ClientsConstants {
     "com.google.android.youtube/21.03.36 (Linux; U; Android 16; GB) gzip";
 
   // =====================
+  // ANDROID_VR (Android VR / Oculus Quest 3) — PipePipe 5.1.1
+  // =====================
+  static readonly ANDROID_VR_CLIENT_ID: string = "28";
+  static readonly ANDROID_VR_CLIENT_NAME: string = "ANDROID_VR";
+  static readonly ANDROID_VR_CLIENT_VERSION: string = "1.65.10";
+  static readonly ANDROID_VR_DEVICE_MAKE: string = "Oculus";
+  static readonly ANDROID_VR_DEVICE_MODEL: string = "Quest 3";
+  static readonly ANDROID_VR_OS_VERSION: string = "12L";
+  static readonly ANDROID_VR_SDK_VERSION: string = "32";
+  static readonly ANDROID_VR_USER_AGENT: string =
+    "com.google.android.apps.youtube.vr.oculus/" + "1.65.10" +
+    " (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip";
+  static readonly ANDROID_VR_YOUTUBE_KEY: string = "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w";
+
+  // =====================
   // Safari (WEB client with Safari UA) - aligned with PipePipe
   // =====================
   static readonly SAFARI_CLIENT_NAME: string = "WEB";

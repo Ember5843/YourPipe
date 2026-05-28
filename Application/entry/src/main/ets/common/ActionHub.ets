@@ -30,6 +30,21 @@ export class ActionHub {
   setSearchLocale: (languageCode: string, countryCode: string) => void = () => {};
   resetSearchLocale: () => void = () => {};
 
+  /**
+   * Called before openVideo. Set by PlaylistDetailPage to pre-load the play queue.
+   * When set, the Index.openVideoDetail path will call this before switching the video.
+   */
+  beforeOpenVideo: (video: VideoItem) => Promise<void> = async () => {};
+
+  /** Save the current play queue as a local playlist. */
+  saveCurrentQueueAsLocal: (name: string) => void = () => {};
+
+  /** Delete a locally saved queue by id. */
+  deleteLocalQueue: (id: string) => void = () => {};
+
+  /** Load a local queue into the play queue and start playing from the given video. */
+  loadLocalQueue: (queueId: string, startVideoId?: string) => void = () => {};
+
   // 事件监听和触发方法
   private events: Map<string, Array<CallbackFunc>> = new Map();
 

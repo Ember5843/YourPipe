@@ -33,6 +33,8 @@ import { CommentNavWrapper } from './components/CommentNavWrapper';
 import { WatchHistoryStore } from '../../common/WatchHistoryStore';
 import { AvPlayerController, PlayerState } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
+import { PlayQueueList } from './components/PlayQueueList';
+import { PlayQueueManager } from './PlayQueueManager';
 
 const logger = AppLog.getInstance('PlayerPage');
 
@@ -158,6 +160,14 @@ export struct VideoPlayerPage {
     await this.onVideoChange();
     this.controller = session.controller;
 
+    // Register queue switch callback: when user clicks another video in the play queue,
+    // PlayerPage reloads without going through AppStorage/Index.openVideoDetail.
+    PlayQueueManager.getInstance().onSwitchVideo = (v: VideoItem) => {
+      logger.info(`${TAG} queue switch → ${v.videoId}`);
+      this.video = v;
+      this.onVideoChange();
+    };
+
     this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, () => {
       this.handleFullScreenExit();
     });
@@ -261,16 +271,29 @@ export struct VideoPlayerPage {
       return;
     }
 
+    // 切换视频：清空旧流数据以显示加载占位图，清空元数据避免残留
     this.isLoading = true;
     this.videoDescriptionError = null;
-    const videoSource = await session.play(this.video);
+    this.videoSource = {
+      name: this.videoSource.name,
+      description: '',
+      time: '00:00',
+      auto: true,
+      head: this.videoSource.head,
+      likeCount: '0',
+      commentCount: '0',
+      shareCount: '0',
+      play: false,
+      index: 0
+    };
+    const newVideoSource = await session.play(this.video);
 
     this.controller = session.controller;
 
-    if (videoSource) {
-      if (!this.videoSource.videoId || this.videoSource.videoId !== videoSource.videoId) {
-        this.videoSource = videoSource;
-        session.cachedVideoSource = videoSource;
+    if (newVideoSource) {
+      if (!this.videoSource.videoId || this.videoSource.videoId !== newVideoSource.videoId) {
+        this.videoSource = newVideoSource;
+        session.cachedVideoSource = newVideoSource;
       }
     } else {
       const err = session.lastPlayError;
@@ -467,13 +490,7 @@ export struct VideoPlayerPage {
               } else if (item.id === 1) {
                 CommentNavWrapper({ videoId: this.video?.videoId || '' })
               } else {
-                Row() {
-                  Text($r('app.string.yt_empty_no_content'))
-                    .fontSize(16)
-                    .fontColor($r('app.color.yourtube_text_hint'))
-                }
-                .width(Const.WIDTH_FULL_PERCENT)
-                .justifyContent(FlexAlign.Center)
+                PlayQueueList()
               }
             }
             .width(Const.WIDTH_FULL_PERCENT)

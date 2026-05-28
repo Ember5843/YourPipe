@@ -13,7 +13,7 @@ import { VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../common/SubscriptionModel';
 import { LocalStore } from '../common/LocalStore';
 import { PreferencesStore } from '../common/PreferencesStore';
-import { PlaylistItem } from '../common/PlaylistModel';
+import { PlaylistItem, StoredLocalQueue } from '../common/PlaylistModel';
 import { WatchHistoryItem, WatchHistoryStore } from '../common/WatchHistoryStore';
 import { DownloadManager, DownloadTask } from '../common/DownloadManager';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
@@ -67,6 +67,7 @@ import {
   CacheMaxAge, CACHE_MAX_AGE_LABELS, CACHE_MAX_AGE_DISPLAY,
 } from '../common/PlaybackConfig';
 import { PlayerSession } from '../common/PlayerSession';
+import { PlayQueueManager } from '../features/player/PlayQueueManager';
 
 const logger = AppLog.getInstance('Index');
 const APP_VERSION = '0.4.0';
@@ -173,6 +174,7 @@ struct Index {
   @StorageLink('favorites') favorites: VideoItem[] = [];
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
   @StorageLink('playlists') playlists: PlaylistItem[] = [];
+  @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
   @StorageLink('watchHistory') watchHistory: WatchHistoryItem[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
@@ -500,9 +502,13 @@ struct Index {
     if (!AppStorage.get<DownloadTask[]>('downloadTasks')) {
       AppStorage.setOrCreate('downloadTasks', []);
     }
+    if (!AppStorage.get<StoredLocalQueue[]>('localQueues')) {
+      AppStorage.setOrCreate('localQueues', []);
+    }
     this.loadSubscriptionsFromStorage();
     this.loadFavoritesFromStorage();
     this.loadPlaylistsFromStorage();
+    this.loadLocalQueuesFromStorage();
     this.loadWatchHistoryFromStorage();
   }
 
@@ -531,6 +537,29 @@ struct Index {
 
   private syncPlaylistsToStorage(): void {
     PreferencesStore.setString('playlistsJson', LocalStore.savePlaylists(this.playlists));
+  }
+
+  private loadLocalQueuesFromStorage(): void {
+    const stored = PreferencesStore.getString('localQueuesJson', '[]');
+    this.localQueues = LocalStore.loadLocalQueues(stored);
+  }
+
+  private syncLocalQueuesToStorage(): void {
+    PreferencesStore.setString('localQueuesJson', LocalStore.saveLocalQueues(this.localQueues));
+  }
+
+  /** Save the current play queue as a local playlist */
+  private saveCurrentQueueAsLocal(name: string): void {
+    const qm = PlayQueueManager.getInstance();
+    const entry = qm.saveAsLocal(name);
+    this.localQueues = [...this.localQueues, entry];
+    this.syncLocalQueuesToStorage();
+  }
+
+  /** Delete a locally saved queue by id */
+  private deleteLocalQueue(id: string): void {
+    this.localQueues = this.localQueues.filter(q => q.id !== id);
+    this.syncLocalQueuesToStorage();
   }
 
   private loadWatchHistoryFromStorage(): void {
@@ -593,6 +622,25 @@ struct Index {
     };
     this.actionHub.removePlaylist = (playlistId: string) => {
       this.removePlaylist(playlistId);
+    };
+    this.actionHub.saveCurrentQueueAsLocal = (name: string) => {
+      this.saveCurrentQueueAsLocal(name);
+    };
+    this.actionHub.deleteLocalQueue = (id: string) => {
+      this.deleteLocalQueue(id);
+    };
+    this.actionHub.loadLocalQueue = (queueId: string, startVideoId?: string) => {
+      const queue = this.localQueues.find(q => q.id === queueId);
+      if (queue && queue.videos.length > 0) {
+        const qm = PlayQueueManager.getInstance();
+        qm.setLocalQueue(queue.videos, queue.name, queueId, startVideoId);
+        const startVid = startVideoId
+          ? queue.videos.find(v => v.videoId === startVideoId)
+          : queue.videos[0];
+        if (startVid) {
+          this.openVideoDetail(startVid);
+        }
+      }
     };
     this.actionHub.shareVideo = (video: VideoItem) => {
       this.shareVideo(video);
@@ -887,6 +935,15 @@ struct Index {
   }
 
   private async openVideoDetail(video: VideoItem): Promise<void> {
+    // Allow PlaylistDetailPage to pre-load the play queue before opening the video
+    await this.actionHub.beforeOpenVideo(video);
+
+    // If no queue is set (from home/search/subscriptions), create an adhoc single-video queue
+    const queueManager = PlayQueueManager.getInstance();
+    if (queueManager.sourceType === 'none' || queueManager.queue.length === 0) {
+      queueManager.setAdhocQueue([video], 0);
+    }
+
     const session = PlayerSession.getInstance();
     const state = session.playerState;
     const pipActive = state === PlayerState.PIP_ACTIVE || state === PlayerState.PIP_ENTERING;

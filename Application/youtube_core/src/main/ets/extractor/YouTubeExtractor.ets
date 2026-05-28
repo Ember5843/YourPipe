@@ -643,7 +643,7 @@ export class YouTubeExtractor {
     // Primary streaming data and cpn (Safari preferred when logged in, Android otherwise)
     const primarySd = this.safariStreamingData ?? this.androidStreamingData;
     const primaryCpn = this.safariCpn ?? this.androidCpn ?? '';
-    const primarySourceClient = this.safariStreamingData ? 'safari' : 'android';
+    const primarySourceClient = this.safariStreamingData ? 'safari' : 'android_vr';
 
     const allItagInfos: ItagInfo[] = [];
 
@@ -1973,7 +1973,7 @@ export class YouTubeExtractor {
     return match ? match[1] : undefined;
   }
 
-  private buildAudioStreamInfo(itagInfo: ItagInfo, sourceClient: string = 'android'): StreamInfo {
+  private buildAudioStreamInfo(itagInfo: ItagInfo, sourceClient: string = 'android_vr'): StreamInfo {
     const itagItem = itagInfo.getItagItem();
     const mimeType = getMediaFormatMimeType(itagItem.getMediaFormat());
     const container = getMediaFormatSuffix(itagItem.getMediaFormat());
@@ -2014,7 +2014,7 @@ export class YouTubeExtractor {
     return stream;
   }
 
-  private buildVideoStreamInfo(itagInfo: ItagInfo, areStreamsVideoOnly: boolean, sourceClient: string = 'android'): StreamInfo {
+  private buildVideoStreamInfo(itagInfo: ItagInfo, areStreamsVideoOnly: boolean, sourceClient: string = 'android_vr'): StreamInfo {
     const itagItem = itagInfo.getItagItem();
     const mimeType = getMediaFormatMimeType(itagItem.getMediaFormat());
     const container = getMediaFormatSuffix(itagItem.getMediaFormat());

@@ -20,7 +20,9 @@ import { VideoItem } from 'youtube_core';
 import { PlaybackConfig } from './PlaybackConfig';
 import { PipWindowController, PipPlayerDelegate } from '../features/player/PipWindowController';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
+import { PlayQueueManager } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
+import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
 import { YOUTUBE_VIDEO_ID } from './Constants';
 
 export interface CachedChannelProfile {
@@ -314,6 +316,18 @@ export class PlayerSession {
         this._lastPlayError = null;
         this._watchVideoId = videoId;
         this._controller.updateVideoSource(videoSource);
+
+        // Store related items for auto-play queue (PipePipe-style)
+        const relatedItems = result.videoInfo.relatedItems;
+        if (relatedItems && relatedItems.length > 0) {
+          // Convert RelatedVideoInfo → VideoItem
+          const videoItems: VideoItem[] = relatedItems.map((r) => new VideoItem(
+            0, r.videoId, r.title, r.author, '',
+            normalizeUrl(r.thumbnailUrl || ''), !!r.isLive, '#CCCCCC',
+            r.channelId || '', '', '', '', null
+          ));
+          PlayQueueManager.getInstance().setAutoQueueCandidates(videoItems);
+        }
 
         if (videoStream && videoStream.width && videoStream.height) {
           this._pipController?.updatePipContentSize(videoStream.width, videoStream.height);

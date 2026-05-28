@@ -15,6 +15,7 @@ import { VideoCard } from '../../common/components/VideoCard';
 import { VideoCardGrid } from '../../common/components/VideoCardGrid';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
+import { PlayQueueManager } from '../player/PlayQueueManager';
 
 const logger = AppLog.getInstance('PlaylistDetailPage');
 
@@ -43,6 +44,22 @@ export struct PlaylistDetailPage {
 
   aboutToAppear() {
     this.loadPlaylistVideos();
+    // Hook: when a video is tapped from this playlist page, pre-load the play queue
+    // before the video opens, so PlayerPage Tab 3 shows the full playlist context.
+    const playlistId = (this.playlist.playlistId || '').trim();
+    const playlistName = this.playlist.name || '';
+    this.actionHub.beforeOpenVideo = async (video: VideoItem) => {
+      const qm = PlayQueueManager.getInstance();
+      // Only override if clicking within the same playlist (not navigating from elsewhere)
+      if (qm.sourceType !== 'remote' || qm.sourceId !== playlistId) {
+        await qm.loadFromRemotePlaylist(playlistId, video.videoId, playlistName);
+      }
+    };
+  }
+
+  aboutToDisappear() {
+    // Clear the hook so other pages don't incorrectly load this playlist's queue
+    this.actionHub.beforeOpenVideo = async () => {};
   }
 
   private getVideoGridColumnCount(): number {

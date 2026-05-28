@@ -1,7 +1,7 @@
 import { AppLog } from './AppLog';
 import { SubscriptionUser } from './SubscriptionModel';
 import { VideoItem } from 'youtube_core';
-import { PlaylistItem } from './PlaylistModel';
+import { PlaylistItem, StoredLocalQueue } from './PlaylistModel';
 
 const logger = AppLog.getInstance('LocalStore');
 
@@ -81,6 +81,44 @@ export class LocalStore {
 
   static savePlaylists(playlists: PlaylistItem[]): string {
     return JSON.stringify(playlists);
+  }
+
+  static loadLocalQueues(json: string): StoredLocalQueue[] {
+    if (!json || json.length === 0) {
+      return [];
+    }
+    try {
+      const raw = JSON.parse(json) as Array<Record<string, Object>>;
+      return raw.map((item: Record<string, Object>): StoredLocalQueue => ({
+        id: LocalStore.asString(item['id']),
+        name: LocalStore.asString(item['name']),
+        videos: (item['videos'] as Array<Record<string, Object>> || []).map((v) =>
+          new VideoItem(
+            v['id'] as number || 0,
+            LocalStore.asString(v['videoId']),
+            LocalStore.asString(v['title']),
+            LocalStore.asString(v['author']),
+            LocalStore.asString(v['viewCount']),
+            LocalStore.asString(v['thumbnailUrl']),
+            typeof v['isLive'] === 'boolean' ? v['isLive'] as boolean : false,
+            LocalStore.asString(v['thumbnailColor']) || '#CCCCCC',
+            LocalStore.asString(v['channelId']),
+            LocalStore.asString(v['channelAvatarUrl']),
+            LocalStore.asString(v['channelHandle']),
+            LocalStore.asString(v['videoDescription']),
+            (v['videoDescriptionError'] as string) || null
+          )
+        ),
+        createdAt: item['createdAt'] as number || 0,
+      }));
+    } catch (err) {
+      logger.error('Failed to parse local queues:', JSON.stringify(err));
+      return [];
+    }
+  }
+
+  static saveLocalQueues(queues: StoredLocalQueue[]): string {
+    return JSON.stringify(queues);
   }
 
   private static asString(value: Object | undefined): string {

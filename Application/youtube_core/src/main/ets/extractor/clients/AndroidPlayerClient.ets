@@ -6,10 +6,14 @@ import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 
 const logger = YTCoreLogger.getInstance('AndroidPlayerClient');
 
-interface AndroidClientInfo {
+// ---- Android VR payload types ----
+
+interface AndroidVRClientInfo {
   clientName: string;
   clientVersion: string;
   clientScreen: string;
+  deviceMake: string;
+  deviceModel: string;
   androidSdkVersion: number;
   osName: string;
   osVersion: string;
@@ -20,75 +24,95 @@ interface AndroidClientInfo {
   utcOffsetMinutes: number;
 }
 
-interface AndroidRequestInfo {
+interface AndroidVRRequestInfo {
   internalExperimentFlags: string[];
   useSsl: boolean;
 }
 
-interface AndroidUserInfo {
+interface AndroidVRUserInfo {
   lockedSafetyMode: boolean;
 }
 
-interface AndroidClientContext {
-  client: AndroidClientInfo;
-  request: AndroidRequestInfo;
-  user: AndroidUserInfo;
+interface AndroidVRContext {
+  client: AndroidVRClientInfo;
+  request: AndroidVRRequestInfo;
+  user: AndroidVRUserInfo;
 }
 
-interface AndroidPlayerRequest {
+interface AndroidVRPayload {
+  context: AndroidVRContext;
   videoId: string;
   cpn: string;
   contentCheckOk: boolean;
   racyCheckOk: boolean;
 }
 
-interface AndroidPayload {
-  context: AndroidClientContext;
-  playerRequest: AndroidPlayerRequest;
-  disablePlayerResponse: boolean;
-}
-
-interface AndroidReelResponse {
-  playerResponse?: PlayerResponse;
-}
-
+/**
+ * Android VR (Oculus Quest 3) InnerTube client — PipePipe 5.1.1
+ *
+ * Replaces the old Android Mobile client:
+ *   - Endpoint: reel/reel_item_watch → player
+ *   - Client: ANDROID (21.03.36) → ANDROID_VR (1.65.10)
+ *   - Device: generic Android → Oculus Quest 3
+ *   - Response: no longer nested inside playerResponse
+ */
 export class AndroidPlayerClient {
   static async fetch(ctx: ClientFetchContext, httpClient: YouTubeHttpClient): Promise<ClientFetchResult | undefined> {
     const cpn = randomCpn();
-    const clientInfo: AndroidClientInfo = {
-      clientName: ClientsConstants.ANDROID_CLIENT_NAME,
-      clientVersion: ClientsConstants.ANDROID_CLIENT_VERSION,
+
+    const clientInfo: AndroidVRClientInfo = {
+      clientName: ClientsConstants.ANDROID_VR_CLIENT_NAME,
+      clientVersion: ClientsConstants.ANDROID_VR_CLIENT_VERSION,
       clientScreen: 'WATCH',
-      androidSdkVersion: parseInt(ClientsConstants.ANDROID_SDK_VERSION),
+      deviceMake: ClientsConstants.ANDROID_VR_DEVICE_MAKE,
+      deviceModel: ClientsConstants.ANDROID_VR_DEVICE_MODEL,
+      androidSdkVersion: parseInt(ClientsConstants.ANDROID_VR_SDK_VERSION),
       osName: 'Android',
-      osVersion: ClientsConstants.ANDROID_OS_VERSION,
+      osVersion: ClientsConstants.ANDROID_VR_OS_VERSION,
       hl: ctx.hl,
       gl: ctx.gl,
       platform: 'MOBILE',
       visitorData: ctx.visitorData,
       utcOffsetMinutes: 0
     };
-    const reqInfo: AndroidRequestInfo = { internalExperimentFlags: [], useSsl: true };
-    const userInfo: AndroidUserInfo = { lockedSafetyMode: false };
-    const context: AndroidClientContext = { client: clientInfo, request: reqInfo, user: userInfo };
-    const playerReq: AndroidPlayerRequest = { videoId: ctx.videoId, cpn: cpn, contentCheckOk: true, racyCheckOk: true };
-    const payload: AndroidPayload = { context: context, playerRequest: playerReq, disablePlayerResponse: false };
+
+    const reqInfo: AndroidVRRequestInfo = { internalExperimentFlags: [], useSsl: true };
+    const userInfo: AndroidVRUserInfo = { lockedSafetyMode: false };
+    const context: AndroidVRContext = { client: clientInfo, request: reqInfo, user: userInfo };
+
+    const payload: AndroidVRPayload = {
+      context: context,
+      videoId: ctx.videoId,
+      cpn: cpn,
+      contentCheckOk: true,
+      racyCheckOk: true
+    };
 
     const headers: Record<string, string> = {
-      'User-Agent': ClientsConstants.ANDROID_USER_AGENT,
+      'User-Agent': ClientsConstants.ANDROID_VR_USER_AGENT,
       'Content-Type': 'application/json',
       'X-Goog-Api-Format-Version': '2'
     };
+
     const t = randomTParameter();
-    const url = `https://youtubei.googleapis.com/youtubei/v1/reel/reel_item_watch?prettyPrint=false&t=${t}&id=${ctx.videoId}&$fields=playerResponse`;
+    const url = `https://youtubei.googleapis.com/youtubei/v1/player`
+      + `?key=${ClientsConstants.ANDROID_VR_YOUTUBE_KEY}`
+      + `&prettyPrint=false`
+      + `&t=${t}`
+      + `&id=${ctx.videoId}`;
 
     try {
       const response = await httpClient.postJson(url, payload, headers);
       if (response && response.responseCode === 200) {
-        const parsed = JSON.parse(response.result as string) as AndroidReelResponse;
-        const pr = parsed.playerResponse;
+        // Android VR response is directly a PlayerResponse — NOT nested
+        const pr = JSON.parse(response.result as string) as PlayerResponse;
         if (pr?.streamingData) {
-          const result: ClientFetchResult = { streamingData: pr.streamingData, cpn: cpn, sourceClient: 'android', playerResponse: pr };
+          const result: ClientFetchResult = {
+            streamingData: pr.streamingData,
+            cpn: cpn,
+            sourceClient: 'android_vr',
+            playerResponse: pr
+          };
           return result;
         }
       }
