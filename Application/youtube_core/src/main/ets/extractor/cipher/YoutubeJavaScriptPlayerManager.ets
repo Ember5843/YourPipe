@@ -1,4 +1,4 @@
-﻿import { YTCoreLogger } from '../../common/YTCoreLogger';
+import { YTCoreLogger } from '../../common/YTCoreLogger';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 import { PipePipeApiDecoder, PlayerMetadata, SolveResult } from './PipePipeApiDecoder';
 
@@ -6,9 +6,13 @@ const logger = YTCoreLogger.getInstance('YoutubeJavaScriptPlayerManager');
 
 export class YoutubeJavaScriptPlayerManager {
   /**
-   * PipePipe API 无需预处理 player JS，直接拉取远端已缓存的 player 元数据。
+   * Player metadata is now extracted locally from ytcfg in YouTubeExtractor.
+   * This method is kept for backward compatibility but is a no-op.
+   * @deprecated Use PipePipeApiDecoder.setLocalMetadata() instead.
    */
   static async ensurePlayer(_html: string, _client: YouTubeHttpClient): Promise<PlayerMetadata> {
+    logger.debug('ensurePlayer: metadata now extracted locally from ytcfg');
+    // No-op — metadata is injected via PipePipeApiDecoder.setLocalMetadata() in fetchInnertubePlayer
     return PipePipeApiDecoder.getLatestPlayer();
   }
 

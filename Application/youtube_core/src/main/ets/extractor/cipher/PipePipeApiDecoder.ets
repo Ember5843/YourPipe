@@ -1,4 +1,4 @@
-﻿import { http } from '@kit.NetworkKit';
+import { http } from '@kit.NetworkKit';
 import { YTCoreLogger } from '../../common/YTCoreLogger';
 
 const logger = YTCoreLogger.getInstance('PipePipeApiDecoder');
@@ -22,11 +22,6 @@ export interface SolveResult {
   n: Record<string, string | null>;
 }
 
-interface LatestPlayerResponse {
-  player: string;
-  signatureTimestamp: number;
-}
-
 interface DecodeResponseEntry {
   type: string;
   data: Record<string, string>;
@@ -42,7 +37,6 @@ interface HttpHeaders {
 }
 
 export class PipePipeApiDecoder {
-  private static readonly LATEST_PLAYER_URL = 'https://api.pipepipe.dev/decoder/latest-player';
   private static readonly DECODE_URL = 'https://api.pipepipe.dev/decoder/decode';
   private static readonly TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -53,50 +47,27 @@ export class PipePipeApiDecoder {
   private static cachedMetadata: PlayerMetadata | null = null;
   private static cacheExpiry: number = 0;
 
-  // Per-parameter caches to avoid redundant API calls within a session
   private static sigCache: Map<string, string> = new Map();
   private static nCache: Map<string, string> = new Map();
+
+  /**
+   * Inject locally-extracted player metadata into the cache.
+   * Called from YouTubeExtractor after parsing ytcfg from HTML.
+   * Subsequent getLatestPlayer() calls will hit this cache instead of the API.
+   */
+  static setLocalMetadata(meta: PlayerMetadata): void {
+    PipePipeApiDecoder.cachedMetadata = meta;
+    PipePipeApiDecoder.cacheExpiry = Date.now() + PipePipeApiDecoder.TTL_MS;
+    logger.info(`Player metadata set from local extraction: id=${meta.playerId} sts=${meta.signatureTimestamp}`);
+  }
 
   static async getLatestPlayer(): Promise<PlayerMetadata> {
     const now = Date.now();
     if (PipePipeApiDecoder.cachedMetadata && now < PipePipeApiDecoder.cacheExpiry) {
-      logger.debug('Using cached player metadata');
+      logger.debug('Using cached player metadata (local)');
       return PipePipeApiDecoder.cachedMetadata;
     }
-
-    const httpRequest = http.createHttp();
-    try {
-      const response = await httpRequest.request(PipePipeApiDecoder.LATEST_PLAYER_URL, {
-        method: http.RequestMethod.GET,
-        header: PipePipeApiDecoder.REQUEST_HEADERS,
-        connectTimeout: 10000,
-        readTimeout: 10000,
-      });
-
-      if (response.responseCode !== 200) {
-        throw new Error(`latest-player HTTP ${response.responseCode}`);
-      }
-
-      const body = typeof response.result === 'string'
-        ? response.result
-        : arrayBufferToString(response.result as ArrayBuffer);
-      const parsed = JSON.parse(body) as LatestPlayerResponse;
-
-      if (!parsed.player || !parsed.signatureTimestamp) {
-        throw new Error('latest-player response missing fields');
-      }
-
-      const meta: PlayerMetadata = {
-        playerId: parsed.player,
-        signatureTimestamp: parsed.signatureTimestamp,
-      };
-      PipePipeApiDecoder.cachedMetadata = meta;
-      PipePipeApiDecoder.cacheExpiry = now + PipePipeApiDecoder.TTL_MS;
-      logger.info(`Player metadata fetched: id=${meta.playerId} sts=${meta.signatureTimestamp}`);
-      return meta;
-    } finally {
-      httpRequest.destroy();
-    }
+    throw new Error('Player metadata not available — setLocalMetadata() must be called first');
   }
 
   static async decodeBatch(
@@ -110,7 +81,6 @@ export class PipePipeApiDecoder {
       return result;
     }
 
-    // Check caches first
     const uncachedSigs: string[] = [];
     for (const s of sigs) {
       const cached = PipePipeApiDecoder.sigCache.get(s);
@@ -120,7 +90,6 @@ export class PipePipeApiDecoder {
         uncachedSigs.push(s);
       }
     }
-
     const uncachedNs: string[] = [];
     for (const n of nParams) {
       const cached = PipePipeApiDecoder.nCache.get(n);
@@ -168,8 +137,6 @@ export class PipePipeApiDecoder {
         throw new Error(`Unexpected decode response: ${parsed.type}`);
       }
 
-      // responses[0] = n params, responses[1] = sig params (when both present)
-      // if only one type requested, responses[0] = that type
       let nResponse: DecodeResponseEntry | undefined;
       let sigResponse: DecodeResponseEntry | undefined;
 
