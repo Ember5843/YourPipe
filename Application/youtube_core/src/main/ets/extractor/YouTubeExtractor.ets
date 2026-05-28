@@ -31,6 +31,7 @@ import { MediaFormat, getMediaFormatMimeType, getMediaFormatSuffix } from './ita
 import { ItagInfo } from './ItagInfo';
 import { parseHlsMasterManifest } from './HlsManifestParser';
 import { YoutubeJavaScriptPlayerManager } from './cipher/YoutubeJavaScriptPlayerManager';
+import { PipePipeApiDecoder, PlayerMetadata } from './cipher/PipePipeApiDecoder';
 import {
   ExtractorException,
   ContentNotAvailableException,
@@ -926,6 +927,41 @@ export class YouTubeExtractor {
     return match ? match[1] : undefined;
   }
 
+  /**
+   * Extract ytcfg JSON from HTML — mirrors yt-dlp's extract_ytcfg:
+   *   r'ytcfg\.set\s*\(\s*({.+?})\s*\)\s*;'
+   * Uses [\s\S] instead of . to match across newlines.
+   */
+  private parseYtcfgSet(html: string): Record<string, Object> | null {
+    const ytcfgRegex = /ytcfg\.set\s*\(\s*(\{[\s\S]+?\})\s*\)\s*;/;
+    const match = ytcfgRegex.exec(html);
+    if (!match || !match[1]) {
+      logger.debug('parseYtcfgSet: no ytcfg.set({...}) match found in HTML');
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(match[1]) as Record<string, Object>;
+      const keys = Object.keys(parsed);
+      logger.debug(`parseYtcfgSet: parsed ${keys.length} ytcfg keys, has STS=${parsed['STS'] !== undefined ? 'Y' : 'N'}, has PLAYER_JS_URL=${parsed['PLAYER_JS_URL'] !== undefined ? 'Y' : 'N'}`);
+      return parsed;
+    } catch (e) {
+      logger.warn('parseYtcfgSet: JSON.parse failed:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Extract 8-char hex player ID from a player JS URL.
+   * Mirrors yt-dlp's _extract_player_info.
+   * Input:  /s/player/abc12345/player_ias.vflset/en_US/base.js
+   * Output: "abc12345"
+   */
+  private extractPlayerIdFromUrl(playerJsUrl: string): string | null {
+    const idRegex = /\/s\/player\/([a-fA-F0-9]{8,})\//;
+    const match = idRegex.exec(playerJsUrl);
+    return match ? match[1] : null;
+  }
+
   private randomCpn(): string {
     return generateContentPlaybackNonce();
   }
@@ -985,8 +1021,34 @@ export class YouTubeExtractor {
    * Mirrors PipePipe exactly: unlogged → Android only, logged in (cookie) → Safari only.
    */
   private async fetchInnertubePlayer(html: string, videoId: string): Promise<InnertubePlayerResult> {
-    // 必须先准备 player.js,后续所有 sig/n 解密(包括本函数内的 getLatestPlayer)都依赖这一步
-    await YoutubeJavaScriptPlayerManager.ensurePlayer(html, this.client);
+    // Extract player metadata locally from ytcfg (mirrors yt-dlp's extract_ytcfg + _extract_signature_timestamp)
+    const ytcfg = this.parseYtcfgSet(html);
+    let localSts: number | undefined;
+    let playerId: string | null = null;
+
+    if (ytcfg) {
+      // STS: yt-dlp reads ytcfg.STS as integer — direct field access
+      const stsValue = ytcfg['STS'];
+      if (typeof stsValue === 'number') {
+        localSts = stsValue;
+      }
+      // PLAYER_JS_URL: yt-dlp reads ytcfg.PLAYER_JS_URL as string
+      const playerJsUrl = ytcfg['PLAYER_JS_URL'];
+      if (typeof playerJsUrl === 'string') {
+        playerId = this.extractPlayerIdFromUrl(playerJsUrl);
+      }
+    }
+
+    if (localSts !== undefined || playerId) {
+      const meta: PlayerMetadata = {
+        playerId: playerId ?? '',
+        signatureTimestamp: localSts ?? 0,
+      };
+      PipePipeApiDecoder.setLocalMetadata(meta);
+      logger.info(`[METADATA] local extraction OK: playerId=${meta.playerId || '(missing)'} sts=${meta.signatureTimestamp || '(missing)'}`);
+    } else {
+      logger.warn('[METADATA] ytcfg did not contain STS or PLAYER_JS_URL — decode will use API fallback');
+    }
 
     const htmlVisitorData = this.parseYtcfgValue(html, 'VISITOR_DATA');
     const androidVisitor = await this.getAndroidVisitorData();
@@ -1007,16 +1069,8 @@ export class YouTubeExtractor {
       hl: this.hl,
       gl: this.gl,
       visitorData: visitorData,
-      signatureTimestamp: undefined
+      signatureTimestamp: localSts
     };
-
-    // signatureTimestamp is needed by Safari and TvHtml5 clients
-    try {
-      const meta = await YoutubeJavaScriptPlayerManager.getLatestPlayer();
-      ctx.signatureTimestamp = meta.signatureTimestamp;
-    } catch (e) {
-      logger.warn('Failed to get signatureTimestamp:', e);
-    }
 
     if (hasCookieAuth) {
       // Logged in: Safari client
