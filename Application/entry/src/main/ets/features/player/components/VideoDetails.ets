@@ -265,8 +265,7 @@ export struct VideoDetails {
             this.item.author,
             this.item.thumbnailUrl,
             videoStream,
-            audioStream,
-            selection.threadCount || 4
+            audioStream
           );
           task._context = ctx;
           this.downloadManager.addTask(task);

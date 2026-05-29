@@ -22,6 +22,7 @@ export class UIConfig {
   animationSpeed: number = 300;
   enableLogger: boolean = false;
   homeLayoutMode: string = 'grid';
+  maxConcurrentDownloads: number = 1;
   constructor() {
   }
 
@@ -38,6 +39,7 @@ export class UIConfig {
     next.animationSpeed = this.animationSpeed;
     next.enableLogger = this.enableLogger;
     next.homeLayoutMode = this.homeLayoutMode;
+    next.maxConcurrentDownloads = this.maxConcurrentDownloads;
     return next;
   }
 
@@ -51,6 +53,10 @@ export class UIConfig {
     config.colorPreset = PreferencesStore.getString('cfg_colorPreset', 'default');
     config.enableLogger = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
     config.homeLayoutMode = PreferencesStore.getString('cfg_homeLayoutMode', 'grid');
+    const maxConcurrentDownloads = parseInt(PreferencesStore.getString('cfg_maxConcurrentDownloads', '1'), 10);
+    config.maxConcurrentDownloads = Number.isFinite(maxConcurrentDownloads)
+      ? Math.max(1, Math.min(4, maxConcurrentDownloads))
+      : 1;
     logger.info(`Loaded UIConfig from Preferences: ${JSON.stringify(config)}`);
     return config;
   }
@@ -65,6 +71,7 @@ export class UIConfig {
     PreferencesStore.setString('cfg_colorPreset', config.colorPreset);
     PreferencesStore.setString('cfg_enableLogger', config.enableLogger ? 'true' : 'false');
     PreferencesStore.setString('cfg_homeLayoutMode', config.homeLayoutMode);
+    PreferencesStore.setString('cfg_maxConcurrentDownloads', `${Math.max(1, Math.min(4, Math.round(config.maxConcurrentDownloads || 1)))}`);
   }
 }
 

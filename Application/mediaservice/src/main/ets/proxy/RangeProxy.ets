@@ -7,24 +7,85 @@ import Logger from '../utils/Logger';
 const TAG = '[LocalProxy][RangeProxy]';
 const MAX_RETRIES = 2;
 const TIMEOUT_MS = 30000;
+const requestNumberMap: Map<string, number> = new Map<string, number>();
 
 function buildYoutubeRangeUrl(url: string, rangeSpec: string): string {
   const sep = url.includes('?') ? '&' : '?';
   return url + sep + 'range=' + rangeSpec;
 }
 
+function appendYoutubeRn(url: string, urlKey: string): string {
+  let result = url.replace(/([?&])rn=[^&]*&?/, (_match: string, sep: string): string => sep === '?' ? '?' : '');
+  if (result.endsWith('?') || result.endsWith('&')) {
+    result = result.substring(0, result.length - 1);
+  }
+  const rn = requestNumberMap.get(urlKey) || 0;
+  requestNumberMap.set(urlKey, rn + 1);
+  const sep = result.includes('?') ? '&' : '?';
+  return `${result}${sep}rn=${rn}`;
+}
+
+function getYoutubeClient(url: string): string {
+  const match = url.match(/[?&]c=([^&]+)/);
+  if (!match || !match[1]) {
+    return '';
+  }
+  try {
+    return decodeURIComponent(match[1]).toUpperCase();
+  } catch (_error) {
+    return match[1].toUpperCase();
+  }
+}
+
 function isAndroidUrl(url: string): boolean {
-  return url.includes('&c=ANDROID');
+  return getYoutubeClient(url).startsWith('ANDROID');
 }
 
 function isIosUrl(url: string): boolean {
-  return url.includes('&c=IOS');
+  return getYoutubeClient(url).startsWith('IOS');
+}
+
+function isWebUrl(url: string): boolean {
+  return getYoutubeClient(url).startsWith('WEB');
+}
+
+function isTvUrl(url: string): boolean {
+  return getYoutubeClient(url) === 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
 }
 
 function makeHeaders(resource: StreamResource): rcp.RequestHeaders {
   const h: rcp.RequestHeaders = { 'Accept-Encoding': 'identity' };
   if (resource.userAgent) h['User-Agent'] = resource.userAgent;
   if (resource.referer) h['Referer'] = resource.referer;
+  return h;
+}
+
+function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
+  const h: rcp.RequestHeaders = { 'Accept-Encoding': 'identity' };
+  const isAndroid = isAndroidUrl(resource.url);
+  const isIos = isIosUrl(resource.url);
+  const isWeb = isWebUrl(resource.url);
+  const isTv = isTvUrl(resource.url);
+
+  if (isWeb || isTv) {
+    h['Origin'] = 'https://www.youtube.com';
+    h['Referer'] = 'https://www.youtube.com';
+    h['Sec-Fetch-Dest'] = 'empty';
+    h['Sec-Fetch-Mode'] = 'cors';
+    h['Sec-Fetch-Site'] = 'cross-site';
+  }
+
+  if (isAndroid) {
+    h['User-Agent'] = 'com.google.android.youtube/21.03.36 (Linux; U; Android 16; GB) gzip';
+  } else if (isIos) {
+    h['User-Agent'] = 'com.google.ios.youtube/20.03.02(iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X; GB)';
+  } else if (resource.userAgent) {
+    h['User-Agent'] = resource.userAgent;
+  }
+
+  if (resource.referer && !h['Referer']) {
+    h['Referer'] = resource.referer;
+  }
   return h;
 }
 
@@ -138,12 +199,12 @@ export async function serveRange(
   }
 
   const rangeSpec = `${start}-${end}`;
-  const headers = makeHeaders(resource);
   let lastError = '';
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const sessionHeaders = resource.isYoutubePlayback ? makeYoutubeHeaders(resource) : makeHeaders(resource);
     const rcpSession = rcp.createSession({
-      headers,
+      headers: sessionHeaders,
       requestConfiguration: { transfer: { timeout: { connectMs: TIMEOUT_MS, transferMs: TIMEOUT_MS } } }
     });
     try {
@@ -152,15 +213,24 @@ export async function serveRange(
 
       let resp: rcp.Response;
       if (resource.isYoutubePlayback) {
-        const fetchUrl = buildYoutubeRangeUrl(resource.url, rangeSpec);
+        const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
+        const headers = makeYoutubeHeaders(resource);
         const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
         if (usePost) {
-          // Empty body required so RCP sends Content-Length: 0 (YouTube returns 411 otherwise)
+          // PipePipe: Android/Android VR/iOS use POST with empty body and range= URL parameter.
           const req = new rcp.Request(fetchUrl, 'POST', headers, '');
           req.destination = dest;
           resp = await rcpSession.fetch(req);
         } else {
-          resp = await rcpSession.downloadToStream(fetchUrl, dest);
+          const req = new rcp.Request(fetchUrl, 'GET', headers);
+          req.destination = dest;
+          resp = await rcpSession.fetch(req);
+          if (resp.statusCode === 411) {
+            Logger.warn(TAG, `serveRange: upstream 411, retry with empty POST resource=${resource.id} range=${rangeSpec}`);
+            const retryReq = new rcp.Request(appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url), 'POST', headers, '');
+            retryReq.destination = dest;
+            resp = await rcpSession.fetch(retryReq);
+          }
         }
       } else {
         const rangeHeaders: rcp.RequestHeaders = { 'Accept-Encoding': 'identity' };

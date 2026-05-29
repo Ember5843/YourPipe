@@ -5,7 +5,6 @@ export interface DownloadSelection {
   video?: StreamInfo;
   audio?: StreamInfo;
   progressive?: StreamInfo;
-  threadCount?: number;
 }
 
 enum DownloadMode {
@@ -29,7 +28,6 @@ export struct DownloadDialog {
   @State selectedDashVideo: string = '';
   @State selectedDashAudio: string = '';
   @State selectedAudioTrack: ResourceStr = '';
-  @State selectedThreadCount: number = 4;
   @State estimatedSize: string = '';
 
   @State audioTrackOptions: SelectOption[] = [];
@@ -218,45 +216,6 @@ export struct DownloadDialog {
             .padding({ top: 12 })
           }
 
-          Divider().margin({ top: 16, bottom: 6 }).color($r('sys.color.comp_divider'))
-          Column() {
-            this.SectionHeader('Threads')
-            Row({ space: 10 }) {
-              Button({ type: ButtonType.Circle, stateEffect: true }) {
-                Text('-')
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Medium)
-              }
-              .width(36)
-              .height(36)
-              .backgroundColor($r('app.color.yourtube_bg_page'))
-              .onClick(() => {
-                this.selectedThreadCount = Math.max(1, this.selectedThreadCount - 1);
-              })
-
-              Text(`${this.selectedThreadCount}`)
-                .fontSize(16)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.yourtube_text_primary'))
-                .textAlign(TextAlign.Center)
-                .layoutWeight(1)
-
-              Button({ type: ButtonType.Circle, stateEffect: true }) {
-                Text('+')
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Medium)
-              }
-              .width(36)
-              .height(36)
-              .backgroundColor($r('app.color.yourtube_bg_page'))
-              .onClick(() => {
-                this.selectedThreadCount = Math.min(8, this.selectedThreadCount + 1);
-              })
-            }
-            .width('100%')
-            .height(40)
-          }
-          .width('100%')
         }
         .width('100%')
       }
@@ -456,7 +415,7 @@ export struct DownloadDialog {
   }
 
   private getCurrentSelection(): DownloadSelection | null {
-    const selection: DownloadSelection = { threadCount: this.selectedThreadCount };
+    const selection: DownloadSelection = {};
     if (this.selectedMode === DownloadMode.PROGRESSIVE) {
       selection.progressive = this.getStreamByLabel(this.streamCategories?.progressive || [], this.selectedProgressive);
       return selection.progressive ? selection : null;

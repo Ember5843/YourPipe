@@ -1,6 +1,4 @@
 import { DownloadManager, DownloadTask, DownloadStatus } from '../../common/DownloadManager';
-import { ActionHub } from '../../common/ActionHub';
-import { UIConfig } from '../../common/AppState';
 import { fileUri, picker } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 
@@ -24,10 +22,6 @@ function isActiveStatus(status: DownloadStatus): boolean {
 @Component
 export struct DownloadPage {
   @StorageLink('downloadTasks') tasks: DownloadTask[] = [];
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
-  @Consume('actionHub') actionHub: ActionHub;
-  private downloadManager: DownloadManager = DownloadManager.getInstance();
-  @State exportingTaskId: string = '';
 
   build() {
     if (this.tasks.length === 0) {
@@ -53,9 +47,9 @@ export struct DownloadPage {
       List({ space: 6 }) {
         ForEach(this.tasks, (task: DownloadTask) => {
           ListItem() {
-            this.DownloadRow(task)
+            DownloadTaskRow({ task: task })
           }
-        }, (task: DownloadTask) => `${task.id}_${task.status}_${task.progress}`)
+        }, (task: DownloadTask) => task.id)
       }
       .width('100%')
       .height('100%')
@@ -63,13 +57,19 @@ export struct DownloadPage {
       .edgeEffect(EdgeEffect.Spring)
     }
   }
+}
 
-  @Builder
-  DownloadRow(task: DownloadTask) {
+@Component
+struct DownloadTaskRow {
+  @ObjectLink task: DownloadTask;
+  private downloadManager: DownloadManager = DownloadManager.getInstance();
+  @State exporting: boolean = false;
+
+  build() {
     Row({ space: 10 }) {
       Stack() {
-        if (task.thumbnailUrl && task.thumbnailUrl.length > 0) {
-          Image(task.thumbnailUrl)
+        if (this.task.thumbnailUrl && this.task.thumbnailUrl.length > 0) {
+          Image(this.task.thumbnailUrl)
             .width(96)
             .height(54)
             .objectFit(ImageFit.Cover)
@@ -83,12 +83,12 @@ export struct DownloadPage {
             .radius(6)
         }
 
-        if (task.status === DownloadStatus.COMPLETED) {
+        if (this.task.status === DownloadStatus.COMPLETED) {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .fontSize(18)
             .fontColor([$r('app.color.yourtube_theme_primary')])
             .position({ x: 4, y: 4 })
-        } else if (task.status === DownloadStatus.FAILED) {
+        } else if (this.task.status === DownloadStatus.FAILED) {
           SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
             .fontSize(18)
             .fontColor(['#FF4444'])
@@ -99,7 +99,7 @@ export struct DownloadPage {
       .height(54)
 
       Column() {
-        Text(task.title)
+        Text(this.task.title)
           .fontSize(14)
           .fontColor($r('app.color.yourtube_text_primary'))
           .fontWeight(FontWeight.Medium)
@@ -107,7 +107,7 @@ export struct DownloadPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
 
-        Text(task.author || task.getStatusLabel())
+        Text(this.task.author || this.task.getStatusLabel())
           .fontSize(11)
           .fontColor($r('app.color.yourtube_text_quaternary'))
           .maxLines(1)
@@ -115,9 +115,9 @@ export struct DownloadPage {
           .width('100%')
           .margin({ top: 2 })
 
-        Text(this.getSubtitle(task))
+        Text(this.getSubtitle())
           .fontSize(10)
-          .fontColor(this.getStatusColor(task))
+          .fontColor(this.getStatusColor())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
@@ -129,22 +129,22 @@ export struct DownloadPage {
       .alignItems(HorizontalAlign.Start)
 
       Column() {
-        if (isActiveStatus(task.status)) {
-          this.ProgressRing(task)
+        if (isActiveStatus(this.task.status)) {
+          this.ProgressRing()
 
           this.IconButton($r('sys.symbol.xmark'), () => {
-            this.downloadManager.cancelTask(task.id);
+            this.downloadManager.cancelTask(this.task.id);
           })
         } else {
-          this.ProgressRing(task)
+          this.ProgressRing()
 
-          if (task.status === DownloadStatus.COMPLETED) {
+          if (this.task.status === DownloadStatus.COMPLETED) {
             this.IconButton($r('sys.symbol.arrowshape_down_to_line_fill'), () => {
-              this.exportTaskToDownloads(task);
+              this.exportTaskToDownloads();
             })
           } else {
             this.IconButton($r('sys.symbol.trash'), () => {
-              this.downloadManager.deleteTask(task.id);
+              this.downloadManager.deleteTask(this.task.id);
             })
           }
         }
@@ -162,33 +162,34 @@ export struct DownloadPage {
   }
 
   @Builder
-  ProgressRing(task: DownloadTask) {
+  ProgressRing() {
     Stack({ alignContent: Alignment.Center }) {
       Progress({
-        value: this.getRingValue(task),
+        value: this.getRingValue(),
         total: 100,
         type: ProgressType.Ring
       })
+        .value(this.getRingValue())
         .width(42)
         .height(42)
-        .color(this.getStatusColor(task))
+        .color(this.getStatusColor())
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .style({ strokeWidth: 5 })
 
-      if (task.status === DownloadStatus.COMPLETED) {
+      if (this.task.status === DownloadStatus.COMPLETED) {
         SymbolGlyph($r('sys.symbol.checkmark'))
           .fontSize(16)
           .fontColor([$r('app.color.yourtube_theme_primary')])
-      } else if (task.status === DownloadStatus.FAILED) {
+      } else if (this.task.status === DownloadStatus.FAILED) {
         SymbolGlyph($r('sys.symbol.xmark'))
           .fontSize(16)
           .fontColor(['#FF4444'])
-      } else if (task.status === DownloadStatus.CANCELLED) {
+      } else if (this.task.status === DownloadStatus.CANCELLED) {
         SymbolGlyph($r('sys.symbol.minus'))
           .fontSize(16)
           .fontColor([$r('app.color.yourtube_text_hint')])
       } else {
-        Text(`${this.getRingValue(task)}%`)
+        Text(`${this.getRingValue()}%`)
           .fontSize(10)
           .fontColor($r('app.color.yourtube_text_primary'))
           .fontWeight(FontWeight.Medium)
@@ -212,25 +213,25 @@ export struct DownloadPage {
     .onClick(() => action())
   }
 
-  private getSubtitle(task: DownloadTask): string {
-    if (task.status === DownloadStatus.FAILED) {
-      return task.errorMessage || 'Download failed';
+  private getSubtitle(): string {
+    if (this.task.status === DownloadStatus.FAILED) {
+      return this.task.errorMessage || 'Download failed';
     }
-    if (task.status === DownloadStatus.COMPLETED) {
-      return task.outputPath || 'Saved in app downloads';
+    if (this.task.status === DownloadStatus.COMPLETED) {
+      return this.task.outputPath || 'Saved in app downloads';
     }
-    if (task.status === DownloadStatus.PENDING) {
-      return `${task.getStatusLabel()} · ${task.threadCount} threads`;
+    if (this.task.status === DownloadStatus.PENDING) {
+      return this.task.getStatusLabel();
     }
-    const progressText = task.getProgressText();
-    return progressText ? `${task.getStatusLabel()} · ${progressText}` : task.getStatusLabel();
+    const progressText = this.task.getProgressText();
+    return progressText ? `${this.task.getStatusLabel()} · ${progressText}` : this.task.getStatusLabel();
   }
 
-  private async exportTaskToDownloads(task: DownloadTask): Promise<void> {
-    if (this.exportingTaskId.length > 0 || task.status !== DownloadStatus.COMPLETED) {
+  private async exportTaskToDownloads(): Promise<void> {
+    if (this.exporting || this.task.status !== DownloadStatus.COMPLETED) {
       return;
     }
-    this.exportingTaskId = task.id;
+    this.exporting = true;
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       const documentViewPicker = new picker.DocumentViewPicker(context);
@@ -241,7 +242,7 @@ export struct DownloadPage {
         return;
       }
       const destinationDir = new fileUri.FileUri(result[0]).path;
-      await this.downloadManager.exportCompletedTask(task.id, destinationDir);
+      await this.downloadManager.exportCompletedTask(this.task.id, destinationDir);
       this.getUIContext().getPromptAction().showToast({
         message: 'Saved to Downloads',
         duration: 2000
@@ -252,41 +253,41 @@ export struct DownloadPage {
         duration: 2000
       });
     } finally {
-      this.exportingTaskId = '';
+      this.exporting = false;
     }
   }
 
-  private getRightLabel(task: DownloadTask): string {
-    if (task.status === DownloadStatus.COMPLETED) {
+  private getRightLabel(): string {
+    if (this.task.status === DownloadStatus.COMPLETED) {
       return '100%';
     }
-    if (task.status === DownloadStatus.FAILED) {
+    if (this.task.status === DownloadStatus.FAILED) {
       return 'Failed';
     }
-    if (task.status === DownloadStatus.CANCELLED) {
+    if (this.task.status === DownloadStatus.CANCELLED) {
       return 'Cancelled';
     }
-    return formatRelativeTime(task.createdAt);
+    return formatRelativeTime(this.task.createdAt);
   }
 
-  private getRingValue(task: DownloadTask): number {
-    if (task.status === DownloadStatus.COMPLETED) {
+  private getRingValue(): number {
+    if (this.task.status === DownloadStatus.COMPLETED) {
       return 100;
     }
-    if (task.status === DownloadStatus.FAILED || task.status === DownloadStatus.CANCELLED) {
-      return Math.max(0, Math.min(100, task.progress || 0));
+    if (this.task.status === DownloadStatus.FAILED || this.task.status === DownloadStatus.CANCELLED) {
+      return Math.max(0, Math.min(100, this.task.progress || 0));
     }
-    if (task.status === DownloadStatus.PENDING) {
+    if (this.task.status === DownloadStatus.PENDING) {
       return 0;
     }
-    return Math.max(0, Math.min(100, task.progress || 0));
+    return Math.max(0, Math.min(100, this.task.progress || 0));
   }
 
-  private getStatusColor(task: DownloadTask): ResourceColor {
-    if (task.status === DownloadStatus.FAILED) {
+  private getStatusColor(): ResourceColor {
+    if (this.task.status === DownloadStatus.FAILED) {
       return '#FF4444';
     }
-    if (task.status === DownloadStatus.COMPLETED || isActiveStatus(task.status)) {
+    if (this.task.status === DownloadStatus.COMPLETED || isActiveStatus(this.task.status)) {
       return $r('app.color.yourtube_theme_primary');
     }
     return $r('app.color.yourtube_text_hint');
