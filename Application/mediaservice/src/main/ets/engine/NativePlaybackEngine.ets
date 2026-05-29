@@ -291,7 +291,6 @@ export class NativePlaybackEngine {
   }
 
   attachSurface(surfaceId: string): void {
-    if (surfaceId === this.surfaceId) return;
     this.surfaceId = surfaceId;
     const player = this.player;
     if (!player || player.state === 'released') {

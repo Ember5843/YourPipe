@@ -29,6 +29,8 @@ export class AvSessionManager {
   public onSeekCommand: ((position: number) => void) | undefined = undefined;
   public onFastForwardCommand: ((skipIntervalSec?: number) => void) | undefined = undefined;
   public onRewindCommand: ((skipIntervalSec?: number) => void) | undefined = undefined;
+  public onNextCommand: (() => void) | undefined = undefined;
+  public onPreviousCommand: (() => void) | undefined = undefined;
   public onStopCommand: (() => void) | undefined = undefined;
 
   // Cast state
@@ -102,6 +104,8 @@ export class AvSessionManager {
       this.session.off('seek');
       this.session.off('fastForward');
       this.session.off('rewind');
+      this.session.off('playNext');
+      this.session.off('playPrevious');
       this.session.off('stop');
       // outputDeviceChange 未注册成功，无需 off
     } catch (e) {
@@ -317,6 +321,14 @@ export class AvSessionManager {
     this.session.on('rewind', (skipIntervalSec?: number) => {
       Logger.debug(TAG, `Control center → rewind ${skipIntervalSec}s`);
       this.onRewindCommand?.(skipIntervalSec);
+    });
+    this.session.on('playNext', () => {
+      Logger.debug(TAG, 'Control center -> playNext');
+      this.onNextCommand?.();
+    });
+    this.session.on('playPrevious', () => {
+      Logger.debug(TAG, 'Control center -> playPrevious');
+      this.onPreviousCommand?.();
     });
     this.session.on('stop', () => {
       Logger.debug(TAG, 'Control center → stop');

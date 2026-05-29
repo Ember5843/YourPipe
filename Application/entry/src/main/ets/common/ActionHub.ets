@@ -1,5 +1,6 @@
 import { VideoItem } from 'youtube_core';
 import { SearchChannelItem, SearchPlaylistItem } from 'youtube_core';
+import { PlayQueueSourceHint } from '../features/player/PlayQueueManager';
 
 export type CallbackFunc = Function;
 
@@ -11,7 +12,7 @@ export enum ActionHubEvent {
 
 export class ActionHub {
   openSearch: () => void = () => {};
-  openVideo: (video: VideoItem) => void = () => {};
+  openVideo: (video: VideoItem, sourceHint?: PlayQueueSourceHint) => void = () => {};
   openChannel: (channel: SearchChannelItem) => void = () => {};
   openChannelById: (channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string) => void = () => {};
   openPlaylist: (playlist: SearchPlaylistItem) => void = () => {};
@@ -29,12 +30,6 @@ export class ActionHub {
   setSearchCountry: (countryCode: string) => void = () => {};
   setSearchLocale: (languageCode: string, countryCode: string) => void = () => {};
   resetSearchLocale: () => void = () => {};
-
-  /**
-   * Called before openVideo. Set by PlaylistDetailPage to pre-load the play queue.
-   * When set, the Index.openVideoDetail path will call this before switching the video.
-   */
-  beforeOpenVideo: (video: VideoItem) => Promise<void> = async () => {};
 
   /** Save the current play queue as a local playlist. */
   saveCurrentQueueAsLocal: (name: string) => void = () => {};

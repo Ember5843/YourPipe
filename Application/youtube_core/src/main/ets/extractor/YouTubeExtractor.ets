@@ -785,10 +785,7 @@ export class YouTubeExtractor {
 
     // 先提取元数据（确保即使后续流程失败，元数据也已就绪）
     const videoInfo = this.extractMetadata(videoId, watchPlayerResponse);
-
-    // 提前启动非关键请求：next 端点 + RYD 点踩数，与流提取并行
-    const nextPromise = this.fetchNextResponse(videoId);
-    const dislikePromise = this.fetchDislikeCount(videoId);
+    videoInfo.playerResponse = watchPlayerResponse;
 
     // Extract streams using ensureStreamsAreCached() pattern (multi-client, batch deobfuscation)
     await this.ensureStreamsAreCached(videoId, html, watchPlayerResponse);
@@ -808,8 +805,16 @@ export class YouTubeExtractor {
       videoInfo.dashMpdUrl = await this.deobfuscateManifestUrl(dashRaw);
     }
 
-    // 等待提前启动的非关键请求完成
-    const settledResults = await Promise.allSettled([nextPromise, dislikePromise]);
+    return videoInfo;
+  }
+
+  async fetchPlaybackExtras(videoId: string, playerResponse?: PlayerResponse): Promise<VideoInfo> {
+    logger.info(`Fetching playback extras for: ${videoId}`);
+    const baseInfo = new VideoInfo(videoId);
+    const settledResults = await Promise.allSettled([
+      this.fetchNextResponse(videoId),
+      this.fetchDislikeCount(videoId)
+    ]);
     const nextResult = settledResults[0];
     const rydResult = settledResults[1];
 
@@ -819,15 +824,14 @@ export class YouTubeExtractor {
     }
 
     if (rydResult.status === 'fulfilled' && (rydResult.value as number) >= 0) {
-      videoInfo.dislikeCount = rydResult.value as number;
+      baseInfo.dislikeCount = rydResult.value as number;
     }
 
-    // 从 nextResponse 提取补充元数据
     if (nextResponse) {
-      this.enrichFromNextResponse(videoInfo, nextResponse, watchPlayerResponse);
+      this.enrichFromNextResponse(baseInfo, nextResponse, playerResponse);
     }
 
-    return videoInfo;
+    return baseInfo;
   }
 
   private parseRange(range: Range | undefined): StreamRange | undefined {
@@ -1202,14 +1206,14 @@ export class YouTubeExtractor {
   private enrichFromNextResponse(
     videoInfo: VideoInfo,
     nextResponse: NextResponse,
-    playerResponse: PlayerResponse
+    playerResponse?: PlayerResponse
   ): void {
     const twoCol = nextResponse.contents?.twoColumnWatchNextResults;
     const contents = twoCol?.results?.results?.contents || [];
 
     // videoPrimaryInfoRenderer → likeCount
     const primaryInfo = contents.find(c => c.videoPrimaryInfoRenderer)?.videoPrimaryInfoRenderer;
-    if (primaryInfo) {
+    if (primaryInfo && playerResponse) {
       const likeCount = this.extractLikeCount(primaryInfo, playerResponse);
       if (likeCount >= 0) {
         videoInfo.likeCount = likeCount;

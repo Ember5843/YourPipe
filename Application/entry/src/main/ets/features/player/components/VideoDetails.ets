@@ -32,14 +32,16 @@ const TAG: string = '[VideoDetails]';
 
 @Component
 export struct VideoDetails {
-  @Prop item: VideoItem;
-  @Prop videoDescription?: string;
-  @Prop videoDescriptionError?: string;
+  @Prop @Watch('onItemChanged') item: VideoItem;
+  @Prop videoDescription: string = '';
+  @Prop videoDescriptionError: string = '';
   @Prop streams: StreamInfo[] = [];
   @Prop viewCount: number = 0;
   @Prop likeCount: string = '0';
   @Prop publishDate: string = '';
   @Prop tags: string[] = [];
+  @Prop @Watch('onChannelIdentityChanged') channelId: string = '';
+  @Prop @Watch('onChannelIdentityChanged') channelAvatarUrl: string = '';
   @State isTitleExpanded: boolean = false;
   @State channelInfo: SearchChannelItem = new SearchChannelItem(
           0,
@@ -68,7 +70,7 @@ export struct VideoDetails {
   }
 
   private getEffectiveError(): string | undefined {
-    if (this.videoDescriptionError !== undefined) {
+    if (this.videoDescriptionError.length > 0) {
       return this.videoDescriptionError;
     }
     return this.item?.videoDescriptionError || undefined;
@@ -97,25 +99,7 @@ export struct VideoDetails {
 
   aboutToAppear() {
     this.channelInfoService = new ChannelInfoService();
-    if (this.item?.channelId) {
-      const cached = PlayerSession.getInstance().getCachedChannelProfile(this.item.channelId);
-      if (cached) {
-        this.channelInfo = new SearchChannelItem(
-          0,
-          this.item.channelId,
-          cached.name || this.item.author || '',
-          cached.subscriberText || '0 subscribers',
-          cached.videoCountText || '0 videos',
-          cached.avatarUrl || this.item.channelAvatarUrl || '',
-          cached.description || '',
-          '#CCCCCC'
-        );
-      } else {
-        // 延迟加载频道信息，避免与视频提取竞争带宽
-        // 频道信息仅在详情 Tab 中展示，非首屏关键路径
-        setTimeout(() => { this.fetchChannelInfo(); }, 1500);
-      }
-    }
+    this.resetForCurrentItem();
     this.classifyStreamsForDownload();
 
     if (this.getEffectiveDesc().length === 0) {
@@ -129,6 +113,59 @@ export struct VideoDetails {
     if (this.descSkeletonTimer >= 0) {
       clearInterval(this.descSkeletonTimer);
     }
+  }
+
+  private onItemChanged(): void {
+    this.isTitleExpanded = false;
+    this.resetForCurrentItem();
+    this.classifyStreamsForDownload();
+  }
+
+  private onChannelIdentityChanged(): void {
+    this.resetForCurrentItem();
+  }
+
+  private resetForCurrentItem(): void {
+    this.channelInfoError = null;
+    const effectiveChannelId = this.channelId || this.item?.channelId || '';
+    const effectiveAvatarUrl = this.channelAvatarUrl || this.item?.channelAvatarUrl || '';
+    this.channelInfo = new SearchChannelItem(
+      0,
+      effectiveChannelId,
+      this.item?.author || '',
+      '0 subscribers',
+      '0 videos',
+      effectiveAvatarUrl,
+      '',
+      '#CCCCCC'
+    );
+
+    if (!effectiveChannelId) {
+      return;
+    }
+
+    const channelId = effectiveChannelId;
+    const cached = PlayerSession.getInstance().getCachedChannelProfile(channelId);
+    if (cached) {
+      this.channelInfo = new SearchChannelItem(
+        0,
+        channelId,
+        cached.name || this.item.author || '',
+        cached.subscriberText || '0 subscribers',
+        cached.videoCountText || '0 videos',
+        cached.avatarUrl || effectiveAvatarUrl,
+        cached.description || '',
+        '#CCCCCC'
+      );
+      return;
+    }
+
+    setTimeout(() => {
+      const currentChannelId = this.channelId || this.item?.channelId || '';
+      if (currentChannelId === channelId) {
+        this.fetchChannelInfo();
+      }
+    }, 1500);
   }
 
   private classifyStreamsForDownload(): void {
@@ -193,21 +230,23 @@ export struct VideoDetails {
   }
 
   private async fetchChannelInfo() {
-    Logger.debug(TAG, `[fetchChannelInfo] Starting, channelId=${this.item.channelId}`);
-    if (!this.item.channelId || !this.channelInfoService) {
+    const channelId = this.channelId || this.item.channelId || '';
+    const avatarUrl = this.channelAvatarUrl || this.item.channelAvatarUrl || '';
+    Logger.debug(TAG, `[fetchChannelInfo] Starting, channelId=${channelId}`);
+    if (!channelId || !this.channelInfoService) {
       return;
     }
 
     try {
-      const profile = await this.channelInfoService.fetchChannelProfile(this.item.channelId);
+      const profile = await this.channelInfoService.fetchChannelProfile(channelId);
       if (profile) {
         this.channelInfo = new SearchChannelItem(
           0,
-          this.item.channelId,
+          channelId,
           profile.name || this.item.author || '',
           profile.subscriberText || '0 subscribers',
           profile.videoCountText || '0 videos',
-          profile.avatarUrl || this.item.channelAvatarUrl || '',
+          profile.avatarUrl || avatarUrl,
           profile.description || '',
           '#CCCCCC'
         );
@@ -219,7 +258,7 @@ export struct VideoDetails {
           avatarUrl: profile.avatarUrl || '',
           description: profile.description || ''
         };
-        PlayerSession.getInstance().setCachedChannelProfile(this.item.channelId, cacheEntry);
+        PlayerSession.getInstance().setCachedChannelProfile(channelId, cacheEntry);
       } else {
         this.channelInfoError = $r('app.string.yt_error_load_channel_info');
       }
@@ -252,7 +291,7 @@ export struct VideoDetails {
         this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
           $r('app.string.yt_action_download'), () => { this.showTodo(); })
         this.ActionButton($r('sys.symbol.bookmark'),
-          '添加到列表', () => { this.showTodo(); })
+          '保存到播放列表', () => { this.showTodo(); })
         this.ActionButton($r('sys.symbol.play_circle'),
           '后台播放', () => { this.showTodo(); })
         this.ActionButton($r('sys.symbol.share'),
@@ -311,7 +350,7 @@ export struct VideoDetails {
         .alignItems(HorizontalAlign.Start)
 
         // ── 元数据行 ──
-        if (this.viewCount > 0 || this.publishDate) {
+        if (this.viewCount > 0 || (this.likeCount && this.likeCount !== '0') || this.publishDate) {
           Text(this.buildMetadataText())
             .fontSize(13)
             .fontColor($r('app.color.yourtube_text_secondary'))

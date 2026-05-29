@@ -177,6 +177,18 @@ export struct VideoPlayer {
   private cacheCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private cacheCanvasCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cacheCanvasSettings);
   private seekableRangesListener = () => { this.drawCacheRanges(); };
+  private isHandlingEnded: boolean = false;
+  private isEndedListener = async () => {
+    if (this.isHandlingEnded) {
+      return;
+    }
+    this.isHandlingEnded = true;
+    try {
+      await PlayerSession.getInstance().playNextFromQueue();
+    } finally {
+      this.isHandlingEnded = false;
+    }
+  };
   // 屏幕实件订阅者：监听 SCREEN_OFF / SCREEN_ON 以关闭/恢复视频输出
   private screenEventSubscriber: commonEventManager.CommonEventSubscriber | null = null;
   @State showForwardHint: boolean = false;
@@ -273,6 +285,7 @@ export struct VideoPlayer {
       this.lastController.removeErrorListener(this.errorListener);
       this.lastController.removeWaitingForBufferListener(this.waitingForBufferListener);
       this.lastController.removeSeekableRangesListener(this.seekableRangesListener);
+      this.lastController.removeIsEndedListener(this.isEndedListener);
     }
 
     // 2. 向新 controller 注册监听器
@@ -283,6 +296,7 @@ export struct VideoPlayer {
       this.controller.addErrorListener(this.errorListener);
       this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
       this.controller.addSeekableRangesListener(this.seekableRangesListener);
+      this.controller.addIsEndedListener(this.isEndedListener);
 
       // 3. 立即同步 UI 状态
       this.isPlaying = this.controller.isPlaying;
@@ -363,6 +377,7 @@ export struct VideoPlayer {
     this.controller.addErrorListener(this.errorListener);
     this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
+    this.controller.addIsEndedListener(this.isEndedListener);
 
     // 同步投屏状态
     this.isCasting = this.controller.isCasting;
@@ -1053,6 +1068,7 @@ export struct VideoPlayer {
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
+    this.controller.removeIsEndedListener(this.isEndedListener);
     this.clearHideTimer();
     clearTimeout(this.volHideTimerId);
     clearTimeout(this.brightnessHideTimerId);

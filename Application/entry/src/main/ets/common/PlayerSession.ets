@@ -16,7 +16,7 @@
 import { AppLog } from './AppLog';
 import { common } from '@kit.AbilityKit';
 import { AvPlayerController, VideoData, LocalMediaProxy, PlayerState } from 'mediaservice';
-import { VideoItem } from 'youtube_core';
+import { VideoInfo, VideoItem } from 'youtube_core';
 import { PlaybackConfig } from './PlaybackConfig';
 import { PipWindowController, PipPlayerDelegate } from '../features/player/PipWindowController';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
@@ -36,15 +36,25 @@ export interface CachedChannelProfile {
 const logger = AppLog.getInstance('PlayerSession');
 const TAG = '[PlayerSession]';
 
+function getFallbackThumbnailUrl(videoId: string): string {
+  return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '';
+}
+
 class SessionPipDelegate implements PipPlayerDelegate {
   private controller: AvPlayerController;
+  private session: PlayerSession;
 
-  constructor(controller: AvPlayerController) {
+  constructor(controller: AvPlayerController, session: PlayerSession) {
     this.controller = controller;
+    this.session = session;
   }
 
   syncPlay(): void { this.controller.syncPlay(); }
   syncPause(): void { this.controller.syncPause(); }
+  playNext(): void { this.session.playNextFromQueue(); }
+  playPrevious(): void { this.session.playPreviousFromQueue(); }
+  canPlayNext(): boolean { return this.session.canPlayNextFromQueue(); }
+  canPlayPrevious(): boolean { return this.session.canPlayPreviousFromQueue(); }
   get isPlaying(): boolean { return this.controller.isPlaying; }
 }
 
@@ -74,6 +84,8 @@ export class PlayerSession {
   private _cachedVideoSource: VideoData | null = null;
   private _lastPlayError: string | Resource | null = null;
   private _cachedChannelProfiles: Map<string, CachedChannelProfile> = new Map();
+  private _activeExtrasVideoId: string = '';
+  private _pipListenersBound: boolean = false;
 
   /** PIP 恢复时由外部（Index.ets）设置的回调 */
   onPipRestore?: () => void;
@@ -104,6 +116,8 @@ export class PlayerSession {
     };
 
     this._controller = new AvPlayerController(this._defaultSource);
+    this.bindControllerQueueControls();
+    this.bindQueueSwitchHandler();
     LocalMediaProxy.initCache(this._context);
     logger.debug(`${TAG} PlayerSession created`);
   }
@@ -186,30 +200,39 @@ export class PlayerSession {
   }
 
   detachSurface(): void {
+    const state = this._controller.playerState;
+    if (state === PlayerState.PIP_ACTIVE || state === PlayerState.PIP_ENTERING) {
+      logger.debug(`${TAG} surface detach ignored while PiP active`);
+      return;
+    }
     this._xComponentController = undefined;
     logger.debug(`${TAG} surface detached`);
   }
 
   private async setupPipController(xComponentController: XComponentController): Promise<void> {
     this._pipController = new PipWindowController(xComponentController);
-    const delegate = new SessionPipDelegate(this._controller);
+    const delegate = new SessionPipDelegate(this._controller, this);
     const pipW = this._defaultSource.width || 0;
     const pipH = this._defaultSource.height || 0;
     await this._pipController.createPipController(delegate, pipW, pipH);
 
-    // READY 后启用 PiP autoStart
-    this._controller.addIsReadyListener((ready: boolean) => {
-      if (ready && this._pipController) {
-        const pbCfg = AppStorage.get('playbackConfig') as Record<string, Object> | undefined;
-        const enablePip = (pbCfg?.enablePip as boolean) ?? true;
-        this._pipController.updateAutoStart(enablePip);
-      }
-    });
+    if (!this._pipListenersBound) {
+      this._pipListenersBound = true;
+      // READY 后启用 PiP autoStart
+      this._controller.addIsReadyListener((ready: boolean) => {
+        if (ready && this._pipController) {
+          const pbCfg = AppStorage.get('playbackConfig') as Record<string, Object> | undefined;
+          const enablePip = (pbCfg?.enablePip as boolean) ?? true;
+          this._pipController.updateAutoStart(enablePip);
+        }
+        this._pipController?.syncQueueControlEnabled();
+      });
 
-    // 播放状态变更时同步 PiP 面板的播放/暂停状态
-    this._controller.addIsPlayingListener((_isPlaying: boolean) => {
-      this._pipController?.syncPipPlayState();
-    });
+      // 播放状态变更时同步 PiP 面板的播放/暂停状态
+      this._controller.addIsPlayingListener((_isPlaying: boolean) => {
+        this._pipController?.syncPipPlayState();
+      });
+    }
 
     this._pipController.onPipStop = () => {
       if (this._controller.playerState === PlayerState.PIP_RESTORING) {
@@ -234,6 +257,49 @@ export class PlayerSession {
   }
 
   // ──── 播放控制 ────
+
+  private bindControllerQueueControls(): void {
+    this._controller.onNextCommand = () => {
+      this.playNextFromQueue();
+    };
+    this._controller.onPreviousCommand = () => {
+      this.playPreviousFromQueue();
+    };
+  }
+
+  private bindQueueSwitchHandler(): void {
+    PlayQueueManager.getInstance().onSwitchVideo = (video: VideoItem) => {
+      this.switchToQueueVideo(video);
+    };
+  }
+
+  private async switchToQueueVideo(video: VideoItem): Promise<void> {
+    if (!video || !video.videoId) {
+      return;
+    }
+    logger.info(`${TAG} queue switch -> ${video.videoId}`);
+    AppStorage.setOrCreate('selectedVideo', video);
+    await this.play(video);
+  }
+
+  canPlayNextFromQueue(): boolean {
+    const queueManager = PlayQueueManager.getInstance();
+    return queueManager.hasNext() || queueManager.hasMorePages;
+  }
+
+  canPlayPreviousFromQueue(): boolean {
+    return PlayQueueManager.getInstance().hasPrev();
+  }
+
+  async playNextFromQueue(): Promise<boolean> {
+    const video = await PlayQueueManager.getInstance().nextOrLoadMore();
+    return video !== null;
+  }
+
+  async playPreviousFromQueue(): Promise<boolean> {
+    const video = PlayQueueManager.getInstance().prev();
+    return video !== null;
+  }
 
   async play(video: VideoItem): Promise<VideoData | null> {
     if (!this.isSessionActive()) {
@@ -283,6 +349,20 @@ export class PlayerSession {
 
       if (result.success && result.videoInfo) {
         const videoStream = result.videoInfo.streams?.find((s) => s.hasVideo && s.width && s.height);
+        if (this._currentVideo) {
+          if (result.videoInfo.author && this._currentVideo.author !== result.videoInfo.author) {
+            this._currentVideo.author = result.videoInfo.author;
+          }
+          if (result.videoInfo.channelId && this._currentVideo.channelId !== result.videoInfo.channelId) {
+            this._currentVideo.channelId = result.videoInfo.channelId;
+          }
+          if (result.videoInfo.uploaderAvatarUrl) {
+            const avatarUrl = normalizeUrl(result.videoInfo.uploaderAvatarUrl);
+            if (this._currentVideo.channelAvatarUrl !== avatarUrl) {
+              this._currentVideo.channelAvatarUrl = avatarUrl;
+            }
+          }
+        }
         const videoSource: VideoData = {
           name: this._defaultSource.name,
           description: result.videoInfo.title || '',
@@ -315,29 +395,19 @@ export class PlayerSession {
         this._defaultSource = videoSource;
         this._lastPlayError = null;
         this._watchVideoId = videoId;
-        this._controller.updateVideoSource(videoSource);
-
-        // Store related items for auto-play queue (PipePipe-style)
-        const relatedItems = result.videoInfo.relatedItems;
-        if (relatedItems && relatedItems.length > 0) {
-          // Convert RelatedVideoInfo → VideoItem
-          const videoItems: VideoItem[] = relatedItems.map((r) => new VideoItem(
-            0, r.videoId, r.title, r.author, '',
-            normalizeUrl(r.thumbnailUrl || ''), !!r.isLive, '#CCCCCC',
-            r.channelId || '', '', '', '', null
-          ));
-          PlayQueueManager.getInstance().setAutoQueueCandidates(videoItems);
-        }
-
-        if (videoStream && videoStream.width && videoStream.height) {
-          this._pipController?.updatePipContentSize(videoStream.width, videoStream.height);
-        }
-
         const resumeSec: number = WatchHistoryStore.getProgress(videoId);
         if (resumeSec > 0) {
           logger.info(`${TAG} Will resume at ${resumeSec}s`);
           this._controller.setPendingStartFromSec(resumeSec);
         }
+        logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
+        this._controller.updateVideoSource(videoSource);
+        this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
+
+        if (videoStream && videoStream.width && videoStream.height) {
+          this._pipController?.updatePipContentSize(videoStream.width, videoStream.height);
+        }
+
         this.startWatchSaveTimer();
         return videoSource;
       } else {
@@ -352,7 +422,51 @@ export class PlayerSession {
     }
   }
 
+  private fetchPlaybackExtrasInBackground(playService: YouTubePlayService, videoInfo: VideoInfo): void {
+    const videoId = videoInfo.videoId;
+    this._activeExtrasVideoId = videoId;
+    const startedAt = Date.now();
+    logger.info(`${TAG} playback extras start video=${videoId}`);
+    playService.fetchPlaybackExtrasFor(videoInfo).then((extras) => {
+      if (!extras || this._currentVideo?.videoId !== videoId || this._activeExtrasVideoId !== videoId) {
+        return;
+      }
+      logger.info(`${TAG} playback extras done video=${videoId} elapsed=${Date.now() - startedAt}ms like=${extras.likeCount ?? -1} related=${extras.relatedItems?.length || 0}`);
+
+      const relatedItems = extras.relatedItems;
+      if (relatedItems && relatedItems.length > 0) {
+        const videoItems: VideoItem[] = relatedItems.map((r) => new VideoItem(
+          0, r.videoId, r.title, r.author, '',
+          normalizeUrl(r.thumbnailUrl || getFallbackThumbnailUrl(r.videoId)), !!r.isLive, '#CCCCCC',
+          r.channelId || '', '', '', '', null
+        ));
+        PlayQueueManager.getInstance().setAutoQueueCandidates(videoItems);
+      }
+    }).catch((e: Error) => {
+      logger.warn(`${TAG} fetchPlaybackExtrasInBackground failed: ${e.message || e}`);
+    });
+  }
+
   async enterPip(): Promise<boolean> {
+    if (!this._xComponentController) {
+      logger.warn(`${TAG} enterPip: XComponentController not ready`);
+      return false;
+    }
+
+    try {
+      if (this._controller.playerState !== PlayerState.PIP_ACTIVE &&
+        this._controller.playerState !== PlayerState.PIP_ENTERING) {
+        if (this._pipController) {
+          this._pipController.destroyPipController();
+          this._pipController = undefined;
+        }
+        await this.setupPipController(this._xComponentController);
+        logger.info(`${TAG} PiP controller refreshed before enter`);
+      }
+    } catch (e) {
+      logger.warn(`${TAG} refresh PiP controller before enter failed: ${e}`);
+    }
+
     if (!this._pipController?.pipController) {
       logger.warn(`${TAG} enterPip: pipController not ready`);
       return false;
@@ -470,6 +584,7 @@ export class PlayerSession {
     this._activePlayVideoId = '';
     this._cachedVideoSource = null;
     this._cachedChannelProfiles.clear();
+    this._pipListenersBound = false;
     this._defaultSource = {
       name: $r('app.string.module_desc'),
       description: '',
@@ -483,6 +598,8 @@ export class PlayerSession {
       index: 0
     };
     this._controller = new AvPlayerController(this._defaultSource);
+    this.bindControllerQueueControls();
+    this.bindQueueSwitchHandler();
     logger.debug(`${TAG} Session reset`);
   }
 }

@@ -15,7 +15,7 @@ import { VideoCard } from '../../common/components/VideoCard';
 import { VideoCardGrid } from '../../common/components/VideoCardGrid';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
-import { PlayQueueManager } from '../player/PlayQueueManager';
+import { PlayQueueSourceHint } from '../player/PlayQueueManager';
 
 const logger = AppLog.getInstance('PlaylistDetailPage');
 
@@ -44,22 +44,22 @@ export struct PlaylistDetailPage {
 
   aboutToAppear() {
     this.loadPlaylistVideos();
-    // Hook: when a video is tapped from this playlist page, pre-load the play queue
-    // before the video opens, so PlayerPage Tab 3 shows the full playlist context.
-    const playlistId = (this.playlist.playlistId || '').trim();
-    const playlistName = this.playlist.name || '';
-    this.actionHub.beforeOpenVideo = async (video: VideoItem) => {
-      const qm = PlayQueueManager.getInstance();
-      // Only override if clicking within the same playlist (not navigating from elsewhere)
-      if (qm.sourceType !== 'remote' || qm.sourceId !== playlistId) {
-        await qm.loadFromRemotePlaylist(playlistId, video.videoId, playlistName);
-      }
-    };
   }
 
   aboutToDisappear() {
-    // Clear the hook so other pages don't incorrectly load this playlist's queue
-    this.actionHub.beforeOpenVideo = async () => {};
+  }
+
+  private openPlaylistVideo(video: VideoItem, index: number): void {
+    const hint: PlayQueueSourceHint = {
+      type: 'playlist',
+      playlistId: (this.playlist.playlistId || '').trim(),
+      playlistName: this.playlist.name || '',
+      loadedItems: this.videoList.slice(),
+      startIndex: index,
+      nextPageToken: this.nextPageToken,
+      visitorData: this.visitorData
+    };
+    this.actionHub.openVideo(video, hint);
   }
 
   private getVideoGridColumnCount(): number {
@@ -276,13 +276,16 @@ export struct PlaylistDetailPage {
               columns: this.getVideoGridColumnCount(),
               gutter: { x: 8, y: 8 }
             }) {
-              ForEach(this.videoList, (item: VideoItem) => {
+              ForEach(this.videoList, (item: VideoItem, index: number) => {
                 GridCol({ span: 1 }) {
                   VideoCardGrid({
                     video: item,
                     actionLabel: $r('app.string.yt_action_favorite'),
                     actionType: 'favorite',
-                    useFavoriteToggle: true
+                    useFavoriteToggle: true,
+                    onOpenVideo: () => {
+                      this.openPlaylistVideo(item, index);
+                    }
                   })
                 }
               }, (item: VideoItem) => item.videoId || item.id.toString())
@@ -316,13 +319,16 @@ export struct PlaylistDetailPage {
         })
       } else {
         List({ space: 4, scroller: this.scrollerForList }) {
-          ForEach(this.videoList, (item: VideoItem) => {
+          ForEach(this.videoList, (item: VideoItem, index: number) => {
             ListItem() {
               VideoCard({
                 video: item,
                 actionLabel: $r('app.string.yt_action_favorite'),
                 actionType: 'favorite',
-                useFavoriteToggle: true
+                useFavoriteToggle: true,
+                onOpenVideo: () => {
+                  this.openPlaylistVideo(item, index);
+                }
               })
             }
           }, (item: VideoItem) => item.videoId || item.id.toString())

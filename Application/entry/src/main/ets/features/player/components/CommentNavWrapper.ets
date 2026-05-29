@@ -5,9 +5,16 @@ import { ActionHub, ActionHubEvent } from '../../../common/ActionHub';
 
 @Component
 export struct CommentNavWrapper {
-  @Prop videoId: string;
+  @Prop @Watch('onVideoIdChanged') videoId: string;
   @Provide('commentPageInfo') commentPageInfo: NavPathStack = new NavPathStack();
   @Consume('actionHub') actionHub: ActionHub;
+  private exitRepliesHandler: () => void = () => {
+    setTimeout(() => {
+      if (this.commentPageInfo.size() > 0) {
+        this.commentPageInfo.pop();
+      }
+    }, 0);
+  };
 
   @Builder
   CommentTabMap(name: string, param: Object) {
@@ -17,15 +24,18 @@ export struct CommentNavWrapper {
   }
 
   aboutToAppear(): void {
-    this.actionHub.on(ActionHubEvent.EXIT_COMMENT_REPLIES, () => {
-      if (this.commentPageInfo.size() > 0) {
-        this.commentPageInfo.pop();
-      }
-    });
+    this.actionHub.on(ActionHubEvent.EXIT_COMMENT_REPLIES, this.exitRepliesHandler);
   }
 
   aboutToDisappear(): void {
-    this.actionHub.off(ActionHubEvent.EXIT_COMMENT_REPLIES);
+    this.actionHub.off(ActionHubEvent.EXIT_COMMENT_REPLIES, this.exitRepliesHandler);
+  }
+
+  private onVideoIdChanged(): void {
+    setTimeout(() => {
+      this.commentPageInfo = new NavPathStack();
+      this.actionHub.emit(ActionHubEvent.IS_REPLIES_OPEN_CHANGE, false);
+    }, 0);
   }
 
   build() {

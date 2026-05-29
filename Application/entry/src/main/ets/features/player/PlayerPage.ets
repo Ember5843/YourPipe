@@ -34,7 +34,7 @@ import { WatchHistoryStore } from '../../common/WatchHistoryStore';
 import { AvPlayerController, PlayerState } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
 import { PlayQueueList } from './components/PlayQueueList';
-import { PlayQueueManager } from './PlayQueueManager';
+import { PlayQueueManager, QueueSourceType } from './PlayQueueManager';
 
 const logger = AppLog.getInstance('PlayerPage');
 
@@ -74,9 +74,15 @@ export struct VideoPlayerPage {
   @State tabArray: Array<TabItem> = initTabData();
   @State currentTabIndex: number = 0;
   @State videoDescriptionError: string | null = null;
+  @State detailLikeCount: string = '0';
+  @State detailChannelId: string = '';
+  @State detailChannelAvatarUrl: string = '';
   @State isRetrying: boolean = false;
   @State isLoading: boolean = false;
   private windowUtil: WindowUtil = WindowUtil.getInstance();
+  private handleExitFullscreen: () => void = () => {
+    this.handleFullScreenExit();
+  };
   /** 当前播放视频的 videoId，用于历史记录 */
   private watchVideoId: string = '';
   /** 10 秒定时保存历史进度的 Timer ID */
@@ -118,6 +124,12 @@ export struct VideoPlayerPage {
     this.isRetrying = true;
     await this.onVideoChange();
     this.isRetrying = false;
+  }
+
+  private syncDetailStateFromSource(source: VideoData): void {
+    this.detailLikeCount = source.likeCount || '0';
+    this.detailChannelId = source.channelId || this.video?.channelId || '';
+    this.detailChannelAvatarUrl = this.video?.channelAvatarUrl || '';
   }
 
   async aboutToAppear(): Promise<void> {
@@ -162,15 +174,15 @@ export struct VideoPlayerPage {
 
     // Register queue switch callback: when user clicks another video in the play queue,
     // PlayerPage reloads without going through AppStorage/Index.openVideoDetail.
-    PlayQueueManager.getInstance().onSwitchVideo = (v: VideoItem) => {
+    PlayQueueManager.getInstance().onSwitchVideo = async (v: VideoItem) => {
       logger.info(`${TAG} queue switch → ${v.videoId}`);
-      this.video = v;
-      this.onVideoChange();
+      // Set StorageProp to trigger @Watch('onVideoChange') — do NOT call onVideoChange()
+      // explicitly to avoid double-trigger race condition.
+      AppStorage.setOrCreate('selectedVideo', v);
+      await PlayerSession.getInstance().play(v);
     };
 
-    this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, () => {
-      this.handleFullScreenExit();
-    });
+    this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
 
     // 监听投屏状态变化 —— 连接时暂停本地播放，断开后恢复
     this.controller.onCastStateChange = (isCasting: boolean, deviceName: string) => {
@@ -235,7 +247,7 @@ export struct VideoPlayerPage {
     this.windowUtil.enableWindowSystemBar();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
     this.windowUtil.registerOffWindowSizeChange();
-    this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN);
+    this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
     this.controller.onCastStateChange = undefined;
 
     // 防御性清理：如果 session 已释放（X 按钮关闭），确保 PiP 不会残留
@@ -243,10 +255,29 @@ export struct VideoPlayerPage {
     if (session.isReleased || session.playerState === PlayerState.IDLE) {
       session.invalidatePipController();
     }
+
+    // Clear adhoc queues when leaving the player (not during PiP).
+    // Remote and local queues are preserved — they carry semantic context
+    // (a YouTube playlist or a saved local queue) that should survive navigation.
+    const qm = PlayQueueManager.getInstance();
+    const isPipActive = session.playerState === PlayerState.PIP_ACTIVE
+      || session.playerState === PlayerState.PIP_ENTERING;
+    if (!isPipActive && qm.sourceType === QueueSourceType.ADHOC) {
+      qm.clear();
+      logger.info(`${TAG} cleared adhoc queue on exit`);
+    }
   }
+
+  // Guard against concurrent onVideoChange invocations (e.g. @Watch + explicit call)
+  private isVideoChanging: boolean = false;
 
   private async onVideoChange(): Promise<void> {
     if (!this.video) return;
+    if (this.isVideoChanging) {
+      logger.info(`${TAG} onVideoChange skipped: already in progress`);
+      return;
+    }
+    this.isVideoChanging = true;
 
     const session = PlayerSession.getInstance();
 
@@ -256,8 +287,10 @@ export struct VideoPlayerPage {
       this.controller = session.controller;
       if (session.cachedVideoSource) {
         this.videoSource = session.cachedVideoSource;
+        this.syncDetailStateFromSource(session.cachedVideoSource);
       }
       this.isLoading = false;
+      this.isVideoChanging = false;
       return;
     }
 
@@ -266,52 +299,56 @@ export struct VideoPlayerPage {
       this.controller = session.controller;
       if (session.cachedVideoSource) {
         this.videoSource = session.cachedVideoSource;
+        this.syncDetailStateFromSource(session.cachedVideoSource);
       }
       this.isLoading = false;
+      this.isVideoChanging = false;
       return;
     }
 
     // 切换视频：清空旧流数据以显示加载占位图，清空元数据避免残留
-    this.isLoading = true;
-    this.videoDescriptionError = null;
-    this.videoSource = {
-      name: this.videoSource.name,
-      description: '',
-      time: '00:00',
-      auto: true,
-      head: this.videoSource.head,
-      likeCount: '0',
-      commentCount: '0',
-      shareCount: '0',
-      play: false,
-      index: 0
-    };
-    const newVideoSource = await session.play(this.video);
-
-    this.controller = session.controller;
-
-    if (newVideoSource) {
-      if (!this.videoSource.videoId || this.videoSource.videoId !== newVideoSource.videoId) {
-        this.videoSource = newVideoSource;
-        session.cachedVideoSource = newVideoSource;
+    try {
+      const isSwitchingVideo = !!this.videoSource.videoId && this.videoSource.videoId !== this.video.videoId;
+      if (isSwitchingVideo) {
+        session.controller.syncPause();
       }
-    } else {
-      const err = session.lastPlayError;
-      if (err === null) {
-        this.videoDescriptionError = '加载视频失败';
-      } else if (typeof err === 'string') {
-        this.videoDescriptionError = err;
+      this.isLoading = true;
+      this.videoDescriptionError = null;
+      this.detailLikeCount = '0';
+      this.detailChannelId = this.video.channelId || '';
+      this.detailChannelAvatarUrl = this.video.channelAvatarUrl || '';
+      const newVideoSource = await session.play(this.video);
+
+      this.controller = session.controller;
+
+      if (newVideoSource) {
+        if (!this.videoSource.videoId || this.videoSource.videoId !== newVideoSource.videoId) {
+          this.videoSource = newVideoSource;
+          session.cachedVideoSource = newVideoSource;
+          this.syncDetailStateFromSource(newVideoSource);
+        }
       } else {
-        try {
-          const ctx = getContext(this);
-          this.videoDescriptionError = ctx.resourceManager.getStringSync((err as Resource).id);
-        } catch (_e) {
+        const err = session.lastPlayError;
+        if (err === null) {
           this.videoDescriptionError = '加载视频失败';
+        } else if (typeof err === 'string') {
+          this.videoDescriptionError = err;
+        } else {
+          try {
+            const ctx = getContext(this);
+            this.videoDescriptionError = ctx.resourceManager.getStringSync((err as Resource).id);
+          } catch (_e) {
+            this.videoDescriptionError = '加载视频失败';
+          }
         }
       }
+    } catch (e) {
+      logger.error(`${TAG} onVideoChange exception: ${e}`);
+      this.videoDescriptionError = '加载视频失败';
+    } finally {
+      this.isLoading = false;
+      this.isVideoChanging = false;
     }
-
-    this.isLoading = false;
   }
 
   onPageHide(): void {
@@ -482,9 +519,11 @@ export struct VideoPlayerPage {
                     videoDescription: this.videoSource.videoDescription,
                     streams: this.videoSource.streams || [],
                     viewCount: this.videoSource.viewCount || 0,
-                    likeCount: this.videoSource.likeCount,
+                    likeCount: this.detailLikeCount,
                     publishDate: this.videoSource.publishDate || '',
                     tags: this.videoSource.tags || [],
+                    channelId: this.detailChannelId,
+                    channelAvatarUrl: this.detailChannelAvatarUrl,
                   })
                 }
               } else if (item.id === 1) {
@@ -513,7 +552,7 @@ export struct VideoPlayerPage {
 
   @Builder
   VideoPlayerContent() {
-    if (!this.videoSource.streams || this.videoSource.streams.length === 0) {
+    if (this.isLoading || this.videoDescriptionError || !this.videoSource.streams || this.videoSource.streams.length === 0) {
       this.VideoPlaceholder()
     } else {
       VideoPlayer({

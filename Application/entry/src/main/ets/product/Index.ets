@@ -67,7 +67,7 @@ import {
   CacheMaxAge, CACHE_MAX_AGE_LABELS, CACHE_MAX_AGE_DISPLAY,
 } from '../common/PlaybackConfig';
 import { PlayerSession } from '../common/PlayerSession';
-import { PlayQueueManager } from '../features/player/PlayQueueManager';
+import { PlayQueueManager, QueueSourceType, PlayQueueSourceHint } from '../features/player/PlayQueueManager';
 
 const logger = AppLog.getInstance('Index');
 const APP_VERSION = '0.4.0';
@@ -571,8 +571,8 @@ struct Index {
     this.actionHub.openSearch = () => {
       this.openSearchPage();
     };
-    this.actionHub.openVideo = async (video: VideoItem) => {
-      await this.openVideoDetail(video);
+    this.actionHub.openVideo = async (video: VideoItem, sourceHint?: PlayQueueSourceHint) => {
+      await this.openVideoDetail(video, sourceHint);
     };
     this.actionHub.openChannel = async (channel: SearchChannelItem) => {
       // 如果当前在播放页，先进入 PiP 再跳转到作者页（保留 PlayerPage 在栈中）
@@ -934,14 +934,41 @@ struct Index {
     this.navPathStack.pushPath({ name: 'SearchPage' });
   }
 
-  private async openVideoDetail(video: VideoItem): Promise<void> {
-    // Allow PlaylistDetailPage to pre-load the play queue before opening the video
-    await this.actionHub.beforeOpenVideo(video);
-
-    // If no queue is set (from home/search/subscriptions), create an adhoc single-video queue
+  private async openVideoDetail(video: VideoItem, sourceHint?: PlayQueueSourceHint): Promise<void> {
     const queueManager = PlayQueueManager.getInstance();
-    if (queueManager.sourceType === 'none' || queueManager.queue.length === 0) {
-      queueManager.setAdhocQueue([video], 0);
+    logger.info(`openVideoDetail: video=${video.videoId} source=${sourceHint ? sourceHint.type : 'adhoc'} queueType=${queueManager.sourceType}`);
+
+    // If a source hint is provided, pre-load the queue from that source.
+    // Fire-and-forget: do NOT await — the player page must open immediately.
+    // PlayQueueList will update reactively when the queue loads in the background.
+    if (sourceHint && sourceHint.type === 'playlist') {
+      if (sourceHint.loadedItems && sourceHint.loadedItems.length > 0) {
+        queueManager.setRemotePlaylistSnapshot(
+          sourceHint.playlistId,
+          sourceHint.loadedItems,
+          video.videoId,
+          sourceHint.playlistName,
+          sourceHint.startIndex ?? -1,
+          sourceHint.nextPageToken ?? null,
+          sourceHint.visitorData || ''
+        );
+      } else if (queueManager.sourceType !== QueueSourceType.REMOTE || queueManager.sourceId !== sourceHint.playlistId) {
+        logger.info(`openVideoDetail: start remote playlist load playlist=${sourceHint.playlistId} start=${video.videoId}`);
+        queueManager.loadFromRemotePlaylist(sourceHint.playlistId, video.videoId, sourceHint.playlistName);
+      } else {
+        const index = queueManager.queue.findIndex((item) => item.videoId === video.videoId);
+        if (index >= 0 && index !== queueManager.currentIndex) {
+          queueManager.moveTo(index);
+        }
+      }
+    }
+
+    // External video opens create a fresh generated queue. Queue-internal switches use moveTo().
+    if (!sourceHint) {
+      const currentQueueVideo = queueManager.getCurrent();
+      if (queueManager.sourceType !== QueueSourceType.ADHOC || currentQueueVideo?.videoId !== video.videoId) {
+        queueManager.setAdhocQueue([video], 0);
+      }
     }
 
     const session = PlayerSession.getInstance();

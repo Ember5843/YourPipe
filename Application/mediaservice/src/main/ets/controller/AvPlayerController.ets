@@ -49,6 +49,8 @@ export class AvPlayerController {
   @Track isCasting: boolean = false;
   @Track castDeviceName: string = '';
   public onCastStateChange: ((isCasting: boolean, deviceName: string) => void) | undefined = undefined;
+  public onNextCommand: (() => void) | undefined = undefined;
+  public onPreviousCommand: (() => void) | undefined = undefined;
 
   private curIndex: number = 0;
   private curSource: VideoData;
@@ -68,6 +70,7 @@ export class AvPlayerController {
   private currentLocalMediaSessionId: string = '';
   private pendingStartFromSec: number = 0;
   private lastUpdateTimestamp: number = 0;
+  private lastUpdateVideoId: string = '';
 
   // Error recovery state
   private errorRetryCount: number = 0;
@@ -180,6 +183,12 @@ export class AvPlayerController {
         this.nativeEngine.play();
       }
     };
+    this.avSessionManager.onNextCommand = () => {
+      this.onNextCommand?.();
+    };
+    this.avSessionManager.onPreviousCommand = () => {
+      this.onPreviousCommand?.();
+    };
     this.avSessionManager.onStopCommand = () => {
       this.nativeEngine.stop();
       this.avSessionManager.setPlaybackState(false, this.currentTime, this.playbackSpeed, false, false);
@@ -208,12 +217,20 @@ export class AvPlayerController {
 
   public async updateVideoSource(newSource: VideoData): Promise<void> {
     if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
+
+    if (!newSource.streams || newSource.streams.length === 0) {
+      Logger.debug(TAG, `updateVideoSource ignored: no streams videoId=${newSource.videoId || 'N/A'}`);
+      return;
+    }
+
     const now = Date.now();
-    if (now - this.lastUpdateTimestamp < 500) {
-      Logger.warn(TAG, 'updateVideoSource ignored duplicate call');
+    const newVideoId = newSource.videoId || '';
+    if (newVideoId && newVideoId === this.lastUpdateVideoId && now - this.lastUpdateTimestamp < 500) {
+      Logger.warn(TAG, `updateVideoSource ignored duplicate call videoId=${newVideoId}`);
       return;
     }
     this.lastUpdateTimestamp = now;
+    this.lastUpdateVideoId = newVideoId;
 
     this.resetPlaybackState();
     this.destroyCurrentLocalSession();
@@ -229,11 +246,6 @@ export class AvPlayerController {
     }
 
     Logger.info(TAG, `updateVideoSource: videoId=${newSource.videoId || 'N/A'} streams=${newSource.streams?.length || 0} isLive=${newSource.isLive} subtitles=${newSource.subtitleTracks?.length || 0}`);
-
-    if (!newSource.streams || newSource.streams.length === 0) {
-      Logger.debug(TAG, 'No streams available yet, skipping playback initialization');
-      return;
-    }
 
     const uiConfig = AppStorage.get('uiConfig') as Record<string, string> | undefined;
     const searchLanguage = uiConfig?.searchLanguage || 'en-GB';
@@ -331,7 +343,6 @@ export class AvPlayerController {
 
   public setSurfaceID(surfaceID: string): void {
     if (!this.isActive()) return;
-    if (surfaceID === this.surfaceID) return;
     this.surfaceID = surfaceID;
     this.nativeEngine.attachSurface(surfaceID);
   }

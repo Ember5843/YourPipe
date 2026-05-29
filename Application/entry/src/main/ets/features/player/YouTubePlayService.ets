@@ -175,6 +175,26 @@ export class YouTubePlayService {
     }
   }
 
+  async fetchPlaybackExtras(videoId: string): Promise<VideoInfo | null> {
+    if (!this.extractor) await this.initialize();
+    try {
+      return await this.extractor!.fetchPlaybackExtras(videoId);
+    } catch (e) {
+      logger.warn(`${TAG} fetchPlaybackExtras failed: ${(e as Error).message || e}`);
+      return null;
+    }
+  }
+
+  async fetchPlaybackExtrasFor(videoInfo: VideoInfo): Promise<VideoInfo | null> {
+    if (!this.extractor) await this.initialize();
+    try {
+      return await this.extractor!.fetchPlaybackExtras(videoInfo.videoId, videoInfo.playerResponse);
+    } catch (e) {
+      logger.warn(`${TAG} fetchPlaybackExtrasFor failed: ${(e as Error).message || e}`);
+      return null;
+    }
+  }
+
   async play(videoIdOrUrl: string): Promise<YouTubePlayResult> {
     logger.info(`${TAG} play() called for ${videoIdOrUrl}`);
     if (!this.extractor) await this.initialize();

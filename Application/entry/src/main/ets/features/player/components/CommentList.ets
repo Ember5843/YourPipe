@@ -10,7 +10,7 @@ const logger = AppLog.getInstance('CommentList');
 
 @Component
 export struct CommentList {
-  @Prop videoId: string;
+  @Prop @Watch('onVideoIdChanged') videoId: string;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @State comments: CommentItem[] = [];
   @State isLoading: boolean = false;
@@ -21,18 +21,32 @@ export struct CommentList {
   // 用于导航到回复页面
   @Consume('commentPageInfo') pageInfo: NavPathStack;
   @Consume('actionHub') actionHub: ActionHub;
+  private activeRequestKey: string = '';
 
   aboutToAppear() {
     this.loadComments(true);
   }
 
+  private onVideoIdChanged(): void {
+    this.comments = [];
+    this.nextPageToken = null;
+    this.errorMessage = '';
+    this.commentCount = 0;
+    this.isLoading = false;
+    this.loadComments(true);
+  }
+
   async loadComments(reset: boolean): Promise<void> {
     if (this.isLoading) return;
+    if (!this.videoId) return;
     
     // 如果不是重置且没有 token，说明已加载完所有
     if (!reset && !this.nextPageToken) return;
 
     this.isLoading = true;
+    const loadingVideoId = this.videoId;
+    const requestKey = `${loadingVideoId}_${Date.now()}`;
+    this.activeRequestKey = requestKey;
     logger.info(`loadComments(reset=${reset}), current count: ${this.comments.length}, token: ${this.nextPageToken ? 'present' : 'none'}`);
 
     if (reset) {
@@ -44,7 +58,10 @@ export struct CommentList {
     try {
       const context = getContext(this) as common.UIAbilityContext;
       const service = YouTubePlayService.getInstance(context);
-      const response: CommentResponse = await service.fetchComments(this.videoId, this.nextPageToken);
+      const response: CommentResponse = await service.fetchComments(loadingVideoId, this.nextPageToken);
+      if (this.videoId !== loadingVideoId || this.activeRequestKey !== requestKey) {
+        return;
+      }
       
       if (reset) {
         this.comments = response.items;
@@ -66,10 +83,15 @@ export struct CommentList {
       this.errorMessage = '';
       logger.info(`Loaded ${response.items.length} items, nextToken: ${this.nextPageToken ? 'present' : 'none'}`);
     } catch (e) {
+      if (this.videoId !== loadingVideoId || this.activeRequestKey !== requestKey) {
+        return;
+      }
       this.errorMessage = $r('app.string.yt_error_load_comments');
       logger.error('loadComments failed:', JSON.stringify(e));
     } finally {
-      this.isLoading = false;
+      if (this.videoId === loadingVideoId && this.activeRequestKey === requestKey) {
+        this.isLoading = false;
+      }
     }
   }
 

@@ -26,6 +26,7 @@ export struct VideoCard {
   @Prop showViewCount: boolean = true;
   @Prop showLiveTag: boolean = true;
   @Prop useFavoriteToggle: boolean = false;
+  onOpenVideo?: (video: VideoItem) => void;
   @StorageLink('favorites') favorites: VideoItem[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
@@ -84,6 +85,17 @@ export struct VideoCard {
       const targetId = this.video.videoId || this.video.id.toString();
       this.actionHub.removeFavorite(targetId);
     }
+  }
+
+  private handleOpen(): void {
+    if (!this.enableOpen) {
+      return;
+    }
+    if (this.onOpenVideo) {
+      this.onOpenVideo(this.video);
+      return;
+    }
+    this.actionHub.openVideo(this.video);
   }
 
   private getContextMenus(): ContextMenuItem[] {
@@ -171,7 +183,7 @@ export struct VideoCard {
             .id('thumb_' + this.video.id)
             .width(this.getThumbWidth())
             .height(this.getThumbHeight())
-            .objectFit(ImageFit.Contain)
+            .objectFit(ImageFit.Cover)
             .borderRadius(6)
             .backgroundColor(this.video.thumbnailColor || $r('app.color.yourtube_icon_hint'));
         } else {
@@ -279,9 +291,7 @@ export struct VideoCard {
       }
     })
     .onClick(() => {
-      if (this.enableOpen) {
-        this.actionHub.openVideo(this.video);
-      }
+      this.handleOpen();
     })
     .gesture(LongPressGesture()
       .onAction(() => {

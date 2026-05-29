@@ -1,38 +1,26 @@
 import { VideoItem } from 'youtube_core';
 import { PlayQueueManager, QueueSourceType, QueueChangeListener } from '../PlayQueueManager';
-import { UIConfig } from '../../../common/AppState';
 
-/**
- * Listener that bridges PlayQueueManager → PlayQueueList component state.
- * Named class required by ArkTS (no inline object literals).
- */
 class PlayQueueListListener extends QueueChangeListener {
   private component: PlayQueueList;
+
   constructor(comp: PlayQueueList) {
     super();
     this.component = comp;
   }
+
   onQueueChanged(): void {
     this.component.syncStateToComponent();
-    setTimeout(() => {
-      this.component.scrollToCurrent();
-    }, 100);
   }
-  onCurrentIndexChanged(_index: number): void {
-    this.component.currentIndex = _index;
+
+  onCurrentIndexChanged(index: number): void {
+    this.component.currentIndex = index;
     setTimeout(() => {
       this.component.scrollToCurrent();
     }, 100);
   }
 }
 
-/**
- * Play queue list shown in PlayerPage Tab 3.
- *
- * Uses VideoCard/VideoCardGrid (same as Home/Search) and respects uiConfig.homeLayoutMode.
- * Clicking a queue item switches the video via AppStorage — does NOT go through
- * actionHub.openVideo to avoid unnecessary navPathStack operations.
- */
 @Component
 export struct PlayQueueList {
   @State queue: VideoItem[] = [];
@@ -41,13 +29,11 @@ export struct PlayQueueList {
   @State sourceName: string = '';
   @State isLoadingMore: boolean = false;
   @State canLoadMore: boolean = false;
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
-  @StorageLink('deviceWidth') deviceWidth: number = 0;
 
   private manager: PlayQueueManager = PlayQueueManager.getInstance();
-  private scroller: Scroller = new Scroller();
+  private listScroller: Scroller = new Scroller();
   private readonly THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
-  private readonly GRID_SIDE_PADDING: number = 12;
+  private boundListener: PlayQueueListListener | null = null;
 
   syncStateToComponent(): void {
     this.queue = this.manager.queue.slice();
@@ -55,36 +41,37 @@ export struct PlayQueueList {
     this.sourceType = this.manager.sourceType;
     this.sourceName = this.manager.sourceName;
     this.isLoadingMore = this.manager.isLoadingNextPage;
-    this.canLoadMore = this.manager.hasMoreRemotePages;
+    this.canLoadMore = this.manager.hasMorePages;
   }
 
   scrollToCurrent(): void {
     if (this.currentIndex >= 0 && this.currentIndex < this.queue.length) {
-      this.scroller.scrollToIndex(this.currentIndex, true, ScrollAlign.CENTER);
+      this.listScroller.scrollToIndex(this.currentIndex, true, ScrollAlign.CENTER);
     }
   }
 
   aboutToAppear(): void {
     this.syncStateToComponent();
-    const listener: PlayQueueListListener = new PlayQueueListListener(this);
-    this.manager.addListener(listener);
+    if (!this.boundListener) {
+      this.boundListener = new PlayQueueListListener(this);
+      this.manager.addListener(this.boundListener);
+    }
   }
 
-  /** Switch to a different video in the queue */
+  aboutToDisappear(): void {
+    if (this.boundListener) {
+      this.manager.removeListener(this.boundListener);
+      this.boundListener = null;
+    }
+  }
+
   private switchToVideo(_video: VideoItem, index: number): void {
     if (index === this.currentIndex) {
       return;
     }
-    // moveTo fires PlayQueueManager.onSwitchVideo → PlayerPage reloads
     this.manager.moveTo(index);
-
-    // PipePipe-style auto-play: when reaching the last item, append a related video
-    if (index >= this.manager.queue.length - 1) {
-      this.manager.appendAutoQueueNext();
-    }
   }
 
-  /** Load more for remote playlists */
   private async handleLoadMore(): Promise<void> {
     if (this.isLoadingMore || !this.canLoadMore) {
       return;
@@ -97,18 +84,13 @@ export struct PlayQueueList {
     }
   }
 
-  /** Responsive grid column count (same logic as PlaylistDetailPage) */
-  private getGridColumnCount(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : 360;
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    if (contentWidth >= 1440) return 5;
-    if (contentWidth >= 1080) return 4;
-    if (contentWidth >= 760) return 3;
-    if (contentWidth >= 520) return 2;
-    return 1;
+  private handleBottomReached(): void {
+    if (this.isLoadingMore || !this.canLoadMore) {
+      return;
+    }
+    this.handleLoadMore();
   }
 
-  /** Header text */
   private getHeaderText(): string | Resource {
     if (this.sourceType === QueueSourceType.REMOTE) {
       return this.sourceName || $r('app.string.yt_tab_playlists');
@@ -122,6 +104,17 @@ export struct PlayQueueList {
     return `${this.queue.length} videos in queue`;
   }
 
+  private getMetaText(item: VideoItem): string {
+    const parts: string[] = [];
+    if (item.author && item.author.length > 0) {
+      parts.push(item.author);
+    }
+    if (item.viewCount && item.viewCount.length > 0) {
+      parts.push(item.viewCount);
+    }
+    return parts.join('  ');
+  }
+
   @Builder
   QueueHeader() {
     Row() {
@@ -133,7 +126,7 @@ export struct PlayQueueList {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1)
 
-      if (this.sourceType === QueueSourceType.REMOTE && this.canLoadMore) {
+      if (this.canLoadMore) {
         Text(`${this.queue.length}+`)
           .fontSize(11)
           .fontColor($r('app.color.yourtube_text_quaternary'))
@@ -174,139 +167,140 @@ export struct PlayQueueList {
     .padding({ top: 12, bottom: 12 })
   }
 
-  /** Compact queue item row — tighter than full VideoCard */
   @Builder
-  QueueItemRow(item: VideoItem, index: number) {
-    Row() {
-      // Current-item highlight bar
-      if (index === this.currentIndex) {
-        Row()
-          .width(3)
-          .height('100%')
-          .backgroundColor(this.THEME_COLOR)
-          .position({ x: 0, y: 0 })
-          .zIndex(5)
-      }
+  LoadMoreSentinel() {
+    if (this.isLoadingMore) {
+      this.LoadingFooter()
+    } else {
+      Row()
+        .width('100%')
+        .height(24)
+    }
+  }
 
-      // Thumbnail
-      if (item.thumbnailUrl) {
+  @Builder
+  Thumbnail(item: VideoItem) {
+    Stack({ alignContent: Alignment.BottomEnd }) {
+      if (item.thumbnailUrl && item.thumbnailUrl.length > 0) {
         Image(item.thumbnailUrl)
-          .width(80)
-          .height(45)
+          .width('100%')
+          .height('100%')
           .objectFit(ImageFit.Cover)
-          .borderRadius(4)
           .backgroundColor(item.thumbnailColor || $r('app.color.yourtube_icon_hint'))
       } else {
         Rect()
-          .width(80)
-          .height(45)
+          .width('100%')
+          .height('100%')
           .fill(item.thumbnailColor || $r('app.color.yourtube_icon_hint'))
-          .radius(4)
       }
 
-      // Info
-      Column() {
-        Text(item.title || '')
-          .fontSize(13)
-          .fontColor(index === this.currentIndex ? this.THEME_COLOR : $r('app.color.yourtube_text_primary'))
-          .fontWeight(index === this.currentIndex ? FontWeight.Medium : FontWeight.Normal)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .lineHeight(17)
+      if (item.isLive) {
+        Text('LIVE')
+          .fontSize(9)
+          .fontColor(Color.White)
+          .fontWeight(FontWeight.Medium)
+          .backgroundColor('#D93025')
+          .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+          .margin({ right: 4, bottom: 4 })
+      }
+    }
+    .width(104)
+    .height(58)
+    .borderRadius(4)
+    .clip(true)
+  }
 
+  @Builder
+  QueueRow(item: VideoItem, index: number) {
+    Row() {
+      if (index === this.currentIndex) {
+        Column()
+          .width(3)
+          .height(52)
+          .backgroundColor(this.THEME_COLOR)
+          .borderRadius(2)
+          .margin({ right: 8 })
+      } else {
+        Column()
+          .width(3)
+          .height(52)
+          .margin({ right: 8 })
+      }
+
+      this.Thumbnail(item)
+
+      Column() {
         Row() {
-          if (item.author) {
-            Text(item.author)
-              .fontSize(11)
-              .fontColor($r('app.color.yourtube_text_tertiary'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .constraintSize({ maxWidth: 140 })
-          }
-          if (item.isLive) {
-            Text(' · LIVE')
-              .fontSize(10)
-              .fontColor(Color.Red)
-              .fontWeight(FontWeight.Bold)
+          Text(item.title || '')
+            .fontSize(13)
+            .fontColor($r('app.color.yourtube_text_primary'))
+            .fontWeight(index === this.currentIndex ? FontWeight.Medium : FontWeight.Regular)
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .lineHeight(17)
+            .layoutWeight(1)
+
+          if (index === this.currentIndex) {
+            Text('NOW')
+              .fontSize(9)
+              .fontColor(Color.White)
+              .fontWeight(FontWeight.Medium)
+              .backgroundColor(this.THEME_COLOR)
+              .borderRadius(3)
+              .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+              .margin({ left: 8 })
           }
         }
-        .margin({ top: 2 })
+        .width('100%')
+        .alignItems(VerticalAlign.Top)
+
+        Text(this.getMetaText(item))
+          .fontSize(11)
+          .fontColor($r('app.color.yourtube_text_quaternary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .margin({ top: 5 })
       }
       .layoutWeight(1)
       .margin({ left: 10 })
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .height(52)
-    .padding({ left: 12, right: 12 })
-    .alignItems(VerticalAlign.Top)
-    .backgroundColor(index === this.currentIndex
-      ? $r('app.color.yourtube_bg_surface')
-      : Color.Transparent)
+    .height(76)
+    .padding({ left: 8, right: 10, top: 8, bottom: 8 })
+    .backgroundColor(index === this.currentIndex ? $r('app.color.yourtube_bg_surface') : Color.Transparent)
     .onClick(() => {
       this.switchToVideo(item, index);
     })
   }
 
-  /** List-mode: compact queue items, scrolls when overflow */
   @Builder
   QueueListMode() {
-    Scroll(this.scroller) {
-      Column() {
-        ForEach(this.queue, (item: VideoItem, index: number) => {
-          this.QueueItemRow(item, index)
-        }, (item: VideoItem, index: number) => item.videoId + '_r' + index)
+    List({ space: 0, scroller: this.listScroller }) {
+      ForEach(this.queue, (item: VideoItem, index: number) => {
+        ListItem() {
+          this.QueueRow(item, index)
+        }
+      }, (item: VideoItem, index: number) => `${item.videoId}_${index}`)
 
-        if (this.isLoadingMore) {
-          this.LoadingFooter()
+      if (this.isLoadingMore || this.canLoadMore) {
+        ListItem() {
+          this.LoadMoreSentinel()
         }
       }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
     .layoutWeight(1)
+    .padding({ left: 8, right: 8, top: 6, bottom: 12 })
     .edgeEffect(EdgeEffect.Spring)
     .scrollBar(BarState.Off)
-    .onReachEnd(() => {
-      if (!this.isLoadingMore && this.canLoadMore) {
-        this.handleLoadMore();
+    .onScrollIndex((_firstIndex: number, lastIndex: number) => {
+      if (lastIndex >= this.queue.length - 1) {
+        this.handleBottomReached();
       }
     })
-  }
-
-  /** Grid-mode: compact queue items in a responsive grid */
-  @Builder
-  QueueGridMode() {
-    Scroll(this.scroller) {
-      Column() {
-        GridRow({
-          columns: this.getGridColumnCount(),
-          gutter: { x: 4, y: 4 }
-        }) {
-          ForEach(this.queue, (item: VideoItem, index: number) => {
-            GridCol({ span: 1 }) {
-              this.QueueItemRow(item, index)
-            }
-          }, (item: VideoItem, index: number) => item.videoId + '_g' + index)
-        }
-        .width('100%')
-
-        if (this.isLoadingMore) {
-          this.LoadingFooter()
-        }
-      }
-      .width('100%')
-    }
-    .width('100%')
-    .padding({ left: 8, right: 8, top: 4, bottom: 10 })
-    .edgeEffect(EdgeEffect.Spring)
-    .scrollBar(BarState.Off)
-    .layoutWeight(1)
     .onReachEnd(() => {
-      if (!this.isLoadingMore && this.canLoadMore) {
-        this.handleLoadMore();
-      }
+      this.handleBottomReached();
     })
   }
 
@@ -316,12 +310,7 @@ export struct PlayQueueList {
         this.EmptyState()
       } else {
         this.QueueHeader()
-
-        if (this.uiConfig.homeLayoutMode === 'grid') {
-          this.QueueGridMode()
-        } else {
-          this.QueueListMode()
-        }
+        this.QueueListMode()
       }
     }
     .width('100%')

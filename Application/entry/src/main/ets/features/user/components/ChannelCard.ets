@@ -234,7 +234,12 @@ export struct ChannelCard {
       }
     })
     .onClick(() => {
-      this.actionHub.openChannel(this.channel);
+      const channelId = this.getChannelId();
+      if (channelId) {
+        this.actionHub.openChannelById(channelId, this.channel.name || '', this.channel.avatarUrl || '', this.channel.handle || '');
+      } else {
+        this.actionHub.openChannel(this.channel);
+      }
     })
     .gesture(LongPressGesture()
       .onAction(() => {

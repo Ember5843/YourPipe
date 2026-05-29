@@ -18,6 +18,10 @@ const TAG = '[PipWindowController]';
 export interface PipPlayerDelegate {
   syncPlay(): void;
   syncPause(): void;
+  playNext?(): void;
+  playPrevious?(): void;
+  canPlayNext?(): boolean;
+  canPlayPrevious?(): boolean;
   isPlaying: boolean;
 }
 
@@ -64,6 +68,7 @@ export class PipWindowController {
           templateType: PiPWindow.PiPTemplateType.VIDEO_PLAY,
           contentWidth: contentWidth || 0,
           contentHeight: contentHeight || 0,
+          controlGroups: [PiPWindow.VideoPlayControlGroup.VIDEO_PREVIOUS_NEXT],
         };
         this.pipController = await PiPWindow.create(config);
       } catch (e) {
@@ -137,6 +142,22 @@ export class PipWindowController {
       ? PiPWindow.PiPControlStatus.PLAY
       : PiPWindow.PiPControlStatus.PAUSE;
     this.pipController.updatePiPControlStatus(PiPWindow.PiPControlType.VIDEO_PLAY_PAUSE, status);
+  }
+
+  public syncQueueControlEnabled(): void {
+    if (!this.pipController) return;
+    try {
+      this.pipController.setPiPControlEnabled(
+        PiPWindow.PiPControlType.VIDEO_PREVIOUS,
+        this.playerDelegate?.canPlayPrevious?.() ?? false
+      );
+      this.pipController.setPiPControlEnabled(
+        PiPWindow.PiPControlType.VIDEO_NEXT,
+        this.playerDelegate?.canPlayNext?.() ?? false
+      );
+    } catch (e) {
+      Logger.warn(TAG, `syncQueueControlEnabled failed: ${e}`);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -214,6 +235,16 @@ export class PipWindowController {
             PiPWindow.PiPControlStatus.PLAY
           );
         }
+        break;
+
+      case 'nextVideo':
+        this.playerDelegate?.playNext?.();
+        setTimeout(() => { this.syncQueueControlEnabled(); }, 300);
+        break;
+
+      case 'previousVideo':
+        this.playerDelegate?.playPrevious?.();
+        setTimeout(() => { this.syncQueueControlEnabled(); }, 300);
         break;
 
       default:
