@@ -75,6 +75,7 @@ import {
 
 const logger = AppLog.getInstance('Index');
 const APP_VERSION = '0.4.0';
+const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 
 
 @Component
@@ -93,7 +94,7 @@ struct StateObserver {
     .height('100%')
     // 绑定 key 到配置关键字段，确保任意配置变化时 StateObserver 重建，
     // 从而触发内部 @Builder 内容（OptionsMainPage 等）重新渲染
-    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.showHighResolutions}-${this.playbackConfig.enablePip}`)
+    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.showHighResolutions}-${this.playbackConfig.enablePip}`)
   }
 }
 
@@ -321,6 +322,7 @@ struct Index {
   private applyAndSaveConfig(next: UIConfig): void {
     this.uiConfig = next;
     UIConfig.saveToPreferences(next);
+    DownloadManager.getInstance().refreshTaskPool();
   }
 
   /** 恢复所有配置为默认值 */
@@ -2224,6 +2226,18 @@ struct Index {
               this.updatePlaybackConfig(cfg => cfg.enablePip = val);
             }
           )
+
+          this.PlaybackSectionTitle('下载')
+
+          PlaybackSelectRow({
+            title: '并发下载任务',
+            options: DOWNLOAD_CONCURRENCY_VALUES.map((value: number) => ({ value: `${value}` } as SelectOption)),
+            selectedIndex: DOWNLOAD_CONCURRENCY_VALUES.indexOf(this.uiConfig.maxConcurrentDownloads || 1),
+            onChange: (index: number) => {
+              const value = DOWNLOAD_CONCURRENCY_VALUES[index] || 1;
+              this.updateUiConfig(cfg => cfg.maxConcurrentDownloads = value);
+            }
+          })
 
           this.PlaybackSectionTitle('缓存')
 

@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CommonConstants as Const, Logger, StreamInfo, StreamCategories, PlayerModel } from 'mediaservice';
+import { CommonConstants as Const, Logger, StreamInfo, StreamCategories } from 'mediaservice';
 import { LengthMetrics } from '@kit.ArkUI';
 import { ErrorPage } from '../../../common/components/ErrorPage';
 import { SearchChannelItem } from 'youtube_core';
@@ -173,16 +173,66 @@ export struct VideoDetails {
   }
 
   private classifyStreamsForDownload(): void {
-    if (!this.streams || this.streams.length === 0) return;
-    const playerModel = new PlayerModel();
-    playerModel.classifyStreams(this.streams);
-    this.streamCategories = playerModel.getStreamCategories();
+    const categories: StreamCategories = {
+      audio: [],
+      video: [],
+      dashManifest: [],
+      hlsManifest: [],
+      progressive: []
+    };
+
+    if (!this.streams || this.streams.length === 0) {
+      this.streamCategories = categories;
+      return;
+    }
+
+    this.streams.forEach((stream: StreamInfo) => {
+      if (!stream.url) {
+        return;
+      }
+
+      const kind = (stream.kind || '').toLowerCase();
+      const delivery = (stream.deliveryMethod || '').toUpperCase();
+      const mimeType = (stream.mimeType || '').toLowerCase();
+      const codecs = (stream.codecs || '').toLowerCase();
+      const hasVideo = stream.hasVideo === true
+        || !!stream.width
+        || !!stream.height
+        || !!stream.videoQuality
+        || mimeType.startsWith('video/');
+      const hasAudio = stream.hasAudio === true
+        || !!stream.audioQuality
+        || !!stream.audioLanguage
+        || !!stream.audioTrackName
+        || mimeType.startsWith('audio/')
+        || codecs.includes('mp4a')
+        || codecs.includes('opus');
+
+      if (kind === 'manifest_hls' || delivery === 'HLS') {
+        categories.hlsManifest.push(stream);
+      } else if (kind === 'manifest_dash') {
+        categories.dashManifest.push(stream);
+      } else if (kind === 'progressive' || delivery === 'PROGRESSIVE_HTTP' || (hasVideo && hasAudio)) {
+        categories.progressive.push(stream);
+      } else if (kind === 'video_only' || hasVideo) {
+        categories.video.push(stream);
+      } else if (kind === 'audio_only' || hasAudio) {
+        categories.audio.push(stream);
+      }
+    });
+
+    categories.video.sort((a: StreamInfo, b: StreamInfo): number => (b.height || 0) - (a.height || 0));
+    categories.audio.sort((a: StreamInfo, b: StreamInfo): number => (b.bitrate || 0) - (a.bitrate || 0));
+    categories.progressive.sort((a: StreamInfo, b: StreamInfo): number => (b.height || 0) - (a.height || 0));
+    this.streamCategories = categories;
   }
 
   private openDownloadDialog(): void {
+    this.classifyStreamsForDownload();
     if (!this.streamCategories ||
       (this.streamCategories.video.length === 0 &&
         this.streamCategories.progressive.length === 0)) {
+      this.getUIContext().getPromptAction().showToast({ message: 'No downloadable streams available' });
       return;
     }
 
@@ -293,7 +343,7 @@ export struct VideoDetails {
         this.ActionButton($r('sys.symbol.TV_tv'),
           '投屏', () => { this.openCastPicker(); })
         this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
-          $r('app.string.yt_action_download'), () => { this.showTodo(); })
+          $r('app.string.yt_action_download'), () => { this.openDownloadDialog(); })
         this.ActionButton($r('sys.symbol.bookmark'),
           '保存到播放列表', () => { this.showSavePlaylistSheet = true; })
         this.ActionButton($r('sys.symbol.play_circle'),

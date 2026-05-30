@@ -161,6 +161,8 @@ export struct LogPage {
   @State isExporting: boolean = false;
   /** 正在导出的 Session id（防重复点击） */
   @State exportingId: string = '';
+  @State logFilterPattern: string = '';
+  @State logFilterError: string = '';
 
   private readonly THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
 
@@ -218,6 +220,30 @@ export struct LogPage {
   }
 
   // ── 开关持久化 ───────────────────────────────────────────────────────────
+  private updateLogFilter(value: string): void {
+    this.logFilterPattern = value;
+    this.logFilterError = '';
+    if (!value.trim()) {
+      return;
+    }
+    try {
+      new RegExp(value, 'i');
+    } catch (e) {
+      this.logFilterError = (e as Error).message || 'Invalid regex';
+    }
+  }
+
+  private getFilteredSessions(): LogSession[] {
+    const pattern = this.logFilterPattern.trim();
+    if (!pattern || this.logFilterError) {
+      return this.sessions;
+    }
+    const regex = new RegExp(pattern, 'i');
+    return this.sessions.filter((session: LogSession) =>
+      session.logs.some((log: LogData) => regex.test(`[${log.level}] ${log.tag} ${log.message}`))
+    );
+  }
+
   private toggleLogger(): void {
     const next = new UIConfig();
     next.darkMode = this.uiConfig.darkMode;
@@ -281,6 +307,27 @@ export struct LogPage {
         .onClick(() => {
           this.toggleLogger();
         })
+
+        Column() {
+          TextInput({ placeholder: 'Regex filter, e.g. DownloadManager|Task .*failed', text: this.logFilterPattern })
+            .width('100%')
+            .height(42)
+            .fontSize(14)
+            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            .borderRadius(12)
+            .onChange((value: string) => {
+              this.updateLogFilter(value);
+            })
+          if (this.logFilterError) {
+            Text(this.logFilterError)
+              .fontSize(12)
+              .fontColor('#FF4444')
+              .width('100%')
+              .margin({ top: 4 })
+          }
+        }
+        .width('100%')
+        .margin({ top: 12 })
 
         if (this.sessions.length > 0) {
           Row({ space: 12 }) {
@@ -360,13 +407,13 @@ export struct LogPage {
       } else {
         // Session 卡片列表
         List({ space: 8 }) {
-          ForEach(this.sessions, (item: LogSession, index: number) => {
+          ForEach(this.getFilteredSessions(), (item: LogSession, index: number) => {
             ListItem() {
               // SessionCard 通过 @ObjectLink 绑定 item（@Observed LogSession）
               // logs 被替换时，此卡片自动刷新 logCount，无需重建整个列表
               SessionCard({
                 session: item,
-                displayIndex: this.sessions.length - index,
+                displayIndex: this.getFilteredSessions().length - index,
                 onDeleteSession: (id: string) => {
                   AppLogStore.deleteSession(id);
                 },

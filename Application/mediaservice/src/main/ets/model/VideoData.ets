@@ -20,6 +20,8 @@ export interface StreamInfo {
   kind: string;
   sourceClient?: string;
   itag?: number;
+  hasVideo?: boolean;
+  hasAudio?: boolean;
   quality?: string;
   format?: string;
   audioQuality?: string;

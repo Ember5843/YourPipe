@@ -1,10 +1,21 @@
 import { AppLog } from './AppLog';
-import { StreamInfo, PlayerModel } from 'mediaservice';
+import { StreamInfo } from 'mediaservice';
 import common from '@ohos.app.ability.common';
-import { fileIo as fs, picker, fileUri as fileUriKit } from '@kit.CoreFileKit';
+import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
+import { notificationManager } from '@kit.NotificationKit';
+import { BusinessError } from '@kit.BasicServicesKit';
+import { FFmpeg } from '@sj/ffmpeg';
+import { UIConfig } from './AppState';
 
 const logger = AppLog.getInstance('DownloadManager');
+const DOWNLOAD_ROOT: string = 'downloads';
+const HTTP_CHUNK_SIZE: number = 10 * 1024 * 1024;
+const DOWNLOAD_NOTIFICATION_TEMPLATE: string = 'downloadTemplate';
+const DOWNLOAD_NOTIFICATION_MIN_INTERVAL_MS: number = 1200;
+const DOWNLOAD_NOTIFICATION_MIN_PROGRESS_DELTA: number = 2;
+const DOWNLOAD_NOTIFICATION_RATE_LIMIT_BACKOFF_MS: number = 5000;
+const DOWNLOAD_NOTIFICATION_GLOBAL_INTERVAL_MS: number = 800;
 
 export enum DownloadStatus {
   PENDING = 'pending',
@@ -16,36 +27,52 @@ export enum DownloadStatus {
   CANCELLED = 'cancelled'
 }
 
+interface StreamChunkResult {
+  responseCode: number;
+  bytesWritten: number;
+}
+
 @Observed
 export class DownloadTask {
-  id: string;
-  videoId: string;
-  title: string;
-  author: string;
-  thumbnailUrl: string;
+  @Track id: string;
+  @Track videoId: string;
+  @Track title: string;
+  @Track author: string;
+  @Track thumbnailUrl: string;
   videoStream: StreamInfo;
   audioStream: StreamInfo | null;
   @Track status: DownloadStatus = DownloadStatus.PENDING;
   @Track progress: number = 0;
   @Track videoProgress: number = 0;
   @Track audioProgress: number = 0;
+  @Track mergeProgress: number = 0;
   @Track totalSize: number = 0;
   @Track downloadedSize: number = 0;
+  @Track videoDownloadedSize: number = 0;
+  @Track audioDownloadedSize: number = 0;
   @Track errorMessage: string = '';
   @Track outputPath: string = '';
-  createdAt: number = Date.now();
+  @Track taskDir: string = '';
+  @Track createdAt: number = Date.now();
 
   _cancelled: boolean = false;
   _videoFilePath: string = '';
   _audioFilePath: string = '';
   _context: common.UIAbilityContext | null = null;
-
-  private _lastProgressUpdate: number = 0;
-  private _lastReportedProgress: number = -1;
+  _notificationId: number = 0;
+  _lastNotificationProgress: number = -1;
+  _lastNotificationStatus: DownloadStatus = DownloadStatus.PENDING;
+  _lastNotificationAt: number = 0;
+  _notificationRateLimitedUntil: number = 0;
 
   constructor(
-    id: string, videoId: string, title: string, author: string,
-    thumbnailUrl: string, videoStream: StreamInfo, audioStream: StreamInfo | null
+    id: string,
+    videoId: string,
+    title: string,
+    author: string,
+    thumbnailUrl: string,
+    videoStream: StreamInfo,
+    audioStream: StreamInfo | null
   ) {
     this.id = id;
     this.videoId = videoId;
@@ -58,44 +85,41 @@ export class DownloadTask {
   }
 
   updateProgress(bytesDownloaded: number, total: number, type: 'video' | 'audio'): void {
-    const now = Date.now();
     const pct = total > 0 ? Math.min(Math.round((bytesDownloaded / total) * 100), 100) : 0;
-    const shouldUpdate =
-      now - this._lastProgressUpdate >= 300 ||
-      Math.abs(pct - this._lastReportedProgress) >= 1 ||
-      pct >= 100;
-
-    if (!shouldUpdate && this._lastReportedProgress >= 0) {
-      return;
-    }
-
-    this._lastProgressUpdate = now;
-    this._lastReportedProgress = pct;
 
     if (type === 'video') {
       this.videoProgress = pct;
+      this.videoDownloadedSize = bytesDownloaded;
     } else {
       this.audioProgress = pct;
+      this.audioDownloadedSize = bytesDownloaded;
     }
 
     if (this.audioStream) {
-      this.progress = Math.round(this.videoProgress * 0.7 + this.audioProgress * 0.3);
+      this.progress = Math.round(this.videoProgress * 0.7 + this.audioProgress * 0.25 + this.mergeProgress * 0.05);
     } else {
       this.progress = this.videoProgress;
     }
 
-    this.downloadedSize = bytesDownloaded;
+    this.downloadedSize = this.videoDownloadedSize + this.audioDownloadedSize;
+  }
+
+  updateMergeProgress(progress: number): void {
+    this.mergeProgress = Math.max(0, Math.min(100, Math.round(progress)));
+    if (this.audioStream) {
+      this.progress = Math.round(this.videoProgress * 0.7 + this.audioProgress * 0.25 + this.mergeProgress * 0.05);
+    }
   }
 
   getStatusLabel(): string {
     switch (this.status) {
-      case DownloadStatus.PENDING: return '等待中';
-      case DownloadStatus.DOWNLOADING_VIDEO: return '下载视频';
-      case DownloadStatus.DOWNLOADING_AUDIO: return '下载音频';
-      case DownloadStatus.MERGING: return '合并中';
-      case DownloadStatus.COMPLETED: return '已完成';
-      case DownloadStatus.FAILED: return '失败';
-      case DownloadStatus.CANCELLED: return '已取消';
+      case DownloadStatus.PENDING: return 'Waiting';
+      case DownloadStatus.DOWNLOADING_VIDEO: return 'Downloading video';
+      case DownloadStatus.DOWNLOADING_AUDIO: return 'Downloading audio';
+      case DownloadStatus.MERGING: return 'Merging';
+      case DownloadStatus.COMPLETED: return 'Completed';
+      case DownloadStatus.FAILED: return 'Failed';
+      case DownloadStatus.CANCELLED: return 'Cancelled';
       default: return '';
     }
   }
@@ -116,11 +140,254 @@ export class DownloadTask {
   }
 }
 
+interface DownloadNotificationUpdate {
+  task: DownloadTask;
+  force: boolean;
+  dueAt: number;
+}
+
+class DownloadNotificationDispatcher {
+  private pendingUpdates: Map<string, DownloadNotificationUpdate> = new Map();
+  private templateSupported: boolean | null = null;
+  private templateSupportChecking: boolean = false;
+  private disabled: boolean = false;
+  private publishing: boolean = false;
+  private flushTimer: number = -1;
+  private lastGlobalPublishAt: number = 0;
+  private nextNotificationId: number = 10000;
+  private getStatusText: (task: DownloadTask) => string;
+  private getFileName: (task: DownloadTask) => string;
+  private truncateText: (value: string, maxLength: number) => string;
+
+  constructor(
+    getStatusText: (task: DownloadTask) => string,
+    getFileName: (task: DownloadTask) => string,
+    truncateText: (value: string, maxLength: number) => string
+  ) {
+    this.getStatusText = getStatusText;
+    this.getFileName = getFileName;
+    this.truncateText = truncateText;
+  }
+
+  enqueue(task: DownloadTask, force: boolean = false): void {
+    if (task.status === DownloadStatus.PENDING || task.status === DownloadStatus.CANCELLED) {
+      return;
+    }
+    if (this.disabled || this.templateSupported === false) {
+      return;
+    }
+
+    const now = Date.now();
+    const progress = this.clampProgress(task.progress);
+    const dueAt = this.getTaskDueAt(task, progress, force, now);
+    if (dueAt < 0) {
+      return;
+    }
+
+    const current = this.pendingUpdates.get(task.id);
+    this.pendingUpdates.set(task.id, {
+      task,
+      force: force || current?.force === true,
+      dueAt: current ? Math.min(current.dueAt, dueAt) : dueAt
+    });
+
+    if (this.templateSupported === null) {
+      this.checkTemplateSupport();
+      return;
+    }
+
+    this.scheduleFlush(Math.max(0, dueAt - now));
+  }
+
+  cancel(task: DownloadTask): void {
+    this.pendingUpdates.delete(task.id);
+    if (task._notificationId === 0) {
+      return;
+    }
+    notificationManager.cancel(task._notificationId, (err: BusinessError) => {
+      if (err) {
+        logger.warn(`Task ${task.id} progress notification cancel failed: code=${err.code}, message=${err.message}`);
+      }
+    });
+  }
+
+  private getTaskDueAt(task: DownloadTask, progress: number, force: boolean, now: number): number {
+    if (now < task._notificationRateLimitedUntil && progress !== 100) {
+      return task._notificationRateLimitedUntil;
+    }
+
+    const statusChanged = task._lastNotificationStatus !== task.status;
+    const progressDelta = Math.abs(progress - task._lastNotificationProgress);
+    const progressChangedEnough = task._lastNotificationProgress < 0 ||
+      progressDelta >= DOWNLOAD_NOTIFICATION_MIN_PROGRESS_DELTA ||
+      progress === 100;
+
+    if (!force && !statusChanged && !progressChangedEnough) {
+      return -1;
+    }
+
+    if (!force && !statusChanged) {
+      return Math.max(now, task._lastNotificationAt + DOWNLOAD_NOTIFICATION_MIN_INTERVAL_MS);
+    }
+
+    return now;
+  }
+
+  private checkTemplateSupport(): void {
+    if (this.templateSupportChecking) {
+      return;
+    }
+    this.templateSupportChecking = true;
+    notificationManager.isSupportTemplate(DOWNLOAD_NOTIFICATION_TEMPLATE).then((supported: boolean) => {
+      this.templateSupported = supported;
+      this.templateSupportChecking = false;
+      logger.info(`Download notification template supported: ${supported}`);
+      if (supported) {
+        this.scheduleFlush(0);
+      } else {
+        this.pendingUpdates.clear();
+      }
+    }).catch((err: BusinessError) => {
+      this.templateSupported = false;
+      this.templateSupportChecking = false;
+      this.pendingUpdates.clear();
+      logger.warn(`Download notification template check failed: code=${err.code}, message=${err.message}`);
+    });
+  }
+
+  private scheduleFlush(delayMs: number): void {
+    if (this.flushTimer >= 0 || this.publishing || this.pendingUpdates.size === 0) {
+      return;
+    }
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = -1;
+      this.flush();
+    }, Math.max(0, delayMs));
+  }
+
+  private flush(): void {
+    if (this.publishing || this.disabled || this.templateSupported !== true) {
+      return;
+    }
+    if (this.pendingUpdates.size === 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const globalDueAt = this.lastGlobalPublishAt + DOWNLOAD_NOTIFICATION_GLOBAL_INTERVAL_MS;
+    if (now < globalDueAt) {
+      this.scheduleFlush(globalDueAt - now);
+      return;
+    }
+
+    const next = this.pickNextUpdate(now);
+    if (!next) {
+      this.scheduleFlush(this.getNextDueDelay(now));
+      return;
+    }
+
+    this.pendingUpdates.delete(next.task.id);
+    this.publish(next.task);
+  }
+
+  private pickNextUpdate(now: number): DownloadNotificationUpdate | null {
+    let selected: DownloadNotificationUpdate | null = null;
+    this.pendingUpdates.forEach((update: DownloadNotificationUpdate) => {
+      if (update.dueAt > now) {
+        return;
+      }
+      if (!selected || update.force || update.dueAt < selected.dueAt) {
+        selected = update;
+      }
+    });
+    return selected;
+  }
+
+  private getNextDueDelay(now: number): number {
+    let nextDueAt = Number.MAX_SAFE_INTEGER;
+    this.pendingUpdates.forEach((update: DownloadNotificationUpdate) => {
+      nextDueAt = Math.min(nextDueAt, update.dueAt);
+    });
+    if (nextDueAt === Number.MAX_SAFE_INTEGER) {
+      return DOWNLOAD_NOTIFICATION_GLOBAL_INTERVAL_MS;
+    }
+    return Math.max(0, nextDueAt - now);
+  }
+
+  private publish(task: DownloadTask): void {
+    if (task._notificationId === 0) {
+      task._notificationId = this.nextNotificationId++;
+    }
+
+    const progress = this.clampProgress(task.progress);
+    const title = this.truncateText(task.title || task.videoId, 60);
+    const statusText = this.getStatusText(task);
+    const fileName = this.truncateText(this.getFileName(task), 80);
+    const notificationRequest: notificationManager.NotificationRequest = {
+      id: task._notificationId,
+      content: {
+        notificationContentType: notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
+        normal: {
+          title: title,
+          text: statusText,
+          additionalText: `${progress}%`
+        }
+      },
+      template: {
+        name: DOWNLOAD_NOTIFICATION_TEMPLATE,
+        data: {
+          title: title,
+          fileName: fileName,
+          progressValue: progress
+        }
+      }
+    };
+
+    this.publishing = true;
+    this.lastGlobalPublishAt = Date.now();
+    notificationManager.publish(notificationRequest, (err: BusinessError) => {
+      this.publishing = false;
+      if (err) {
+        logger.warn(`Task ${task.id} progress notification publish failed: code=${err.code}, message=${err.message}`);
+        if (err.code === 1600004 || (err.message && err.message.includes('Notification disabled'))) {
+          this.disabled = true;
+          this.pendingUpdates.clear();
+        } else if (err.code === 1600009) {
+          task._notificationRateLimitedUntil = Date.now() + DOWNLOAD_NOTIFICATION_RATE_LIMIT_BACKOFF_MS;
+          this.enqueue(task, false);
+        }
+        this.scheduleFlush(DOWNLOAD_NOTIFICATION_GLOBAL_INTERVAL_MS);
+        return;
+      }
+
+      task._lastNotificationProgress = progress;
+      task._lastNotificationStatus = task.status;
+      task._lastNotificationAt = Date.now();
+      logger.debug(`Task ${task.id} progress notification published: progress=${progress} status=${task.status}`);
+      this.scheduleFlush(0);
+    });
+  }
+
+  private clampProgress(progress: number): number {
+    return Math.max(0, Math.min(100, progress || 0));
+  }
+}
+
 export class DownloadManager {
   private static instance: DownloadManager;
   private tasks: DownloadTask[] = [];
-  private activeTaskId: string | null = null;
-  private _tasksSnapshot: DownloadTask[] = [];
+  private activeTaskIds: Set<string> = new Set();
+  private exportTail: Promise<void> = Promise.resolve();
+  private context: common.UIAbilityContext | null = null;
+  private notificationDispatcher: DownloadNotificationDispatcher;
+
+  private constructor() {
+    this.notificationDispatcher = new DownloadNotificationDispatcher(
+      (task: DownloadTask): string => this.getNotificationStatusText(task),
+      (task: DownloadTask): string => this.getNotificationFileName(task),
+      (value: string, maxLength: number): string => this.truncateNotificationText(value, maxLength)
+    );
+  }
 
   static getInstance(): DownloadManager {
     if (!DownloadManager.instance) {
@@ -133,280 +400,706 @@ export class DownloadManager {
     return this.tasks;
   }
 
-  private notifyTasksChanged(): void {
-    this._tasksSnapshot = [...this.tasks];
-    AppStorage.setOrCreate('downloadTasks', this._tasksSnapshot);
+  setContext(ctx: common.UIAbilityContext): void {
+    this.context = ctx;
+    this.tasks.forEach((task: DownloadTask) => {
+      if (!task._context) {
+        task._context = ctx;
+      }
+    });
   }
 
   addTask(task: DownloadTask): void {
+    if (!task._context && this.context) {
+      task._context = this.context;
+    }
+    logger.info(`Task ${task.id} queued: video=${task.videoId} title="${task.title}" videoStream=${this.getStreamLogLabel(task.videoStream)} audioStream=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'}`);
     this.tasks.unshift(task);
     this.notifyTasksChanged();
     this.processQueue();
   }
 
   cancelTask(taskId: string): void {
-    const task = this.tasks.find(t => t.id === taskId);
+    const task = this.tasks.find((item: DownloadTask) => item.id === taskId);
     if (task && task.status !== DownloadStatus.COMPLETED) {
       task._cancelled = true;
       task.status = DownloadStatus.CANCELLED;
-      this.notifyTasksChanged();
+      logger.info(`Task ${task.id} cancelled`);
+      this.cancelDownloadNotification(task);
+      this.processQueue();
     }
   }
 
   deleteTask(taskId: string): void {
-    const idx = this.tasks.findIndex(t => t.id === taskId);
-    if (idx !== -1) {
-      this.cleanupTaskFiles(this.tasks[idx]);
+    const task = this.tasks.find((item: DownloadTask) => item.id === taskId);
+    if (task) {
+      task._cancelled = true;
+      logger.info(`Task ${task.id} deleted includeOutput=true`);
+      this.cancelDownloadNotification(task);
+      this.cleanupTaskFiles(task, true);
     }
-    this.tasks = this.tasks.filter(t => t.id !== taskId);
-    if (this.activeTaskId === taskId) {
-      this.activeTaskId = null;
-    }
+    this.tasks = this.tasks.filter((item: DownloadTask) => item.id !== taskId);
     this.notifyTasksChanged();
-    if (!this.activeTaskId) {
-      this.processQueue();
-    }
+    this.processQueue();
   }
 
-  removeCompleted(): void {
-    this.tasks = this.tasks.filter(t =>
-      t.status === DownloadStatus.DOWNLOADING_VIDEO ||
-      t.status === DownloadStatus.DOWNLOADING_AUDIO ||
-      t.status === DownloadStatus.MERGING ||
-      t.status === DownloadStatus.PENDING
-    );
-    this.notifyTasksChanged();
-  }
-
-  setContext(ctx: common.UIAbilityContext): void {
-    this.tasks.forEach(t => t._context = ctx);
-  }
-
-  private async processQueue(): Promise<void> {
-    if (this.activeTaskId) return;
-
-    const pending = this.tasks.find(t => t.status === DownloadStatus.PENDING);
-    if (!pending) return;
-
-    this.activeTaskId = pending.id;
-    try {
-      await this.executeTask(pending);
-    } catch (e) {
-      logger.error(`Task ${pending.id} failed: ${JSON.stringify(e)}`);
-    } finally {
-      this.activeTaskId = null;
-      this.notifyTasksChanged();
-      this.processQueue();
+  async exportCompletedTask(taskId: string, destinationDir: string): Promise<string> {
+    const task = this.tasks.find((item: DownloadTask) => item.id === taskId);
+    if (!task) {
+      throw new Error('Download task not found');
     }
-  }
-
-  private async executeTask(task: DownloadTask): Promise<void> {
-    if (task._cancelled) return;
-    if (!task._context) {
-      task.status = DownloadStatus.FAILED;
-      task.errorMessage = '缺少上下文';
-      return;
+    if (task.status !== DownloadStatus.COMPLETED || !task.outputPath) {
+      throw new Error('Download task is not completed');
+    }
+    if (!destinationDir) {
+      throw new Error('Missing destination directory');
     }
 
-    const tempDir = task._context.tempDir;
-
-    // Step 1: Download video
-    task.status = DownloadStatus.DOWNLOADING_VIDEO;
-    this.notifyTasksChanged();
-
-    const videoExt = this.getFileExtension(task.videoStream);
-    task._videoFilePath = `${tempDir}/${task.id}_video.${videoExt}`;
-    try {
-      await this.downloadFile(task, task.videoStream, task._videoFilePath, 'video');
-    } catch (e) {
-      if (!task._cancelled) {
-        task.status = DownloadStatus.FAILED;
-        task.errorMessage = `视频下载失败: ${e}`;
-        this.notifyTasksChanged();
-      }
-      return;
-    }
-    if (task._cancelled) return;
-
-    // Step 2: Download audio (if any)
-    if (task.audioStream) {
-      task.status = DownloadStatus.DOWNLOADING_AUDIO;
-      this.notifyTasksChanged();
-
-      const audioExt = this.getFileExtension(task.audioStream);
-      task._audioFilePath = `${tempDir}/${task.id}_audio.${audioExt}`;
-      try {
-        await this.downloadFile(task, task.audioStream, task._audioFilePath, 'audio');
-      } catch (e) {
-        if (!task._cancelled) {
-          task.status = DownloadStatus.FAILED;
-          task.errorMessage = `音频下载失败: ${e}`;
-          this.notifyTasksChanged();
-        }
-        return;
-      }
-      if (task._cancelled) return;
-    }
-
-    // Step 3: Merge and save
-    task.status = DownloadStatus.MERGING;
-    this.notifyTasksChanged();
-
-    try {
-      const outputPath = await this.mergeAndSave(task);
-      task.outputPath = outputPath;
-      task.status = DownloadStatus.COMPLETED;
-      task.progress = 100;
-      task.videoProgress = 100;
-      if (task.audioStream) {
-        task.audioProgress = 100;
-      }
-      this.notifyTasksChanged();
-      this.cleanupTaskFiles(task);
-    } catch (e) {
-      if (!task._cancelled) {
-        task.status = DownloadStatus.FAILED;
-        task.errorMessage = `保存失败: ${e}`;
-        this.notifyTasksChanged();
-      }
-    }
-  }
-
-  private async downloadFile(
-    task: DownloadTask, stream: StreamInfo, filePath: string, type: 'video' | 'audio'
-  ): Promise<void> {
-    const totalBytes = stream.contentLength || 0;
-    let downloadedBytes = 0;
-    let file: fs.File | null = null;
-
-    try {
-      file = fs.openSync(filePath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY);
-
-      const httpRequest = http.createHttp();
-      const response = await httpRequest.request(
-        stream.url,
-        {
-          method: http.RequestMethod.GET,
-          expectDataType: http.HttpDataType.ARRAY_BUFFER,
-          connectTimeout: 30000,
-          readTimeout: 120000,
-        }
-      );
-
-      if (task._cancelled) return;
-
-      const code = response.responseCode;
-      if (code === 200 || code === 206) {
-        const data = response.result as ArrayBuffer;
-        if (data && data.byteLength > 0) {
-          const chunkSize = 256 * 1024;
-          let offset = 0;
-          while (offset < data.byteLength) {
-            if (task._cancelled) return;
-            const end = Math.min(offset + chunkSize, data.byteLength);
-            const chunk = data.slice(offset, end);
-            fs.writeSync(file.fd, chunk);
-            downloadedBytes = end;
-            task.updateProgress(
-              downloadedBytes,
-              totalBytes > 0 ? totalBytes : data.byteLength,
-              type
-            );
-            offset = end;
-          }
-        }
-      } else {
-        throw new Error(`HTTP ${code}`);
-      }
-
-      httpRequest.destroy();
-    } finally {
-      if (file) {
-        try { fs.closeSync(file); } catch (_e) {
-        }
-      }
-    }
-  }
-
-  private async mergeAndSave(task: DownloadTask): Promise<string> {
-    if (!task._context) throw new Error('缺少上下文');
-
-    const context = task._context;
-    const filePicker = new picker.DocumentViewPicker(context);
-    const options = new picker.DocumentSaveOptions();
-
-    const safeTitle = this.sanitizeFilename(task.title || task.videoId);
-    const safeAuthor = task.author ? this.sanitizeFilename(task.author) : '';
-    const baseName = safeAuthor ? `${safeTitle}_${safeAuthor}` : safeTitle;
-    const ext = this.getFileExtension(task.videoStream);
-    const fileName = `${baseName}.${ext}`;
-
-    options.newFileNames = [fileName];
-    options.pickerMode = picker.DocumentPickerMode.DOWNLOAD;
-
-    const result = await filePicker.save(options);
-    if (!result || result.length === 0) {
-      throw new Error('用户取消了保存');
-    }
-
-    const uriPath = result[0];
-    const uri = new fileUriKit.FileUri(uriPath + '/' + fileName);
-    const outputPath = uri.path;
-
-    if (task.audioStream && task._audioFilePath) {
-      this.concatFiles(task._videoFilePath, task._audioFilePath, outputPath);
-    } else {
-      fs.copyFileSync(task._videoFilePath, outputPath);
-    }
-
-    logger.info(`File saved to: ${outputPath}`);
+    const fileName = this.getFileName(task.outputPath);
+    const outputPath = `${destinationDir}/${fileName}`;
+    fs.copyFileSync(task.outputPath, outputPath);
+    logger.info(`Task ${task.id} exported to downloads: ${outputPath}`);
+    this.deleteTask(task.id);
     return outputPath;
   }
 
-  private concatFiles(videoPath: string, audioPath: string, outputPath: string): void {
-    const outputFile = fs.openSync(outputPath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY);
-
-    try {
-      const videoStat = fs.statSync(videoPath);
-      const videoFile = fs.openSync(videoPath, fs.OpenMode.READ_ONLY);
-      const videoBuffer = new ArrayBuffer(videoStat.size);
-      const videoRead = fs.readSync(videoFile.fd, videoBuffer);
-      if (videoRead > 0) {
-        fs.writeSync(outputFile.fd, videoBuffer.slice(0, videoRead));
+  removeCompleted(): void {
+    const retainedTasks = this.tasks.filter((task: DownloadTask) =>
+      task.status === DownloadStatus.DOWNLOADING_VIDEO ||
+      task.status === DownloadStatus.DOWNLOADING_AUDIO ||
+      task.status === DownloadStatus.MERGING ||
+      task.status === DownloadStatus.PENDING
+    );
+    this.tasks.forEach((task: DownloadTask) => {
+      if (!retainedTasks.includes(task)) {
+        this.cancelDownloadNotification(task);
       }
-      fs.closeSync(videoFile);
+    });
+    this.tasks = retainedTasks;
+    this.notifyTasksChanged();
+    this.processQueue();
+  }
 
-      const audioStat = fs.statSync(audioPath);
-      const audioFile = fs.openSync(audioPath, fs.OpenMode.READ_ONLY);
-      const audioBuffer = new ArrayBuffer(audioStat.size);
-      const audioRead = fs.readSync(audioFile.fd, audioBuffer);
-      if (audioRead > 0) {
-        fs.writeSync(outputFile.fd, audioBuffer.slice(0, audioRead));
+  refreshTaskPool(): void {
+    this.processQueue();
+  }
+
+  private notifyTasksChanged(): void {
+    AppStorage.setOrCreate('downloadTasks', [...this.tasks]);
+  }
+
+  private processQueue(): void {
+    const maxActiveTasks = this.getMaxConcurrentDownloads();
+    while (this.activeTaskIds.size < maxActiveTasks) {
+      const pending = this.tasks.find((task: DownloadTask) => task.status === DownloadStatus.PENDING && !this.activeTaskIds.has(task.id));
+      if (!pending) {
+        return;
       }
-      fs.closeSync(audioFile);
-    } finally {
-      fs.closeSync(outputFile);
+
+      this.activeTaskIds.add(pending.id);
+      logger.info(`Task ${pending.id} picked by taskpool: active=${this.activeTaskIds.size}/${maxActiveTasks}`);
+      this.runTask(pending);
     }
   }
 
-  private cleanupTaskFiles(task: DownloadTask): void {
-    [task._videoFilePath, task._audioFilePath].forEach(p => {
-      if (p && p.length > 0) {
-        try {
-          if (fs.accessSync(p)) {
-            fs.unlinkSync(p);
-          }
-        } catch (_e) {
-        }
+  private async runTask(task: DownloadTask): Promise<void> {
+    try {
+      await this.executeTask(task);
+    } catch (error) {
+      if (!task._cancelled) {
+        task.status = DownloadStatus.FAILED;
+        task.errorMessage = this.getErrorMessage(error);
+        this.publishDownloadNotification(task, true);
       }
+      logger.error(`Task ${task.id} failed: ${this.getErrorMessage(error)}`);
+    } finally {
+      this.activeTaskIds.delete(task.id);
+      this.processQueue();
+    }
+  }
+
+  private getMaxConcurrentDownloads(): number {
+    const uiConfig = AppStorage.get<UIConfig>('uiConfig');
+    const value = uiConfig?.maxConcurrentDownloads || 1;
+    return Math.max(1, Math.min(4, Math.round(value)));
+  }
+
+  private async executeTask(task: DownloadTask): Promise<void> {
+    if (task._cancelled) {
+      return;
+    }
+    if (!task._context) {
+      task.status = DownloadStatus.FAILED;
+      task.errorMessage = 'Missing app context';
+      return;
+    }
+
+    task.taskDir = this.ensureTaskDir(task);
+    const videoExt = this.getFileExtension(task.videoStream);
+    const audioExt = task.audioStream ? this.getFileExtension(task.audioStream) : '';
+    task._videoFilePath = `${task.taskDir}/video.${videoExt}`;
+    task._audioFilePath = task.audioStream ? `${task.taskDir}/audio.${audioExt}` : '';
+    logger.info(`Task ${task.id} start: dir=${task.taskDir} totalSize=${task.totalSize || 'unknown'} video=${this.getStreamLogLabel(task.videoStream)} audio=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'}`);
+    this.showToast(`开始下载：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+
+    task.status = DownloadStatus.DOWNLOADING_VIDEO;
+    this.publishDownloadNotification(task, true);
+    await this.downloadStream(task, task.videoStream, task._videoFilePath, 'video');
+    if (task._cancelled) {
+      return;
+    }
+
+    if (task.audioStream) {
+      task.status = DownloadStatus.DOWNLOADING_AUDIO;
+      this.publishDownloadNotification(task, true);
+      await this.downloadStream(task, task.audioStream, task._audioFilePath, 'audio');
+      if (task._cancelled) {
+        return;
+      }
+    }
+
+    task.status = DownloadStatus.MERGING;
+    task.updateMergeProgress(5);
+    logger.info(`Task ${task.id} merging`);
+    this.publishDownloadNotification(task, true);
+
+    task.outputPath = await this.mergeOrCopy(task);
+    task.status = DownloadStatus.COMPLETED;
+    task.progress = 100;
+    task.videoProgress = 100;
+    task.audioProgress = task.audioStream ? 100 : 0;
+    task.mergeProgress = 100;
+    this.cleanupTaskFiles(task, false);
+    logger.info(`Task ${task.id} completed: output=${task.outputPath}`);
+    this.publishDownloadNotification(task, true);
+    const exportedPath = await this.runAutoExportAtTaskEnd(task);
+    if (exportedPath) {
+      this.showToast(`已保存到下载：${this.truncateNotificationText(this.getFileName(exportedPath), 36)}`);
+    } else {
+      this.showToast(`下载完成：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+    }
+  }
+
+  private async runAutoExportAtTaskEnd(task: DownloadTask): Promise<string | null> {
+    const previousExport = this.exportTail;
+    let releaseExport: () => void = () => {};
+    this.exportTail = new Promise<void>((resolve: () => void) => {
+      releaseExport = resolve;
     });
+
+    await previousExport;
+    try {
+      return await this.autoExportCompletedTask(task);
+    } finally {
+      releaseExport();
+    }
+  }
+
+  private async autoExportCompletedTask(task: DownloadTask): Promise<string | null> {
+    if (!this.tasks.includes(task) || !task._context || task.status !== DownloadStatus.COMPLETED || !task.outputPath) {
+      return null;
+    }
+
+    try {
+      logger.info(`Task ${task.id} auto export prompt opening`);
+      const documentViewPicker = new picker.DocumentViewPicker(task._context);
+      const documentSaveOptions = new picker.DocumentSaveOptions();
+      documentSaveOptions.pickerMode = picker.DocumentPickerMode.DOWNLOAD;
+      const result = await documentViewPicker.save(documentSaveOptions);
+      if (!result || result.length === 0) {
+        logger.info(`Task ${task.id} auto export cancelled`);
+        return null;
+      }
+
+      const destinationDir = new fileUri.FileUri(result[0]).path;
+      const exportedPath = await this.exportCompletedTask(task.id, destinationDir);
+      logger.info(`Task ${task.id} auto export completed: ${exportedPath}`);
+      return exportedPath;
+    } catch (error) {
+      logger.warn(`Task ${task.id} auto export failed: ${this.getErrorMessage(error)}`);
+      return null;
+    }
+  }
+
+  private async downloadStream(
+    task: DownloadTask,
+    stream: StreamInfo,
+    filePath: string,
+    type: 'video' | 'audio'
+  ): Promise<void> {
+    const totalBytes = stream.contentLength || 0;
+    const chunkCount = totalBytes > 0 ? Math.ceil(totalBytes / HTTP_CHUNK_SIZE) : 1;
+    logger.info(`Task ${task.id} ${type} download start: mode=${totalBytes > 0 ? 'chunked-stream' : 'stream'} chunks=${chunkCount} chunkSize=${HTTP_CHUNK_SIZE} size=${totalBytes || 'unknown'} stream=${this.getStreamLogLabel(stream)}`);
+
+    const file = fs.openSync(filePath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+    try {
+      if (totalBytes > 0) {
+        await this.downloadChunkedStream(task, stream, file, type, totalBytes);
+      } else {
+        await this.downloadUnknownSizeStream(task, stream, file, type);
+      }
+    } finally {
+      fs.closeSync(file);
+    }
+
+    logger.info(`Task ${task.id} ${type} stream download completed: ${filePath} bytes=${totalBytes || (type === 'video' ? task.videoDownloadedSize : task.audioDownloadedSize)}`);
+  }
+
+  private async downloadChunkedStream(
+    task: DownloadTask,
+    stream: StreamInfo,
+    file: fs.File,
+    type: 'video' | 'audio',
+    totalBytes: number
+  ): Promise<void> {
+    let downloaded = 0;
+    let chunkIndex = 0;
+    while (downloaded < totalBytes) {
+      if (task._cancelled) {
+        return;
+      }
+
+      const start = downloaded;
+      const end = Math.min(start + HTTP_CHUNK_SIZE - 1, totalBytes - 1);
+      const expectedSize = end - start + 1;
+      const rangeSpec = `${start}-${end}`;
+      chunkIndex++;
+      logger.debug(`Task ${task.id} ${type} chunk ${chunkIndex}: range=${rangeSpec}`);
+
+      const result = await this.requestStreamToFile(
+        this.buildStreamUrl(stream.url, rangeSpec),
+        this.buildStreamHeaders(stream.url, rangeSpec),
+        file,
+        task,
+        (chunkWritten: number) => {
+          task.updateProgress(start + chunkWritten, totalBytes, type);
+          this.publishDownloadNotification(task);
+        }
+      );
+
+      if (task._cancelled) {
+        return;
+      }
+      if (result.responseCode !== 206 && result.responseCode !== 200) {
+        throw new Error(`Chunk request returned HTTP ${result.responseCode}`);
+      }
+      if (result.bytesWritten !== expectedSize) {
+        throw new Error(`Chunk size mismatch expected=${expectedSize} actual=${result.bytesWritten}`);
+      }
+      downloaded += result.bytesWritten;
+      task.updateProgress(downloaded, totalBytes, type);
+      this.publishDownloadNotification(task);
+    }
+  }
+
+  private async downloadUnknownSizeStream(
+    task: DownloadTask,
+    stream: StreamInfo,
+    file: fs.File,
+    type: 'video' | 'audio'
+  ): Promise<void> {
+    const result = await this.requestStreamToFile(
+      stream.url,
+      { 'Accept-Encoding': 'identity' },
+      file,
+      task,
+      (written: number) => {
+        task.updateProgress(written, written, type);
+        this.publishDownloadNotification(task);
+      }
+    );
+    if (task._cancelled) {
+      return;
+    }
+    if (result.responseCode !== 200 && result.responseCode !== 206) {
+      throw new Error(`HTTP ${result.responseCode}`);
+    }
+    task.updateProgress(result.bytesWritten, result.bytesWritten, type);
+    this.publishDownloadNotification(task);
+  }
+
+  private async requestStreamToFile(
+    url: string,
+    header: Record<string, string>,
+    file: fs.File,
+    task: DownloadTask,
+    onProgress: (written: number) => void,
+    redirectDepth: number = 0
+  ): Promise<StreamChunkResult> {
+    if (redirectDepth > 5) {
+      throw new Error('Too many redirects');
+    }
+    const httpRequest = http.createHttp();
+    return new Promise<StreamChunkResult>((resolve, reject) => {
+      let bytesWritten = 0;
+      let responseCode = 0;
+      let requestReturned = false;
+      let streamEnded = false;
+      let settled = false;
+      let redirectLocation: string | null = null;
+
+      const cleanup = (): void => {
+        try {
+          httpRequest.off('headersReceive');
+          httpRequest.off('dataReceive');
+          httpRequest.off('dataEnd');
+        } catch (_error) {
+        }
+      };
+
+      const finishResolve = (result: StreamChunkResult): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        try {
+          httpRequest.destroy();
+        } catch (_error) {
+        }
+        resolve(result);
+      };
+
+      const finishReject = (error: Error | Object): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        try {
+          httpRequest.destroy();
+        } catch (_error) {
+        }
+        reject(error);
+      };
+
+      const followRedirect = (): void => {
+        if (settled || !redirectLocation) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        try {
+          httpRequest.destroy();
+        } catch (_error) {
+        }
+        this.requestStreamToFile(redirectLocation, header, file, task, onProgress, redirectDepth + 1)
+          .then(resolve)
+          .catch(reject);
+      };
+
+      const tryFinish = (): void => {
+        if (settled || !requestReturned) {
+          return;
+        }
+        if (responseCode >= 300 && responseCode < 400) {
+          if (redirectLocation) {
+            followRedirect();
+            return;
+          }
+          finishReject(new Error(`HTTP redirect ${responseCode} without Location`));
+          return;
+        }
+        if (streamEnded) {
+          finishResolve({ responseCode: responseCode, bytesWritten: bytesWritten });
+        }
+      };
+
+      httpRequest.on('headersReceive', (headers: Object) => {
+        redirectLocation = this.getRedirectLocation(headers as Record<string, string | string[]>);
+      });
+
+      httpRequest.on('dataReceive', (data: ArrayBuffer) => {
+        if (task._cancelled) {
+          finishResolve({ responseCode: responseCode, bytesWritten: bytesWritten });
+          return;
+        }
+        try {
+          if (data.byteLength > 0) {
+            fs.writeSync(file.fd, data);
+            bytesWritten += data.byteLength;
+            onProgress(bytesWritten);
+          }
+        } catch (error) {
+          finishReject(error as Error);
+        }
+      });
+
+      httpRequest.on('dataEnd', () => {
+        streamEnded = true;
+        tryFinish();
+      });
+
+      httpRequest.requestInStream(
+        url,
+        {
+          method: http.RequestMethod.GET,
+          header,
+          connectTimeout: 30000,
+          readTimeout: 120000,
+          usingCache: false
+        }
+      ).then((code: number) => {
+        responseCode = code || 0;
+        requestReturned = true;
+        tryFinish();
+      }).catch((error: Error) => {
+        finishReject(error);
+      });
+    });
+  }
+
+  private buildStreamHeaders(url: string, rangeSpec: string): Record<string, string> {
+    const header: Record<string, string> = { 'Accept-Encoding': 'identity' };
+    if (!this.isYoutubePlaybackUrl(url)) {
+      header['Range'] = `bytes=${rangeSpec}`;
+    }
+    return header;
+  }
+
+  private buildStreamUrl(url: string, rangeSpec: string): string {
+    if (!this.isYoutubePlaybackUrl(url)) {
+      return url;
+    }
+    return this.buildRangeUrl(url, rangeSpec);
+  }
+
+  private getRedirectLocation(headers: Record<string, string | string[] | Object>): string | null {
+    const keys = ['Location', 'location'];
+    for (const key of keys) {
+      const value = headers[key];
+      if (typeof value === 'string' && value.length > 0) {
+        return value;
+      }
+      if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string' && value[0]) {
+        return value[0];
+      }
+    }
+    return null;
+  }
+
+  private publishDownloadNotification(task: DownloadTask, force: boolean = false): void {
+    this.notificationDispatcher.enqueue(task, force);
+  }
+
+  private cancelDownloadNotification(task: DownloadTask): void {
+    this.notificationDispatcher.cancel(task);
+  }
+
+  private getNotificationStatusText(task: DownloadTask): string {
+    if (task.status === DownloadStatus.FAILED) {
+      return task.errorMessage || 'Download failed';
+    }
+    const progressText = task.getProgressText();
+    return progressText ? `${task.getStatusLabel()} · ${progressText}` : task.getStatusLabel();
+  }
+
+  private getNotificationFileName(task: DownloadTask): string {
+    if (task.outputPath) {
+      return this.getFileName(task.outputPath);
+    }
+    const safeTitle = this.sanitizeFilename(task.title || task.videoId);
+    return `${safeTitle}.${this.getOutputExtension(task)}`;
+  }
+
+  private truncateNotificationText(value: string, maxLength: number): string {
+    if (value.length <= maxLength) {
+      return value;
+    }
+    return `${value.substring(0, Math.max(0, maxLength - 3))}...`;
+  }
+
+  private showToast(message: string): void {
+    try {
+      const uiContext = AppStorage.get<UIContext>('uiContext');
+      if (!uiContext) {
+        logger.warn(`Download toast skipped, missing uiContext: ${message}`);
+        return;
+      }
+      uiContext.getPromptAction().showToast({
+        message,
+        duration: 2000
+      });
+      logger.debug(`Download toast requested: ${message}`);
+    } catch (error) {
+      logger.warn(`Download toast failed: ${this.getErrorMessage(error)}`);
+    }
+  }
+
+  private async mergeOrCopy(task: DownloadTask): Promise<string> {
+    const safeTitle = this.sanitizeFilename(task.title || task.videoId);
+    const outputExt = this.getOutputExtension(task);
+    const outputPath = `${task.taskDir}/${safeTitle}.${outputExt}`;
+
+    if (task.audioStream && task._audioFilePath) {
+      logger.info(`Task ${task.id} ffmpeg merge output=${outputExt} videoExt=${this.getFileExtension(task.videoStream)} audioExt=${this.getFileExtension(task.audioStream)}`);
+      const commands: string[] = [
+        'ffmpeg',
+        '-y',
+        '-i',
+        task._videoFilePath,
+        '-i',
+        task._audioFilePath,
+        '-c',
+        'copy',
+        outputPath
+      ];
+      await FFmpeg.execute(commands, {
+        logCallback: (message: string) => {
+          logger.debug(`[ffmpeg] ${message}`);
+        },
+        progressCallback: (_message: string) => {
+          task.updateMergeProgress(Math.max(task.mergeProgress, 50));
+          this.publishDownloadNotification(task);
+        }
+      });
+      task.updateMergeProgress(100);
+      this.publishDownloadNotification(task);
+    } else {
+      fs.copyFileSync(task._videoFilePath, outputPath);
+      task.updateMergeProgress(100);
+      this.publishDownloadNotification(task);
+    }
+
+    logger.info(`File saved to app downloads: ${outputPath}`);
+    return outputPath;
+  }
+
+  private getStreamLogLabel(stream: StreamInfo): string {
+    const parts: string[] = [];
+    if (stream.itag) parts.push(`itag=${stream.itag}`);
+    if (stream.kind) parts.push(`kind=${stream.kind}`);
+    if (stream.quality || stream.videoQuality || stream.audioQuality) {
+      parts.push(`quality=${stream.quality || stream.videoQuality || stream.audioQuality}`);
+    }
+    if (stream.mimeType) parts.push(`mime=${stream.mimeType.split(';')[0]}`);
+    if (stream.codecs) parts.push(`codecs=${stream.codecs}`);
+    if (stream.bitrate) parts.push(`bitrate=${stream.bitrate}`);
+    if (stream.contentLength) parts.push(`size=${stream.contentLength}`);
+    return parts.length > 0 ? parts.join(',') : 'unknown';
+  }
+
+  private ensureTaskDir(task: DownloadTask): string {
+    if (!task._context) {
+      throw new Error('Missing app context');
+    }
+    const root = `${task._context.filesDir}/${DOWNLOAD_ROOT}`;
+    const taskDir = `${root}/${task.id}`;
+    this.ensureDir(root);
+    this.ensureDir(taskDir);
+    return taskDir;
+  }
+
+  private ensureDir(path: string): void {
+    try {
+      if (!fs.accessSync(path)) {
+        fs.mkdirSync(path, true);
+      }
+    } catch (_error) {
+      fs.mkdirSync(path, true);
+    }
+  }
+
+  private cleanupTaskFiles(task: DownloadTask, includeOutput: boolean): void {
+    [task._videoFilePath, task._audioFilePath].forEach((path: string) => this.safeUnlink(path));
+    this.safeRemoveDir(`${task.taskDir}/video_parts`);
+    this.safeRemoveDir(`${task.taskDir}/audio_parts`);
+    if (includeOutput && task.taskDir) {
+      this.safeRemoveDir(task.taskDir);
+    }
+  }
+
+  private safeUnlink(path: string): void {
+    if (!path) {
+      return;
+    }
+    try {
+      if (fs.accessSync(path)) {
+        fs.unlinkSync(path);
+      }
+    } catch (_error) {
+    }
+  }
+
+  private safeRemoveDir(path: string): void {
+    if (!path) {
+      return;
+    }
+    try {
+      if (!fs.accessSync(path)) {
+        return;
+      }
+      const files = fs.listFileSync(path);
+      files.forEach((name: string) => {
+        const child = `${path}/${name}`;
+        try {
+          this.safeUnlink(child);
+        } catch (_error) {
+          this.safeRemoveDir(child);
+        }
+      });
+      fs.rmdirSync(path);
+    } catch (_error) {
+    }
+  }
+
+  private buildRangeUrl(url: string, rangeSpec: string): string {
+    if (!this.isYoutubePlaybackUrl(url)) {
+      return url;
+    }
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}range=${rangeSpec}`;
+  }
+
+  private isYoutubePlaybackUrl(url: string): boolean {
+    const lower = url.toLowerCase();
+    return lower.includes('googlevideo.com') || lower.includes('youtube.com') || lower.includes('youtu.be');
+  }
+
+  private getOutputExtension(task: DownloadTask): string {
+    const videoExt = this.getFileExtension(task.videoStream);
+    const audioExt = task.audioStream ? this.getFileExtension(task.audioStream) : '';
+    if (!task.audioStream || videoExt === audioExt) {
+      return videoExt;
+    }
+
+    const videoMime = (task.videoStream.mimeType || '').toLowerCase();
+    const audioMime = (task.audioStream.mimeType || '').toLowerCase();
+    const videoCodecs = (task.videoStream.codecs || '').toLowerCase();
+    const audioCodecs = (task.audioStream.codecs || '').toLowerCase();
+    const isMp4Video = videoExt === 'mp4' || videoMime.includes('mp4') ||
+      videoCodecs.includes('avc1') || videoCodecs.includes('avc3') ||
+      videoCodecs.includes('hvc1') || videoCodecs.includes('hev1');
+    const isWebmAudio = audioExt === 'webm' || audioExt === 'opus' || audioMime.includes('webm') ||
+      audioCodecs.includes('opus') || audioCodecs.includes('vp9') || audioCodecs.includes('vp09');
+
+    if (isMp4Video && isWebmAudio) {
+      return 'mkv';
+    }
+
+    const isMp4Audio = audioExt === 'mp4' || audioExt === 'm4a' || audioExt === 'aac' ||
+      audioMime.includes('mp4') || audioCodecs.includes('mp4a');
+    const isWebmVideo = videoExt === 'webm' || videoMime.includes('webm') ||
+      videoCodecs.includes('vp9') || videoCodecs.includes('vp09') || videoCodecs.includes('av01');
+    if (isWebmVideo && isMp4Audio) {
+      return 'mkv';
+    }
+
+    if (isMp4Video && isMp4Audio) {
+      return 'mp4';
+    }
+    if (isWebmVideo && isWebmAudio) {
+      return 'webm';
+    }
+
+    return 'mkv';
   }
 
   private getFileExtension(stream: StreamInfo): string {
     const mime = (stream.mimeType || '').toLowerCase();
-    if (mime.includes('mp4')) return 'mp4';
     if (mime.includes('webm')) return 'webm';
     if (mime.includes('3gpp')) return '3gp';
+    if (mime.includes('mp4')) return 'mp4';
     if (mime.includes('mpeg') && !stream.videoQuality) return 'mp3';
     if (mime.includes('aac')) return 'aac';
     if (mime.includes('ogg') || mime.includes('opus')) return 'opus';
@@ -416,9 +1109,26 @@ export class DownloadManager {
   }
 
   private sanitizeFilename(name: string): string {
-    return name.replace(/[\\/:*?"<>|]/g, '_')
+    const value = name.replace(/[\\/:*?"<>|]/g, '_')
       .replace(/\s+/g, '_')
       .substring(0, 80)
       .trim();
+    return value.length > 0 ? value : 'download';
+  }
+
+  private getFileName(path: string): string {
+    const index = path.lastIndexOf('/');
+    return index >= 0 ? path.substring(index + 1) : path;
+  }
+
+  private getErrorMessage(error: Object | string | undefined): string {
+    if (!error) {
+      return 'Unknown error';
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    const maybeError = error as Error;
+    return maybeError.message || JSON.stringify(error);
   }
 }

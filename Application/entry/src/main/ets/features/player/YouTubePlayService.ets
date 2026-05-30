@@ -130,6 +130,8 @@ export class YouTubePlayService {
       const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
         url: stream.url,
         itag: stream.itag,
+        hasVideo: stream.hasVideo,
+        hasAudio: stream.hasAudio,
         kind: stream.kind || '',
         quality: stream.qualityLabel,
         format: stream.container,
@@ -226,6 +228,8 @@ export class YouTubePlayService {
       const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
         url: stream.url,
         itag: stream.itag,
+        hasVideo: stream.hasVideo,
+        hasAudio: stream.hasAudio,
         kind: stream.kind || '',
         quality: stream.qualityLabel,
         format: stream.container,
