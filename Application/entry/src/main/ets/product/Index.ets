@@ -74,7 +74,7 @@ import {
 } from '../features/player/PlaybackContinuationService';
 
 const logger = AppLog.getInstance('Index');
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.4.1';
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 
 

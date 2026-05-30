@@ -5,8 +5,8 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 
-const APP_VERSION = '0.4.0';
-const APP_BUILD = '1000007';
+const APP_VERSION = '0.4.1';
+const APP_BUILD = '1000008';
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
 
@@ -32,13 +32,26 @@ const OPEN_SOURCE_ITEMS: OpenSourceItem[] = [
 
 const AI_MODELS: string[] = [
   'Kimi k2.6',
-  'Xiaomi MiMo 2.5 Pro',
+  'Deepseek v4 pro',
   'Google Gemini 3.1',
   'Claude Sonnet 4.7',
   'GPT 5.5',
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.4.1', date: '2026-05-30',
+    changes: [
+      '优化视频加载速度',
+      '应用pipepipe5.1.1版本补丁',
+      '允许谷歌登录，基本消除bot protection问题',
+      '优化多种设备的全屏交互机制',
+      '开发播放页面多个模块',
+      '初步做完下载功能',
+      '完全播放列表功能',
+      '接入系统及投屏入口，实验性初步接入应用流转'
+    ],
+  },
   {
     version: '0.4.0', date: '2026-05-25',
     changes: [
