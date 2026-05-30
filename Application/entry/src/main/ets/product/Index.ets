@@ -562,6 +562,65 @@ struct Index {
     this.syncLocalQueuesToStorage();
   }
 
+  /** Generate a local queue id with the `local_` prefix used to distinguish local lists. */
+  private generateLocalQueueId(): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let id = 'local_';
+    for (let i = 0; i < 16; i++) {
+      id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return id;
+  }
+
+  /** Create a new local playlist seeded with a single video. */
+  private createLocalQueueWithVideo(name: string, video: VideoItem): void {
+    const entry: StoredLocalQueue = {
+      id: this.generateLocalQueueId(),
+      name: name,
+      videos: [video],
+      createdAt: Date.now(),
+    };
+    this.localQueues = [...this.localQueues, entry];
+    this.syncLocalQueuesToStorage();
+  }
+
+  /** Add a video to an existing local playlist (deduplicated by videoId). */
+  private addVideoToLocalQueue(queueId: string, video: VideoItem): void {
+    this.localQueues = this.localQueues.map((q) => {
+      if (q.id !== queueId) {
+        return q;
+      }
+      if (q.videos.some((v) => v.videoId === video.videoId)) {
+        return q;
+      }
+      const updated: StoredLocalQueue = {
+        id: q.id,
+        name: q.name,
+        videos: [...q.videos, video],
+        createdAt: q.createdAt,
+      };
+      return updated;
+    });
+    this.syncLocalQueuesToStorage();
+  }
+
+  /** Remove a video from a local playlist by videoId. */
+  private removeVideoFromLocalQueue(queueId: string, videoId: string): void {
+    this.localQueues = this.localQueues.map((q) => {
+      if (q.id !== queueId) {
+        return q;
+      }
+      const updated: StoredLocalQueue = {
+        id: q.id,
+        name: q.name,
+        videos: q.videos.filter((v) => v.videoId !== videoId),
+        createdAt: q.createdAt,
+      };
+      return updated;
+    });
+    this.syncLocalQueuesToStorage();
+  }
+
   private loadWatchHistoryFromStorage(): void {
     WatchHistoryStore.loadToAppStorage();
     this.watchHistory = WatchHistoryStore.getAll();
@@ -629,16 +688,28 @@ struct Index {
     this.actionHub.deleteLocalQueue = (id: string) => {
       this.deleteLocalQueue(id);
     };
+    this.actionHub.createLocalQueueWithVideo = (name: string, video: VideoItem) => {
+      this.createLocalQueueWithVideo(name, video);
+    };
+    this.actionHub.addVideoToLocalQueue = (queueId: string, video: VideoItem) => {
+      this.addVideoToLocalQueue(queueId, video);
+    };
+    this.actionHub.removeVideoFromLocalQueue = (queueId: string, videoId: string) => {
+      this.removeVideoFromLocalQueue(queueId, videoId);
+    };
     this.actionHub.loadLocalQueue = (queueId: string, startVideoId?: string) => {
       const queue = this.localQueues.find(q => q.id === queueId);
       if (queue && queue.videos.length > 0) {
-        const qm = PlayQueueManager.getInstance();
-        qm.setLocalQueue(queue.videos, queue.name, queueId, startVideoId);
         const startVid = startVideoId
           ? queue.videos.find(v => v.videoId === startVideoId)
           : queue.videos[0];
         if (startVid) {
-          this.openVideoDetail(startVid);
+          const hint: PlayQueueSourceHint = {
+            type: 'local',
+            playlistId: queue.id,
+            playlistName: queue.name,
+          };
+          this.openVideoDetail(startVid, hint);
         }
       }
     };
@@ -941,7 +1012,15 @@ struct Index {
     // If a source hint is provided, pre-load the queue from that source.
     // Fire-and-forget: do NOT await — the player page must open immediately.
     // PlayQueueList will update reactively when the queue loads in the background.
-    if (sourceHint && sourceHint.type === 'playlist') {
+    if (sourceHint && sourceHint.type === 'local') {
+      const queue = this.localQueues.find(q => q.id === sourceHint.playlistId);
+      if (queue && queue.videos.length > 0) {
+        queueManager.setLocalQueue(queue.videos, queue.name, queue.id, video.videoId);
+      } else if (queueManager.sourceType !== QueueSourceType.ADHOC
+        || queueManager.getCurrent()?.videoId !== video.videoId) {
+        queueManager.setAdhocQueue([video], 0);
+      }
+    } else if (sourceHint && sourceHint.type === 'playlist') {
       if (sourceHint.loadedItems && sourceHint.loadedItems.length > 0) {
         queueManager.setRemotePlaylistSnapshot(
           sourceHint.playlistId,

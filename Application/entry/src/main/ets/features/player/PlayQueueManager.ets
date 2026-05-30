@@ -16,7 +16,7 @@ export enum QueueSourceType {
 
 /** Hints passed from the caller to pre-configure the play queue before opening the player. */
 export interface PlayQueueSourceHint {
-  type: 'playlist';
+  type: 'playlist' | 'local';
   playlistId: string;
   playlistName: string;
   loadedItems?: VideoItem[];

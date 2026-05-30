@@ -761,6 +761,22 @@
       "value": "Mes playlists favorites"
     },
     {
+      "name": "yt_local_playlists_title",
+      "value": "Playlists locales"
+    },
+    {
+      "name": "yt_local_playlists_tag",
+      "value": "Locale"
+    },
+    {
+      "name": "yt_empty_no_local_playlists",
+      "value": "Aucune playlist locale"
+    },
+    {
+      "name": "yt_empty_local_playlists_hint",
+      "value": "Enregistrez des vidéos dans une playlist locale depuis le lecteur"
+    },
+    {
       "name": "yt_empty_no_fav_videos",
       "value": "Aucune vidéo favorite"
     },

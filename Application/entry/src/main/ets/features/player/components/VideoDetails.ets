@@ -21,6 +21,7 @@ import { VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../../../common/SubscriptionModel';
 import { ChannelCard } from '../../user/components/ChannelCard';
 import { DownloadDialog, DownloadSelection } from './DownloadDialog';
+import { SavePlaylistSheet } from './SavePlaylistSheet';
 import { DownloadManager, DownloadTask } from '../../../common/DownloadManager';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
@@ -64,6 +65,7 @@ export struct VideoDetails {
   private downloadDialogController: CustomDialogController | null = null;
   private descSkeletonTimer: number = -1;
   @State descSkeletonOpacity: number = 0.3;
+  @State showSavePlaylistSheet: boolean = false;
 
   private getEffectiveDesc(): string {
     return (this.videoDescription ?? this.item?.videoDescription) || '';
@@ -291,7 +293,7 @@ export struct VideoDetails {
         this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
           $r('app.string.yt_action_download'), () => { this.showTodo(); })
         this.ActionButton($r('sys.symbol.bookmark'),
-          '保存到播放列表', () => { this.showTodo(); })
+          '保存到播放列表', () => { this.showSavePlaylistSheet = true; })
         this.ActionButton($r('sys.symbol.play_circle'),
           '后台播放', () => { this.showTodo(); })
         this.ActionButton($r('sys.symbol.share'),
@@ -396,6 +398,21 @@ export struct VideoDetails {
       bottom: 24,
       left: $r('app.float.padding_16'),
       right: $r('app.float.padding_16'),
+    })
+    .bindSheet($$this.showSavePlaylistSheet, this.SavePlaylistSheetBuilder(), {
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+      dragBar: true,
+      backgroundColor: $r('app.color.yourtube_bg_page'),
+      preferType: SheetType.BOTTOM,
+      showClose: false,
+    })
+  }
+
+  @Builder
+  SavePlaylistSheetBuilder() {
+    SavePlaylistSheet({
+      video: this.item,
+      isShow: $showSavePlaylistSheet
     })
   }
 

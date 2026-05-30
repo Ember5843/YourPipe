@@ -131,6 +131,7 @@ export struct OptionsGoogleAccountPage {
       .width('100%')
       .layoutWeight(1)
       .edgeEffect(EdgeEffect.Spring)
+      .align(Alignment.Top)
     }
     .width('100%')
     .height('100%')

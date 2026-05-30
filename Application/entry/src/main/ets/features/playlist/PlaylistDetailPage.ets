@@ -9,6 +9,7 @@ import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { SearchPlaylistItem } from 'youtube_core';
 import { VideoItem } from 'youtube_core';
 import { UIConfig } from '../../common/AppState';
+import { StoredLocalQueue } from '../../common/PlaylistModel';
 
 import { SubscriptionFeedService } from '../../features/subscription/SubscriptionFeedService';
 import { VideoCard } from '../../common/components/VideoCard';
@@ -25,6 +26,7 @@ export struct PlaylistDetailPage {
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
+  @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
 
   @State videoList: VideoItem[] = [];
   @State nextPageToken: string | null = null;
@@ -49,10 +51,16 @@ export struct PlaylistDetailPage {
   aboutToDisappear() {
   }
 
+  /** 本地播放列表的 id 带 local_ 前缀，与联机播放列表区分。 */
+  private isLocal(): boolean {
+    return (this.playlist.playlistId || '').trim().startsWith('local_');
+  }
+
   private openPlaylistVideo(video: VideoItem, index: number): void {
+    const playlistId = (this.playlist.playlistId || '').trim();
     const hint: PlayQueueSourceHint = {
-      type: 'playlist',
-      playlistId: (this.playlist.playlistId || '').trim(),
+      type: this.isLocal() ? 'local' : 'playlist',
+      playlistId: playlistId,
       playlistName: this.playlist.name || '',
       loadedItems: this.videoList.slice(),
       startIndex: index,
@@ -89,6 +97,15 @@ export struct PlaylistDetailPage {
         this.videoList = [];
         this.nextPageToken = null;
         this.visitorData = '';
+        return;
+      }
+      // 本地播放列表：直接从内存快照读取，不走网络、无分页。
+      if (this.isLocal()) {
+        const queue = this.localQueues.find((q) => q.id === playlistId);
+        this.videoList = queue ? queue.videos.slice() : [];
+        this.nextPageToken = null;
+        this.visitorData = '';
+        this.totalCountText = `${this.videoList.length} 个视频`;
         return;
       }
       this.nextPageToken = null;
@@ -312,6 +329,7 @@ export struct PlaylistDetailPage {
         .scrollBar(BarState.Off)
         .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
         .height('100%')
+        .align(Alignment.Top)
         .onReachEnd(() => {
           if (!this.isLoading && !this.isLoadingMore && this.nextPageToken) {
             this.loadMoreVideos();
@@ -387,6 +405,7 @@ export struct PlaylistDetailPage {
         .scrollBar(BarState.Off)
         .width('100%')
         .height('100%')
+        .align(Alignment.Top)
       }
       .width('100%')
       .layoutWeight(1)
@@ -402,7 +421,7 @@ export struct PlaylistDetailPage {
         this.actionHub.closePage();
       },
       immersiveShadow: true,
-      menus: [
+      menus: this.isLocal() ? [] : [
         buildTitleMenu($r('sys.symbol.share'), $r('app.string.yt_action_share'), () => {
           this.handleShare();
         }, this.SHARE_BUTTON_ID)

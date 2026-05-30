@@ -1,6 +1,6 @@
 import { AppLog } from '../../common/AppLog';
 import { VideoItem } from 'youtube_core';
-import { PlaylistItem } from '../../common/PlaylistModel';
+import { PlaylistItem, StoredLocalQueue } from '../../common/PlaylistModel';
 import { SearchPlaylistItem } from 'youtube_core';
 import { VideoCard } from '../../common/components/VideoCard';
 import { VideoCardGrid } from '../../common/components/VideoCardGrid';
@@ -16,6 +16,7 @@ const logger = AppLog.getInstance('FavoritesPage');
 export struct FavoritesPage {
   @StorageLink('favorites') favorites: VideoItem[] = [];
   @StorageLink('playlists') playlists: PlaylistItem[] = [];
+  @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   @State overviewMap: Record<string, SearchPlaylistItem> = {};
@@ -57,6 +58,21 @@ export struct FavoritesPage {
       '',
       '',
       item.coverUrl || '',
+      '',
+      '#CCCCCC'
+    );
+  }
+
+  /** 把本地播放列表快照转成 PlaylistCard 可渲染的 SearchPlaylistItem，封面取首个视频缩略图。 */
+  private buildLocalPlaylistItem(queue: StoredLocalQueue, index: number): SearchPlaylistItem {
+    const cover = queue.videos.length > 0 ? (queue.videos[0].thumbnailUrl || '') : '';
+    return new SearchPlaylistItem(
+      index,
+      queue.id,
+      queue.name || 'Untitled',
+      '',
+      `${queue.videos.length} 个视频`,
+      cover,
       '',
       '#CCCCCC'
     );
@@ -215,6 +231,44 @@ export struct FavoritesPage {
             })
           }
         }, (item: PlaylistItem) => item.playlistId)
+      }
+
+      // 本地播放列表部分
+      ListItem() {
+        Text($r('app.string.yt_local_playlists_title'))
+          .fontSize(20)
+          .fontColor($r('app.color.yourtube_text_primary'))
+          .fontWeight(FontWeight.Medium)
+          .margin({ top: 24, bottom: 12 })
+          .padding({ left: 16, right: 16 })
+          .width('100%')
+      }
+
+      if (!this.localQueues || this.localQueues.length === 0) {
+        ListItem() {
+          Column() {
+            Text($r('app.string.yt_empty_no_local_playlists'))
+              .fontSize(14)
+              .fontColor($r('app.color.yourtube_text_secondary'))
+              .margin({ top: 20 })
+            Text($r('app.string.yt_empty_local_playlists_hint'))
+              .fontSize(12)
+              .fontColor($r('app.color.yourtube_text_hint'))
+              .margin({ top: 6 })
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Center)
+          .padding({ bottom: 24 })
+        }
+      } else {
+        ForEach(this.localQueues, (queue: StoredLocalQueue, index: number) => {
+          ListItem() {
+            PlaylistCard({
+              playlist: this.buildLocalPlaylistItem(queue, index),
+              typeLabel: $r('app.string.yt_local_playlists_tag')
+            })
+          }
+        }, (queue: StoredLocalQueue) => queue.id + queue.videos.length)
       }
     }
     .width('100%')

@@ -761,6 +761,22 @@
       "value": "我收藏的播放清單"
     },
     {
+      "name": "yt_local_playlists_title",
+      "value": "本地播放清單"
+    },
+    {
+      "name": "yt_local_playlists_tag",
+      "value": "本地"
+    },
+    {
+      "name": "yt_empty_no_local_playlists",
+      "value": "暫無本地播放清單"
+    },
+    {
+      "name": "yt_empty_local_playlists_hint",
+      "value": "在播放頁儲存影片到本地播放清單"
+    },
+    {
       "name": "yt_empty_no_fav_videos",
       "value": "暫無收藏的影片"
     },

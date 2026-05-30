@@ -761,6 +761,22 @@
       "value": "قوائمي المفضلة"
     },
     {
+      "name": "yt_local_playlists_title",
+      "value": "قوائم التشغيل المحلية"
+    },
+    {
+      "name": "yt_local_playlists_tag",
+      "value": "محلي"
+    },
+    {
+      "name": "yt_empty_no_local_playlists",
+      "value": "لا توجد قوائم تشغيل محلية بعد"
+    },
+    {
+      "name": "yt_empty_local_playlists_hint",
+      "value": "احفظ مقاطع الفيديو في قائمة تشغيل محلية من المشغل"
+    },
+    {
       "name": "yt_empty_no_fav_videos",
       "value": "لا توجد فيديوهات مفضلة"
     },

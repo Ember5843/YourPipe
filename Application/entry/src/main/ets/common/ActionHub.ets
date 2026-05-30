@@ -37,6 +37,15 @@ export class ActionHub {
   /** Delete a locally saved queue by id. */
   deleteLocalQueue: (id: string) => void = () => {};
 
+  /** Create a new local playlist seeded with a single video. */
+  createLocalQueueWithVideo: (name: string, video: VideoItem) => void = () => {};
+
+  /** Add a single video to an existing local playlist (deduplicated by videoId). */
+  addVideoToLocalQueue: (queueId: string, video: VideoItem) => void = () => {};
+
+  /** Remove a single video from a local playlist by videoId. */
+  removeVideoFromLocalQueue: (queueId: string, videoId: string) => void = () => {};
+
   /** Load a local queue into the play queue and start playing from the given video. */
   loadLocalQueue: (queueId: string, startVideoId?: string) => void = () => {};
 

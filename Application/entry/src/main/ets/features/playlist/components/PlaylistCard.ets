@@ -31,6 +31,11 @@ export struct PlaylistCard {
     return (this.playlist.playlistId || '').trim();
   }
 
+  /** 本地播放列表的 id 带 local_ 前缀，与联机播放列表区分。 */
+  private isLocal(): boolean {
+    return this.getPlaylistId().startsWith('local_');
+  }
+
   private isFavorited(): boolean {
     const playlistId = this.getPlaylistId();
     if (!playlistId) {
@@ -40,6 +45,9 @@ export struct PlaylistCard {
   }
 
   private getActionLabel(): ResourceStr {
+    if (this.isLocal()) {
+      return $r('app.string.yt_action_delete');
+    }
     if (typeof this.forceActionLabel === 'string' && this.forceActionLabel.length > 0) {
       return this.forceActionLabel;
     }
@@ -51,6 +59,10 @@ export struct PlaylistCard {
     if (!playlistId) {
       return;
     }
+    if (this.isLocal()) {
+      this.actionHub.deleteLocalQueue(playlistId);
+      return;
+    }
     if (this.isFavorited()) {
       this.actionHub.removePlaylist(playlistId);
     } else {
@@ -60,6 +72,21 @@ export struct PlaylistCard {
 
   private getContextMenus(): ContextMenuItem[] {
     const items: ContextMenuItem[] = [];
+    if (this.isLocal()) {
+      items.push({
+        symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
+          .fontSize(SYMBOL_FONT_SIZE)
+          .fontColor([$r('sys.color.font_primary')]),
+        content: $r('app.string.yt_action_delete'),
+        callback: () => {
+          const playlistId = this.getPlaylistId();
+          if (playlistId) {
+            this.actionHub.deleteLocalQueue(playlistId);
+          }
+        }
+      });
+      return items;
+    }
     if (this.isFavorited()) {
       items.push({
         symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.star_fill'))

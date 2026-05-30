@@ -785,6 +785,22 @@
       "value": "我收藏的播放列表"
     },
     {
+      "name": "yt_local_playlists_title",
+      "value": "本地播放列表"
+    },
+    {
+      "name": "yt_local_playlists_tag",
+      "value": "本地"
+    },
+    {
+      "name": "yt_empty_no_local_playlists",
+      "value": "暂无本地播放列表"
+    },
+    {
+      "name": "yt_empty_local_playlists_hint",
+      "value": "在播放页保存视频到本地播放列表"
+    },
+    {
       "name": "yt_empty_no_fav_videos",
       "value": "暂无收藏的视频"
     },

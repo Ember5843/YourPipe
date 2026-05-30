@@ -761,6 +761,22 @@
       "value": "Мои избранные плейлисты"
     },
     {
+      "name": "yt_local_playlists_title",
+      "value": "Локальные плейлисты"
+    },
+    {
+      "name": "yt_local_playlists_tag",
+      "value": "Локальный"
+    },
+    {
+      "name": "yt_empty_no_local_playlists",
+      "value": "Локальных плейлистов пока нет"
+    },
+    {
+      "name": "yt_empty_local_playlists_hint",
+      "value": "Сохраняйте видео в локальный плейлист из проигрывателя"
+    },
+    {
       "name": "yt_empty_no_fav_videos",
       "value": "Нет избранных видео"
     },
