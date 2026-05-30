@@ -68,6 +68,10 @@ import {
 } from '../common/PlaybackConfig';
 import { PlayerSession } from '../common/PlayerSession';
 import { PlayQueueManager, QueueSourceType, PlayQueueSourceHint } from '../features/player/PlayQueueManager';
+import {
+  PlaybackContinuationRestoreRequest,
+  PlaybackContinuationService
+} from '../features/player/PlaybackContinuationService';
 
 const logger = AppLog.getInstance('Index');
 const APP_VERSION = '0.4.0';
@@ -179,6 +183,7 @@ struct Index {
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
+  @StorageLink('pendingPlaybackContinuation') @Watch('onPendingContinuationChanged') pendingPlaybackContinuation: string = '';
   @Provide('actionHub') actionHub: ActionHub = new ActionHub();
   @State showOptions: boolean = false;
   @State isLoadingMore: boolean = false;
@@ -484,6 +489,11 @@ struct Index {
     this.homeErrorMessage = '';
     this.homeModeNoticeMessage = '';
     this.loadLiveVideos(true);
+    this.consumePendingPlaybackContinuation();
+  }
+
+  private onPendingContinuationChanged(): void {
+    this.consumePendingPlaybackContinuation();
   }
 
   private ensureStores(): void {
@@ -1005,7 +1015,7 @@ struct Index {
     this.navPathStack.pushPath({ name: 'SearchPage' });
   }
 
-  private async openVideoDetail(video: VideoItem, sourceHint?: PlayQueueSourceHint): Promise<void> {
+  private async openVideoDetail(video: VideoItem, sourceHint?: PlayQueueSourceHint, preserveQueue: boolean = false): Promise<void> {
     const queueManager = PlayQueueManager.getInstance();
     logger.info(`openVideoDetail: video=${video.videoId} source=${sourceHint ? sourceHint.type : 'adhoc'} queueType=${queueManager.sourceType}`);
 
@@ -1043,7 +1053,7 @@ struct Index {
     }
 
     // External video opens create a fresh generated queue. Queue-internal switches use moveTo().
-    if (!sourceHint) {
+    if (!sourceHint && !preserveQueue) {
       const currentQueueVideo = queueManager.getCurrent();
       if (queueManager.sourceType !== QueueSourceType.ADHOC || currentQueueVideo?.videoId !== video.videoId) {
         queueManager.setAdhocQueue([video], 0);
@@ -1085,6 +1095,43 @@ struct Index {
     } else {
       logger.info('PlayerPage moved to top or already at top, only switching source');
     }
+  }
+
+  private consumePendingPlaybackContinuation(): void {
+    const raw = this.pendingPlaybackContinuation
+      || AppStorage.get<string>(PlaybackContinuationService.APP_STORAGE_PENDING_KEY);
+    if (!raw) {
+      return;
+    }
+    this.pendingPlaybackContinuation = '';
+    AppStorage.setOrCreate(PlaybackContinuationService.APP_STORAGE_PENDING_KEY, '');
+    const payload = PlaybackContinuationService.parsePayload(raw);
+    if (!payload) {
+      logger.warn('Pending continuation payload is invalid');
+      return;
+    }
+    const restoreRequest = PlaybackContinuationService.toRestoreRequest(payload);
+    if (!restoreRequest) {
+      logger.warn('Pending continuation restore request is invalid');
+      return;
+    }
+    setTimeout(() => {
+      this.restorePlaybackContinuation(restoreRequest);
+    }, 0);
+  }
+
+  private async restorePlaybackContinuation(request: PlaybackContinuationRestoreRequest): Promise<void> {
+    const qm = PlayQueueManager.getInstance();
+    qm.restoreSnapshot({
+      items: request.queue.items,
+      currentIndex: request.queue.currentIndex,
+      sourceType: request.queue.sourceType,
+      sourceId: request.queue.sourceId,
+      sourceName: request.queue.sourceName
+    });
+    PlayerSession.getInstance().setContinuationRestoreOptions(request.progressSec, request.wasPlaying);
+    await this.openVideoDetail(request.video, undefined, true);
+    logger.info(`Restored playback continuation video=${request.video.videoId} progress=${request.progressSec}`);
   }
 
   /** 如果当前 PlayerPage 在栈顶且正在播放，先进入 PiP 再导航离开 */

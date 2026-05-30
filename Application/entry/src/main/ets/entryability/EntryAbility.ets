@@ -12,6 +12,8 @@ import { EnhancedLogger } from 'mediaservice';
 import { AuthSessionManager, YTCoreLogger } from 'youtube_core';
 import { AppLogStore } from '../common/AppLogStore';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
+import { PlayerSession } from '../common/PlayerSession';
 
 const logger = AppLog.getInstance('EntryAbility');
 
@@ -20,6 +22,7 @@ export default class EntryAbility extends UIAbility {
   private curBp: string = '';
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate('context', this.context);
+    this.handleContinuationWant(want, launchParam);
     try {
       let systemLanguage: string = i18n.System.getSystemLanguage();
       let systemRegion: string = i18n.System.getSystemRegion();
@@ -46,6 +49,24 @@ export default class EntryAbility extends UIAbility {
       logger.error(`onCreate failed: ${JSON.stringify(err)}`);
     }
     logger.info('Ability onCreate');
+  }
+
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    this.handleContinuationWant(want, launchParam);
+  }
+
+  onContinue(wantParam: Record<string, Object>): AbilityConstant.OnContinueResult {
+    try {
+      const ok = PlaybackContinuationService.writeWantParam(wantParam);
+      if (!ok) {
+        return AbilityConstant.OnContinueResult.REJECT;
+      }
+      PlayerSession.getInstance().controller.syncPause();
+      return AbilityConstant.OnContinueResult.AGREE;
+    } catch (err) {
+      logger.error(`onContinue failed: ${JSON.stringify(err)}`);
+      return AbilityConstant.OnContinueResult.REJECT;
+    }
   }
 
   onDestroy(): void {
@@ -86,15 +107,37 @@ export default class EntryAbility extends UIAbility {
     // Ability has brought to foreground
     logger.info('Ability onForeground');
     AppStorage.setOrCreate('isAppBackground', false);
+    this.setContinueState(AbilityConstant.ContinueState.ACTIVE);
   }
 
   onBackground(): void {
     // Ability has back to background
     logger.info('Ability onBackground');
     AppStorage.setOrCreate('isAppBackground', true);
+    this.setContinueState(AbilityConstant.ContinueState.INACTIVE);
     // 用 UIAbility 自身的 context（最可靠来源）确保后台长时任务生效
     // AVSession.init() 里的首次注册可能因 canIUse 或时序问题失败，这里作为兜底
     BackgroundTaskManager.startContinuousTask(this.context);
+  }
+
+  private handleContinuationWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    if (launchParam.launchReason !== AbilityConstant.LaunchReason.CONTINUATION) {
+      return;
+    }
+    const payload = PlaybackContinuationService.extractFromWantParameters(want.parameters);
+    if (!payload) {
+      logger.warn('Continuation launch ignored: payload missing or invalid');
+      return;
+    }
+    AppStorage.setOrCreate(PlaybackContinuationService.APP_STORAGE_PENDING_KEY, JSON.stringify(payload));
+  }
+
+  private setContinueState(state: AbilityConstant.ContinueState): void {
+    try {
+      this.context.setMissionContinueState(state);
+    } catch (err) {
+      logger.warn(`setMissionContinueState failed: ${JSON.stringify(err)}`);
+    }
   }
 
   private updateBreakpoint(windowWidth: number): void {

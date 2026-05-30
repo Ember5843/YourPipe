@@ -28,6 +28,8 @@ import { UIConfig } from '../../../common/AppState';
 import { ActionHub } from '../../../common/ActionHub';
 import common from '@ohos.app.ability.common';
 import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSession';
+import { AVCastPickerStyle, avSession } from '@kit.AVSessionKit';
+import type { BusinessError } from '@kit.BasicServicesKit';
 
 const TAG: string = '[VideoDetails]';
 
@@ -289,7 +291,7 @@ export struct VideoDetails {
     Scroll() {
       Row({ space: 10 }) {
         this.ActionButton($r('sys.symbol.TV_tv'),
-          '投屏', () => { this.showTodo(); })
+          '投屏', () => { this.openCastPicker(); })
         this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
           $r('app.string.yt_action_download'), () => { this.showTodo(); })
         this.ActionButton($r('sys.symbol.bookmark'),
@@ -467,6 +469,17 @@ export struct VideoDetails {
 
   private showTodo(): void {
     this.getUIContext().getPromptAction().showToast({ message: '功能开发中' });
+  }
+
+  private openCastPicker(): void {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const pickerHelper = new avSession.AVCastPickerHelper(context);
+    pickerHelper.select({
+      sessionType: 'video',
+      pickerStyle: AVCastPickerStyle.STYLE_PANEL
+    }).catch((error: BusinessError) => {
+      Logger.error(TAG, `Failed to open cast picker: ${JSON.stringify(error)}`);
+    });
   }
 
   private shareVideo(): void {

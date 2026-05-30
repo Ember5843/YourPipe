@@ -184,15 +184,12 @@ export struct VideoPlayerPage {
 
     this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
 
-    // 监听投屏状态变化 —— 连接时暂停本地播放，断开后恢复
     this.controller.onCastStateChange = (isCasting: boolean, deviceName: string) => {
       logger.info(`${TAG} Cast state changed: isCasting=${isCasting}, device=${deviceName}`);
       if (isCasting) {
         this.controller.syncPause();
-      } else {
-        if (this.isPageShow && !this.controller.isCasting) {
-          this.controller.syncPlay();
-        }
+      } else if (this.isPageShow && !this.controller.isCasting) {
+        this.controller.syncPlay();
       }
     };
 
