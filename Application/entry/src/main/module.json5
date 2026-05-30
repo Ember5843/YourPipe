@@ -54,6 +54,10 @@
         "startWindowBackground": "$color:start_window_background",
         "exported": true,
         "orientation": "auto_rotation_restricted",
+        "continuable": true,
+        "continueType": [
+          "YourPipePlayback_ContinueQuickStart"
+        ],
         "backgroundModes": [
           "audioPlayback"
         ],

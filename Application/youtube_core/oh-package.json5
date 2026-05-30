@@ -5,7 +5,5 @@
   "main": "Index.ets",
   "author": "",
   "license": "Apache-2.0",
-  "dependencies": {
-    "libyoutubecore.so": "file:./src/main/cpp/types/libyoutubecore"
-  }
+  "dependencies": {}
 }

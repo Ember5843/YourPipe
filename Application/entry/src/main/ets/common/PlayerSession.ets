@@ -86,6 +86,8 @@ export class PlayerSession {
   private _cachedChannelProfiles: Map<string, CachedChannelProfile> = new Map();
   private _activeExtrasVideoId: string = '';
   private _pipListenersBound: boolean = false;
+  private _pendingResumeSec: number = -1;
+  private _pendingAutoPlay: boolean | null = null;
 
   /** PIP 恢复时由外部（Index.ets）设置的回调 */
   onPipRestore?: () => void;
@@ -165,6 +167,11 @@ export class PlayerSession {
 
   get lastPlayError(): string | Resource | null {
     return this._lastPlayError;
+  }
+
+  setContinuationRestoreOptions(progressSec: number, shouldPlay: boolean): void {
+    this._pendingResumeSec = progressSec > 0 ? progressSec : 0;
+    this._pendingAutoPlay = shouldPlay;
   }
 
   getCachedChannelProfile(channelId: string): CachedChannelProfile | undefined {
@@ -395,11 +402,18 @@ export class PlayerSession {
         this._defaultSource = videoSource;
         this._lastPlayError = null;
         this._watchVideoId = videoId;
-        const resumeSec: number = WatchHistoryStore.getProgress(videoId);
+        const resumeSec: number = this._pendingResumeSec >= 0
+          ? this._pendingResumeSec
+          : WatchHistoryStore.getProgress(videoId);
+        const shouldPlay = this._pendingAutoPlay ?? true;
+        this._pendingResumeSec = -1;
+        this._pendingAutoPlay = null;
         if (resumeSec > 0) {
           logger.info(`${TAG} Will resume at ${resumeSec}s`);
           this._controller.setPendingStartFromSec(resumeSec);
         }
+        videoSource.play = shouldPlay;
+        videoSource.auto = shouldPlay;
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
         this._controller.updateVideoSource(videoSource);
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);

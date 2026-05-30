@@ -25,6 +25,14 @@ export interface PlayQueueSourceHint {
   visitorData?: string;
 }
 
+export interface PlayQueueSnapshot {
+  items: VideoItem[];
+  currentIndex: number;
+  sourceType: QueueSourceType;
+  sourceId: string;
+  sourceName: string;
+}
+
 export class QueueChangeListener {
   onQueueChanged(): void {}
   onCurrentIndexChanged(_index: number): void {}
@@ -591,5 +599,35 @@ export class PlayQueueManager {
       videos: this.queue.slice(),
       createdAt: Date.now(),
     };
+  }
+
+  exportSnapshot(maxItems: number = 50): PlayQueueSnapshot {
+    const limit = maxItems > 0 ? maxItems : 50;
+    return {
+      items: this.queue.slice(0, limit),
+      currentIndex: this.currentIndex,
+      sourceType: this.sourceType,
+      sourceId: this.sourceId,
+      sourceName: this.sourceName
+    };
+  }
+
+  restoreSnapshot(snapshot: PlayQueueSnapshot): void {
+    if (!snapshot || !snapshot.items || snapshot.items.length === 0) {
+      return;
+    }
+    const startIndex = snapshot.currentIndex >= 0 && snapshot.currentIndex < snapshot.items.length
+      ? snapshot.currentIndex
+      : 0;
+    this.sourceType = snapshot.sourceType;
+    this.sourceId = snapshot.sourceId || '';
+    this.sourceName = snapshot.sourceName || '';
+    this.nextPageToken = null;
+    this.visitorData = '';
+    this.resetAutoQueueState();
+    this.applyLazyQueue(snapshot.items, startIndex);
+    logger.info(`restoreSnapshot: type=${this.sourceType} total=${snapshot.items.length} shown=${this.queue.length} idx=${this.currentIndex}`);
+    this.notifyQueueChanged();
+    this.notifyCurrentIndexChanged(this.currentIndex);
   }
 }
