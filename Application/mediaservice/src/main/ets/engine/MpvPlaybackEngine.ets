@@ -354,11 +354,16 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (this.destroyed || ctrl !== this.controller) return;
 
     if (type === 1) {
-      if (!this.isSeeking) {
-        this.lastPositionMs = value;
-        if (value > 0) {
-          this.lastKnownPositionMs = value;
+      // 位置更新事件。若 pendingSeekMs 设置了目标位置且事件位置已追上，则清除 pendingSeekMs
+      if (this.pendingSeekMs >= 0) {
+        const diff = Math.abs(value - this.pendingSeekMs);
+        if (value > 0 && diff < 2000) {  // 2s 内视为确认
+          this.pendingSeekMs = -1;
         }
+      }
+      this.lastPositionMs = value;
+      if (value > 0) {
+        this.lastKnownPositionMs = value;
       }
     } else if (type === 2) {
       this.handleStatusUpdate(value);
@@ -395,7 +400,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
     if (this.isSeeking && !seeking) {
       this.isSeeking = false;
-      this.pendingSeekMs = -1;
+      // pendingSeekMs 不清除，由 onMpvEvent type=1 的位置事件确认后清除
     } else if (seeking) {
       this.isSeeking = true;
     }
@@ -452,9 +457,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // isPlaying 由调用 play()/pause() 时设置的本地 mpvPlaybackState 权威决定
     const isPlaying: boolean = this.mpvPlaybackState === kStatePlaying;
 
-    const currentMs: number = (this.isSeeking && this.pendingSeekMs >= 0)
-      ? this.pendingSeekMs
-      : posMs;
+    // pendingSeekMs >= 0 时优先使用跳转目标位置（直到位置事件确认追上了目标，见 onMpvEvent type=1）
+    const currentMs: number = (this.pendingSeekMs >= 0) ? this.pendingSeekMs : posMs;
     const engineState = this.mapEngineState(isPlaying);
 
     return {

@@ -9,7 +9,7 @@
  *
  * 设计原则：
  *   - 不入库 @Track（不直接参与 ArkTS 响应式），由 AvPlayerController 担任 @Track 宿主
- *   - progressSubscribers 使用 requestAnimationFrame 节流，避免高频 currentTime 触发 UI 重渲染
+ *   - progressSubscribers 仅在 currentTime/durationTime 发生变化时发布，避免高频触发 UI 重渲染
  */
 
 import { PlaybackState } from '../engine/PlaybackEngine';
@@ -23,12 +23,11 @@ const TAG: string = '[PlayerStateRelay]';
 export type ProgressSubscriber = (currentTime: number, durationTime: number) => void;
 
 export class PlayerStateRelay {
-  private stateMachine: PlayerStateMachine;
-  private avSession: AvSessionManager;
+  private stateMachine: PlayerStateMachine | null = null;
+  private avSession: AvSessionManager | null = null;
 
   // Progress throttling
   private progressSubscribers: Set<ProgressSubscriber> = new Set();
-  private rafPending: boolean = false;
   private lastPublishedCurrentTime: number = -1;
   private lastPublishedDuration: number = -1;
 
@@ -105,10 +104,10 @@ export class PlayerStateRelay {
   // ── private ──
 
   private syncStateMachine(state: PlaybackState): void {
-    const sm = this.stateMachine;
-    if (!sm) return;
+    const sm: PlayerStateMachine | null = this.stateMachine;
+    if (sm === null) return;
 
-    const readyChanged = this.prevIsReady !== state.isReady;
+    const readyChanged: boolean = this.prevIsReady !== state.isReady;
     const endedChanged = !this.prevIsEnded && state.isEnded;
     const bufferingChanged = this.prevIsBuffering !== state.isBuffering;
     const playingChanged = this.prevIsPlaying !== state.isPlaying;
@@ -155,8 +154,9 @@ export class PlayerStateRelay {
 
     const push = () => {
       this.avSessionPushScheduled = false;
-      if (!this.avSession) return;
-      this.avSession.setPlaybackState(
+      const session: AvSessionManager | null = this.avSession;
+      if (session === null) return;
+      session.setPlaybackState(
         state.isPlaying,
         state.currentTime,
         state.playbackSpeed,
@@ -171,29 +171,21 @@ export class PlayerStateRelay {
   }
 
   private scheduleProgressPublish(state: PlaybackState): void {
-    if (this.rafPending) return;
-
     // currentTime 和 durationTime 都未变化则跳过
     if (this.lastPublishedCurrentTime === state.currentTime &&
         this.lastPublishedDuration === state.duration) {
       return;
     }
 
-    this.rafPending = true;
-    const publish = () => {
-      this.rafPending = false;
-      this.lastPublishedCurrentTime = state.currentTime;
-      this.lastPublishedDuration = state.duration;
-      for (const cb of this.progressSubscribers) {
-        try {
-          cb(state.currentTime, state.duration);
-        } catch (e) {
-          Logger.warn(TAG, `progressSubscriber error: ${e}`);
-        }
+    this.lastPublishedCurrentTime = state.currentTime;
+    this.lastPublishedDuration = state.duration;
+    for (const cb of this.progressSubscribers) {
+      try {
+        cb(state.currentTime, state.duration);
+      } catch (e) {
+        Logger.warn(TAG, `progressSubscriber error: ${e}`);
       }
-    };
-    // requestAnimationFrame 节流
-    requestAnimationFrame(publish);
+    }
   }
 
   private cacheForNext(state: PlaybackState): void {
