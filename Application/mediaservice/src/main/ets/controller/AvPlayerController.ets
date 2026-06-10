@@ -9,6 +9,7 @@ import { PlaybackEngine, PlaybackState } from '../engine/PlaybackEngine';
 import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
 import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
+import { PlayerStateRelay, ProgressSubscriber } from '../state/PlayerStateRelay';
 import { PlayerStateMachine, StateChangeListener } from '../state/PlayerStateMachine';
 import { PlayerState } from '../state/PlayerState';
 import Logger from '../utils/Logger';
@@ -58,16 +59,11 @@ export class AvPlayerController {
   private playbackEngine: PlaybackEngine = new MpvPlaybackEngine();
   private avSessionManager: AvSessionManager = AvSessionManager.getInstance();
   private stateMachine: PlayerStateMachine = new PlayerStateMachine();
+  private stateRelay: PlayerStateRelay = new PlayerStateRelay();
 
-  private isPlayingListeners: ((isPlaying: boolean) => void)[] = [];
-  private isBufferingListeners: ((isBuffering: boolean) => void)[] = [];
-  private isReadyListeners: ((isReady: boolean) => void)[] = [];
-  private progressListeners: ((currentTime: number, durationTime: number) => void)[] = [];
   private errorListeners: ((errorMsg: string) => void)[] = [];
   private waitingForBufferListeners: ((isWaiting: boolean) => void)[] = [];
   private seekableRangesListeners: (() => void)[] = [];
-  private isSeekingListeners: ((isSeeking: boolean) => void)[] = [];
-  private isEndedListeners: (() => void)[] = [];
 
   private currentLocalMediaSessionId: string = '';
   private pendingStartFromSec: number = 0;
@@ -121,24 +117,28 @@ export class AvPlayerController {
     }
   }
 
-  public addIsPlayingListener(listener: (isPlaying: boolean) => void): void { this.isPlayingListeners.push(listener); }
-  public removeIsPlayingListener(listener: (isPlaying: boolean) => void): void { this.isPlayingListeners = this.isPlayingListeners.filter(l => l !== listener); }
-  public addIsBufferingListener(listener: (isBuffering: boolean) => void): void { this.isBufferingListeners.push(listener); }
-  public removeIsBufferingListener(listener: (isBuffering: boolean) => void): void { this.isBufferingListeners = this.isBufferingListeners.filter(l => l !== listener); }
-  public addIsReadyListener(listener: (isReady: boolean) => void): void { this.isReadyListeners.push(listener); }
-  public removeIsReadyListener(listener: (isReady: boolean) => void): void { this.isReadyListeners = this.isReadyListeners.filter(l => l !== listener); }
-  public addProgressListener(listener: (currentTime: number, durationTime: number) => void): void { this.progressListeners.push(listener); }
-  public removeProgressListener(listener: (currentTime: number, durationTime: number) => void): void { this.progressListeners = this.progressListeners.filter(l => l !== listener); }
+  /**
+   * 订阅节流后的进度更新（currentTime 高频变动，通过此接口而非 @Track 绑定）
+   */
+  public subscribeProgress(listener: ProgressSubscriber): void {
+    this.stateRelay.subscribeProgress(listener);
+  }
+  public unsubscribeProgress(listener: ProgressSubscriber): void {
+    this.stateRelay.unsubscribeProgress(listener);
+  }
+  public subscribeEnded(listener: () => void): void {
+    this.stateRelay.subscribeEnded(listener);
+  }
+  public unsubscribeEnded(listener: () => void): void {
+    this.stateRelay.unsubscribeEnded(listener);
+  }
+
   public addErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners.push(listener); }
   public removeErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners = this.errorListeners.filter(l => l !== listener); }
   public addWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners.push(listener); }
   public removeWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners = this.waitingForBufferListeners.filter(l => l !== listener); }
   public addSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners.push(listener); }
   public removeSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners = this.seekableRangesListeners.filter(l => l !== listener); }
-  public addIsSeekingListener(listener: (isSeeking: boolean) => void): void { this.isSeekingListeners.push(listener); }
-  public removeIsSeekingListener(listener: (isSeeking: boolean) => void): void { this.isSeekingListeners = this.isSeekingListeners.filter(l => l !== listener); }
-  public addIsEndedListener(listener: () => void): void { this.isEndedListeners.push(listener); }
-  public removeIsEndedListener(listener: () => void): void { this.isEndedListeners = this.isEndedListeners.filter(l => l !== listener); }
 
   public getStreamCategories(): StreamCategories { return this.playerModel.getStreamCategories(); }
   public getCurrentStreams(): CurrentStreams { return this.playerModel.getCurrentStreams(); }
@@ -167,6 +167,10 @@ export class AvPlayerController {
       Logger.warn(TAG, `initPlaybackEngine skipped: invalid state ${this.stateMachine.currentState}`);
       return;
     }
+
+    // 初始化状态路由层
+    this.stateRelay.setStateMachine(this.stateMachine);
+    this.stateRelay.setAvSession(this.avSessionManager);
 
     await this.avSessionManager.init();
     this.avSessionManager.onPlayCommand = () => {
@@ -289,7 +293,6 @@ export class AvPlayerController {
       }
       this.updateAvSessionMetadata();
       this.isBuffering = true;
-      this.isBufferingListeners.forEach(l => l(true));
       this.playbackEngine.load(playbackUrl, 0);
       if (newSource.play || newSource.auto) {
         this.playbackEngine.play();
@@ -309,7 +312,6 @@ export class AvPlayerController {
 
     this.updateAvSessionMetadata();
     this.isBuffering = true;
-    this.isBufferingListeners.forEach(l => l(true));
 
     const autoSubtitle = this.pickSubtitleForLanguage(searchLanguage);
     if (autoSubtitle) {
@@ -415,15 +417,9 @@ export class AvPlayerController {
     this.destroyCurrentLocalSession();
     this.avSessionManager.destroy();
     this.resetPlaybackState();
-    this.isPlayingListeners = [];
-    this.isBufferingListeners = [];
-    this.isReadyListeners = [];
-    this.progressListeners = [];
     this.errorListeners = [];
     this.waitingForBufferListeners = [];
     this.seekableRangesListeners = [];
-    this.isSeekingListeners = [];
-    this.isEndedListeners = [];
     this.playerModel = new PlayerModel();
   }
 
@@ -780,14 +776,6 @@ export class AvPlayerController {
 
   private onPlaybackStateChange(state: PlaybackState): void {
     if (!this.isActive()) return;
-    const playingChanged = this.isPlaying !== state.isPlaying;
-    const bufferingChanged = this.isBuffering !== state.isBuffering;
-    const readyChanged = this.isReady !== state.isReady;
-    const seekingChanged = this.isSeeking !== state.isSeeking;
-    const endedChanged = !this.isEnded && state.isEnded;
-    const errorChanged = this.errorMsg !== state.errorMsg;
-    const speedChanged = this.playbackSpeed !== state.playbackSpeed;
-    const progressChanged = this.currentTime !== state.currentTime || this.durationTime !== state.duration;
 
     if (state.isPlaying && !this.isPlaying) {
       this.errorRetryCount = 0;
@@ -801,6 +789,7 @@ export class AvPlayerController {
 
     const prevDuration = this.durationTime;
 
+    // 更新 @Track 字段（ArkTS 自动推送到绑定的 UI）
     this.isPlaying = state.isPlaying;
     this.isBuffering = state.isBuffering;
     this.isReady = state.isReady;
@@ -813,53 +802,20 @@ export class AvPlayerController {
     this.cachedPercent = state.bufferingPercent;
     this.errorMsg = state.errorMsg;
 
-    // 状态机同步：引擎状态 → 应用层状态
-    if (readyChanged && state.isReady && this.stateMachine.isOneOf(PlayerState.LOADING)) {
-      this.stateMachine.transition(PlayerState.READY);
-    }
-    if (endedChanged && state.isEnded) {
-      this.stateMachine.transition(PlayerState.COMPLETED);
-    }
-    if (bufferingChanged && state.isBuffering && this.stateMachine.isOneOf(PlayerState.PLAYING, PlayerState.READY)) {
-      this.stateMachine.forceTransition(PlayerState.BUFFERING);
-    }
-    if (playingChanged && state.isPlaying && !state.isBuffering
-      && this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.PIP_RESTORING)) {
-      this.stateMachine.transition(PlayerState.PLAYING);
-    }
-    if (errorChanged && state.errorMsg && this.stateMachine.isOneOf(PlayerState.LOADING, PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING)) {
-      this.stateMachine.transition(PlayerState.ERROR);
-    }
-
     if (prevDuration === 0 && this.durationTime > 0) {
       this.updateAvSessionMetadata();
     }
 
-    if (playingChanged) this.isPlayingListeners.forEach(l => l(this.isPlaying));
-    if (bufferingChanged) this.isBufferingListeners.forEach(l => l(this.isBuffering));
-    if (readyChanged) this.isReadyListeners.forEach(l => l(this.isReady));
-    if (progressChanged) this.progressListeners.forEach(l => l(this.currentTime, this.durationTime));
-    if (seekingChanged) this.isSeekingListeners.forEach(l => l(this.isSeeking));
-    if (endedChanged) this.isEndedListeners.forEach(l => l());
-    if (errorChanged) {
+    // 委托给 PlayerStateRelay：状态机 + AVSession + 节流进度
+    this.stateRelay.onStateChange(state);
+
+    // 错误监听（手动，需要特殊处理）
+    const errorChanged = this.errorMsg !== state.errorMsg;
+    if (errorChanged && state.errorMsg) {
       this.errorListeners.forEach(l => l(this.errorMsg));
-      if (this.errorMsg && !this.isRecovering) {
+      if (!this.isRecovering) {
         this.handlePlaybackError(state);
       }
-    }
-
-    // 只在关键状态变化时推送给 AVSession。
-    // timeUpdate 导致的纯 currentTime 变化不推送，
-    // 因为 PLAY 状态下系统会根据 elapsedTime + updateTime + speed 自动推算位置。
-    const shouldPushToAvSession = playingChanged || bufferingChanged || seekingChanged || endedChanged || errorChanged || speedChanged || (prevDuration === 0 && this.durationTime > 0);
-    if (shouldPushToAvSession) {
-      this.avSessionManager.setPlaybackState(
-        this.isPlaying,
-        this.currentTime,
-        this.playbackSpeed,
-        this.isBuffering || this.isSeeking,
-        this.isEnded
-      );
     }
   }
 
@@ -880,10 +836,6 @@ export class AvPlayerController {
     this.subtitleVisible = false;
     this.subtitleText = '';
     this.lastKnownGoodPosition = 0;
-    this.isPlayingListeners.forEach(l => l(false));
-    this.isBufferingListeners.forEach(l => l(false));
-    this.isReadyListeners.forEach(l => l(false));
-    this.progressListeners.forEach(l => l(0, 0));
     this.waitingForBufferListeners.forEach(l => l(false));
     this.errorListeners.forEach(l => l(''));
   }

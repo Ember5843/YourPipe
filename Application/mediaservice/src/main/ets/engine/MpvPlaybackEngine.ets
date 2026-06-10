@@ -1,4 +1,4 @@
-import { MdkPlayerController as MpvPlayerController, MediaStatus, MediaType, PlaybackState as MdkPlaybackState, SeekFlag } from '@mediadevkit/libmdk-napi';
+import { MdkPlayerController as MpvPlayerController, MediaStatus, MediaType, SeekFlag } from '@mediadevkit/libmdk-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
 
@@ -413,12 +413,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       this.lastErrorCategory = 'unknown';
     }
 
-    if (!this.hasError) {
-      const ctrl: MpvPlayerController | null = this.controller;
-      if (ctrl !== null) {
-        this.mpvPlaybackState = ctrl.isPlaying() ? kStatePlaying : kStateStopped;
-      }
-    }
+    // 不读 ctrl.isPlaying() —— 该调用异步滞后，本地 mpvPlaybackState 是权威来源
 
     if (!wasReady && this.isReady) {
       this.preparing = false;
@@ -435,54 +430,31 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   private buildState(): PlaybackState {
     const ctrl: MpvPlayerController | null = this.controller;
-    let nativeStatus: number = 0;
-    let nativeState: number = this.mpvPlaybackState;
-    let nativePositionMs: number = this.lastPositionMs;
-    let nativeDurationMs: number = this.lastDurationMs;
 
+    // 仅从 native 读取位置和时长（事件已更新，这里做兜底补偿）
+    // 不读 ctrl.getState() —— isPlaying 由本地 mpvPlaybackState 权威决定
+    let posMs: number = this.lastPositionMs;
+    let durMs: number = this.lastDurationMs;
     if (ctrl !== null && !this.destroyed) {
-      nativeState = ctrl.getState();
-      nativeStatus = ctrl.getMediaStatus();
-      nativePositionMs = ctrl.getPosition();
-      nativeDurationMs = ctrl.getDuration();
-    }
-
-    if (nativePositionMs > 0) {
-      this.lastPositionMs = nativePositionMs;
-      this.lastKnownPositionMs = nativePositionMs;
-    }
-    if (nativeDurationMs > 0) {
-      this.lastDurationMs = nativeDurationMs;
-    }
-
-    const statusBuffering: boolean = (nativeStatus & MediaStatus.Buffering) !== 0 || (nativeStatus & MediaStatus.Stalled) !== 0;
-    const statusSeeking: boolean = (nativeStatus & MediaStatus.Seeking) !== 0;
-    const statusEnded: boolean = (nativeStatus & MediaStatus.End) !== 0;
-    const statusPrepared: boolean = (nativeStatus & MediaStatus.Prepared) !== 0;
-    const statusLoaded: boolean = (nativeStatus & MediaStatus.Loaded) !== 0;
-    const statusInvalid: boolean = (nativeStatus & MediaStatus.Invalid) !== 0;
-    const statusLoading: boolean = (nativeStatus & MediaStatus.Loading) !== 0;
-
-    if (nativeStatus !== 0) {
-      this.loaded = statusLoaded || statusPrepared;
-      this.isReady = statusPrepared;
-      this.isEnded = statusEnded;
-      this.isSeeking = statusSeeking || this.isSeeking;
-      this.isBuffering = (statusBuffering || statusLoading || this.preparing) && !statusSeeking && !statusPrepared;
-      if (statusInvalid) {
-        this.hasError = true;
-        if (this.errorMsg.length === 0) {
-          this.errorMsg = '[mpv] playback error';
-        }
+      const nativePos: number = ctrl.getPosition();
+      const nativeDur: number = ctrl.getDuration();
+      if (nativePos > 0) {
+        posMs = nativePos;
+        this.lastPositionMs = nativePos;
+        this.lastKnownPositionMs = nativePos;
+      }
+      if (nativeDur > 0) {
+        durMs = nativeDur;
+        this.lastDurationMs = nativeDur;
       }
     }
 
-    const isPlaying: boolean = nativeState === MdkPlaybackState.Playing;
-    this.mpvPlaybackState = nativeState;
+    // isPlaying 由调用 play()/pause() 时设置的本地 mpvPlaybackState 权威决定
+    const isPlaying: boolean = this.mpvPlaybackState === kStatePlaying;
 
     const currentMs: number = (this.isSeeking && this.pendingSeekMs >= 0)
       ? this.pendingSeekMs
-      : nativePositionMs;
+      : posMs;
     const engineState = this.mapEngineState(isPlaying);
 
     return {
@@ -493,9 +465,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       isSeeking: this.isSeeking,
       isEnded: this.isEnded,
       isLive: this.isLive,
-      isSeekable: !this.isLive && nativeDurationMs > 0,
+      isSeekable: !this.isLive && durMs > 0,
       currentTime: currentMs > 0 ? currentMs / 1000 : 0,
-      duration: nativeDurationMs > 0 ? nativeDurationMs / 1000 : 0,
+      duration: durMs > 0 ? durMs / 1000 : 0,
       playbackSpeed: this.playbackSpeed,
       bufferingPercent: 0,
       uri: this.sourceUrl,

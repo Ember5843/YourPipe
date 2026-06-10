@@ -55,33 +55,28 @@ export struct VideoPlayer {
   @State trackThicknessSize: number = CommonConstants.TRACK_SIZE_MIN;
   @Link @Watch('onControllerChanged') controller: AvPlayerController;
   private lastController?: AvPlayerController;
-  @State hasStreams: boolean = false; // 用于同步是否有媒体流状态
-  @State hasError: boolean = false; // 是否有错误
-  @State isWaitingForDualBuffer: boolean = false; // 是否正在等待双轨道缓存同步
-  @State isPlaying: boolean = false; // 用于同步 UI 的播放状态
-  @State isBuffering: boolean = false; // 用于同步加载状态
-  @State isReady: boolean = false; // 用于同步就绪状态
-  @State currentTime: number = 0; // 来自 controller/native 状态回调的当前进度
-  @State durationTime: number = 0; // 来自 controller/native 状态回调的总时长
+  @State hasStreams: boolean = false;
+  @State hasError: boolean = false;
+  @State isWaitingForDualBuffer: boolean = false;
+  // currentTime/durationTime 通过节流后的 ProgressSubscriber 更新（避免高频 @Track 触发 UI 重渲染）
+  @State currentTime: number = 0;
+  @State durationTime: number = 0;
 
   // 投屏状态
   @State isCasting: boolean = false;
   @State castDeviceName: string = '';
 
-  private isPlayingListener = (isPlaying: boolean) => {
-    this.isPlaying = isPlaying;
+  /**
+   * controller.isPlaying 变化时，管理屏幕常亮与 UI 自动隐藏
+   */
+  private onPlayingChanged(isPlaying: boolean): void {
     this.updateKeepScreenOn();
     if (isPlaying) { this.scheduleHideControls(); } else { this.clearHideTimer(); }
-  };
+  }
 
-  private isBufferingListener = (isBuffering: boolean) => {
-    this.isBuffering = isBuffering;
+  private onBufferingChanged(isBuffering: boolean): void {
     this.updateKeepScreenOn();
-  };
-
-  private isReadyListener = (isReady: boolean) => {
-    this.isReady = isReady;
-  };
+  }
 
   private progressListener = (currentTime: number, durationTime: number) => {
     this.currentTime = currentTime;
@@ -93,9 +88,7 @@ export struct VideoPlayer {
       return;
     }
     this.controller.refreshPlaybackState();
-    this.isPlaying = this.controller.isPlaying;
-    this.isBuffering = this.controller.isBuffering;
-    this.isReady = this.controller.isReady;
+    // isPlaying/isBuffering/isReady 由 @Track 自动同步到模板
     this.currentTime = this.controller.currentTime;
     this.durationTime = this.controller.durationTime;
   }
@@ -113,7 +106,7 @@ export struct VideoPlayer {
   };
 
   private updateKeepScreenOn(): void {
-    const shouldKeepOn = this.isPlaying || this.isBuffering;
+    const shouldKeepOn = this.controller.isPlaying || this.controller.isBuffering;
     this.envService.setKeepScreenOn(shouldKeepOn);
   }
 
@@ -197,16 +190,12 @@ export struct VideoPlayer {
   private cacheCanvasCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cacheCanvasSettings);
   private seekableRangesListener = () => { this.drawCacheRanges(); };
   private isHandlingEnded: boolean = false;
-  private isEndedListener = async () => {
+  private onEnded = () => {
     if (this.isHandlingEnded) {
       return;
     }
     this.isHandlingEnded = true;
-    try {
-      await PlayerSession.getInstance().playNextFromQueue();
-    } finally {
-      this.isHandlingEnded = false;
-    }
+    PlayerSession.getInstance().playNextFromQueue().finally(() => { this.isHandlingEnded = false; });
   };
   // 屏幕实件订阅者：监听 SCREEN_OFF / SCREEN_ON 以关闭/恢复视频输出
   private screenEventSubscriber: commonEventManager.CommonEventSubscriber | null = null;
@@ -299,33 +288,24 @@ export struct VideoPlayer {
   private onControllerChanged(): void {
     // 1. 从旧 controller 移除监听器
     if (this.lastController && this.lastController !== this.controller) {
-      this.lastController.removeIsPlayingListener(this.isPlayingListener);
-      this.lastController.removeIsBufferingListener(this.isBufferingListener);
-      this.lastController.removeIsReadyListener(this.isReadyListener);
-      this.lastController.removeProgressListener(this.progressListener);
+      this.lastController.unsubscribeProgress(this.progressListener);
+      this.lastController.unsubscribeEnded(this.onEnded);
       this.lastController.removeErrorListener(this.errorListener);
       this.lastController.removeWaitingForBufferListener(this.waitingForBufferListener);
       this.lastController.removeSeekableRangesListener(this.seekableRangesListener);
-      this.lastController.removeIsEndedListener(this.isEndedListener);
     }
 
     // 2. 向新 controller 注册监听器
     if (this.controller) {
-      this.controller.addIsPlayingListener(this.isPlayingListener);
-      this.controller.addIsBufferingListener(this.isBufferingListener);
-      this.controller.addIsReadyListener(this.isReadyListener);
-      this.controller.addProgressListener(this.progressListener);
+      this.controller.subscribeProgress(this.progressListener);
+      this.controller.subscribeEnded(this.onEnded);
       this.controller.addErrorListener(this.errorListener);
       this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
       this.controller.addSeekableRangesListener(this.seekableRangesListener);
-      this.controller.addIsEndedListener(this.isEndedListener);
 
       // 3. 立即同步 UI 状态
-      this.isPlaying = this.controller.isPlaying;
-      this.isBuffering = this.controller.isBuffering;
-      this.isReady = this.controller.isReady;
-      this.currentTime = this.currentTime;
-      this.durationTime = this.durationTime;
+      this.currentTime = this.controller.currentTime;
+      this.durationTime = this.controller.durationTime;
       this.hasError = this.controller.errorMsg.length > 0;
       const pm = this.controller.playerModel;
       this.hasStreams = pm ? (pm.categorizedStreams.audio.length + pm.categorizedStreams.video.length +
@@ -366,7 +346,7 @@ export struct VideoPlayer {
 
     Logger.info(TAG, 'Page shown and App foreground → restore playback');
     this.syncPlaybackStateFromController();
-    if (this.isReady && !this.isPlaying) {
+    if (this.controller.isReady && !this.controller.isPlaying) {
       this.controller.syncPlay();
     }
     if (!this.controller.surfaceID) {
@@ -390,15 +370,13 @@ export struct VideoPlayer {
     this.isWaitingForDualBuffer = false;
     this.curSource.error = undefined;
 
-    // 注册播放状态监听
-    this.controller.addIsPlayingListener(this.isPlayingListener);
-    this.controller.addIsBufferingListener(this.isBufferingListener);
-    this.controller.addIsReadyListener(this.isReadyListener);
-    this.controller.addProgressListener(this.progressListener);
+    // 注册进度监听（节流后的 currentTime/durationTime）
+    this.controller.subscribeProgress(this.progressListener);
+    this.controller.subscribeEnded(this.onEnded);
+    // 错误与特殊状态监听
     this.controller.addErrorListener(this.errorListener);
     this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
-    this.controller.addIsEndedListener(this.isEndedListener);
 
     // 同步投屏状态
     this.isCasting = this.controller.isCasting;
@@ -439,7 +417,7 @@ export struct VideoPlayer {
       () => { /* screen off — globally disabled */ },
       () => {
         Logger.info(TAG, 'Screen on → restore playback');
-        if (this.isReady && !this.isPlaying) {
+        if (this.controller.isReady && !this.controller.isPlaying) {
           this.controller.syncPlay();
         }
       }
@@ -557,18 +535,17 @@ export struct VideoPlayer {
     this.controller.setCurIndex(this.curIndex);
     if (this.curIndex !== this.index) {
       this.controller.syncPause();
-    } else if (this.isReady && this.isPageShow) {
+    } else if (this.controller.isReady && this.isPageShow) {
       this.controller.syncPlay();
     }
   }
 
   private togglePlayback() {
-    // 仅在播放器准备就绪且有媒体源时允许操作
-    if (!this.isReady || !this.hasStreams) {
-      Logger.warn(TAG, `togglePlayback ignored: isReady=${this.isReady}, hasStreams=${this.hasStreams}`);
+    if (!this.controller.isReady || !this.hasStreams) {
+      Logger.warn(TAG, `togglePlayback ignored: isReady=${this.controller.isReady}, hasStreams=${this.hasStreams}`);
       return;
     }
-    if (this.isPlaying) {
+    if (this.controller.isPlaying) {
       this.controller.syncPause();
     } else {
       this.controller.syncPlay();
@@ -618,7 +595,7 @@ export struct VideoPlayer {
         .zIndex(CommonConstants.Z_INDEX_BASE)
 
       // 加载中/缓冲提示层（包括双轨道缓存等待）
-      if (this.isBuffering || this.isWaitingForDualBuffer || (!this.curSource.error && !this.hasError && !this.isReady && this.hasStreams)) {
+      if (this.controller.isBuffering || this.isWaitingForDualBuffer || (!this.curSource.error && !this.hasError && !this.controller.isReady && this.hasStreams)) {
         Column() {
           LoadingProgress()
             .width(48)
@@ -984,10 +961,10 @@ export struct VideoPlayer {
   PlayControl() {
     Row({ space: 8 }) {
       // 播放/暂停按鈕：正在播放或缓冲中时显示暂停图标，其他状态显示播放图标
-      SymbolGlyph(this.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
+      SymbolGlyph(this.controller.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
         .fontSize(24).width(24).height(24)
         .fontColor([Color.White])
-        .opacity(this.isReady && this.hasStreams ? 1 : 0.4)
+        .opacity(this.controller.isReady && this.hasStreams ? 1 : 0.4)
         .onClick(() => this.togglePlayback())
 
       Text(secondToTime(Math.floor(
@@ -1025,7 +1002,7 @@ export struct VideoPlayer {
             style: this.sliderStyle
           })
           .width('100%').trackColor(Color.Transparent).selectedColor(Color.White)
-          .trackThickness(this.trackThicknessSize).enabled(!!(this.isReady && this.hasStreams))
+          .trackThickness(this.trackThicknessSize).enabled(!!(this.controller.isReady && this.hasStreams))
           .onChange((value: number, mode: SliderChangeMode) => this.sliderOnchange(value, mode))
       }.layoutWeight(1)
 
@@ -1080,14 +1057,11 @@ export struct VideoPlayer {
   aboutToDisappear(): void {
     // 释放环境服务
     this.envService.release();
-    this.controller.removeIsPlayingListener(this.isPlayingListener);
-    this.controller.removeIsBufferingListener(this.isBufferingListener);
-    this.controller.removeIsReadyListener(this.isReadyListener);
-    this.controller.removeProgressListener(this.progressListener);
+    this.controller.unsubscribeProgress(this.progressListener);
+    this.controller.unsubscribeEnded(this.onEnded);
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
-    this.controller.removeIsEndedListener(this.isEndedListener);
     this.clearHideTimer();
     clearTimeout(this.volHideTimerId);
     clearTimeout(this.brightnessHideTimerId);
