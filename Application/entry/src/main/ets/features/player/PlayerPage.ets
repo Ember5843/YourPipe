@@ -31,7 +31,7 @@ import { CommentList } from './components/CommentList';
 import { CommentReplyPage } from './components/CommentReplyPage';
 import { CommentNavWrapper } from './components/CommentNavWrapper';
 import { WatchHistoryStore } from '../../common/WatchHistoryStore';
-import { AvPlayerController, PlayerState } from 'mediaservice';
+import { AvPlayerController } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
 import { PlayQueueList } from './components/PlayQueueList';
 import { PlayQueueManager, QueueSourceType } from './PlayQueueManager';
@@ -247,19 +247,9 @@ export struct VideoPlayerPage {
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
     this.controller.onCastStateChange = undefined;
 
-    // 防御性清理：如果 session 已释放（X 按钮关闭），确保 PiP 不会残留
-    const session = PlayerSession.getInstance();
-    if (session.isReleased || session.playerState === PlayerState.IDLE) {
-      session.invalidatePipController();
-    }
-
-    // Clear adhoc queues when leaving the player (not during PiP).
-    // Remote and local queues are preserved — they carry semantic context
-    // (a YouTube playlist or a saved local queue) that should survive navigation.
+    // 退出时清理 adhoc 队列
     const qm = PlayQueueManager.getInstance();
-    const isPipActive = session.playerState === PlayerState.PIP_ACTIVE
-      || session.playerState === PlayerState.PIP_ENTERING;
-    if (!isPipActive && qm.sourceType === QueueSourceType.ADHOC) {
+    if (qm.sourceType === QueueSourceType.ADHOC) {
       qm.clear();
       logger.info(`${TAG} cleared adhoc queue on exit`);
     }
@@ -277,19 +267,6 @@ export struct VideoPlayerPage {
     this.isVideoChanging = true;
 
     const session = PlayerSession.getInstance();
-
-    // PiP 恢复期间：session 仍在播放，只需同步 controller 引用，不触发 play
-    if (session.isRestoringFromPip) {
-      logger.info(`${TAG} onVideoChange skipped: PiP restore in progress (state=${session.playerState})`);
-      this.controller = session.controller;
-      if (session.cachedVideoSource) {
-        this.videoSource = session.cachedVideoSource;
-        this.syncDetailStateFromSource(session.cachedVideoSource);
-      }
-      this.isLoading = false;
-      this.isVideoChanging = false;
-      return;
-    }
 
     // 同视频已就绪：直接同步，使用缓存数据
     if (session.currentVideo?.videoId === this.video?.videoId && session.controller.isReady) {
@@ -356,11 +333,7 @@ export struct VideoPlayerPage {
     this.isPageShow = true;
 
     const session = PlayerSession.getInstance();
-    const pipActive = session.playerState === PlayerState.PIP_ACTIVE
-      || session.playerState === PlayerState.PIP_ENTERING
-      || session.playerState === PlayerState.PIP_RESTORING;
-
-    if (session.isReleased && this.video && !pipActive) {
+    if (session.isReleased && this.video) {
       logger.info(`${TAG} Session was released while hidden, reloading video`);
       this.onVideoChange();
     }

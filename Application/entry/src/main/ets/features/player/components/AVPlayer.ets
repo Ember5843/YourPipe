@@ -61,6 +61,8 @@ export struct VideoPlayer {
   @State isPlaying: boolean = false; // 用于同步 UI 的播放状态
   @State isBuffering: boolean = false; // 用于同步加载状态
   @State isReady: boolean = false; // 用于同步就绪状态
+  @State currentTime: number = 0; // 来自 controller/native 状态回调的当前进度
+  @State durationTime: number = 0; // 来自 controller/native 状态回调的总时长
 
   // 投屏状态
   @State isCasting: boolean = false;
@@ -80,6 +82,23 @@ export struct VideoPlayer {
   private isReadyListener = (isReady: boolean) => {
     this.isReady = isReady;
   };
+
+  private progressListener = (currentTime: number, durationTime: number) => {
+    this.currentTime = currentTime;
+    this.durationTime = durationTime;
+  };
+
+  private syncPlaybackStateFromController(): void {
+    if (!this.controller) {
+      return;
+    }
+    this.controller.refreshPlaybackState();
+    this.isPlaying = this.controller.isPlaying;
+    this.isBuffering = this.controller.isBuffering;
+    this.isReady = this.controller.isReady;
+    this.currentTime = this.controller.currentTime;
+    this.durationTime = this.controller.durationTime;
+  }
 
   private lastLoggedError: string = '';
 
@@ -267,6 +286,7 @@ export struct VideoPlayer {
 
     Logger.info(TAG, `Source changed to: ${this.curSource.name}. hasStreams: ${this.hasStreams}. Triggering updateVideoSource.`);
     await this.controller.updateVideoSource(this.curSource);
+    this.syncPlaybackStateFromController();
 
     this.preCalculateRects();
     this.calculateSurfaceSize();
@@ -274,7 +294,7 @@ export struct VideoPlayer {
 
   /**
    * Controller 实例被替换时（如 session.release + resetSession 后）自动迁移监听器
-   * 并重新绑定 Surface ID，防止 PiP/切视频后出现黑屏或 UI 无响应。
+   * 并重新绑定 Surface ID，防止切视频后出现黑屏或 UI 无响应。
    */
   private onControllerChanged(): void {
     // 1. 从旧 controller 移除监听器
@@ -282,6 +302,7 @@ export struct VideoPlayer {
       this.lastController.removeIsPlayingListener(this.isPlayingListener);
       this.lastController.removeIsBufferingListener(this.isBufferingListener);
       this.lastController.removeIsReadyListener(this.isReadyListener);
+      this.lastController.removeProgressListener(this.progressListener);
       this.lastController.removeErrorListener(this.errorListener);
       this.lastController.removeWaitingForBufferListener(this.waitingForBufferListener);
       this.lastController.removeSeekableRangesListener(this.seekableRangesListener);
@@ -293,6 +314,7 @@ export struct VideoPlayer {
       this.controller.addIsPlayingListener(this.isPlayingListener);
       this.controller.addIsBufferingListener(this.isBufferingListener);
       this.controller.addIsReadyListener(this.isReadyListener);
+      this.controller.addProgressListener(this.progressListener);
       this.controller.addErrorListener(this.errorListener);
       this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
       this.controller.addSeekableRangesListener(this.seekableRangesListener);
@@ -302,6 +324,8 @@ export struct VideoPlayer {
       this.isPlaying = this.controller.isPlaying;
       this.isBuffering = this.controller.isBuffering;
       this.isReady = this.controller.isReady;
+      this.currentTime = this.currentTime;
+      this.durationTime = this.durationTime;
       this.hasError = this.controller.errorMsg.length > 0;
       const pm = this.controller.playerModel;
       this.hasStreams = pm ? (pm.categorizedStreams.audio.length + pm.categorizedStreams.video.length +
@@ -309,16 +333,19 @@ export struct VideoPlayer {
                               pm.categorizedStreams.progressive.length) > 0 : false;
       this.isCasting = this.controller.isCasting;
       this.castDeviceName = this.controller.castDeviceName;
+      this.syncPlaybackStateFromController();
 
-      // 4. 重新注入 Surface ID（如果 XComponent 已加载）
+      // Re-inject the surface only when the new controller does not have one yet.
       try {
-        const surfaceId = this.xComponentController.getXComponentSurfaceId();
-        if (surfaceId) {
-          this.controller.setSurfaceID(surfaceId);
-          Logger.debug(TAG, `SurfaceID re-injected after controller change: ${surfaceId}`);
+        if (!this.controller.surfaceID) {
+          const surfaceId = this.xComponentController.getXComponentSurfaceId();
+          if (surfaceId) {
+            this.controller.setSurfaceID(surfaceId);
+            Logger.debug(TAG, `SurfaceID re-injected after controller change: ${surfaceId}`);
+          }
         }
       } catch (_e) {
-        // XComponent 可能尚未加载，忽略
+        // XComponent may not be loaded yet.
       }
     }
 
@@ -327,32 +354,25 @@ export struct VideoPlayer {
 
   onPageVisibilityChange(): void {
     const session = PlayerSession.getInstance();
-    const state = session.playerState;
-
-    const pipActive = state === PlayerState.PIP_ACTIVE || state === PlayerState.PIP_ENTERING;
     const isVisible = this.isPageShow && !this.isAppBackground;
 
-    if (!isVisible && !pipActive) {
+    if (!isVisible) {
       return;
-    } else if (isVisible) {
-      if (pipActive) {
-        session.exitPip();
-        session.invalidatePipController();
-      }
+    }
 
-      if (!session.pipController && session.playerState !== PlayerState.RELEASED) {
-        session.attachSurface(this.xComponentController).catch(() => {});
-      }
+    if (session.playerState !== PlayerState.RELEASED) {
+      session.attachSurface(this.xComponentController).catch(() => {});
+    }
 
-      Logger.info(TAG, 'Page shown and App foreground → restore playback');
-      // 不调用 setVideoOutputEnabled（会触发 setMediaMuted 在未就绪时崩溃），直接恢复播放
-      if (this.isReady && !this.isPlaying) {
-        this.controller.syncPlay();
-      }
-
+    Logger.info(TAG, 'Page shown and App foreground → restore playback');
+    this.syncPlaybackStateFromController();
+    if (this.isReady && !this.isPlaying) {
+      this.controller.syncPlay();
+    }
+    if (!this.controller.surfaceID) {
       try {
         const surfaceId = this.xComponentController.getXComponentSurfaceId();
-        if (surfaceId && this.controller.surfaceID !== surfaceId) {
+        if (surfaceId) {
           this.controller.setSurfaceID(surfaceId);
           Logger.info(TAG, `SurfaceID re-bound on visibility change: ${surfaceId}`);
         }
@@ -374,6 +394,7 @@ export struct VideoPlayer {
     this.controller.addIsPlayingListener(this.isPlayingListener);
     this.controller.addIsBufferingListener(this.isBufferingListener);
     this.controller.addIsReadyListener(this.isReadyListener);
+    this.controller.addProgressListener(this.progressListener);
     this.controller.addErrorListener(this.errorListener);
     this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
@@ -397,15 +418,17 @@ export struct VideoPlayer {
     this.preCalculateRects();
     this.calculateSurfaceSize();
 
-    // 向全局会话注册当前页面的 surface（会顺带初始化 PiP 控制器）
+    // 向全局会话注册当前页面的 surface
     const session = PlayerSession.getInstance();
     await session.attachSurface(this.xComponentController);
 
     // 兜底：如果 XComponent 已加载，确保 Surface ID 已同步（应对 controller 被替换场景）
     try {
-      const surfaceId = this.xComponentController.getXComponentSurfaceId();
-      if (surfaceId) {
-        this.controller.setSurfaceID(surfaceId);
+      if (!this.controller.surfaceID) {
+        const surfaceId = this.xComponentController.getXComponentSurfaceId();
+        if (surfaceId) {
+          this.controller.setSurfaceID(surfaceId);
+        }
       }
     } catch (_e) {
       // XComponent 尚未加载，等待 onLoad 回调
@@ -427,7 +450,7 @@ export struct VideoPlayer {
   // 当 seekableRanges 更新时由 @Watch 触发，在 Canvas onReady 保存的 ctx 上绘制。
   private drawCacheRanges(): void {
     const ctx = this.cacheCanvasCtx;
-    const duration = this.controller.durationTime;
+    const duration = this.durationTime;
     const ranges = this.controller.seekableRanges;
     const w = ctx.width;
     const h = ctx.height;
@@ -534,10 +557,8 @@ export struct VideoPlayer {
     this.controller.setCurIndex(this.curIndex);
     if (this.curIndex !== this.index) {
       this.controller.syncPause();
-      this.controller.setIsPlaying(false);
     } else if (this.isReady && this.isPageShow) {
       this.controller.syncPlay();
-      this.controller.setIsPlaying(true);
     }
   }
 
@@ -547,12 +568,12 @@ export struct VideoPlayer {
       Logger.warn(TAG, `togglePlayback ignored: isReady=${this.isReady}, hasStreams=${this.hasStreams}`);
       return;
     }
-    // 直接驱动控制器动作，UI 状态会通过监听器自动同步
     if (this.isPlaying) {
       this.controller.syncPause();
     } else {
       this.controller.syncPlay();
     }
+    this.syncPlaybackStateFromController();
   }
 
 
@@ -582,10 +603,6 @@ export struct VideoPlayer {
           // onLoad 时仅注册 surfaceId，不在这里设置 surfaceRect。
           // surfaceRect 由 onAreaChange 根据 XComponent 的实际屏幕像素尺寸动态设置。
           this.controller.setSurfaceID(this.xComponentController.getXComponentSurfaceId());
-
-          // 注意：不在此处主动 exitPip()。
-          // PiP 恢复由系统通过 navigationId 自动协调，
-          // 主动干预会导致状态竞争和栈溢出。
         })
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const pxWidth = Math.round(this.getUIContext().vp2px(Number(newArea.width)));
@@ -755,7 +772,7 @@ export struct VideoPlayer {
       // 2. 手势提示层
       RelativeContainer() {
         if (this.isGestureSeek) {
-          Text(`${secondToTime(Math.floor(this.gestureSeekTime))} / ${secondToTime(Math.floor(this.controller.durationTime))}`)
+          Text(`${secondToTime(Math.floor(this.gestureSeekTime))} / ${secondToTime(Math.floor(this.durationTime))}`)
             .fontColor(Color.White).fontSize(26).fontWeight(FontWeight.Medium)
             .textShadow({ radius: 8, color: Color.Black })
             .alignRules({ middle: { anchor: '__container__', align: HorizontalAlign.Center }, center: { anchor: '__container__', align: VerticalAlign.Center } })
@@ -832,13 +849,13 @@ export struct VideoPlayer {
             const x: number = event.fingerList[0]?.localX ?? 0;
             if (x > this.containerVpWidth / 2) {
               Logger.info(TAG, 'Double-tap forward +15s');
-              this.controller.syncSeek(Math.min(this.controller.currentTime + 15, this.controller.durationTime) * 1000);
+              this.controller.syncSeek(Math.min(this.currentTime + 15, this.durationTime) * 1000);
               clearTimeout(this.forwardHintTimerId);
               this.showForwardHint = true;
               this.forwardHintTimerId = setTimeout(() => { this.showForwardHint = false; }, 800);
             } else {
               Logger.info(TAG, 'Double-tap backward -15s');
-              this.controller.syncSeek(Math.max(this.controller.currentTime - 15, 0) * 1000);
+              this.controller.syncSeek(Math.max(this.currentTime - 15, 0) * 1000);
               clearTimeout(this.backwardHintTimerId);
               this.showBackwardHint = true;
               this.backwardHintTimerId = setTimeout(() => { this.showBackwardHint = false; }, 800);
@@ -858,12 +875,13 @@ export struct VideoPlayer {
             this.panGestureIgnoredForSlider = false;
             this.scheduleHideControls();
             this.isGestureSeek = true;
-            this.gestureSeekStartTime = this.controller.currentTime;
+            this.gestureSeekStartTime = this.currentTime;
           })
           .onActionUpdate((event: GestureEvent) => {
             if (this.panGestureIgnoredForSlider) { return; }
-            const t = this.gestureSeekStartTime + (event.offsetX / 200) * this.controller.durationTime;
-            this.gestureSeekTime = Math.min(Math.max(0, t), this.controller.durationTime);
+            const seekWidth = Math.max(1, this.containerVpWidth);
+            const t = this.gestureSeekStartTime + (event.offsetX / seekWidth) * this.durationTime;
+            this.gestureSeekTime = Math.min(Math.max(0, t), this.durationTime);
             this.panEndTime = this.gestureSeekTime;
           })
           .onActionEnd((_e: GestureEvent) => {
@@ -965,7 +983,7 @@ export struct VideoPlayer {
   @Builder
   PlayControl() {
     Row({ space: 8 }) {
-      // 播放/暂停按鈕 — fontSize 统一用 vp，避免物理像素单位在不同 DPI 设备上大小不一致
+      // 播放/暂停按鈕：正在播放或缓冲中时显示暂停图标，其他状态显示播放图标
       SymbolGlyph(this.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
         .fontSize(24).width(24).height(24)
         .fontColor([Color.White])
@@ -975,7 +993,7 @@ export struct VideoPlayer {
       Text(secondToTime(Math.floor(
         this.isSliderDragging ? this.sliderDragValue
           : this.isGestureSeek ? this.gestureSeekTime
-          : this.controller.currentTime
+          : this.currentTime
       )))
         .fontColor(Color.White).fontSize(13).width(48).textAlign(TextAlign.Center)
 
@@ -1002,8 +1020,8 @@ export struct VideoPlayer {
         Slider({
             value: this.isSliderDragging ? this.sliderDragValue
                  : this.isGestureSeek    ? this.gestureSeekTime
-                 : this.controller.currentTime,
-            max: this.controller.durationTime,
+                 : this.currentTime,
+            max: this.durationTime,
             style: this.sliderStyle
           })
           .width('100%').trackColor(Color.Transparent).selectedColor(Color.White)
@@ -1011,7 +1029,7 @@ export struct VideoPlayer {
           .onChange((value: number, mode: SliderChangeMode) => this.sliderOnchange(value, mode))
       }.layoutWeight(1)
 
-      Text(secondToTime(Math.floor(this.controller.durationTime)))
+      Text(secondToTime(Math.floor(this.durationTime)))
         .fontColor('#AAFFFFFF').fontSize(13).width(48).textAlign(TextAlign.Center)
 
       // 全屏按鈕 — fontSize 统一用 vp，移除冲突的 height(24)限制
@@ -1038,7 +1056,7 @@ export struct VideoPlayer {
     switch (mode) {
       case SliderChangeMode.Begin:
         this.isSliderDragging = true;
-        this.sliderDragValue = this.controller.currentTime; // 初始化为当前位置
+        this.sliderDragValue = this.currentTime; // 初始化为当前位置
         this.trackThicknessSize = CommonConstants.TRACK_SIZE_MAX;
         this.sliderStyle = SliderStyle.InSet;
         this.scheduleHideControls();
@@ -1065,6 +1083,7 @@ export struct VideoPlayer {
     this.controller.removeIsPlayingListener(this.isPlayingListener);
     this.controller.removeIsBufferingListener(this.isBufferingListener);
     this.controller.removeIsReadyListener(this.isReadyListener);
+    this.controller.removeProgressListener(this.progressListener);
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);

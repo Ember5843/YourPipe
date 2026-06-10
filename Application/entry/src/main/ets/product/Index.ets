@@ -19,7 +19,7 @@ import { DownloadManager, DownloadTask } from '../common/DownloadManager';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
 import { AppLogStore } from '../common/AppLogStore';
 import { VideoSearchResult } from '../features/home/SearchService';
-import { LocalMediaProxy, PlayerState } from 'mediaservice';
+import { LocalMediaProxy } from 'mediaservice';
 import { KioskPageResult } from '../features/home/HomeFeedService';
 import { ChannelInfoService } from '../features/user/ChannelInfoService';
 import { VideoCard } from '../common/components/VideoCard';
@@ -646,25 +646,6 @@ struct Index {
       await this.openVideoDetail(video, sourceHint);
     };
     this.actionHub.openChannel = async (channel: SearchChannelItem) => {
-      // 如果当前在播放页，先进入 PiP 再跳转到作者页（保留 PlayerPage 在栈中）
-      const playerIndex = this.navPathStack.getIndexByName('PlayerPage');
-      const topIndex = this.navPathStack.size() - 1;
-      if (playerIndex.length > 0 && playerIndex[0] === topIndex) {
-        const session = PlayerSession.getInstance();
-        const state = session.playerState;
-        const alreadyInPip = state === PlayerState.PIP_ACTIVE
-          || state === PlayerState.PIP_ENTERING;
-        if (!alreadyInPip) {
-          this.ensurePlayerSessionPipRestore();
-          try {
-            await session.enterPip();
-          } catch (_e) {
-            // PiP 失败也继续跳转
-          }
-        }
-        // 不再 pop PlayerPage：PiP 只是视觉层叠，播放页应保留在栈中。
-        // 从作者页返回后可直接回到播放页，避免不必要的组件重建。
-      }
       this.openUserPage(channel);
     };
     this.actionHub.openChannelById = async (channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string) => {
@@ -754,52 +735,6 @@ struct Index {
       this.isRepliesOpen = isOpen;
     });
 
-  }
-
-  private ensurePlayerSessionPipRestore(): void {
-    const session = PlayerSession.getInstance();
-    session.onPipRestore = () => {
-      const state = session.playerState;
-      if (state === PlayerState.PIP_RESTORING) {
-        logger.info('PiP restore already in progress, skipping duplicate');
-        return;
-      }
-
-      const stateMachine = session.controller.getPlayerStateMachine();
-      if (!stateMachine.transition(PlayerState.PIP_RESTORING)) {
-        logger.info(`PiP restore skipped: cannot transition from ${state}`);
-        return;
-      }
-
-      const playerIndices = this.navPathStack.getIndexByName('PlayerPage');
-      const topIndex = this.navPathStack.size() - 1;
-
-      if (playerIndices.length > 0 && playerIndices[0] === topIndex) {
-        logger.info('PiP restore: PlayerPage already at top');
-      } else if (playerIndices.length > 0) {
-        this.navPathStack.moveToTop('PlayerPage');
-      } else {
-        this.navPathStack.pushPath({ name: 'PlayerPage' });
-      }
-
-      // 等待页面重建完成后，恢复状态并重建 PiP controller
-      setTimeout(() => {
-        if (session.playerState === PlayerState.PIP_RESTORING) {
-          stateMachine.transition(PlayerState.PLAYING);
-        }
-        session.recreatePipControllerIfNeeded();
-      }, 600);
-    };
-
-    // PiP 窗口被用户关闭（非 restore）时，清理 NavStack 中的 PlayerPage
-    // 避免返回后显示已销毁的死页面
-    session.onSessionReleased = () => {
-      const playerIndices = this.navPathStack.getIndexByName('PlayerPage');
-      if (playerIndices.length > 0) {
-        logger.info('PiP closed: removing dead PlayerPage from nav stack');
-        this.navPathStack.removeByIndexes(playerIndices);
-      }
-    };
   }
 
   private isSubscribed(channelId: string): boolean {
@@ -1063,33 +998,10 @@ struct Index {
     }
 
     const session = PlayerSession.getInstance();
-    const state = session.playerState;
-    const pipActive = state === PlayerState.PIP_ACTIVE || state === PlayerState.PIP_ENTERING;
-
-    if (pipActive) {
-      if (session.currentVideo?.videoId === video.videoId) {
-        logger.info('PiP playing same video, stopping PiP and restoring PlayerPage');
-        await session.exitPip();
-        session.invalidatePipController();
-        this.ensurePlayerSessionPipRestore();
-        const playerIndices = this.navPathStack.getIndexByName('PlayerPage');
-        if (playerIndices.length > 0) {
-          this.navPathStack.moveToTop('PlayerPage');
-        } else {
-          this.navPathStack.pushPath({ name: 'PlayerPage' });
-        }
-        return;
-      }
-
-      logger.info('PiP is active, stopping it before opening new video');
-      await session.exitPip();
-      session.release();
-    }
 
     this.selectedVideo = video;
     this.showOptions = false;
     AppStorage.setOrCreate('selectedVideo', video);
-    this.ensurePlayerSessionPipRestore();
 
     const movedIndex = this.navPathStack.moveToTop('PlayerPage');
     if (movedIndex === -1) {
@@ -1136,37 +1048,14 @@ struct Index {
     logger.info(`Restored playback continuation video=${request.video.videoId} progress=${request.progressSec}`);
   }
 
-  /** 如果当前 PlayerPage 在栈顶且正在播放，先进入 PiP 再导航离开 */
-  private async maybeEnterPipBeforeNavigate(): Promise<void> {
-    const playerIndices = this.navPathStack.getIndexByName('PlayerPage');
-    const topIndex = this.navPathStack.size() - 1;
-    if (playerIndices.length === 0 || playerIndices[0] !== topIndex) {
-      return;
-    }
-    const session = PlayerSession.getInstance();
-    const alreadyInPip = session.playerState === PlayerState.PIP_ACTIVE
-      || session.playerState === PlayerState.PIP_ENTERING;
-    if (alreadyInPip || !session.controller.isReady || session.isReleased) {
-      return;
-    }
-    this.ensurePlayerSessionPipRestore();
-    try {
-      await session.enterPip();
-    } catch (_e) {
-      // PiP 失败不影响导航
-    }
-  }
-
   private async openUserPage(channel: SearchChannelItem): Promise<void> {
     this.showOptions = false;
-    await this.maybeEnterPipBeforeNavigate();
     this.selectedChannel = channel;
     this.navPathStack.pushPath({ name: 'UserPage' });
   }
 
   private async openChannelById(channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string): Promise<void> {
     this.showOptions = false;
-    await this.maybeEnterPipBeforeNavigate();
     // 只创建基本的频道对象，只填写ID和名称，其他信息由UserPage后期填充
     const channel = new SearchChannelItem(0, channelId, channelName, '', '', channelAvatarUrl, '', '#CCCCCC', channelHandle);
     
@@ -1504,18 +1393,8 @@ struct Index {
           return true;
         } else {
           const session = PlayerSession.getInstance();
-          this.ensurePlayerSessionPipRestore();
-          session.enterPip().then((ok: boolean) => {
-            if (ok) {
-              this.navPathStack.pop();
-            } else {
-              session.release();
-              this.navPathStack.pop();
-            }
-          }).catch(() => {
-            session.release();
-            this.navPathStack.pop();
-          });
+          session.release();
+          this.navPathStack.pop();
           return true;
         }
       })
@@ -2144,7 +2023,6 @@ struct Index {
   private savePlaybackConfig(next: PlaybackConfig): void {
     this.playbackConfig = next;
     PlaybackConfig.saveToPreferences(next);
-    PlayerSession.getInstance().pipController?.updateAutoStart(next.enablePip);
   }
 
   // ─────────────────────────────────────────────────────────────────────────

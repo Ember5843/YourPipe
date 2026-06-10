@@ -1,65 +1,12 @@
 import { media } from '@kit.MediaKit';
 import { audio } from '@kit.AudioKit';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
 
 const TAG: string = '[PlayerLog][SystemAvPlaybackEngine]';
 
-export type PlaybackErrorCategory = 'network' | 'url_expired' | 'format' | 'source' | 'unknown';
-
-export interface PlaybackState {
-  gstState: 'stopped' | 'buffering' | 'paused' | 'playing';
-  isPlaying: boolean;
-  isReady: boolean;
-  isBuffering: boolean;
-  isSeeking: boolean;
-  isEnded: boolean;
-  isLive: boolean;
-  isSeekable: boolean;
-  currentTime: number;
-  duration: number;
-  playbackSpeed: number;
-  bufferingPercent: number;
-  uri: string;
-  mediaTitle: string;
-  containerFormat: string;
-  videoWidth: number;
-  videoHeight: number;
-  videoStreamCount: number;
-  audioStreamCount: number;
-  subtitleStreamCount: number;
-  errorMsg: string;
-  errorCategory?: PlaybackErrorCategory;
-  errorCode?: number;
-}
-
-export interface EngineConfig {
-  hwdecMode?: string;
-  decoderFallback?: boolean;
-  readaheadSecs?: number;
-  cachePauseWait?: number;
-  maxBackBytesKey?: string;
-  streamBufferSizeCap?: number;
-  seekKeyframeMode?: boolean;
-  msgLevel?: string;
-  minBufferMs?: number;
-  maxBufferMs?: number;
-  bufferForPlaybackMs?: number;
-  bufferForPlaybackAfterRebufferMs?: number;
-  backBufferDurationMs?: number;
-  retainBackBufferFromKeyframe?: boolean;
-  livePresentationDelayMs?: number;
-  liveDvrWindowSegments?: number;
-  liveEdgeThresholdSec?: number;
-  subtitlePosition?: string;
-  subtitleFontSize?: number;
-  subtitleColor?: string;
-  subtitleBackgroundAlpha?: number;
-  subtitleDelayMs?: number;
-  subtitleAutoSync?: boolean;
-}
-
-export class NativePlaybackEngine {
+export class NativePlaybackEngine implements PlaybackEngine {
   private initialized: boolean = false;
   private player: media.AVPlayer | undefined = undefined;
   private stateCallback?: (state: PlaybackState) => void;
@@ -699,8 +646,9 @@ export class NativePlaybackEngine {
       currentMs = this.pendingSeekPositionMs;
     }
 
+    const engineState = this.mapState(avState);
     return {
-      gstState: this.mapState(avState),
+      engineState: engineState,
       isPlaying: isPlaying,
       isReady: isReady,
       isBuffering: this.isBuffering,
@@ -726,7 +674,7 @@ export class NativePlaybackEngine {
     };
   }
 
-  private mapState(state: media.AVPlayerState): 'stopped' | 'buffering' | 'paused' | 'playing' {
+  private mapState(state: media.AVPlayerState): PlaybackEngineState {
     if (this.isBuffering) return 'buffering';
     if (state === 'playing') return 'playing';
     if (state === 'paused' || state === 'prepared' || state === 'completed') return 'paused';

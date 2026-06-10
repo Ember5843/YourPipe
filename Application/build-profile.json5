@@ -94,6 +94,18 @@
     {
       "name": "youtube_core",
       "srcPath": "./youtube_core"
+    },
+    {
+      "name": "libmdk_napi",
+      "srcPath": "../../libmdk-napi/libmdk_napi",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
     }
   ]
 }

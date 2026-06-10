@@ -5,7 +5,8 @@
 
 import { VideoData, StreamInfo, SubtitleTrackInfo } from '../model/VideoData';
 import { PlayerModel, StreamCategories, CurrentStreams } from '../model/PlayerModel';
-import { NativePlaybackEngine, PlaybackState } from '../engine/NativePlaybackEngine';
+import { PlaybackEngine, PlaybackState } from '../engine/PlaybackEngine';
+import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
 import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
 import { PlayerStateMachine, StateChangeListener } from '../state/PlayerStateMachine';
@@ -54,13 +55,14 @@ export class AvPlayerController {
 
   private curIndex: number = 0;
   private curSource: VideoData;
-  private nativeEngine: NativePlaybackEngine = new NativePlaybackEngine();
+  private playbackEngine: PlaybackEngine = new MpvPlaybackEngine();
   private avSessionManager: AvSessionManager = AvSessionManager.getInstance();
   private stateMachine: PlayerStateMachine = new PlayerStateMachine();
 
   private isPlayingListeners: ((isPlaying: boolean) => void)[] = [];
   private isBufferingListeners: ((isBuffering: boolean) => void)[] = [];
   private isReadyListeners: ((isReady: boolean) => void)[] = [];
+  private progressListeners: ((currentTime: number, durationTime: number) => void)[] = [];
   private errorListeners: ((errorMsg: string) => void)[] = [];
   private waitingForBufferListeners: ((isWaiting: boolean) => void)[] = [];
   private seekableRangesListeners: (() => void)[] = [];
@@ -101,6 +103,17 @@ export class AvPlayerController {
       && this.stateMachine.currentState !== PlayerState.IDLE;
   }
 
+  getPlaybackState(): PlaybackState {
+    return this.playbackEngine.getState();
+  }
+
+  refreshPlaybackState(): void {
+    if (this.stateMachine.isOneOf(PlayerState.RELEASED, PlayerState.IDLE)) {
+      return;
+    }
+    this.onPlaybackStateChange(this.playbackEngine.getState());
+  }
+
   constructor(curSource: VideoData) {
     this.curSource = curSource;
     if (curSource.streams) {
@@ -114,6 +127,8 @@ export class AvPlayerController {
   public removeIsBufferingListener(listener: (isBuffering: boolean) => void): void { this.isBufferingListeners = this.isBufferingListeners.filter(l => l !== listener); }
   public addIsReadyListener(listener: (isReady: boolean) => void): void { this.isReadyListeners.push(listener); }
   public removeIsReadyListener(listener: (isReady: boolean) => void): void { this.isReadyListeners = this.isReadyListeners.filter(l => l !== listener); }
+  public addProgressListener(listener: (currentTime: number, durationTime: number) => void): void { this.progressListeners.push(listener); }
+  public removeProgressListener(listener: (currentTime: number, durationTime: number) => void): void { this.progressListeners = this.progressListeners.filter(l => l !== listener); }
   public addErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners.push(listener); }
   public removeErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners = this.errorListeners.filter(l => l !== listener); }
   public addWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners.push(listener); }
@@ -141,46 +156,44 @@ export class AvPlayerController {
     Logger.debug(TAG, `Pending start position set to ${this.pendingStartFromSec}s`);
   }
 
-  public async initAVPlayer(): Promise<void> {
+  public async initPlaybackEngine(): Promise<void> {
     // 先检查引擎是否已初始化，避免从 LOADING 等状态尝试非法转换
     if (this.stateMachine.isOneOf(PlayerState.INITIALIZING, PlayerState.LOADING, PlayerState.READY,
       PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.PIP_ACTIVE)) {
-      Logger.debug(TAG, 'initAVPlayer skipped: engine already initialized');
+      Logger.debug(TAG, 'initPlaybackEngine skipped: engine already initialized');
       return;
     }
     if (!this.stateMachine.transition(PlayerState.INITIALIZING)) {
-      Logger.warn(TAG, `initAVPlayer skipped: invalid state ${this.stateMachine.currentState}`);
+      Logger.warn(TAG, `initPlaybackEngine skipped: invalid state ${this.stateMachine.currentState}`);
       return;
     }
 
     await this.avSessionManager.init();
     this.avSessionManager.onPlayCommand = () => {
       this.syncPlay();
-      // 立即同步 PLAY，防止 isBuffering 等标志干扰导致系统按钮状态错误
-      this.avSessionManager.setPlaybackState(true, this.currentTime, this.playbackSpeed, false, false);
+      this.refreshPlaybackState();
     };
     this.avSessionManager.onPauseCommand = () => {
       this.syncPause();
-      // 立即同步 PAUSE，确保系统播控按钮从 || 变成 ▶
-      this.avSessionManager.setPlaybackState(false, this.currentTime, this.playbackSpeed, false, false);
+      this.refreshPlaybackState();
     };
     this.avSessionManager.onSeekCommand = (positionSec: number) => {
-      this.nativeEngine.seek(positionSec, false);
+      this.playbackEngine.seek(positionSec, false);
     };
     this.avSessionManager.onFastForwardCommand = (skipIntervalSec?: number) => {
       const skip = skipIntervalSec ?? 15;
       const newTime = Math.min(this.durationTime || Infinity, this.currentTime + skip);
-      this.nativeEngine.seek(newTime, false);
+      this.playbackEngine.seek(newTime, false);
       if (!this.isPlaying) {
-        this.nativeEngine.play();
+        this.playbackEngine.play();
       }
     };
     this.avSessionManager.onRewindCommand = (skipIntervalSec?: number) => {
       const skip = skipIntervalSec ?? 15;
       const newTime = Math.max(0, this.currentTime - skip);
-      this.nativeEngine.seek(newTime, false);
+      this.playbackEngine.seek(newTime, false);
       if (!this.isPlaying) {
-        this.nativeEngine.play();
+        this.playbackEngine.play();
       }
     };
     this.avSessionManager.onNextCommand = () => {
@@ -190,8 +203,8 @@ export class AvPlayerController {
       this.onPreviousCommand?.();
     };
     this.avSessionManager.onStopCommand = () => {
-      this.nativeEngine.stop();
-      this.avSessionManager.setPlaybackState(false, this.currentTime, this.playbackSpeed, false, false);
+      this.playbackEngine.stop();
+      this.refreshPlaybackState();
     };
     this.avSessionManager.onCastStateChange = (isCasting: boolean, deviceName: string) => {
       this.isCasting = isCasting;
@@ -199,20 +212,24 @@ export class AvPlayerController {
       this.onCastStateChange?.(isCasting, deviceName);
     };
 
-    const ok = await this.nativeEngine.initialize({});
+    const ok = await this.playbackEngine.initialize({});
     if (ok) {
       this.stateMachine.forceTransition(PlayerState.INITIALIZING);
-      this.nativeEngine.setStateCallback((state: PlaybackState) => this.onPlaybackStateChange(state));
-      this.nativeEngine.setSubtitleCallback((text: string, _startTime: number, _duration: number) => {
+      this.playbackEngine.setStateCallback((state: PlaybackState) => this.onPlaybackStateChange(state));
+      this.playbackEngine.setSubtitleCallback((text: string, _startTime: number, _duration: number) => {
         this.subtitleText = text;
       });
       if (this.surfaceID.length > 0) {
-        this.nativeEngine.attachSurface(this.surfaceID);
+        this.playbackEngine.attachSurface(this.surfaceID);
       }
     }
     if (!ok) {
       this.stateMachine.transition(PlayerState.ERROR);
     }
+  }
+
+  public async initAVPlayer(): Promise<void> {
+    await this.initPlaybackEngine();
   }
 
   public async updateVideoSource(newSource: VideoData): Promise<void> {
@@ -257,7 +274,7 @@ export class AvPlayerController {
       return;
     }
 
-    await this.initAVPlayer();
+    await this.initPlaybackEngine();
     if (this.stateMachine.isOneOf(PlayerState.RELEASED, PlayerState.IDLE)) return;
 
     this.stateMachine.forceTransition(PlayerState.LOADING);
@@ -273,9 +290,9 @@ export class AvPlayerController {
       this.updateAvSessionMetadata();
       this.isBuffering = true;
       this.isBufferingListeners.forEach(l => l(true));
-      this.nativeEngine.load(playbackUrl, 0);
+      this.playbackEngine.load(playbackUrl, 0);
       if (newSource.play || newSource.auto) {
-        this.nativeEngine.play();
+        this.playbackEngine.play();
       }
       return;
     }
@@ -298,14 +315,14 @@ export class AvPlayerController {
     if (autoSubtitle) {
       this.currentSubtitleUrl = autoSubtitle.url;
       this.subtitleVisible = true;
-      this.nativeEngine.preloadSubtitleTracks([autoSubtitle.url]);
+      this.playbackEngine.preloadSubtitleTracks([autoSubtitle.url]);
     } else {
-      this.nativeEngine.preloadSubtitleTracks([]);
+      this.playbackEngine.preloadSubtitleTracks([]);
     }
-    this.nativeEngine.load(playbackUrl, this.pendingStartFromSec);
+    this.playbackEngine.load(playbackUrl, this.pendingStartFromSec);
     this.pendingStartFromSec = 0;
     if (newSource.play || newSource.auto) {
-      this.nativeEngine.play();
+      this.playbackEngine.play();
     }
   }
 
@@ -325,62 +342,64 @@ export class AvPlayerController {
     }
 
     Logger.debug(TAG, `switchQuality: pos=${resumePos.toFixed(2)}s url=${this.describePlaybackUrl(playbackUrl)}`);
-    this.nativeEngine.load(playbackUrl, resumePos);
+    this.playbackEngine.load(playbackUrl, resumePos);
     if (wasPlaying) {
-      this.nativeEngine.play();
+      this.playbackEngine.play();
     }
   }
 
   public setPlaybackSpeed(speed: number): void {
     if (!this.isActive() || speed <= 0) return;
     this.playbackSpeed = speed;
-    this.nativeEngine.setPlaybackSpeed(speed);
+    this.playbackEngine.setPlaybackSpeed(speed);
   }
 
   public resizeSurface(widthPx: number, heightPx: number): void {
-    if (this.isActive()) this.nativeEngine.resizeSurface(widthPx, heightPx);
+    if (this.isActive()) this.playbackEngine.resizeSurface(widthPx, heightPx);
   }
 
   public setSurfaceID(surfaceID: string): void {
-    if (!this.isActive()) return;
+    if (!surfaceID || this.surfaceID === surfaceID) return;
     this.surfaceID = surfaceID;
-    this.nativeEngine.attachSurface(surfaceID);
+    if (this.isActive()) {
+      this.playbackEngine.attachSurface(surfaceID);
+    }
   }
 
   public syncPlay(): void {
     if (!this.isActive()) return;
     if (this.isEnded) {
-      this.nativeEngine.seek(0, true);
+      this.playbackEngine.seek(0, true);
       this.isEnded = false;
     }
-    this.nativeEngine.play();
+    this.playbackEngine.play();
   }
 
   public syncPause(): void {
-    if (this.isActive()) this.nativeEngine.pause();
+    if (this.isActive()) this.playbackEngine.pause();
   }
 
   public syncStop(): void {
-    if (this.isActive()) this.nativeEngine.stop();
+    if (this.isActive()) this.playbackEngine.stop();
   }
 
   public syncSeek(seekTime: number): void {
-    if (this.isActive()) this.nativeEngine.seek(seekTime / 1000, false);
+    if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, false);
   }
 
   public syncSeekFast(seekTime: number): void {
-    if (this.isActive()) this.nativeEngine.seek(seekTime / 1000, true);
+    if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, true);
   }
 
   public syncSeekExact(seekTime: number): void {
-    if (this.isActive()) this.nativeEngine.seek(seekTime / 1000, false);
+    if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, false);
   }
 
   public setVideoOutputEnabled(enabled: boolean): void {
     // 只在 AVPlayer 支持 setMediaMuted 的状态下调用 (prepared/playing/paused/completed)
     if (this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING, PlayerState.PAUSED,
       PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.PIP_ACTIVE)) {
-      this.nativeEngine.setVideoOutputEnabled(enabled);
+      this.playbackEngine.setVideoOutputEnabled(enabled);
     }
   }
 
@@ -391,14 +410,15 @@ export class AvPlayerController {
   public releaseVideo(_index: number): void {
     if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
     this.stateMachine.forceTransition(PlayerState.RELEASED);
-    Logger.debug(TAG, 'releaseVideo: destroy AVPlayer engine and LocalMediaProxy session');
-    this.nativeEngine.destroy();
+    Logger.debug(TAG, 'releaseVideo: destroy playback engine and LocalMediaProxy session');
+    this.playbackEngine.destroy();
     this.destroyCurrentLocalSession();
     this.avSessionManager.destroy();
     this.resetPlaybackState();
     this.isPlayingListeners = [];
     this.isBufferingListeners = [];
     this.isReadyListeners = [];
+    this.progressListeners = [];
     this.errorListeners = [];
     this.waitingForBufferListeners = [];
     this.seekableRangesListeners = [];
@@ -409,7 +429,7 @@ export class AvPlayerController {
 
   public toggleSubtitle(): void {
     this.subtitleVisible = !this.subtitleVisible;
-    this.nativeEngine.setSubtitleVisible(this.subtitleVisible);
+    this.playbackEngine.setSubtitleVisible(this.subtitleVisible);
     if (!this.subtitleVisible) {
       this.subtitleText = '';
     }
@@ -417,7 +437,7 @@ export class AvPlayerController {
 
   public setSubtitleVisible(visible: boolean): void {
     this.subtitleVisible = visible;
-    this.nativeEngine.setSubtitleVisible(visible);
+    this.playbackEngine.setSubtitleVisible(visible);
     if (!visible) {
       this.subtitleText = '';
     }
@@ -767,6 +787,7 @@ export class AvPlayerController {
     const endedChanged = !this.isEnded && state.isEnded;
     const errorChanged = this.errorMsg !== state.errorMsg;
     const speedChanged = this.playbackSpeed !== state.playbackSpeed;
+    const progressChanged = this.currentTime !== state.currentTime || this.durationTime !== state.duration;
 
     if (state.isPlaying && !this.isPlaying) {
       this.errorRetryCount = 0;
@@ -817,6 +838,7 @@ export class AvPlayerController {
     if (playingChanged) this.isPlayingListeners.forEach(l => l(this.isPlaying));
     if (bufferingChanged) this.isBufferingListeners.forEach(l => l(this.isBuffering));
     if (readyChanged) this.isReadyListeners.forEach(l => l(this.isReady));
+    if (progressChanged) this.progressListeners.forEach(l => l(this.currentTime, this.durationTime));
     if (seekingChanged) this.isSeekingListeners.forEach(l => l(this.isSeeking));
     if (endedChanged) this.isEndedListeners.forEach(l => l());
     if (errorChanged) {
@@ -861,6 +883,7 @@ export class AvPlayerController {
     this.isPlayingListeners.forEach(l => l(false));
     this.isBufferingListeners.forEach(l => l(false));
     this.isReadyListeners.forEach(l => l(false));
+    this.progressListeners.forEach(l => l(0, 0));
     this.waitingForBufferListeners.forEach(l => l(false));
     this.errorListeners.forEach(l => l(''));
   }
@@ -905,9 +928,9 @@ export class AvPlayerController {
       this.setError('[PLAYER] RETRY_FAILED');
       return;
     }
-    this.nativeEngine.load(playbackUrl, resumePos);
+    this.playbackEngine.load(playbackUrl, resumePos);
     if (this.isPlaying) {
-      this.nativeEngine.play();
+      this.playbackEngine.play();
     }
   }
 
@@ -938,9 +961,9 @@ export class AvPlayerController {
         this.setError('[PLAYER] REFRESH_PROXY_FAILED');
         return;
       }
-      this.nativeEngine.load(playbackUrl, resumePos);
+      this.playbackEngine.load(playbackUrl, resumePos);
       if (this.isPlaying) {
-        this.nativeEngine.play();
+        this.playbackEngine.play();
       }
     } catch (e) {
       Logger.error(TAG, `refreshAndReplay failed: ${e}`);
@@ -957,9 +980,9 @@ export class AvPlayerController {
       Logger.info(TAG, `Switched to progressive fallback: ${progressive.quality} [${progressive.itag}]`);
       const playbackUrl = await this.createPlaybackUrl(progressive, undefined);
       if (playbackUrl) {
-        this.nativeEngine.load(playbackUrl, resumePos);
+        this.playbackEngine.load(playbackUrl, resumePos);
         if (this.isPlaying) {
-          this.nativeEngine.play();
+          this.playbackEngine.play();
         }
         return;
       }
