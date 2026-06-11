@@ -17,7 +17,7 @@ import { componentUtils } from '@kit.ArkUI';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
-import { AvPlayerController, VideoData, StreamInfo, PlayerState } from 'mediaservice';
+import { AvPlayerController, VideoData, StreamInfo, PlayerState, VideoEntry } from 'mediaservice';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
@@ -110,18 +110,6 @@ export struct VideoPlayer {
     }
     this.hasError = errorMsg.length > 0;
   };
-
-  get qualityOptions(): SelectOption[] {
-    return this.controller.getMergedVideoList().map(e => ({
-      value: `${e.resolutionLabel} (${e.codecLabel})`
-    }));
-  }
-
-  get qualityLabel(): string {
-    const idx = this.controller.getCurrentVideoIndex();
-    const opts = this.qualityOptions;
-    return (idx >= 0 && idx < opts.length) ? opts[idx].value : 'Auto';
-  }
 
   private updateKeepScreenOn(): void {
     const shouldKeepOn = this.vm.isPlaying || this.vm.isBuffering;
@@ -601,6 +589,18 @@ export struct VideoPlayer {
   }
 
   @Builder
+  QualityMenu() {
+    Menu() {
+      ForEach(this.controller.getMergedVideoList(), (entry: VideoEntry) => {
+        MenuItem({ content: `${entry.resolutionLabel} (${entry.codecLabel})` })
+          .onClick(() => {
+            this.controller.switchToVideoEntry(entry);
+          })
+      })
+    }
+  }
+
+  @Builder
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
@@ -920,20 +920,13 @@ export struct VideoPlayer {
 
       // 右侧操作栏 (字幕 + 清晰度 + 播放速度)
       Row({ space: 20 }) {
-        // 清晰度选择（直播时隐藏）
+        // 清晰度图标（直播时隐藏）
         if (!this.curSource.isLive) {
-          Select(this.qualityOptions)
-            .selected(this.controller.getCurrentVideoIndex())
-            .value(this.qualityLabel)
-            .font({ size: 14 })
-            .selectedOptionFont({ size: 14, weight: FontWeight.Medium })
-            .optionFont({ size: 14 })
-            .onSelect((index: number, _value: string) => {
-              const entries = this.controller.getMergedVideoList();
-              if (index >= 0 && index < entries.length) {
-                this.controller.switchToVideoEntry(entries[index]);
-              }
-            })
+          SymbolGlyph($r('sys.symbol.resolution_video'))
+            .width(24)
+            .height(24)
+            .fontColor([Color.White])
+            .bindMenu(this.QualityMenu())
         }
 
         // 播放速度
