@@ -112,15 +112,19 @@ export struct VideoPlayer {
   };
 
   get qualityOptions(): SelectOption[] {
-    return this.controller.getMergedVideoList().map(e => ({
-      value: `${e.resolutionLabel} (${e.codecLabel})`
-    }));
+    return this.controller.getMergedVideoList().map(e => {
+      const opt: SelectOption = { value: `${e.resolutionLabel} (${e.codecLabel})` };
+      return opt;
+    });
   }
 
-  get qualityLabel(): string {
+  get qualityLabel(): ResourceStr {
     const idx = this.controller.getCurrentVideoIndex();
     const opts = this.qualityOptions;
-    return (idx >= 0 && idx < opts.length) ? opts[idx].value : 'Auto';
+    if (idx >= 0 && idx < opts.length) {
+      return opts[idx].value;
+    }
+    return 'Auto';
   }
 
   private updateKeepScreenOn(): void {
