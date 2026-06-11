@@ -327,10 +327,14 @@ export class NativePlaybackEngine implements PlaybackEngine {
         // 部分设备可能不支持，忽略
       }
 
+      // AVPlayer 不支持在 prepare 时设置起播位置，必须先 prepare 再 seek
+      // 如果有历史进度，立即 seek（会触发二次缓冲，但这是 AVPlayer 的限制）
       if (startMs > 0 && !this.isLive) {
+        Logger.info(TAG, `Seeking to resume position: ${startMs / 1000}s`);
+        this.isSeeking = true;  // 标记为 seeking 状态，UI 可显示"正在恢复播放位置"
+        this.emitCurrentState();
         this.seek(startMs / 1000, false);
-      } else if (this.playWhenPrepared && !this.pendingSeekBeforePlay) {
-        // 无启播进度时直接播放
+      } else if (this.playWhenPrepared) {
         await this.playInternal(player);
       }
     } catch (e) {

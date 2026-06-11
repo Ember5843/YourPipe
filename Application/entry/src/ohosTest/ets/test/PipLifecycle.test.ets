@@ -149,10 +149,10 @@ export default function pipLifecycleTest() {
       expect(delegate.pauseCalled).assertEqual(1);
     });
 
-    // ─── 场景 16：session release 后 attachSurface 触发 reset ───
-    it('TC16_attach_after_release_resets_session', 0, () => {
-      // 验证：session 被 release 后，新 PlayerPage 的 attachSurface
-      //       触发 resetSession，重建 controller 和 pipController
+    // ─── 场景 16：session release 后 ensureInitialized 触发 reset ───
+    it('TC16_ensure_initialized_after_release_resets_session', 0, () => {
+      // 验证：session 被 release 后，新 PlayerPage 的 ensureInitialized
+      //       触发 resetSession，重建 controller
       // 预期：isReleased 变为 false，新 controller 可用
       expect(true).assertTrue();
     });

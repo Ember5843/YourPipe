@@ -87,7 +87,8 @@ export struct VideoPlayer {
     if (!this.controller) {
       return;
     }
-    this.controller.refreshPlaybackState();
+    // 移除主动刷新，依赖 PlayerStateRelay 的事件驱动
+    // 仅在必要时同步最新值（如页面恢复、源切换）
     // isPlaying/isBuffering/isReady 由 @Track 自动同步到模板
     this.currentTime = this.controller.currentTime;
     this.durationTime = this.controller.durationTime;
@@ -157,6 +158,7 @@ export struct VideoPlayer {
   @State sliderDragValue: number = 0;   // 拖动时的本地同步值，避免依赖异步的 currentTime
   @State isSliderGesture: boolean = false;
   private panGestureIgnoredForSlider: boolean = false; // 在 onActionStart 时记录，避免 End 时的竞争条件
+  private sliderChangeDebounceTimer: number = -1; // Seek防抖定时器
   // UI auto-hide
   @State showControls: boolean = true;
   private controlsHideTimerId: number = -1;
@@ -337,18 +339,21 @@ export struct VideoPlayer {
     const isVisible = this.isPageShow && !this.isAppBackground;
 
     if (!isVisible) {
+      // 页面隐藏：停止视频输出，但播放器继续运行（音频继续播放）
+      Logger.info(TAG, 'Page hidden → disable video output');
+      this.controller.setVideoOutputEnabled(false);
       return;
     }
 
-    if (session.playerState !== PlayerState.RELEASED) {
-      session.attachSurface(this.xComponentController).catch(() => {});
+    // 页面显示：恢复视频输出
+    Logger.info(TAG, 'Page shown and App foreground → restore video output');
+
+    if (session.playerState === PlayerState.RELEASED) {
+      // 如果会话已释放，需要重新初始化
+      session.ensureInitialized().catch(() => {});
     }
 
-    Logger.info(TAG, 'Page shown and App foreground → restore playback');
-    this.syncPlaybackStateFromController();
-    if (this.controller.isReady && !this.controller.isPlaying) {
-      this.controller.syncPlay();
-    }
+    // 确保 surfaceID 已绑定
     if (!this.controller.surfaceID) {
       try {
         const surfaceId = this.xComponentController.getXComponentSurfaceId();
@@ -357,7 +362,16 @@ export struct VideoPlayer {
           Logger.info(TAG, `SurfaceID re-bound on visibility change: ${surfaceId}`);
         }
       } catch (_e) {
+        Logger.warn(TAG, 'Failed to get surfaceId on visibility change');
       }
+    }
+
+    // 恢复视频输出
+    this.controller.setVideoOutputEnabled(true);
+
+    this.syncPlaybackStateFromController();
+    if (this.controller.isReady && !this.controller.isPlaying) {
+      this.controller.syncPlay();
     }
   }
 
@@ -396,21 +410,11 @@ export struct VideoPlayer {
     this.preCalculateRects();
     this.calculateSurfaceSize();
 
-    // 向全局会话注册当前页面的 surface
+    // 确保播放引擎已初始化（不再需要传递 XComponentController）
     const session = PlayerSession.getInstance();
-    await session.attachSurface(this.xComponentController);
+    await session.ensureInitialized();
 
-    // 兜底：如果 XComponent 已加载，确保 Surface ID 已同步（应对 controller 被替换场景）
-    try {
-      if (!this.controller.surfaceID) {
-        const surfaceId = this.xComponentController.getXComponentSurfaceId();
-        if (surfaceId) {
-          this.controller.setSurfaceID(surfaceId);
-        }
-      }
-    } catch (_e) {
-      // XComponent 尚未加载，等待 onLoad 回调
-    }
+    // XComponent.onLoad 时会自动绑定 surfaceId
 
     // 订阅屏幕锁定/亮屏事件
     this.envService.subscribeScreenEvents(
@@ -1043,9 +1047,16 @@ export struct VideoPlayer {
         this.isSliderDragging = true;
         this.trackThicknessSize = CommonConstants.TRACK_SIZE_MAX;
         this.sliderStyle = SliderStyle.InSet;
+        // Moving期间仅更新UI，不发送seek命令
         break;
       case SliderChangeMode.End:
-        this.controller.syncSeek(value * 1000);
+        // 清除防抖定时器，立即发送最终seek
+        if (this.sliderChangeDebounceTimer >= 0) {
+          clearTimeout(this.sliderChangeDebounceTimer);
+          this.sliderChangeDebounceTimer = -1;
+        }
+        // 使用快速seek模式（keyframe）提升响应速度
+        this.controller.syncSeekFast(value * 1000);
         this.isSliderDragging = false;
         this.sliderDragValue = value;
         this.trackThicknessSize = CommonConstants.TRACK_SIZE_MIN;
@@ -1067,7 +1078,8 @@ export struct VideoPlayer {
     clearTimeout(this.brightnessHideTimerId);
     clearTimeout(this.forwardHintTimerId);
     clearTimeout(this.backwardHintTimerId);
-    // 从全局会话注销当前 surface（不释放播放器，因为 PIP 可能继续）
-    PlayerSession.getInstance().detachSurface();
+    // 停止视频输出，但不释放播放器（播放器继续在后台运行，支持 PIP 等场景）
+    this.controller.setVideoOutputEnabled(false);
+    Logger.debug(TAG, 'AVPlayer disappeared, video output disabled');
   }
 }

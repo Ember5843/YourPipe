@@ -2,7 +2,6 @@ import { AppLog } from './AppLog';
 import { common } from '@kit.AbilityKit';
 import { AvPlayerController, VideoData, LocalMediaProxy, PlayerState } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
-import { PlaybackConfig } from './PlaybackConfig';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { PlayQueueManager } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
@@ -28,7 +27,6 @@ export class PlayerSession {
   private static instance: PlayerSession | null = null;
 
   private _controller: AvPlayerController;
-  private _xComponentController?: XComponentController;
   private _currentVideo: VideoItem | null = null;
   private _defaultSource: VideoData;
   private _context: common.UIAbilityContext;
@@ -73,7 +71,6 @@ export class PlayerSession {
     this._controller = new AvPlayerController(this._defaultSource);
     this.bindControllerQueueControls();
     this.bindQueueSwitchHandler();
-    LocalMediaProxy.initCache(this._context);
     logger.debug(`${TAG} PlayerSession created`);
   }
 
@@ -128,19 +125,15 @@ export class PlayerSession {
   }
 
   // ──── Surface 绑定 ────
+  // Surface 管理现在由 UI 层（AVPlayer）直接负责
+  // UI 层在 XComponent.onLoad 时调用 controller.setSurfaceID()
 
-  async attachSurface(xComponentController: XComponentController): Promise<void> {
+  async ensureInitialized(): Promise<void> {
     if (this._controller.playerState === PlayerState.RELEASED) {
-      logger.warn(`${TAG} attachSurface called after release, reinitializing`);
+      logger.warn(`${TAG} ensureInitialized called after release, reinitializing`);
       this.resetSession();
     }
-    this._xComponentController = xComponentController;
     await this._controller.initAVPlayer();
-  }
-
-  detachSurface(): void {
-    this._xComponentController = undefined;
-    logger.debug(`${TAG} surface detached`);
   }
 
   // ──── 播放控制 ────
@@ -192,9 +185,6 @@ export class PlayerSession {
     if (!this.isSessionActive()) {
       this.resetSession();
     }
-
-    const pbCfg = PlaybackConfig.loadFromPreferences();
-    LocalMediaProxy.applyCacheConfig(parseInt(pbCfg.cacheDiskSize), parseInt(pbCfg.cacheMaxAge));
 
     const videoId = video.videoId || YOUTUBE_VIDEO_ID;
 
@@ -382,12 +372,10 @@ export class PlayerSession {
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
     this._controller.releaseVideo(0);
-    this._xComponentController = undefined;
   }
 
   private resetSession(): void {
     this._controller.releaseVideo(0);
-    this._xComponentController = undefined;
     this._currentVideo = null;
     this._watchVideoId = '';
     this._activePlayPromise = null;
