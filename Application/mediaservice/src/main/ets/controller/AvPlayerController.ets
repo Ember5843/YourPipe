@@ -612,12 +612,12 @@ export class AvPlayerController {
     if (vh > 0) vDelay += `,h=${vh}`;
     if (vfps > 0) vDelay += `,fps=${vfps}`;
     parts.push(vDelay);
-    if (vbr > 0) parts.push(`!track_meta,title=${videoStream.quality || 'video'},byterate=${Math.floor(vbr * 1000 / 8)}`);
+    if (vbr > 0) parts.push(`!track_meta,title=${videoStream.quality || 'video'},byterate=${Math.floor(vbr / 8)}`);
     parts.push(`${vUrl},length=${durationSec}`);
     // 音频轨
     parts.push('!new_stream', '!no_clip', '!no_chapters');
     parts.push(`!delay_open,media_type=audio,codec=${aCodec}`);
-    if (abr > 0) parts.push(`!track_meta,title=${audioStream?.quality || 'audio'},byterate=${Math.floor(abr * 1000 / 8)}`);
+    if (abr > 0) parts.push(`!track_meta,title=${audioStream?.quality || 'audio'},byterate=${Math.floor(abr / 8)}`);
     parts.push(`${aUrl},length=${durationSec}`);
 
     const edlUrl = 'edl://' + parts.join(';') + ';';

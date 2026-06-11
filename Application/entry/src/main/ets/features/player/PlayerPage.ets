@@ -522,9 +522,7 @@ export struct VideoPlayerPage {
 
   @Builder
   VideoPlayerContent() {
-    if (this.isLoading || this.videoDescriptionError || !this.videoSource.streams || this.videoSource.streams.length === 0) {
-      this.VideoPlaceholder()
-    } else {
+    Stack({ alignContent: Alignment.Center }) {
       VideoPlayer({
         controller: $controller,
         isFullLandscapeScreen: this.isFullLandscapeScreen,
@@ -555,6 +553,10 @@ export struct VideoPlayerPage {
         curIndex: 0,
         index: 0,
       })
+
+      if (this.isLoading || this.videoDescriptionError || !this.videoSource.streams || this.videoSource.streams.length === 0) {
+        this.VideoPlaceholder()
+      }
     }
   }
 

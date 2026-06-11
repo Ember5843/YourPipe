@@ -598,19 +598,13 @@ export struct VideoPlayer {
         .height('100%')
         .zIndex(CommonConstants.Z_INDEX_BASE)
 
-      // 加载中/缓冲提示层（包括双轨道缓存等待）
-      if (this.controller.isBuffering || this.isWaitingForDualBuffer || (!this.curSource.error && !this.hasError && !this.controller.isReady && this.hasStreams)) {
+      // 加载中/缓冲提示层
+      if (this.controller.isBuffering) {
         Column() {
           LoadingProgress()
             .width(48)
             .height(48)
             .color(Color.White)
-          if (this.isWaitingForDualBuffer) {
-            Text($r('app.string.yt_player_syncing_buffer'))
-              .fontColor(Color.White)
-              .fontSize(14)
-              .margin({ top: 12 })
-          }
         }
         .width('100%')
         .height('100%')
@@ -977,41 +971,53 @@ export struct VideoPlayer {
           : this.currentTime
       )))
         .fontColor(Color.White).fontSize(13).width(48).textAlign(TextAlign.Center)
+        .visibility(this.curSource.isLive ? Visibility.None : Visibility.Visible)
 
-      Stack({ alignContent: Alignment.Start }) {
-        // 轨道底层：透明 Slider 提供轨道几何（起点缩进、高度等），仅用于对齐
-        Slider({ value: 0, max: 100, style: this.sliderStyle })
-          .width('100%')
-          .trackColor('#33FFFFFF')       // 未缓存区底色（20%白）
-          .selectedColor(Color.Transparent)
-          .blockColor(Color.Transparent)
-          .trackThickness(this.trackThicknessSize)
-          .hitTestBehavior(HitTestMode.None)
+      if (this.curSource.isLive) {
+        Row({ space: 6 }) {
+          Circle({ width: 8, height: 8 }).fill('#FF3B30')
+          Text('LIVE')
+            .fontColor(Color.White).fontSize(13).fontWeight(FontWeight.Medium)
+        }
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else {
+        Stack({ alignContent: Alignment.Start }) {
+          // 轨道底层：透明 Slider 提供轨道几何（起点缩进、高度等），仅用于对齐
+          Slider({ value: 0, max: 100, style: this.sliderStyle })
+            .width('100%')
+            .trackColor('#33FFFFFF')       // 未缓存区底色（20%白）
+            .selectedColor(Color.Transparent)
+            .blockColor(Color.Transparent)
+            .trackThickness(this.trackThicknessSize)
+            .hitTestBehavior(HitTestMode.None)
 
-        // 多段缓存条：onReady 是 VoidCallback，context 通过构造时传入的 cacheCanvasCtx 引用获得
-        Canvas(this.cacheCanvasCtx)
-          .width('100%')
-          .height(this.trackThicknessSize)
-          .hitTestBehavior(HitTestMode.None)
-          .onReady(() => {
-            this.drawCacheRanges();
-          })
+          // 多段缓存条：onReady 是 VoidCallback，context 通过构造时传入的 cacheCanvasCtx 引用获得
+          Canvas(this.cacheCanvasCtx)
+            .width('100%')
+            .height(this.trackThicknessSize)
+            .hitTestBehavior(HitTestMode.None)
+            .onReady(() => {
+              this.drawCacheRanges();
+            })
 
-        // 已播放进度（顶层）
-        Slider({
-            value: this.isSliderDragging ? this.sliderDragValue
-                 : this.isGestureSeek    ? this.gestureSeekTime
-                 : this.currentTime,
-            max: this.durationTime,
-            style: this.sliderStyle
-          })
-          .width('100%').trackColor(Color.Transparent).selectedColor(Color.White)
-          .trackThickness(this.trackThicknessSize).enabled(!!(this.controller.isReady && this.hasStreams))
-          .onChange((value: number, mode: SliderChangeMode) => this.sliderOnchange(value, mode))
-      }.layoutWeight(1)
+          // 已播放进度（顶层）
+          Slider({
+              value: this.isSliderDragging ? this.sliderDragValue
+                   : this.isGestureSeek    ? this.gestureSeekTime
+                   : this.currentTime,
+              max: this.durationTime,
+              style: this.sliderStyle
+            })
+            .width('100%').trackColor(Color.Transparent).selectedColor(Color.White)
+            .trackThickness(this.trackThicknessSize).enabled(!!(this.controller.isReady && this.hasStreams))
+            .onChange((value: number, mode: SliderChangeMode) => this.sliderOnchange(value, mode))
+        }.layoutWeight(1)
+      }
 
       Text(secondToTime(Math.floor(this.durationTime)))
         .fontColor('#AAFFFFFF').fontSize(13).width(48).textAlign(TextAlign.Center)
+        .visibility(this.curSource.isLive ? Visibility.None : Visibility.Visible)
 
       // 全屏按鈕 — fontSize 统一用 vp，移除冲突的 height(24)限制
       SymbolGlyph(this.isFullLandscapeScreen ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') : $r('sys.symbol.arrow_up_left_and_arrow_down_right'))
@@ -1066,7 +1072,6 @@ export struct VideoPlayer {
   }
 
   aboutToDisappear(): void {
-    // 释放环境服务
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
     this.controller.unsubscribeEnded(this.onEnded);
@@ -1078,8 +1083,5 @@ export struct VideoPlayer {
     clearTimeout(this.brightnessHideTimerId);
     clearTimeout(this.forwardHintTimerId);
     clearTimeout(this.backwardHintTimerId);
-    // 停止视频输出，但不释放播放器（播放器继续在后台运行，支持 PIP 等场景）
-    this.controller.setVideoOutputEnabled(false);
-    Logger.debug(TAG, 'AVPlayer disappeared, video output disabled');
   }
 }

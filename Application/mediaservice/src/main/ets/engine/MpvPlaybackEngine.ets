@@ -159,7 +159,20 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.mpvPlaybackState = kStateStopped;
     this.emitCurrentState();
 
-    Logger.info(TAG, `load: startPos=${startPos.toFixed(2)}s url=${this.sourceUrl.substring(0, 120)}`);
+    Logger.info(TAG, `load: startPos=${startPos.toFixed(2)}s isLive=${this.isLive} url=${this.sourceUrl.substring(0, 120)}`);
+
+    // HLS (live or DVR replay): reconnect_at_eof 会让 FFmpeg 在每个 segment EOF 时死循环重连
+    // 同一 URL，而非让 HLS demuxer 正常切换到下一个 segment。HLS 流必须禁用。
+    const isHls = this.looksHls(this.sourceUrl);
+    if (isHls) {
+      ctrl.setProperty('demuxer-lavf-o', 'reconnect_delay_max=3');
+      ctrl.setProperty('demuxer-readahead-secs', '30');
+      ctrl.setProperty('cache-secs', '30');
+    } else {
+      ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
+      ctrl.setProperty('demuxer-readahead-secs', '8');
+      ctrl.setProperty('cache-secs', '10');
+    }
 
     try {
       ctrl.setMedia(this.sourceUrl);
@@ -442,19 +455,18 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.loaded = loaded || prepared;
     this.preparing = this.preparing && !prepared && !invalid;
     this.isReady = prepared;
-    this.isBuffering = (buffering || this.preparing || loading) && !seeking && !prepared;
+    this.isBuffering = buffering || loading || this.preparing;
     this.isEnded = ended;
+
+    if (seeking) {
+      this.isSeeking = true;
+    } else if (this.isSeeking) {
+      this.isSeeking = false;
+    }
 
     if (ended) {
       this.playWhenReady = false;
       this.mpvPlaybackState = kStateStopped;
-    }
-
-    if (this.isSeeking && !seeking) {
-      this.isSeeking = false;
-      // pendingSeekMs 不清除，由 onMpvEvent type=1 的位置事件确认后清除
-    } else if (seeking) {
-      this.isSeeking = true;
     }
 
     if (invalid && !this.hasError) {
@@ -469,8 +481,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       this.errorMsg = '';
       this.lastErrorCategory = 'unknown';
     }
-
-    // 不读 ctrl.isPlaying() —— 该调用异步滞后，本地 mpvPlaybackState 是权威来源
 
     if (!wasReady && this.isReady) {
       this.preparing = false;
@@ -559,7 +569,23 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
       return false;
     }
-    return lower.includes('/manifest/') || lower.includes('live');
+    if (!lower.includes('/manifest/') && !lower.includes('live')) {
+      return false;
+    }
+    // DVR = 直播回放，可 seek，不算 live
+    if (lower.includes('playlist_type/dvr') || lower.includes('playlist_type=dvr')) {
+      return false;
+    }
+    return true;
+  }
+
+  private looksHls(url: string): boolean {
+    const lower: string = url.toLowerCase();
+    if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
+      return false;
+    }
+    return lower.includes('.m3u8') || lower.includes('/hls_playlist/') ||
+      lower.includes('application/vnd.apple.mpegurl');
   }
 
   private resetLocalState(clearSurface: boolean): void {
