@@ -40,6 +40,15 @@ export interface CurrentStreams {
   manifest: StreamInfo | undefined;
 }
 
+export interface VideoEntry {
+  stream: StreamInfo;
+  height: number;
+  resolutionLabel: string;
+  codecLabel: string;
+  deliveryMethod: 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP';
+  requiresSeparateAudio: boolean;
+}
+
 // YouTube itag 映射表 (2024-2026 完整版)
 export interface ItagMetadata {
   quality: string;
@@ -133,6 +142,8 @@ export class PlayerModel {
     hlsManifest: [],
     progressive: []
   };
+
+  @Track public mergedVideoList: VideoEntry[] = [];
 
   @Track public currentVideoStream?: StreamInfo;
   @Track public currentAudioStream?: StreamInfo;
@@ -300,6 +311,67 @@ export class PlayerModel {
 
     this.categorizedStreams.audio = sortedAudioStreams;
 
+    const codecShortName = (codecs?: string): string => {
+      if (!codecs) return '';
+      const c = codecs.toLowerCase();
+      if (c.startsWith('av01')) return 'AV1';
+      if (c.startsWith('vp9') || c.startsWith('vp09')) return 'VP9';
+      if (c.startsWith('hvc1') || c.startsWith('hev1')) return 'H265';
+      if (c.startsWith('avc1') || c.startsWith('avc3')) return 'H264';
+      return codecs.split('.')[0].toUpperCase();
+    };
+
+    const heightOf = (s: StreamInfo): number => {
+      return ITAG_MAP[s.itag!]?.height || s.height || 0;
+    };
+
+    const dedupVideoMap = new Map<string, StreamInfo>();
+    const bucketsToMerge: StreamInfo[][] = [
+      this.categorizedStreams.progressive,
+      this.categorizedStreams.hlsManifest,
+      this.categorizedStreams.video,
+    ];
+    for (const bucket of bucketsToMerge) {
+      for (const stream of bucket) {
+        const h = heightOf(stream);
+        const codec = codecShortName(stream.codecs);
+        const key = `${codec}|${h}`;
+        dedupVideoMap.set(key, stream);
+      }
+    }
+
+    const getDeliveryFromBucket = (stream: StreamInfo): 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP' => {
+      if (this.categorizedStreams.video.includes(stream)) return 'DASH';
+      if (this.categorizedStreams.hlsManifest.includes(stream)) return 'HLS';
+      return 'PROGRESSIVE_HTTP';
+    };
+
+    const codecSortPriority = (label: string): number => {
+      if (label === 'H264') return 4;
+      if (label === 'H265') return 3;
+      if (label === 'VP9') return 2;
+      if (label === 'AV1') return 1;
+      return 0;
+    };
+
+    this.mergedVideoList = Array.from(dedupVideoMap.values())
+      .map(stream => {
+        const h = heightOf(stream);
+        const codec = codecShortName(stream.codecs);
+        const delivery = getDeliveryFromBucket(stream);
+        return {
+          stream, height: h,
+          resolutionLabel: stream.quality || '',
+          codecLabel: codec || 'Unknown',
+          deliveryMethod: delivery,
+          requiresSeparateAudio: delivery !== 'PROGRESSIVE_HTTP',
+        } as VideoEntry;
+      })
+      .sort((a, b) => {
+        if (b.height !== a.height) return b.height - a.height;
+        return codecSortPriority(b.codecLabel) - codecSortPriority(a.codecLabel);
+      });
+
     Logger.info(TAG, `Streams categorized: 
       Audio: ${this.categorizedStreams.audio.length}, 
       Video: ${this.categorizedStreams.video.length}, 
@@ -314,6 +386,7 @@ export class PlayerModel {
   }
 
   public getStreamCategories(): StreamCategories { return this.categorizedStreams; }
+  public getMergedVideoList(): VideoEntry[] { return this.mergedVideoList; }
   public getCurrentStreams(): CurrentStreams { return { video: this.currentVideoStream, audio: this.currentAudioStream, manifest: this.currentManifestStream }; }
   public updateVideoStream(stream: StreamInfo | undefined): void { this.currentVideoStream = stream; }
   public updateAudioStream(stream: StreamInfo | undefined): void { this.currentAudioStream = stream; }

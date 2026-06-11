@@ -4,7 +4,7 @@
  */
 
 import { VideoData, StreamInfo, SubtitleTrackInfo } from '../model/VideoData';
-import { PlayerModel, StreamCategories, CurrentStreams } from '../model/PlayerModel';
+import { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from '../model/PlayerModel';
 import { PlaybackEngine, PlaybackState } from '../engine/PlaybackEngine';
 import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
 import { LocalMediaProxy } from './LocalMediaProxy';
@@ -454,34 +454,35 @@ export class AvPlayerController {
       }
     }
 
-    if (categories.video.length > 0 && categories.audio.length > 0) {
-      const video = this.selectBestVideo(categories.video, false);
-      const audio = video ? this.selectBestCompatibleAudio(video, categories.audio) : undefined;
-      if (video && audio) {
-        this.vm.playerModel.updateVideoStream(video);
-        this.vm.playerModel.updateAudioStream(audio);
-        Logger.info(TAG, `Selected DASH separated: video=${video.quality} [${video.itag}], audio=${audio.quality} [${audio.itag}]`);
+    const merged = this.vm.playerModel.getMergedVideoList();
+    const video = this.selectBestVideoEntry(merged);
+    if (!video) {
+      const manifest = this.selectManifestByCap(categories.hlsManifest.length > 0 ? categories.hlsManifest : categories.dashManifest, false);
+      if (manifest) {
+        this.vm.playerModel.updateVideoStream(manifest);
+        this.vm.playerModel.updateAudioStream(undefined);
+        Logger.info(TAG, `Selected fallback manifest: ${this.describePlaybackUrl(manifest.url)}`);
         return true;
       }
+      return false;
     }
 
-    if (categories.progressive.length > 0) {
-      const progressive = this.selectBestProgressive(categories.progressive);
-      this.vm.playerModel.updateVideoStream(progressive);
-      this.vm.playerModel.updateAudioStream(undefined);
-      Logger.info(TAG, `Selected progressive: ${progressive.quality} [${progressive.itag}]`);
-      return true;
+    let audio: StreamInfo | undefined = undefined;
+    if (video.requiresSeparateAudio) {
+      audio = this.selectBestCompatibleAudio(video.stream, categories.audio);
     }
+    this.vm.playerModel.updateVideoStream(video.stream);
+    this.vm.playerModel.updateAudioStream(audio);
 
-    const manifest = this.selectManifestByCap(categories.hlsManifest.length > 0 ? categories.hlsManifest : categories.dashManifest, false);
-    if (manifest) {
-      this.vm.playerModel.updateVideoStream(manifest);
-      this.vm.playerModel.updateAudioStream(undefined);
-      Logger.info(TAG, `Selected fallback manifest: ${this.describePlaybackUrl(manifest.url)}`);
-      return true;
+    const label = `${video.resolutionLabel} [${video.stream.itag}]`;
+    if (video.deliveryMethod === 'DASH') {
+      Logger.info(TAG, `Selected DASH separated: video=${label}${audio ? ` audio=${audio.quality} [${audio.itag}]` : ' (no audio)'}`);
+    } else if (video.deliveryMethod === 'HLS') {
+      Logger.info(TAG, `Selected HLS variant: ${label}`);
+    } else {
+      Logger.info(TAG, `Selected progressive: ${label}`);
     }
-
-    return false;
+    return true;
   }
 
   private selectBestVideo(streams: StreamInfo[], live: boolean): StreamInfo | undefined {
@@ -509,6 +510,13 @@ export class AvPlayerController {
     if (!streams || streams.length === 0) return undefined;
     const selected = this.selectBestVideo(streams, live);
     return selected || streams[0];
+  }
+
+  private selectBestVideoEntry(entries: VideoEntry[]): VideoEntry | undefined {
+    const prefs = PlaybackPreferences.snapshot();
+    const maxHeight = this.resolveMaxHeight(prefs.defaultQuality, prefs.showHighResolutions);
+    const candidate = entries.find(e => e.height <= maxHeight);
+    return candidate || (entries.length > 0 ? entries[0] : undefined);
   }
 
   private resolveMaxHeight(targetQuality: string, showHighRes: boolean): number {
@@ -558,77 +566,94 @@ export class AvPlayerController {
     return 'null';
   }
 
-  private async createPlaybackUrl(videoStream?: StreamInfo, audioStream?: StreamInfo): Promise<string> {
-    if (!videoStream || !videoStream.url) return '';
-    if (this.isRemoteManifestUrl(videoStream.url)) {
+  private async createPlaybackUrl(video?: StreamInfo, audio?: StreamInfo): Promise<string> {
+    if (!video || !video.url) return '';
+
+    if (this.isRemoteManifestUrl(video.url)) {
       Logger.debug(TAG, `createPlaybackUrl: using remote manifest directly`);
       this.destroyCurrentLocalSession();
-      return videoStream.url;
+      return video.url;
     }
 
+    switch ((video.deliveryMethod || '').toUpperCase()) {
+      case 'HLS':
+        this.destroyCurrentLocalSession();
+        Logger.info(TAG, `createPlaybackUrl: HLS variant direct url=${this.describePlaybackUrl(video.url)}`);
+        return video.url;
+
+      case 'DASH':
+        if (audio && this.isSeparatedDash(video, audio)) {
+          return await this.buildDualEdlUrl(video, audio);
+        }
+        return await this.buildSingleProxyUrl(video);
+
+      case 'PROGRESSIVE_HTTP':
+      default:
+        return await this.buildSingleProxyUrl(video);
+    }
+  }
+
+  private async buildSingleProxyUrl(video: StreamInfo): Promise<string> {
     this.destroyCurrentLocalSession();
-    const isDual = this.isSeparatedDash(videoStream, audioStream) && !!audioStream;
-    const durationMs = isDual ? this.resolveDurationMs(videoStream, audioStream) : 0;
-    Logger.info(TAG, `createPlaybackUrl: type=${isDual ? 'dual-edl' : 'single'} video=[itag=${videoStream.itag} ${videoStream.quality} ${videoStream.codecs}]${isDual ? ` audio=[itag=${audioStream!.itag} ${audioStream!.codecs}]` : ''} durationMs=${durationMs}`);
-
-    // 双流 EDL 必须有正 duration，否则 MPV timeline 长度为 0 会立刻判 EOF，
-    // 上层会把这条当作"播放结束"自动 skip 到下一个视频。
-    // 直播流应该走 hlsUrl 分支，到这里说明 isLive/hlsUrl 没设上来，明确报错让上层处理。
-    if (isDual && durationMs <= 0) {
-      Logger.error(TAG, `createPlaybackUrl: dual stream with unknown duration (live without manifest?), refusing to build EDL`);
-      return '';
-    }
-
-    const sessionId = await (isDual
-      ? LocalMediaProxy.createYoutubeDualUrlSession(videoStream, audioStream!, durationMs)
-      : LocalMediaProxy.createSingleUrlSession(videoStream.url, videoStream));
-
+    const sessionId = await LocalMediaProxy.createSingleUrlSession(video.url, video);
     const playbackUrl = LocalMediaProxy.getPlaybackUrl(sessionId);
     if (!playbackUrl.startsWith('http://127.0.0.1:')) {
-      Logger.error(TAG, `createPlaybackUrl: invalid playbackUrl="${playbackUrl}" sessionId=${sessionId}`);
+      Logger.error(TAG, `buildSingleProxyUrl: invalid url sessionId=${sessionId}`);
+      LocalMediaProxy.destroySession(sessionId);
+      return '';
+    }
+    this.currentLocalMediaSessionId = sessionId;
+    Logger.debug(TAG, `buildSingleProxyUrl: itag=${video.itag} url=${playbackUrl}`);
+    return playbackUrl;
+  }
+
+  private async buildDualEdlUrl(video: StreamInfo, audio: StreamInfo): Promise<string> {
+    this.destroyCurrentLocalSession();
+    const durationMs = this.resolveDurationMs(video, audio);
+    if (durationMs <= 0) {
+      Logger.error(TAG, `buildDualEdlUrl: dual stream with unknown duration, refusing to build EDL`);
+      return '';
+    }
+    Logger.info(TAG, `buildDualEdlUrl: video=[itag=${video.itag} ${video.quality} ${video.codecs}] audio=[itag=${audio.itag} ${audio.codecs}] durationMs=${durationMs}`);
+
+    const sessionId = await LocalMediaProxy.createYoutubeDualUrlSession(video, audio, durationMs);
+    const playbackUrl = LocalMediaProxy.getPlaybackUrl(sessionId);
+    if (!playbackUrl.startsWith('http://127.0.0.1:')) {
+      Logger.error(TAG, `buildDualEdlUrl: invalid playbackUrl="${playbackUrl}" sessionId=${sessionId}`);
       LocalMediaProxy.destroySession(sessionId);
       return '';
     }
     this.currentLocalMediaSessionId = sessionId;
 
-    // 单流（progressive 或 embedded audio）直接用 proxy URL
-    if (!isDual) {
-      Logger.debug(TAG, `createPlaybackUrl: single stream url=${playbackUrl}`);
-      return playbackUrl;
-    }
-
-    // 双流（separated video+audio）：用 EDL !new_stream + !delay_open 合并
     const baseUrl = playbackUrl.replace('/manifest.mpd', '');
     const vUrl = `${baseUrl}/video/0`;
     const aUrl = `${baseUrl}/audio/0`;
     const durationSec = (durationMs / 1000).toFixed(3);
 
-    const vCodec = this.codecToMpv(videoStream.codecs || '');
-    const vw = videoStream.width || 0;
-    const vh = videoStream.height || 0;
-    const vfps = videoStream.fps || 0;
-    const vbr = videoStream.bitrate || 0;
-    const aCodec = this.codecToMpv(audioStream?.codecs || '');
-    const abr = audioStream?.bitrate || 0;
+    const vCodec = this.codecToMpv(video.codecs || '');
+    const vw = video.width || 0;
+    const vh = video.height || 0;
+    const vfps = video.fps || 0;
+    const vbr = video.bitrate || 0;
+    const aCodec = this.codecToMpv(audio.codecs || '');
+    const abr = audio.bitrate || 0;
 
     const parts: string[] = [];
-    // 视频轨
     parts.push('!new_stream', '!no_clip', '!no_chapters');
     let vDelay = `!delay_open,media_type=video,codec=${vCodec}`;
     if (vw > 0) vDelay += `,w=${vw}`;
     if (vh > 0) vDelay += `,h=${vh}`;
     if (vfps > 0) vDelay += `,fps=${vfps}`;
     parts.push(vDelay);
-    if (vbr > 0) parts.push(`!track_meta,title=${videoStream.quality || 'video'},byterate=${Math.floor(vbr / 8)}`);
+    if (vbr > 0) parts.push(`!track_meta,title=${video.quality || 'video'},byterate=${Math.floor(vbr / 8)}`);
     parts.push(`${vUrl},length=${durationSec}`);
-    // 音频轨
     parts.push('!new_stream', '!no_clip', '!no_chapters');
     parts.push(`!delay_open,media_type=audio,codec=${aCodec}`);
-    if (abr > 0) parts.push(`!track_meta,title=${audioStream?.quality || 'audio'},byterate=${Math.floor(abr / 8)}`);
+    if (abr > 0) parts.push(`!track_meta,title=${audio.quality || 'audio'},byterate=${Math.floor(abr / 8)}`);
     parts.push(`${aUrl},length=${durationSec}`);
 
     const edlUrl = 'edl://' + parts.join(';') + ';';
-    Logger.info(TAG, `createPlaybackUrl: edl=${edlUrl.substring(0, 300)}`);
+    Logger.info(TAG, `buildDualEdlUrl: edl=${edlUrl.substring(0, 300)}`);
     return edlUrl;
   }
 

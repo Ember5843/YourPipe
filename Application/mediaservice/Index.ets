@@ -6,7 +6,7 @@ export { AvPlayerController, NativeLogBridgeFns } from './src/main/ets/controlle
 export { LocalMediaProxy } from './src/main/ets/controller/LocalMediaProxy';
 export { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './src/main/ets/engine/PlaybackEngine';
 export { NativePlaybackEngine } from './src/main/ets/engine/NativePlaybackEngine';
-export { PlayerModel, StreamCategories, CurrentStreams } from './src/main/ets/model/PlayerModel';
+export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from './src/main/ets/model/PlayerModel';
 export { VideoData, StreamInfo, SelectOption, SubtitleTrackInfo } from './src/main/ets/model/VideoData';
 export { BackgroundTaskManager } from './src/main/ets/common/BackgroundTaskManager';
 export { PlayerState, isValidTransition, describeState } from './src/main/ets/state/PlayerState';
