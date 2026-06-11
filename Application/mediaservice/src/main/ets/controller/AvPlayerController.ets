@@ -136,6 +136,25 @@ export class AvPlayerController {
   public setCurIndex(curIndex: number): void { this.curIndex = curIndex; }
   public setIsPlaying(isPlaying: boolean): void { this.vm.isPlaying = isPlaying; }
 
+  public getMergedVideoList(): VideoEntry[] {
+    return this.vm.playerModel.getMergedVideoList();
+  }
+
+  public getCurrentVideoIndex(): number {
+    const list = this.getMergedVideoList();
+    const cur = this.vm.playerModel.getCurrentStreams().video;
+    return cur ? list.findIndex(e => e.stream === cur) : -1;
+  }
+
+  public async switchToVideoEntry(entry: VideoEntry): Promise<void> {
+    let audio: StreamInfo | undefined = undefined;
+    if (entry.requiresSeparateAudio) {
+      const cats = this.vm.playerModel.getStreamCategories();
+      audio = this.selectBestCompatibleAudio(entry.stream, cats.audio);
+    }
+    await this.switchQuality(entry.stream, audio);
+  }
+
   public setRefreshHandler(handler: (videoId: string, resumePos: number) => Promise<VideoData | null>): void {
     this.onRequestRefreshStreams = handler;
   }

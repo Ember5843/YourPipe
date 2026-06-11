@@ -18,7 +18,7 @@ import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
 import { AvPlayerController, VideoData, StreamInfo, PlayerState } from 'mediaservice';
-import { ResolutionDialog } from './ResolutionDialog';
+import { QualitySelect } from './ResolutionDialog';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
@@ -213,8 +213,6 @@ export struct VideoPlayer {
   private backwardHintTimerId: number = -1;
 
   
-  private resolutionDialogController: CustomDialogController | null = null;
-
   private xComponentController: XComponentController = new XComponentController();
   private screenHeight: number = 0;
   private envService: PlayerEnvironmentService = new PlayerEnvironmentService();
@@ -911,40 +909,16 @@ export struct VideoPlayer {
 
       // 右侧操作栏 (字幕 + 清晰度 + 播放速度)
       Row({ space: 20 }) {
-        // 清晰度图标（直播时隐藏）
+        // 清晰度下拉（直播时隐藏）
         if (!this.curSource.isLive) {
-          SymbolGlyph($r('sys.symbol.resolution_video'))
-            .width(24)
-            .height(24)
-            .fontColor([Color.White])
-            .onClick(() => {
-            const streamCategories = this.controller.getStreamCategories();
-            const currentStreams = this.controller.getCurrentStreams();
-            this.resolutionDialogController?.close();
-            this.resolutionDialogController = new CustomDialogController({
-              builder: ResolutionDialog({
-                streamCategories: streamCategories,
-                currentStreams: currentStreams,
-                onConfirm: (selection) => {
-                  let videoStream = selection.dashVideo || selection.progressive || selection.hlsManifest || selection.dashManifest;
-                  let audioStream = selection.dashAudio;
-                  if (videoStream) {
-                    this.controller.switchQuality(videoStream, audioStream);
-                  }
-                },
-                onCancel: () => {
-                  Logger.info(TAG, 'Resolution selection cancelled');
-                }
-              }),
-              alignment: DialogAlignment.Center,
-              gridCount: 4,
-              autoCancel: true,
-              customStyle: true,
-              openAnimation: { duration: 300, curve: Curve.Friction },
-              closeAnimation: { duration: 250, curve: Curve.Friction }
-            });
-            this.resolutionDialogController?.open();
+          QualitySelect({
+            entries: this.controller.getMergedVideoList(),
+            currentIndex: this.controller.getCurrentVideoIndex(),
+            onPick: (entry) => {
+              this.controller.switchToVideoEntry(entry);
+            }
           })
+          .width(140)
         }
 
         // 播放速度
