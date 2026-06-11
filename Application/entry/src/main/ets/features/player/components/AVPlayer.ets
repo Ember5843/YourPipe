@@ -17,8 +17,7 @@ import { componentUtils } from '@kit.ArkUI';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
-import { AvPlayerController, VideoData, StreamInfo, PlayerState } from 'mediaservice';
-import { QualitySelect } from './ResolutionDialog';
+import { AvPlayerController, VideoData, StreamInfo, PlayerState, VideoEntry } from 'mediaservice';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
@@ -590,6 +589,18 @@ export struct VideoPlayer {
   }
 
   @Builder
+  QualityMenu() {
+    Menu() {
+      ForEach(this.controller.getMergedVideoList(), (entry: VideoEntry) => {
+        MenuItem({ content: `${entry.resolutionLabel} (${entry.codecLabel})` })
+          .onClick(() => {
+            this.controller.switchToVideoEntry(entry);
+          })
+      })
+    }
+  }
+
+  @Builder
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
@@ -909,16 +920,13 @@ export struct VideoPlayer {
 
       // 右侧操作栏 (字幕 + 清晰度 + 播放速度)
       Row({ space: 20 }) {
-        // 清晰度下拉（直播时隐藏）
+        // 清晰度图标（直播时隐藏）
         if (!this.curSource.isLive) {
-          QualitySelect({
-            entries: this.controller.getMergedVideoList(),
-            currentIndex: this.controller.getCurrentVideoIndex(),
-            onPick: (entry) => {
-              this.controller.switchToVideoEntry(entry);
-            }
-          })
-          .width(140)
+          SymbolGlyph($r('sys.symbol.resolution_video'))
+            .width(24)
+            .height(24)
+            .fontColor([Color.White])
+            .bindMenu(this.QualityMenu())
         }
 
         // 播放速度
