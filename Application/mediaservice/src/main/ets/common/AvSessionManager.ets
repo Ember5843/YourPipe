@@ -10,7 +10,6 @@
 import { common, wantAgent } from '@kit.AbilityKit';
 import { avSession } from '@kit.AVSessionKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { BackgroundTaskManager } from '../common/BackgroundTaskManager';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { image } from '@kit.ImageKit';
@@ -79,8 +78,8 @@ export class AvSessionManager {
       // Register launch intent so tapping the notification reopens the app
       this.setLaunchAbility();
       await this.session.activate();
-      // Register background long-running task so the process stays alive
-      BackgroundTaskManager.startContinuousTask(this.context);
+      // 注：后台长时任务由 PlayerStateMachine 监听器统一管理（见 AvPlayerController），
+      // 不再在此处启动，避免与状态机决策不同步。
       // Wire up control-center button callbacks
       this.registerSessionListeners();
       Logger.info(TAG, 'AVSession initialized and activated');
@@ -121,7 +120,7 @@ export class AvSessionManager {
     } catch (e) {
       Logger.error(TAG, `session destroy failed: ${(e as BusinessError).message}`);
     }
-    BackgroundTaskManager.stopContinuousTask(this.context);
+    // 后台长时任务由 PlayerStateMachine 监听器统一停掉，这里不再做。
     Logger.info(TAG, 'AVSession destroyed');
   }
 

@@ -31,7 +31,7 @@ import { CommentList } from './components/CommentList';
 import { CommentReplyPage } from './components/CommentReplyPage';
 import { CommentNavWrapper } from './components/CommentNavWrapper';
 import { WatchHistoryStore } from '../../common/WatchHistoryStore';
-import { AvPlayerController } from 'mediaservice';
+import { AvPlayerController, PlayerUiViewModel } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
 import { PlayQueueList } from './components/PlayQueueList';
 import { PlayQueueManager, QueueSourceType } from './PlayQueueManager';
@@ -70,6 +70,7 @@ export struct VideoPlayerPage {
     index: 0
   };
   @State controller: AvPlayerController = PlayerSession.getInstance().controller;
+  @State vm: PlayerUiViewModel = PlayerSession.getInstance().controller.vm;
   @State isPageShow: boolean = false;
   @State tabArray: Array<TabItem> = initTabData();
   @State currentTabIndex: number = 0;
@@ -135,6 +136,7 @@ export struct VideoPlayerPage {
   async aboutToAppear(): Promise<void> {
     const session = PlayerSession.getInstance();
     this.controller = session.controller;
+    this.vm = session.controller.vm;
 
     let context: Context = this.getUIContext().getHostContext() as Context;
     const initW = this.deviceWidth;
@@ -171,6 +173,7 @@ export struct VideoPlayerPage {
 
     await this.onVideoChange();
     this.controller = session.controller;
+    this.vm = session.controller.vm;
 
     // Register queue switch callback: when user clicks another video in the play queue,
     // PlayerPage reloads without going through AppStorage/Index.openVideoDetail.
@@ -188,7 +191,7 @@ export struct VideoPlayerPage {
       logger.info(`${TAG} Cast state changed: isCasting=${isCasting}, device=${deviceName}`);
       if (isCasting) {
         this.controller.syncPause();
-      } else if (this.isPageShow && !this.controller.isCasting) {
+      } else if (this.isPageShow && !this.vm.isCasting) {
         this.controller.syncPlay();
       }
     };
@@ -269,8 +272,9 @@ export struct VideoPlayerPage {
     const session = PlayerSession.getInstance();
 
     // 同视频已就绪：直接同步，使用缓存数据
-    if (session.currentVideo?.videoId === this.video?.videoId && session.controller.isReady) {
+    if (session.currentVideo?.videoId === this.video?.videoId && session.controller.vm.isReady) {
       this.controller = session.controller;
+      this.vm = session.controller.vm;
       if (session.cachedVideoSource) {
         this.videoSource = session.cachedVideoSource;
         this.syncDetailStateFromSource(session.cachedVideoSource);
@@ -294,6 +298,7 @@ export struct VideoPlayerPage {
       const newVideoSource = await session.play(this.video);
 
       this.controller = session.controller;
+      this.vm = session.controller.vm;
 
       if (newVideoSource) {
         if (!this.videoSource.videoId || this.videoSource.videoId !== newVideoSource.videoId) {
@@ -350,8 +355,8 @@ export struct VideoPlayerPage {
     if (!this.watchVideoId) return;
     try {
       const controller = this.controller;
-      const progressSec = controller.currentTime;
-      const durationSec = controller.durationTime;
+      const progressSec = controller.vm.currentTime;
+      const durationSec = controller.vm.durationTime;
       WatchHistoryStore.record(
         this.watchVideoId,
         this.video?.title || this.videoSource.description as string || '',
@@ -525,6 +530,7 @@ export struct VideoPlayerPage {
     Stack({ alignContent: Alignment.Center }) {
       VideoPlayer({
         controller: $controller,
+        vm: $vm,
         isFullLandscapeScreen: this.isFullLandscapeScreen,
         onFullScreenClick: () => {
           // Toggle guard: 当前已是全屏 → 退出

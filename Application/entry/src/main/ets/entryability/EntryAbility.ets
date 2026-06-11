@@ -5,10 +5,12 @@ import { i18n } from '@kit.LocalizationKit';
 import { BreakpointConstants } from '../common/constants/BreakpointConstants';
 import { PreferencesStore } from '../common/PreferencesStore';
 import { AppState } from '../common/AppState';
+import { UIConfig } from '../common/AppState';
+import { PlaybackConfig } from '../common/PlaybackConfig';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
 import { BackgroundTaskManager } from 'mediaservice';
-import { EnhancedLogger } from 'mediaservice';
+import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
 import { AuthSessionManager, YTCoreLogger } from 'youtube_core';
 import { AppLogStore } from '../common/AppLogStore';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -30,6 +32,17 @@ export default class EntryAbility extends UIAbility {
 
       PreferencesStore.init(this.context);
       AppState.init();
+      // 把 UI 偏好读取注入 mediaservice，避免 controller 直接依赖 AppStorage
+      PlaybackPreferences.setProvider(() => {
+        const ui = AppStorage.get<UIConfig>('uiConfig') ?? new UIConfig();
+        const pb = AppStorage.get<PlaybackConfig>('playbackConfig') ?? new PlaybackConfig();
+        return {
+          searchLanguage: ui.searchLanguage && ui.searchLanguage !== 'default' ? ui.searchLanguage : 'en-GB',
+          defaultQuality: pb.defaultQuality,
+          mobileQuality: pb.mobileQuality,
+          showHighResolutions: pb.showHighResolutions,
+        };
+      });
       // 日志初始化：尽早建立日志列表，根据持久化开关决定是否开始记录
       const logEnabled = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
       AppLogStore.init(logEnabled, this.context.filesDir);
@@ -115,8 +128,8 @@ export default class EntryAbility extends UIAbility {
     logger.info('Ability onBackground');
     AppStorage.setOrCreate('isAppBackground', true);
     this.setContinueState(AbilityConstant.ContinueState.INACTIVE);
-    // 用 UIAbility 自身的 context（最可靠来源）确保后台长时任务生效
-    // AVSession.init() 里的首次注册可能因 canIUse 或时序问题失败，这里作为兜底
+    // 后台长时任务由 PlayerStateMachine 统一管理；此处保留兜底注册以应对极端时序
+    // （重复注册返回 9800005 会被静默忽略，详见 BackgroundTaskManager）。
     BackgroundTaskManager.startContinuousTask(this.context);
   }
 

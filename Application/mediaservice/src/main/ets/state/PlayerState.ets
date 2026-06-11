@@ -26,17 +26,19 @@ export enum PlayerState {
 
 const VALID_TRANSITIONS: Map<PlayerState, PlayerState[]> = new Map([
   [PlayerState.IDLE,           [PlayerState.INITIALIZING, PlayerState.RELEASED]],
-  [PlayerState.INITIALIZING,   [PlayerState.LOADING, PlayerState.IDLE, PlayerState.ERROR, PlayerState.RELEASED]],
+  [PlayerState.INITIALIZING,   [PlayerState.LOADING, PlayerState.READY, PlayerState.IDLE, PlayerState.ERROR, PlayerState.RELEASED]],
   [PlayerState.LOADING,        [PlayerState.READY, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED]],
-  [PlayerState.READY,          [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.IDLE, PlayerState.RELEASED]],
+  [PlayerState.READY,          [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.IDLE, PlayerState.RELEASED]],
   [PlayerState.PLAYING,        [
-    PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED,
+    PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.LOADING,
     PlayerState.PIP_ENTERING, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED
   ]],
-  [PlayerState.PAUSED,         [PlayerState.PLAYING, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED,
+  [PlayerState.PAUSED,         [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.BUFFERING,
+                                PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED,
                                 PlayerState.PIP_ENTERING]],
-  [PlayerState.BUFFERING,      [PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.ERROR, PlayerState.RELEASED]],
-  [PlayerState.COMPLETED,      [PlayerState.PLAYING, PlayerState.IDLE, PlayerState.RELEASED]],
+  [PlayerState.BUFFERING,      [PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.LOADING,
+                                PlayerState.COMPLETED, PlayerState.ERROR, PlayerState.RELEASED]],
+  [PlayerState.COMPLETED,      [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.IDLE, PlayerState.RELEASED]],
   [PlayerState.PIP_ENTERING,   [PlayerState.PIP_ACTIVE, PlayerState.PLAYING, PlayerState.ERROR, PlayerState.RELEASED]],
   [PlayerState.PIP_ACTIVE,     [PlayerState.PIP_RESTORING, PlayerState.PAUSED, PlayerState.IDLE, PlayerState.RELEASED,
                                 PlayerState.ERROR]],

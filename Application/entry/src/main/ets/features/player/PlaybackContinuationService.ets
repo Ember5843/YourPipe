@@ -80,7 +80,7 @@ export class PlaybackContinuationService {
     }
 
     const controller = session.controller;
-    if (!controller.isReady || controller.errorMsg) {
+    if (!controller.vm.isReady || controller.vm.errorMsg) {
       return null;
     }
 
@@ -100,9 +100,9 @@ export class PlaybackContinuationService {
       title: video.title,
       author: video.author,
       thumbnailUrl: video.thumbnailUrl,
-      durationSec: sanitizeNumber(controller.durationTime),
-      progressSec: sanitizeNumber(controller.currentTime),
-      wasPlaying: controller.isPlaying,
+      durationSec: sanitizeNumber(controller.vm.durationTime),
+      progressSec: sanitizeNumber(controller.vm.currentTime),
+      wasPlaying: controller.vm.isPlaying,
       queue: queue
     };
     return payload;

@@ -22,6 +22,7 @@ import { ResolutionDialog } from './ResolutionDialog';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
+import { PlayerUiViewModel } from 'mediaservice';
 
 const TAG: string = '[PlayerLog][VideoPlayer]';
 
@@ -54,7 +55,12 @@ export struct VideoPlayer {
   
   @State trackThicknessSize: number = CommonConstants.TRACK_SIZE_MIN;
   @Link @Watch('onControllerChanged') controller: AvPlayerController;
+  // ArkUI V1 的 @Track 不会穿透到嵌套 @Observed，因此 vm 必须由组件自己 @Link，
+  // 才能让 vm 内部字段（isPlaying / isReady / ...）的变化触发 UI 重渲染。
+  @Link vm: PlayerUiViewModel;
   private lastController?: AvPlayerController;
+  /** 防抖 disable 视频输出的定时器：避免回前台 race 触发引擎重启。-1 表示无挂起。 */
+  private disableVideoTimerId: number = -1;
   @State hasStreams: boolean = false;
   @State hasError: boolean = false;
   @State isWaitingForDualBuffer: boolean = false;
@@ -90,8 +96,8 @@ export struct VideoPlayer {
     // 移除主动刷新，依赖 PlayerStateRelay 的事件驱动
     // 仅在必要时同步最新值（如页面恢复、源切换）
     // isPlaying/isBuffering/isReady 由 @Track 自动同步到模板
-    this.currentTime = this.controller.currentTime;
-    this.durationTime = this.controller.durationTime;
+    this.currentTime = this.vm.currentTime;
+    this.durationTime = this.vm.durationTime;
   }
 
   private lastLoggedError: string = '';
@@ -107,7 +113,7 @@ export struct VideoPlayer {
   };
 
   private updateKeepScreenOn(): void {
-    const shouldKeepOn = this.controller.isPlaying || this.controller.isBuffering;
+    const shouldKeepOn = this.vm.isPlaying || this.vm.isBuffering;
     this.envService.setKeepScreenOn(shouldKeepOn);
   }
 
@@ -306,15 +312,15 @@ export struct VideoPlayer {
       this.controller.addSeekableRangesListener(this.seekableRangesListener);
 
       // 3. 立即同步 UI 状态
-      this.currentTime = this.controller.currentTime;
-      this.durationTime = this.controller.durationTime;
-      this.hasError = this.controller.errorMsg.length > 0;
-      const pm = this.controller.playerModel;
+      this.currentTime = this.vm.currentTime;
+      this.durationTime = this.vm.durationTime;
+      this.hasError = this.vm.errorMsg.length > 0;
+      const pm = this.vm.playerModel;
       this.hasStreams = pm ? (pm.categorizedStreams.audio.length + pm.categorizedStreams.video.length +
                               pm.categorizedStreams.dashManifest.length + pm.categorizedStreams.hlsManifest.length +
                               pm.categorizedStreams.progressive.length) > 0 : false;
-      this.isCasting = this.controller.isCasting;
-      this.castDeviceName = this.controller.castDeviceName;
+      this.isCasting = this.vm.isCasting;
+      this.castDeviceName = this.vm.castDeviceName;
       this.syncPlaybackStateFromController();
 
       // Re-inject the surface only when the new controller does not have one yet.
@@ -339,13 +345,28 @@ export struct VideoPlayer {
     const isVisible = this.isPageShow && !this.isAppBackground;
 
     if (!isVisible) {
-      // 页面隐藏：停止视频输出，但播放器继续运行（音频继续播放）
-      Logger.info(TAG, 'Page hidden → disable video output');
-      this.controller.setVideoOutputEnabled(false);
+      // 回前台时 isAppBackground 与 playerPageVisible 是两个独立 StorageProp，
+      // 它们在几毫秒内先后变化会让 isVisible 短暂为 false，紧跟着又回 true。
+      // 直接 disable 会让 MPV 释放 GPU/decoder 又立刻重建，触发重新缓冲。
+      // 给 disable 加 200ms 防抖：真隐藏走得通，临时抖动会被随后的 visible 抵消。
+      if (this.disableVideoTimerId >= 0) {
+        clearTimeout(this.disableVideoTimerId);
+      }
+      this.disableVideoTimerId = setTimeout(() => {
+        this.disableVideoTimerId = -1;
+        if (!(this.isPageShow && !this.isAppBackground)) {
+          Logger.info(TAG, 'Page hidden → disable video output (debounced)');
+          this.controller.setVideoOutputEnabled(false);
+        }
+      }, 200);
       return;
     }
 
-    // 页面显示：恢复视频输出
+    // 页面显示：抵消挂起的 disable，恢复视频输出
+    if (this.disableVideoTimerId >= 0) {
+      clearTimeout(this.disableVideoTimerId);
+      this.disableVideoTimerId = -1;
+    }
     Logger.info(TAG, 'Page shown and App foreground → restore video output');
 
     if (session.playerState === PlayerState.RELEASED) {
@@ -370,7 +391,7 @@ export struct VideoPlayer {
     this.controller.setVideoOutputEnabled(true);
 
     this.syncPlaybackStateFromController();
-    if (this.controller.isReady && !this.controller.isPlaying) {
+    if (this.vm.isReady && !this.vm.isPlaying) {
       this.controller.syncPlay();
     }
   }
@@ -379,7 +400,7 @@ export struct VideoPlayer {
     const context: Context = this.getUIContext().getHostContext() as Context;
 
     // 清理错误状态（包括 PlayerPage 设置的 API 层错误和 Controller 设置的播放错误）
-    this.controller.errorMsg = '';
+    this.vm.errorMsg = '';
     this.hasError = false;
     this.isWaitingForDualBuffer = false;
     this.curSource.error = undefined;
@@ -393,8 +414,8 @@ export struct VideoPlayer {
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
 
     // 同步投屏状态
-    this.isCasting = this.controller.isCasting;
-    this.castDeviceName = this.controller.castDeviceName;
+    this.isCasting = this.vm.isCasting;
+    this.castDeviceName = this.vm.castDeviceName;
 
     // 初始化流状态
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
@@ -421,7 +442,7 @@ export struct VideoPlayer {
       () => { /* screen off — globally disabled */ },
       () => {
         Logger.info(TAG, 'Screen on → restore playback');
-        if (this.controller.isReady && !this.controller.isPlaying) {
+        if (this.vm.isReady && !this.vm.isPlaying) {
           this.controller.syncPlay();
         }
       }
@@ -433,7 +454,7 @@ export struct VideoPlayer {
   private drawCacheRanges(): void {
     const ctx = this.cacheCanvasCtx;
     const duration = this.durationTime;
-    const ranges = this.controller.seekableRanges;
+    const ranges = this.vm.seekableRanges;
     const w = ctx.width;
     const h = ctx.height;
     ctx.clearRect(0, 0, w, h);
@@ -539,17 +560,17 @@ export struct VideoPlayer {
     this.controller.setCurIndex(this.curIndex);
     if (this.curIndex !== this.index) {
       this.controller.syncPause();
-    } else if (this.controller.isReady && this.isPageShow) {
+    } else if (this.vm.isReady && this.isPageShow) {
       this.controller.syncPlay();
     }
   }
 
   private togglePlayback() {
-    if (!this.controller.isReady || !this.hasStreams) {
-      Logger.warn(TAG, `togglePlayback ignored: isReady=${this.controller.isReady}, hasStreams=${this.hasStreams}`);
+    if (!this.vm.isReady || !this.hasStreams) {
+      Logger.warn(TAG, `togglePlayback ignored: isReady=${this.vm.isReady}, hasStreams=${this.hasStreams}`);
       return;
     }
-    if (this.controller.isPlaying) {
+    if (this.vm.isPlaying) {
       this.controller.syncPause();
     } else {
       this.controller.syncPlay();
@@ -599,7 +620,7 @@ export struct VideoPlayer {
         .zIndex(CommonConstants.Z_INDEX_BASE)
 
       // 加载中/缓冲提示层
-      if (this.controller.isBuffering) {
+      if (this.vm.isBuffering) {
         Column() {
           LoadingProgress()
             .width(48)
@@ -626,7 +647,7 @@ export struct VideoPlayer {
             .fontWeight(FontWeight.Bold)
             .textAlign(TextAlign.Center)
 
-          Text(this.getErrorDisplay(this.curSource.error || this.controller.errorMsg))
+          Text(this.getErrorDisplay(this.curSource.error || this.vm.errorMsg))
             .fontColor('#CCFFFFFF')
             .fontSize(13)
             .textAlign(TextAlign.Center)
@@ -649,7 +670,7 @@ export struct VideoPlayer {
               } else {
                 // Fallback: 直接复用旧流重试（仅适用于 URL 不过期的场景）
                 this.curSource.error = undefined;
-                this.controller.errorMsg = '';
+                this.vm.errorMsg = '';
                 this.controller.updateVideoSource(this.curSource);
               }
             })
@@ -662,9 +683,9 @@ export struct VideoPlayer {
       }
 
       // 字幕显示层
-      if (this.controller.subtitleVisible && this.controller.subtitleText.length > 0) {
+      if (this.vm.subtitleVisible && this.vm.subtitleText.length > 0) {
         Column() {
-          Text(this.controller.subtitleText)
+          Text(this.vm.subtitleText)
             .fontColor(Color.White)
             .fontSize(this.isFullLandscapeScreen ? 18 : 14)
             .textAlign(TextAlign.Center)
@@ -927,7 +948,7 @@ export struct VideoPlayer {
         }
 
         // 播放速度
-        Text(this.controller.playbackSpeed + 'x')
+        Text(this.vm.playbackSpeed + 'x')
           .fontSize(16)
           .fontColor(Color.White)
           .fontWeight(FontWeight.Medium)
@@ -959,10 +980,10 @@ export struct VideoPlayer {
   PlayControl() {
     Row({ space: 8 }) {
       // 播放/暂停按鈕：正在播放或缓冲中时显示暂停图标，其他状态显示播放图标
-      SymbolGlyph(this.controller.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
+      SymbolGlyph(this.vm.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
         .fontSize(24).width(24).height(24)
         .fontColor([Color.White])
-        .opacity(this.controller.isReady && this.hasStreams ? 1 : 0.4)
+        .opacity(this.vm.isReady && this.hasStreams ? 1 : 0.4)
         .onClick(() => this.togglePlayback())
 
       Text(secondToTime(Math.floor(
@@ -1010,7 +1031,7 @@ export struct VideoPlayer {
               style: this.sliderStyle
             })
             .width('100%').trackColor(Color.Transparent).selectedColor(Color.White)
-            .trackThickness(this.trackThicknessSize).enabled(!!(this.controller.isReady && this.hasStreams))
+            .trackThickness(this.trackThicknessSize).enabled(!!(this.vm.isReady && this.hasStreams))
             .onChange((value: number, mode: SliderChangeMode) => this.sliderOnchange(value, mode))
         }.layoutWeight(1)
       }
@@ -1078,6 +1099,10 @@ export struct VideoPlayer {
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
+    if (this.disableVideoTimerId >= 0) {
+      clearTimeout(this.disableVideoTimerId);
+      this.disableVideoTimerId = -1;
+    }
     this.clearHideTimer();
     clearTimeout(this.volHideTimerId);
     clearTimeout(this.brightnessHideTimerId);

@@ -115,13 +115,13 @@ export class PlayerStateMachine {
   private getAllowedTransitions(from: PlayerState): PlayerState[] {
     switch (from) {
       case PlayerState.IDLE:           return [PlayerState.INITIALIZING, PlayerState.RELEASED];
-      case PlayerState.INITIALIZING:   return [PlayerState.LOADING, PlayerState.IDLE, PlayerState.ERROR, PlayerState.RELEASED];
+      case PlayerState.INITIALIZING:   return [PlayerState.LOADING, PlayerState.READY, PlayerState.IDLE, PlayerState.ERROR, PlayerState.RELEASED];
       case PlayerState.LOADING:        return [PlayerState.READY, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.READY:          return [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.PLAYING:        return [PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.PIP_ENTERING, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.PAUSED:         return [PlayerState.PLAYING, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED, PlayerState.PIP_ENTERING];
-      case PlayerState.BUFFERING:      return [PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.ERROR, PlayerState.RELEASED];
-      case PlayerState.COMPLETED:      return [PlayerState.PLAYING, PlayerState.IDLE, PlayerState.RELEASED];
+      case PlayerState.READY:          return [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.IDLE, PlayerState.RELEASED];
+      case PlayerState.PLAYING:        return [PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.LOADING, PlayerState.PIP_ENTERING, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED];
+      case PlayerState.PAUSED:         return [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.BUFFERING, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED, PlayerState.PIP_ENTERING];
+      case PlayerState.BUFFERING:      return [PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.LOADING, PlayerState.COMPLETED, PlayerState.ERROR, PlayerState.RELEASED];
+      case PlayerState.COMPLETED:      return [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.IDLE, PlayerState.RELEASED];
       case PlayerState.PIP_ENTERING:   return [PlayerState.PIP_ACTIVE, PlayerState.PLAYING, PlayerState.ERROR, PlayerState.RELEASED];
       case PlayerState.PIP_ACTIVE:     return [PlayerState.PIP_RESTORING, PlayerState.PAUSED, PlayerState.IDLE, PlayerState.RELEASED, PlayerState.ERROR];
       case PlayerState.PIP_RESTORING:  return [PlayerState.PLAYING, PlayerState.PIP_ACTIVE, PlayerState.ERROR, PlayerState.RELEASED];

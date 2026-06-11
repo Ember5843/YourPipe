@@ -188,7 +188,7 @@ export class PlayerSession {
 
     const videoId = video.videoId || YOUTUBE_VIDEO_ID;
 
-    if (this._currentVideo?.videoId === video.videoId && this._controller.isReady) {
+    if (this._currentVideo?.videoId === video.videoId && this._controller.vm.isReady) {
       logger.info(`${TAG} play() skipped: same video ${videoId} already ready`);
       return this._defaultSource;
     }
@@ -345,8 +345,8 @@ export class PlayerSession {
   private saveWatchHistory(): void {
     if (!this._watchVideoId) return;
     try {
-      const progressSec = this._controller.currentTime;
-      const durationSec = this._controller.durationTime;
+      const progressSec = this._controller.vm.currentTime;
+      const durationSec = this._controller.vm.durationTime;
       WatchHistoryStore.record(
         this._watchVideoId,
         this._currentVideo?.title || '',

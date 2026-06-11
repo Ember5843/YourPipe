@@ -9,9 +9,13 @@ import { PlaybackEngine, PlaybackState } from '../engine/PlaybackEngine';
 import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
 import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
+import { BackgroundTaskManager } from '../common/BackgroundTaskManager';
+import { PlaybackPreferences } from '../common/PlaybackPreferences';
+import { common } from '@kit.AbilityKit';
 import { PlayerStateRelay, ProgressSubscriber } from '../state/PlayerStateRelay';
 import { PlayerStateMachine, StateChangeListener } from '../state/PlayerStateMachine';
 import { PlayerState } from '../state/PlayerState';
+import { PlayerUiViewModel } from '../state/PlayerUiViewModel';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 
@@ -30,26 +34,9 @@ const TAG: string = '[PlayerLog][AvPlayerController]';
 
 @Observed
 export class AvPlayerController {
-  @Track surfaceID: string = '';
-  @Track isPlaying: boolean = false;
-  @Track isReady: boolean = false;
-  @Track isBuffering: boolean = false;
-  @Track isSeeking: boolean = false;
-  @Track isEnded: boolean = false;
-  @Track currentTime: number = 0;
-  @Track duration: number = 0;
-  @Track durationTime: number = 0;
-  @Track errorMsg: string = '';
-  @Track cachedPercent: number = 0;
-  @Track seekableRanges: number[][] = [];
-  @Track playbackSpeed: number = 1.0;
-  @Track public playerModel: PlayerModel = new PlayerModel();
-  @Track subtitleTracks: SubtitleTrackInfo[] = [];
-  @Track currentSubtitleUrl: string = '';
-  @Track subtitleVisible: boolean = false;
-  @Track subtitleText: string = '';
-  @Track isCasting: boolean = false;
-  @Track castDeviceName: string = '';
+  @Track public vm: PlayerUiViewModel = new PlayerUiViewModel();
+  /** Surface 句柄；由 UI 在 XComponent.onLoad 写入，非响应式状态。 */
+  public surfaceID: string = '';
   public onCastStateChange: ((isCasting: boolean, deviceName: string) => void) | undefined = undefined;
   public onNextCommand: (() => void) | undefined = undefined;
   public onPreviousCommand: (() => void) | undefined = undefined;
@@ -60,6 +47,8 @@ export class AvPlayerController {
   private avSessionManager: AvSessionManager = AvSessionManager.getInstance();
   private stateMachine: PlayerStateMachine = new PlayerStateMachine();
   private stateRelay: PlayerStateRelay = new PlayerStateRelay();
+  private backgroundTaskListener: StateChangeListener | null = null;
+  private backgroundTaskActive: boolean = false;
 
   private errorListeners: ((errorMsg: string) => void)[] = [];
   private waitingForBufferListeners: ((isWaiting: boolean) => void)[] = [];
@@ -67,8 +56,8 @@ export class AvPlayerController {
 
   private currentLocalMediaSessionId: string = '';
   private pendingStartFromSec: number = 0;
-  private lastUpdateTimestamp: number = 0;
-  private lastUpdateVideoId: string = '';
+  /** 上一次 updateVideoSource 处理过的 source 引用，用于幂等去重。 */
+  private lastUpdatedSourceRef: VideoData | null = null;
 
   // Error recovery state
   private errorRetryCount: number = 0;
@@ -113,7 +102,7 @@ export class AvPlayerController {
   constructor(curSource: VideoData) {
     this.curSource = curSource;
     if (curSource.streams) {
-      this.playerModel.classifyStreams(curSource.streams);
+      this.vm.playerModel.classifyStreams(curSource.streams);
     }
   }
 
@@ -140,12 +129,12 @@ export class AvPlayerController {
   public addSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners.push(listener); }
   public removeSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners = this.seekableRangesListeners.filter(l => l !== listener); }
 
-  public getStreamCategories(): StreamCategories { return this.playerModel.getStreamCategories(); }
-  public getCurrentStreams(): CurrentStreams { return this.playerModel.getCurrentStreams(); }
-  public updateVideoStream(stream: StreamInfo): void { this.playerModel.updateVideoStream(stream); }
-  public updateAudioStream(stream: StreamInfo | undefined): void { this.playerModel.updateAudioStream(stream); }
+  public getStreamCategories(): StreamCategories { return this.vm.playerModel.getStreamCategories(); }
+  public getCurrentStreams(): CurrentStreams { return this.vm.playerModel.getCurrentStreams(); }
+  public updateVideoStream(stream: StreamInfo): void { this.vm.playerModel.updateVideoStream(stream); }
+  public updateAudioStream(stream: StreamInfo | undefined): void { this.vm.playerModel.updateAudioStream(stream); }
   public setCurIndex(curIndex: number): void { this.curIndex = curIndex; }
-  public setIsPlaying(isPlaying: boolean): void { this.isPlaying = isPlaying; }
+  public setIsPlaying(isPlaying: boolean): void { this.vm.isPlaying = isPlaying; }
 
   public setRefreshHandler(handler: (videoId: string, resumePos: number) => Promise<VideoData | null>): void {
     this.onRequestRefreshStreams = handler;
@@ -172,6 +161,9 @@ export class AvPlayerController {
     this.stateRelay.setStateMachine(this.stateMachine);
     this.stateRelay.setAvSession(this.avSessionManager);
 
+    // 注册后台任务监听器：进入活跃播放状态启动 ContinuousTask，回到 IDLE/RELEASED 时停止。
+    this.attachBackgroundTaskListener();
+
     await this.avSessionManager.init();
     this.avSessionManager.onPlayCommand = () => {
       this.syncPlay();
@@ -186,17 +178,17 @@ export class AvPlayerController {
     };
     this.avSessionManager.onFastForwardCommand = (skipIntervalSec?: number) => {
       const skip = skipIntervalSec ?? 15;
-      const newTime = Math.min(this.durationTime || Infinity, this.currentTime + skip);
+      const newTime = Math.min(this.vm.durationTime || Infinity, this.vm.currentTime + skip);
       this.playbackEngine.seek(newTime, false);
-      if (!this.isPlaying) {
+      if (!this.vm.isPlaying) {
         this.playbackEngine.play();
       }
     };
     this.avSessionManager.onRewindCommand = (skipIntervalSec?: number) => {
       const skip = skipIntervalSec ?? 15;
-      const newTime = Math.max(0, this.currentTime - skip);
+      const newTime = Math.max(0, this.vm.currentTime - skip);
       this.playbackEngine.seek(newTime, false);
-      if (!this.isPlaying) {
+      if (!this.vm.isPlaying) {
         this.playbackEngine.play();
       }
     };
@@ -211,17 +203,16 @@ export class AvPlayerController {
       this.refreshPlaybackState();
     };
     this.avSessionManager.onCastStateChange = (isCasting: boolean, deviceName: string) => {
-      this.isCasting = isCasting;
-      this.castDeviceName = deviceName;
+      this.vm.isCasting = isCasting;
+      this.vm.castDeviceName = deviceName;
       this.onCastStateChange?.(isCasting, deviceName);
     };
 
     const ok = await this.playbackEngine.initialize({});
     if (ok) {
-      this.stateMachine.forceTransition(PlayerState.INITIALIZING);
       this.playbackEngine.setStateCallback((state: PlaybackState) => this.onPlaybackStateChange(state));
       this.playbackEngine.setSubtitleCallback((text: string, _startTime: number, _duration: number) => {
-        this.subtitleText = text;
+        this.vm.subtitleText = text;
       });
       if (this.surfaceID.length > 0) {
         this.playbackEngine.attachSurface(this.surfaceID);
@@ -244,33 +235,33 @@ export class AvPlayerController {
       return;
     }
 
-    const now = Date.now();
-    const newVideoId = newSource.videoId || '';
-    if (newVideoId && newVideoId === this.lastUpdateVideoId && now - this.lastUpdateTimestamp < 500) {
-      Logger.warn(TAG, `updateVideoSource ignored duplicate call videoId=${newVideoId}`);
+    // 幂等：PlayerSession 与 AVPlayer.onSourceChange 会先后推同一个 source 引用，
+    // 如果 controller 第二次仍跑完整 load 流程会让 MPV 重新建立 timeline / decoder，
+    // 直播场景下还会因为 length=0 的 EDL 被 MPV 立刻判 EOF 触发自动 skip。
+    if (this.lastUpdatedSourceRef === newSource) {
+      Logger.debug(TAG, `updateVideoSource ignored: same source reference videoId=${newSource.videoId || 'N/A'}`);
       return;
     }
-    this.lastUpdateTimestamp = now;
-    this.lastUpdateVideoId = newVideoId;
+    this.lastUpdatedSourceRef = newSource;
 
     this.resetPlaybackState();
     this.destroyCurrentLocalSession();
     this.curSource = newSource;
     this.curIndex = newSource.index;
-    this.subtitleTracks = newSource.subtitleTracks || [];
+    this.vm.subtitleTracks = newSource.subtitleTracks || [];
     // 优先从 newSource 的流信息中恢复 duration，避免后续 resolveDurationMs 取到 0
     if (newSource.streams && newSource.streams.length > 0) {
       const ms = newSource.streams[0].approxDurationMs || 0;
       if (ms > 0) {
-        this.durationTime = ms / 1000;
+        this.vm.durationTime = ms / 1000;
       }
     }
 
     Logger.info(TAG, `updateVideoSource: videoId=${newSource.videoId || 'N/A'} streams=${newSource.streams?.length || 0} isLive=${newSource.isLive} subtitles=${newSource.subtitleTracks?.length || 0}`);
 
-    const uiConfig = AppStorage.get('uiConfig') as Record<string, string> | undefined;
-    const searchLanguage = uiConfig?.searchLanguage || 'en-GB';
-    this.playerModel.classifyStreams(newSource.streams, searchLanguage);
+    const prefs = PlaybackPreferences.snapshot();
+    const searchLanguage = prefs.searchLanguage;
+    this.vm.playerModel.classifyStreams(newSource.streams, searchLanguage);
 
     if (!this.selectInitialStreams(newSource.isLive === true)) {
       Logger.warn(TAG, `selectInitialStreams failed: no supported stream found`);
@@ -281,7 +272,11 @@ export class AvPlayerController {
     await this.initPlaybackEngine();
     if (this.stateMachine.isOneOf(PlayerState.RELEASED, PlayerState.IDLE)) return;
 
-    this.stateMachine.forceTransition(PlayerState.LOADING);
+    if (!this.stateMachine.transition(PlayerState.LOADING)) {
+      // 极端情况：转换被拒绝（例如 ERROR 之外的非法源状态），强制对齐到 LOADING
+      Logger.warn(TAG, `LOADING transition rejected from ${this.stateMachine.currentState}, forcing`);
+      this.stateMachine.forceTransition(PlayerState.LOADING);
+    }
 
     // Live streams: use HLS manifest URL directly, skip local proxy
     if (newSource.isLive && newSource.hlsUrl) {
@@ -292,7 +287,7 @@ export class AvPlayerController {
         return;
       }
       this.updateAvSessionMetadata();
-      this.isBuffering = true;
+      this.vm.isBuffering = true;
       this.playbackEngine.load(playbackUrl, 0);
       if (newSource.play || newSource.auto) {
         this.playbackEngine.play();
@@ -300,7 +295,7 @@ export class AvPlayerController {
       return;
     }
 
-    const current = this.playerModel.getCurrentStreams();
+    const current = this.vm.playerModel.getCurrentStreams();
     const playbackUrl = await this.resolveManifestPlaybackUrl(
       await this.createPlaybackUrl(current.video, current.audio),
       newSource.isLive === true
@@ -311,12 +306,12 @@ export class AvPlayerController {
     }
 
     this.updateAvSessionMetadata();
-    this.isBuffering = true;
+    this.vm.isBuffering = true;
 
     const autoSubtitle = this.pickSubtitleForLanguage(searchLanguage);
     if (autoSubtitle) {
-      this.currentSubtitleUrl = autoSubtitle.url;
-      this.subtitleVisible = true;
+      this.vm.currentSubtitleUrl = autoSubtitle.url;
+      this.vm.subtitleVisible = true;
       this.playbackEngine.preloadSubtitleTracks([autoSubtitle.url]);
     } else {
       this.playbackEngine.preloadSubtitleTracks([]);
@@ -330,12 +325,12 @@ export class AvPlayerController {
 
   public async switchQuality(videoStream: StreamInfo, audioStream?: StreamInfo): Promise<void> {
     if (!this.isActive() || !videoStream) return;
-    const wasPlaying = this.isPlaying;
-    const resumePos = this.currentTime;
+    const wasPlaying = this.vm.isPlaying;
+    const resumePos = this.vm.currentTime;
     const effectiveAudio = this.isSeparatedDash(videoStream, audioStream) ? this.ensureCompatibleAudio(videoStream, audioStream) : undefined;
 
-    this.playerModel.updateVideoStream(videoStream);
-    this.playerModel.updateAudioStream(effectiveAudio);
+    this.vm.playerModel.updateVideoStream(videoStream);
+    this.vm.playerModel.updateAudioStream(effectiveAudio);
 
     const playbackUrl = await this.createPlaybackUrl(videoStream, effectiveAudio);
     if (!playbackUrl) {
@@ -352,7 +347,7 @@ export class AvPlayerController {
 
   public setPlaybackSpeed(speed: number): void {
     if (!this.isActive() || speed <= 0) return;
-    this.playbackSpeed = speed;
+    this.vm.playbackSpeed = speed;
     this.playbackEngine.setPlaybackSpeed(speed);
   }
 
@@ -370,9 +365,9 @@ export class AvPlayerController {
 
   public syncPlay(): void {
     if (!this.isActive()) return;
-    if (this.isEnded) {
+    if (this.vm.isEnded) {
       this.playbackEngine.seek(0, true);
-      this.isEnded = false;
+      this.vm.isEnded = false;
     }
     this.playbackEngine.play();
   }
@@ -411,31 +406,35 @@ export class AvPlayerController {
 
   public releaseVideo(_index: number): void {
     if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
-    this.stateMachine.forceTransition(PlayerState.RELEASED);
+    if (!this.stateMachine.transition(PlayerState.RELEASED)) {
+      this.stateMachine.forceTransition(PlayerState.RELEASED);
+    }
     Logger.debug(TAG, 'releaseVideo: destroy playback engine and LocalMediaProxy session');
     this.playbackEngine.destroy();
     this.destroyCurrentLocalSession();
     this.avSessionManager.destroy();
+    this.detachBackgroundTaskListener();
     this.resetPlaybackState();
+    this.lastUpdatedSourceRef = null;
     this.errorListeners = [];
     this.waitingForBufferListeners = [];
     this.seekableRangesListeners = [];
-    this.playerModel = new PlayerModel();
+    this.vm.playerModel = new PlayerModel();
   }
 
   public toggleSubtitle(): void {
-    this.subtitleVisible = !this.subtitleVisible;
-    this.playbackEngine.setSubtitleVisible(this.subtitleVisible);
-    if (!this.subtitleVisible) {
-      this.subtitleText = '';
+    this.vm.subtitleVisible = !this.vm.subtitleVisible;
+    this.playbackEngine.setSubtitleVisible(this.vm.subtitleVisible);
+    if (!this.vm.subtitleVisible) {
+      this.vm.subtitleText = '';
     }
   }
 
   public setSubtitleVisible(visible: boolean): void {
-    this.subtitleVisible = visible;
+    this.vm.subtitleVisible = visible;
     this.playbackEngine.setSubtitleVisible(visible);
     if (!visible) {
-      this.subtitleText = '';
+      this.vm.subtitleText = '';
     }
   }
 
@@ -444,12 +443,12 @@ export class AvPlayerController {
   }
 
   private selectInitialStreams(isLive: boolean): boolean {
-    const categories = this.playerModel.categorizedStreams;
+    const categories = this.vm.playerModel.categorizedStreams;
     if (isLive) {
       const manifest = this.selectManifestByCap(categories.hlsManifest.length > 0 ? categories.hlsManifest : categories.dashManifest, true);
       if (manifest) {
-        this.playerModel.updateVideoStream(manifest);
-        this.playerModel.updateAudioStream(undefined);
+        this.vm.playerModel.updateVideoStream(manifest);
+        this.vm.playerModel.updateAudioStream(undefined);
         Logger.info(TAG, `Selected live manifest: ${this.describePlaybackUrl(manifest.url)}`);
         return true;
       }
@@ -459,8 +458,8 @@ export class AvPlayerController {
       const video = this.selectBestVideo(categories.video, false);
       const audio = video ? this.selectBestCompatibleAudio(video, categories.audio) : undefined;
       if (video && audio) {
-        this.playerModel.updateVideoStream(video);
-        this.playerModel.updateAudioStream(audio);
+        this.vm.playerModel.updateVideoStream(video);
+        this.vm.playerModel.updateAudioStream(audio);
         Logger.info(TAG, `Selected DASH separated: video=${video.quality} [${video.itag}], audio=${audio.quality} [${audio.itag}]`);
         return true;
       }
@@ -468,16 +467,16 @@ export class AvPlayerController {
 
     if (categories.progressive.length > 0) {
       const progressive = this.selectBestProgressive(categories.progressive);
-      this.playerModel.updateVideoStream(progressive);
-      this.playerModel.updateAudioStream(undefined);
+      this.vm.playerModel.updateVideoStream(progressive);
+      this.vm.playerModel.updateAudioStream(undefined);
       Logger.info(TAG, `Selected progressive: ${progressive.quality} [${progressive.itag}]`);
       return true;
     }
 
     const manifest = this.selectManifestByCap(categories.hlsManifest.length > 0 ? categories.hlsManifest : categories.dashManifest, false);
     if (manifest) {
-      this.playerModel.updateVideoStream(manifest);
-      this.playerModel.updateAudioStream(undefined);
+      this.vm.playerModel.updateVideoStream(manifest);
+      this.vm.playerModel.updateAudioStream(undefined);
       Logger.info(TAG, `Selected fallback manifest: ${this.describePlaybackUrl(manifest.url)}`);
       return true;
     }
@@ -486,9 +485,9 @@ export class AvPlayerController {
   }
 
   private selectBestVideo(streams: StreamInfo[], live: boolean): StreamInfo | undefined {
-    const pbCfg = AppStorage.get('playbackConfig') as Record<string, Object> | undefined;
-    const targetQuality = (live ? pbCfg?.mobileQuality : pbCfg?.defaultQuality) as string || 'best';
-    const showHighRes = (pbCfg?.showHighResolutions as boolean) ?? false;
+    const prefs = PlaybackPreferences.snapshot();
+    const targetQuality = live ? prefs.mobileQuality : prefs.defaultQuality;
+    const showHighRes = prefs.showHighResolutions;
     const maxHeight = this.resolveMaxHeight(targetQuality, showHighRes);
     const candidates = streams.filter(s => (s.height || this.heightFromQuality(s.quality)) <= maxHeight);
     const usable = candidates.length > 0 ? candidates : streams;
@@ -572,6 +571,14 @@ export class AvPlayerController {
     const durationMs = isDual ? this.resolveDurationMs(videoStream, audioStream) : 0;
     Logger.info(TAG, `createPlaybackUrl: type=${isDual ? 'dual-edl' : 'single'} video=[itag=${videoStream.itag} ${videoStream.quality} ${videoStream.codecs}]${isDual ? ` audio=[itag=${audioStream!.itag} ${audioStream!.codecs}]` : ''} durationMs=${durationMs}`);
 
+    // 双流 EDL 必须有正 duration，否则 MPV timeline 长度为 0 会立刻判 EOF，
+    // 上层会把这条当作"播放结束"自动 skip 到下一个视频。
+    // 直播流应该走 hlsUrl 分支，到这里说明 isLive/hlsUrl 没设上来，明确报错让上层处理。
+    if (isDual && durationMs <= 0) {
+      Logger.error(TAG, `createPlaybackUrl: dual stream with unknown duration (live without manifest?), refusing to build EDL`);
+      return '';
+    }
+
     const sessionId = await (isDual
       ? LocalMediaProxy.createYoutubeDualUrlSession(videoStream, audioStream!, durationMs)
       : LocalMediaProxy.createSingleUrlSession(videoStream.url, videoStream));
@@ -632,7 +639,7 @@ export class AvPlayerController {
         ? audio.approxDurationMs
         : 0;
     if (fromStream > 0) return fromStream;
-    const fromMeta = Math.round((this.durationTime || 0) * 1000);
+    const fromMeta = Math.round((this.vm.durationTime || 0) * 1000);
     if (fromMeta > 0) return fromMeta;
     // 最后 fallback：从流的 contentLength / bitrate 估算（秒转毫秒）
     const estimateFromBitrate = (s: StreamInfo): number => {
@@ -648,13 +655,13 @@ export class AvPlayerController {
   }
 
   private pickSubtitleForLanguage(language: string): SubtitleTrackInfo | null {
-    if (this.subtitleTracks.length === 0) return null;
+    if (this.vm.subtitleTracks.length === 0) return null;
     const lang = language.split('-')[0].toLowerCase();
-    const exact = this.subtitleTracks.find(t => t.languageCode.toLowerCase() === language.toLowerCase());
+    const exact = this.vm.subtitleTracks.find(t => t.languageCode.toLowerCase() === language.toLowerCase());
     if (exact) return exact;
-    const prefix = this.subtitleTracks.find(t => t.languageCode.split('-')[0].toLowerCase() === lang);
+    const prefix = this.vm.subtitleTracks.find(t => t.languageCode.split('-')[0].toLowerCase() === lang);
     if (prefix) return prefix;
-    const manual = this.subtitleTracks.find(t => !t.isAutoGenerated && t.languageCode.split('-')[0].toLowerCase() === lang);
+    const manual = this.vm.subtitleTracks.find(t => !t.isAutoGenerated && t.languageCode.split('-')[0].toLowerCase() === lang);
     if (manual) return manual;
     return null;
   }
@@ -682,9 +689,8 @@ export class AvPlayerController {
       if (variants.length === 0) {
         return url;
       }
-      const pbCfg = AppStorage.get('playbackConfig') as Record<string, Object> | undefined;
-      const maxHeight = this.resolveMaxHeight((pbCfg?.mobileQuality as string) || '480p',
-        (pbCfg?.showHighResolutions as boolean) ?? false);
+      const prefs = PlaybackPreferences.snapshot();
+      const maxHeight = this.resolveMaxHeight(prefs.mobileQuality || '480p', prefs.showHighResolutions);
       const selected = variants
         .filter(v => (v.height || 0) <= maxHeight)
         .sort((a: HlsVariant, b: HlsVariant): number => (b.height || 0) - (a.height || 0) ||
@@ -767,7 +773,7 @@ export class AvPlayerController {
 
   private isSeparatedDash(videoStream: StreamInfo, audioStream?: StreamInfo): boolean {
     if (!audioStream || !audioStream.url) return false;
-    const categories = this.playerModel.categorizedStreams;
+    const categories = this.vm.playerModel.categorizedStreams;
     if (categories.video.length === 0 || categories.audio.length === 0) return false;
     const kind = videoStream.kind?.toLowerCase() || '';
     const delivery = videoStream.deliveryMethod?.toUpperCase() || '';
@@ -784,7 +790,7 @@ export class AvPlayerController {
     if (requestedAudio && this.isAudioCompatibleWithVideo(videoStream, requestedAudio)) {
       return requestedAudio;
     }
-    return this.selectBestCompatibleAudio(videoStream, this.playerModel.categorizedStreams.audio) || requestedAudio;
+    return this.selectBestCompatibleAudio(videoStream, this.vm.playerModel.categorizedStreams.audio) || requestedAudio;
   }
 
   private compatibleAudioCandidates(videoStream: StreamInfo, audioStreams: StreamInfo[]): StreamInfo[] {
@@ -832,32 +838,33 @@ export class AvPlayerController {
   private onPlaybackStateChange(state: PlaybackState): void {
     if (!this.isActive()) return;
 
-    if (state.isPlaying && !this.isPlaying) {
+    if (state.isPlaying && !this.vm.isPlaying) {
       this.errorRetryCount = 0;
     }
 
     if (state.currentTime > 0) {
       this.lastKnownGoodPosition = state.currentTime;
-    } else if (this.currentTime > 0 && state.errorMsg) {
-      this.lastKnownGoodPosition = this.currentTime;
+    } else if (this.vm.currentTime > 0 && state.errorMsg) {
+      this.lastKnownGoodPosition = this.vm.currentTime;
     }
 
-    const prevDuration = this.durationTime;
+    const prevDuration = this.vm.durationTime;
 
-    // 更新 @Track 字段（ArkTS 自动推送到绑定的 UI）
-    this.isPlaying = state.isPlaying;
-    this.isBuffering = state.isBuffering;
-    this.isReady = state.isReady;
-    this.isSeeking = state.isSeeking;
-    this.isEnded = state.isEnded;
-    this.currentTime = state.currentTime;
-    this.duration = state.duration;
-    this.durationTime = state.duration;
-    this.playbackSpeed = state.playbackSpeed;
-    this.cachedPercent = state.bufferingPercent;
-    this.errorMsg = state.errorMsg;
+    // 更新 ViewModel 字段（ArkTS 自动推送到绑定的 UI）
+    this.vm.isPlaying = state.isPlaying;
+    this.vm.isBuffering = state.isBuffering;
+    this.vm.isReady = state.isReady;
+    this.vm.isSeeking = state.isSeeking;
+    this.vm.isEnded = state.isEnded;
+    this.vm.currentTime = state.currentTime;
+    this.vm.duration = state.duration;
+    this.vm.durationTime = state.duration;
+    this.vm.playbackSpeed = state.playbackSpeed;
+    this.vm.cachedPercent = state.bufferingPercent;
+    const prevErrorMsg = this.vm.errorMsg;
+    this.vm.errorMsg = state.errorMsg;
 
-    if (prevDuration === 0 && this.durationTime > 0) {
+    if (prevDuration === 0 && this.vm.durationTime > 0) {
       this.updateAvSessionMetadata();
     }
 
@@ -865,9 +872,9 @@ export class AvPlayerController {
     this.stateRelay.onStateChange(state);
 
     // 错误监听（手动，需要特殊处理）
-    const errorChanged = this.errorMsg !== state.errorMsg;
+    const errorChanged = prevErrorMsg !== state.errorMsg;
     if (errorChanged && state.errorMsg) {
-      this.errorListeners.forEach(l => l(this.errorMsg));
+      this.errorListeners.forEach(l => l(this.vm.errorMsg));
       if (!this.isRecovering) {
         this.handlePlaybackError(state);
       }
@@ -875,21 +882,7 @@ export class AvPlayerController {
   }
 
   private resetPlaybackState(): void {
-    this.isPlaying = false;
-    this.isBuffering = false;
-    this.isReady = false;
-    this.isSeeking = false;
-    this.isEnded = false;
-    this.currentTime = 0;
-    this.duration = 0;
-    this.durationTime = 0;
-    this.errorMsg = '';
-    this.cachedPercent = 0;
-    this.seekableRanges = [];
-    this.playbackSpeed = 1.0;
-    this.currentSubtitleUrl = '';
-    this.subtitleVisible = false;
-    this.subtitleText = '';
+    this.vm.reset();
     this.lastKnownGoodPosition = 0;
     this.waitingForBufferListeners.forEach(l => l(false));
     this.errorListeners.forEach(l => l(''));
@@ -900,7 +893,7 @@ export class AvPlayerController {
     const category = state.errorCategory || 'unknown';
     // 使用 lastKnownGoodPosition 而非 this.currentTime，
     // 因为 error 回调中 player.reset() 会将 currentTime 清零
-    const resumePos = this.lastKnownGoodPosition > 0 ? this.lastKnownGoodPosition : this.currentTime;
+    const resumePos = this.lastKnownGoodPosition > 0 ? this.lastKnownGoodPosition : this.vm.currentTime;
 
     Logger.info(TAG, `handlePlaybackError category=${category} retryCount=${this.errorRetryCount} resumePos=${resumePos.toFixed(2)}s`);
 
@@ -924,19 +917,19 @@ export class AvPlayerController {
     }
 
     this.errorRetryCount = 0;
-    this.onErrorNeedsUserAction?.(this.errorMsg);
+    this.onErrorNeedsUserAction?.(this.vm.errorMsg);
   }
 
   private async retryPlayback(resumePos: number): Promise<void> {
     Logger.debug(TAG, `retryPlayback at ${resumePos.toFixed(2)}s`);
-    const current = this.playerModel.getCurrentStreams();
+    const current = this.vm.playerModel.getCurrentStreams();
     const playbackUrl = await this.createPlaybackUrl(current.video, current.audio);
     if (!playbackUrl) {
       this.setError('[PLAYER] RETRY_FAILED');
       return;
     }
     this.playbackEngine.load(playbackUrl, resumePos);
-    if (this.isPlaying) {
+    if (this.vm.isPlaying) {
       this.playbackEngine.play();
     }
   }
@@ -957,19 +950,19 @@ export class AvPlayerController {
       }
       Logger.info(TAG, `Streams refreshed, ${refreshed.streams.length} streams available`);
       this.curSource = refreshed;
-      this.playerModel.classifyStreams(refreshed.streams);
+      this.vm.playerModel.classifyStreams(refreshed.streams);
       if (!this.selectInitialStreams(refreshed.isLive === true)) {
         this.setError('[PLAYER] REFRESH_NO_STREAM');
         return;
       }
-      const current = this.playerModel.getCurrentStreams();
+      const current = this.vm.playerModel.getCurrentStreams();
       const playbackUrl = await this.createPlaybackUrl(current.video, current.audio);
       if (!playbackUrl) {
         this.setError('[PLAYER] REFRESH_PROXY_FAILED');
         return;
       }
       this.playbackEngine.load(playbackUrl, resumePos);
-      if (this.isPlaying) {
+      if (this.vm.isPlaying) {
         this.playbackEngine.play();
       }
     } catch (e) {
@@ -979,16 +972,16 @@ export class AvPlayerController {
   }
 
   private async switchToProgressiveFallback(resumePos: number): Promise<void> {
-    const categories = this.playerModel.categorizedStreams;
+    const categories = this.vm.playerModel.categorizedStreams;
     if (categories.progressive.length > 0) {
       const progressive = this.selectBestProgressive(categories.progressive);
-      this.playerModel.updateVideoStream(progressive);
-      this.playerModel.updateAudioStream(undefined);
+      this.vm.playerModel.updateVideoStream(progressive);
+      this.vm.playerModel.updateAudioStream(undefined);
       Logger.info(TAG, `Switched to progressive fallback: ${progressive.quality} [${progressive.itag}]`);
       const playbackUrl = await this.createPlaybackUrl(progressive, undefined);
       if (playbackUrl) {
         this.playbackEngine.load(playbackUrl, resumePos);
-        if (this.isPlaying) {
+        if (this.vm.isPlaying) {
           this.playbackEngine.play();
         }
         return;
@@ -1003,14 +996,14 @@ export class AvPlayerController {
   }
 
   private setError(error: string): void {
-    this.errorMsg = error;
+    this.vm.errorMsg = error;
     this.errorListeners.forEach(l => l(error));
     Logger.error(TAG, error);
   }
 
   private updateAvSessionMetadata(): void {
     const title = this.toPlainText(this.curSource.description) || this.toPlainText(this.curSource.name) || 'YourPipe';
-    this.avSessionManager.setMetadata(title, this.curSource.author || '', this.durationTime, this.curSource.thumbnailUrl);
+    this.avSessionManager.setMetadata(title, this.curSource.author || '', this.vm.durationTime, this.curSource.thumbnailUrl);
   }
 
   private toPlainText(value: ResourceStr): string {
@@ -1022,5 +1015,50 @@ export class AvPlayerController {
     const query = url.indexOf('?');
     const visible = query >= 0 ? url.substring(0, query) : url;
     return visible.length > 160 ? visible.substring(0, 160) + '...' : visible;
+  }
+
+  private attachBackgroundTaskListener(): void {
+    if (this.backgroundTaskListener) return;
+    const listener = new BackgroundTaskStateListener(this);
+    this.backgroundTaskListener = listener;
+    this.stateMachine.addListener(listener);
+  }
+
+  private detachBackgroundTaskListener(): void {
+    if (this.backgroundTaskListener) {
+      this.stateMachine.removeListener(this.backgroundTaskListener);
+      this.backgroundTaskListener = null;
+    }
+    if (this.backgroundTaskActive) {
+      const ctx = AppStorage.get<common.UIAbilityContext>('context');
+      this.backgroundTaskActive = false;
+      if (ctx) BackgroundTaskManager.stopContinuousTask(ctx);
+    }
+  }
+
+  // 由 BackgroundTaskStateListener 调用，集中管理后台任务的开关。
+  public _bgTaskOnStateChange(to: PlayerState): void {
+    const ctx = AppStorage.get<common.UIAbilityContext>('context');
+    if (!ctx) return;
+    const isActive = to === PlayerState.PLAYING || to === PlayerState.PAUSED || to === PlayerState.BUFFERING
+      || to === PlayerState.READY || to === PlayerState.LOADING
+      || to === PlayerState.PIP_ENTERING || to === PlayerState.PIP_ACTIVE || to === PlayerState.PIP_RESTORING;
+    if (isActive && !this.backgroundTaskActive) {
+      this.backgroundTaskActive = true;
+      BackgroundTaskManager.startContinuousTask(ctx);
+    } else if ((to === PlayerState.IDLE || to === PlayerState.RELEASED) && this.backgroundTaskActive) {
+      this.backgroundTaskActive = false;
+      BackgroundTaskManager.stopContinuousTask(ctx);
+    }
+  }
+}
+
+class BackgroundTaskStateListener implements StateChangeListener {
+  private readonly owner: AvPlayerController;
+  constructor(owner: AvPlayerController) {
+    this.owner = owner;
+  }
+  onStateChange(_from: PlayerState, to: PlayerState): void {
+    this.owner._bgTaskOnStateChange(to);
   }
 }
