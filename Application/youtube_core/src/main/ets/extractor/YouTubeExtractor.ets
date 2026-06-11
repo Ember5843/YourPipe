@@ -24,7 +24,6 @@ import { ClientFetchContext, ClientFetchResult } from './clients/ClientTypes';
 import { SafariPlayerClient } from './clients/SafariPlayerClient';
 import { AndroidPlayerClient } from './clients/AndroidPlayerClient';
 import { IosPlayerClient } from './clients/IosPlayerClient';
-import { TvHtml5PlayerClient } from './clients/TvHtml5PlayerClient';
 import { WebEmbeddedPlayerClient } from './clients/WebEmbeddedPlayerClient';
 import { ItagItem, ItagType } from './itag/ItagItem';
 import { MediaFormat, getMediaFormatMimeType, getMediaFormatSuffix } from './itag/MediaFormat';
@@ -1116,18 +1115,9 @@ export class YouTubeExtractor {
       }
     }
 
-    // TvHtml5: always fetched as age-restricted fallback (mirrors PipePipe)
-    try {
-      const tvResult = await TvHtml5PlayerClient.fetch(ctx, this.client);
-      if (tvResult?.playerResponse) {
-        const sd = tvResult.streamingData;
-        logger.info(`[STREAM_DEBUG] TvHtml5: status=${tvResult.playerResponse.playabilityStatus?.status}, formats=${sd?.formats?.length || 0}, adaptive=${sd?.adaptiveFormats?.length || 0}`);
-        result.tv = tvResult.playerResponse;
-        result.tvCpn = tvResult.cpn;
-      }
-    } catch (e) {
-      logger.warn('TvHtml5 fetch error:', e);
-    }
+    // 对齐 PipePipe onFetchPage (1306-1397)：实际只发 web、android-or-safari、next 三个请求。
+    // PipePipe 的 fetchTvHtml5EmbedJsonPlayer / fetchWebJsonPlayer / fetchIosMobileJsonPlayer 都是死代码，
+    // 不在 onFetchPage 调用链上。这里不再额外发起 TvHtml5 请求，减少反爬曝光。
 
     return result;
   }
@@ -2081,18 +2071,20 @@ export class YouTubeExtractor {
   }
 
   private getHlsManifestUrlFromStreamingData(): string {
-    for (const sd of [this.safariStreamingData, this.iosStreamingData]) {
+    // 对齐 PipePipe YoutubeStreamExtractor.getHlsUrl (727)：safari → android → tvHtml5
+    for (const sd of [this.safariStreamingData, this.androidStreamingData, this.tvHtml5StreamingData]) {
       if (sd && sd.hlsManifestUrl) {
-        return sd.hlsManifestUrl;
+        return sd.hlsManifestUrl + '?mpd_version=7';
       }
     }
     return '';
   }
 
   private getDashManifestUrlFromStreamingData(): string {
-    for (const sd of [this.androidStreamingData, this.safariStreamingData, this.tvHtml5StreamingData]) {
+    // 对齐 PipePipe YoutubeStreamExtractor.getDashMpdUrl (708)：safari → android
+    for (const sd of [this.safariStreamingData, this.androidStreamingData]) {
       if (sd && sd.dashManifestUrl) {
-        return sd.dashManifestUrl;
+        return sd.dashManifestUrl + '?mpd_version=7';
       }
     }
     return '';

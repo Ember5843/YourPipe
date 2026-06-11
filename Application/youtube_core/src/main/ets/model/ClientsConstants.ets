@@ -100,7 +100,6 @@ export class ClientsConstants {
   static readonly ANDROID_VR_USER_AGENT: string =
     "com.google.android.apps.youtube.vr.oculus/" + "1.65.10" +
     " (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip";
-  static readonly ANDROID_VR_YOUTUBE_KEY: string = "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w";
 
   // =====================
   // Safari (WEB client with Safari UA) - aligned with PipePipe

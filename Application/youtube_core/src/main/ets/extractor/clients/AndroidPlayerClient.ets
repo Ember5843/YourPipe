@@ -95,9 +95,10 @@ export class AndroidPlayerClient {
     };
 
     const t = randomTParameter();
+    // 对齐 PipePipe YoutubeParsingHelper.getMobilePostResponseAsync (1297-1322):
+    // ANDROID_VR 的认证靠 X-Goog-Api-Format-Version + visitorData + UA，URL 不带 ?key=
     const url = `https://youtubei.googleapis.com/youtubei/v1/player`
-      + `?key=${ClientsConstants.ANDROID_VR_YOUTUBE_KEY}`
-      + `&prettyPrint=false`
+      + `?prettyPrint=false`
       + `&t=${t}`
       + `&id=${ctx.videoId}`;
 
