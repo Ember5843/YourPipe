@@ -1,3 +1,8 @@
+export interface OtfSegmentTimelineEntry {
+  durationMs: number;
+  repeat: number;
+}
+
 export interface StreamResource {
   id: string;
   url: string;
@@ -19,6 +24,9 @@ export interface StreamResource {
   isYoutubePlayback: boolean;
   isOtf: boolean;
   sourceClient: string;
+  otfPrepared: boolean;
+  otfDurationMs: number;
+  otfSegmentTimeline: OtfSegmentTimelineEntry[];
 }
 
 export interface SidxSegment {
@@ -62,7 +70,7 @@ function emptyResource(): StreamResource {
     contentLength: 0, bitrate: 0,
     width: 0, height: 0, fps: 0, approxDurationMs: 0,
     isAudio: false, isYoutubePlayback: false, isOtf: false,
-    sourceClient: '',
+    sourceClient: '', otfPrepared: false, otfDurationMs: 0, otfSegmentTimeline: [],
   };
 }
 

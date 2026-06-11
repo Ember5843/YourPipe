@@ -1,7 +1,6 @@
 import { StreamInfo } from '../model/VideoData';
 import Logger from '../utils/Logger';
 import { localProxyServer } from '../proxy/LocalProxyServer';
-import { MCMediaCache } from '@sj/mediacache';
 
 const TAG: string = '[PlayerLog][LocalMediaProxy]';
 const DEFAULT_USER_AGENT: string = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36';
@@ -42,61 +41,14 @@ interface LocalMediaSessionInput {
   audios?: LocalMediaResource[];
 }
 
-export interface CacheConfig {
-  enabled?: boolean;
-  maxSizeBytes?: number;
-}
-
-export interface CacheStats {
-  enabled: boolean;
-  currentSizeBytes: number;
-  entryCount: number;
-  maxSizeBytes: number;
-  hitCount: number;
-  missCount: number;
-}
-
 export class LocalMediaProxy {
   private static serverReady: boolean = false;
-  private static cacheReady: boolean = false;
 
   private static async ensureServer(): Promise<boolean> {
     if (LocalMediaProxy.serverReady) return true;
     const ok = await localProxyServer.start();
     LocalMediaProxy.serverReady = ok;
     return ok;
-  }
-
-  private static async ensureCache(context: Context): Promise<void> {
-    if (LocalMediaProxy.cacheReady) return;
-    try {
-      await MCMediaCache.prepare(context);
-      LocalMediaProxy.cacheReady = true;
-      Logger.info(TAG, 'MCMediaCache initialized');
-    } catch (e) {
-      Logger.error(TAG, `MCMediaCache init failed: ${e}`);
-    }
-  }
-
-  static applyCacheConfig(diskSizeMB: number, maxAgeHours: number): void {
-    if (!LocalMediaProxy.cacheReady) return;
-    MCMediaCache.cacheConfig.maxDiskSize = diskSizeMB * 1024 * 1024;
-    MCMediaCache.cacheConfig.maxAge = maxAgeHours * 60 * 60 * 1000;
-    Logger.info(TAG, `MCMediaCache config applied: maxDisk=${diskSizeMB}MB, maxAge=${maxAgeHours}h`);
-  }
-
-  static async initCache(context: Context): Promise<void> {
-    await LocalMediaProxy.ensureCache(context);
-  }
-
-  static async proxyUrl(url: string): Promise<string> {
-    if (!LocalMediaProxy.cacheReady || !url) return url;
-    try {
-      return await MCMediaCache.proxy(url);
-    } catch (e) {
-      Logger.warn(TAG, `MCMediaCache.proxy failed, using direct url: ${(e as Error).message}`);
-      return url;
-    }
   }
 
   static async createSingleUrlSession(url: string, metadata?: StreamInfo): Promise<string> {
@@ -165,18 +117,6 @@ export class LocalMediaProxy {
 
   static stopAll(): void {
     localProxyServer.destroyAll();
-  }
-
-  static setCacheConfig(_config: CacheConfig): void {
-    // no-op in ArkTS implementation
-  }
-
-  static getCacheStats(): CacheStats | null {
-    return null;
-  }
-
-  static clearCache(): void {
-    // no-op in ArkTS implementation
   }
 
   private static async createSession(inputJson: string): Promise<string> {

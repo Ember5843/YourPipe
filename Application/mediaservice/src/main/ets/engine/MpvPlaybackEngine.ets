@@ -38,6 +38,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private pendingSubtitleUrls: string[] = [];
   private subtitleLoaded: boolean = false;
   private lastKnownPositionMs: number = 0;
+  private lastTimeEmitMs: number = 0;
 
   async initialize(_config: EngineConfig): Promise<boolean> {
     if (this.initialized && this.controller !== null) {
@@ -50,10 +51,30 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setEventCallback((type: number, value: number) => {
         this.onMpvEvent(ctrl, type, value);
       });
-      ctrl.setProperty('cache', 'no');
-      ctrl.setProperty('demuxer-readahead-secs', '0');
-      ctrl.setProperty('demuxer-max-bytes', '524288');
-      ctrl.setProperty('demuxer-max-back-bytes', '0');
+      // 启用内存缓存（不写磁盘），改善seek性能和网络波动容忍度
+      ctrl.setProperty('cache', 'yes');
+      ctrl.setProperty('cache-secs', '10');
+      ctrl.setProperty('cache-on-disk', 'no');
+
+      // 优化缓冲区配置以避免触发YouTube SABR限速
+      // demuxer-max-bytes 从 50MB 降低到 20MB：
+      //   - 避免MPV一次请求过大范围（RangeProxy已限制单次10MB）
+      //   - 20MB足够缓存约2-4秒的1080p/60fps流（码率5-8Mbps）
+      //   - 配合RangeProxy的10MB chunk限制，MPV最多发起2个并发请求
+      ctrl.setProperty('demuxer-readahead-secs', '8');
+      ctrl.setProperty('demuxer-max-bytes', '20971520'); // 20MB
+      // 回放缓冲降低到5MB，减少seek时的初始请求大小
+      ctrl.setProperty('demuxer-max-back-bytes', '5242880'); // 5MB
+
+      // 精确seek，改善seek精度和用户体验
+      ctrl.setProperty('hr-seek', 'yes');
+      ctrl.setProperty('hr-seek-framedrop', 'no');
+
+      // 流缓冲保持4MB
+      ctrl.setProperty('stream-buffer-size', '4194304');
+
+      // FFmpeg HTTP 读到10MB截断后自动重连续传
+      ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
       this.controller = ctrl;
       this.initialized = true;
       if (this.surfaceId.length > 0) {
@@ -93,6 +114,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.surfaceId = surfaceId;
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
+    Logger.info(TAG, `attachSurface: surfaceId=${surfaceId.substring(0, 24)}`);
     this.bindSurface(ctrl, surfaceId);
   }
 
@@ -143,9 +165,16 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setMedia(this.sourceUrl);
       if (this.surfaceId.length > 0) {
         this.bindSurface(ctrl, this.surfaceId);
+        Logger.info(TAG, `load: surface bound id=${this.surfaceId.substring(0, 24)}`);
+      } else {
+        Logger.warn(TAG, `load: surfaceId is empty, video may not render`);
       }
       this.preparing = true;
-      ctrl.prepare(this.pendingStartMs >= 0 ? this.pendingStartMs : 0);
+      // EDL + delay_open: prepare 的 seek 可能无法传播到 lazy 打开的子 demuxer
+      // 改为 prepare(0) 不 seek，交给 applyReadyActions 统一处理
+      const isEdl = this.sourceUrl.startsWith('edl://');
+      const startMs = this.pendingStartMs >= 0 && !isEdl ? this.pendingStartMs : 0;
+      ctrl.prepare(startMs);
       if (generation !== this.loadGeneration || this.destroyed) {
         return false;
       }
@@ -337,13 +366,29 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private applyReadyActions(): void {
     this.applyPendingSubtitles();
 
+    // EDL + delay_open 场景：loadfile 后重新绑定 surface（surface ID 可能已变化）
+    if (this.surfaceId.length > 0 && this.controller !== null) {
+      this.bindSurface(this.controller, this.surfaceId);
+    }
+
     if (!this.isLive) {
-      const targetMs = this.pendingSeekMs >= 0 ? this.pendingSeekMs : this.pendingStartMs;
-      if (targetMs > 0) {
-        this.seekInternal(targetMs, false);
+      // 优先处理用户主动的 pendingSeekMs
+      if (this.pendingSeekMs >= 0) {
+        this.seekInternal(this.pendingSeekMs, false);
+        this.pendingSeekMs = -1;
+      }
+      // 起播/续播位置处理
+      else if (this.pendingStartMs >= 0) {
+        const isEdl = this.sourceUrl.startsWith('edl://');
+        // EDL + delay_open: 即使 pendingStartMs=0 也必须 seek 以激活子 demuxer
+        // 非 EDL: 仅在位置偏差>2s 时补救 seek
+        if (isEdl || Math.abs(this.lastPositionMs - this.pendingStartMs) > 2000) {
+          Logger.info(TAG, `startup seek: target=${this.pendingStartMs}ms${isEdl ? ' (edl)' : ''}`);
+          this.seekInternal(this.pendingStartMs, false);
+        }
+        this.pendingStartMs = -1;
       }
     }
-    this.pendingStartMs = -1;
 
     if (this.playWhenReady) {
       this.playInternal();
@@ -354,17 +399,24 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (this.destroyed || ctrl !== this.controller) return;
 
     if (type === 1) {
-      // 位置更新事件。若 pendingSeekMs 设置了目标位置且事件位置已追上，则清除 pendingSeekMs
+      // 位置更新事件：缩小容差到500ms（MPV内部seek已经较准）
       if (this.pendingSeekMs >= 0) {
         const diff = Math.abs(value - this.pendingSeekMs);
-        if (value > 0 && diff < 2000) {  // 2s 内视为确认
+        if (value > 0 && diff < 500) {  // 500ms容差，更精确
           this.pendingSeekMs = -1;
+          this.isSeeking = false;
+          Logger.debug(TAG, `seek confirmed: target=${this.pendingSeekMs}ms actual=${value}ms`);
         }
       }
       this.lastPositionMs = value;
       if (value > 0) {
         this.lastKnownPositionMs = value;
       }
+
+      // 添加节流，避免高频emit（100ms节流）
+      const now = Date.now();
+      if (now - this.lastTimeEmitMs < 100) return;
+      this.lastTimeEmitMs = now;
     } else if (type === 2) {
       this.handleStatusUpdate(value);
     } else if (type === 3) {

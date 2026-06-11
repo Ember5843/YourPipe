@@ -3,7 +3,7 @@ import { util } from '@kit.ArkTS';
 import { sessionStore, DashSession } from './SessionStore';
 import { parseInputJson } from './InputParser';
 import { buildDashManifest } from './PlaylistBuilder';
-import { serveRange } from './RangeProxy';
+import { serveRange, serveOtfSegment } from './RangeProxy';
 import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][Server]';
@@ -107,20 +107,51 @@ async function routeRequest(
 
   // manifest.mpd
   if (parts.length === 3 && segment === 'manifest.mpd') {
-    const body = method === 'HEAD' ? '' : buildDashManifest(session, port);
-    await sendText(conn, 200, 'OK', 'application/dash+xml', body);
+    try {
+      const body = method === 'HEAD' ? '' : await buildDashManifest(session, port);
+      await sendText(conn, 200, 'OK', 'application/dash+xml', body);
+    } catch (e) {
+      Logger.error(TAG, `manifest build error: ${(e as Error).message}`);
+      await sendText(conn, 500, 'Manifest Error', 'text/plain', `Manifest generation failed: ${(e as Error).message}`);
+    }
     return;
   }
 
-  // video/0 or audio/0 — byte-range proxy
+  // video/0, audio/0 — byte-range proxy; video/0/sq/N, audio/0/sq/N — YouTube OTF segment proxy
   if (parts.length >= 4) {
     const idx = parseInt(parts[3], 10) || 0;
     if (segment === 'video' && idx < session.videos.length) {
-      await serveRange(conn, session.videos[idx], rangeHeader, method === 'HEAD');
+      const resource = session.videos[idx];
+      if (parts.length >= 6 && parts[4] === 'sq') {
+        const sq = parseInt(parts[5], 10);
+        if (resource.isOtf && !Number.isNaN(sq)) {
+          await serveOtfSegment(conn, resource, sq, method === 'HEAD');
+          return;
+        }
+        await sendText(conn, 400, 'Bad Request', 'text/plain', 'Invalid OTF segment request');
+        return;
+      }
+      if (resource.isOtf) {
+        Logger.warn(TAG, `OTF resource requested through byte-range endpoint: video/${idx}`);
+      }
+      await serveRange(conn, resource, rangeHeader, method === 'HEAD');
       return;
     }
     if (segment === 'audio' && session.hasAudio && idx < session.audios.length) {
-      await serveRange(conn, session.audios[idx], rangeHeader, method === 'HEAD');
+      const resource = session.audios[idx];
+      if (parts.length >= 6 && parts[4] === 'sq') {
+        const sq = parseInt(parts[5], 10);
+        if (resource.isOtf && !Number.isNaN(sq)) {
+          await serveOtfSegment(conn, resource, sq, method === 'HEAD');
+          return;
+        }
+        await sendText(conn, 400, 'Bad Request', 'text/plain', 'Invalid OTF segment request');
+        return;
+      }
+      if (resource.isOtf) {
+        Logger.warn(TAG, `OTF resource requested through byte-range endpoint: audio/${idx}`);
+      }
+      await serveRange(conn, resource, rangeHeader, method === 'HEAD');
       return;
     }
     if (segment === 'resource' && parts[3] === 'main') {

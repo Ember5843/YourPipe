@@ -541,6 +541,24 @@ export class AvPlayerController {
     return 0;
   }
 
+  private codecToMpv(codec: string): string {
+    const c = codec.toLowerCase();
+    if (c.startsWith('avc1')) return 'h264';
+    if (c.startsWith('hev1') || c.startsWith('hvc1')) return 'hevc';
+    if (c.startsWith('vp09') || c.startsWith('vp9')) return 'vp9';
+    if (c.startsWith('av01')) return 'av1';
+    if (c.startsWith('mp4a')) return 'aac';
+    if (c.startsWith('opus')) return 'opus';
+    if (c.startsWith('vorbis')) return 'vorbis';
+    if (c.startsWith('ac-3') || c.startsWith('ac3')) return 'ac3';
+    if (c.startsWith('ec-3') || c.startsWith('eac3')) return 'eac3';
+    if (c.startsWith('dts')) return 'dts';
+    if (c.startsWith('flac')) return 'flac';
+    if (c.startsWith('theora')) return 'theora';
+    if (c.startsWith('wmapro')) return 'wmapro';
+    return 'null';
+  }
+
   private async createPlaybackUrl(videoStream?: StreamInfo, audioStream?: StreamInfo): Promise<string> {
     if (!videoStream || !videoStream.url) return '';
     if (this.isRemoteManifestUrl(videoStream.url)) {
@@ -552,7 +570,7 @@ export class AvPlayerController {
     this.destroyCurrentLocalSession();
     const isDual = this.isSeparatedDash(videoStream, audioStream) && !!audioStream;
     const durationMs = isDual ? this.resolveDurationMs(videoStream, audioStream) : 0;
-    Logger.info(TAG, `createPlaybackUrl: type=${isDual ? 'dual-dash' : 'single'} video=[itag=${videoStream.itag} ${videoStream.quality} ${videoStream.codecs}]${isDual ? ` audio=[itag=${audioStream!.itag} ${audioStream!.codecs}]` : ''} durationMs=${durationMs}`);
+    Logger.info(TAG, `createPlaybackUrl: type=${isDual ? 'dual-edl' : 'single'} video=[itag=${videoStream.itag} ${videoStream.quality} ${videoStream.codecs}]${isDual ? ` audio=[itag=${audioStream!.itag} ${audioStream!.codecs}]` : ''} durationMs=${durationMs}`);
 
     const sessionId = await (isDual
       ? LocalMediaProxy.createYoutubeDualUrlSession(videoStream, audioStream!, durationMs)
@@ -565,9 +583,46 @@ export class AvPlayerController {
       return '';
     }
     this.currentLocalMediaSessionId = sessionId;
-    const cachedUrl = await LocalMediaProxy.proxyUrl(playbackUrl);
-    Logger.debug(TAG, `createPlaybackUrl: sessionId=${sessionId} url=${cachedUrl}`);
-    return cachedUrl;
+
+    // 单流（progressive 或 embedded audio）直接用 proxy URL
+    if (!isDual) {
+      Logger.debug(TAG, `createPlaybackUrl: single stream url=${playbackUrl}`);
+      return playbackUrl;
+    }
+
+    // 双流（separated video+audio）：用 EDL !new_stream + !delay_open 合并
+    const baseUrl = playbackUrl.replace('/manifest.mpd', '');
+    const vUrl = `${baseUrl}/video/0`;
+    const aUrl = `${baseUrl}/audio/0`;
+    const durationSec = (durationMs / 1000).toFixed(3);
+
+    const vCodec = this.codecToMpv(videoStream.codecs || '');
+    const vw = videoStream.width || 0;
+    const vh = videoStream.height || 0;
+    const vfps = videoStream.fps || 0;
+    const vbr = videoStream.bitrate || 0;
+    const aCodec = this.codecToMpv(audioStream?.codecs || '');
+    const abr = audioStream?.bitrate || 0;
+
+    const parts: string[] = [];
+    // 视频轨
+    parts.push('!new_stream', '!no_clip', '!no_chapters');
+    let vDelay = `!delay_open,media_type=video,codec=${vCodec}`;
+    if (vw > 0) vDelay += `,w=${vw}`;
+    if (vh > 0) vDelay += `,h=${vh}`;
+    if (vfps > 0) vDelay += `,fps=${vfps}`;
+    parts.push(vDelay);
+    if (vbr > 0) parts.push(`!track_meta,title=${videoStream.quality || 'video'},byterate=${Math.floor(vbr * 1000 / 8)}`);
+    parts.push(`${vUrl},length=${durationSec}`);
+    // 音频轨
+    parts.push('!new_stream', '!no_clip', '!no_chapters');
+    parts.push(`!delay_open,media_type=audio,codec=${aCodec}`);
+    if (abr > 0) parts.push(`!track_meta,title=${audioStream?.quality || 'audio'},byterate=${Math.floor(abr * 1000 / 8)}`);
+    parts.push(`${aUrl},length=${durationSec}`);
+
+    const edlUrl = 'edl://' + parts.join(';') + ';';
+    Logger.info(TAG, `createPlaybackUrl: edl=${edlUrl.substring(0, 300)}`);
+    return edlUrl;
   }
 
   private resolveDurationMs(video: StreamInfo, audio?: StreamInfo): number {
