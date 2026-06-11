@@ -59,6 +59,8 @@ export interface DashSession {
   hasAudio: boolean;
   videoHls: HlsCache;
   audioHls: HlsCache;
+  stale: boolean;
+  cancel?: () => void;
 }
 
 function emptyResource(): StreamResource {
@@ -84,6 +86,7 @@ export function makeEmptySession(id: string): DashSession {
     single: emptyResource(), video: emptyResource(), audio: emptyResource(),
     videos: [], audios: [], hasAudio: false,
     videoHls: emptyHlsCache(), audioHls: emptyHlsCache(),
+    stale: false,
   };
 }
 

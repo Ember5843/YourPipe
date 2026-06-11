@@ -78,6 +78,13 @@ async function handleConnection(conn: socket.TCPSocketConnection, port: number):
           return;
         }
 
+        if (session.stale) {
+          await sendText(conn, 410, 'Gone', 'text/plain', 'Session stale');
+          conn.close();
+          resolve();
+          return;
+        }
+
         await routeRequest(conn, req.method, parts, req.rangeHeader, session, port);
       } catch (e) {
         Logger.error(TAG, `handleConnection error: ${e}`);
@@ -237,7 +244,17 @@ export class LocalProxyServer {
 
   destroySession(sessionId: string): void {
     Logger.debug(TAG, `destroySession: id=${sessionId}`);
-    sessionStore.remove(sessionId);
+    const session = sessionStore.get(sessionId);
+    if (session) {
+      session.cancel?.();
+      sessionStore.remove(sessionId);
+    }
+  }
+
+  markSessionStale(sessionId: string): void {
+    if (!sessionId) return;
+    const session = sessionStore.get(sessionId);
+    if (session) session.stale = true;
   }
 
   destroyAll(): void {

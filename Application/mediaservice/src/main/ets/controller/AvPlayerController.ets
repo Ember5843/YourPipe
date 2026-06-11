@@ -55,6 +55,7 @@ export class AvPlayerController {
   private seekableRangesListeners: (() => void)[] = [];
 
   private currentLocalMediaSessionId: string = '';
+  private pendingDestroySessionId: string = '';
   private pendingStartFromSec: number = 0;
   /** 上一次 updateVideoSource 处理过的 source 引用，用于幂等去重。 */
   private lastUpdatedSourceRef: VideoData | null = null;
@@ -264,7 +265,7 @@ export class AvPlayerController {
     this.lastUpdatedSourceRef = newSource;
 
     this.resetPlaybackState();
-    this.destroyCurrentLocalSession();
+    this.deferCurrentSessionDestroy();
     this.curSource = newSource;
     this.curIndex = newSource.index;
     this.vm.subtitleTracks = newSource.subtitleTracks || [];
@@ -588,15 +589,16 @@ export class AvPlayerController {
   private async createPlaybackUrl(video?: StreamInfo, audio?: StreamInfo): Promise<string> {
     if (!video || !video.url) return '';
 
+    // Defer old session destroy: mark stale, save for cleanup after new source is READY
+    this.deferCurrentSessionDestroy();
+
     if (this.isRemoteManifestUrl(video.url)) {
       Logger.debug(TAG, `createPlaybackUrl: using remote manifest directly`);
-      this.destroyCurrentLocalSession();
       return video.url;
     }
 
     switch ((video.deliveryMethod || '').toUpperCase()) {
       case 'HLS':
-        this.destroyCurrentLocalSession();
         Logger.info(TAG, `createPlaybackUrl: HLS variant direct url=${this.describePlaybackUrl(video.url)}`);
         return video.url;
 
@@ -613,7 +615,6 @@ export class AvPlayerController {
   }
 
   private async buildSingleProxyUrl(video: StreamInfo): Promise<string> {
-    this.destroyCurrentLocalSession();
     const sessionId = await LocalMediaProxy.createSingleUrlSession(video.url, video);
     const playbackUrl = LocalMediaProxy.getPlaybackUrl(sessionId);
     if (!playbackUrl.startsWith('http://127.0.0.1:')) {
@@ -627,7 +628,6 @@ export class AvPlayerController {
   }
 
   private async buildDualEdlUrl(video: StreamInfo, audio: StreamInfo): Promise<string> {
-    this.destroyCurrentLocalSession();
     const durationMs = this.resolveDurationMs(video, audio);
     if (durationMs <= 0) {
       Logger.error(TAG, `buildDualEdlUrl: dual stream with unknown duration, refusing to build EDL`);
@@ -674,6 +674,22 @@ export class AvPlayerController {
     const edlUrl = 'edl://' + parts.join(';') + ';';
     Logger.info(TAG, `buildDualEdlUrl: edl=${edlUrl.substring(0, 300)}`);
     return edlUrl;
+  }
+
+  /**
+   * Defer current session destroy: mark stale so new requests get 410 Gone,
+   * save session id for cleanup after new source reaches READY state.
+   */
+  private deferCurrentSessionDestroy(): void {
+    if (this.pendingDestroySessionId) {
+      // Previous pending session not yet destroyed (e.g. rapid switching)
+      LocalMediaProxy.destroySession(this.pendingDestroySessionId);
+    }
+    if (this.currentLocalMediaSessionId) {
+      this.pendingDestroySessionId = this.currentLocalMediaSessionId;
+      LocalMediaProxy.markSessionStale(this.currentLocalMediaSessionId);
+      this.currentLocalMediaSessionId = '';
+    }
   }
 
   private resolveDurationMs(video: StreamInfo, audio?: StreamInfo): number {
@@ -914,6 +930,12 @@ export class AvPlayerController {
 
     // 委托给 PlayerStateRelay：状态机 + AVSession + 节流进度
     this.stateRelay.onStateChange(state);
+
+    // 新源 Prepared 后回收旧 session，避免 in-flight 请求 404
+    if (state.isReady && this.pendingDestroySessionId) {
+      LocalMediaProxy.destroySession(this.pendingDestroySessionId);
+      this.pendingDestroySessionId = '';
+    }
 
     // 错误监听（手动，需要特殊处理）
     const errorChanged = prevErrorMsg !== state.errorMsg;

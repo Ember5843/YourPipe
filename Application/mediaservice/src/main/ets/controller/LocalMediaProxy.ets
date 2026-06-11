@@ -115,6 +115,12 @@ export class LocalMediaProxy {
     localProxyServer.destroySession(sessionId);
   }
 
+  static markSessionStale(sessionId: string): void {
+    if (!sessionId) return;
+    Logger.debug(TAG, `markSessionStale: ${sessionId}`);
+    localProxyServer.markSessionStale(sessionId);
+  }
+
   static stopAll(): void {
     localProxyServer.destroyAll();
   }
