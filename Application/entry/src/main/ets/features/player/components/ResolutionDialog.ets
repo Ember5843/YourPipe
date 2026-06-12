@@ -30,7 +30,8 @@ export struct QualitySelect {
       .selected(this.currentIndex)
       .value(this.entries[this.currentIndex]?.resolutionLabel ?? 'Auto')
       .font({ size: 14 })
-      .selectedOptionFont({ size: 14, weight: FontWeight.Medium })
+      .selectedOptionFont({ size: 14, weight: FontWeight.Bold })
+      .selectedOptionFontColor('#007BFF')
       .optionFont({ size: 14 })
       .onSelect((index: number, _value: string) => {
         this.onPick(this.entries[index]);

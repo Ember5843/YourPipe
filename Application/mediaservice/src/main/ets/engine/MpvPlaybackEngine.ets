@@ -37,6 +37,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private pendingSeekMs: number = -1;
   private pendingSubtitleUrls: string[] = [];
   private subtitleLoaded: boolean = false;
+  private subtitleUrlToIndex: Map<string, number> = new Map();
+  private activeSubtitleIndex: number = -1;
   private lastKnownPositionMs: number = 0;
   private lastTimeEmitMs: number = 0;
 
@@ -153,6 +155,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.pendingStartMs = !this.isLive ? Math.max(0, Math.round(startPos * 1000)) : 0;
     this.pendingSeekMs = -1;
     this.subtitleLoaded = false;
+    this.subtitleUrlToIndex.clear();
     this.lastPositionMs = 0;
     this.lastDurationMs = 0;
     this.lastKnownPositionMs = 0;
@@ -287,13 +290,25 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     Logger.debug(TAG, `preloadSubtitleTracks: ${urls.length} url(s)`);
   }
 
-  selectSubtitleTrack(_index: number): void {}
+  selectSubtitleTrack(index: number): void {
+    this.activeSubtitleIndex = index;
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl !== null && !this.destroyed && index >= 0) {
+      ctrl.setActiveTracks([index], MediaType.Subtitle);
+    }
+  }
+
+  getSubtitleTrackIndex(url: string): number {
+    const idx = this.subtitleUrlToIndex.get(url);
+    return idx !== undefined ? idx : -1;
+  }
 
   setSubtitleVisible(visible: boolean): void {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
     if (visible) {
-      ctrl.setActiveTracks([0], MediaType.Subtitle);
+      const idx = this.activeSubtitleIndex >= 0 ? this.activeSubtitleIndex : 0;
+      ctrl.setActiveTracks([idx], MediaType.Subtitle);
     } else {
       ctrl.setActiveTracks([], MediaType.Subtitle);
       this.subtitleCallback?.('', 0, 0);
@@ -370,14 +385,21 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.pendingSubtitleUrls.length === 0 || this.subtitleLoaded || this.destroyed) return;
     this.subtitleLoaded = true;
+    let index = 0;
     for (const url of this.pendingSubtitleUrls) {
-      ctrl.setProperty('sub-add', url);
+      ctrl.command(['sub-add', url, 'auto']);
+      this.subtitleUrlToIndex.set(url, index);
+      index++;
       Logger.debug(TAG, `sub-add: ${url.substring(0, 80)}`);
     }
   }
 
   private applyReadyActions(): void {
     this.applyPendingSubtitles();
+
+    if (this.activeSubtitleIndex >= 0 && this.controller !== null) {
+      this.controller.setActiveTracks([this.activeSubtitleIndex], MediaType.Subtitle);
+    }
 
     // EDL + delay_open 场景：loadfile 后重新绑定 surface（surface ID 可能已变化）
     if (this.surfaceId.length > 0 && this.controller !== null) {
@@ -610,6 +632,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.pendingSeekMs = -1;
     this.pendingSubtitleUrls = [];
     this.subtitleLoaded = false;
+    this.subtitleUrlToIndex.clear();
+    this.activeSubtitleIndex = -1;
     this.lastKnownPositionMs = 0;
   }
 

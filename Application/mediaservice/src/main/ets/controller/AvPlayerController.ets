@@ -18,6 +18,7 @@ import { PlayerState } from '../state/PlayerState';
 import { PlayerUiViewModel } from '../state/PlayerUiViewModel';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
+import { fileIo } from '@kit.CoreFileKit';
 
 export interface NativeLogBridgeFns {
   start: () => void;
@@ -59,6 +60,7 @@ export class AvPlayerController {
   private pendingStartFromSec: number = 0;
   /** 上一次 updateVideoSource 处理过的 source 引用，用于幂等去重。 */
   private lastUpdatedSourceRef: VideoData | null = null;
+  private subtitleUrlToIndex: Map<string, number> = new Map();
 
   // Error recovery state
   private errorRetryCount: number = 0;
@@ -328,13 +330,31 @@ export class AvPlayerController {
     this.updateAvSessionMetadata();
     this.vm.isBuffering = true;
 
+    const allUrls = this.vm.subtitleTracks.map((t: SubtitleTrackInfo) => t.url);
+    Logger.info(TAG, `subtitle preload: ${allUrls.length} track(s)`);
+    if (allUrls.length > 0) {
+      const localPaths: string[] = [];
+      for (let i = 0; i < allUrls.length; i++) {
+        Logger.info(TAG, `downloading subtitle ${i}: ${allUrls[i].substring(0, 80)}`);
+        const localPath = await this.downloadSubtitleToFile(allUrls[i], i);
+        Logger.info(TAG, `subtitle ${i} result: ${localPath || 'FAILED'}`);
+        if (localPath) {
+          this.subtitleUrlToIndex.set(allUrls[i], localPaths.length);
+          localPaths.push(localPath);
+        }
+      }
+      if (localPaths.length > 0) {
+        this.playbackEngine.preloadSubtitleTracks(localPaths);
+      }
+    }
     const autoSubtitle = this.pickSubtitleForLanguage(searchLanguage);
     if (autoSubtitle) {
       this.vm.currentSubtitleUrl = autoSubtitle.url;
       this.vm.subtitleVisible = true;
-      this.playbackEngine.preloadSubtitleTracks([autoSubtitle.url]);
+      this.playbackEngine.selectSubtitleTrack(this.subtitleUrlToIndex.get(autoSubtitle.url) ?? 0);
     } else {
-      this.playbackEngine.preloadSubtitleTracks([]);
+      this.vm.currentSubtitleUrl = '';
+      this.vm.subtitleVisible = false;
     }
     this.playbackEngine.load(playbackUrl, this.pendingStartFromSec);
     this.pendingStartFromSec = 0;
@@ -455,6 +475,24 @@ export class AvPlayerController {
     this.playbackEngine.setSubtitleVisible(visible);
     if (!visible) {
       this.vm.subtitleText = '';
+    }
+  }
+
+  public switchSubtitle(url: string): void {
+    if (!url) {
+      this.vm.currentSubtitleUrl = '';
+      this.setSubtitleVisible(false);
+      return;
+    }
+    if (url === this.vm.currentSubtitleUrl && this.vm.subtitleVisible) {
+      return;
+    }
+    this.vm.currentSubtitleUrl = url;
+    this.vm.subtitleVisible = true;
+    const index = this.subtitleUrlToIndex.get(url);
+    if (index !== undefined) {
+      this.playbackEngine.selectSubtitleTrack(index);
+      this.playbackEngine.setSubtitleVisible(true);
     }
   }
 
@@ -777,9 +815,38 @@ export class AvPlayerController {
         connectTimeout: 8000,
         readTimeout: 10000,
       });
+      Logger.info(TAG, `subtitle fetchText: code=${response.responseCode} resultType=${typeof response.result} len=${typeof response.result === 'string' ? response.result.length : 0}`);
       return typeof response.result === 'string' ? response.result : '';
+    } catch (e) {
+      Logger.warn(TAG, `subtitle fetchText error: ${e}`);
+      return '';
     } finally {
       request.destroy();
+    }
+  }
+
+  private async downloadSubtitleToFile(url: string, index: number): Promise<string> {
+    try {
+      const ctx = AppStorage.get<common.UIAbilityContext>('context');
+      if (!ctx) {
+        Logger.warn(TAG, `downloadSubtitleToFile: no context`);
+        return '';
+      }
+      Logger.info(TAG, `downloadSubtitleToFile: tempDir=${ctx.tempDir}`);
+      const text = await this.fetchText(url);
+      if (!text) {
+        Logger.warn(TAG, `downloadSubtitleToFile: fetchText returned empty`);
+        return '';
+      }
+      Logger.info(TAG, `downloadSubtitleToFile: fetched ${text.length} bytes`);
+      const filePath = `${ctx.tempDir}/subtitle_${index}.vtt`;
+      const file = fileIo.openSync(filePath, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+      fileIo.writeSync(file.fd, text);
+      fileIo.closeSync(file.fd);
+      return filePath;
+    } catch (e) {
+      Logger.warn(TAG, `downloadSubtitleToFile failed index=${index}: ${e}`);
+      return '';
     }
   }
 
@@ -949,6 +1016,7 @@ export class AvPlayerController {
 
   private resetPlaybackState(): void {
     this.vm.reset();
+    this.subtitleUrlToIndex.clear();
     this.lastKnownGoodPosition = 0;
     this.waitingForBufferListeners.forEach(l => l(false));
     this.errorListeners.forEach(l => l(''));
