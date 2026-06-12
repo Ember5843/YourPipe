@@ -158,21 +158,23 @@ export struct VideoPlayerPage {
 
     // 让系统旋转动画完整驱动布局：windowSizeChange 用 animateTo({duration:0})
     // 显式禁用属性动画，让系统旋转动画独占；否则属性动画会跟系统旋转动画打架。
+    // isManualFullscreen 是权威标志，由按钮路径维护；这里只读取它决定布局，不修改。
     this.windowUtil.registerOnWindowSizeChange((size) => {
       const isLandscape = size.width > size.height;
 
       animateTo({ duration: 0 }, () => {
-        if (isLandscape) {
-          // 横屏：根据是否"用户主动全屏"分两种
-          //   是 → 沉浸全屏（视频铺满）
-          //   否 → 平板/折叠屏分栏宽布局（左视频右信息）
-          this.isFullLandscapeScreen = this.isManualFullscreen;
-          this.isWideLayout = !this.isManualFullscreen;
+        if (this.isManualFullscreen) {
+          // 用户主动沉浸全屏：任何方向都铺满（兼容竖向视频沉浸全屏）
+          this.isFullLandscapeScreen = true;
+          this.isWideLayout = false;
+        } else if (isLandscape) {
+          // 系统横屏：宽布局分栏
+          this.isFullLandscapeScreen = false;
+          this.isWideLayout = true;
         } else {
-          // 竖屏：清掉所有横屏状态（即使之前是手动全屏，旋转回竖屏也退出）
+          // 系统竖屏：普通布局
           this.isFullLandscapeScreen = false;
           this.isWideLayout = false;
-          this.isManualFullscreen = false;
         }
       });
 
@@ -408,18 +410,18 @@ export struct VideoPlayerPage {
 
   handleFullScreenExit(): void {
     // 退出沉浸全屏：清掉 manual 标志，恢复系统栏，解除方向锁
-    // - 若设备物理是横屏，windowSizeChange 不会再触发（尺寸不变），
-    //   但因为窗口尺寸仍然 isLandscape，需要在这里手动切到宽布局
-    // - 若设备物理是竖屏，setMainWindowOrientation 会触发系统旋转，
-    //   动画完成后 windowSizeChange 接管布局
+    // 三种来源场景：
+    //   - 物理横屏 + 横向视频沉浸：尺寸不变 → 这里直接切宽布局，由 .animation 驱动
+    //   - 物理竖屏 + 竖向视频沉浸：尺寸不变 → 这里直接清状态，由 .animation 驱动
+    //   - 物理竖屏 + 横向沉浸（之前手动旋转过来）：解锁后系统旋回竖屏，
+    //     windowSizeChange 触发，由它接管
     this.isManualFullscreen = false;
     this.windowUtil.enableWindowSystemBar();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
 
     const isLandscape = this.deviceWidth > this.deviceHeight;
     if (isLandscape) {
-      // 物理横屏：尺寸不变，系统旋转不触发
-      // 直接修改状态，由容器的 .animation() 属性动画驱动 100% → 60% 的过渡
+      // 物理横屏：直接切宽布局
       const shortSideVp = this.getUIContext().px2vp(Math.min(this.deviceWidth, this.deviceHeight));
       this.isFullLandscapeScreen = false;
       this.isWideLayout = true;
@@ -427,6 +429,11 @@ export struct VideoPlayerPage {
       if (this.isImmersive) {
         this.windowUtil.disableWindowSystemBar();
       }
+    } else {
+      // 物理竖屏：直接清沉浸状态（竖向视频沉浸全屏退出走这里）
+      this.isFullLandscapeScreen = false;
+      this.isWideLayout = false;
+      this.isImmersive = false;
     }
     this.notifyFullScreenChange();
   }
@@ -556,20 +563,25 @@ export struct VideoPlayerPage {
             this.handleFullScreenExit();
             return;
           }
-          // 进入沉浸全屏：先置 manual 标志，再触发系统旋转
-          // - 若当前是竖屏，旋转触发 windowSizeChange，会读取 manual=true 切沉浸
-          // - 若当前已是系统横屏（宽布局），尺寸不变 → windowSizeChange 不触发
-          //   需要在这里同步切到沉浸状态
-          this.isManualFullscreen = true;
-          this.windowUtil.disableWindowSystemBar();
+          // 进入沉浸全屏：根据视频比例选目标方向
+          //   横向视频 → LANDSCAPE
+          //   竖向视频（短视频）→ PORTRAIT（不旋转，竖向沉浸全屏）
           const isLandscapeVideo = this.videoSource.width && this.videoSource.height
             && this.videoSource.width > this.videoSource.height;
-          this.windowUtil.setMainWindowOrientation(
-            isLandscapeVideo ? window.Orientation.LANDSCAPE : window.Orientation.PORTRAIT
-          );
-          // 当前已横屏（宽布局）：尺寸不变，系统旋转不触发
-          // 直接修改状态，由容器的 .animation() 属性动画驱动 60% → 100% 的过渡
-          if (this.isWideLayout) {
+          const targetOrientation = isLandscapeVideo
+            ? window.Orientation.LANDSCAPE
+            : window.Orientation.PORTRAIT;
+          const isCurrentLandscape = this.deviceWidth > this.deviceHeight;
+          const willRotate = isLandscapeVideo !== isCurrentLandscape;
+
+          this.isManualFullscreen = true;
+          this.windowUtil.disableWindowSystemBar();
+          this.windowUtil.setMainWindowOrientation(targetOrientation);
+
+          // 不会发生旋转（窗口尺寸不变）：直接改状态，由容器 .animation() 驱动平滑过渡
+          // 适用：竖屏+竖向视频、横屏宽布局+横向视频
+          // 会旋转的路径交给 windowSizeChange 处理
+          if (!willRotate) {
             this.isWideLayout = false;
             this.isFullLandscapeScreen = true;
             this.isImmersive = true;
