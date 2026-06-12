@@ -284,6 +284,7 @@ export async function serveOtfSegment(
 
   const sqUrl = appendYoutubeRn(buildOtfRequestUrl(resource.url, sq), `${resource.url}:otf`);
   let lastError = '';
+  const writer = new OtfTcpWriter(conn, contentType);
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const headers = makeYoutubeHeaders(resource);
     const rcpSession = rcp.createSession({
@@ -291,7 +292,6 @@ export async function serveOtfSegment(
       requestConfiguration: { transfer: { timeout: { connectMs: TIMEOUT_MS, transferMs: TIMEOUT_MS } } }
     });
     try {
-      const writer = new OtfTcpWriter(conn, contentType);
       const dest: rcp.DownloadToStream = { kind: 'stream', stream: writer };
       let resp: rcp.Response;
       const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
@@ -304,6 +304,10 @@ export async function serveOtfSegment(
         req.destination = dest;
         resp = await rcpSession.fetch(req);
         if (resp.statusCode === 411) {
+          if (writer.hasEmittedAny()) {
+            Logger.error(TAG, `otfSegment: 411 after bytes emitted resource=${resource.id} sq=${sq}`);
+            return;
+          }
           const retryReq = new rcp.Request(sqUrl, 'POST', headers, '');
           retryReq.destination = dest;
           resp = await rcpSession.fetch(retryReq);
@@ -315,7 +319,9 @@ export async function serveOtfSegment(
       }
       if (resp.statusCode >= 400 && resp.statusCode < 500) {
         Logger.warn(TAG, `otfSegment: upstream ${resp.statusCode} resource=${resource.id} sq=${sq}`);
-        await sendError(conn, 502, `upstream ${resp.statusCode}`);
+        if (!writer.hasEmittedAny()) {
+          await sendError(conn, 502, `upstream ${resp.statusCode}`);
+        }
         return;
       }
       lastError = `status=${resp.statusCode}`;
@@ -325,12 +331,19 @@ export async function serveOtfSegment(
     } finally {
       rcpSession.close();
     }
+    // Same as serveRange: retrying after bytes have hit the wire would corrupt the stream.
+    if (writer.hasEmittedAny()) {
+      Logger.error(TAG, `otfSegment: aborting retry after partial write, resource=${resource.id} sq=${sq} err=${lastError}`);
+      return;
+    }
     if (attempt < MAX_RETRIES) {
       await new Promise<void>(r => setTimeout(r, 300 * (attempt + 1)));
     }
   }
   Logger.error(TAG, `otfSegment failed: ${lastError} resource=${resource.id} sq=${sq}`);
-  await sendError(conn, 502, `upstream failed: ${lastError}`);
+  if (!writer.hasEmittedAny()) {
+    await sendError(conn, 502, `upstream failed: ${lastError}`);
+  }
 }
 
 class TcpWriter implements rcp.WriteStream {
@@ -341,6 +354,7 @@ class TcpWriter implements rcp.WriteStream {
   private end: number;
   private total: number;
   private contentType: string;
+  bytesEmitted: number = 0;
 
   constructor(conn: socket.TCPSocketConnection, start: number, end: number, total: number, contentType: string) {
     this.conn = conn;
@@ -348,6 +362,10 @@ class TcpWriter implements rcp.WriteStream {
     this.end = end;
     this.total = total;
     this.contentType = contentType;
+  }
+
+  hasEmittedAny(): boolean {
+    return this.headerSent || this.bytesEmitted > 0;
   }
 
   async write(buffer: ArrayBuffer): Promise<void | number> {
@@ -366,6 +384,7 @@ class TcpWriter implements rcp.WriteStream {
         this.headerSent = true;
       }
       await this.conn.send({ data: buffer });
+      this.bytesEmitted += buffer.byteLength;
       return buffer.byteLength;
     } catch (e) {
       this.closed = true;
@@ -380,10 +399,15 @@ class OtfTcpWriter implements rcp.WriteStream {
   private headerSent: boolean = false;
   private closed: boolean = false;
   private contentType: string;
+  bytesEmitted: number = 0;
 
   constructor(conn: socket.TCPSocketConnection, contentType: string) {
     this.conn = conn;
     this.contentType = contentType;
+  }
+
+  hasEmittedAny(): boolean {
+    return this.headerSent || this.bytesEmitted > 0;
   }
 
   async write(buffer: ArrayBuffer): Promise<void | number> {
@@ -398,6 +422,7 @@ class OtfTcpWriter implements rcp.WriteStream {
         this.headerSent = true;
       }
       await this.conn.send({ data: buffer });
+      this.bytesEmitted += buffer.byteLength;
       return buffer.byteLength;
     } catch (e) {
       this.closed = true;
@@ -448,6 +473,7 @@ export async function serveRange(
 
   const rangeSpec = `${start}-${end}`;
   let lastError = '';
+  const writer = new TcpWriter(conn, start, end, total, contentType);
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const sessionHeaders = resource.isYoutubePlayback ? makeYoutubeHeaders(resource) : makeHeaders(resource);
@@ -456,7 +482,6 @@ export async function serveRange(
       requestConfiguration: { transfer: { timeout: { connectMs: TIMEOUT_MS, transferMs: TIMEOUT_MS } } }
     });
     try {
-      const writer = new TcpWriter(conn, start, end, total, contentType);
       const dest: rcp.DownloadToStream = { kind: 'stream', stream: writer };
 
       let resp: rcp.Response;
@@ -474,6 +499,10 @@ export async function serveRange(
           req.destination = dest;
           resp = await rcpSession.fetch(req);
           if (resp.statusCode === 411) {
+            if (writer.hasEmittedAny()) {
+              Logger.error(TAG, `serveRange: 411 after bytes emitted, cannot retry resource=${resource.id} range=${rangeSpec}`);
+              return;
+            }
             Logger.warn(TAG, `serveRange: upstream 411, retry with empty POST resource=${resource.id} range=${rangeSpec}`);
             const retryReq = new rcp.Request(appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url), 'POST', headers, '');
             retryReq.destination = dest;
@@ -496,7 +525,9 @@ export async function serveRange(
       // Non-retryable errors: 4xx client errors
       if (resp.statusCode >= 400 && resp.statusCode < 500) {
         Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} (non-retryable) resource=${resource.id} range=${rangeSpec}`);
-        await sendError(conn, 502, `upstream ${resp.statusCode}`);
+        if (!writer.hasEmittedAny()) {
+          await sendError(conn, 502, `upstream ${resp.statusCode}`);
+        }
         return;
       }
       lastError = `status=${resp.statusCode}`;
@@ -506,10 +537,19 @@ export async function serveRange(
     } finally {
       rcpSession.close();
     }
+    // Cannot retry safely once any bytes have been written to the client connection:
+    // the next attempt would re-send the HTTP header and a fresh upstream body, producing
+    // [partial_body_1][header_2][body_2] on the wire and corrupting the bitstream.
+    if (writer.hasEmittedAny()) {
+      Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resource.id} range=${rangeSpec} err=${lastError}`);
+      return;
+    }
     if (attempt < MAX_RETRIES) {
       await new Promise<void>(r => setTimeout(r, 300 * (attempt + 1)));
     }
   }
   Logger.error(TAG, `serveRange failed: ${lastError} resource=${resource.id}`);
-  await sendError(conn, 502, `upstream failed: ${lastError}`);
+  if (!writer.hasEmittedAny()) {
+    await sendError(conn, 502, `upstream failed: ${lastError}`);
+  }
 }

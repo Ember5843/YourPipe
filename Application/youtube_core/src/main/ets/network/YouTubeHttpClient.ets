@@ -61,37 +61,33 @@ export class YouTubeHttpClient {
   }
 
   /**
-   * 发送 GET 请求（自动携带 Cookie）
+   * 发送 GET 请求
+   * 默认匿名（对齐 PipePipe）。仅在 stream 提取链上把 withAuth 设为 true 才注入登录头。
    */
   async get(
     url: string,
-    customHeaders?: Record<string, string | string[]>
+    customHeaders?: Record<string, string | string[]>,
+    withAuth: boolean = false
   ): Promise<http.HttpResponse> {
-    // 1. 准备请求头
-    const headers = await this.prepareHeaders(customHeaders, url);
-
-    // 2. 发送请求
+    const headers = await this.prepareHeaders(customHeaders, url, withAuth);
     const response: http.HttpResponse = await this.downloader.request('GET', url, headers, undefined, this.localization);
-
-    // 3. 保存响应中的 Cookie
     this.saveCookiesFromResponse(response, url);
-
     return response;
   }
 
   /**
-   * 发送 POST 请求（自动携带 Cookie）
+   * 发送 POST 请求
+   * 默认匿名（对齐 PipePipe）。仅在 stream 提取链上把 withAuth 设为 true 才注入登录头。
    */
   async post(
     url: string,
     data?: string,
     customHeaders?: Record<string, string | string[]>,
-    contentType?: string
+    contentType?: string,
+    withAuth: boolean = false
   ): Promise<http.HttpResponse> {
-    // 1. 准备请求头
-    const headers = await this.prepareHeaders(customHeaders, url);
+    const headers = await this.prepareHeaders(customHeaders, url, withAuth);
 
-    // 2. 转换 headers 格式
     const postHeaders: Record<string, string[]> = {};
     const headerKeys = Object.keys(headers);
     for (let i = 0; i < headerKeys.length; i++) {
@@ -104,33 +100,37 @@ export class YouTubeHttpClient {
       }
     }
 
-    // 3. 发送请求
     const response: http.HttpResponse = await this.downloader.post(url, data, postHeaders, this.localization, contentType);
-
-    // 3. 保存响应中的 Cookie
     this.saveCookiesFromResponse(response, url);
-
     return response;
   }
 
   /**
-   * 发送 POST JSON 请求（自动携带 Cookie）
+   * 发送 POST JSON 请求
+   * 默认匿名。stream 提取链显式传 withAuth=true。
    */
   async postJson(
     url: string,
     data?: object,
-    customHeaders?: Record<string, string | string[]>
+    customHeaders?: Record<string, string | string[]>,
+    withAuth: boolean = false
   ): Promise<http.HttpResponse> {
     const jsonData = data ? JSON.stringify(data) : undefined;
-    return this.post(url, jsonData, customHeaders, 'application/json');
+    return this.post(url, jsonData, customHeaders, 'application/json', withAuth);
   }
 
   /**
    * 准备请求头（合并默认头、Cookie、自定义头）
+   *
+   * 对齐 PipePipe DownloaderImpl + addLoggedInHeaders 行为：
+   *   - 默认匿名：仅 SOCS（同意）+ 受限模式 cookie + cookieJar 已有的非鉴权 cookie
+   *   - withAuth=true 时才注入 SAPISIDHASH Authorization + 完整 Cookie + X-Origin + DNT
+   *   - 调用方需要在 stream 提取链（SafariPlayerClient 等）显式传 withAuth=true
    */
   private async prepareHeaders(
     customHeaders?: Record<string, string | string[]>,
-    targetUrl?: string
+    targetUrl?: string,
+    withAuth: boolean = false
   ): Promise<Record<string, string | string[]>> {
     const headers: Record<string, string | string[]> = {};
 
@@ -148,7 +148,7 @@ export class YouTubeHttpClient {
       headers['User-Agent'] = YouTubeHttpClient.DEFAULT_USER_AGENT;
     }
 
-    // Cookie（所有请求都可以带）
+    // Cookie：cookieJar 中累积的非鉴权 cookie（SOCS、CONSENT、受限模式 cookie 等）
     if (targetUrl) {
       const cookieHeader = this.cookieJar.getCookieHeader(targetUrl);
       if (cookieHeader) {
@@ -174,17 +174,20 @@ export class YouTubeHttpClient {
         headers['Referer'] = 'https://www.youtube.com/';
       }
 
-      const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
-      if (activeAuthSession && activeAuthSession.isSignedIn()) {
-        const cookieStr = activeAuthSession.getCookieString();
-        if (cookieStr) {
-          headers['Cookie'] = cookieStr;
-          headers['X-Origin'] = 'https://www.youtube.com';
-          headers['DNT'] = '1';
-        }
-        const authorization = await activeAuthSession.getAuthorizationHeader();
-        if (authorization && authorization.length > 0) {
-          headers['Authorization'] = authorization;
+      // 登录头：仅 stream 提取链显式 opt-in 时注入（对齐 PipePipe addLoggedInHeaders）
+      if (withAuth) {
+        const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
+        if (activeAuthSession && activeAuthSession.isSignedIn()) {
+          const cookieStr = activeAuthSession.getCookieString();
+          if (cookieStr) {
+            headers['Cookie'] = cookieStr;
+            headers['X-Origin'] = 'https://www.youtube.com';
+            headers['DNT'] = '1';
+          }
+          const authorization = await activeAuthSession.getAuthorizationHeader();
+          if (authorization && authorization.length > 0) {
+            headers['Authorization'] = authorization;
+          }
         }
       }
     }

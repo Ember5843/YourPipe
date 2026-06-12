@@ -10,7 +10,7 @@
  */
 
 import { PlayerModel } from '../model/PlayerModel';
-import { SubtitleTrackInfo } from '../model/VideoData';
+import { SubtitleTrack } from 'youtube_core';
 
 @Observed
 export class PlayerUiViewModel {
@@ -27,9 +27,8 @@ export class PlayerUiViewModel {
   @Track seekableRanges: number[][] = [];
   @Track playbackSpeed: number = 1.0;
   @Track playerModel: PlayerModel = new PlayerModel();
-  @Track subtitleTracks: SubtitleTrackInfo[] = [];
+  @Track subtitleTracks: SubtitleTrack[] = [];
   @Track currentSubtitleUrl: string = '';
-  @Track subtitleVisible: boolean = false;
   @Track subtitleText: string = '';
   @Track isCasting: boolean = false;
   @Track castDeviceName: string = '';
@@ -49,7 +48,6 @@ export class PlayerUiViewModel {
     this.playbackSpeed = 1.0;
     this.subtitleTracks = [];
     this.currentSubtitleUrl = '';
-    this.subtitleVisible = false;
     this.subtitleText = '';
   }
 }

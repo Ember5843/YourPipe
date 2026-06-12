@@ -35,10 +35,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private loadGeneration: number = 0;
   private pendingStartMs: number = -1;
   private pendingSeekMs: number = -1;
-  private pendingSubtitleUrls: string[] = [];
-  private subtitleLoaded: boolean = false;
-  private subtitleUrlToIndex: Map<string, number> = new Map();
-  private activeSubtitleIndex: number = -1;
+  private pendingSubtitleUrl: string = '';
+  private currentSubtitleUrl: string = '';
   private lastKnownPositionMs: number = 0;
   private lastTimeEmitMs: number = 0;
 
@@ -154,8 +152,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.isSeeking = false;
     this.pendingStartMs = !this.isLive ? Math.max(0, Math.round(startPos * 1000)) : 0;
     this.pendingSeekMs = -1;
-    this.subtitleLoaded = false;
-    this.subtitleUrlToIndex.clear();
     this.lastPositionMs = 0;
     this.lastDurationMs = 0;
     this.lastKnownPositionMs = 0;
@@ -186,11 +182,12 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         Logger.warn(TAG, `load: surfaceId is empty, video may not render`);
       }
       this.preparing = true;
-      // EDL + delay_open: prepare 的 seek 可能无法传播到 lazy 打开的子 demuxer
-      // 改为 prepare(0) 不 seek，交给 applyReadyActions 统一处理
-      const isEdl = this.sourceUrl.startsWith('edl://');
-      const startMs = this.pendingStartMs >= 0 && !isEdl ? this.pendingStartMs : 0;
-      ctrl.prepare(startMs);
+      // 统一策略：prepare(0) 不带 seek，交给 applyReadyActions 在 Prepared 事件后 seek。
+      // 原因：
+      //   - EDL + delay_open：prepare 的 seek 不会传播到 lazy 打开的子 demuxer
+      //   - HLS：MPV 的 HLS demuxer 在加载 master playlist / 切 variant 时会丢弃 prepare 位置
+      // 在 Ready 之后显式 seek 能保证两种 source 都从正确位置起播。
+      ctrl.prepare(0);
       if (generation !== this.loadGeneration || this.destroyed) {
         return false;
       }
@@ -281,49 +278,16 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     return false;
   }
 
-  preloadSubtitleTracks(urls: string[]): void {
-    this.pendingSubtitleUrls = urls.slice();
-    this.subtitleLoaded = false;
-    if (this.isReady) {
-      this.applyPendingSubtitles();
-    }
-    Logger.debug(TAG, `preloadSubtitleTracks: ${urls.length} url(s)`);
-  }
-
-  selectSubtitleTrack(index: number): void {
-    this.activeSubtitleIndex = index;
-    const ctrl: MpvPlayerController | null = this.controller;
-    if (ctrl !== null && !this.destroyed && index >= 0) {
-      ctrl.setActiveTracks([index], MediaType.Subtitle);
-    }
-  }
-
-  getSubtitleTrackIndex(url: string): number {
-    const idx = this.subtitleUrlToIndex.get(url);
-    return idx !== undefined ? idx : -1;
-  }
-
-  setSubtitleVisible(visible: boolean): void {
+  setSubtitle(url: string): void {
+    this.pendingSubtitleUrl = url;
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
-    if (visible) {
-      const idx = this.activeSubtitleIndex >= 0 ? this.activeSubtitleIndex : 0;
-      ctrl.setActiveTracks([idx], MediaType.Subtitle);
-    } else {
-      ctrl.setActiveTracks([], MediaType.Subtitle);
-      this.subtitleCallback?.('', 0, 0);
+    if (!this.isReady) {
+      Logger.debug(TAG, `setSubtitle: deferred url=${url.length > 0 ? url.substring(0, 60) : '(none)'}`);
+      return;
     }
+    this.applyPendingSubtitle();
   }
-
-  setSubtitleDelay(_delayMs: number): void {}
-
-  getSubtitleDelay(): number {
-    return 0;
-  }
-
-  setSubtitleStyle(_position: string, _fontSize: number, _color: string, _bgAlpha: number): void {}
-
-  setSubtitleAutoSync(_enabled: boolean): void {}
 
   setVideoOutputEnabled(enabled: boolean): void {
     const ctrl: MpvPlayerController | null = this.controller;
@@ -381,25 +345,24 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.emitCurrentState();
   }
 
-  private applyPendingSubtitles(): void {
+  private applyPendingSubtitle(): void {
     const ctrl: MpvPlayerController | null = this.controller;
-    if (ctrl === null || this.pendingSubtitleUrls.length === 0 || this.subtitleLoaded || this.destroyed) return;
-    this.subtitleLoaded = true;
-    let index = 0;
-    for (const url of this.pendingSubtitleUrls) {
-      ctrl.command(['sub-add', url, 'auto']);
-      this.subtitleUrlToIndex.set(url, index);
-      index++;
-      Logger.debug(TAG, `sub-add: ${url.substring(0, 80)}`);
+    if (ctrl === null || this.destroyed) return;
+    const target = this.pendingSubtitleUrl;
+    if (target === this.currentSubtitleUrl) return;
+    if (this.currentSubtitleUrl.length > 0) {
+      ctrl.command(['sub-remove']);
+      this.subtitleCallback?.('', 0, 0);
     }
+    if (target.length > 0) {
+      ctrl.command(['sub-add', target, 'select']);
+      Logger.debug(TAG, `sub-add: ${target.substring(0, 80)}`);
+    }
+    this.currentSubtitleUrl = target;
   }
 
   private applyReadyActions(): void {
-    this.applyPendingSubtitles();
-
-    if (this.activeSubtitleIndex >= 0 && this.controller !== null) {
-      this.controller.setActiveTracks([this.activeSubtitleIndex], MediaType.Subtitle);
-    }
+    this.applyPendingSubtitle();
 
     // EDL + delay_open 场景：loadfile 后重新绑定 surface（surface ID 可能已变化）
     if (this.surfaceId.length > 0 && this.controller !== null) {
@@ -412,12 +375,11 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         this.seekInternal(this.pendingSeekMs, false);
         this.pendingSeekMs = -1;
       }
-      // 起播/续播位置处理
+      // 起播/续播位置处理：load() 时 prepare(0)，这里在 Prepared 后统一显式 seek。
+      // pendingStartMs > 0 时一定 seek（无论 EDL/HLS/普通），=0 时仅 EDL 需要 seek 以激活子 demuxer。
       else if (this.pendingStartMs >= 0) {
         const isEdl = this.sourceUrl.startsWith('edl://');
-        // EDL + delay_open: 即使 pendingStartMs=0 也必须 seek 以激活子 demuxer
-        // 非 EDL: 仅在位置偏差>2s 时补救 seek
-        if (isEdl || Math.abs(this.lastPositionMs - this.pendingStartMs) > 2000) {
+        if (this.pendingStartMs > 0 || isEdl) {
           Logger.info(TAG, `startup seek: target=${this.pendingStartMs}ms${isEdl ? ' (edl)' : ''}`);
           this.seekInternal(this.pendingStartMs, false);
         }
@@ -591,14 +553,23 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
       return false;
     }
-    if (!lower.includes('/manifest/') && !lower.includes('live')) {
+    // 显式点播标记（VOD / DVR / CLEAN 都是可 seek 的录播）
+    if (lower.includes('playlist_type/vod') || lower.includes('playlist_type=vod') ||
+        lower.includes('playlist_type/dvr') || lower.includes('playlist_type=dvr') ||
+        lower.includes('playlist_type/clean') || lower.includes('playlist_type=clean')) {
       return false;
     }
-    // DVR = 直播回放，可 seek，不算 live
-    if (lower.includes('playlist_type/dvr') || lower.includes('playlist_type=dvr')) {
-      return false;
+    // 显式直播标记
+    if (lower.includes('playlist_type/live') || lower.includes('playlist_type=live') ||
+        lower.includes('yt_live_broadcast')) {
+      return true;
     }
-    return true;
+    // 兜底：YouTube live manifest 路径形如 /api/manifest/hls_variant/.../live/1/...
+    // 注意：用 '/live/' 而非裸 'live'，避免误命中 'keepalive' 等子串
+    if (lower.includes('/manifest/') && lower.includes('/live/')) {
+      return true;
+    }
+    return false;
   }
 
   private looksHls(url: string): boolean {
@@ -630,10 +601,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.preparing = false;
     this.pendingStartMs = -1;
     this.pendingSeekMs = -1;
-    this.pendingSubtitleUrls = [];
-    this.subtitleLoaded = false;
-    this.subtitleUrlToIndex.clear();
-    this.activeSubtitleIndex = -1;
+    this.pendingSubtitleUrl = '';
+    this.currentSubtitleUrl = '';
     this.lastKnownPositionMs = 0;
   }
 

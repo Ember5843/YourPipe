@@ -68,7 +68,9 @@ export class SafariPlayerClient {
     const url = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
 
     try {
-      const response = await httpClient.postJson(url, payload, headers);
+      // SafariPlayerClient 是登录态下的主流提取客户端，显式 opt-in 注入登录头
+      // （对齐 PipePipe getSafariPostResponseAsync → addLoggedInHeaders）
+      const response = await httpClient.postJson(url, payload, headers, true);
       if (response && response.responseCode === 200) {
         const pr = JSON.parse(response.result as string) as PlayerResponse;
         if (pr?.streamingData) {

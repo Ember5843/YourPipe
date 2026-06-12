@@ -46,12 +46,6 @@ export interface EngineConfig {
   livePresentationDelayMs?: number;
   liveDvrWindowSegments?: number;
   liveEdgeThresholdSec?: number;
-  subtitlePosition?: string;
-  subtitleFontSize?: number;
-  subtitleColor?: string;
-  subtitleBackgroundAlpha?: number;
-  subtitleDelayMs?: number;
-  subtitleAutoSync?: boolean;
 }
 
 export interface PlaybackEngine {
@@ -75,13 +69,7 @@ export interface PlaybackEngine {
   prebufferTargetQuality(videoUrl: string, audioUrl: string): number;
   switchToPrebuffered(videoHandle: number, audioHandle: number, resumePos: number): boolean;
 
-  preloadSubtitleTracks(urls: string[]): void;
-  selectSubtitleTrack(index: number): void;
-  setSubtitleVisible(visible: boolean): void;
-  setSubtitleDelay(delayMs: number): void;
-  getSubtitleDelay(): number;
-  setSubtitleStyle(position: string, fontSize: number, color: string, bgAlpha: number): void;
-  setSubtitleAutoSync(enabled: boolean): void;
+  setSubtitle(url: string): void;
 
   setVideoOutputEnabled(enabled: boolean): void;
   setHwdecMode(mode: string): void;
