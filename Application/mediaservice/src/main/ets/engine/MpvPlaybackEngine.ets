@@ -289,14 +289,10 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.applyPendingSubtitle();
   }
 
-  setVideoOutputEnabled(enabled: boolean): void {
-    const ctrl: MpvPlayerController | null = this.controller;
-    if (ctrl === null || this.destroyed) return;
-    if (enabled) {
-      ctrl.setActiveTracks([0], MediaType.Video);
-    } else {
-      ctrl.setActiveTracks([], MediaType.Video);
-    }
+  setVideoOutputEnabled(_enabled: boolean): void {
+    // 不切换视频轨道：toggling active video tracks 会让 mpv demuxer 重排，
+    // 触发回前台时的"重新加载"。Surface 在 XComponent 隐藏时由 OS 失效，
+    // 显示时自然恢复，mpv 引擎对此无感知。
   }
 
   setHwdecMode(_mode: string): void {}

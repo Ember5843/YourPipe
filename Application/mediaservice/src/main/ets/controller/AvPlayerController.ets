@@ -169,7 +169,7 @@ export class AvPlayerController {
   public async initPlaybackEngine(): Promise<void> {
     // 先检查引擎是否已初始化，避免从 LOADING 等状态尝试非法转换
     if (this.stateMachine.isOneOf(PlayerState.INITIALIZING, PlayerState.LOADING, PlayerState.READY,
-      PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.PIP_ACTIVE)) {
+      PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING)) {
       Logger.debug(TAG, 'initPlaybackEngine skipped: engine already initialized');
       return;
     }
@@ -409,7 +409,7 @@ export class AvPlayerController {
   public setVideoOutputEnabled(enabled: boolean): void {
     // 只在 AVPlayer 支持 setMediaMuted 的状态下调用 (prepared/playing/paused/completed)
     if (this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING, PlayerState.PAUSED,
-      PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.PIP_ACTIVE)) {
+      PlayerState.BUFFERING, PlayerState.COMPLETED)) {
       this.playbackEngine.setVideoOutputEnabled(enabled);
     }
   }
@@ -1086,8 +1086,7 @@ export class AvPlayerController {
     const ctx = AppStorage.get<common.UIAbilityContext>('context');
     if (!ctx) return;
     const isActive = to === PlayerState.PLAYING || to === PlayerState.PAUSED || to === PlayerState.BUFFERING
-      || to === PlayerState.READY || to === PlayerState.LOADING
-      || to === PlayerState.PIP_ENTERING || to === PlayerState.PIP_ACTIVE || to === PlayerState.PIP_RESTORING;
+      || to === PlayerState.READY || to === PlayerState.LOADING;
     if (isActive && !this.backgroundTaskActive) {
       this.backgroundTaskActive = true;
       BackgroundTaskManager.startContinuousTask(ctx);

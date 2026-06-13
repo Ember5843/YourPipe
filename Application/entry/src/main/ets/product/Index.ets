@@ -33,6 +33,7 @@ import { UserPage } from '../features/user/UserPage';
 import { PlaylistDetailPage } from '../features/playlist/PlaylistDetailPage';
 import { VideoDetailPage } from '../features/player/VideoDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
+import { PipNavigator } from '../features/player/pip/PipNavigator';
 import { OptionsGoogleAccountPage } from '../features/auth/OptionsGoogleAccountPage';
 import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
 import { customAnimationUtil } from '../common/AnimationUtil';
@@ -451,6 +452,8 @@ struct Index {
     this.buildPickerItems();
     this.initLanguageSettings();
     this.bindActionHub();
+    PipNavigator.bind(this.navPathStack);
+    PlayerSession.getInstance().pipBinding.setEnabled(this.playbackConfig.enablePip);
     const uiContext = this.getUIContext();
     const hostContext = uiContext?.getHostContext() as common.UIAbilityContext;
     if (!hostContext) {
@@ -999,6 +1002,11 @@ struct Index {
 
     const session = PlayerSession.getInstance();
 
+    // 如果当前 PiP 可见且要换视频（同视频不切流）→ 先收回 PiP
+    if (session.pipBinding.isVisible() && session.currentVideo?.videoId !== video.videoId) {
+      await session.pipBinding.requestExit();
+    }
+
     this.selectedVideo = video;
     this.showOptions = false;
     AppStorage.setOrCreate('selectedVideo', video);
@@ -1050,17 +1058,31 @@ struct Index {
 
   private async openUserPage(channel: SearchChannelItem): Promise<void> {
     this.showOptions = false;
+    await this.maybeEnterPipBeforeNavigate();
     this.selectedChannel = channel;
     this.navPathStack.pushPath({ name: 'UserPage' });
   }
 
   private async openChannelById(channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string): Promise<void> {
     this.showOptions = false;
+    await this.maybeEnterPipBeforeNavigate();
     // 只创建基本的频道对象，只填写ID和名称，其他信息由UserPage后期填充
     const channel = new SearchChannelItem(0, channelId, channelName, '', '', channelAvatarUrl, '', '#CCCCCC', channelHandle);
-    
+
     this.selectedChannel = channel;
     this.navPathStack.pushPath({ name: 'UserPage' });
+  }
+
+  /** 仅当 PlayerPage 在栈顶且会话就绪时，跳转前进入 PiP。失败静默。 */
+  private async maybeEnterPipBeforeNavigate(): Promise<void> {
+    if (!PipNavigator.isPlayerPageOnTop()) return;
+    const session = PlayerSession.getInstance();
+    if (session.isReleased || !session.controller.vm.isReady) return;
+    try {
+      await session.pipBinding.requestEnter();
+    } catch (_e) {
+      // PiP 失败不阻塞导航
+    }
   }
 
   private openPlaylistPage(playlist: SearchPlaylistItem): void {
@@ -1393,8 +1415,18 @@ struct Index {
           return true;
         } else {
           const session = PlayerSession.getInstance();
-          session.release();
-          this.navPathStack.pop();
+          // 返回键：先尝试进 PiP，PiP 失败则按旧行为 release。
+          // 注意：requestEnter 是异步的，pop 必须等它回（或失败）后再做，
+          // 否则 PlayerPage 已 pop 时 PipBinding 还没 startPiP 就拿不到 surface。
+          session.pipBinding.requestEnter().then((ok: boolean) => {
+            if (!ok) {
+              session.release();
+            }
+            this.navPathStack.pop();
+          }).catch(() => {
+            session.release();
+            this.navPathStack.pop();
+          });
           return true;
         }
       })
@@ -2021,8 +2053,12 @@ struct Index {
 
 
   private savePlaybackConfig(next: PlaybackConfig): void {
+    const pipChanged = this.playbackConfig.enablePip !== next.enablePip;
     this.playbackConfig = next;
     PlaybackConfig.saveToPreferences(next);
+    if (pipChanged) {
+      PlayerSession.getInstance().pipBinding.setEnabled(next.enablePip);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────

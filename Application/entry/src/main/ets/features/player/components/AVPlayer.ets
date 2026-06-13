@@ -60,8 +60,6 @@ export struct VideoPlayer {
   // 才能让 vm 内部字段（isPlaying / isReady / ...）的变化触发 UI 重渲染。
   @Link vm: PlayerUiViewModel;
   private lastController?: AvPlayerController;
-  /** 防抖 disable 视频输出的定时器：避免回前台 race 触发引擎重启。-1 表示无挂起。 */
-  private disableVideoTimerId: number = -1;
   private qualityArrowModifier: SymbolGlyphModifier = new SymbolGlyphModifier();
   @State hasStreams: boolean = false;
   @State hasError: boolean = false;
@@ -226,6 +224,7 @@ export struct VideoPlayer {
   onFullScreenClick: (isLandscape?: boolean) => void = () => {};
   /** 当播放器内部发生不可恢复错误时，通知父组件重新获取流信息 */
   onRetry: () => void = () => {};
+  onSurfaceReady?: (xc: XComponentController) => void;
 
   /**
    * 核心预计算逻辑：提前算出竖屏和横屏下的 Surface 渲染区域
@@ -345,36 +344,19 @@ export struct VideoPlayer {
     const isVisible = this.isPageShow && !this.isAppBackground;
 
     if (!isVisible) {
-      // 回前台时 isAppBackground 与 playerPageVisible 是两个独立 StorageProp，
-      // 它们在几毫秒内先后变化会让 isVisible 短暂为 false，紧跟着又回 true。
-      // 直接 disable 会让 MPV 释放 GPU/decoder 又立刻重建，触发重新缓冲。
-      // 给 disable 加 200ms 防抖：真隐藏走得通，临时抖动会被随后的 visible 抵消。
-      if (this.disableVideoTimerId >= 0) {
-        clearTimeout(this.disableVideoTimerId);
-      }
-      this.disableVideoTimerId = setTimeout(() => {
-        this.disableVideoTimerId = -1;
-        if (!(this.isPageShow && !this.isAppBackground)) {
-          Logger.info(TAG, 'Page hidden → disable video output (debounced)');
-          this.controller.setVideoOutputEnabled(false);
-        }
-      }, 200);
+      // 后台/页面隐藏：不动 mpv 引擎也不切视频轨。
+      // 切视频轨 / vid=no 都会让 demuxer 重排，回前台时表现为"重新加载"。
+      // Surface 在 XComponent 隐藏时由 OS 自然失效，mpv 内部跳过 swap，
+      // 音频持续，前台恢复时不需要任何重启。
       return;
     }
 
-    // 页面显示：抵消挂起的 disable，恢复视频输出
-    if (this.disableVideoTimerId >= 0) {
-      clearTimeout(this.disableVideoTimerId);
-      this.disableVideoTimerId = -1;
-    }
-    Logger.info(TAG, 'Page shown and App foreground → restore video output');
-
     if (session.playerState === PlayerState.RELEASED) {
-      // 如果会话已释放，需要重新初始化
+      // 会话已释放（极端时序）才需要重新初始化
       session.ensureInitialized().catch(() => {});
     }
 
-    // 确保 surfaceID 已绑定
+    // surfaceID 兜底重绑：仅在丢失时
     if (!this.controller.surfaceID) {
       try {
         const surfaceId = this.xComponentController.getXComponentSurfaceId();
@@ -387,13 +369,7 @@ export struct VideoPlayer {
       }
     }
 
-    // 恢复视频输出
-    this.controller.setVideoOutputEnabled(true);
-
     this.syncPlaybackStateFromController();
-    if (this.vm.isReady && !this.vm.isPlaying) {
-      this.controller.syncPlay();
-    }
   }
 
   async aboutToAppear(): Promise<void> {
@@ -641,6 +617,9 @@ export struct VideoPlayer {
           // onLoad 时仅注册 surfaceId，不在这里设置 surfaceRect。
           // surfaceRect 由 onAreaChange 根据 XComponent 的实际屏幕像素尺寸动态设置。
           this.controller.setSurfaceID(this.xComponentController.getXComponentSurfaceId());
+          if (this.onSurfaceReady) {
+            this.onSurfaceReady(this.xComponentController);
+          }
         })
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const pxWidth = Math.round(this.getUIContext().vp2px(Number(newArea.width)));
@@ -1136,10 +1115,6 @@ export struct VideoPlayer {
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
-    if (this.disableVideoTimerId >= 0) {
-      clearTimeout(this.disableVideoTimerId);
-      this.disableVideoTimerId = -1;
-    }
     this.clearHideTimer();
     clearTimeout(this.volHideTimerId);
     clearTimeout(this.brightnessHideTimerId);

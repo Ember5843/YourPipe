@@ -4,7 +4,6 @@ import CipherBridgeTest from "./CipherBridge.test";
 import youTubeExtractorTest from "./YouTubeExtractor.test";
 //import youTubeExtractorAdditionalTest from "./YouTubeExtractorAdditional.test";
 import YouTubeHttpClientTest from "./YouTubeHttpClient.test";
-import pipLifecycleTest from "./PipLifecycle.test";
 
 
 export default function testsuite() {
@@ -13,6 +12,5 @@ export default function testsuite() {
   youTubeExtractorTest()
   CipherBridgeTest()
   cipherTest()
-  pipLifecycleTest()
   //youTubeExtractorAdditionalTest()
 }

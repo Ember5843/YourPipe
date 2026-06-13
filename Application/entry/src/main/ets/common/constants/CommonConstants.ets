@@ -121,10 +121,6 @@ export class CommonConstants {
    */
   static readonly LIVE_VIDEO_NAME: string = 'live.mp4';
   /**
-   * Pip window util.
-   */
-  static readonly PIP_WINDOW_UTIL: string = 'pipWindowUtil';
-  /**
    * Av player util.
    */
   static readonly AV_PLAYER_UTIL: string = 'avPlayerUtil';

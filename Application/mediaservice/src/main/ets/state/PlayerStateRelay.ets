@@ -125,7 +125,7 @@ export class PlayerStateRelay {
     }
     if (playingChanged && state.isPlaying && !state.isBuffering &&
       sm.isOneOf(PlayerState.READY, PlayerState.PAUSED, PlayerState.BUFFERING,
-        PlayerState.COMPLETED, PlayerState.PIP_RESTORING)) {
+        PlayerState.COMPLETED)) {
       sm.transition(PlayerState.PLAYING);
     }
     if (errorChanged && state.errorMsg &&
