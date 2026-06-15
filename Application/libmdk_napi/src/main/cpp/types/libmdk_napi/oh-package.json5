@@ -1,0 +1,6 @@
+{
+  "name": "libmdk_napi.so",
+  "types": "./Index.d.ts",
+  "version": "0.2.0",
+  "description": "Type declarations for the libmdk OHOS native module"
+}

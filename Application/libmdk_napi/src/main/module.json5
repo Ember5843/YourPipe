@@ -1,0 +1,11 @@
+{
+  "module": {
+    "name": "libmdk_napi",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet",
+      "2in1"
+    ]
+  }
+}

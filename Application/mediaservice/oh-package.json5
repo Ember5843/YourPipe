@@ -7,7 +7,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "youtube_core": "file:../youtube_core",
-    "@mediadevkit/libmdk-napi": "file:../../../libmdk-napi/libmdk_napi"
+    "@mediadevkit/libmdk-napi": "file:../libmdk_napi"
   },
   "devDependencies": {}
 }

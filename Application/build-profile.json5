@@ -97,7 +97,7 @@
     },
     {
       "name": "libmdk_napi",
-      "srcPath": "../../libmdk-napi/libmdk_napi",
+      "srcPath": "./libmdk_napi",
       "targets": [
         {
           "name": "default",
