@@ -50,7 +50,6 @@ export class PlaybackConfig {
   defaultQuality: VideoQualityCap = 'best';
   mobileQuality: VideoQualityCap = '480p';
   showHighResolutions: boolean = false;
-  enablePip: boolean = true;
   cacheDiskSize: CacheDiskSize = '512';
   cacheMaxAge: CacheMaxAge = '6';
 
@@ -61,7 +60,6 @@ export class PlaybackConfig {
     next.defaultQuality = this.defaultQuality;
     next.mobileQuality = this.mobileQuality;
     next.showHighResolutions = this.showHighResolutions;
-    next.enablePip = this.enablePip;
     next.cacheDiskSize = this.cacheDiskSize;
     next.cacheMaxAge = this.cacheMaxAge;
     return next;
@@ -72,7 +70,6 @@ export class PlaybackConfig {
     cfg.defaultQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_defaultQuality', 'best'), 'best');
     cfg.mobileQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_mobileQuality', '480p'), '480p');
     cfg.showHighResolutions = PreferencesStore.getString('cfg_pb_showHighRes', 'false') === 'true';
-    cfg.enablePip = PreferencesStore.getString('cfg_pb_pip', 'true') === 'true';
     const diskSize = PreferencesStore.getString('cfg_pb_cacheDiskSize', '512');
     cfg.cacheDiskSize = CACHE_DISK_SIZE_LABELS.includes(diskSize as CacheDiskSize) ? diskSize as CacheDiskSize : '512';
     const maxAge = PreferencesStore.getString('cfg_pb_cacheMaxAge', '6');
@@ -85,7 +82,6 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_defaultQuality', cfg.defaultQuality);
     PreferencesStore.setString('cfg_pb_mobileQuality', cfg.mobileQuality);
     PreferencesStore.setString('cfg_pb_showHighRes', cfg.showHighResolutions ? 'true' : 'false');
-    PreferencesStore.setString('cfg_pb_pip', cfg.enablePip ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_cacheDiskSize', cfg.cacheDiskSize);
     PreferencesStore.setString('cfg_pb_cacheMaxAge', cfg.cacheMaxAge);
     logger.info('Saved PlaybackConfig');

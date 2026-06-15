@@ -6,7 +6,7 @@
  *   2. 校验并执行状态转换
  *   3. 通知所有订阅者状态变更
  *
- * 各子系统（Surface / PiP / AVSession / BackgroundTask）通过
+ * 各子系统（Surface / AVSession / BackgroundTask）通过
  * addListener / removeListener 订阅状态变更，并自行决定响应策略，
  * 不再由上层手动编排操作顺序。
  */
@@ -36,16 +36,6 @@ export class PlayerStateMachine {
 
   isOneOf(...states: PlayerState[]): boolean {
     return states.includes(this._currentState);
-  }
-
-  isPlayingOrPip(): boolean {
-    return this._currentState === PlayerState.PLAYING
-      || this._currentState === PlayerState.PAUSED
-      || this._currentState === PlayerState.BUFFERING;
-  }
-
-  isPipRelated(): boolean {
-    return false;
   }
 
   canPlay(): boolean {

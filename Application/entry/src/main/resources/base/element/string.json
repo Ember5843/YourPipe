@@ -1,4 +1,4 @@
-{
+﻿{
   "string": [
     {
       "name": "module_desc",
@@ -232,11 +232,11 @@
       "name": "internet_reason",
       "value": "Request network data"
     },
-    {
+        {
       "name": "reason_background",
       "value": "keep video background running"
     },
-    {
+{
       "name": "share",
       "value": "share"
     },
@@ -383,18 +383,6 @@
     {
       "name": "yt_setting_max_back_bytes",
       "value": "后向缓冲大小 (向后 Seek 不重拉流)"
-    },
-    {
-      "name": "yt_section_other",
-      "value": "其他"
-    },
-    {
-      "name": "yt_setting_pip",
-      "value": "应用外画中画"
-    },
-    {
-      "name": "yt_setting_pip_subtitle",
-      "value": "退出应用或按 Home 键时保留画中画窗口"
     },
     {
       "name": "yt_quality_best",

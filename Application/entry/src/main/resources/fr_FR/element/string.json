@@ -1,4 +1,4 @@
-{
+﻿{
   "string": [
     {
       "name": "module_desc",
@@ -220,11 +220,11 @@
       "name": "internet_reason",
       "value": "Demander des données réseau"
     },
-    {
+        {
       "name": "reason_background",
-      "value": "Lecture vidéo en arrière-plan"
+      "value": "Maintenir la lecture en arriere-plan"
     },
-    {
+{
       "name": "share",
       "value": "Partager"
     },
@@ -371,18 +371,6 @@
     {
       "name": "yt_setting_max_back_bytes",
       "value": "Taille du tampon arrière (pas de rechargement lors du retour arrière)"
-    },
-    {
-      "name": "yt_section_other",
-      "value": "Autres"
-    },
-    {
-      "name": "yt_setting_pip",
-      "value": "Image dans l'image (PiP)"
-    },
-    {
-      "name": "yt_setting_pip_subtitle",
-      "value": "Entrer automatiquement en mode PiP lors de l'appui sur Home"
     },
     {
       "name": "yt_quality_best",

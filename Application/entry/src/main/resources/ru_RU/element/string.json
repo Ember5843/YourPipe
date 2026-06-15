@@ -1,4 +1,4 @@
-{
+﻿{
   "string": [
     {
       "name": "module_desc",
@@ -220,11 +220,11 @@
       "name": "internet_reason",
       "value": "Запрос сетевых данных"
     },
-    {
+        {
       "name": "reason_background",
-      "value": "Фоновое воспроизведение видео"
+      "value": "Продолжать воспроизведение в фоновом режиме"
     },
-    {
+{
       "name": "share",
       "value": "Поделиться"
     },
@@ -371,18 +371,6 @@
     {
       "name": "yt_setting_max_back_bytes",
       "value": "Размер обратного буфера (не перезагружать при Seek назад)"
-    },
-    {
-      "name": "yt_section_other",
-      "value": "Другое"
-    },
-    {
-      "name": "yt_setting_pip",
-      "value": "Картинка в картинке (PiP)"
-    },
-    {
-      "name": "yt_setting_pip_subtitle",
-      "value": "Автоматический вход в режим PiP при нажатии Home"
     },
     {
       "name": "yt_quality_best",

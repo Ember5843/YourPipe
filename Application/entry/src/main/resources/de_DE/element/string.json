@@ -1,4 +1,4 @@
-{
+﻿{
   "string": [
     {
       "name": "module_desc",
@@ -220,11 +220,11 @@
       "name": "internet_reason",
       "value": "Netzwerkdaten anfordern"
     },
-    {
+        {
       "name": "reason_background",
-      "value": "Video im Hintergrund laufen lassen"
+      "value": "Video im Hintergrund weiter ausfuhren"
     },
-    {
+{
       "name": "share",
       "value": "Teilen"
     },
@@ -371,18 +371,6 @@
     {
       "name": "yt_setting_max_back_bytes",
       "value": "Rückwärtspuffer (kein Neuladen bei Rückwärts-Seek)"
-    },
-    {
-      "name": "yt_section_other",
-      "value": "Sonstiges"
-    },
-    {
-      "name": "yt_setting_pip",
-      "value": "Bild-in-Bild (PiP)"
-    },
-    {
-      "name": "yt_setting_pip_subtitle",
-      "value": "Bei Home-Taste automatisch in PiP-Modus wechseln"
     },
     {
       "name": "yt_quality_best",

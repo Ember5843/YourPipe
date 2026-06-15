@@ -1,4 +1,4 @@
-{
+﻿{
   "string": [
     {
       "name": "yt_tab_home",
@@ -220,11 +220,11 @@
       "name": "internet_reason",
       "value": "Request network data"
     },
-    {
+        {
       "name": "reason_background",
       "value": "Keep video running in background"
     },
-    {
+{
       "name": "share",
       "value": "Share"
     },
@@ -371,18 +371,6 @@
     {
       "name": "yt_setting_max_back_bytes",
       "value": "Backward Buffer Size (no re-fetch when seeking back)"
-    },
-    {
-      "name": "yt_section_other",
-      "value": "Other"
-    },
-    {
-      "name": "yt_setting_pip",
-      "value": "Picture-in-Picture (PiP)"
-    },
-    {
-      "name": "yt_setting_pip_subtitle",
-      "value": "Automatically enter PiP mode when pressing Home"
     },
     {
       "name": "yt_quality_best",

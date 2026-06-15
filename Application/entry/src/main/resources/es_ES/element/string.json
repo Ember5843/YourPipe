@@ -1,4 +1,4 @@
-{
+﻿{
   "string": [
     {
       "name": "module_desc",
@@ -220,11 +220,11 @@
       "name": "internet_reason",
       "value": "Solicitar datos de red"
     },
-    {
+        {
       "name": "reason_background",
-      "value": "Reproducción de video en segundo plano"
+      "value": "Mantener el video en ejecucion en segundo plano"
     },
-    {
+{
       "name": "share",
       "value": "Compartir"
     },
@@ -371,18 +371,6 @@
     {
       "name": "yt_setting_max_back_bytes",
       "value": "Tamaño del búfer hacia atrás (no recargar al retroceder)"
-    },
-    {
-      "name": "yt_section_other",
-      "value": "Otros"
-    },
-    {
-      "name": "yt_setting_pip",
-      "value": "Imagen en imagen (PiP)"
-    },
-    {
-      "name": "yt_setting_pip_subtitle",
-      "value": "Entrar automáticamente en modo PiP al presionar Inicio"
     },
     {
       "name": "yt_quality_best",

@@ -3,7 +3,7 @@
  *
  * 设计原则：
  *   1. 状态是播放器的唯一权威来源，替代散落在各处的布尔标志。
- *   2. 每个状态对应一组明确的子系统行为（Surface / PiP / AVSession / BackgroundTask），
+ *   2. 每个状态对应一组明确的子系统行为（Surface / AVSession / BackgroundTask），
  *      各子系统独立订阅状态变更，不再由 PlayerSession 手动编排。
  *   3. 只有 VALID_TRANSITIONS 中声明的转换才被允许，非法转换直接拒绝。
  */

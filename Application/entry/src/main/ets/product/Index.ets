@@ -33,7 +33,6 @@ import { UserPage } from '../features/user/UserPage';
 import { PlaylistDetailPage } from '../features/playlist/PlaylistDetailPage';
 import { VideoDetailPage } from '../features/player/VideoDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
-import { PipNavigator } from '../features/player/pip/PipNavigator';
 import { OptionsGoogleAccountPage } from '../features/auth/OptionsGoogleAccountPage';
 import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
 import { customAnimationUtil } from '../common/AnimationUtil';
@@ -95,7 +94,7 @@ struct StateObserver {
     .height('100%')
     // 绑定 key 到配置关键字段，确保任意配置变化时 StateObserver 重建，
     // 从而触发内部 @Builder 内容（OptionsMainPage 等）重新渲染
-    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.showHighResolutions}-${this.playbackConfig.enablePip}`)
+    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.showHighResolutions}`)
   }
 }
 
@@ -452,8 +451,6 @@ struct Index {
     this.buildPickerItems();
     this.initLanguageSettings();
     this.bindActionHub();
-    PipNavigator.bind(this.navPathStack);
-    PlayerSession.getInstance().pipBinding.setEnabled(this.playbackConfig.enablePip);
     const uiContext = this.getUIContext();
     const hostContext = uiContext?.getHostContext() as common.UIAbilityContext;
     if (!hostContext) {
@@ -1002,11 +999,6 @@ struct Index {
 
     const session = PlayerSession.getInstance();
 
-    // 如果当前 PiP 可见且要换视频（同视频不切流）→ 先收回 PiP
-    if (session.pipBinding.isVisible() && session.currentVideo?.videoId !== video.videoId) {
-      await session.pipBinding.requestExit();
-    }
-
     this.selectedVideo = video;
     this.showOptions = false;
     AppStorage.setOrCreate('selectedVideo', video);
@@ -1058,31 +1050,17 @@ struct Index {
 
   private async openUserPage(channel: SearchChannelItem): Promise<void> {
     this.showOptions = false;
-    await this.maybeEnterPipBeforeNavigate();
     this.selectedChannel = channel;
     this.navPathStack.pushPath({ name: 'UserPage' });
   }
 
   private async openChannelById(channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string): Promise<void> {
     this.showOptions = false;
-    await this.maybeEnterPipBeforeNavigate();
     // 只创建基本的频道对象，只填写ID和名称，其他信息由UserPage后期填充
     const channel = new SearchChannelItem(0, channelId, channelName, '', '', channelAvatarUrl, '', '#CCCCCC', channelHandle);
 
     this.selectedChannel = channel;
     this.navPathStack.pushPath({ name: 'UserPage' });
-  }
-
-  /** 仅当 PlayerPage 在栈顶且会话就绪时，跳转前进入 PiP。失败静默。 */
-  private async maybeEnterPipBeforeNavigate(): Promise<void> {
-    if (!PipNavigator.isPlayerPageOnTop()) return;
-    const session = PlayerSession.getInstance();
-    if (session.isReleased || !session.controller.vm.isReady) return;
-    try {
-      await session.pipBinding.requestEnter();
-    } catch (_e) {
-      // PiP 失败不阻塞导航
-    }
   }
 
   private openPlaylistPage(playlist: SearchPlaylistItem): void {
@@ -1415,18 +1393,8 @@ struct Index {
           return true;
         } else {
           const session = PlayerSession.getInstance();
-          // 返回键：先尝试进 PiP，PiP 失败则按旧行为 release。
-          // 注意：requestEnter 是异步的，pop 必须等它回（或失败）后再做，
-          // 否则 PlayerPage 已 pop 时 PipBinding 还没 startPiP 就拿不到 surface。
-          session.pipBinding.requestEnter().then((ok: boolean) => {
-            if (!ok) {
-              session.release();
-            }
-            this.navPathStack.pop();
-          }).catch(() => {
-            session.release();
-            this.navPathStack.pop();
-          });
+          session.release();
+          this.navPathStack.pop();
           return true;
         }
       })
@@ -2045,20 +2013,15 @@ struct Index {
 
   private getPlaybackSubtitle(config: PlaybackConfig): string {
     const q = this.resourceToString(this.getQualityDisplay(config.defaultQuality));
-    const pip = config.enablePip ? 'PiP' : 'No PiP';
     const highRes = config.showHighResolutions ? 'High-res' : '1080p max';
-    return `${q} · ${pip} · ${highRes}`;
+    return `${q} · ${highRes}`;
   }
 
 
 
   private savePlaybackConfig(next: PlaybackConfig): void {
-    const pipChanged = this.playbackConfig.enablePip !== next.enablePip;
     this.playbackConfig = next;
     PlaybackConfig.saveToPreferences(next);
-    if (pipChanged) {
-      PlayerSession.getInstance().pipBinding.setEnabled(next.enablePip);
-    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2127,17 +2090,6 @@ struct Index {
             this.playbackConfig.showHighResolutions,
             (val: boolean) => {
               this.updatePlaybackConfig(cfg => cfg.showHighResolutions = val);
-            }
-          )
-
-          this.PlaybackSectionTitle($r('app.string.yt_section_other'))
-
-          this.PlaybackToggleRow(
-            $r('app.string.yt_setting_pip'),
-            $r('app.string.yt_setting_pip_subtitle'),
-            this.playbackConfig.enablePip,
-            (val: boolean) => {
-              this.updatePlaybackConfig(cfg => cfg.enablePip = val);
             }
           )
 

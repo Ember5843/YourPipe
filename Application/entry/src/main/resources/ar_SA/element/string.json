@@ -1,4 +1,4 @@
-{
+﻿{
   "string": [
     {
       "name": "module_desc",
@@ -220,11 +220,11 @@
       "name": "internet_reason",
       "value": "طلب بيانات الشبكة"
     },
-    {
+        {
       "name": "reason_background",
-      "value": "تشغيل الفيديو في الخلفية"
+      "value": "إبقاء تشغيل الفيديو في الخلفية"
     },
-    {
+{
       "name": "share",
       "value": "مشاركة"
     },
@@ -371,18 +371,6 @@
     {
       "name": "yt_setting_max_back_bytes",
       "value": "حجم التخزين المؤقت الخلفي (لا إعادة التحميل عند التراجع)"
-    },
-    {
-      "name": "yt_section_other",
-      "value": "أخرى"
-    },
-    {
-      "name": "yt_setting_pip",
-      "value": "صورة داخل صورة (PiP)"
-    },
-    {
-      "name": "yt_setting_pip_subtitle",
-      "value": "الدخول التلقائي إلى وضع PiP عند الضغط على Home"
     },
     {
       "name": "yt_quality_best",

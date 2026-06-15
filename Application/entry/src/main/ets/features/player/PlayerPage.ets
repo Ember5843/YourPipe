@@ -35,7 +35,6 @@ import { AvPlayerController, PlayerUiViewModel } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
 import { PlayQueueList } from './components/PlayQueueList';
 import { PlayQueueManager, QueueSourceType } from './PlayQueueManager';
-import { PipBinding } from './pip/PipBinding';
 
 const logger = AppLog.getInstance('PlayerPage');
 
@@ -131,21 +130,6 @@ export struct VideoPlayerPage {
     this.isRetrying = true;
     await this.onVideoChange();
     this.isRetrying = false;
-  }
-
-  private async bindPipSurface(xc: XComponentController): Promise<void> {
-    const ctx: common.UIAbilityContext | undefined = AppStorage.get('context');
-    if (!ctx) {
-      logger.warn(`${TAG} bindPipSurface skipped: no UIAbilityContext`);
-      return;
-    }
-    const session = PlayerSession.getInstance();
-    await session.pipBinding.bindPlayerSurface(
-      ctx,
-      { xComponentController: xc, handleId: this.getUniqueId() },
-      () => ({ width: this.videoSource.width || 0, height: this.videoSource.height || 0 }),
-      session.controller,
-    );
   }
 
   private syncDetailStateFromSource(source: VideoData): void {
@@ -302,12 +286,6 @@ export struct VideoPlayerPage {
       return;
     }
     const session = PlayerSession.getInstance();
-    if (session.pipBinding.isVisible()) {
-      logger.info(`${TAG} onVideoChange skipped: PiP visible (state=${session.pipBinding.getState()}), only syncing refs`);
-      this.controller = session.controller;
-      this.vm = session.controller.vm;
-      return;
-    }
     this.isVideoChanging = true;
 
     // 同视频已就绪：直接同步，使用缓存数据
@@ -612,8 +590,7 @@ export struct VideoPlayerPage {
         onRetry: () => {
           this.retryLoadVideo();
         },
-        onSurfaceReady: (xc: XComponentController) => {
-          this.bindPipSurface(xc);
+        onSurfaceReady: (_xc: XComponentController) => {
         },
         curSource: $videoSource,
         curIndex: 0,

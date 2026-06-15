@@ -7,7 +7,6 @@ import { PlayQueueManager } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
 import { YOUTUBE_VIDEO_ID } from './Constants';
-import { PipBinding } from '../features/player/pip/PipBinding';
 
 export interface CachedChannelProfile {
   name: string;
@@ -28,7 +27,6 @@ export class PlayerSession {
   private static instance: PlayerSession | null = null;
 
   private _controller: AvPlayerController;
-  private _pipBinding: PipBinding = new PipBinding();
   private _currentVideo: VideoItem | null = null;
   private _defaultSource: VideoData;
   private _context: common.UIAbilityContext;
@@ -78,10 +76,6 @@ export class PlayerSession {
 
   get controller(): AvPlayerController {
     return this._controller;
-  }
-
-  get pipBinding(): PipBinding {
-    return this._pipBinding;
   }
 
   get currentVideo(): VideoItem | null {
@@ -292,9 +286,6 @@ export class PlayerSession {
         videoSource.auto = shouldPlay;
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
         this._controller.updateVideoSource(videoSource);
-        if (videoStream && videoStream.width && videoStream.height) {
-          this._pipBinding.notifyVideoSizeChanged(videoStream.width, videoStream.height);
-        }
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
         this.startWatchSaveTimer();
         return videoSource;
