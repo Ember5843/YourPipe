@@ -52,6 +52,8 @@ export class PlaybackConfig {
   showHighResolutions: boolean = false;
   cacheDiskSize: CacheDiskSize = '512';
   cacheMaxAge: CacheMaxAge = '6';
+  /** 返回键/home 键时是否自动进入画中画（设备不支持时强制 false） */
+  pipOnReturn: boolean = true;
 
   constructor() {}
 
@@ -62,6 +64,7 @@ export class PlaybackConfig {
     next.showHighResolutions = this.showHighResolutions;
     next.cacheDiskSize = this.cacheDiskSize;
     next.cacheMaxAge = this.cacheMaxAge;
+    next.pipOnReturn = this.pipOnReturn;
     return next;
   }
 
@@ -74,6 +77,7 @@ export class PlaybackConfig {
     cfg.cacheDiskSize = CACHE_DISK_SIZE_LABELS.includes(diskSize as CacheDiskSize) ? diskSize as CacheDiskSize : '512';
     const maxAge = PreferencesStore.getString('cfg_pb_cacheMaxAge', '6');
     cfg.cacheMaxAge = CACHE_MAX_AGE_LABELS.includes(maxAge as CacheMaxAge) ? maxAge as CacheMaxAge : '6';
+    cfg.pipOnReturn = PreferencesStore.getString('cfg_pb_pipOnReturn', 'true') === 'true';
     logger.info(`Loaded PlaybackConfig: ${JSON.stringify(cfg)}`);
     return cfg;
   }
@@ -84,6 +88,7 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_showHighRes', cfg.showHighResolutions ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_cacheDiskSize', cfg.cacheDiskSize);
     PreferencesStore.setString('cfg_pb_cacheMaxAge', cfg.cacheMaxAge);
+    PreferencesStore.setString('cfg_pb_pipOnReturn', cfg.pipOnReturn ? 'true' : 'false');
     logger.info('Saved PlaybackConfig');
   }
 }

@@ -269,6 +269,13 @@ export class AvPlayerController {
     this.deferCurrentSessionDestroy();
     this.curSource = newSource;
     this.curIndex = newSource.index;
+    // 用视频原始分辨率给引擎播种 surface 几何：load() 在 aboutToAppear 阶段就跑，
+    // 早于 NodeContainer.onAreaChange / onSurfaceChanged，UI 喂不进尺寸会导致
+    // mpv video chain 初始化报 "Failed to get height and width"。视频原生尺寸不依赖布局，
+    // 设给 NativeWindow buffer geometry 足以让 chain 起来，之后 onAreaChange 再用真实像素精修。
+    if (newSource.width && newSource.height && newSource.width > 0 && newSource.height > 0) {
+      this.playbackEngine.resizeSurface(newSource.width, newSource.height);
+    }
     this.vm.subtitleTracks = newSource.subtitleTracks || [];
     // 优先从 newSource 的流信息中恢复 duration，避免后续 resolveDurationMs 取到 0
     if (newSource.streams && newSource.streams.length > 0) {
@@ -366,15 +373,17 @@ export class AvPlayerController {
   }
 
   public resizeSurface(widthPx: number, heightPx: number): void {
-    if (this.isActive()) this.playbackEngine.resizeSurface(widthPx, heightPx);
+    // 不门控 isActive：引擎层会缓存几何，供 LOADING 阶段 bindSurface 时套用，
+    // 否则 mpv video chain 初始化拿不到宽高（typeNode surface 早于引擎就绪）。
+    this.playbackEngine.resizeSurface(widthPx, heightPx);
   }
 
   public setSurfaceID(surfaceID: string): void {
     if (!surfaceID || this.surfaceID === surfaceID) return;
     this.surfaceID = surfaceID;
-    if (this.isActive()) {
-      this.playbackEngine.attachSurface(surfaceID);
-    }
+    // 不门控 isActive：始终把 surfaceId 透传给引擎缓存，使引擎 initialize()/load() 时能据此重绑，
+    // 避免 typeNode surface 早于引擎就绪导致的丢绑、无画面。
+    this.playbackEngine.attachSurface(surfaceID);
   }
 
   public syncPlay(): void {

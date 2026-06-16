@@ -14,6 +14,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private subtitleCallback: ((text: string, startTime: number, duration: number) => void) | null = null;
 
   private surfaceId: string = '';
+  /** 最近一次已知的 surface 像素尺寸；bindSurface 后据此立即设置几何，避免 mpv video chain 拿不到宽高 */
+  private surfaceWidthPx: number = 0;
+  private surfaceHeightPx: number = 0;
   private sourceUrl: string = '';
   private playbackSpeed: number = 1.0;
 
@@ -123,8 +126,12 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   }
 
   resizeSurface(widthPx: number, heightPx: number): void {
+    if (widthPx <= 0 || heightPx <= 0) return;
+    // 先缓存：即使引擎尚未 active（surface 比 controller 早就绪），下次 bindSurface 也能立即套用几何
+    this.surfaceWidthPx = widthPx;
+    this.surfaceHeightPx = heightPx;
     const ctrl: MpvPlayerController | null = this.controller;
-    if (ctrl === null || this.destroyed || widthPx <= 0 || heightPx <= 0) return;
+    if (ctrl === null || this.destroyed) return;
     ctrl.setVideoSurfaceSize(widthPx, heightPx);
     Logger.debug(TAG, `resizeSurface: ${widthPx}x${heightPx}px`);
   }
@@ -318,7 +325,15 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private bindSurface(ctrl: MpvPlayerController, surfaceId: string): void {
     if (surfaceId.length === 0) return;
     ctrl.setVideoSurfaceId(surfaceId);
-    Logger.debug(TAG, `attachSurface: surfaceId=${surfaceId}`);
+    // 绑定后立即套用已知几何：mpv 的 ohos vo 在 video chain 初始化时需要宽高，
+    // 否则报 "Failed to get height and width" 且无画面。typeNode 方案下 onSurfaceCreated
+    // 可能早于 onSurfaceChanged，UI 层首次回调时尺寸常为 0，故由引擎用缓存兜底。
+    if (this.surfaceWidthPx > 0 && this.surfaceHeightPx > 0) {
+      ctrl.setVideoSurfaceSize(this.surfaceWidthPx, this.surfaceHeightPx);
+      Logger.debug(TAG, `bindSurface: id=${surfaceId.substring(0, 24)} geometry=${this.surfaceWidthPx}x${this.surfaceHeightPx}`);
+    } else {
+      Logger.warn(TAG, `bindSurface: id=${surfaceId.substring(0, 24)} but no known geometry yet`);
+    }
   }
 
   private playInternal(): void {

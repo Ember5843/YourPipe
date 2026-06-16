@@ -41,6 +41,10 @@ export class PlayerSession {
   private _activeExtrasVideoId: string = '';
   private _pendingResumeSec: number = -1;
   private _pendingAutoPlay: boolean | null = null;
+  /** 画中画是否激活（由 PiPManager.onStateChange 设置） */
+  private _isPiPActive: boolean = false;
+  /** release() 时调用，用于停止 PiP（避免循环 import，由 PiPManager 注入） */
+  onStopPiP: (() => Promise<void>) | null = null;
 
   /** PlayerSession 被 release 销毁时由外部（Index.ets）设置的回调，用于清理 NavStack */
   onSessionReleased?: () => void;
@@ -104,6 +108,18 @@ export class PlayerSession {
 
   get lastPlayError(): string | Resource | null {
     return this._lastPlayError;
+  }
+
+  get isPiPActive(): boolean {
+    return this._isPiPActive;
+  }
+
+  setPiPActive(active: boolean): void {
+    if (this._isPiPActive !== active) {
+      this._isPiPActive = active;
+      AppStorage.setOrCreate('isPiPActive', active);
+      logger.info(`${TAG} isPiPActive=${active}`);
+    }
   }
 
   setContinuationRestoreOptions(progressSec: number, shouldPlay: boolean): void {
@@ -369,6 +385,13 @@ export class PlayerSession {
   release(): void {
     if (this._controller.playerState === PlayerState.RELEASED) return;
     logger.info(`${TAG} release() called`);
+    // 若画中画激活，先停止 PiP（释放播放器前关闭悬浮窗）
+    if (this._isPiPActive && this.onStopPiP) {
+      this.onStopPiP().catch((e: Error) => {
+        logger.warn(`${TAG} stopPiP on release failed: ${e.message}`);
+      });
+      this.setPiPActive(false);
+    }
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
     this._controller.releaseVideo(0);

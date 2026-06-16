@@ -213,7 +213,10 @@ export struct VideoPlayer {
   private backwardHintTimerId: number = -1;
 
   
-  private xComponentController: XComponentController = new XComponentController();
+  // 播放页渲染用的 XComponentController。也作为 PiP 的 componentController：
+  // XComponent 方式的 PiP 不迁移节点，进/出 PiP 时同一个 surface 直接投到悬浮窗，
+  // surfaceId 不变，MPV 无需 detach/re-attach，避免黑帧与几何丢失。
+  private x_componentController: XComponentController = new XComponentController();
   private screenHeight: number = 0;
   private envService: PlayerEnvironmentService = new PlayerEnvironmentService();
 
@@ -325,14 +328,14 @@ export struct VideoPlayer {
       // Re-inject the surface only when the new controller does not have one yet.
       try {
         if (!this.controller.surfaceID) {
-          const surfaceId = this.xComponentController.getXComponentSurfaceId();
+          const surfaceId = this.x_componentController.getXComponentSurfaceId();
           if (surfaceId) {
             this.controller.setSurfaceID(surfaceId);
             Logger.debug(TAG, `SurfaceID re-injected after controller change: ${surfaceId}`);
           }
         }
       } catch (_e) {
-        // XComponent may not be loaded yet.
+        // XComponent surface may not be ready yet.
       }
     }
 
@@ -359,7 +362,7 @@ export struct VideoPlayer {
     // surfaceID 兜底重绑：仅在丢失时
     if (!this.controller.surfaceID) {
       try {
-        const surfaceId = this.xComponentController.getXComponentSurfaceId();
+        const surfaceId = this.x_componentController.getXComponentSurfaceId();
         if (surfaceId) {
           this.controller.setSurfaceID(surfaceId);
           Logger.info(TAG, `SurfaceID re-bound on visibility change: ${surfaceId}`);
@@ -607,20 +610,27 @@ export struct VideoPlayer {
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
-      // 1. 渲染层
+      // 1. 渲染层（XComponent SURFACE 直渲）
+      // XComponent 在 build() 内联，.onLoad() 触发时节点已上树、surface 几何有效，
+      // MPV setVideoSurfaceId 即可拿到宽高。进入 PiP 时系统把同一 surface 投到悬浮窗，
+      // surfaceId 不变，引擎无需重绑。
       XComponent({
-        id: 'XComponent',
+        id: 'PlayerXComponent',
         type: XComponentType.SURFACE,
-        controller: this.xComponentController
+        controller: this.x_componentController
       })
         .onLoad(() => {
-          // onLoad 时仅注册 surfaceId，不在这里设置 surfaceRect。
-          // surfaceRect 由 onAreaChange 根据 XComponent 的实际屏幕像素尺寸动态设置。
-          this.controller.setSurfaceID(this.xComponentController.getXComponentSurfaceId());
+          const surfaceId = this.x_componentController.getXComponentSurfaceId();
+          Logger.info(TAG, `XComponent onLoad, surfaceId=${surfaceId}`);
+          this.controller.setSurfaceID(surfaceId);
           if (this.onSurfaceReady) {
-            this.onSurfaceReady(this.xComponentController);
+            this.onSurfaceReady(this.x_componentController);
           }
         })
+        .onDestroy(() => {
+          Logger.info(TAG, 'XComponent onDestroy');
+        })
+        .aspectRatio(this.curSource.width && this.curSource.height ? this.curSource.width / this.curSource.height : 16 / 9)
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const pxWidth = Math.round(this.getUIContext().vp2px(Number(newArea.width)));
           const pxHeight = Math.round(this.getUIContext().vp2px(Number(newArea.height)));
@@ -629,10 +639,6 @@ export struct VideoPlayer {
             this.controller.resizeSurface(pxWidth, pxHeight);
           }
         })
-        // aspectRatio 保持视频比例：横竖屏切换时 XComponent 自身宽高按比例平滑变化，
-        // 避免 surface 突变 → libmdk 重建 NativeWindow 缓冲区 → 黑帧闪烁。
-        // 黑边由外层 Stack 黑色背景提供。
-        .aspectRatio(this.curSource.width && this.curSource.height ? this.curSource.width / this.curSource.height : 16 / 9)
         .zIndex(CommonConstants.Z_INDEX_BASE)
 
       // 加载中/缓冲提示层

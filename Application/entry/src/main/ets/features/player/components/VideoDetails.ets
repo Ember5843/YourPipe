@@ -347,7 +347,7 @@ export struct VideoDetails {
         this.ActionButton($r('sys.symbol.bookmark'),
           '保存到播放列表', () => { this.showSavePlaylistSheet = true; })
         this.ActionButton($r('sys.symbol.play_circle'),
-          '后台播放', () => { this.showTodo(); })
+          '后台播放', () => { this.moveToBackground(); })
         this.ActionButton($r('sys.symbol.share'),
           '分享', () => { this.shareVideo(); })
       }
@@ -517,8 +517,13 @@ export struct VideoDetails {
     .width('100%')
   }
 
-  private showTodo(): void {
-    this.getUIContext().getPromptAction().showToast({ message: '功能开发中' });
+  private moveToBackground(): void {
+    // 回到桌面保活：不碰 vo，不弹画中画，mpv 持续渲染，音频继续播放。
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    ctx.moveAbilityToBackground().catch((e: Error) => {
+      Logger.error(TAG, `moveAbilityToBackground failed: ${e.message}`);
+      this.getUIContext().getPromptAction().showToast({ message: '回到桌面失败' });
+    });
   }
 
   private openCastPicker(): void {

@@ -19,7 +19,7 @@ import { DownloadManager, DownloadTask } from '../common/DownloadManager';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
 import { AppLogStore } from '../common/AppLogStore';
 import { VideoSearchResult } from '../features/home/SearchService';
-import { LocalMediaProxy } from 'mediaservice';
+import { LocalMediaProxy, PlayerState } from 'mediaservice';
 import { KioskPageResult } from '../features/home/HomeFeedService';
 import { ChannelInfoService } from '../features/user/ChannelInfoService';
 import { VideoCard } from '../common/components/VideoCard';
@@ -67,6 +67,7 @@ import {
   CacheMaxAge, CACHE_MAX_AGE_LABELS, CACHE_MAX_AGE_DISPLAY,
 } from '../common/PlaybackConfig';
 import { PlayerSession } from '../common/PlayerSession';
+import { PiPManager } from '../features/player/pip/PiPManager';
 import { PlayQueueManager, QueueSourceType, PlayQueueSourceHint } from '../features/player/PlayQueueManager';
 import {
   PlaybackContinuationRestoreRequest,
@@ -1393,6 +1394,23 @@ struct Index {
           return true;
         } else {
           const session = PlayerSession.getInstance();
+          const pip = PiPManager.getInstance();
+          // 返回键进入画中画：pipOnReturn 且设备支持且 PiP 已初始化且未激活且播放器处于可播状态
+          const canEnterPiP = this.playbackConfig.pipOnReturn
+            && pip.isPiPSupported()
+            && pip.isReady
+            && !session.isPiPActive
+            && (session.playerState === PlayerState.PLAYING
+              || session.playerState === PlayerState.PAUSED
+              || session.playerState === PlayerState.BUFFERING
+              || session.playerState === PlayerState.READY);
+          if (canEnterPiP) {
+            pip.startPiP().catch((e: Error) => {
+              logger.warn(`startPiP on back failed: ${e.message}`);
+            });
+            // 不 pop 播放页，不 release：typeNode 迁到 PiP，主页面保留占位层，app 仍前台
+            return true;
+          }
           session.release();
           this.navPathStack.pop();
           return true;
@@ -2092,6 +2110,19 @@ struct Index {
               this.updatePlaybackConfig(cfg => cfg.showHighResolutions = val);
             }
           )
+
+          if (PiPManager.getInstance().isPiPSupported()) {
+            this.PlaybackSectionTitle('画中画')
+
+            this.PlaybackToggleRow(
+              '返回时进入画中画',
+              '按返回键或 home 键时自动弹出画中画窗口',
+              this.playbackConfig.pipOnReturn,
+              (val: boolean) => {
+                this.updatePlaybackConfig(cfg => cfg.pipOnReturn = val);
+              }
+            )
+          }
 
           this.PlaybackSectionTitle('下载')
 

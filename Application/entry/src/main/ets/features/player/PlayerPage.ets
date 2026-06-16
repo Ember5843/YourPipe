@@ -16,7 +16,7 @@ import { AppLog } from '../../common/AppLog';
 
 import { window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
-import { CommonConstants as Const, Logger, VideoData } from 'mediaservice';
+import { CommonConstants as Const, VideoData } from 'mediaservice';
 import { WindowUtil } from '../../common/utils/WindowUtil';
 import { VideoDetails } from './components/VideoDetails';
 import { VideoPlayer } from './components/AVPlayer';
@@ -27,14 +27,13 @@ import { Constants } from '../../common/Constants';
 import { YouTubePlayService } from './YouTubePlayService';
 import { VideoItem } from 'youtube_core';
 import { ActionHub, ActionHubEvent } from '../../common/ActionHub';
-import { CommentList } from './components/CommentList';
-import { CommentReplyPage } from './components/CommentReplyPage';
 import { CommentNavWrapper } from './components/CommentNavWrapper';
-import { WatchHistoryStore } from '../../common/WatchHistoryStore';
 import { AvPlayerController, PlayerUiViewModel } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
 import { PlayQueueList } from './components/PlayQueueList';
 import { PlayQueueManager, QueueSourceType } from './PlayQueueManager';
+import { PiPManager } from './pip/PiPManager';
+import { PlaybackConfig } from '../../common/PlaybackConfig';
 
 const logger = AppLog.getInstance('PlayerPage');
 
@@ -85,14 +84,14 @@ export struct VideoPlayerPage {
   @State detailChannelAvatarUrl: string = '';
   @State isRetrying: boolean = false;
   @State isLoading: boolean = false;
+  /** 画中画是否激活（订阅 PlayerSession.isPiPActive → 显示占位层） */
+  @StorageLink('isPiPActive') isPiPActive: boolean = false;
+  /** 播放设置（含 pipOnReturn） */
+  @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   private windowUtil: WindowUtil = WindowUtil.getInstance();
   private handleExitFullscreen: () => void = () => {
     this.handleFullScreenExit();
   };
-  /** 当前播放视频的 videoId，用于历史记录 */
-  private watchVideoId: string = '';
-  /** 10 秒定时保存历史进度的 Timer ID */
-  private watchSaveTimerId: number = -1;
 
   private getVideoHeightVp(): number {
     // 宽布局（折叠屏展开/平板横屏）或全屏 → 撑满
@@ -115,16 +114,6 @@ export struct VideoPlayerPage {
   /**
    * 重试加载视频信息（从获取视频详细信息和流开始）
    */
-  private resourceToString(res: ResourceStr | null): string {
-    if (res === null) return '';
-    if (typeof res === 'string') return res;
-    try {
-      return getContext().resourceManager.getStringSync(res.id);
-    } catch (e) {
-      return '';
-    }
-  }
-
   private async retryLoadVideo(): Promise<void> {
     if (this.isRetrying) return;
     this.isRetrying = true;
@@ -144,6 +133,11 @@ export struct VideoPlayerPage {
     this.vm = session.controller.vm;
 
     let context: Context = this.getUIContext().getHostContext() as Context;
+
+    // XComponent 方式 PiP：surface 由 AVPlayer 的内联 XComponent.onLoad 直接绑定，
+    // 这里无需注册 surface 监听。仅注入 release 时停 PiP 的回调（避免 PlayerSession 循环 import）。
+    PlayerSession.getInstance().onStopPiP = () => PiPManager.getInstance().stopPiP();
+
     const initW = this.deviceWidth;
     const initH = this.deviceHeight;
     if (initW > 0 && initH > 0 && initW > initH) {
@@ -258,15 +252,16 @@ export struct VideoPlayerPage {
   }
 
   aboutToDisappear(): void {
-    // 退出播放页面时，保存最终进度到历史记录
-    this.saveWatchHistory();
-    this.stopWatchSaveTimer();
     // 恢复状态栏并恢复全局自动旋转
     this.windowUtil.enableWindowSystemBar();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
     this.windowUtil.registerOffWindowSizeChange();
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
     this.controller.onCastStateChange = undefined;
+
+    // 退出播放页：关闭 PiP 自动启动（避免非播放页 home 键误启），注销生命周期回调
+    PiPManager.getInstance().setAutoStart(false);
+    PiPManager.getInstance().unregisterPipStateChangeListener();
 
     // 退出时清理 adhoc 队列
     const qm = PlayQueueManager.getInstance();
@@ -323,6 +318,24 @@ export struct VideoPlayerPage {
           session.cachedVideoSource = newVideoSource;
           this.syncDetailStateFromSource(newVideoSource);
         }
+        // 画中画：首次播放时创建 PiPController，切视频时更新 contentSize（调整 PiP 窗口比例）
+        const pip = PiPManager.getInstance();
+        if (pip.isPiPSupported()) {
+          const vw = newVideoSource.width || 16;
+          const vh = newVideoSource.height || 9;
+          if (pip.isReady) {
+            pip.updateContentSize(vw, vh);
+          } else {
+            const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+            pip.init(ctx, vw, vh).then((ok: boolean) => {
+              if (ok) {
+                logger.info(`${TAG} PiPController created for ${newVideoSource.videoId}`);
+              }
+            }).catch((e: Error) => {
+              logger.warn(`${TAG} PiPController init failed: ${e.message}`);
+            });
+          }
+        }
       } else {
         const err = session.lastPlayError;
         if (err === null) {
@@ -349,10 +362,18 @@ export struct VideoPlayerPage {
 
   onPageHide(): void {
     this.isPageShow = false;
+    // 页面隐藏时关闭 PiP 自动启动（避免非播放页 home 键误启）
+    PiPManager.getInstance().setAutoStart(false);
   }
 
   onPageShow(): void {
     this.isPageShow = true;
+
+    // 页面可见时：若开启 pipOnReturn 且设备支持，允许 home 键自动启动 PiP
+    const pip = PiPManager.getInstance();
+    if (pip.isPiPSupported() && this.playbackConfig.pipOnReturn) {
+      pip.setAutoStart(true);
+    }
 
     const session = PlayerSession.getInstance();
     if (session.isReleased && this.video) {
@@ -364,46 +385,6 @@ export struct VideoPlayerPage {
   private notifyFullScreenChange(): void {
     if (this.onFullScreenChange) {
       this.onFullScreenChange(this.isFullLandscapeScreen);
-    }
-  }
-
-  /** 保存当前播放位置到历史记录 */
-  private saveWatchHistory(): void {
-    if (!this.watchVideoId) return;
-    try {
-      const controller = this.controller;
-      const progressSec = controller.vm.currentTime;
-      const durationSec = controller.vm.durationTime;
-      WatchHistoryStore.record(
-        this.watchVideoId,
-        this.video?.title || this.videoSource.description as string || '',
-        this.video?.author || this.videoSource.author || '',
-        this.video?.thumbnailUrl || this.videoSource.thumbnailUrl || '',
-        durationSec,
-        progressSec,
-        this.video?.channelId || this.videoSource.channelId || '',
-        this.video?.channelAvatarUrl || '',
-        this.video?.channelHandle || ''
-      );
-      logger.info(`${TAG} Saved history: ${this.watchVideoId} at ${progressSec.toFixed(1)}s / ${durationSec.toFixed(1)}s`);
-    } catch (e) {
-      logger.warn(`${TAG} saveWatchHistory failed: ${e}`);
-    }
-  }
-
-  /** 启动 10 秒定时保存 */
-  private startWatchSaveTimer(): void {
-    this.stopWatchSaveTimer();
-    this.watchSaveTimerId = setInterval(() => {
-      this.saveWatchHistory();
-    }, 10000);
-  }
-
-  /** 清除定时保存 */
-  private stopWatchSaveTimer(): void {
-    if (this.watchSaveTimerId !== -1) {
-      clearInterval(this.watchSaveTimerId);
-      this.watchSaveTimerId = -1;
     }
   }
 
@@ -590,7 +571,9 @@ export struct VideoPlayerPage {
         onRetry: () => {
           this.retryLoadVideo();
         },
-        onSurfaceReady: (_xc: XComponentController) => {
+        onSurfaceReady: (xc: XComponentController) => {
+          // 把播放页 XComponentController 注入 PiPManager 作为 PiP 的 componentController
+          PiPManager.getInstance().setComponentController(xc);
         },
         curSource: $videoSource,
         curIndex: 0,
@@ -600,7 +583,34 @@ export struct VideoPlayerPage {
       if (this.isLoading || this.videoDescriptionError || !this.videoSource.streams || this.videoSource.streams.length === 0) {
         this.VideoPlaceholder()
       }
+
+      // 画中画激活时：typeNode 已迁移到 PiP 窗口，主页面显示占位层提示
+      if (this.isPiPActive) {
+        this.PiPPlaceholderLayer()
+      }
     }
+  }
+
+  @Builder
+  PiPPlaceholderLayer() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column({ space: 12 }) {
+        SymbolGlyph($r('sys.symbol.play_circle'))
+          .fontSize(40)
+          .fontColor([Color.White])
+        Text('画中画播放中')
+          .fontColor(Color.White)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+        Text('点击画中画窗口恢复')
+          .fontColor('#99FFFFFF')
+          .fontSize(13)
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Black)
+    .hitTestBehavior(HitTestMode.None)
   }
 
   build() {
