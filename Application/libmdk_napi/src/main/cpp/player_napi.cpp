@@ -1150,20 +1150,21 @@ napi_value SetVideoSurfaceId(napi_env env, napi_callback_info info)
             // pendingLoad is false once playback has started, so without this
             // branch mpv keeps rendering to the old (gone) surface -> black.
             //
-            // Re-push "wid" at runtime so the OHOS VO rebuilds its native window
-            // onto the new surface, then nudge a redraw via an exact seek to the
-            // current position so a frame is presented even while paused.
+            // Re-push the new surfaceId into mpv's "wid" option. This fork tags
+            // "wid" with UPDATE_VO (mpv commit 8b0b186 "options: handle runtime
+            // wid change"), so changing it makes mpv tear down the whole VO
+            // (uninit_video_out) and rebuild it (reinit_video_chain) against the
+            // new surface, then auto queue_seek to the current position to
+            // present a frame — see player/command.c UPDATE_VO handler. That
+            // built-in seek is why we do NOT issue our own here. Cost: the
+            // decoder is also recreated, so expect a brief stall (acceptable,
+            // usually hidden by the PiP restore animation).
             if (surfaceChanged && ctx.initialized && ctx.mpv) {
-                const int64_t positionMs = ctx.lastPositionMs.load();
-                const string seconds = to_string(static_cast<double>(positionMs) / 1000.0);
                 OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                             "surface redirect old=%{public}s new=%{public}s pos=%{public}lldms",
-                             previousSurfaceId.c_str(), surfaceId.c_str(),
-                             static_cast<long long>(positionMs));
-                PostCommand(ctx, [seconds](PlayerContext& workerCtx) {
+                             "surface redirect old=%{public}s new=%{public}s (UPDATE_VO)",
+                             previousSurfaceId.c_str(), surfaceId.c_str());
+                PostCommand(ctx, [](PlayerContext& workerCtx) {
                     ApplyWindowOption(workerCtx);
-                    RunMpvCommand(workerCtx, {"seek", seconds, "absolute+exact"},
-                                  "surface-redirect-redraw");
                 });
             }
             return;
