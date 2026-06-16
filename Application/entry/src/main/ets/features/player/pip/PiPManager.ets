@@ -41,6 +41,13 @@ export class PiPManager {
   private navigationId: string = 'mainNavigation';
   private lifecycleCallbacks: PiPLifecycleCallback[] = [];
 
+  /** PiP 关闭时回调（移植 0.4.0）：由 PlayerSession 注入，区分后台暂停/前台释放 */
+  onPipStop: (() => void) | null = null;
+  /** PiP 恢复时回调（移植 0.4.0）：由 Index 注入，确保 PlayerPage 在栈顶以重建 */
+  onPipRestore: (() => void) | null = null;
+  /** 正在从 PiP 恢复，避免 STOPPED 误触发 onPipStop 的释放 */
+  isRestoring: boolean = false;
+
   private constructor() {}
 
   static getInstance(): PiPManager {
@@ -152,15 +159,31 @@ export class PiPManager {
         // XComponent 方式：系统把播放页 surface 投到悬浮窗，无需迁移节点。
         session.setPiPActive(true);
         break;
+      case PiPWindow.PiPState.ABOUT_TO_RESTORE:
+        // 点 PiP 恢复按钮：通知外部（Index）确保 PlayerPage 在栈顶，准备重建。
+        this.isRestoring = true;
+        if (this.onPipRestore) {
+          this.onPipRestore();
+        }
+        break;
       case PiPWindow.PiPState.STOPPED:
         session.setPiPActive(false);
+        // 移植 0.4.0 退出语义：还原(panelActionRestore)或删除(requestDelete)走系统流程，跳过 onPipStop；
+        // 其余关闭按 app 前后台区分——后台仅暂停(保活后台播放)，前台释放会话。
+        if (reason === 'panelActionRestore' || reason === 'requestDelete') {
+          logger.info(`${TAG} STOPPED via ${reason}, skip onPipStop`);
+        } else if (this.onPipStop) {
+          this.onPipStop();
+        }
+        this.isRestoring = false;
         break;
       case PiPWindow.PiPState.ERROR:
         logger.error(`${TAG} PiP error: ${reason}`);
         session.setPiPActive(false);
+        this.isRestoring = false;
         break;
       default:
-        // ABOUT_TO_STOP / ABOUT_TO_RESTORE：还原由系统经 navigationId 处理，无需操作。
+        // ABOUT_TO_STOP：节点/页面操作由 onPipStop / 系统处理。
         break;
     }
     for (const cb of this.lifecycleCallbacks) {

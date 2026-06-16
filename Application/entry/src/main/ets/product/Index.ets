@@ -452,6 +452,14 @@ struct Index {
     this.buildPickerItems();
     this.initLanguageSettings();
     this.bindActionHub();
+    // PiP 恢复：不手动 push 播放页。系统经 navigationId 自动还原出一个播放页，
+    // 新页面 XComponent onLoad 会把新 surfaceId 透传给引擎，由 native 运行时把 mpv
+    // 重定向到新 surface（见 player_napi SetVideoSurfaceId 的 surface-redirect 分支）。
+    // 之前这里再 pushPath 一个 PlayerPage，与系统还原的那个叠加 => 栈里出现两个播放页
+    // （上层黑屏、返回后露出下层），故移除。
+    PiPManager.getInstance().onPipRestore = () => {
+      logger.info('onPipRestore: rely on system navigationId restore, no manual push');
+    };
     const uiContext = this.getUIContext();
     const hostContext = uiContext?.getHostContext() as common.UIAbilityContext;
     if (!hostContext) {
@@ -1405,10 +1413,11 @@ struct Index {
               || session.playerState === PlayerState.BUFFERING
               || session.playerState === PlayerState.READY);
           if (canEnterPiP) {
+            // 返回 = 弹 PiP + pop 回上一页（一步到位）。引擎在 PlayerSession 中存活，PiP 悬浮窗续播。
             pip.startPiP().catch((e: Error) => {
               logger.warn(`startPiP on back failed: ${e.message}`);
             });
-            // 不 pop 播放页，不 release：typeNode 迁到 PiP，主页面保留占位层，app 仍前台
+            this.navPathStack.pop();
             return true;
           }
           session.release();

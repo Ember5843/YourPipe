@@ -1138,10 +1138,34 @@ napi_value SetVideoSurfaceId(napi_env env, napi_callback_info info)
     OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "surface id id=%{public}s surface=%{public}s",
                  id.c_str(), surfaceId.c_str());
     lockFor(id, [&](PlayerContext& ctx) {
+        const string previousSurfaceId = ctx.surfaceId;
+        const bool surfaceChanged = !surfaceId.empty() && surfaceId != "0" && surfaceId != previousSurfaceId;
         if (!surfaceId.empty() && surfaceId != "0") {
             ctx.surfaceId = surfaceId;
         }
         if (!ctx.pendingLoad || ctx.mediaUrl.empty()) {
+            // Runtime surface redirect (e.g. PiP restore: a brand-new XComponent
+            // hands us a fresh surfaceId while mpv is already initialized and
+            // playing). The first-load path below never runs here because
+            // pendingLoad is false once playback has started, so without this
+            // branch mpv keeps rendering to the old (gone) surface -> black.
+            //
+            // Re-push "wid" at runtime so the OHOS VO rebuilds its native window
+            // onto the new surface, then nudge a redraw via an exact seek to the
+            // current position so a frame is presented even while paused.
+            if (surfaceChanged && ctx.initialized && ctx.mpv) {
+                const int64_t positionMs = ctx.lastPositionMs.load();
+                const string seconds = to_string(static_cast<double>(positionMs) / 1000.0);
+                OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                             "surface redirect old=%{public}s new=%{public}s pos=%{public}lldms",
+                             previousSurfaceId.c_str(), surfaceId.c_str(),
+                             static_cast<long long>(positionMs));
+                PostCommand(ctx, [seconds](PlayerContext& workerCtx) {
+                    ApplyWindowOption(workerCtx);
+                    RunMpvCommand(workerCtx, {"seek", seconds, "absolute+exact"},
+                                  "surface-redirect-redraw");
+                });
+            }
             return;
         }
         const string url = ctx.mediaUrl;

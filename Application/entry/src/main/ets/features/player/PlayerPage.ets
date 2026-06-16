@@ -138,6 +138,20 @@ export struct VideoPlayerPage {
     // 这里无需注册 surface 监听。仅注入 release 时停 PiP 的回调（避免 PlayerSession 循环 import）。
     PlayerSession.getInstance().onStopPiP = () => PiPManager.getInstance().stopPiP();
 
+    // 移植 0.4.0 退出语义：PiP 被关闭时，后台仅暂停（保活后台播放），前台释放会话。
+    PiPManager.getInstance().onPipStop = () => {
+      const session = PlayerSession.getInstance();
+      const isAppBackground = AppStorage.get<boolean>('isAppBackground') ?? false;
+      if (isAppBackground) {
+        logger.info(`${TAG} onPipStop while background → pause only`);
+        session.controller.syncPause();
+      } else {
+        logger.info(`${TAG} onPipStop while foreground → release session`);
+        session.release();
+        this.actionHub.closePage();
+      }
+    };
+
     const initW = this.deviceWidth;
     const initH = this.deviceHeight;
     if (initW > 0 && initH > 0 && initW > initH) {
