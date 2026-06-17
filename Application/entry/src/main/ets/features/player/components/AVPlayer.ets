@@ -22,6 +22,7 @@ import { AvPlayerController, VideoData, StreamInfo, PlayerState, VideoEntry, Sub
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
+import { PiPManager } from '../pip/PiPManager';
 import { PlayerUiViewModel } from 'mediaservice';
 
 const TAG: string = '[PlayerLog][VideoPlayer]';
@@ -415,6 +416,11 @@ export struct VideoPlayer {
     // 确保播放引擎已初始化（不再需要传递 XComponentController）
     const session = PlayerSession.getInstance();
     await session.ensureInitialized();
+
+    // 主动注入 componentController：aboutToAppear 每次组件创建必跑，比 onLoad 可靠。
+    // 冷启动 destroy 清空了 PiPManager.componentController，若仅靠 onLoad 重注入，
+    // 节点复用不重跑 onLoad 时会导致 pendingInit 永远挂起、PiP 不可用。这里兜底注入。
+    PiPManager.getInstance().setComponentController(this.x_componentController);
 
     // XComponent.onLoad 时会自动绑定 surfaceId
 

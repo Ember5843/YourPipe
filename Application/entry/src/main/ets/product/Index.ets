@@ -965,6 +965,14 @@ struct Index {
     const queueManager = PlayQueueManager.getInstance();
     logger.info(`openVideoDetail: video=${video.videoId} source=${sourceHint ? sourceHint.type : 'adhoc'} queueType=${queueManager.sourceType}`);
 
+    // 冷启动：从列表/作者页点视频进入播放页时，彻底重置上一次的播放状态，等价于"应用首次播放"，
+    // 杜绝关闭 PiP 等残留影响本次。队列内切换走 session.play()、PiP 恢复走 onPipRestore，
+    // 均不经此路径，故不受影响。preserveQueue=true 为跨设备续播恢复，保留其会话快照，不冷重置。
+    if (!preserveQueue) {
+      PiPManager.getInstance().destroy();
+      PlayerSession.getInstance().forceReset();
+    }
+
     // If a source hint is provided, pre-load the queue from that source.
     // Fire-and-forget: do NOT await — the player page must open immediately.
     // PlayQueueList will update reactively when the queue loads in the background.
@@ -1412,6 +1420,7 @@ struct Index {
               || session.playerState === PlayerState.PAUSED
               || session.playerState === PlayerState.BUFFERING
               || session.playerState === PlayerState.READY);
+          logger.info(`onBackPressed canEnterPiP=${canEnterPiP} | pipOnReturn=${this.playbackConfig.pipOnReturn} supported=${pip.isPiPSupported()} isReady=${pip.isReady} isPiPActive=${session.isPiPActive} state=${session.playerState}`);
           if (canEnterPiP) {
             // 返回 = 弹 PiP + pop 回上一页（一步到位）。引擎在 PlayerSession 中存活，PiP 悬浮窗续播。
             pip.startPiP().catch((e: Error) => {

@@ -397,6 +397,18 @@ export class PlayerSession {
     this._controller.releaseVideo(0);
   }
 
+  /**
+   * 强制冷重置：把会话恢复到"应用首次播放"的干净状态。
+   * 用于全新进入播放页（从列表/作者页点新视频）前，彻底清除上一次（尤其关闭 PiP）的残留状态。
+   * 注意：不要在 PiP 恢复路径调用——那条必须保留存活引擎。
+   */
+  forceReset(): void {
+    logger.info(`${TAG} forceReset() called`);
+    this.saveWatchHistory();
+    this.stopWatchSaveTimer();
+    this.resetSession();
+  }
+
   private resetSession(): void {
     this._controller.releaseVideo(0);
     this._currentVideo = null;
@@ -405,6 +417,9 @@ export class PlayerSession {
     this._activePlayVideoId = '';
     this._cachedVideoSource = null;
     this._cachedChannelProfiles.clear();
+    // 清 PiP 激活状态：避免会话在 PiP 激活时被 reset 后，_isPiPActive / AppStorage.isPiPActive
+    // 残留为 true，导致占位层显示残留或返回键误判已在 PiP。
+    this.setPiPActive(false);
     this._defaultSource = {
       name: $r('app.string.module_desc'),
       description: '',

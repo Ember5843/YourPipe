@@ -48,6 +48,12 @@ export class PiPManager {
   /** 正在从 PiP 恢复，避免 STOPPED 误触发 onPipStop 的释放 */
   isRestoring: boolean = false;
 
+  /** 待初始化：init 时若 componentController 未就绪，缓存参数，待 setComponentController 后自动补 init。
+   *  消除"流提取完成调 init"与"新页 XComponent.onLoad 注入 controller"的到达顺序竞争。 */
+  private pendingInitCtx: common.UIAbilityContext | null = null;
+  private pendingInitW: number = 0;
+  private pendingInitH: number = 0;
+
   private constructor() {}
 
   static getInstance(): PiPManager {
@@ -75,6 +81,17 @@ export class PiPManager {
    */
   setComponentController(controller: XComponentController): void {
     this.componentController = controller;
+    // 若此前 init 因 controller 未就绪而挂起，现在补做（消除冷启动后的到达顺序竞争）。
+    if (!this.isInitialized && this.pendingInitCtx) {
+      const ctx = this.pendingInitCtx;
+      const w = this.pendingInitW;
+      const h = this.pendingInitH;
+      this.pendingInitCtx = null;
+      logger.info(`${TAG} setComponentController: running pending init`);
+      this.init(ctx, w, h).catch((e: Error) => {
+        logger.warn(`${TAG} pending init failed: ${e.message}`);
+      });
+    }
   }
 
   /**
@@ -91,7 +108,12 @@ export class PiPManager {
       return false;
     }
     if (!this.componentController) {
-      logger.warn(`${TAG} init failed: componentController not set yet (XComponent not loaded)`);
+      // componentController 尚未注入（新页 XComponent.onLoad 还没触发）：缓存参数，
+      // 待 setComponentController 注入后自动补 init，避免冷启动后竞争失败导致 PiP 不可用。
+      logger.info(`${TAG} init deferred: componentController not set yet, pending`);
+      this.pendingInitCtx = ctx;
+      this.pendingInitW = videoWidth;
+      this.pendingInitH = videoHeight;
       return false;
     }
 
@@ -168,10 +190,21 @@ export class PiPManager {
         break;
       case PiPWindow.PiPState.STOPPED:
         session.setPiPActive(false);
-        // 移植 0.4.0 退出语义：还原(panelActionRestore)或删除(requestDelete)走系统流程，跳过 onPipStop；
-        // 其余关闭按 app 前后台区分——后台仅暂停(保活后台播放)，前台释放会话。
-        if (reason === 'panelActionRestore' || reason === 'requestDelete') {
-          logger.info(`${TAG} STOPPED via ${reason}, skip onPipStop`);
+        // panelActionRestore：恢复到播放页，跳过清理（节点交还播放页继续播）。
+        // requestDelete：用户主动关闭 PiP，意图是彻底停止——直接 release（不看前后台），
+        //   否则后台分支只 pause 不 release，PiP surface 已销毁而 MPV 渲染管线仍指向它，
+        //   触发 VK_ERROR_SURFACE_LOST_KHR 并残留状态导致下次切视频/退出报错。
+        // 其它原因：走 onPipStop 按前后台处理。
+        if (reason === 'panelActionRestore') {
+          logger.info(`${TAG} STOPPED via panelActionRestore, skip (will restore)`);
+        } else if (reason === 'requestDelete') {
+          logger.info(`${TAG} STOPPED via requestDelete, release session + destroy pipController`);
+          session.release();
+          // 销毁 PiPController 本身：它持有已销毁播放页的旧 XComponentController，
+          // 若残留，下次播新视频 init() 会复用它，导致系统重绑 surface 失败
+          // (SetXComponentController: swap xComponent failed / OnInitXComponentController failed)。
+          // destroy 后 isInitialized=false，下次 init 重建绑定新 XComponentController 的干净控制器。
+          this.destroy();
         } else if (this.onPipStop) {
           this.onPipStop();
         }
@@ -317,8 +350,24 @@ export class PiPManager {
    * 销毁 PiPController（应用退出 / 全局释放时）。
    */
   destroy(): void {
+    // 先关闭系统 PiP 窗口再置空控制器：否则 PiP 激活时点新视频走 destroy，
+    // app 侧控制器没了但系统悬浮窗还在，成为孤儿窗口导致状态错乱。
+    const ctrl = this.pipController;
+    if (ctrl) {
+      ctrl.stopPiP().catch((e: Error) => {
+        logger.warn(`${TAG} stopPiP during destroy failed: ${e.message}`);
+      });
+    }
     this.unregisterCallbacks();
     this.pipController = null;
     this.isInitialized = false;
+    // 注意：不清 componentController。它由 AVPlayer 的 XComponentController 提供，
+    // 该 controller 随 AVPlayer 实例存活。页面复用(moveToTop)时 aboutToAppear/onLoad 都不重跑，
+    // 若在此清空则无人重新注入 → 下次 init 永远 deferred、PiP 不可用（连续进出第 N 次失效的根因）。
+    // 新建页面时 aboutToAppear 会用新 controller 覆盖，无悬空风险。
+    // 同步清 PiP 激活标志，避免占位层/返回键误判残留。
+    PlayerSession.getInstance().setPiPActive(false);
+    // 清待初始化缓存，避免冷重置后残留旧参数误触发 init。
+    this.pendingInitCtx = null;
   }
 }
