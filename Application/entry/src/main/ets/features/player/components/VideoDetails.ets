@@ -15,6 +15,7 @@
 import { CommonConstants as Const, Logger, StreamInfo, StreamCategories } from 'mediaservice';
 import { LengthMetrics } from '@kit.ArkUI';
 import { ErrorPage } from '../../../common/components/ErrorPage';
+import { TabErrorPanel } from '../../../common/components/TabErrorPanel';
 import { SearchChannelItem } from 'youtube_core';
 import { ChannelInfoService } from '../../user/ChannelInfoService';
 import { VideoItem } from 'youtube_core';
@@ -417,8 +418,9 @@ export struct VideoDetails {
 
         // ── 频道信息行（不修改）──
         if (this.channelInfoError) {
-          ErrorPage({
+          TabErrorPanel({
             errorMessage: this.channelInfoError,
+            showRetry: true,
             onRetry: () => { this.fetchChannelInfo(); }
           })
         } else {
@@ -471,8 +473,9 @@ export struct VideoDetails {
   @Builder
   DescriptionSection() {
     if (this.getEffectiveError()) {
-      ErrorPage({
-        errorMessage: this.getEffectiveError(),
+      TabErrorPanel({
+        errorMessage: this.getEffectiveError()!,
+        showRetry: true,
         onRetry: () => {
           if (this.onRetryDescription) this.onRetryDescription();
         }

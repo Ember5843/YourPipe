@@ -465,6 +465,10 @@
       "value": "重试"
     },
     {
+      "name": "yt_action_open_browser",
+      "value": "在浏览器中打开"
+    },
+    {
       "name": "yt_action_show_more",
       "value": "显示更多"
     },
@@ -987,6 +991,110 @@
     {
       "name": "yt_error_no_supported_stream",
       "value": "没有找到可支持的视频流"
+    },
+    {
+      "name": "yt_error_age_restricted",
+      "value": "此视频有年龄限制"
+    },
+    {
+      "name": "yt_error_age_restricted_hint",
+      "value": "需要在浏览器中登录 YouTube 账号才能观看"
+    },
+    {
+      "name": "yt_error_geo_restricted",
+      "value": "此内容在你所在的地区不可用"
+    },
+    {
+      "name": "yt_error_geo_restricted_hint",
+      "value": "视频发布者限制了播放地区"
+    },
+    {
+      "name": "yt_error_paid_content",
+      "value": "此视频为付费内容"
+    },
+    {
+      "name": "yt_error_paid_content_hint",
+      "value": "需要购买或租借才能观看"
+    },
+    {
+      "name": "yt_error_premium_content",
+      "value": "此内容仅限 YouTube Premium 会员"
+    },
+    {
+      "name": "yt_error_premium_content_hint",
+      "value": "需要订阅 YouTube Premium 才能播放"
+    },
+    {
+      "name": "yt_error_private_content",
+      "value": "此视频为私密视频"
+    },
+    {
+      "name": "yt_error_private_content_hint",
+      "value": "只有获得授权的用户才能观看"
+    },
+    {
+      "name": "yt_error_login_required",
+      "value": "需要登录才能观看"
+    },
+    {
+      "name": "yt_error_login_required_hint",
+      "value": "请在浏览器中登录 YouTube 账号"
+    },
+    {
+      "name": "yt_error_account_terminated",
+      "value": "此频道已被终止"
+    },
+    {
+      "name": "yt_error_account_terminated_hint",
+      "value": "该账号因违反 YouTube 政策已被封禁"
+    },
+    {
+      "name": "yt_error_live_offline",
+      "value": "直播已结束"
+    },
+    {
+      "name": "yt_error_live_offline_hint",
+      "value": "此直播流已下线或尚未开始"
+    },
+    {
+      "name": "yt_error_content_not_supported",
+      "value": "不支持此类型的内容"
+    },
+    {
+      "name": "yt_error_content_not_supported_hint",
+      "value": "该视频格式暂不支持播放"
+    },
+    {
+      "name": "yt_error_network",
+      "value": "网络连接失败"
+    },
+    {
+      "name": "yt_error_network_hint",
+      "value": "请检查网络连接后重试"
+    },
+    {
+      "name": "yt_error_timeout",
+      "value": "请求超时"
+    },
+    {
+      "name": "yt_error_timeout_hint",
+      "value": "服务器响应过慢，请稍后重试"
+    },
+    {
+      "name": "yt_error_extraction_failed",
+      "value": "解析视频信息失败"
+    },
+    {
+      "name": "yt_error_extraction_failed_hint",
+      "value": "无法获取视频播放数据"
+    },
+    {
+      "name": "yt_error_cipher_failed",
+      "value": "解密视频流失败"
+    },
+    {
+      "name": "yt_error_cipher_failed_hint",
+      "value": "签名算法更新，请等待应用更新"
     },
     {
       "name": "new_app_name",

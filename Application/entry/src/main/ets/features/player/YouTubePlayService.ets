@@ -2,12 +2,10 @@ import { AppLog } from '../../common/AppLog';
 import { media } from '@kit.MediaKit';
 import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
-import { fileIo as fs } from '@kit.CoreFileKit';
 import {
   YouTubeExtractor,
   VideoInfo,
   StreamInfo as YouTubeStreamInfo,
-  CommentItem,
   CommentResponse,
   AgeRestrictedContentException,
   PrivateContentException,
@@ -24,6 +22,7 @@ import {
 } from 'youtube_core';
 import { StreamInfo, SubtitleTrack } from 'mediaservice';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
+import { ErrorInfo } from '../../common/model/ErrorInfo';
 
 const logger = AppLog.getInstance('YouTubePlayService');
 
@@ -35,7 +34,7 @@ export interface YouTubePlayResult {
   playerStreams?: StreamInfo[];
   subtitleTracks?: SubtitleTrack[];
   mediaSource?: media.MediaSource;
-  error?: string | Resource;
+  error?: ErrorInfo;
   errorCode?: YouTubeErrorCode;
 }
 
@@ -124,7 +123,17 @@ export class YouTubePlayService {
     try {
       const videoInfo = await this.extractor!.extractVideoStreams(videoId);
       if (videoInfo.streams.length === 0) {
-        return { success: false, videoInfo: videoInfo, error: 'No streams available', errorCode: YouTubeErrorCode.NO_STREAMS };
+        const result: YouTubePlayResult = {
+          success: false,
+          videoInfo: videoInfo,
+          error: new ErrorInfo(
+            YouTubeErrorCode.NO_STREAMS,
+            'No streams available',
+            { isRetryable: true }
+          ),
+          errorCode: YouTubeErrorCode.NO_STREAMS
+        };
+        return result;
       }
 
       const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
@@ -163,9 +172,18 @@ export class YouTubePlayService {
         videoInfo: videoInfo,
         playerStreams: playerStreams,
         subtitleTracks: videoInfo.subtitleTracks
-      };
+      } as YouTubePlayResult;
     } catch (e) {
-      return { success: false, error: (e as Error).message, errorCode: YouTubeErrorCode.UNKNOWN_ERROR };
+      const result: YouTubePlayResult = {
+        success: false,
+        error: new ErrorInfo(
+          YouTubeErrorCode.UNKNOWN_ERROR,
+          (e as Error).message,
+          { isRetryable: true, exception: e as Error }
+        ),
+        errorCode: YouTubeErrorCode.UNKNOWN_ERROR
+      };
+      return result;
     }
   }
 
@@ -203,7 +221,18 @@ export class YouTubePlayService {
     }
 
     const videoId = this.extractVideoId(videoIdOrUrl);
-    if (!videoId) return { success: false, error: $r('app.string.yt_error_invalid_video_id'), errorCode: YouTubeErrorCode.INVALID_INPUT };
+    if (!videoId) {
+      const result: YouTubePlayResult = {
+        success: false,
+        error: new ErrorInfo(
+          YouTubeErrorCode.INVALID_INPUT,
+          $r('app.string.yt_error_invalid_video_id'),
+          { isRetryable: false }
+        ),
+        errorCode: YouTubeErrorCode.INVALID_INPUT
+      };
+      return result;
+    }
 
     try {
       logger.info(`${TAG} 开始提取视频流及元数据 (包含 Player JS 和解密)...`);
@@ -214,7 +243,13 @@ export class YouTubePlayService {
       if (videoInfo.streams.length === 0) {
         const errorCode = this.determineNoStreamsErrorCode(videoInfo);
         logger.warn(`${TAG} 无可用流 errorCode=${errorCode} ageRestricted=${videoInfo.isAgeRestricted} requiresLogin=${videoInfo.requiresLogin}`);
-        return { success: false, videoInfo: videoInfo, error: this.getErrorMessage(errorCode, videoInfo), errorCode: errorCode };
+        const result: YouTubePlayResult = {
+          success: false,
+          videoInfo: videoInfo,
+          error: this.getErrorMessage(errorCode, videoInfo),
+          errorCode: errorCode
+        };
+        return result;
       }
 
       const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
@@ -283,11 +318,141 @@ export class YouTubePlayService {
   }
 
   private analyzeErrorCode(error: Error): YouTubeErrorCode {
+    if (error instanceof AgeRestrictedContentException) {
+      return YouTubeErrorCode.AGE_RESTRICTED;
+    }
+    if (error instanceof GeographicRestrictionException) {
+      return YouTubeErrorCode.GEO_RESTRICTED;
+    }
+    if (error instanceof PaidContentException) {
+      return YouTubeErrorCode.PAID_CONTENT;
+    }
+    if (error instanceof YoutubeMusicPremiumContentException) {
+      return YouTubeErrorCode.PREMIUM_CONTENT;
+    }
+    if (error instanceof PrivateContentException) {
+      return YouTubeErrorCode.VIDEO_PRIVATE;
+    }
+    if (error instanceof LoginRequiredException || error instanceof SignInConfirmNotBotException) {
+      return YouTubeErrorCode.LOGIN_REQUIRED;
+    }
+    if (error instanceof AccountTerminatedException) {
+      return YouTubeErrorCode.CONTENT_NOT_AVAILABLE;
+    }
+    if (error instanceof LiveStreamOfflineException) {
+      return YouTubeErrorCode.CONTENT_NOT_AVAILABLE;
+    }
+    if (error instanceof ContentNotSupportedException) {
+      return YouTubeErrorCode.CONTENT_NOT_AVAILABLE;
+    }
+    if (error instanceof ContentNotAvailableException) {
+      return YouTubeErrorCode.CONTENT_NOT_AVAILABLE;
+    }
+    if (error instanceof ExtractionException) {
+      return YouTubeErrorCode.EXTRACT_FAILED;
+    }
+
+    const errorMsg = error.message?.toLowerCase() || '';
+    if (errorMsg.includes('network') || errorMsg.includes('连接')) {
+      return YouTubeErrorCode.NETWORK_ERROR;
+    }
+    if (errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+      return YouTubeErrorCode.TIMEOUT;
+    }
+
     return YouTubeErrorCode.UNKNOWN_ERROR;
   }
 
-  private getErrorMessage(errorCode: YouTubeErrorCode, videoInfo?: VideoInfo, error?: Error): string | Resource {
-    return error?.message || $r('app.string.yt_error_playback_failed');
+  private getErrorMessage(errorCode: YouTubeErrorCode, videoInfo?: VideoInfo, error?: Error): ErrorInfo {
+    let message: string | Resource;
+    let actionHint: string | Resource | undefined;
+    let isRetryable = true;
+    let openInBrowserUrl: string | undefined;
+
+    switch (errorCode) {
+      case YouTubeErrorCode.AGE_RESTRICTED:
+        message = $r('app.string.yt_error_age_restricted');
+        actionHint = $r('app.string.yt_error_age_restricted_hint');
+        isRetryable = false;
+        openInBrowserUrl = videoInfo?.videoId ? `https://www.youtube.com/watch?v=${videoInfo.videoId}` : undefined;
+        break;
+      case YouTubeErrorCode.GEO_RESTRICTED:
+        message = $r('app.string.yt_error_geo_restricted');
+        actionHint = $r('app.string.yt_error_geo_restricted_hint');
+        isRetryable = false;
+        break;
+      case YouTubeErrorCode.PAID_CONTENT:
+        message = $r('app.string.yt_error_paid_content');
+        actionHint = $r('app.string.yt_error_paid_content_hint');
+        isRetryable = false;
+        openInBrowserUrl = videoInfo?.videoId ? `https://www.youtube.com/watch?v=${videoInfo.videoId}` : undefined;
+        break;
+      case YouTubeErrorCode.PREMIUM_CONTENT:
+        message = $r('app.string.yt_error_premium_content');
+        actionHint = $r('app.string.yt_error_premium_content_hint');
+        isRetryable = false;
+        openInBrowserUrl = videoInfo?.videoId ? `https://www.youtube.com/watch?v=${videoInfo.videoId}` : undefined;
+        break;
+      case YouTubeErrorCode.VIDEO_PRIVATE:
+        message = $r('app.string.yt_error_private_content');
+        actionHint = $r('app.string.yt_error_private_content_hint');
+        isRetryable = false;
+        break;
+      case YouTubeErrorCode.LOGIN_REQUIRED:
+        message = $r('app.string.yt_error_login_required');
+        actionHint = $r('app.string.yt_error_login_required_hint');
+        isRetryable = false;
+        openInBrowserUrl = videoInfo?.videoId ? `https://www.youtube.com/watch?v=${videoInfo.videoId}` : undefined;
+        break;
+      case YouTubeErrorCode.NETWORK_ERROR:
+        message = $r('app.string.yt_error_network');
+        actionHint = $r('app.string.yt_error_network_hint');
+        isRetryable = true;
+        break;
+      case YouTubeErrorCode.TIMEOUT:
+        message = $r('app.string.yt_error_timeout');
+        actionHint = $r('app.string.yt_error_timeout_hint');
+        isRetryable = true;
+        break;
+      case YouTubeErrorCode.CIPHER_DECRYPT_FAILED:
+        message = $r('app.string.yt_error_cipher_failed');
+        actionHint = $r('app.string.yt_error_cipher_failed_hint');
+        isRetryable = false;
+        break;
+      case YouTubeErrorCode.EXTRACT_FAILED:
+        message = $r('app.string.yt_error_extraction_failed');
+        actionHint = $r('app.string.yt_error_extraction_failed_hint');
+        isRetryable = true;
+        break;
+      case YouTubeErrorCode.CONTENT_NOT_AVAILABLE:
+        if (error instanceof AccountTerminatedException) {
+          message = $r('app.string.yt_error_account_terminated');
+          actionHint = $r('app.string.yt_error_account_terminated_hint');
+          isRetryable = false;
+        } else if (error instanceof LiveStreamOfflineException) {
+          message = $r('app.string.yt_error_live_offline');
+          actionHint = $r('app.string.yt_error_live_offline_hint');
+          isRetryable = true;
+        } else if (error instanceof ContentNotSupportedException) {
+          message = $r('app.string.yt_error_content_not_supported');
+          actionHint = $r('app.string.yt_error_content_not_supported_hint');
+          isRetryable = false;
+        } else {
+          message = $r('app.string.yt_error_load_video');
+          isRetryable = true;
+        }
+        break;
+      default:
+        message = error?.message || $r('app.string.yt_error_playback_failed');
+        isRetryable = true;
+    }
+
+    return new ErrorInfo(errorCode, message, {
+      isRetryable,
+      openInBrowserUrl,
+      actionHint,
+      exception: error
+    });
   }
 
   private extractVideoId(input: string): string | undefined {

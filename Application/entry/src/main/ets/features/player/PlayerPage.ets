@@ -34,6 +34,7 @@ import { PlayQueueList } from './components/PlayQueueList';
 import { PlayQueueManager, QueueSourceType } from './PlayQueueManager';
 import { PiPManager } from './pip/PiPManager';
 import { PlaybackConfig } from '../../common/PlaybackConfig';
+import { ErrorInfo } from '../../common/model/ErrorInfo';
 
 const logger = AppLog.getInstance('PlayerPage');
 
@@ -79,6 +80,7 @@ export struct VideoPlayerPage {
   @State tabArray: Array<TabItem> = initTabData();
   @State currentTabIndex: number = 0;
   @State videoDescriptionError: string | null = null;
+  @State errorInfo: ErrorInfo | null = null;
   @State detailLikeCount: string = '0';
   @State detailChannelId: string = '';
   @State detailChannelAvatarUrl: string = '';
@@ -119,6 +121,18 @@ export struct VideoPlayerPage {
     this.isRetrying = true;
     await this.onVideoChange();
     this.isRetrying = false;
+  }
+
+  private openInBrowser(url: string): void {
+    try {
+      logger.info(`Opening URL in browser: ${url}`);
+      const context = getContext(this) as common.UIAbilityContext;
+      context.openLink(url, {
+        appLinkingOnly: false
+      });
+    } catch (err) {
+      logger.error(`Failed to open browser: ${JSON.stringify(err)}`);
+    }
   }
 
   private syncDetailStateFromSource(source: VideoData): void {
@@ -318,6 +332,7 @@ export struct VideoPlayerPage {
       }
       this.isLoading = true;
       this.videoDescriptionError = null;
+      this.errorInfo = null;
       this.detailLikeCount = '0';
       this.detailChannelId = this.video.channelId || '';
       this.detailChannelAvatarUrl = this.video.channelAvatarUrl || '';
@@ -354,15 +369,10 @@ export struct VideoPlayerPage {
         const err = session.lastPlayError;
         if (err === null) {
           this.videoDescriptionError = '加载视频失败';
-        } else if (typeof err === 'string') {
-          this.videoDescriptionError = err;
+          this.errorInfo = null;
         } else {
-          try {
-            const ctx = getContext(this);
-            this.videoDescriptionError = ctx.resourceManager.getStringSync((err as Resource).id);
-          } catch (_e) {
-            this.videoDescriptionError = '加载视频失败';
-          }
+          this.errorInfo = err;
+          this.videoDescriptionError = null;
         }
       }
     } catch (e) {
@@ -467,7 +477,68 @@ export struct VideoPlayerPage {
           .fill(Color.Black)
       }
 
-      if (this.videoDescriptionError) {
+      if (this.errorInfo) {
+        Column({ space: 16 }) {
+          SymbolGlyph(this.errorInfo.getIcon())
+            .fontSize(40)
+            .fontColor([Color.White])
+
+          Text(this.errorInfo.message)
+            .fontColor('#CCFFFFFF')
+            .fontSize(14)
+            .textAlign(TextAlign.Center)
+            .maxLines(3)
+            .padding({ left: 24, right: 24 })
+
+          if (this.errorInfo.actionHint) {
+            Text(this.errorInfo.actionHint)
+              .fontColor('#99FFFFFF')
+              .fontSize(12)
+              .textAlign(TextAlign.Center)
+              .maxLines(2)
+              .padding({ left: 24, right: 24 })
+          }
+
+          Row({ space: 12 }) {
+            if (this.errorInfo.isRetryable) {
+              Button() {
+                Row({ space: 6 }) {
+                  SymbolGlyph($r('sys.symbol.arrow_clockwise'))
+                    .fontSize(16)
+                    .fontColor([Color.White])
+                  Text($r('app.string.yt_action_retry'))
+                    .fontSize(14)
+                    .fontColor(Color.White)
+                }
+              }
+              .height(36)
+              .padding({ left: 20, right: 20 })
+              .backgroundColor($r('app.color.yourtube_theme_primary'))
+              .borderRadius(18)
+              .onClick(() => { this.retryLoadVideo(); })
+            }
+
+            if (this.errorInfo.openInBrowserUrl) {
+              Button() {
+                Row({ space: 6 }) {
+                  SymbolGlyph($r('sys.symbol.arrow_up_right'))
+                    .fontSize(16)
+                    .fontColor([Color.White])
+                  Text($r('app.string.yt_action_open_browser'))
+                    .fontSize(14)
+                    .fontColor(Color.White)
+                }
+              }
+              .height(36)
+              .padding({ left: 20, right: 20 })
+              .backgroundColor('#666666')
+              .borderRadius(18)
+              .onClick(() => { this.openInBrowser(this.errorInfo!.openInBrowserUrl!); })
+            }
+          }
+          .justifyContent(FlexAlign.Center)
+        }
+      } else if (this.videoDescriptionError) {
         Column({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
             .fontSize(40)

@@ -1,12 +1,13 @@
 import { AppLog } from './AppLog';
 import { common } from '@kit.AbilityKit';
-import { AvPlayerController, VideoData, LocalMediaProxy, PlayerState } from 'mediaservice';
+import { AvPlayerController, VideoData, PlayerState } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { PlayQueueManager } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
 import { YOUTUBE_VIDEO_ID } from './Constants';
+import { ErrorInfo, ErrorInfoOptions } from './model/ErrorInfo';
 
 export interface CachedChannelProfile {
   name: string;
@@ -36,7 +37,7 @@ export class PlayerSession {
   private _activePlayVideoId: string = '';
 
   private _cachedVideoSource: VideoData | null = null;
-  private _lastPlayError: string | Resource | null = null;
+  private _lastPlayError: ErrorInfo | null = null;
   private _cachedChannelProfiles: Map<string, CachedChannelProfile> = new Map();
   private _activeExtrasVideoId: string = '';
   private _pendingResumeSec: number = -1;
@@ -106,7 +107,7 @@ export class PlayerSession {
     this._cachedVideoSource = source;
   }
 
-  get lastPlayError(): string | Resource | null {
+  get lastPlayError(): ErrorInfo | null {
     return this._lastPlayError;
   }
 
@@ -312,7 +313,15 @@ export class PlayerSession {
       }
     } catch (e) {
       logger.error(`${TAG} play() exception: ${e}`);
-      this._lastPlayError = (e as Error).message || null;
+      const options: ErrorInfoOptions = {
+        isRetryable: true,
+        exception: e as Error
+      };
+      this._lastPlayError = new ErrorInfo(
+        'UNKNOWN_ERROR',
+        (e as Error).message || $r('app.string.yt_error_playback_failed'),
+        options
+      );
       return null;
     }
   }

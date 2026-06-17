@@ -5,6 +5,7 @@ import { ActionHub, ActionHubEvent } from '../../../common/ActionHub';
 import common from '@ohos.app.ability.common';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
+import { TabErrorPanel } from '../../../common/components/TabErrorPanel';
 
 const logger = AppLog.getInstance('CommentList');
 
@@ -150,13 +151,11 @@ export struct CommentList {
           .height('100%')
           .justifyContent(FlexAlign.Center)
         } else if (this.errorMessage) {
-          Column() {
-            Text(this.errorMessage).fontColor($r('app.color.yourtube_text_secondary'))
-            Button($r('app.string.yt_action_retry')).margin({ top: 16 }).onClick(() => this.loadComments(true))
-          }
-          .width('100%')
-          .height('100%')
-          .justifyContent(FlexAlign.Center)
+          TabErrorPanel({
+            errorMessage: this.errorMessage,
+            showRetry: true,
+            onRetry: () => this.loadComments(true)
+          })
         } else {
           Column() {
             Text($r('app.string.yt_empty_no_comments')).fontColor($r('app.color.yourtube_text_quaternary'))
