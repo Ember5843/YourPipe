@@ -61,6 +61,7 @@ export interface DashSession {
   audioHls: HlsCache;
   stale: boolean;
   cancel?: () => void;
+  refreshUrls?: () => Promise<boolean>;  // 当 URL 过期(411)时调用此回调刷新
 }
 
 function emptyResource(): StreamResource {

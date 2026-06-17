@@ -141,7 +141,7 @@ async function routeRequest(
       if (resource.isOtf) {
         Logger.warn(TAG, `OTF resource requested through byte-range endpoint: video/${idx}`);
       }
-      await serveRange(conn, resource, rangeHeader, method === 'HEAD');
+      await serveRange(conn, resource, rangeHeader, method === 'HEAD', session);
       return;
     }
     if (segment === 'audio' && session.hasAudio && idx < session.audios.length) {
@@ -158,11 +158,11 @@ async function routeRequest(
       if (resource.isOtf) {
         Logger.warn(TAG, `OTF resource requested through byte-range endpoint: audio/${idx}`);
       }
-      await serveRange(conn, resource, rangeHeader, method === 'HEAD');
+      await serveRange(conn, resource, rangeHeader, method === 'HEAD', session);
       return;
     }
     if (segment === 'resource' && parts[3] === 'main') {
-      await serveRange(conn, session.single, rangeHeader, method === 'HEAD');
+      await serveRange(conn, session.single, rangeHeader, method === 'HEAD', session);
       return;
     }
   }
@@ -237,9 +237,21 @@ export class LocalProxyServer {
       return false;
     }
     session.id = sessionId;
+    // 保留已有的 refreshUrls 回调
+    const existing = sessionStore.get(sessionId);
+    if (existing?.refreshUrls) {
+      session.refreshUrls = existing.refreshUrls;
+    }
     sessionStore.add(session);
     Logger.info(TAG, `refreshSession: id=${sessionId} type=${session.type}`);
     return true;
+  }
+
+  setSessionRefreshCallback(sessionId: string, callback: () => Promise<boolean>): void {
+    const session = sessionStore.get(sessionId);
+    if (session) {
+      session.refreshUrls = callback;
+    }
   }
 
   destroySession(sessionId: string): void {

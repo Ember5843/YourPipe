@@ -640,6 +640,39 @@ export class AvPlayerController {
     }
     this.currentLocalMediaSessionId = sessionId;
 
+    // 设置 URL 刷新回调：当 proxy 检测到 411 时，重新提取流 URL 并更新 session
+    LocalMediaProxy.setSessionRefreshCallback(sessionId, async (): Promise<boolean> => {
+      try {
+        Logger.info(TAG, `URL refresh triggered for session=${sessionId}`);
+        const videoId: string | undefined = this.curSource.videoId;
+        if (!videoId || !this.onRequestRefreshStreams) {
+          Logger.warn(TAG, `URL refresh: missing videoId or refresh callback`);
+          return false;
+        }
+        const refreshed: VideoData | null = await this.onRequestRefreshStreams(videoId, this.playbackEngine.getState().currentTime);
+        if (!refreshed?.streams) {
+          Logger.warn(TAG, `URL refresh: failed to get new streams`);
+          return false;
+        }
+        const newVideo: StreamInfo | undefined = refreshed.streams.find((s: StreamInfo) => s.itag === video.itag);
+        const newAudio: StreamInfo | undefined = refreshed.streams.find((s: StreamInfo) => s.itag === audio.itag);
+        if (!newVideo || !newAudio) {
+          Logger.warn(TAG, `URL refresh: failed to find matching itags video=${video.itag} audio=${audio.itag}`);
+          return false;
+        }
+        const ok: string = await LocalMediaProxy.refreshYoutubeDualUrlSession(sessionId, newVideo, newAudio, durationMs);
+        if (!ok) {
+          Logger.warn(TAG, `URL refresh: refreshYoutubeDualUrlSession failed`);
+          return false;
+        }
+        Logger.info(TAG, `URL refresh succeeded for session=${sessionId}`);
+        return true;
+      } catch (e) {
+        Logger.error(TAG, `URL refresh error: ${e}`);
+        return false;
+      }
+    });
+
     const baseUrl = playbackUrl.replace('/manifest.mpd', '');
     const vUrl = `${baseUrl}/video/0`;
     const aUrl = `${baseUrl}/audio/0`;

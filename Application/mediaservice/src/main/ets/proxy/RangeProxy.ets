@@ -1,4 +1,4 @@
-import { StreamResource, OtfSegmentTimelineEntry } from './SessionStore';
+import { StreamResource, OtfSegmentTimelineEntry, DashSession } from './SessionStore';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
@@ -436,7 +436,8 @@ export async function serveRange(
   conn: socket.TCPSocketConnection,
   resource: StreamResource,
   rangeHeader: string,
-  headOnly: boolean
+  headOnly: boolean,
+  session?: DashSession
 ): Promise<void> {
   const total = resource.contentLength;
   const parsed = parseRangeHeader(rangeHeader, total);
@@ -521,6 +522,18 @@ export async function serveRange(
 
       if (resp.statusCode === 200 || resp.statusCode === 206) {
         return;
+      }
+      // 411 Length Required: YouTube URL 可能已过期，尝试刷新
+      if (resp.statusCode === 411 && resource.isYoutubePlayback && session?.refreshUrls && !writer.hasEmittedAny()) {
+        Logger.info(TAG, `serveRange: 411 detected, attempting URL refresh for resource=${resource.id}`);
+        const refreshed = await session.refreshUrls();
+        if (refreshed) {
+          Logger.info(TAG, `serveRange: URL refreshed successfully, retrying resource=${resource.id}`);
+          // 刷新成功，跳过延迟直接重试（resource.url 已被更新）
+          continue;
+        } else {
+          Logger.warn(TAG, `serveRange: URL refresh failed for resource=${resource.id}`);
+        }
       }
       // Non-retryable errors: 4xx client errors
       if (resp.statusCode >= 400 && resp.statusCode < 500) {

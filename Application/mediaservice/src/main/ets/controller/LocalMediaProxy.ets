@@ -125,6 +125,10 @@ export class LocalMediaProxy {
     localProxyServer.destroyAll();
   }
 
+  static setSessionRefreshCallback(sessionId: string, callback: () => Promise<boolean>): void {
+    localProxyServer.setSessionRefreshCallback(sessionId, callback);
+  }
+
   private static async createSession(inputJson: string): Promise<string> {
     try {
       return localProxyServer.createSession(inputJson);
