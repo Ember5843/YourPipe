@@ -33,27 +33,50 @@ function normalizeQuality(value: string, fallback: VideoQualityCap): VideoQualit
   return VIDEO_QUALITY_CAP_LABELS.includes(value as VideoQualityCap) ? value as VideoQualityCap : fallback;
 }
 
-export type CacheDiskSize = '256' | '512' | '1024' | '2048';
-export type CacheMaxAge = '2' | '6' | '12' | '24';
+// MPV 播放器配置
+export type CacheSecs = '5' | '10' | '20' | '30' | '60';
+export type DemuxerReadahead = '5' | '8' | '15' | '30' | '60';
+export type DemuxerMaxBytes = '10' | '20' | '50' | '100';
+export type GpuApi = 'auto' | 'opengl' | 'vulkan';
 
-export const CACHE_DISK_SIZE_LABELS: CacheDiskSize[] = ['256', '512', '1024', '2048'];
-export const CACHE_DISK_SIZE_DISPLAY: Record<CacheDiskSize, string> = {
-  '256': '256 MB', '512': '512 MB', '1024': '1 GB', '2048': '2 GB'
+export const CACHE_SECS_LABELS: CacheSecs[] = ['5', '10', '20', '30', '60'];
+export const CACHE_SECS_DISPLAY: Record<CacheSecs, string> = {
+  '5': '5 秒', '10': '10 秒', '20': '20 秒', '30': '30 秒', '60': '60 秒'
 };
 
-export const CACHE_MAX_AGE_LABELS: CacheMaxAge[] = ['2', '6', '12', '24'];
-export const CACHE_MAX_AGE_DISPLAY: Record<CacheMaxAge, string> = {
-  '2': '2 小时', '6': '6 小时', '12': '12 小时', '24': '24 小时'
+export const DEMUXER_READAHEAD_LABELS: DemuxerReadahead[] = ['5', '8', '15', '30', '60'];
+export const DEMUXER_READAHEAD_DISPLAY: Record<DemuxerReadahead, string> = {
+  '5': '5 秒', '8': '8 秒', '15': '15 秒', '30': '30 秒', '60': '60 秒'
+};
+
+export const DEMUXER_MAX_BYTES_LABELS: DemuxerMaxBytes[] = ['10', '20', '50', '100'];
+export const DEMUXER_MAX_BYTES_DISPLAY: Record<DemuxerMaxBytes, string> = {
+  '10': '10 MB', '20': '20 MB', '50': '50 MB', '100': '100 MB'
+};
+
+export const GPU_API_LABELS: GpuApi[] = ['auto', 'opengl', 'vulkan'];
+export const GPU_API_DISPLAY: Record<GpuApi, string> = {
+  'auto': '自动', 'opengl': 'OpenGL', 'vulkan': 'Vulkan'
 };
 
 export class PlaybackConfig {
   defaultQuality: VideoQualityCap = 'best';
   mobileQuality: VideoQualityCap = '480p';
   showHighResolutions: boolean = false;
-  cacheDiskSize: CacheDiskSize = '512';
-  cacheMaxAge: CacheMaxAge = '6';
   /** 返回键/home 键时是否自动进入画中画（设备不支持时强制 false） */
   pipOnReturn: boolean = true;
+
+  // MPV 播放器设置
+  /** 硬件解码开关 */
+  hwdecEnabled: boolean = true;
+  /** 内存缓存时长（秒） */
+  cacheSecs: CacheSecs = '10';
+  /** 预读缓冲时长（秒） */
+  demuxerReadaheadSecs: DemuxerReadahead = '8';
+  /** 解封装器最大缓冲区（MB） */
+  demuxerMaxBytes: DemuxerMaxBytes = '20';
+  /** GPU 渲染 API */
+  gpuApi: GpuApi = 'auto';
 
   constructor() {}
 
@@ -62,9 +85,12 @@ export class PlaybackConfig {
     next.defaultQuality = this.defaultQuality;
     next.mobileQuality = this.mobileQuality;
     next.showHighResolutions = this.showHighResolutions;
-    next.cacheDiskSize = this.cacheDiskSize;
-    next.cacheMaxAge = this.cacheMaxAge;
     next.pipOnReturn = this.pipOnReturn;
+    next.hwdecEnabled = this.hwdecEnabled;
+    next.cacheSecs = this.cacheSecs;
+    next.demuxerReadaheadSecs = this.demuxerReadaheadSecs;
+    next.demuxerMaxBytes = this.demuxerMaxBytes;
+    next.gpuApi = this.gpuApi;
     return next;
   }
 
@@ -73,11 +99,19 @@ export class PlaybackConfig {
     cfg.defaultQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_defaultQuality', 'best'), 'best');
     cfg.mobileQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_mobileQuality', '480p'), '480p');
     cfg.showHighResolutions = PreferencesStore.getString('cfg_pb_showHighRes', 'false') === 'true';
-    const diskSize = PreferencesStore.getString('cfg_pb_cacheDiskSize', '512');
-    cfg.cacheDiskSize = CACHE_DISK_SIZE_LABELS.includes(diskSize as CacheDiskSize) ? diskSize as CacheDiskSize : '512';
-    const maxAge = PreferencesStore.getString('cfg_pb_cacheMaxAge', '6');
-    cfg.cacheMaxAge = CACHE_MAX_AGE_LABELS.includes(maxAge as CacheMaxAge) ? maxAge as CacheMaxAge : '6';
     cfg.pipOnReturn = PreferencesStore.getString('cfg_pb_pipOnReturn', 'true') === 'true';
+
+    // MPV 播放器设置
+    cfg.hwdecEnabled = PreferencesStore.getString('cfg_pb_hwdecEnabled', 'true') === 'true';
+    const cacheSecs = PreferencesStore.getString('cfg_pb_cacheSecs', '10');
+    cfg.cacheSecs = CACHE_SECS_LABELS.includes(cacheSecs as CacheSecs) ? cacheSecs as CacheSecs : '10';
+    const readahead = PreferencesStore.getString('cfg_pb_demuxerReadaheadSecs', '8');
+    cfg.demuxerReadaheadSecs = DEMUXER_READAHEAD_LABELS.includes(readahead as DemuxerReadahead) ? readahead as DemuxerReadahead : '8';
+    const maxBytes = PreferencesStore.getString('cfg_pb_demuxerMaxBytes', '20');
+    cfg.demuxerMaxBytes = DEMUXER_MAX_BYTES_LABELS.includes(maxBytes as DemuxerMaxBytes) ? maxBytes as DemuxerMaxBytes : '20';
+    const gpuApi = PreferencesStore.getString('cfg_pb_gpuApi', 'auto');
+    cfg.gpuApi = GPU_API_LABELS.includes(gpuApi as GpuApi) ? gpuApi as GpuApi : 'auto';
+
     logger.info(`Loaded PlaybackConfig: ${JSON.stringify(cfg)}`);
     return cfg;
   }
@@ -86,9 +120,15 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_defaultQuality', cfg.defaultQuality);
     PreferencesStore.setString('cfg_pb_mobileQuality', cfg.mobileQuality);
     PreferencesStore.setString('cfg_pb_showHighRes', cfg.showHighResolutions ? 'true' : 'false');
-    PreferencesStore.setString('cfg_pb_cacheDiskSize', cfg.cacheDiskSize);
-    PreferencesStore.setString('cfg_pb_cacheMaxAge', cfg.cacheMaxAge);
     PreferencesStore.setString('cfg_pb_pipOnReturn', cfg.pipOnReturn ? 'true' : 'false');
+
+    // MPV 播放器设置
+    PreferencesStore.setString('cfg_pb_hwdecEnabled', cfg.hwdecEnabled ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_cacheSecs', cfg.cacheSecs);
+    PreferencesStore.setString('cfg_pb_demuxerReadaheadSecs', cfg.demuxerReadaheadSecs);
+    PreferencesStore.setString('cfg_pb_demuxerMaxBytes', cfg.demuxerMaxBytes);
+    PreferencesStore.setString('cfg_pb_gpuApi', cfg.gpuApi);
+
     logger.info('Saved PlaybackConfig');
   }
 }

@@ -46,6 +46,12 @@ export interface EngineConfig {
   livePresentationDelayMs?: number;
   liveDvrWindowSegments?: number;
   liveEdgeThresholdSec?: number;
+  // MPV 专用配置
+  mpvHwdecEnabled?: boolean;
+  mpvCacheSecs?: number;
+  mpvDemuxerReadaheadSecs?: number;
+  mpvDemuxerMaxBytes?: number;
+  mpvGpuApi?: string;
 }
 
 export interface PlaybackEngine {

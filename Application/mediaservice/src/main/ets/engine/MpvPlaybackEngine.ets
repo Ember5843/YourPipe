@@ -43,6 +43,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private lastKnownPositionMs: number = 0;
   private lastTimeEmitMs: number = 0;
 
+  // 保存配置供 load() 方法使用
+  private engineConfig: EngineConfig = {};
+
   async initialize(_config: EngineConfig): Promise<boolean> {
     if (this.initialized && this.controller !== null) {
       return true;
@@ -50,22 +53,49 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
     try {
       this.destroyed = false;
+      // 保存配置供后续使用
+      this.engineConfig = _config;
+
       const ctrl: MpvPlayerController = new MpvPlayerController();
       ctrl.setEventCallback((type: number, value: number) => {
         this.onMpvEvent(ctrl, type, value);
       });
+
+      // 从 EngineConfig 读取用户配置（如果有），否则使用默认值
+      const hwdecEnabled = _config.mpvHwdecEnabled ?? true;
+      const cacheSecs = _config.mpvCacheSecs ?? 10;
+      const demuxerReadaheadSecs = _config.mpvDemuxerReadaheadSecs ?? 8;
+      const demuxerMaxBytes = _config.mpvDemuxerMaxBytes ?? 20;
+      const gpuApi = _config.mpvGpuApi ?? 'auto';
+
+      // 硬件解码配置
+      if (hwdecEnabled) {
+        ctrl.setProperty('hwdec', 'auto');
+        Logger.info(TAG, 'Hardware decoding enabled: auto');
+      } else {
+        ctrl.setProperty('hwdec', 'no');
+        Logger.info(TAG, 'Hardware decoding disabled');
+      }
+
+      // GPU 渲染 API
+      if (gpuApi !== 'auto') {
+        ctrl.setProperty('gpu-api', gpuApi);
+        Logger.info(TAG, `GPU API set to: ${gpuApi}`);
+      }
+
       // 启用内存缓存（不写磁盘），改善seek性能和网络波动容忍度
       ctrl.setProperty('cache', 'yes');
-      ctrl.setProperty('cache-secs', '10');
+      ctrl.setProperty('cache-secs', `${cacheSecs}`);
       ctrl.setProperty('cache-on-disk', 'no');
+      Logger.info(TAG, `Memory cache configured: ${cacheSecs}s`);
 
       // 优化缓冲区配置以避免触发YouTube SABR限速
-      // demuxer-max-bytes 从 50MB 降低到 20MB：
-      //   - 避免MPV一次请求过大范围（RangeProxy已限制单次10MB）
-      //   - 20MB足够缓存约2-4秒的1080p/60fps流（码率5-8Mbps）
-      //   - 配合RangeProxy的10MB chunk限制，MPV最多发起2个并发请求
-      ctrl.setProperty('demuxer-readahead-secs', '8');
-      ctrl.setProperty('demuxer-max-bytes', '20971520'); // 20MB
+      // demuxerMaxBytes: 用户可配置，单位 MB
+      const maxBytesValue = demuxerMaxBytes * 1024 * 1024;
+      ctrl.setProperty('demuxer-readahead-secs', `${demuxerReadaheadSecs}`);
+      ctrl.setProperty('demuxer-max-bytes', `${maxBytesValue}`);
+      Logger.info(TAG, `Demuxer configured: readahead=${demuxerReadaheadSecs}s, max=${demuxerMaxBytes}MB`);
+
       // 回放缓冲降低到5MB，减少seek时的初始请求大小
       ctrl.setProperty('demuxer-max-back-bytes', '5242880'); // 5MB
 
@@ -172,12 +202,17 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const isHls = this.looksHls(this.sourceUrl);
     if (isHls) {
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_delay_max=3');
-      ctrl.setProperty('demuxer-readahead-secs', '30');
-      ctrl.setProperty('cache-secs', '30');
+      // HLS 需要更大的缓冲，使用用户配置的 2-3 倍
+      const hlsReadaheadMultiplier = 3;
+      const hlsCacheMultiplier = 2;
+      const baseReadahead = this.engineConfig.mpvDemuxerReadaheadSecs ?? 8;
+      const baseCache = this.engineConfig.mpvCacheSecs ?? 10;
+      ctrl.setProperty('demuxer-readahead-secs', `${baseReadahead * hlsReadaheadMultiplier}`);
+      ctrl.setProperty('cache-secs', `${baseCache * hlsCacheMultiplier}`);
     } else {
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
-      ctrl.setProperty('demuxer-readahead-secs', '8');
-      ctrl.setProperty('cache-secs', '10');
+      ctrl.setProperty('demuxer-readahead-secs', `${this.engineConfig.mpvDemuxerReadaheadSecs ?? 8}`);
+      ctrl.setProperty('cache-secs', `${this.engineConfig.mpvCacheSecs ?? 10}`);
     }
 
     try {

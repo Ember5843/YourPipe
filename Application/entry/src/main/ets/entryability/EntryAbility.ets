@@ -9,13 +9,14 @@ import { UIConfig } from '../common/AppState';
 import { PlaybackConfig } from '../common/PlaybackConfig';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
-import { BackgroundTaskManager } from 'mediaservice';
+import { BackgroundTaskManager, AvPlayerController } from 'mediaservice';
 import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
 import { AuthSessionManager, YTCoreLogger } from 'youtube_core';
 import { AppLogStore } from '../common/AppLogStore';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
 import { PlayerSession } from '../common/PlayerSession';
+import type { EngineConfig } from 'mediaservice';
 
 const logger = AppLog.getInstance('EntryAbility');
 
@@ -42,6 +43,17 @@ export default class EntryAbility extends UIAbility {
           mobileQuality: pb.mobileQuality,
           showHighResolutions: pb.showHighResolutions,
         };
+      });
+      // 注入 MPV 引擎配置提供者
+      AvPlayerController.setEngineConfigProvider(() => {
+        const pb = AppStorage.get<PlaybackConfig>('playbackConfig') ?? new PlaybackConfig();
+        return {
+          mpvHwdecEnabled: pb.hwdecEnabled,
+          mpvCacheSecs: parseInt(pb.cacheSecs, 10),
+          mpvDemuxerReadaheadSecs: parseInt(pb.demuxerReadaheadSecs, 10),
+          mpvDemuxerMaxBytes: parseInt(pb.demuxerMaxBytes, 10),
+          mpvGpuApi: pb.gpuApi,
+        } as EngineConfig;
       });
       // 日志初始化：尽早建立日志列表，根据持久化开关决定是否开始记录
       const logEnabled = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';

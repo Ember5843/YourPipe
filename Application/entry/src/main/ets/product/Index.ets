@@ -63,8 +63,10 @@ import { buildTitleMenu, buildYourTubeTitleBar, buildSheetTitleBar } from '../co
 import {
   PlaybackConfig,
   VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, VIDEO_QUALITY_CAP_DISPLAY,
-  CacheDiskSize, CACHE_DISK_SIZE_LABELS, CACHE_DISK_SIZE_DISPLAY,
-  CacheMaxAge, CACHE_MAX_AGE_LABELS, CACHE_MAX_AGE_DISPLAY,
+  CacheSecs, CACHE_SECS_LABELS, CACHE_SECS_DISPLAY,
+  DemuxerReadahead, DEMUXER_READAHEAD_LABELS, DEMUXER_READAHEAD_DISPLAY,
+  DemuxerMaxBytes, DEMUXER_MAX_BYTES_LABELS, DEMUXER_MAX_BYTES_DISPLAY,
+  GpuApi, GPU_API_LABELS, GPU_API_DISPLAY,
 } from '../common/PlaybackConfig';
 import { PlayerSession } from '../common/PlayerSession';
 import { PiPManager } from '../features/player/pip/PiPManager';
@@ -95,7 +97,7 @@ struct StateObserver {
     .height('100%')
     // 绑定 key 到配置关键字段，确保任意配置变化时 StateObserver 重建，
     // 从而触发内部 @Builder 内容（OptionsMainPage 等）重新渲染
-    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.showHighResolutions}`)
+    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.showHighResolutions}-${this.playbackConfig.hwdecEnabled}-${this.playbackConfig.cacheSecs}-${this.playbackConfig.demuxerReadaheadSecs}-${this.playbackConfig.demuxerMaxBytes}-${this.playbackConfig.gpuApi}`)
   }
 }
 
@@ -2142,6 +2144,59 @@ struct Index {
             )
           }
 
+          this.PlaybackSectionTitle('播放器')
+
+          this.PlaybackToggleRow(
+            '硬件解码',
+            '启用硬件加速解码，降低功耗并提升性能',
+            this.playbackConfig.hwdecEnabled,
+            (val: boolean) => {
+              this.updatePlaybackConfig(cfg => cfg.hwdecEnabled = val);
+            }
+          )
+
+          PlaybackSelectRow({
+            title: 'GPU 渲染',
+            options: GPU_API_LABELS.map(s => ({ value: GPU_API_DISPLAY[s] } as SelectOption)),
+            selectedIndex: GPU_API_LABELS.indexOf(this.playbackConfig.gpuApi),
+            onChange: (index: number) => {
+              const api = GPU_API_LABELS[index];
+              this.updatePlaybackConfig(cfg => cfg.gpuApi = api);
+            }
+          })
+
+          this.PlaybackSectionTitle('缓冲与网络')
+
+          PlaybackSelectRow({
+            title: '内存缓存',
+            options: CACHE_SECS_LABELS.map(s => ({ value: CACHE_SECS_DISPLAY[s] } as SelectOption)),
+            selectedIndex: CACHE_SECS_LABELS.indexOf(this.playbackConfig.cacheSecs),
+            onChange: (index: number) => {
+              const secs = CACHE_SECS_LABELS[index];
+              this.updatePlaybackConfig(cfg => cfg.cacheSecs = secs);
+            }
+          })
+
+          PlaybackSelectRow({
+            title: '预读缓冲',
+            options: DEMUXER_READAHEAD_LABELS.map(s => ({ value: DEMUXER_READAHEAD_DISPLAY[s] } as SelectOption)),
+            selectedIndex: DEMUXER_READAHEAD_LABELS.indexOf(this.playbackConfig.demuxerReadaheadSecs),
+            onChange: (index: number) => {
+              const secs = DEMUXER_READAHEAD_LABELS[index];
+              this.updatePlaybackConfig(cfg => cfg.demuxerReadaheadSecs = secs);
+            }
+          })
+
+          PlaybackSelectRow({
+            title: '缓冲区大小',
+            options: DEMUXER_MAX_BYTES_LABELS.map(s => ({ value: DEMUXER_MAX_BYTES_DISPLAY[s] } as SelectOption)),
+            selectedIndex: DEMUXER_MAX_BYTES_LABELS.indexOf(this.playbackConfig.demuxerMaxBytes),
+            onChange: (index: number) => {
+              const bytes = DEMUXER_MAX_BYTES_LABELS[index];
+              this.updatePlaybackConfig(cfg => cfg.demuxerMaxBytes = bytes);
+            }
+          })
+
           this.PlaybackSectionTitle('下载')
 
           PlaybackSelectRow({
@@ -2151,28 +2206,6 @@ struct Index {
             onChange: (index: number) => {
               const value = DOWNLOAD_CONCURRENCY_VALUES[index] || 1;
               this.updateUiConfig(cfg => cfg.maxConcurrentDownloads = value);
-            }
-          })
-
-          this.PlaybackSectionTitle('缓存')
-
-          PlaybackSelectRow({
-            title: '磁盘缓存上限',
-            options: CACHE_DISK_SIZE_LABELS.map(s => ({ value: CACHE_DISK_SIZE_DISPLAY[s] } as SelectOption)),
-            selectedIndex: CACHE_DISK_SIZE_LABELS.indexOf(this.playbackConfig.cacheDiskSize),
-            onChange: (index: number) => {
-              const size = CACHE_DISK_SIZE_LABELS[index];
-              this.updatePlaybackConfig(cfg => cfg.cacheDiskSize = size);
-            }
-          })
-
-          PlaybackSelectRow({
-            title: '缓存保留时长',
-            options: CACHE_MAX_AGE_LABELS.map(s => ({ value: CACHE_MAX_AGE_DISPLAY[s] } as SelectOption)),
-            selectedIndex: CACHE_MAX_AGE_LABELS.indexOf(this.playbackConfig.cacheMaxAge),
-            onChange: (index: number) => {
-              const age = CACHE_MAX_AGE_LABELS[index];
-              this.updatePlaybackConfig(cfg => cfg.cacheMaxAge = age);
             }
           })
 

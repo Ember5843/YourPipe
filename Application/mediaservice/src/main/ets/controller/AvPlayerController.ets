@@ -5,7 +5,7 @@
 
 import { VideoData, StreamInfo } from '../model/VideoData';
 import { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from '../model/PlayerModel';
-import { PlaybackEngine, PlaybackState } from '../engine/PlaybackEngine';
+import { PlaybackEngine, PlaybackState, EngineConfig } from '../engine/PlaybackEngine';
 import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
 import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
@@ -41,6 +41,13 @@ export class AvPlayerController {
   public onCastStateChange: ((isCasting: boolean, deviceName: string) => void) | undefined = undefined;
   public onNextCommand: (() => void) | undefined = undefined;
   public onPreviousCommand: (() => void) | undefined = undefined;
+
+  // 静态配置回调，由 entry 层注入
+  private static engineConfigProvider: (() => EngineConfig) | null = null;
+
+  public static setEngineConfigProvider(provider: () => EngineConfig): void {
+    AvPlayerController.engineConfigProvider = provider;
+  }
 
   private curIndex: number = 0;
   private curSource: VideoData;
@@ -229,7 +236,7 @@ export class AvPlayerController {
       this.onCastStateChange?.(isCasting, deviceName);
     };
 
-    const ok = await this.playbackEngine.initialize({});
+    const ok = await this.playbackEngine.initialize(AvPlayerController.engineConfigProvider?.() ?? {});
     if (ok) {
       this.playbackEngine.setStateCallback((state: PlaybackState) => this.onPlaybackStateChange(state));
       this.playbackEngine.setSubtitleCallback((text: string, _startTime: number, _duration: number) => {
