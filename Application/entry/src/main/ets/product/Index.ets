@@ -2031,7 +2031,7 @@ struct Index {
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
     .borderRadius(18)
-    .backgroundColor(this.activeTabIndex === index ? '#1AD32F2F' : Color.Transparent)
+    .backgroundColor(Color.Transparent)
     .scale({ x: this.activeTabIndex === index ? 1.0 : 0.94, y: this.activeTabIndex === index ? 1.0 : 0.94 })
   }
 
