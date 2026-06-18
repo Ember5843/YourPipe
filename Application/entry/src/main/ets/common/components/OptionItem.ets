@@ -1,15 +1,11 @@
-import { customAnimationUtil } from '../../common/AnimationUtil';
-import { UIConfig } from '../AppState';
-
 @Component
 export struct OptionItem {
-  @Prop icons: Resource | undefined = undefined;
+  @Prop icon: Resource | undefined = undefined;
   @Prop title: ResourceStr = '';
   @Prop subtitle: ResourceStr = '';
-  @Prop isPrimaryIcons: boolean = true;
   @Prop showChevron: boolean = true;
   @Prop iconColor: ResourceColor = $r('app.color.yourtube_theme_primary');
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @Prop clickEffectEnabled: ClickEffect | null = null;
   onClickAction?: () => void;
 
   @Styles
@@ -23,8 +19,8 @@ export struct OptionItem {
 
   build() {
     Row({ space: 12 }) {
-      if (this.icons) {
-        SymbolGlyph(this.icons)
+      if (this.icon) {
+        SymbolGlyph(this.icon)
           .fontSize(24)
           .fontColor([this.iconColor])
       }
@@ -48,8 +44,6 @@ export struct OptionItem {
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
 
-      Blank()
-
       if (this.showChevron) {
         SymbolGlyph($r('sys.symbol.chevron_right'))
           .fontSize(20)
@@ -57,7 +51,7 @@ export struct OptionItem {
       }
     }
     .RowStyle()
-    .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+    .clickEffect(this.clickEffectEnabled)
     .onClick(() => {
       if (this.onClickAction) {
         this.onClickAction();

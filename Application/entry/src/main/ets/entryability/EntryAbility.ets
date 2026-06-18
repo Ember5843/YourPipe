@@ -1,5 +1,5 @@
 import { AppLog } from '../common/AppLog';
-import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { AbilityConstant, UIAbility, Want, Configuration } from '@kit.AbilityKit';
 import { display, window } from '@kit.ArkUI';
 import { i18n } from '@kit.LocalizationKit';
 import { BreakpointConstants } from '../common/constants/BreakpointConstants';
@@ -96,6 +96,14 @@ export default class EntryAbility extends UIAbility {
 
   onDestroy(): void {
     logger.info('Ability onDestroy');
+  }
+
+  onConfigurationUpdate(newConfig: Configuration): void {
+    logger.info(`onConfigurationUpdate: ${JSON.stringify(newConfig)}`);
+    // 配置更新回调：语言、深色模式等系统配置变化时触发。
+    // 这里只记录日志，不做任何操作，避免与应用内的语言/主题切换逻辑冲突导致循环触发。
+    // 语言切换由 LanguageManager.applyPersistedLanguage() 在 onCreate 时应用，
+    // 运行时切换由 Index.ets applyLanguageSelection() 调用 i18n.System.setAppPreferredLanguage() 完成。
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {

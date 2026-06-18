@@ -511,7 +511,7 @@ export struct AboutPage {
             .width('100%').padding({ left: 4, top: 8, bottom: 4 })
 
             OptionItem({
-              icons: $r('sys.symbol.translate_c2e'),
+              icon: $r('sys.symbol.translate_c2e'),
               title: $r('app.string.yt_about_open_source'),
               subtitle: `${OPEN_SOURCE_ITEMS.length} 个项目`,
               iconColor: $r('app.color.yourtube_option_icon_language'),
@@ -519,7 +519,7 @@ export struct AboutPage {
             })
 
             OptionItem({
-              icons: $r('sys.symbol.star_fill'),
+              icon: $r('sys.symbol.star_fill'),
               title: $r('app.string.yt_about_ai_models'),
               subtitle: `${AI_MODELS.length} 个模型`,
               iconColor: '#8B5CF6',
@@ -527,7 +527,7 @@ export struct AboutPage {
             })
 
             OptionItem({
-              icons: $r('sys.symbol.clock'),
+              icon: $r('sys.symbol.clock'),
               title: $r('app.string.yt_about_changelog'),
               subtitle: `最新 v${CHANGELOG[0].version}`,
               iconColor: $r('app.color.yourtube_option_icon_palette'),

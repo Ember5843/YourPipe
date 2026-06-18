@@ -160,3 +160,75 @@ export struct LanguagePickerDialog {
     .clip(true)
   }
 }
+
+@CustomDialog
+export struct UIPickerLanguageDialog {
+  controller: CustomDialogController = new CustomDialogController({ builder: UIPickerLanguageDialog({}) });
+  title: ResourceStr = '';
+  items: LanguagePickerItem[] = [];
+  selectedCode: string = '';
+  onConfirm: (code: string) => void = () => {};
+
+  @State private selectedIndex: number = 0;
+
+  aboutToAppear(): void {
+    this.selectedIndex = Math.max(0, this.items.findIndex(it => it.code === this.selectedCode));
+  }
+
+  build() {
+    Column() {
+      // 标题栏
+      Row() {
+        Button('取消')
+          .fontSize(16)
+          .backgroundColor(Color.Transparent)
+          .fontColor($r('app.color.yourtube_text_secondary'))
+          .onClick(() => {
+            this.controller.close();
+          })
+
+        Text(this.title)
+          .fontSize(18)
+          .fontWeight(FontWeight.Medium)
+          .layoutWeight(1)
+          .textAlign(TextAlign.Center)
+
+        Button('确认')
+          .fontSize(16)
+          .backgroundColor(Color.Transparent)
+          .fontColor($r('app.color.yourtube_theme_primary'))
+          .onClick(() => {
+            const code = this.items[this.selectedIndex].code;
+            this.onConfirm(code);
+            this.controller.close();
+          })
+      }
+      .width('100%')
+      .height(56)
+      .padding({ left: 16, right: 16 })
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Divider()
+        .color($r('app.color.yourtube_divider'))
+
+      // 滚轮选择器
+      UIPickerComponent({ selectedIndex: this.selectedIndex }) {
+        ForEach(this.items, (item: LanguagePickerItem) => {
+          Text(item.localizedName)
+            .fontSize(18)
+        })
+      }
+      .width('100%')
+      .height(240)
+      .canLoop(false)
+      .onChange((selectedIndex: number) => {
+        this.selectedIndex = selectedIndex;
+      })
+      .onScrollStop((selectedIndex: number) => {
+        this.selectedIndex = selectedIndex;
+      })
+    }
+    .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+    .borderRadius(20)
+  }
+}

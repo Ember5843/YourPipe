@@ -41,6 +41,14 @@ import { SearchLocaleManager } from '../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../common/FeedServiceProvider';
 import { YoutubeData } from '../common/model/SupportedCountry';
 import { OptionItem } from '../common/components/OptionItem';
+import { PlaybackSelectRow } from '../common/components/PlaybackSelectRow';
+import { PlaybackToggleRow } from '../common/components/PlaybackToggleRow';
+import { PlaybackSectionTitle } from '../common/components/PlaybackSectionTitle';
+import { OptionsMainPage } from '../features/options/OptionsMainPage';
+import { OptionsAppearancePage } from '../features/options/OptionsAppearancePage';
+import { OptionsPlaybackPage } from '../features/options/OptionsPlaybackPage';
+import { OptionsLanguageAndRegionPage } from '../features/options/OptionsLanguageAndRegionPage';
+import { OptionsRecoveryPage } from '../features/options/OptionsRecoveryPage';
 import { LanguagePickerDialog, LanguagePickerItem } from '../common/components/LanguagePickerDialog';
 import { LanguagePickerPage } from '../common/components/LanguagePickerPage';
 import {
@@ -100,70 +108,6 @@ struct StateObserver {
     // 绑定 key 到配置关键字段，确保任意配置变化时 StateObserver 重建，
     // 从而触发内部 @Builder 内容（OptionsMainPage 等）重新渲染
     .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.showHighResolutions}-${this.playbackConfig.hwdecEnabled}-${this.playbackConfig.cacheSecs}-${this.playbackConfig.demuxerReadaheadSecs}-${this.playbackConfig.demuxerMaxBytes}-${this.playbackConfig.gpuApi}`)
-  }
-}
-
-@Component
-struct PlaybackSelectRow {
-  @Prop title: ResourceStr;
-  @Prop options: Array<SelectOption>;
-  @Prop @Watch('onSelectedIndexChange') selectedIndex: number;
-  @State selectedValue: string = '';
-  @Prop fontColor: ResourceColor = $r('app.color.yourtube_theme_primary');
-  onChange?: (index: number) => void;
-
-  aboutToAppear() {
-    this.syncValue();
-  }
-
-  onSelectedIndexChange() {
-    this.syncValue();
-  }
-
-  private syncValue() {
-    if (this.selectedIndex >= 0 && this.selectedIndex < this.options.length) {
-      const val = this.options[this.selectedIndex].value;
-      if (typeof val === 'string') {
-        this.selectedValue = val;
-      } else {
-        try {
-          this.selectedValue = getContext().resourceManager.getStringSync(val.id);
-        } catch (e) {
-          this.selectedValue = '';
-        }
-      }
-    } else {
-      this.selectedValue = '';
-    }
-  }
-
-  build() {
-    Row() {
-      Text(this.title)
-        .fontSize(15)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.yourtube_text_primary'))
-        .layoutWeight(1)
-
-      Select(this.options)
-        .selected(this.selectedIndex >= 0 ? this.selectedIndex : 0)
-        .value($$this.selectedValue)
-        .font({ size: 14 })
-        .fontColor(this.fontColor)
-        .selectedOptionFont({ size: 14 })
-        .optionFont({ size: 14 })
-        .backgroundColor(Color.Transparent)
-        .onSelect((index: number) => {
-          if (this.onChange) {
-            this.onChange(index);
-          }
-        })
-    }
-    .width('100%')
-    .constraintSize({ minHeight: 56 })
-    .padding({ left: 16, right: 8, top: 4, bottom: 4 })
-    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-    .borderRadius(16)
   }
 }
 
@@ -233,62 +177,68 @@ struct Index {
 
   private buildPickerItems(): void {
     const followSystem = getContext().resourceManager.getStringSync($r('app.string.yt_lang_follow_system').id);
-    const currentLang = LanguageManager.normalizeLanguageCode(i18n.System.getAppPreferredLanguage());
-    const isChineseUI = currentLang.startsWith('zh');
 
-    // App UI 语言
+    // App UI 语言 - 使用固定的原生名称，不依赖当前 UI 语言进行翻译
     const appCodes = ['default', 'zh-Hans', 'zh-HK', 'zh-TW', 'en-Latn', 'ru', 'de', 'fr', 'es', 'ar'];
     this.appLangItems = appCodes.map((code: string): LanguagePickerItem => {
       if (code === 'default') {
         return new LanguagePickerItem('default', followSystem, followSystem);
       }
       let native = code;
-      let localized = code;
-      if (code === 'zh-HK') {
+      // 使用语言自己的原生名称，而不是翻译成当前 UI 语言
+      if (code === 'zh-Hans') {
+        native = '简体中文';
+      } else if (code === 'zh-HK') {
+        native = '繁體中文（香港）';
+      } else if (code === 'zh-TW') {
+        native = '繁體中文（台灣）';
+      } else if (code === 'en-Latn') {
+        native = 'English';
+      } else if (code === 'ru') {
+        native = 'Русский';
+      } else if (code === 'de') {
+        native = 'Deutsch';
+      } else if (code === 'fr') {
+        native = 'Français';
+      } else if (code === 'es') {
+        native = 'Español';
+      } else if (code === 'ar') {
+        native = 'العربية';
+      } else {
+        try { native = i18n.System.getDisplayLanguage(code, code.split('-')[0]); } catch (_e) {}
+      }
+      // localized 和 native 使用相同的值，避免依赖当前语言重新翻译
+      return new LanguagePickerItem(code, native, native);
+    });
+
+    // 内容语言（YouTube SUPPORTED_LANGUAGES）- 使用固定名称
+    const defaultLangItem: LanguagePickerItem = new LanguagePickerItem('default', followSystem, followSystem);
+    const langMapped: LanguagePickerItem[] = YoutubeData.SUPPORTED_LANGUAGES.map((l): LanguagePickerItem => {
+      const code = l.getLanguageCode();
+      let native = code;
+      // 使用固定的语言名称，避免翻译
+      if (code === 'zh-CN') {
+        native = '简体中文';
+      } else if (code === 'zh-HK') {
         native = '繁體中文（香港）';
       } else if (code === 'zh-TW') {
         native = '繁體中文（台灣）';
       } else {
+        // 使用语言自己的原生名称
         try { native = i18n.System.getDisplayLanguage(code, code.split('-')[0]); } catch (_e) {}
       }
-      try { localized = i18n.System.getDisplayLanguage(code, currentLang); } catch (_e) {}
-      return new LanguagePickerItem(code, localized, native);
-    });
-
-    // 内容语言（YouTube SUPPORTED_LANGUAGES）
-    const defaultLangItem: LanguagePickerItem = new LanguagePickerItem('default', followSystem, followSystem);
-    // YouTube 使用的中文代码 zh-CN/zh-HK/zh-TW 在 HarmonyOS i18n 下均显示为"中文"，
-    // 手动覆写为更明确的名称，方便用户区分。仅在中文 UI 下使用覆盖。
-    const langMapped: LanguagePickerItem[] = YoutubeData.SUPPORTED_LANGUAGES.map((l): LanguagePickerItem => {
-      const code = l.getLanguageCode();
-      let localized = code;
-      let native = code;
-      if (code === 'zh-CN') {
-        localized = getContext().resourceManager.getStringSync($r('app.string.yt_lang_simplified').id);
-        native = localized;
-      } else if (code === 'zh-HK') {
-        localized = getContext().resourceManager.getStringSync($r('app.string.yt_lang_traditional_hk').id);
-        native = localized;
-      } else if (code === 'zh-TW') {
-        localized = getContext().resourceManager.getStringSync($r('app.string.yt_lang_traditional_tw').id);
-        native = localized;
-      } else {
-        try { localized = i18n.System.getDisplayLanguage(code, currentLang); } catch (_e) {}
-        try { native = i18n.System.getDisplayLanguage(code, code.split('-')[0]); } catch (_e) {}
-      }
-      return new LanguagePickerItem(code, localized, native);
+      return new LanguagePickerItem(code, native, native);
     });
     this.contentLangItems = [defaultLangItem].concat(langMapped);
 
-    // 内容地区（YouTube SUPPORTED_COUNTRIES）
+    // 内容地区（YouTube SUPPORTED_COUNTRIES）- 使用英文名称
     const defaultCountryItem: LanguagePickerItem = new LanguagePickerItem('default', followSystem, followSystem);
     const countryMapped: LanguagePickerItem[] = YoutubeData.SUPPORTED_COUNTRIES.map((c): LanguagePickerItem => {
       const code = c.getCountryCode();
-      let localized = code;
       let native = code;
-      try { localized = i18n.System.getDisplayCountry(code, currentLang); } catch (_e) {}
+      // 使用英文的国家名称，避免依赖当前语言翻译
       try { native = i18n.System.getDisplayCountry(code, 'en'); } catch (_e) {}
-      return new LanguagePickerItem(code, localized, native);
+      return new LanguagePickerItem(code, native, native);
     });
     this.contentCountryItems = [defaultCountryItem].concat(countryMapped);
   }
@@ -296,6 +246,10 @@ struct Index {
   private getItemDisplay(items: LanguagePickerItem[], code: string): string {
     const found = items.find((it: LanguagePickerItem): boolean => it.code === code);
     return found ? found.localizedName : getContext().resourceManager.getStringSync($r('app.string.yt_lang_follow_system').id);
+  }
+
+  private getAppLanguageSubtitle(): string {
+    return this.getItemDisplay(this.appLangItems, this.uiConfig.userLanguage);
   }
 
   private getGoogleAccountSubtitle(): string {
@@ -1261,8 +1215,10 @@ struct Index {
       ? sysLang
       : languageCode;
     i18n.System.setAppPreferredLanguage(appliedLanguage);
-    // 重新生成语言/地区选项，使显示名称随新UI语言更新
-    this.buildPickerItems();
+    // 不需要重新构建 pickerItems：
+    // 1. 语言名称已使用固定的原生名称，不依赖当前 UI 语言
+    // 2. 用户在 LanguagePickerPage 选完返回后，该页面已不在渲染树中
+    // 3. setAppPreferredLanguage 触发的 onConfigurationUpdate 不会重复调用此方法
   }
 
 
@@ -1589,7 +1545,24 @@ struct Index {
         .margin({ top: 8, bottom: 6 })
 
         StateObserver() {
-          this.OptionsMainPage()
+          OptionsMainPage({
+            params: {
+              uiConfig: this.uiConfig,
+              playbackConfig: this.playbackConfig,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              getGoogleAccountSubtitle: this.getGoogleAccountSubtitle.bind(this),
+              getLanguageAndRegionSubtitle: this.getLanguageAndRegionSubtitle.bind(this),
+              getPlaybackSubtitle: this.getPlaybackSubtitle.bind(this),
+              getAppearanceSubtitle: this.getAppearanceSubtitle.bind(this),
+              onGoogleAccountClick: () => { this.pushOptionsPath('google_account'); },
+              onLanguageClick: () => { this.pushOptionsPath('language'); },
+              onPlaybackClick: () => { this.pushOptionsPath('playback'); },
+              onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
+              onLogClick: () => { this.pushOptionsPath('log_page'); },
+              onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
+              onAboutClick: () => { this.pushOptionsPath('about_page'); }
+            }
+          })
         }
       }
       .width('100%')
@@ -1616,7 +1589,20 @@ struct Index {
     if (name === 'language') {
       HdsNavDestination() {
         StateObserver() {
-          this.OptionsLanguageAndRegionPage()
+          OptionsLanguageAndRegionPage({
+            params: {
+              uiConfig: this.uiConfig,
+              appLangItems: this.appLangItems,
+              contentLangItems: this.contentLangItems,
+              contentCountryItems: this.contentCountryItems,
+              themeColor: this.THEME_COLOR,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              updateUiConfig: this.updateUiConfig.bind(this),
+              reloadHomeForSearchLocaleChange: this.reloadHomeForSearchLocaleChange.bind(this),
+              applyLanguageSelection: this.applyLanguageSelection.bind(this),
+              getAppLanguageSubtitle: this.getAppLanguageSubtitle.bind(this)
+            }
+          })
         }
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
@@ -1672,7 +1658,14 @@ struct Index {
     } else if (name === 'appearance') {
       HdsNavDestination() {
         StateObserver() {
-          this.OptionsAppearancePage()
+          OptionsAppearancePage({
+            params: {
+              uiConfig: this.uiConfig,
+              themeColor: this.THEME_COLOR,
+              applyDarkModeSelection: this.applyDarkModeSelection.bind(this),
+              updateUiConfig: this.updateUiConfig.bind(this)
+            }
+          })
         }
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
@@ -1750,7 +1743,16 @@ struct Index {
     } else if (name === 'playback') {
       HdsNavDestination() {
         StateObserver() {
-          this.OptionsPlaybackPage()
+          OptionsPlaybackPage({
+            params: {
+              uiConfig: this.uiConfig,
+              playbackConfig: this.playbackConfig,
+              themeColor: this.THEME_COLOR,
+              updatePlaybackConfig: this.updatePlaybackConfig.bind(this),
+              updateUiConfig: this.updateUiConfig.bind(this),
+              getQualityDisplay: this.getQualityDisplay.bind(this)
+            }
+          })
         }
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
@@ -1768,7 +1770,13 @@ struct Index {
     } else if (name === 'recovery') {
       HdsNavDestination() {
         StateObserver() {
-          this.OptionsRecoveryPage()
+          OptionsRecoveryPage({
+            params: {
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              onResetSettingsClick: () => { this.showResetSettingsConfirmDialog(); },
+              onClearAllDataClick: () => { this.showClearAllDataConfirmDialog(); }
+            }
+          })
         }
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
@@ -1786,156 +1794,6 @@ struct Index {
     }
   }
 
-  @Builder OptionsMainPage() {
-    Column() {
-      // 使用 Scroll+Column 与播放页面风格一致，无条目出现动画
-      Scroll() {
-        Column({ space: 6 }) {
-          this.PlaybackSectionTitle('首选项')
-
-          OptionItem({
-            icons: $r('sys.symbol.info_circle'),
-            title: 'Google 登录',
-            subtitle: this.getGoogleAccountSubtitle(),
-            iconColor: $r('app.color.yourtube_theme_primary'),
-            onClickAction: () => {
-              this.pushOptionsPath('google_account');
-            }
-          })
-
-          this.PlaybackSectionTitle($r('app.string.yt_option_group_settings'))
-
-          OptionItem({
-            icons: $r('sys.symbol.translate_c2e'),
-            title: $r('app.string.yt_section_language_region'),
-            subtitle: this.getLanguageAndRegionSubtitle(this.uiConfig),
-            iconColor: $r('app.color.yourtube_option_icon_language'),
-            onClickAction: () => {
-              this.pushOptionsPath('language');
-            }
-          })
-
-          OptionItem({
-            icons: $r('sys.symbol.play_circle'),
-            title: $r('app.string.yt_section_playback'),
-            subtitle: this.getPlaybackSubtitle(this.playbackConfig),
-            iconColor: $r('app.color.yourtube_theme_primary'),
-            onClickAction: () => {
-              this.pushOptionsPath('playback');
-            }
-          })
-
-          OptionItem({
-            icons: $r('sys.symbol.paintpalette_fill'),
-            title: $r('app.string.yt_option_appearance'),
-            subtitle: this.getAppearanceSubtitle(this.uiConfig),
-            iconColor: $r('app.color.yourtube_option_icon_palette'),
-            onClickAction: () => {
-              this.pushOptionsPath('appearance');
-            }
-          })
-
-          this.PlaybackSectionTitle($r('app.string.yt_option_group_others'))
-
-          OptionItem({
-            icons: $r('sys.symbol.doc_text'),
-            title: $r('app.string.yt_option_log'),
-            subtitle: $r('app.string.yt_option_log_subtitle'),
-            iconColor: $r('app.color.yourtube_option_icon_log'),
-            onClickAction: () => {
-              this.pushOptionsPath('log_page');
-            }
-          })
-
-          OptionItem({
-            icons: $r('sys.symbol.arrow_counterclockwise'),
-            title: $r('app.string.yt_option_recovery'),
-            subtitle: $r('app.string.yt_option_reset_settings_subtitle'),
-            iconColor: $r('app.color.yourtube_option_icon_palette'),
-            onClickAction: () => { this.pushOptionsPath('recovery'); }
-          })
-
-          OptionItem({
-            icons: $r('sys.symbol.info_circle'),
-            title: $r('app.string.yt_option_about'),
-            subtitle: `v${APP_VERSION}`,
-            iconColor: $r('app.color.yourtube_option_icon_about'),
-            onClickAction: () => {
-              this.pushOptionsPath('about_page');
-            }
-          })
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, top: 8, bottom: 12 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
-    }
-    .width('100%')
-    .height('100%')
-  }
-
-  @Builder OptionsLanguageAndRegionPage() {
-    Column() {
-      Scroll() {
-        Column({ space: 6 }) {
-          this.PlaybackSectionTitle($r('app.string.yt_section_language'))
-
-          // 应用UI语言：通过 LanguagePickerPage 跳转选择。
-          // 关键：用户在该页选完返回后，页面已经不在渲染树中，
-          // setAppPreferredLanguage 触发的 onConfigurationUpdated 不会再重复触发 applyLanguageSelection。
-          OptionItem({
-            title: $r('app.string.yt_setting_ui_language'),
-            subtitle: this.appLangItems.find(it => it.code === this.uiConfig.userLanguage)?.localizedName || getContext().resourceManager.getStringSync($r('app.string.yt_lang_follow_system').id),
-            showChevron: true,
-            onClickAction: () => { this.pushOptionsPath('app_lang'); }
-          })
-
-          // 内容语言：100+ 项，Select 会在弹出时全量创建节点，卡主线程，必须跳转
-          Column() {
-            PlaybackSelectRow({
-              title: $r('app.string.yt_setting_content_language'),
-              options: this.contentLangItems.map(item => ({ value: item.localizedName } as SelectOption)),
-              selectedIndex: this.contentLangItems.findIndex(it => it.code === this.uiConfig.searchLanguage),
-              onChange: (index: number) => {
-                const code = this.contentLangItems[index].code;
-                this.updateUiConfig(cfg => cfg.searchLanguage = code === 'default' ? 'default' : code);
-                this.reloadHomeForSearchLocaleChange();
-              }
-            })
-          }
-
-          // 内容地区：100+ 项，同上
-          Column() {
-            PlaybackSelectRow({
-              title: $r('app.string.yt_setting_content_region'),
-              options: this.contentCountryItems.map(item => ({ value: item.localizedName } as SelectOption)),
-              selectedIndex: this.contentCountryItems.findIndex(it => it.code === this.uiConfig.searchCountry),
-              onChange: (index: number) => {
-                const code = this.contentCountryItems[index].code;
-                this.updateUiConfig(cfg => cfg.searchCountry = code === 'default' ? 'default' : code.toUpperCase());
-                this.reloadHomeForSearchLocaleChange();
-              }
-            })
-          }
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
-  }
-
-
-
   private applyDarkModeSelection(mode: YourtubeDarkMode): void {
     this.updateUiConfig(cfg => cfg.darkMode = mode);
 
@@ -1949,67 +1807,6 @@ struct Index {
         hostContext.getApplicationContext().setColorMode(colorMode);
       }
     });
-  }
-
-  @Builder OptionsAppearancePage() {
-    Column() {
-      Scroll() {
-        Column({ space: 6 }) {
-          this.PlaybackSectionTitle($r('app.string.yt_dark_mode_title'))
-
-          Column() {
-            PlaybackSelectRow({
-              title: $r('app.string.yt_dark_mode_title'),
-              options: [$r('app.string.yt_dark_mode_system'), $r('app.string.yt_dark_mode_light'), $r('app.string.yt_dark_mode_dark')].map(label => ({ value: label } as SelectOption)),
-              selectedIndex: [YourtubeDarkMode.SYSTEM, YourtubeDarkMode.LIGHT, YourtubeDarkMode.DARK]
-                .indexOf(this.uiConfig.darkMode),
-              onChange: (index: number) => {
-                const mode = [YourtubeDarkMode.SYSTEM, YourtubeDarkMode.LIGHT, YourtubeDarkMode.DARK][index];
-                this.applyDarkModeSelection(mode);
-              }
-            })
-          }
-
-          this.PlaybackSectionTitle($r('app.string.yt_setting_home_layout'))
-
-          this.PlaybackToggleRow(
-            $r('app.string.yt_layout_grid'),
-            this.uiConfig.homeLayoutMode === 'grid' ? '卡片模式' : '列表模式',
-            this.uiConfig.homeLayoutMode === 'grid',
-            (val: boolean) => {
-              this.updateUiConfig(cfg => { cfg.homeLayoutMode = val ? 'grid' : 'list'; });
-            }
-          )
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
-  }
-
-  @Builder OptionsSubPage(title: ResourceStr, content: ResourceStr) {
-    Column() {
-      Column() {
-        OptionItem({
-          title: $r('app.string.yt_option_in_development'),
-          subtitle: content,
-          showChevron: false,
-          iconColor: $r('app.color.yourtube_text_hint')
-        })
-      }
-      .padding(16)
-      .width('100%')
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
   }
 
   @Builder TabBarBuilder(iconRes: Resource, label: ResourceStr, index: number) {
@@ -2074,203 +1871,6 @@ struct Index {
   private savePlaybackConfig(next: PlaybackConfig): void {
     this.playbackConfig = next;
     PlaybackConfig.saveToPreferences(next);
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 播放设置页面 Builder
-  // ─────────────────────────────────────────────────────────────────────────
-
-  @Builder
-  PlaybackSectionTitle(title: ResourceStr) {
-    Text(title)
-      .fontSize(13)
-      .fontColor($r('app.color.yourtube_text_hint'))
-      .fontWeight(FontWeight.Medium)
-      .margin({ left: 8, top: 16, bottom: 6 })
-      .width('100%')
-  }
-
-  /** 开关行 */
-  @Builder
-  PlaybackToggleRow(title: ResourceStr, subtitle: ResourceStr, isOn: boolean, onChange: (val: boolean) => void) {
-    Row({ space: 12 }) {
-      Column() {
-        Text(title)
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.yourtube_text_primary'))
-        if (typeof subtitle === 'string' && subtitle.length > 0) {
-          Text(subtitle)
-            .fontSize(12)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
-            .margin({ top: 3 })
-        }
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-
-      Toggle({ type: ToggleType.Switch, isOn: isOn })
-        .selectedColor(this.THEME_COLOR)
-        .onChange((val: boolean) => { onChange(val); })
-    }
-    .width('100%')
-    .constraintSize({ minHeight: 56 })
-    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-    .borderRadius(16)
-  }
-
-  @Builder OptionsPlaybackPage() {
-    Column() {
-      Scroll() {
-        Column({ space: 6 }) {
-          this.PlaybackSectionTitle($r('app.string.yt_section_video'))
-
-          PlaybackSelectRow({
-            title: $r('app.string.yt_setting_default_quality'),
-            options: VIDEO_QUALITY_CAP_LABELS.map(cap => ({ value: this.getQualityDisplay(cap) } as SelectOption)),
-            selectedIndex: VIDEO_QUALITY_CAP_LABELS.indexOf(this.playbackConfig.defaultQuality),
-            onChange: (index: number) => {
-              const cap = VIDEO_QUALITY_CAP_LABELS[index];
-              this.updatePlaybackConfig(cfg => cfg.defaultQuality = cap);
-            }
-          })
-
-          this.PlaybackToggleRow(
-            $r('app.string.yt_setting_show_high_res'),
-            $r('app.string.yt_setting_show_high_res_subtitle'),
-            this.playbackConfig.showHighResolutions,
-            (val: boolean) => {
-              this.updatePlaybackConfig(cfg => cfg.showHighResolutions = val);
-            }
-          )
-
-          if (PiPManager.getInstance().isPiPSupported()) {
-            this.PlaybackSectionTitle('画中画')
-
-            this.PlaybackToggleRow(
-              '返回时进入画中画',
-              '按返回键或 home 键时自动弹出画中画窗口',
-              this.playbackConfig.pipOnReturn,
-              (val: boolean) => {
-                this.updatePlaybackConfig(cfg => cfg.pipOnReturn = val);
-              }
-            )
-          }
-
-          this.PlaybackSectionTitle('播放器')
-
-          this.PlaybackToggleRow(
-            '硬件解码',
-            '启用硬件加速解码，降低功耗并提升性能',
-            this.playbackConfig.hwdecEnabled,
-            (val: boolean) => {
-              this.updatePlaybackConfig(cfg => cfg.hwdecEnabled = val);
-            }
-          )
-
-          PlaybackSelectRow({
-            title: 'GPU 渲染',
-            options: GPU_API_LABELS.map(s => ({ value: GPU_API_DISPLAY[s] } as SelectOption)),
-            selectedIndex: GPU_API_LABELS.indexOf(this.playbackConfig.gpuApi),
-            onChange: (index: number) => {
-              const api = GPU_API_LABELS[index];
-              this.updatePlaybackConfig(cfg => cfg.gpuApi = api);
-            }
-          })
-
-          this.PlaybackSectionTitle('缓冲与网络')
-
-          PlaybackSelectRow({
-            title: '内存缓存',
-            options: CACHE_SECS_LABELS.map(s => ({ value: CACHE_SECS_DISPLAY[s] } as SelectOption)),
-            selectedIndex: CACHE_SECS_LABELS.indexOf(this.playbackConfig.cacheSecs),
-            onChange: (index: number) => {
-              const secs = CACHE_SECS_LABELS[index];
-              this.updatePlaybackConfig(cfg => cfg.cacheSecs = secs);
-            }
-          })
-
-          PlaybackSelectRow({
-            title: '预读缓冲',
-            options: DEMUXER_READAHEAD_LABELS.map(s => ({ value: DEMUXER_READAHEAD_DISPLAY[s] } as SelectOption)),
-            selectedIndex: DEMUXER_READAHEAD_LABELS.indexOf(this.playbackConfig.demuxerReadaheadSecs),
-            onChange: (index: number) => {
-              const secs = DEMUXER_READAHEAD_LABELS[index];
-              this.updatePlaybackConfig(cfg => cfg.demuxerReadaheadSecs = secs);
-            }
-          })
-
-          PlaybackSelectRow({
-            title: '缓冲区大小',
-            options: DEMUXER_MAX_BYTES_LABELS.map(s => ({ value: DEMUXER_MAX_BYTES_DISPLAY[s] } as SelectOption)),
-            selectedIndex: DEMUXER_MAX_BYTES_LABELS.indexOf(this.playbackConfig.demuxerMaxBytes),
-            onChange: (index: number) => {
-              const bytes = DEMUXER_MAX_BYTES_LABELS[index];
-              this.updatePlaybackConfig(cfg => cfg.demuxerMaxBytes = bytes);
-            }
-          })
-
-          this.PlaybackSectionTitle('下载')
-
-          PlaybackSelectRow({
-            title: '并发下载任务',
-            options: DOWNLOAD_CONCURRENCY_VALUES.map((value: number) => ({ value: `${value}` } as SelectOption)),
-            selectedIndex: DOWNLOAD_CONCURRENCY_VALUES.indexOf(this.uiConfig.maxConcurrentDownloads || 1),
-            onChange: (index: number) => {
-              const value = DOWNLOAD_CONCURRENCY_VALUES[index] || 1;
-              this.updateUiConfig(cfg => cfg.maxConcurrentDownloads = value);
-            }
-          })
-
-          Row().height(24)
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
-  }
-
-  @Builder OptionsRecoveryPage() {
-    Column() {
-      Scroll() {
-        Column({ space: 6 }) {
-          this.PlaybackSectionTitle($r('app.string.yt_option_recovery'))
-
-          OptionItem({
-            icons: $r('sys.symbol.arrow_counterclockwise'),
-            title: $r('app.string.yt_option_reset_settings'),
-            subtitle: $r('app.string.yt_option_reset_settings_subtitle'),
-            iconColor: $r('app.color.yourtube_option_icon_palette'),
-            onClickAction: () => { this.showResetSettingsConfirmDialog(); }
-          })
-
-          OptionItem({
-            icons: $r('sys.symbol.trash'),
-            title: $r('app.string.yt_option_clear_all_data'),
-            subtitle: $r('app.string.yt_option_clear_all_data_subtitle'),
-            iconColor: '#D32F2F',
-            onClickAction: () => { this.showClearAllDataConfirmDialog(); }
-          })
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
   }
 
   private showResetSettingsConfirmDialog(): void {
