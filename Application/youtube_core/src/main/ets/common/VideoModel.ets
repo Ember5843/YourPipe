@@ -8,6 +8,8 @@ export class VideoItem {
   thumbnailUrl: string;
   thumbnailColor: string;
   isLive: boolean;
+  isPremium: boolean;
+  requiresMembership: boolean;
   channelAvatarUrl: string;
   channelHandle: string;
   videoDescription: string;
@@ -26,7 +28,9 @@ export class VideoItem {
     channelAvatarUrl: string = "",
     channelHandle: string = "",
     videoDescription: string = "",
-    videoDescriptionError: string | null = null
+    videoDescriptionError: string | null = null,
+    isPremium: boolean = false,
+    requiresMembership: boolean = false
   ) {
     this.id = id;
     this.videoId = videoId;
@@ -35,6 +39,8 @@ export class VideoItem {
     this.viewCount = viewCount;
     this.thumbnailUrl = thumbnailUrl;
     this.isLive = isLive;
+    this.isPremium = isPremium;
+    this.requiresMembership = requiresMembership;
     this.thumbnailColor = thumbnailColor;
     this.channelId = channelId;
     this.channelAvatarUrl = channelAvatarUrl;

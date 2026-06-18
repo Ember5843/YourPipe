@@ -62,7 +62,7 @@ export const GPU_API_DISPLAY: Record<GpuApi, string> = {
 export class PlaybackConfig {
   defaultQuality: VideoQualityCap = 'best';
   mobileQuality: VideoQualityCap = '480p';
-  showHighResolutions: boolean = false;
+  showHighResolutions: boolean = true;
   /** 返回键/home 键时是否自动进入画中画（设备不支持时强制 false） */
   pipOnReturn: boolean = true;
 
@@ -98,7 +98,7 @@ export class PlaybackConfig {
     const cfg = new PlaybackConfig();
     cfg.defaultQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_defaultQuality', 'best'), 'best');
     cfg.mobileQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_mobileQuality', '480p'), '480p');
-    cfg.showHighResolutions = PreferencesStore.getString('cfg_pb_showHighRes', 'false') === 'true';
+    cfg.showHighResolutions = PreferencesStore.getString('cfg_pb_showHighRes', 'true') === 'true';
     cfg.pipOnReturn = PreferencesStore.getString('cfg_pb_pipOnReturn', 'true') === 'true';
 
     // MPV 播放器设置

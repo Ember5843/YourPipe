@@ -18,6 +18,7 @@ export struct CommentReplyPage {
   
   @Consume('commentPageInfo') pageInfo: NavPathStack;
   @Consume('actionHub') actionHub: ActionHub;
+  private scrollerForScroll: Scroller = new Scroller();
 
   aboutToAppear() {
     // 获取传递的参数
@@ -60,7 +61,7 @@ export struct CommentReplyPage {
   build() {
     HdsNavDestination() {
       Column() {
-        List() {
+        List({ scroller: this.scrollerForScroll }) {
           // 父评论
           if (this.parentComment) {
             ListItem() {
@@ -91,6 +92,7 @@ export struct CommentReplyPage {
             }
           }
         }
+        .clip(false)
         .layoutWeight(1)
         .width('100%')
         .onReachEnd(() => {
@@ -103,6 +105,7 @@ export struct CommentReplyPage {
       .height('100%')
       .backgroundColor($r('app.color.yourtube_bg_page'))
     }
+    .bindToScrollable([this.scrollerForScroll])
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .titleBar(buildYourTubeTitleBar({
       title: $r('app.string.yt_label_reply'),

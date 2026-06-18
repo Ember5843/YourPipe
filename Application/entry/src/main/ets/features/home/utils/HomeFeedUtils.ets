@@ -2,7 +2,7 @@ import { VideoItem } from 'youtube_core';
 import { VideoBuildResult } from '../model/FeedResult';
 import { ThumbnailPlaceholder } from '../../../common/ThumbnailPlaceholder';
 import { getContinuationToken } from './ContinuationUtils';
-import { getLockupChannelId, getLockupIsLive, getLockupTitle, getLockupUploaderName, getLockupVideoId, getLockupVideoThumbnailUrl, getLockupViewCount } from './LockupViewModelParser';
+import { getLockupChannelId, getLockupIsLive, getLockupTitle, getLockupUploaderName, getLockupVideoId, getLockupVideoThumbnailUrl, getLockupViewCount, getLockupIsPremium, getLockupRequiresMembership } from './LockupViewModelParser';
 import { buildVideoItemFromReelRenderer, buildVideoItemFromRenderer, buildVideoItemFromShortsLockupViewModel } from './VideoItemBuilder';
 
 export function getHomeKioskItemsFromTabContent(tabContent: Record<string, Object> | undefined): Array<Record<string, Object>> {
@@ -94,7 +94,9 @@ export function buildHomeKioskVideoItems(
           const channelId = getLockupChannelId(lockupInRich);
           const viewCount = getLockupViewCount(lockupInRich);
           const isLive = getLockupIsLive(lockupInRich);
-          items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", ""));
+          const isPremium = getLockupIsPremium(lockupInRich);
+          const requiresMembership = getLockupRequiresMembership(lockupInRich);
+          items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", "", null, isPremium, requiresMembership));
           idCounter += 1;
           return;
         }
@@ -146,7 +148,9 @@ export function buildHomeKioskVideoItems(
         const channelId = getLockupChannelId(lockup);
         const viewCount = getLockupViewCount(lockup);
         const isLive = getLockupIsLive(lockup);
-        items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", ""));
+        const isPremium = getLockupIsPremium(lockup);
+        const requiresMembership = getLockupRequiresMembership(lockup);
+        items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", "", null, isPremium, requiresMembership));
         idCounter += 1;
         return;
       }

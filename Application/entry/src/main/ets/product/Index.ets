@@ -51,8 +51,10 @@ import {
   HdsNavDestinationTitleMode,
   HdsTabs,
   HdsTabsController,
+  HdsTabsFloatingStyle,
   hdsMaterial,
-  HdsNavigationTitleMode
+  HdsNavigationTitleMode,
+  SystemMaterialParams
 } from '@kit.UIDesignKit';
 import { curves } from '@kit.ArkUI';
 import { UIConfig, YourtubeDarkMode } from '../common/AppState';
@@ -60,6 +62,7 @@ import { ColorModeManager } from '../common/ColorModeManager';
 import { LogPage } from '../common/components/LogPage';
 import { AboutPage } from '../common/components/AboutPage';
 import { buildTitleMenu, buildYourTubeTitleBar, buildSheetTitleBar } from '../common/components/HdsTitleBar';
+import { MaterialUtil } from '../common/utils/MaterialUtil';
 import {
   PlaybackConfig,
   VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, VIDEO_QUALITY_CAP_DISPLAY,
@@ -176,6 +179,8 @@ struct Index {
   @State activeTabIndex: number = 0;
   @State navPathStack: NavPathStack = new NavPathStack();
   private tabsController: HdsTabsController = new HdsTabsController();
+  private homeGridScroller: Scroller = new Scroller();
+  private homeListScroller: Scroller = new Scroller();
   @State selectedVideo: VideoItem | null = null;
   @State selectedChannel: SearchChannelItem | null = null;
   @State selectedPlaylist: SearchPlaylistItem | null = null;
@@ -207,6 +212,10 @@ struct Index {
   @State systemLanguageCode: string = LanguageManager.LANGUAGE_EN_LATN;
 
   @State THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
+  // 沉浸光感材质效果（首页标题栏 + HdsTabs 底栏共用）。
+  // 在 aboutToAppear 里通过 MaterialUtil 检测设备能力后注入；
+  // 不支持的设备为 undefined，调用方走降级路径。
+  @State immersiveMaterialEffect: SystemMaterialParams | undefined = undefined;
   private readonly GRID_SIDE_PADDING: number = 12;
   // 视频播放器状态
   @State isPlayerFullLandscapeScreen: boolean = false;
@@ -454,6 +463,8 @@ struct Index {
     this.buildPickerItems();
     this.initLanguageSettings();
     this.bindActionHub();
+    // 沉浸光感能力检测：支持则注入 ADAPTIVE/ADAPTIVE，不支持则 undefined（让 HdsTabs / titleBar 走默认渲染）
+    this.immersiveMaterialEffect = MaterialUtil.getSystemMaterialEffect();
     // PiP 恢复：不手动 push 播放页。系统经 navigationId 自动还原出一个播放页，
     // 新页面 XComponent onLoad 会把新 surfaceId 透传给引擎，由 native 运行时把 mpv
     // 重定向到新 surface（见 player_napi SetVideoSurfaceId 的 surface-redirect 分支）。
@@ -1286,6 +1297,29 @@ struct Index {
     this.activeTabIndex = index;
   }
 
+  private buildHdsTabsFloatingStyle(): HdsTabsFloatingStyle {
+    const base: HdsTabsFloatingStyle = {
+      barWidth: {
+        smallWidth: 312,
+        mediumWidth: 360,
+        largeWidth: 420
+      },
+      barSideMargin: 0,
+      barBottomMargin: Math.max(this.bottomSafeHeight, 12),
+      gradientMask: {
+        maskColor: $r('app.color.yourtube_bg_page'),
+        maskHeight: 132
+      },
+      lightColor: this.THEME_COLOR,
+      thermoCtrl: true,
+      barOpacity: 0.96
+    };
+    if (this.immersiveMaterialEffect) {
+      base.systemMaterialEffect = this.immersiveMaterialEffect;
+    }
+    return base;
+  }
+
   build() {
     HdsNavigation(this.navPathStack) {
       Stack({ alignContent: Alignment.TopStart }) {
@@ -1309,26 +1343,7 @@ struct Index {
         .barHeight(64)
         .barOverlap(true)
         .blurStrategy(BlurStrategy.ADAPTIVE)
-        .barFloatingStyle({
-          barWidth: {
-            smallWidth: 312,
-            mediumWidth: 360,
-            largeWidth: 420
-          },
-          barSideMargin: 0,
-          barBottomMargin: Math.max(this.bottomSafeHeight, 12),
-          gradientMask: {
-            maskColor: $r('app.color.yourtube_bg_page'),
-            maskHeight: 132
-          },
-          lightColor: this.THEME_COLOR,
-          systemMaterialEffect: {
-            materialType: hdsMaterial.MaterialType.IMMERSIVE,
-            materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
-          },
-          thermoCtrl: true,
-          barOpacity: 0.96
-        })
+        .barFloatingStyle(this.buildHdsTabsFloatingStyle())
         .width('100%')
         .height('100%')
         .onChange((index: number) => {
@@ -1357,12 +1372,15 @@ struct Index {
       },
       backIcon: $r('sys.symbol.square_grid_2x2'),
       backLabel: $r('app.string.yt_option_title'),
+      materialEffect: this.immersiveMaterialEffect,
+      avoidLayoutSafeArea: true,
       menus: [
         buildTitleMenu($r('sys.symbol.magnifyingglass'), $r('app.string.yt_placeholder_search'), () => {
           this.openSearchPage();
         })
       ]
     }))
+    .bindToScrollable([this.homeGridScroller, this.homeListScroller])
     .bindSheet($$this.showOptions, this.OptionsPanel(this.optionsDepth), {
       detents: [SheetSize.LARGE],
       dragBar: false,
@@ -1468,7 +1486,7 @@ struct Index {
             }
 
             if (this.uiConfig.homeLayoutMode === 'grid') {
-              Scroll() {
+              Scroll(this.homeGridScroller) {
                 GridRow({
                   columns: this.getVideoGridColumnCount(),
                   gutter: { x: 8, y: 8 }
@@ -1489,6 +1507,7 @@ struct Index {
               }
               .width('100%')
               .layoutWeight(1)
+              .clip(false)
               .backgroundColor($r('app.color.yourtube_bg_page'))
               .padding({ left: 12, right: 12, top: 4, bottom: 4 })
               .edgeEffect(EdgeEffect.Spring)
@@ -1496,7 +1515,7 @@ struct Index {
                 this.loadLiveVideos(false);
               })
             } else {
-              List({ space: 4 }) {
+              List({ scroller: this.homeListScroller, space: 4 }) {
                 ListItem() {
                   Row().height(2).width('100%')
                 }
@@ -1523,6 +1542,7 @@ struct Index {
               }
               .width('100%')
               .layoutWeight(1)
+              .clip(false)
               .backgroundColor($r('app.color.yourtube_bg_page'))
               .padding({ left: 12, right: 12, top: 4, bottom: 4 })
               .edgeEffect(EdgeEffect.Spring)

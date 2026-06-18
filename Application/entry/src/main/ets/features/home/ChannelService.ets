@@ -119,7 +119,7 @@ export class ChannelService {
     const tabContent = this.pickBrowseTabContent(twoColumn, urlSuffix);
     const rawItems = getHomeKioskItemsFromTabContent(tabContent);
 
-    const built = buildHomeKioskVideoItems(rawItems, startId, '');
+    const built = buildHomeKioskVideoItems(rawItems, startId, 'LIVE');
     return { items: built.items, nextPageToken: built.nextPageToken, visitorData };
   }
 
@@ -143,7 +143,7 @@ export class ChannelService {
         if (!continuationItems || continuationItems.length === 0) {
           return;
         }
-        const built = buildHomeKioskVideoItems(continuationItems, startId + items.length, '');
+        const built = buildHomeKioskVideoItems(continuationItems, startId + items.length, 'LIVE');
         items = items.concat(built.items);
         token = built.nextPageToken ?? token;
       });

@@ -272,36 +272,72 @@ export class ChannelInfoService {
   }
 
   private extractSubscriberText(root: Record<string, Object>): string {
-    // 严格按照NewPipeExtractor的getSubscriberCountFromPageChannelHeader逻辑
     const header = this.asRecord(root['header']);
     if (header) {
+      // c4TabbedHeaderRenderer / interactiveTabbedHeaderRenderer
+      const renderers = ['c4TabbedHeaderRenderer', 'interactiveTabbedHeaderRenderer', 'carouselHeaderRenderer'];
+      for (let i = 0; i < renderers.length; i++) {
+        const renderer = this.asRecord(header[renderers[i]]);
+        if (renderer) {
+          const subscriberCountText = this.asRecord(renderer['subscriberCountText']);
+          const text = subscriberCountText ? this.readContent(subscriberCountText) : '';
+          if (text) {
+            return text;
+          }
+          const subtitle = this.asRecord(renderer['subtitle']);
+          const subtitleText = subtitle ? this.readContent(subtitle) : '';
+          if (subtitleText) {
+            return subtitleText;
+          }
+        }
+      }
+
+      // pageHeaderRenderer (modern format) - follow PipePipe's getSubscriberCountFromPageChannelHeader
       const pageHeader = this.asRecord(header['pageHeaderRenderer']);
       if (pageHeader) {
         const pageHeaderContent = this.asRecord(pageHeader['content']);
-        if (pageHeaderContent) {
-          const pageHeaderViewModel = this.asRecord(pageHeaderContent['pageHeaderViewModel']);
-          if (pageHeaderViewModel) {
-            const metadata = this.asRecord(pageHeaderViewModel['metadata']);
-            if (metadata) {
-              const contentMetadata = this.asRecord(metadata['contentMetadataViewModel']);
-              if (contentMetadata) {
-                const metadataRows = this.asArray(contentMetadata['metadataRows']);
-                if (metadataRows && metadataRows.length > 0) {
-                  // 从最后一行元数据中提取订阅数
-                  const lastRow = this.asRecord(metadataRows[metadataRows.length - 1]);
-                  if (lastRow) {
-                    const metadataParts = this.asArray(lastRow['metadataParts']);
-                    if (metadataParts && metadataParts.length >= 2) {
-                      // 订阅数在第一个位置（按照NewPipeExtractor的逻辑）
-                      const subscriberCountPart = this.asRecord(metadataParts[0]);
-                      if (subscriberCountPart) {
-                        const text = this.readText(subscriberCountPart['text']);
-                        if (text) {
-                          return text;
-                        }
-                      }
-                    }
-                  }
+        const pageHeaderViewModel = this.asRecord(pageHeaderContent?.['pageHeaderViewModel']);
+        const metadata = this.asRecord(pageHeaderViewModel?.['metadata']);
+        const contentMetadata = this.asRecord(metadata?.['contentMetadataViewModel']);
+        const metadataRows = this.asArray(contentMetadata?.['metadataRows']);
+        if (metadataRows) {
+          // First pass: look for explicit "subscriber" keyword
+          for (let r = 0; r < metadataRows.length; r++) {
+            const row = this.asRecord(metadataRows[r]);
+            const parts = this.asArray(row?.['metadataParts']);
+            if (!parts) continue;
+            for (let p = 0; p < parts.length; p++) {
+              const part = this.asRecord(parts[p]);
+              const text = this.asRecord(part?.['text']);
+              const content = this.asString(text?.['content']);
+              if (content && content.toLowerCase().includes('subscriber')) {
+                return content;
+              }
+            }
+          }
+
+          // Second pass: use accessibilityLabel as fallback (localized responses)
+          for (let r = 0; r < metadataRows.length; r++) {
+            const row = this.asRecord(metadataRows[r]);
+            const parts = this.asArray(row?.['metadataParts']);
+            if (!parts || parts.length === 0) continue;
+
+            if (parts.length > 1) {
+              const firstPart = this.asRecord(parts[0]);
+              if (firstPart && firstPart['accessibilityLabel']) {
+                const text = this.asRecord(firstPart['text']);
+                const content = this.asString(text?.['content']);
+                if (content && !content.startsWith('@')) {
+                  return content;
+                }
+              }
+            } else {
+              const part = this.asRecord(parts[0]);
+              if (part && part['accessibilityLabel']) {
+                const text = this.asRecord(part['text']);
+                const content = this.asString(text?.['content']);
+                if (content && !content.startsWith('@')) {
+                  return content;
                 }
               }
             }
@@ -309,49 +345,71 @@ export class ChannelInfoService {
         }
       }
     }
-    
+
     return '';
   }
 
   private extractVideoCountText(root: Record<string, Object>): string {
-    // 严格按照NewPipeExtractor的逻辑，从contentMetadataViewModel中获取视频数量
     const header = this.asRecord(root['header']);
     if (header) {
+      // c4TabbedHeaderRenderer has a direct videoCountText
+      const renderers = ['c4TabbedHeaderRenderer'];
+      for (let i = 0; i < renderers.length; i++) {
+        const renderer = this.asRecord(header[renderers[i]]);
+        if (renderer) {
+          const videoCountText = this.asRecord(renderer['videoCountText']);
+          const text = videoCountText ? this.readContent(videoCountText) : '';
+          if (text) {
+            return text;
+          }
+        }
+      }
+
+      // pageHeaderRenderer (modern format) - scan all metadataRows
       const pageHeader = this.asRecord(header['pageHeaderRenderer']);
       if (pageHeader) {
         const pageHeaderContent = this.asRecord(pageHeader['content']);
-        if (pageHeaderContent) {
-          const pageHeaderViewModel = this.asRecord(pageHeaderContent['pageHeaderViewModel']);
-          if (pageHeaderViewModel) {
-            const metadata = this.asRecord(pageHeaderViewModel['metadata']);
-            if (metadata) {
-              const contentMetadata = this.asRecord(metadata['contentMetadataViewModel']);
-              if (contentMetadata) {
-                const metadataRows = this.asArray(contentMetadata['metadataRows']);
-                if (metadataRows && metadataRows.length > 0) {
-                  // 从最后一行元数据中提取视频数
-                  const lastRow = this.asRecord(metadataRows[metadataRows.length - 1]);
-                  if (lastRow) {
-                    const metadataParts = this.asArray(lastRow['metadataParts']);
-                    if (metadataParts && metadataParts.length >= 2) {
-                      // 视频数在第二个位置（按照NewPipeExtractor的逻辑）
-                      const videoCountPart = this.asRecord(metadataParts[1]);
-                      if (videoCountPart) {
-                        const text = this.readText(videoCountPart['text']);
-                        if (text) {
-                          return text;
-                        }
-                      }
-                    }
-                  }
-                }
+        const pageHeaderViewModel = this.asRecord(pageHeaderContent?.['pageHeaderViewModel']);
+        const metadata = this.asRecord(pageHeaderViewModel?.['metadata']);
+        const contentMetadata = this.asRecord(metadata?.['contentMetadataViewModel']);
+        const metadataRows = this.asArray(contentMetadata?.['metadataRows']);
+        if (metadataRows) {
+          // Look for explicit "video" keyword
+          for (let r = 0; r < metadataRows.length; r++) {
+            const row = this.asRecord(metadataRows[r]);
+            const parts = this.asArray(row?.['metadataParts']);
+            if (!parts) continue;
+            for (let p = 0; p < parts.length; p++) {
+              const part = this.asRecord(parts[p]);
+              const text = this.asRecord(part?.['text']);
+              const content = this.asString(text?.['content']);
+              if (content && content.toLowerCase().includes('video')) {
+                return content;
+              }
+            }
+          }
+
+          // Fallback: use accessibilityLabel, second part in multi-part rows
+          for (let r = 0; r < metadataRows.length; r++) {
+            const row = this.asRecord(metadataRows[r]);
+            const parts = this.asArray(row?.['metadataParts']);
+            if (!parts || parts.length < 2) continue;
+
+            // The video count is typically the second part
+            const videoPart = this.asRecord(parts[1]);
+            if (videoPart && videoPart['accessibilityLabel']) {
+              const text = this.asRecord(videoPart['text']);
+              const content = this.asString(text?.['content']);
+              if (content && !content.startsWith('@')) {
+                return content;
               }
             }
           }
         }
       }
     }
-    
+
+    // Fallback: check metadata.channelMetadataRenderer (no video count available here)
     return '';
   }
 
@@ -400,6 +458,17 @@ export class ChannelInfoService {
     const simpleText = this.asString(record['content']);
     return simpleText;
 
+  }
+
+  private readContent(record: Record<string, Object> | null): string {
+    if (!record) {
+      return '';
+    }
+    const content = this.asString(record['content']);
+    if (content) {
+      return content;
+    }
+    return this.readText(record);
   }
 
   private asRecord(value: Object | undefined): Record<string, Object> | null {

@@ -1211,6 +1211,14 @@
     {
       "name": "yt_label_progressive",
       "value": "合并流质量"
+    },
+    {
+      "name": "yt_label_premium",
+      "value": "付费"
+    },
+    {
+      "name": "yt_label_members_only",
+      "value": "会员"
     }
   ]
 }

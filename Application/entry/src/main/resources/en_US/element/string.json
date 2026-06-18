@@ -1035,6 +1035,14 @@
     {
       "name": "yt_label_progressive",
       "value": "Muxed Quality"
+    },
+    {
+      "name": "yt_label_premium",
+      "value": "Premium"
+    },
+    {
+      "name": "yt_label_members_only",
+      "value": "Members"
     }
   ]
 }

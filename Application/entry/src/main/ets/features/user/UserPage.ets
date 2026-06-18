@@ -118,7 +118,10 @@ export struct UserPage {
       channelId,
       channelAvatarUrl,
       channelHandle,
-      video.videoDescription
+      video.videoDescription,
+      video.videoDescriptionError,
+      video.isPremium,
+      video.requiresMembership
     );
   }
 
@@ -1099,6 +1102,7 @@ export struct UserPage {
           }
         }
         .scrollBar(BarState.Off)
+        .clip(false)
         .width('100%')
         .height('100%')
       }

@@ -403,6 +403,7 @@ export struct PlaylistDetailPage {
           }
         }
         .scrollBar(BarState.Off)
+        .clip(false)
         .width('100%')
         .height('100%')
         .align(Alignment.Top)

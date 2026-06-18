@@ -21,7 +21,7 @@ export class UIConfig {
   isAnimation: boolean = true;
   animationSpeed: number = 300;
   enableLogger: boolean = false;
-  homeLayoutMode: string = 'grid';
+  homeLayoutMode: string = 'list';
   maxConcurrentDownloads: number = 1;
   constructor() {
   }
@@ -52,7 +52,7 @@ export class UIConfig {
     config.searchCountry = PreferencesStore.getString('cfg_searchCountry', 'default');
     config.colorPreset = PreferencesStore.getString('cfg_colorPreset', 'default');
     config.enableLogger = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
-    config.homeLayoutMode = PreferencesStore.getString('cfg_homeLayoutMode', 'grid');
+    config.homeLayoutMode = PreferencesStore.getString('cfg_homeLayoutMode', 'list');
     const maxConcurrentDownloads = parseInt(PreferencesStore.getString('cfg_maxConcurrentDownloads', '1'), 10);
     config.maxConcurrentDownloads = Number.isFinite(maxConcurrentDownloads)
       ? Math.max(1, Math.min(4, maxConcurrentDownloads))

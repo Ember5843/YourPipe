@@ -194,6 +194,26 @@ export struct VideoCardGrid {
             .borderRadius({ topLeft: 4, bottomRight: 6 });
         }
 
+        if (this.video.isPremium) {
+          Text($r('app.string.yt_label_premium'))
+            .fontSize($r('app.float.font_size_8'))
+            .fontColor($r('app.color.yourtube_text_inverse'))
+            .backgroundColor('#FFD700')
+            .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+            .borderRadius({ topLeft: 6, bottomRight: 6 })
+            .position({ x: 0, y: 0 });
+        }
+
+        if (this.video.requiresMembership) {
+          Text($r('app.string.yt_label_members_only'))
+            .fontSize($r('app.float.font_size_8'))
+            .fontColor($r('app.color.yourtube_text_inverse'))
+            .backgroundColor('#1DB954')
+            .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+            .borderRadius({ topLeft: 4, bottomRight: 6 })
+            .position({ x: 0, y: this.video.isPremium ? 20 : 0 });
+        }
+
         if (typeof this.typeLabel === 'string' && this.typeLabel.length > 0) {
           Text(this.typeLabel)
             .fontSize($r('app.float.font_size_8'))

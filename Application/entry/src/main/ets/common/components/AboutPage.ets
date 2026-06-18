@@ -318,6 +318,7 @@ export struct AboutPage {
   onBack?: () => void;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @State private aboutNavStack: NavPathStack = new NavPathStack();
+  private aboutScroller: Scroller = new Scroller();
 
   private copyToClipboard(text: string): void {
     const pasteboardData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
@@ -380,7 +381,7 @@ export struct AboutPage {
   @Builder
   MainContent() {
     Column() {
-      Scroll() {
+      Scroll(this.aboutScroller) {
         Column({ space: 0 }) {
 
           // ── App 身份区 ──────────────────────────────────────
@@ -549,6 +550,7 @@ export struct AboutPage {
         .width('100%')
       }
       .width('100%').layoutWeight(1)
+      .clip(false)
       .edgeEffect(EdgeEffect.Spring).scrollBar(BarState.Off)
       .align(Alignment.Top)
     }
@@ -560,6 +562,7 @@ export struct AboutPage {
       this.MainContent()
     }
     .navDestination(this.aboutPageBuilder)
+    .bindToScrollable([this.aboutScroller])
     .titleMode(HdsNavigationTitleMode.MINI)
     .titleBar(buildYourTubeTitleBar({
       title: $r('app.string.yt_option_about'),

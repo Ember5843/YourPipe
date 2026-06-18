@@ -1,5 +1,4 @@
 import {
-  BlurStrategy,
   BottomBuilderShowType,
   DividerShowType,
   HdsNavigationBackgroundStyle,
@@ -14,7 +13,6 @@ import {
   hdsMaterial,
   IconStyleMode,
   ScrollEffectType,
-  ScrollEffectOptions,
   SystemMaterialParams,
   TitleBarContentOptions,
   TitleBarStyleOptions
@@ -30,6 +28,8 @@ export interface YourTubeTitleBarOptions {
   bottomBuilder?: () => void;
   bottomHeight?: Length;
   immersiveShadow?: boolean;
+  materialEffect?: SystemMaterialParams;
+  avoidLayoutSafeArea?: boolean;
 }
 
 export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavigationTitleBarOptions {
@@ -116,25 +116,23 @@ export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavi
       dividerStyle: materialDivider
     }
   };
-  const scrollEffectOpts: ScrollEffectOptions = {
-    enableScrollEffect: true,
-    scrollEffectType: ScrollEffectType.COMMON_BLUR
-  };
-  const systemMaterialEffect: SystemMaterialParams = {
-    materialType: hdsMaterial.MaterialType.IMMERSIVE,
+  const systemMaterialEffect: SystemMaterialParams = options.materialEffect ?? {
+    materialType: hdsMaterial.MaterialType.ADAPTIVE,
     materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
   };
   const style: TitleBarStyleOptions = {
-    scrollEffectOpts,
-    blurStrategy: BlurStrategy.ADAPTIVE,
+    scrollEffectOpts: {
+      enableScrollEffect: true,
+      scrollEffectType: ScrollEffectType.GRADIENT_BLUR
+    },
     systemMaterialEffect,
     originalStyle,
     scrollEffectStyle
   };
 
   return {
-    avoidLayoutSafeArea: true,
-    enableComponentSafeArea: true,
+    avoidLayoutSafeArea: options.avoidLayoutSafeArea ?? false,
+    enableComponentSafeArea: false,
     style,
     content
   };
