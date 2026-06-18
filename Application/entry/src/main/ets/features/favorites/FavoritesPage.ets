@@ -19,6 +19,8 @@ export struct FavoritesPage {
   @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
+  @Consume('safeAreaTop') safeAreaTop: number = 0;
+  @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State overviewMap: Record<string, SearchPlaylistItem> = {};
   @State isLoading: boolean = false;
   private readonly GRID_SIDE_PADDING: number = 12;
@@ -272,7 +274,7 @@ export struct FavoritesPage {
       }
     }
     .width('100%')
-    .padding({ left: 12, right: 12, top: 4, bottom: 12 })
+    .padding({ left: 12, right: 12, top: this.safeAreaTop + 56, bottom: this.safeAreaBottom + 72 })
     .edgeEffect(EdgeEffect.Spring)
     .height('100%')
     .backgroundColor($r('app.color.yourtube_bg_page'))

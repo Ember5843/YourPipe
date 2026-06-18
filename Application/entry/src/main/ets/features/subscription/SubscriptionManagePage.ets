@@ -12,6 +12,8 @@ const logger = AppLog.getInstance('SubscriptionManagePage');
 @Component
 export struct SubscriptionManagePage {
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
+  @Consume('safeAreaTop') safeAreaTop: number = 0;
+  @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State channelMap: Record<string, SearchChannelItem> = {};
   private channelInfoService: ChannelInfoService = new ChannelInfoService();
 
@@ -166,7 +168,7 @@ export struct SubscriptionManagePage {
       }
     }
     .width('100%')
-    .padding({ left: 12, right: 12, top: 4, bottom: 12 })
+    .padding({ left: 12, right: 12, top: this.safeAreaTop + 56, bottom: this.safeAreaBottom + 72 })
     .edgeEffect(EdgeEffect.Spring)
     .height('100%')
     .backgroundColor($r('app.color.yourtube_bg_page'))

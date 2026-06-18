@@ -173,6 +173,7 @@ struct PlaybackSelectRow {
 struct Index {
   @State videoList: VideoItem[] = [];
   @Provide('safeAreaTop') safeAreaTop: number = 0;
+  @Provide('safeAreaBottom') safeAreaBottom: number = 0;
   @State topSafeHeight: number = 0;
   @State bottomSafeHeight: number = 0;
   @State activeTabIndex: number = 0;
@@ -493,12 +494,14 @@ struct Index {
         this.topSafeHeight = this.getUIContext().px2vp(avoidArea.topRect.height);
         this.safeAreaTop = this.topSafeHeight;
         this.bottomSafeHeight = this.getUIContext().px2vp(avoidArea.bottomRect.height);
+        this.safeAreaBottom = this.bottomSafeHeight;
 
         windowClass.on('avoidAreaChange', (data) => {
           if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
             this.topSafeHeight = this.getUIContext().px2vp(data.area.topRect.height);
             this.safeAreaTop = this.topSafeHeight;
             this.bottomSafeHeight = this.getUIContext().px2vp(data.area.bottomRect.height);
+            this.safeAreaBottom = this.bottomSafeHeight;
           }
         });
       } catch (exception) {
