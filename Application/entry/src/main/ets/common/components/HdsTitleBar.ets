@@ -141,6 +141,7 @@ export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavi
 export function buildSheetTitleBar(options: YourTubeTitleBarOptions): HdsNavigationTitleBarOptions {
   const opts = buildYourTubeTitleBar(options);
   opts.avoidLayoutSafeArea = false;
+  opts.enableComponentSafeArea = true;
   return opts;
 }
 

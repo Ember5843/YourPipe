@@ -1866,7 +1866,7 @@ struct Index {
           })
         }
         .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 })
+        .padding({ left: 16, right: 16, top: 8, bottom: 12 })
       }
       .width('100%')
       .layoutWeight(1)

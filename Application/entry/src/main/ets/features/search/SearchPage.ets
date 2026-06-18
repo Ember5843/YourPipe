@@ -25,6 +25,7 @@ const logger = AppLog.getInstance('SearchPage');
 export struct SearchPage {
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
+  @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
   @State query: string = '';
@@ -539,6 +540,7 @@ export struct SearchPage {
     .width('100%')
     .layoutWeight(1)
     .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .padding({ bottom: this.safeAreaBottom + 16 })
   }
 
   @Builder ResultView() {
@@ -649,19 +651,19 @@ export struct SearchPage {
                }
                .width('100%')
              }
-             .width('100%')
-             .layoutWeight(1)
-             .backgroundColor($r('app.color.yourtube_bg_page'))
-             .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-             .edgeEffect(EdgeEffect.Spring)
-             .onReachEnd(() => {
-               this.runSearch(false);
-             })
-           } else {
-             List({ space: 4 }) {
-               ListItem() {
-                 Row() {
-                   Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
+              .width('100%')
+              .layoutWeight(1)
+              .backgroundColor($r('app.color.yourtube_bg_page'))
+              .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 })
+              .edgeEffect(EdgeEffect.Spring)
+              .onReachEnd(() => {
+                this.runSearch(false);
+              })
+            } else {
+              List({ space: 4 }) {
+                ListItem() {
+                  Row() {
+                    Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
                      .fontSize(12)
                      .fontColor($r('app.color.yourtube_text_secondary'))
                      .fontWeight(FontWeight.Medium)
@@ -708,17 +710,17 @@ export struct SearchPage {
                  }
                }
              }
-             .width('100%')
-             .layoutWeight(1)
-             .backgroundColor($r('app.color.yourtube_bg_page'))
-             .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-             .edgeEffect(EdgeEffect.Spring)
-             .onReachEnd(() => {
-               this.runSearch(false);
-             })
-           }
-         }
-      }
+              .width('100%')
+              .layoutWeight(1)
+              .backgroundColor($r('app.color.yourtube_bg_page'))
+              .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 })
+              .edgeEffect(EdgeEffect.Spring)
+              .onReachEnd(() => {
+                this.runSearch(false);
+              })
+            }
+          }
+       }
     }
     .width('100%')
     .layoutWeight(1)
@@ -826,7 +828,7 @@ export struct SearchPage {
       .height('100%')
       .backgroundColor($r('app.color.yourtube_bg_page'))
     }
-    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.BOTTOM])
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .hideTitleBar(true)
     .onBackPressed(() => {
       this.actionHub.closePage();
