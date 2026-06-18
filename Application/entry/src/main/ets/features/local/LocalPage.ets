@@ -300,7 +300,7 @@ export struct LocalPage {
         }
         .width('100%')
         .height('100%')
-        .padding({ left: 12, right: 12, top: this.safeAreaTop + 56, bottom: this.safeAreaBottom + 72 })
+        .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
         .edgeEffect(EdgeEffect.Spring)
       }
       .tabBar(this.TabBarBuilder(0))
@@ -330,7 +330,7 @@ export struct LocalPage {
         }
         .width('100%')
         .height('100%')
-        .padding({ left: 12, right: 12, top: this.safeAreaTop + 56, bottom: this.safeAreaBottom + 72 })
+        .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
       }
       .tabBar(this.TabBarBuilder(1))
     }
@@ -344,6 +344,7 @@ export struct LocalPage {
     })
     .width('100%')
     .height('100%')
+    .padding({ top: this.safeAreaTop + 56 })
     .backgroundColor($r('app.color.yourtube_bg_page'))
   }
 
