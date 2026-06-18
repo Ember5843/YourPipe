@@ -45,7 +45,6 @@ import { LanguagePickerDialog, LanguagePickerItem } from '../common/components/L
 import { LanguagePickerPage } from '../common/components/LanguagePickerPage';
 import {
   BlurStrategy,
-  ExtendBarMode,
   HdsNavigation,
   HdsNavDestination,
   HdsNavDestinationTitleMode,
@@ -1306,13 +1305,9 @@ struct Index {
       },
       barSideMargin: 0,
       barBottomMargin: Math.max(this.bottomSafeHeight, 12),
-      gradientMask: {
-        maskColor: $r('app.color.yourtube_bg_page'),
-        maskHeight: 132
-      },
+      adaptToHandedness: true,
       lightColor: this.THEME_COLOR,
-      thermoCtrl: true,
-      barOpacity: 0.96
+      thermoCtrl: true
     };
     if (this.immersiveMaterialEffect) {
       base.systemMaterialEffect = this.immersiveMaterialEffect;
@@ -1339,8 +1334,6 @@ struct Index {
         .barPosition(BarPosition.End)
         .vertical(false)
         .scrollable(true)
-        .barMode(ExtendBarMode.HALF_SCREEN_FIXED)
-        .barHeight(64)
         .barOverlap(true)
         .blurStrategy(BlurStrategy.ADAPTIVE)
         .barFloatingStyle(this.buildHdsTabsFloatingStyle())
@@ -1392,6 +1385,7 @@ struct Index {
         this.clearOptionsPath();
       }
     })
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
   }
 
   @Builder
@@ -1509,16 +1503,13 @@ struct Index {
               .layoutWeight(1)
               .clip(false)
               .backgroundColor($r('app.color.yourtube_bg_page'))
-              .padding({ left: 12, right: 12, top: 4, bottom: 4 })
+              .padding({ left: 12, right: 12, top: this.topSafeHeight + 56, bottom: this.bottomSafeHeight + 72 })
               .edgeEffect(EdgeEffect.Spring)
               .onReachEnd(() => {
                 this.loadLiveVideos(false);
               })
             } else {
               List({ scroller: this.homeListScroller, space: 4 }) {
-                ListItem() {
-                  Row().height(2).width('100%')
-                }
                 ForEach(this.videoList, (item: VideoItem) => {
                   ListItem() {
                     VideoCard({
@@ -1544,7 +1535,7 @@ struct Index {
               .layoutWeight(1)
               .clip(false)
               .backgroundColor($r('app.color.yourtube_bg_page'))
-              .padding({ left: 12, right: 12, top: 4, bottom: 4 })
+              .padding({ left: 12, right: 12, top: this.topSafeHeight + 56, bottom: this.bottomSafeHeight + 72 })
               .edgeEffect(EdgeEffect.Spring)
               .onReachEnd(() => {
                 this.loadLiveVideos(false);
