@@ -5,8 +5,8 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 
-const APP_VERSION = '0.4.1';
-const APP_BUILD = '1000008';
+const APP_VERSION = '0.5.0';
+const APP_BUILD = '1000009';
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
 
@@ -39,6 +39,19 @@ const AI_MODELS: string[] = [
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.5.0', date: '2026-06-18',
+    changes: [
+      '更换系统播放引擎与第三方FFMpeg至MPVPlayer',
+      '恢复高分辨率播放和字幕功能',
+      '支持HEVC硬件解码和AV1 VP9软件解码',
+      '加入真HDR显示',
+      '优化非登录状态下网络传输库能力',
+      '优化错误显示',
+      '优化UI和设置选项',
+      '应用PipePipe最新版本补丁',
+    ],
+  },
   {
     version: '0.4.1', date: '2026-05-30',
     changes: [
@@ -208,10 +221,13 @@ struct OpenSourcePage {
         .padding({ left: 16, right: 16, bottom: 24 })
       }
       .width('100%').layoutWeight(1)
+      .clip(false)
       .edgeEffect(EdgeEffect.Spring).scrollBar(BarState.Off)
       .align(Alignment.Top)
     }
-    .width('100%').height('100%').backgroundColor(Color.Transparent)
+    .width('100%').height('100%')
+    .padding({ top: 56 })
+    .backgroundColor(Color.Transparent)
   }
 }
 
@@ -249,7 +265,9 @@ struct AiModelsPage {
       .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
       .margin({ left: 16, right: 16, top: 8 })
     }
-    .width('100%').height('100%').backgroundColor(Color.Transparent)
+    .width('100%').height('100%')
+    .padding({ top: 56 })
+    .backgroundColor(Color.Transparent)
   }
 }
 
@@ -307,7 +325,9 @@ struct ChangelogPage {
       .edgeEffect(EdgeEffect.Spring).scrollBar(BarState.Off)
       .align(Alignment.Top)
     }
-    .width('100%').height('100%').backgroundColor(Color.Transparent)
+    .width('100%').height('100%')
+    .padding({ top: 56 })
+    .backgroundColor(Color.Transparent)
   }
 }
 
@@ -383,11 +403,9 @@ export struct AboutPage {
     Column() {
       Scroll(this.aboutScroller) {
         Column({ space: 0 }) {
-
           // ── App 身份区 ──────────────────────────────────────
           Column({ space: 14 }) {
             Image($r('app.media.app_icon'))
-              .width(84).height(84)
               .borderRadius(20)
               .shadow({ radius: 20, color: '#22000000', offsetX: 0, offsetY: 6 })
 
@@ -554,7 +572,9 @@ export struct AboutPage {
       .edgeEffect(EdgeEffect.Spring).scrollBar(BarState.Off)
       .align(Alignment.Top)
     }
-    .width('100%').height('100%').backgroundColor(Color.Transparent)
+    .width('100%').height('100%')
+    .padding({ top: 56 })
+    .backgroundColor(Color.Transparent)
   }
 
   build() {

@@ -204,6 +204,11 @@ export struct VideoPlayer {
       return;
     }
     this.isHandlingEnded = true;
+    const autoPlay = AppStorage.get<boolean>('autoPlayQueue') ?? true;
+    if (!autoPlay) {
+      this.isHandlingEnded = false;
+      return;
+    }
     PlayerSession.getInstance().playNextFromQueue().finally(() => { this.isHandlingEnded = false; });
   };
   // 屏幕实件订阅者：监听 SCREEN_OFF / SCREEN_ON 以关闭/恢复视频输出

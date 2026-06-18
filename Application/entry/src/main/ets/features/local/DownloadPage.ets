@@ -2,16 +2,6 @@ import { DownloadManager, DownloadTask, DownloadStatus } from '../../common/Down
 import { fileUri, picker } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 
-function formatRelativeTime(ts: number): string {
-  const diff = Date.now() - ts;
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return 'Just now';
-  if (min < 60) return `${min} min ago`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour} hours ago`;
-  return `${Math.floor(hour / 24)} days ago`;
-}
-
 function isActiveStatus(status: DownloadStatus): boolean {
   return status === DownloadStatus.DOWNLOADING_VIDEO ||
     status === DownloadStatus.DOWNLOADING_AUDIO ||
@@ -44,7 +34,7 @@ export struct DownloadPage {
       .alignItems(HorizontalAlign.Center)
       .padding({ bottom: 60 })
     } else {
-      List({ space: 6 }) {
+      List({ space: 4 }) {
         ForEach(this.tasks, (task: DownloadTask) => {
           ListItem() {
             DownloadTaskRow({ task: task })
@@ -53,7 +43,7 @@ export struct DownloadPage {
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 12, right: 12, top: 4, bottom: 12 })
+      .padding({ left: 10, right: 10, top: 4, bottom: 12 })
       .edgeEffect(EdgeEffect.Spring)
     }
   }
@@ -66,19 +56,21 @@ struct DownloadTaskRow {
   @State exporting: boolean = false;
 
   build() {
-    Row({ space: 10 }) {
-      Stack() {
+    Row() {
+      Stack({ alignContent: Alignment.BottomEnd }) {
         if (this.task.thumbnailUrl && this.task.thumbnailUrl.length > 0) {
           Image(this.task.thumbnailUrl)
-            .width(96)
-            .height(54)
+            .width(160)
+            .height(90)
             .objectFit(ImageFit.Cover)
             .borderRadius(6)
-            .backgroundColor('#1A1A1A')
+            .backgroundColor(this.task.thumbnailUrl.length > 0
+              ? $r('app.color.yourtube_icon_hint')
+              : '#1A1A1A')
         } else {
           Rect()
-            .width(96)
-            .height(54)
+            .width(160)
+            .height(90)
             .fill('#1A1A1A')
             .radius(6)
         }
@@ -94,71 +86,73 @@ struct DownloadTaskRow {
             .fontColor(['#FF4444'])
             .position({ x: 4, y: 4 })
         }
+
+        if (isActiveStatus(this.task.status)) {
+          Column() {
+            SymbolGlyph($r('sys.symbol.waveform'))
+              .fontSize(20)
+              .fontColor([Color.White])
+          }
+          .width('100%')
+          .height('100%')
+          .justifyContent(FlexAlign.Center)
+          .alignItems(HorizontalAlign.Center)
+          .backgroundColor('rgba(0,0,0,0.4)')
+          .borderRadius(6)
+        }
       }
-      .width(96)
-      .height(54)
+      .width(160)
+      .height(90)
+      .margin({ right: 12 })
 
       Column() {
         Text(this.task.title)
           .fontSize(14)
-          .fontColor($r('app.color.yourtube_text_primary'))
+          .fontColor(isActiveStatus(this.task.status)
+            ? $r('app.color.yourtube_theme_primary')
+            : $r('app.color.yourtube_text_primary'))
           .fontWeight(FontWeight.Medium)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
+          .lineHeight(18)
+          .margin({ bottom: 2 })
 
-        Text(this.task.author || this.task.getStatusLabel())
-          .fontSize(11)
-          .fontColor($r('app.color.yourtube_text_quaternary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
-          .margin({ top: 2 })
+        Row() {
+          Text(this.task.author || '')
+            .fontSize(11)
+            .fontColor($r('app.color.yourtube_text_quaternary'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .constraintSize({ maxWidth: '60%' })
 
-        Text(this.getSubtitle())
-          .fontSize(10)
-          .fontColor(this.getStatusColor())
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
-          .margin({ top: 4 })
+          Text(` · ${this.getSubtitle()}`)
+            .fontSize(11)
+            .fontColor(this.getStatusColor())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
       }
       .layoutWeight(1)
-      .height(64)
-      .justifyContent(FlexAlign.Center)
+      .height(90)
       .alignItems(HorizontalAlign.Start)
 
-      Column() {
-        if (isActiveStatus(this.task.status)) {
-          this.ProgressRing()
-
-          this.IconButton($r('sys.symbol.xmark'), () => {
-            this.downloadManager.cancelTask(this.task.id);
-          })
-        } else {
-          this.ProgressRing()
-
-          if (this.task.status === DownloadStatus.COMPLETED) {
-            this.IconButton($r('sys.symbol.arrowshape_down_to_line_fill'), () => {
-              this.exportTaskToDownloads();
-            })
-          } else {
-            this.IconButton($r('sys.symbol.trash'), () => {
-              this.downloadManager.deleteTask(this.task.id);
-            })
-          }
-        }
-      }
-      .width(64)
-      .height(64)
-      .alignItems(HorizontalAlign.End)
-      .justifyContent(FlexAlign.Center)
+      this.ProgressRing()
     }
     .width('100%')
-    .height(78)
-    .padding({ left: 8, right: 8 })
-    .borderRadius(8)
-    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .alignItems(VerticalAlign.Top)
+    .borderRadius(12)
+    .backgroundColor(isActiveStatus(this.task.status)
+      ? $r('app.color.yourtube_bg_surface_muted')
+      : $r('app.color.yourtube_bg_surface'))
+    .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+    .onClick(() => {
+      if (this.task.status === DownloadStatus.COMPLETED) {
+        this.exportTaskToDownloads();
+      }
+    })
   }
 
   @Builder
@@ -169,7 +163,6 @@ struct DownloadTaskRow {
         total: 100,
         type: ProgressType.Ring
       })
-        .value(this.getRingValue())
         .width(42)
         .height(42)
         .color(this.getStatusColor())
@@ -185,8 +178,8 @@ struct DownloadTaskRow {
           .fontSize(16)
           .fontColor(['#FF4444'])
       } else if (this.task.status === DownloadStatus.CANCELLED) {
-        SymbolGlyph($r('sys.symbol.minus'))
-          .fontSize(16)
+        SymbolGlyph($r('sys.symbol.trash'))
+          .fontSize(13)
           .fontColor([$r('app.color.yourtube_text_hint')])
       } else {
         Text(`${this.getRingValue()}%`)
@@ -195,22 +188,8 @@ struct DownloadTaskRow {
           .fontWeight(FontWeight.Medium)
       }
     }
-    .width(48)
-    .height(48)
-    .margin({ bottom: 2 })
-  }
-
-  @Builder
-  IconButton(icon: Resource, action: () => void) {
-    Button({ type: ButtonType.Circle, stateEffect: true }) {
-      SymbolGlyph(icon)
-        .fontSize(15)
-        .fontColor([$r('app.color.yourtube_text_hint')])
-    }
-    .width(30)
-    .height(30)
-    .backgroundColor(Color.Transparent)
-    .onClick(() => action())
+    .width(52)
+    .height(52)
   }
 
   private getSubtitle(): string {
@@ -218,13 +197,17 @@ struct DownloadTaskRow {
       return this.task.errorMessage || 'Download failed';
     }
     if (this.task.status === DownloadStatus.COMPLETED) {
-      return this.task.outputPath || 'Saved in app downloads';
+      return 'Completed';
     }
     if (this.task.status === DownloadStatus.PENDING) {
-      return this.task.getStatusLabel();
+      return 'Waiting';
     }
+    if (this.task.status === DownloadStatus.CANCELLED) {
+      return 'Cancelled';
+    }
+    const label = this.task.getStatusLabel();
     const progressText = this.task.getProgressText();
-    return progressText ? `${this.task.getStatusLabel()} · ${progressText}` : this.task.getStatusLabel();
+    return progressText ? `${label} · ${progressText}` : label;
   }
 
   private async exportTaskToDownloads(): Promise<void> {
@@ -255,19 +238,6 @@ struct DownloadTaskRow {
     } finally {
       this.exporting = false;
     }
-  }
-
-  private getRightLabel(): string {
-    if (this.task.status === DownloadStatus.COMPLETED) {
-      return '100%';
-    }
-    if (this.task.status === DownloadStatus.FAILED) {
-      return 'Failed';
-    }
-    if (this.task.status === DownloadStatus.CANCELLED) {
-      return 'Cancelled';
-    }
-    return formatRelativeTime(this.task.createdAt);
   }
 
   private getRingValue(): number {

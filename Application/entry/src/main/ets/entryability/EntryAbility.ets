@@ -12,6 +12,7 @@ import { LanguageManager } from '../common/LanguageManager';
 import { BackgroundTaskManager, AvPlayerController } from 'mediaservice';
 import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
 import { AuthSessionManager, YTCoreLogger } from 'youtube_core';
+import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
@@ -58,6 +59,7 @@ export default class EntryAbility extends UIAbility {
       const logEnabled = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
       AppLogStore.init(logEnabled, this.context.filesDir);
       AuthSessionManager.init(this.context);
+      AuthStateHelper.refresh();
       // 注入 EnhancedLogger sink，覆盖所有 mediaservice 调用
       EnhancedLogger.setSink((level, tag, message) => {
         AppLogStore.push(level, tag, message);

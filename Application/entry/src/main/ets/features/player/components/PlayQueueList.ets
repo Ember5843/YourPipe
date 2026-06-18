@@ -29,6 +29,7 @@ export struct PlayQueueList {
   @State sourceName: string = '';
   @State isLoadingMore: boolean = false;
   @State canLoadMore: boolean = false;
+  @StorageLink('autoPlayQueue') autoPlayEnabled: boolean = true;
 
   private manager: PlayQueueManager = PlayQueueManager.getInstance();
   private listScroller: Scroller = new Scroller();
@@ -112,7 +113,7 @@ export struct PlayQueueList {
     if (item.viewCount && item.viewCount.length > 0) {
       parts.push(item.viewCount);
     }
-    return parts.join('  ');
+    return parts.join('  ·  ');
   }
 
   @Builder
@@ -130,7 +131,23 @@ export struct PlayQueueList {
         Text(`${this.queue.length}+`)
           .fontSize(11)
           .fontColor($r('app.color.yourtube_text_quaternary'))
+          .margin({ right: 10 })
       }
+
+      Row() {
+        Text('自动播放')
+          .fontSize(12)
+          .fontColor($r('app.color.yourtube_text_secondary'))
+        Toggle({ type: ToggleType.Switch, isOn: this.autoPlayEnabled })
+          .selectedColor(this.THEME_COLOR)
+          .scale({ x: 0.8, y: 0.8 })
+          .margin({ left: 6 })
+          .onChange((isOn: boolean) => {
+            this.autoPlayEnabled = isOn;
+            AppStorage.setOrCreate('autoPlayQueue', isOn);
+          })
+      }
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .padding({ left: 14, right: 14, top: 8, bottom: 6 })
@@ -179,96 +196,101 @@ export struct PlayQueueList {
   }
 
   @Builder
-  Thumbnail(item: VideoItem) {
+  Thumbnail(item: VideoItem, isPlaying: boolean) {
     Stack({ alignContent: Alignment.BottomEnd }) {
       if (item.thumbnailUrl && item.thumbnailUrl.length > 0) {
         Image(item.thumbnailUrl)
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
+          .borderRadius(6)
           .backgroundColor(item.thumbnailColor || $r('app.color.yourtube_icon_hint'))
       } else {
         Rect()
           .width('100%')
           .height('100%')
           .fill(item.thumbnailColor || $r('app.color.yourtube_icon_hint'))
+          .radius(6)
       }
 
       if (item.isLive) {
-        Text('LIVE')
-          .fontSize(9)
-          .fontColor(Color.White)
-          .fontWeight(FontWeight.Medium)
-          .backgroundColor('#D93025')
-          .padding({ left: 4, right: 4, top: 1, bottom: 1 })
-          .margin({ right: 4, bottom: 4 })
+        Text($r('app.string.yt_label_live'))
+          .fontSize(8)
+          .fontColor($r('app.color.yourtube_text_inverse'))
+          .backgroundColor($r('app.color.yourtube_bg_live_tag'))
+          .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+          .borderRadius({ topLeft: 4, bottomRight: 6 })
+      }
+
+      if (isPlaying) {
+        Column() {
+          SymbolGlyph($r('sys.symbol.waveform'))
+            .fontSize(20)
+            .fontColor([Color.White])
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('rgba(0,0,0,0.4)')
+        .borderRadius(6)
       }
     }
-    .width(104)
-    .height(58)
-    .borderRadius(4)
+    .width(160)
+    .height(90)
+    .borderRadius(6)
     .clip(true)
   }
 
   @Builder
   QueueRow(item: VideoItem, index: number) {
     Row() {
-      if (index === this.currentIndex) {
-        Column()
-          .width(3)
-          .height(52)
-          .backgroundColor(this.THEME_COLOR)
-          .borderRadius(2)
-          .margin({ right: 8 })
-      } else {
-        Column()
-          .width(3)
-          .height(52)
-          .margin({ right: 8 })
-      }
-
-      this.Thumbnail(item)
+      this.Thumbnail(item, index === this.currentIndex)
 
       Column() {
-        Row() {
-          Text(item.title || '')
-            .fontSize(13)
-            .fontColor($r('app.color.yourtube_text_primary'))
-            .fontWeight(index === this.currentIndex ? FontWeight.Medium : FontWeight.Regular)
-            .maxLines(2)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .lineHeight(17)
-            .layoutWeight(1)
+        Text(item.title || '')
+          .fontSize(14)
+          .fontColor(index === this.currentIndex
+            ? this.THEME_COLOR
+            : $r('app.color.yourtube_text_primary'))
+          .fontWeight(index === this.currentIndex ? FontWeight.Medium : FontWeight.Medium)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .lineHeight(18)
+          .margin({ bottom: 2 })
 
-          if (index === this.currentIndex) {
-            Text('NOW')
-              .fontSize(9)
-              .fontColor(Color.White)
-              .fontWeight(FontWeight.Medium)
-              .backgroundColor(this.THEME_COLOR)
-              .borderRadius(3)
-              .padding({ left: 5, right: 5, top: 2, bottom: 2 })
-              .margin({ left: 8 })
+        Row() {
+          Text(item.author || '')
+            .fontSize(11)
+            .fontColor($r('app.color.yourtube_text_quaternary'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .constraintSize({ maxWidth: '60%' })
+
+          if (item.viewCount && item.viewCount.length > 0) {
+            Text(` · ${item.viewCount}`)
+              .fontSize(11)
+              .fontColor($r('app.color.yourtube_text_hint'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
         }
         .width('100%')
-        .alignItems(VerticalAlign.Top)
-
-        Text(this.getMetaText(item))
-          .fontSize(11)
-          .fontColor($r('app.color.yourtube_text_quaternary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 5 })
+        .alignItems(VerticalAlign.Center)
       }
       .layoutWeight(1)
-      .margin({ left: 10 })
+      .height(90)
       .alignItems(HorizontalAlign.Start)
+      .margin({ left: 12 })
     }
     .width('100%')
-    .height(76)
-    .padding({ left: 8, right: 10, top: 8, bottom: 8 })
-    .backgroundColor(index === this.currentIndex ? $r('app.color.yourtube_bg_surface') : Color.Transparent)
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .alignItems(VerticalAlign.Top)
+    .borderRadius(12)
+    .backgroundColor(index === this.currentIndex
+      ? $r('app.color.yourtube_bg_surface_muted')
+      : $r('app.color.yourtube_bg_surface'))
+    .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
     .onClick(() => {
       this.switchToVideo(item, index);
     })
@@ -276,7 +298,7 @@ export struct PlayQueueList {
 
   @Builder
   QueueListMode() {
-    List({ space: 0, scroller: this.listScroller }) {
+    List({ space: 4, scroller: this.listScroller }) {
       ForEach(this.queue, (item: VideoItem, index: number) => {
         ListItem() {
           this.QueueRow(item, index)
@@ -291,7 +313,7 @@ export struct PlayQueueList {
     }
     .width('100%')
     .layoutWeight(1)
-    .padding({ left: 8, right: 8, top: 6, bottom: 12 })
+    .padding({ left: 10, right: 10, top: 6, bottom: 12 })
     .edgeEffect(EdgeEffect.Spring)
     .scrollBar(BarState.Off)
     .onScrollIndex((_firstIndex: number, lastIndex: number) => {

@@ -6,7 +6,6 @@ import { UIConfig } from '../../common/AppState';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 
 interface OptionsLanguageAndRegionPageParams {
-  uiConfig: UIConfig;
   appLangItems: LanguagePickerItem[];
   contentLangItems: LanguagePickerItem[];
   contentCountryItems: LanguagePickerItem[];
@@ -15,13 +14,13 @@ interface OptionsLanguageAndRegionPageParams {
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
   reloadHomeForSearchLocaleChange: () => void;
   applyLanguageSelection: (code: string) => void;
-  getAppLanguageSubtitle: () => string;
 }
 
 @Component
 export struct OptionsLanguageAndRegionPage {
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+
   @Prop params: OptionsLanguageAndRegionPageParams = {
-    uiConfig: new UIConfig(),
     appLangItems: [] as LanguagePickerItem[],
     contentLangItems: [] as LanguagePickerItem[],
     contentCountryItems: [] as LanguagePickerItem[],
@@ -29,13 +28,21 @@ export struct OptionsLanguageAndRegionPage {
     clickEffectEnabled: null,
     updateUiConfig: () => {},
     reloadHomeForSearchLocaleChange: () => {},
-    applyLanguageSelection: () => {},
-    getAppLanguageSubtitle: () => ''
+    applyLanguageSelection: () => {}
   };
+
+  private getItemDisplay(items: LanguagePickerItem[], code: string): string {
+    const found = items.find((it: LanguagePickerItem): boolean => it.code === code);
+    return found ? found.localizedName : '跟随系统';
+  }
+
+  private getAppLanguageSubtitle(): string {
+    return this.getItemDisplay(this.params.appLangItems, this.uiConfig.userLanguage);
+  }
 
   private openAppLanguageDialog(): void {
     const items = this.params.appLangItems;
-    const currentCode = this.params.uiConfig.userLanguage;
+    const currentCode = this.uiConfig.userLanguage;
     const selectedIndex = Math.max(0, items.findIndex(it => it.code === currentCode));
     const range = items.map(it => it.localizedName);
 
@@ -68,10 +75,9 @@ export struct OptionsLanguageAndRegionPage {
         Column({ space: 6 }) {
           PlaybackSectionTitle({ title: $r('app.string.yt_section_language') })
 
-          // 应用UI语言 - 点击弹出 UIPickerComponent 对话框
           OptionItem({
             title: $r('app.string.yt_setting_ui_language'),
-            subtitle: this.params.getAppLanguageSubtitle(),
+            subtitle: this.getAppLanguageSubtitle(),
             showChevron: true,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: () => {
@@ -82,7 +88,7 @@ export struct OptionsLanguageAndRegionPage {
           PlaybackSelectRow({
             title: $r('app.string.yt_setting_content_language'),
             options: this.getContentLangOptions(),
-            selectedIndex: this.params.contentLangItems.findIndex(it => it.code === this.params.uiConfig.searchLanguage),
+            selectedIndex: this.params.contentLangItems.findIndex(it => it.code === this.uiConfig.searchLanguage),
             fontColor: this.params.themeColor,
             onChange: (index: number) => {
               const code = this.params.contentLangItems[index].code;
@@ -94,7 +100,7 @@ export struct OptionsLanguageAndRegionPage {
           PlaybackSelectRow({
             title: $r('app.string.yt_setting_content_region'),
             options: this.getContentCountryOptions(),
-            selectedIndex: this.params.contentCountryItems.findIndex(it => it.code === this.params.uiConfig.searchCountry),
+            selectedIndex: this.params.contentCountryItems.findIndex(it => it.code === this.uiConfig.searchCountry),
             fontColor: this.params.themeColor,
             onChange: (index: number) => {
               const code = this.params.contentCountryItems[index].code;

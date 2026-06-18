@@ -232,7 +232,8 @@ export struct VideoDetails {
     this.classifyStreamsForDownload();
     if (!this.streamCategories ||
       (this.streamCategories.video.length === 0 &&
-        this.streamCategories.progressive.length === 0)) {
+        this.streamCategories.progressive.length === 0 &&
+        this.streamCategories.hlsManifest.length === 0)) {
       this.getUIContext().getPromptAction().showToast({ message: 'No downloadable streams available' });
       return;
     }
@@ -256,6 +257,8 @@ export struct VideoDetails {
 
           if (selection.progressive) {
             videoStream = selection.progressive;
+          } else if (selection.hls) {
+            videoStream = selection.hls;
           } else if (selection.video) {
             videoStream = selection.video;
             audioStream = selection.audio || null;

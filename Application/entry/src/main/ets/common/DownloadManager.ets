@@ -1,11 +1,11 @@
 import { AppLog } from './AppLog';
-import { StreamInfo } from 'mediaservice';
+import { StreamInfo, muxAudioVideo } from 'mediaservice';
 import common from '@ohos.app.ability.common';
 import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
 import { notificationManager } from '@kit.NotificationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { FFmpeg } from '@sj/ffmpeg';
+import { taskpool } from '@kit.ArkTS';
 import { UIConfig } from './AppState';
 
 const logger = AppLog.getInstance('DownloadManager');
@@ -16,6 +16,16 @@ const DOWNLOAD_NOTIFICATION_MIN_INTERVAL_MS: number = 1200;
 const DOWNLOAD_NOTIFICATION_MIN_PROGRESS_DELTA: number = 2;
 const DOWNLOAD_NOTIFICATION_RATE_LIMIT_BACKOFF_MS: number = 5000;
 const DOWNLOAD_NOTIFICATION_GLOBAL_INTERVAL_MS: number = 800;
+
+@Concurrent
+function muxTask(videoPath: string, audioPath: string, outPath: string): void {
+  muxAudioVideo(videoPath, audioPath, outPath);
+}
+
+async function runMuxTask(videoPath: string, audioPath: string, outPath: string): Promise<void> {
+  const task = new taskpool.Task(muxTask, videoPath, audioPath, outPath);
+  await taskpool.execute(task);
+}
 
 export enum DownloadStatus {
   PENDING = 'pending',
@@ -455,8 +465,17 @@ export class DownloadManager {
       throw new Error('Missing destination directory');
     }
 
-    const fileName = this.getFileName(task.outputPath);
-    const outputPath = `${destinationDir}/${fileName}`;
+    let fileName = this.getFileName(task.outputPath);
+    const dotIndex = fileName.lastIndexOf('.');
+    const baseName = dotIndex >= 0 ? fileName.substring(0, dotIndex) : fileName;
+    const ext = dotIndex >= 0 ? fileName.substring(dotIndex) : '';
+    let counter = 1;
+    let outputPath = `${destinationDir}/${fileName}`;
+    while (fs.accessSync(outputPath)) {
+      fileName = `${baseName}_${counter}${ext}`;
+      outputPath = `${destinationDir}/${fileName}`;
+      counter++;
+    }
     fs.copyFileSync(task.outputPath, outputPath);
     logger.info(`Task ${task.id} exported to downloads: ${outputPath}`);
     this.deleteTask(task.id);
@@ -524,6 +543,129 @@ export class DownloadManager {
     return Math.max(1, Math.min(4, Math.round(value)));
   }
 
+  private isHlsStream(stream: StreamInfo): boolean {
+    const kind = (stream.kind || '').toLowerCase();
+    const delivery = (stream.deliveryMethod || '').toUpperCase();
+    return kind === 'manifest_hls' || delivery === 'HLS';
+  }
+
+  private async downloadHlsStream(task: DownloadTask): Promise<void> {
+    logger.info(`Task ${task.id} HLS download start: stream=${this.getStreamLogLabel(task.videoStream)}`);
+    task.status = DownloadStatus.DOWNLOADING_VIDEO;
+    this.publishDownloadNotification(task, true);
+    this.showToast(`开始下载：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+
+    try {
+      const manifestUrl = task.videoStream.url;
+      if (!manifestUrl) {
+        throw new Error('Missing HLS manifest URL');
+      }
+
+      const segments = await this.fetchHlsSegments(manifestUrl, task);
+      if (segments.length === 0) {
+        throw new Error('No segments found in HLS manifest');
+      }
+      logger.info(`Task ${task.id} HLS: ${segments.length} segments to download`);
+
+      task.taskDir = this.ensureTaskDir(task);
+      const outputPath = `${task.taskDir}/output.mp4`;
+      const outputFile = fs.openSync(outputPath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+
+      let totalDownloaded = 0;
+      for (let i = 0; i < segments.length; i++) {
+        if (task._cancelled) {
+          fs.closeSync(outputFile);
+          return;
+        }
+        const segData = await this.downloadHlsSegment(segments[i]);
+        const segBytes = segData.byteLength;
+        totalDownloaded += segBytes;
+        fs.writeSync(outputFile.fd, segData);
+        const pct = Math.round(((i + 1) / segments.length) * 100);
+        task.videoProgress = pct;
+        task.progress = pct;
+        task.downloadedSize = totalDownloaded;
+        this.publishDownloadNotification(task);
+        logger.debug(`Task ${task.id} HLS: segment ${i + 1}/${segments.length} done`);
+      }
+
+      fs.closeSync(outputFile);
+      task.outputPath = outputPath;
+      task.status = DownloadStatus.COMPLETED;
+      task.progress = 100;
+      task.videoProgress = 100;
+      logger.info(`Task ${task.id} HLS completed: output=${outputPath}`);
+      this.publishDownloadNotification(task, true);
+      this.showToast(`下载完成：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+    } catch (error) {
+      task.status = DownloadStatus.FAILED;
+      task.errorMessage = this.getErrorMessage(error);
+      logger.error(`Task ${task.id} HLS failed: ${task.errorMessage}`);
+      this.publishDownloadNotification(task, true);
+    }
+  }
+
+  private async fetchHlsSegments(manifestUrl: string, task: DownloadTask): Promise<string[]> {
+    const request = http.createHttp();
+    try {
+      const response = await request.request(manifestUrl, {
+        method: http.RequestMethod.GET,
+        expectDataType: http.HttpDataType.STRING,
+        header: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36',
+          'Referer': 'https://www.youtube.com/',
+        },
+        connectTimeout: 15000,
+        readTimeout: 15000,
+      });
+      const text = typeof response.result === 'string' ? response.result : '';
+      if (!text) {
+        throw new Error('Empty HLS manifest');
+      }
+      return this.parseHlsSegments(text, manifestUrl);
+    } finally {
+      request.destroy();
+    }
+  }
+
+  private parseHlsSegments(manifestText: string, baseUrl: string): string[] {
+    const lines = manifestText.split(/\r?\n/);
+    const segments: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith('#')) {
+        continue;
+      }
+      if (line.startsWith('http://') || line.startsWith('https://')) {
+        segments.push(line);
+      } else {
+        const slash = baseUrl.lastIndexOf('/');
+        const base = slash >= 0 ? baseUrl.substring(0, slash + 1) : '';
+        segments.push(base + line);
+      }
+    }
+    return segments;
+  }
+
+  private async downloadHlsSegment(url: string): Promise<ArrayBuffer> {
+    const request = http.createHttp();
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.GET,
+        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        header: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36',
+          'Referer': 'https://www.youtube.com/',
+        },
+        connectTimeout: 15000,
+        readTimeout: 15000,
+      });
+      return response.result as ArrayBuffer;
+    } finally {
+      request.destroy();
+    }
+  }
+
   private async executeTask(task: DownloadTask): Promise<void> {
     if (task._cancelled) {
       return;
@@ -531,6 +673,11 @@ export class DownloadManager {
     if (!task._context) {
       task.status = DownloadStatus.FAILED;
       task.errorMessage = 'Missing app context';
+      return;
+    }
+
+    if (this.isHlsStream(task.videoStream)) {
+      await this.downloadHlsStream(task);
       return;
     }
 
@@ -932,27 +1079,20 @@ export class DownloadManager {
     const outputPath = `${task.taskDir}/${safeTitle}.${outputExt}`;
 
     if (task.audioStream && task._audioFilePath) {
-      logger.info(`Task ${task.id} ffmpeg merge output=${outputExt} videoExt=${this.getFileExtension(task.videoStream)} audioExt=${this.getFileExtension(task.audioStream)}`);
-      const commands: string[] = [
-        'ffmpeg',
-        '-y',
-        '-i',
-        task._videoFilePath,
-        '-i',
-        task._audioFilePath,
-        '-c',
-        'copy',
-        outputPath
-      ];
-      await FFmpeg.execute(commands, {
-        logCallback: (message: string) => {
-          logger.debug(`[ffmpeg] ${message}`);
-        },
-        progressCallback: (_message: string) => {
-          task.updateMergeProgress(Math.max(task.mergeProgress, 50));
-          this.publishDownloadNotification(task);
-        }
-      });
+      logger.info(`Task ${task.id} mux merge output=${outputExt} videoExt=${this.getFileExtension(task.videoStream)} audioExt=${this.getFileExtension(task.audioStream)}`);
+
+      const videoPath = task._videoFilePath;
+      const audioPath = task._audioFilePath;
+      const outPath = outputPath;
+
+      try {
+        await runMuxTask(videoPath, audioPath, outPath);
+      } catch (e) {
+        const msg = (e as Error).message || String(e);
+        logger.error(`Task ${task.id} mux failed: ${msg}`);
+        throw new Error(`合并失败: ${msg}`);
+      }
+
       task.updateMergeProgress(100);
       this.publishDownloadNotification(task);
     } else {

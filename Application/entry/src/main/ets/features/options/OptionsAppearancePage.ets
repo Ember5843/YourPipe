@@ -3,9 +3,9 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
+import { customAnimationUtil } from '../../common/AnimationUtil';
 
 interface OptionsAppearancePageParams {
-  uiConfig: UIConfig;
   themeColor: ResourceColor;
   applyDarkModeSelection: (mode: YourtubeDarkMode) => void;
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
@@ -13,8 +13,9 @@ interface OptionsAppearancePageParams {
 
 @Component
 export struct OptionsAppearancePage {
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+
   @Prop params: OptionsAppearancePageParams = {
-    uiConfig: new UIConfig(),
     themeColor: $r('app.color.yourtube_theme_primary'),
     applyDarkModeSelection: () => {},
     updateUiConfig: () => {}
@@ -30,7 +31,7 @@ export struct OptionsAppearancePage {
 
   private getDarkModeIndex(): number {
     return [YourtubeDarkMode.SYSTEM, YourtubeDarkMode.LIGHT, YourtubeDarkMode.DARK]
-      .indexOf(this.params.uiConfig.darkMode);
+      .indexOf(this.uiConfig.darkMode);
   }
 
   build() {
@@ -54,8 +55,8 @@ export struct OptionsAppearancePage {
 
           PlaybackToggleRow({
             title: $r('app.string.yt_layout_grid'),
-            subtitle: this.params.uiConfig.homeLayoutMode === 'grid' ? '卡片模式' : '列表模式',
-            isOn: this.params.uiConfig.homeLayoutMode === 'grid',
+            subtitle: this.uiConfig.homeLayoutMode === 'grid' ? '卡片模式' : '列表模式',
+            isOn: this.uiConfig.homeLayoutMode === 'grid',
             themeColor: this.params.themeColor,
             onChange: (val: boolean) => {
               this.params.updateUiConfig(cfg => { cfg.homeLayoutMode = val ? 'grid' : 'list'; });

@@ -35,6 +35,7 @@ import { VideoDetailPage } from '../features/player/VideoDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
 import { OptionsGoogleAccountPage } from '../features/auth/OptionsGoogleAccountPage';
 import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
+import { AuthStateHelper } from '../common/AuthStateHelper';
 import { customAnimationUtil } from '../common/AnimationUtil';
 import { LanguageManager } from '../common/LanguageManager';
 import { SearchLocaleManager } from '../common/SearchLocaleManager';
@@ -87,29 +88,9 @@ import {
 } from '../features/player/PlaybackContinuationService';
 
 const logger = AppLog.getInstance('Index');
-const APP_VERSION = '0.4.1';
+const APP_VERSION = '0.5.0';
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 
-
-@Component
-struct StateObserver {
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
-  @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
-  @BuilderParam content: () => void = this.defaultContent;
-  
-  @Builder defaultContent() {}
-
-  build() {
-    Column() {
-      this.content()
-    }
-    .width('100%')
-    .height('100%')
-    // 绑定 key 到配置关键字段，确保任意配置变化时 StateObserver 重建，
-    // 从而触发内部 @Builder 内容（OptionsMainPage 等）重新渲染
-    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.hwdecEnabled}-${this.playbackConfig.cacheSecs}-${this.playbackConfig.demuxerReadaheadSecs}-${this.playbackConfig.demuxerMaxBytes}-${this.playbackConfig.gpuApi}`)
-  }
-}
 
 @Entry
 @Component
@@ -252,25 +233,6 @@ struct Index {
     return this.getItemDisplay(this.appLangItems, this.uiConfig.userLanguage);
   }
 
-  private getGoogleAccountSubtitle(): string {
-    const authSession = AuthSessionManager.getInstance();
-    if (!authSession || !authSession.isSignedIn()) {
-      return '登录以获取个性化推荐';
-    }
-    const status = authSession.getStatus();
-    if (status.authMode === 'cookie') {
-      return '已登录 (Cookie)';
-    }
-    return '已登录';
-  }
-
-  private getLanguageAndRegionSubtitle(config: UIConfig): string {
-    const appLang = this.getItemDisplay(this.appLangItems, config.userLanguage);
-    const contentLang = this.getItemDisplay(this.contentLangItems, config.searchLanguage);
-    const region = this.getItemDisplay(this.contentCountryItems, config.searchCountry);
-    return `${appLang} / ${contentLang} / ${region}`;
-  }
-
   /** 克隆 UIConfig 并直接赋值给 @StorageLink 属性，确保响应式重绘和持久化同时生效 */
   private updateUiConfig(mutator: (cfg: UIConfig) => void): void {
     const next = this.uiConfig.clone();
@@ -329,6 +291,7 @@ struct Index {
 
     // 2. 清除登录状态（独立的 Preferences 数据库）
     AuthSessionManager.getInstance()?.signOut();
+    AuthStateHelper.refresh();
 
     // 3. 清除所有 Preferences 数据库
     PreferencesStore.clearAll();
@@ -1223,18 +1186,6 @@ struct Index {
 
 
 
-  private getAppearanceSubtitle(config: UIConfig): ResourceStr {
-    switch (config.darkMode) {
-      case YourtubeDarkMode.LIGHT:
-        return $r('app.string.yt_dark_mode_light');
-      case YourtubeDarkMode.DARK:
-        return $r('app.string.yt_dark_mode_dark');
-      case YourtubeDarkMode.SYSTEM:
-      default:
-        return $r('app.string.yt_dark_mode_system');
-    }
-  }
-
   private getTabLabel(index: number): ResourceStr {
     switch (index) {
       case 0:
@@ -1544,16 +1495,12 @@ struct Index {
         .justifyContent(FlexAlign.Center)
         .margin({ top: 8, bottom: 6 })
 
-        StateObserver() {
-          OptionsMainPage({
+        OptionsMainPage({
             params: {
-              uiConfig: this.uiConfig,
-              playbackConfig: this.playbackConfig,
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
-              getGoogleAccountSubtitle: this.getGoogleAccountSubtitle.bind(this),
-              getLanguageAndRegionSubtitle: this.getLanguageAndRegionSubtitle.bind(this),
-              getPlaybackSubtitle: this.getPlaybackSubtitle.bind(this),
-              getAppearanceSubtitle: this.getAppearanceSubtitle.bind(this),
+              appLangItems: this.appLangItems,
+              contentLangItems: this.contentLangItems,
+              contentCountryItems: this.contentCountryItems,
               onGoogleAccountClick: () => { this.pushOptionsPath('google_account'); },
               onLanguageClick: () => { this.pushOptionsPath('language'); },
               onPlaybackClick: () => { this.pushOptionsPath('playback'); },
@@ -1563,7 +1510,6 @@ struct Index {
               onAboutClick: () => { this.pushOptionsPath('about_page'); }
             }
           })
-        }
       }
       .width('100%')
       .height('100%')
@@ -1588,10 +1534,8 @@ struct Index {
   OptionsPageMap(name: string) {
     if (name === 'language') {
       HdsNavDestination() {
-        StateObserver() {
           OptionsLanguageAndRegionPage({
             params: {
-              uiConfig: this.uiConfig,
               appLangItems: this.appLangItems,
               contentLangItems: this.contentLangItems,
               contentCountryItems: this.contentCountryItems,
@@ -1599,11 +1543,9 @@ struct Index {
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               updateUiConfig: this.updateUiConfig.bind(this),
               reloadHomeForSearchLocaleChange: this.reloadHomeForSearchLocaleChange.bind(this),
-              applyLanguageSelection: this.applyLanguageSelection.bind(this),
-              getAppLanguageSubtitle: this.getAppLanguageSubtitle.bind(this)
+              applyLanguageSelection: this.applyLanguageSelection.bind(this)
             }
           })
-        }
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
@@ -1639,7 +1581,7 @@ struct Index {
     } else if (name === 'webview_login') {
       HdsNavDestination() {
         WebViewLoginPage({
-          onSuccess: () => { this.popOptionsPath(); },
+          onSuccess: () => { AuthStateHelper.refresh(); this.popOptionsPath(); },
           onCancel: () => { this.popOptionsPath(); }
         })
       }
@@ -1657,16 +1599,13 @@ struct Index {
       })
     } else if (name === 'appearance') {
       HdsNavDestination() {
-        StateObserver() {
           OptionsAppearancePage({
             params: {
-              uiConfig: this.uiConfig,
               themeColor: this.THEME_COLOR,
               applyDarkModeSelection: this.applyDarkModeSelection.bind(this),
               updateUiConfig: this.updateUiConfig.bind(this)
             }
           })
-        }
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
@@ -1742,18 +1681,14 @@ struct Index {
       })
     } else if (name === 'playback') {
       HdsNavDestination() {
-        StateObserver() {
           OptionsPlaybackPage({
             params: {
-              uiConfig: this.uiConfig,
-              playbackConfig: this.playbackConfig,
               themeColor: this.THEME_COLOR,
               updatePlaybackConfig: this.updatePlaybackConfig.bind(this),
               updateUiConfig: this.updateUiConfig.bind(this),
               getQualityDisplay: this.getQualityDisplay.bind(this)
             }
           })
-        }
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
@@ -1769,15 +1704,12 @@ struct Index {
       })
     } else if (name === 'recovery') {
       HdsNavDestination() {
-        StateObserver() {
           OptionsRecoveryPage({
             params: {
-              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               onResetSettingsClick: () => { this.showResetSettingsConfirmDialog(); },
               onClearAllDataClick: () => { this.showClearAllDataConfirmDialog(); }
             }
           })
-        }
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
@@ -1858,11 +1790,6 @@ struct Index {
       case 'best': return $r('app.string.yt_quality_best');
       default: return quality;
     }
-  }
-
-  private getPlaybackSubtitle(config: PlaybackConfig): string {
-    const q = this.resourceToString(this.getQualityDisplay(config.defaultQuality));
-    return q;
   }
 
 

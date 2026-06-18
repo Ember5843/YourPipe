@@ -1189,6 +1189,10 @@
       "value": "分离轨道 (DASH)"
     },
     {
+      "name": "yt_download_mode_hls",
+      "value": "HLS 流"
+    },
+    {
       "name": "yt_download_progressive_hint",
       "value": "推荐：视频和音频已合并，无需额外处理"
     },

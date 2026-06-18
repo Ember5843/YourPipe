@@ -5,11 +5,13 @@ export interface DownloadSelection {
   video?: StreamInfo;
   audio?: StreamInfo;
   progressive?: StreamInfo;
+  hls?: StreamInfo;
 }
 
 enum DownloadMode {
   PROGRESSIVE = 'PROGRESSIVE',
-  DASH_TRACKS = 'DASH_TRACKS'
+  DASH_TRACKS = 'DASH_TRACKS',
+  HLS = 'HLS'
 }
 
 @CustomDialog
@@ -27,6 +29,7 @@ export struct DownloadDialog {
   @State selectedProgressive: string = '';
   @State selectedDashVideo: string = '';
   @State selectedDashAudio: string = '';
+  @State selectedHls: string = '';
   @State selectedAudioTrack: ResourceStr = '';
   @State estimatedSize: string = '';
 
@@ -47,6 +50,9 @@ export struct DownloadDialog {
     } else if (this.videoStreams.length > 0) {
       this.selectedMode = DownloadMode.DASH_TRACKS;
       this.selectedDashVideo = this.getStreamLabel(this.videoStreams[0]);
+    } else if (this.streamCategories?.hlsManifest && this.streamCategories.hlsManifest.length > 0) {
+      this.selectedMode = DownloadMode.HLS;
+      this.selectedHls = this.getStreamLabel(this.streamCategories.hlsManifest[0]);
     }
 
     if (this.streamCategories?.audio && this.streamCategories.audio.length > 0) {
@@ -86,13 +92,29 @@ export struct DownloadDialog {
               .backgroundColor($r('app.color.yourtube_bg_page'))
               .borderRadius(8)
               .onSelect((index: number) => {
-                if (index === 0 && this.streamCategories?.progressive?.length) {
-                  this.selectedMode = DownloadMode.PROGRESSIVE;
-                  this.selectedProgressive = this.getStreamLabel(this.streamCategories.progressive[0]);
-                } else {
-                  this.selectedMode = DownloadMode.DASH_TRACKS;
-                  if (this.videoStreams.length > 0) {
+                let pos = 0;
+                if (this.streamCategories?.progressive?.length) {
+                  if (index === pos) {
+                    this.selectedMode = DownloadMode.PROGRESSIVE;
+                    this.selectedProgressive = this.getStreamLabel(this.streamCategories.progressive[0]);
+                    this.updateEstimatedSize();
+                    return;
+                  }
+                  pos++;
+                }
+                if (this.videoStreams.length > 0) {
+                  if (index === pos) {
+                    this.selectedMode = DownloadMode.DASH_TRACKS;
                     this.selectedDashVideo = this.getStreamLabel(this.videoStreams[0]);
+                    this.updateEstimatedSize();
+                    return;
+                  }
+                  pos++;
+                }
+                if (this.streamCategories?.hlsManifest?.length) {
+                  if (index === pos) {
+                    this.selectedMode = DownloadMode.HLS;
+                    this.selectedHls = this.getStreamLabel(this.streamCategories.hlsManifest[0]);
                   }
                 }
                 this.updateEstimatedSize();
@@ -115,6 +137,27 @@ export struct DownloadDialog {
                 }
               )
               Text($r('app.string.yt_download_progressive_hint'))
+                .fontSize(11)
+                .fontColor($r('app.color.yourtube_text_hint'))
+                .width('100%')
+                .margin({ top: 4 })
+            }
+            .width('100%')
+          }
+
+          if (this.selectedMode === DownloadMode.HLS && this.streamCategories?.hlsManifest?.length) {
+            Column() {
+              this.SectionHeader($r('app.string.yt_download_step2_quality'))
+              this.StreamSelector(
+                'HLS',
+                this.streamCategories.hlsManifest,
+                this.selectedHls,
+                (value: string) => {
+                  this.selectedHls = value;
+                  this.updateEstimatedSize();
+                }
+              )
+              Text('HLS 流将以原始分片格式下载并拼接为完整文件')
                 .fontSize(11)
                 .fontColor($r('app.color.yourtube_text_hint'))
                 .width('100%')
@@ -303,13 +346,20 @@ export struct DownloadDialog {
     if (this.videoStreams.length > 0) {
       options.push({ value: $r('app.string.yt_download_mode_dash') } as SelectOption);
     }
+    if (this.streamCategories?.hlsManifest?.length) {
+      options.push({ value: $r('app.string.yt_download_mode_hls') } as SelectOption);
+    }
     return options;
   }
 
   private getModeLabel(mode: DownloadMode): ResourceStr {
-    return mode === DownloadMode.PROGRESSIVE
-      ? $r('app.string.yt_download_mode_progressive')
-      : $r('app.string.yt_download_mode_dash');
+    if (mode === DownloadMode.PROGRESSIVE) {
+      return $r('app.string.yt_download_mode_progressive');
+    }
+    if (mode === DownloadMode.HLS) {
+      return $r('app.string.yt_download_mode_hls');
+    }
+    return $r('app.string.yt_download_mode_dash');
   }
 
   private getVideoOptions(): SelectOption[] {
@@ -420,6 +470,11 @@ export struct DownloadDialog {
     if (this.selectedMode === DownloadMode.PROGRESSIVE) {
       selection.progressive = this.getStreamByLabel(this.streamCategories?.progressive || [], this.selectedProgressive);
       return selection.progressive ? selection : null;
+    }
+
+    if (this.selectedMode === DownloadMode.HLS) {
+      selection.hls = this.getStreamByLabel(this.streamCategories?.hlsManifest || [], this.selectedHls);
+      return selection.hls ? selection : null;
     }
 
     selection.video = this.getStreamByLabel(this.videoStreams, this.selectedDashVideo);

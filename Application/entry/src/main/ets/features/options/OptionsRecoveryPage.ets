@@ -1,16 +1,18 @@
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { OptionItem } from '../../common/components/OptionItem';
+import { UIConfig } from '../../common/AppState';
+import { customAnimationUtil } from '../../common/AnimationUtil';
 
 interface OptionsRecoveryPageParams {
-  clickEffectEnabled: ClickEffect | null;
   onResetSettingsClick: () => void;
   onClearAllDataClick: () => void;
 }
 
 @Component
 export struct OptionsRecoveryPage {
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+
   @Prop params: OptionsRecoveryPageParams = {
-    clickEffectEnabled: null,
     onResetSettingsClick: () => {},
     onClearAllDataClick: () => {}
   };
@@ -26,7 +28,7 @@ export struct OptionsRecoveryPage {
             title: $r('app.string.yt_option_reset_settings'),
             subtitle: $r('app.string.yt_option_reset_settings_subtitle'),
             iconColor: $r('app.color.yourtube_option_icon_palette'),
-            clickEffectEnabled: this.params.clickEffectEnabled,
+            clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
             onClickAction: this.params.onResetSettingsClick
           })
 
@@ -35,7 +37,7 @@ export struct OptionsRecoveryPage {
             title: $r('app.string.yt_option_clear_all_data'),
             subtitle: $r('app.string.yt_option_clear_all_data_subtitle'),
             iconColor: $r('app.color.yourtube_text_warning'),
-            clickEffectEnabled: this.params.clickEffectEnabled,
+            clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
             onClickAction: this.params.onClearAllDataClick
           })
         }

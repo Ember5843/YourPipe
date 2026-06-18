@@ -1,31 +1,18 @@
 import { AuthAccountStatus, AuthSessionManager, AuthStage } from 'youtube_core';
-import { AppLog } from '../../common/AppLog';
-
-const logger = AppLog.getInstance('OptionsGoogleAccountPage');
+import { AuthStateHelper } from '../../common/AuthStateHelper';
 
 @Component
 export struct OptionsGoogleAccountPage {
   onBack?: () => void;
   pushLoginPage?: () => void;
-  private authSession: AuthSessionManager | null = AuthSessionManager.getInstance();
 
-  @State private status: AuthAccountStatus = new AuthAccountStatus();
-
-  aboutToAppear() {
-    this.syncStatus();
-  }
-
-  private syncStatus(): void {
-    if (this.authSession) {
-      this.status = this.authSession.getStatus();
-    }
-  }
+  @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
 
   private startLogin(): void {
     const uiContext = this.getUIContext();
     uiContext.showAlertDialog({
       title: '登录须知',
-      message: '欢迎使用我们的应用，登录功能仍在完善，仅供需要解锁会员内容或者被机器人拦截情况下登录，登录状态下，分辨率将最高限制至1080P',
+      message: '欢迎使用我们的应用，登录功能仍在完善，目前暂不支持获取Youtube账号数据，仅供需要解锁会员内容或者被机器人拦截情况下登录，登录状态下，分辨率将最高限制至1080P',
       autoCancel: true,
       alignment: DialogAlignment.Center,
       offset: { dx: 0, dy: -20 },
@@ -55,16 +42,13 @@ export struct OptionsGoogleAccountPage {
   }
 
   private signOut(): void {
-    if (this.authSession) {
-      this.status = this.authSession.signOut();
-    } else {
-      this.status = new AuthAccountStatus();
-    }
+    AuthSessionManager.getInstance()?.signOut();
+    AuthStateHelper.refresh();
   }
 
   private getStatusText(): string {
-    if (this.status.stage === AuthStage.SIGNED_IN) {
-      if (this.status.authMode === 'cookie') {
+    if (this.authStatus.stage === AuthStage.SIGNED_IN) {
+      if (this.authStatus.authMode === 'cookie') {
         return '已登录 (Cookie)';
       }
       return '已登录';
@@ -74,9 +58,9 @@ export struct OptionsGoogleAccountPage {
 
   @Builder StatusPill() {
     Row({ space: 8 }) {
-      SymbolGlyph(this.status.stage === AuthStage.SIGNED_IN ? $r('sys.symbol.checkmark_circle') : $r('sys.symbol.info_circle'))
+      SymbolGlyph(this.authStatus.stage === AuthStage.SIGNED_IN ? $r('sys.symbol.checkmark_circle') : $r('sys.symbol.info_circle'))
         .fontSize(22)
-        .fontColor([this.status.stage === AuthStage.SIGNED_IN ? $r('app.color.yourtube_theme_primary') : $r('app.color.yourtube_text_quaternary')])
+        .fontColor([this.authStatus.stage === AuthStage.SIGNED_IN ? $r('app.color.yourtube_theme_primary') : $r('app.color.yourtube_text_quaternary')])
       Text(this.getStatusText())
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
@@ -123,7 +107,7 @@ export struct OptionsGoogleAccountPage {
 
   @Builder SignedInView() {
     Column({ space: 12 }) {
-      if (this.status.authMode === 'cookie') {
+      if (this.authStatus.authMode === 'cookie') {
         Text('已通过 Cookie 方式登录')
           .fontSize(14)
           .fontColor($r('app.color.yourtube_text_quaternary'))
@@ -146,7 +130,7 @@ export struct OptionsGoogleAccountPage {
         Column({ space: 16 }) {
           this.StatusPill()
 
-          if (this.status.stage === AuthStage.SIGNED_IN) {
+          if (this.authStatus.stage === AuthStage.SIGNED_IN) {
             this.SignedInView()
           } else {
             this.SignedOutView()

@@ -1013,6 +1013,10 @@
       "value": "Separate Tracks (DASH)"
     },
     {
+      "name": "yt_download_mode_hls",
+      "value": "HLS Stream"
+    },
+    {
       "name": "yt_download_progressive_hint",
       "value": "Recommended: video and audio already merged"
     },

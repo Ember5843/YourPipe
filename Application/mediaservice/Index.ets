@@ -13,3 +13,4 @@ export { PlayerState, isValidTransition, describeState } from './src/main/ets/st
 export { PlayerStateMachine, StateChangeListener } from './src/main/ets/state/PlayerStateMachine';
 export { PlayerUiViewModel } from './src/main/ets/state/PlayerUiViewModel';
 export { PlaybackPreferences, PlaybackPreferencesSnapshot, PlaybackPreferencesProvider } from './src/main/ets/common/PlaybackPreferences';
+export { muxAudioVideo } from '@mediadevkit/libmdk-napi';

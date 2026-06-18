@@ -1,18 +1,17 @@
 import { OptionItem } from '../../common/components/OptionItem';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
-import { UIConfig } from '../../common/AppState';
-import { PlaybackConfig } from '../../common/PlaybackConfig';
+import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
+import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
+import { AuthAccountStatus, AuthStage } from 'youtube_core';
+import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 
-const APP_VERSION: string = '0.4.1';
+const APP_VERSION: string = '0.5.0';
 
 interface OptionsMainPageParams {
-  uiConfig: UIConfig;
-  playbackConfig: PlaybackConfig;
   clickEffectEnabled: ClickEffect | null;
-  getGoogleAccountSubtitle: () => string;
-  getLanguageAndRegionSubtitle: (cfg: UIConfig) => string;
-  getPlaybackSubtitle: (cfg: PlaybackConfig) => string;
-  getAppearanceSubtitle: (cfg: UIConfig) => string;
+  appLangItems: LanguagePickerItem[];
+  contentLangItems: LanguagePickerItem[];
+  contentCountryItems: LanguagePickerItem[];
   onGoogleAccountClick: () => void;
   onLanguageClick: () => void;
   onPlaybackClick: () => void;
@@ -24,14 +23,15 @@ interface OptionsMainPageParams {
 
 @Component
 export struct OptionsMainPage {
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
+  @StorageProp('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
+
   @Prop params: OptionsMainPageParams = {
-    uiConfig: new UIConfig(),
-    playbackConfig: new PlaybackConfig(),
     clickEffectEnabled: null,
-    getGoogleAccountSubtitle: () => '',
-    getLanguageAndRegionSubtitle: () => '',
-    getPlaybackSubtitle: () => '',
-    getAppearanceSubtitle: () => '',
+    appLangItems: [] as LanguagePickerItem[],
+    contentLangItems: [] as LanguagePickerItem[],
+    contentCountryItems: [] as LanguagePickerItem[],
     onGoogleAccountClick: () => {},
     onLanguageClick: () => {},
     onPlaybackClick: () => {},
@@ -40,6 +40,41 @@ export struct OptionsMainPage {
     onRecoveryClick: () => {},
     onAboutClick: () => {}
   };
+
+  private getItemDisplay(items: LanguagePickerItem[], code: string): string {
+    const found = items.find((it: LanguagePickerItem): boolean => it.code === code);
+    return found ? found.localizedName : '跟随系统';
+  }
+
+  private getGoogleAccountSubtitle(): string {
+    if (this.authStatus.stage === AuthStage.SIGNED_IN) {
+      return this.authStatus.authMode === 'cookie' ? '已登录 (Cookie)' : '已登录';
+    }
+    return '登录以获取个性化推荐';
+  }
+
+  private getLanguageAndRegionSubtitle(): string {
+    const appLang = this.getItemDisplay(this.params.appLangItems, this.uiConfig.userLanguage);
+    const contentLang = this.getItemDisplay(this.params.contentLangItems, this.uiConfig.searchLanguage);
+    const region = this.getItemDisplay(this.params.contentCountryItems, this.uiConfig.searchCountry);
+    return `${appLang} / ${contentLang} / ${region}`;
+  }
+
+  private getPlaybackSubtitle(): string {
+    return this.playbackConfig.defaultQuality;
+  }
+
+  private getAppearanceSubtitle(): ResourceStr {
+    switch (this.uiConfig.darkMode) {
+      case YourtubeDarkMode.LIGHT:
+        return $r('app.string.yt_dark_mode_light');
+      case YourtubeDarkMode.DARK:
+        return $r('app.string.yt_dark_mode_dark');
+      case YourtubeDarkMode.SYSTEM:
+      default:
+        return $r('app.string.yt_dark_mode_system');
+    }
+  }
 
   build() {
     Column() {
@@ -50,7 +85,7 @@ export struct OptionsMainPage {
           OptionItem({
             icon: $r('sys.symbol.info_circle'),
             title: 'Google 登录',
-            subtitle: this.params.getGoogleAccountSubtitle(),
+            subtitle: this.getGoogleAccountSubtitle(),
             iconColor: $r('app.color.yourtube_theme_primary'),
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onGoogleAccountClick
@@ -61,7 +96,7 @@ export struct OptionsMainPage {
           OptionItem({
             icon: $r('sys.symbol.translate_c2e'),
             title: $r('app.string.yt_section_language_region'),
-            subtitle: this.params.getLanguageAndRegionSubtitle(this.params.uiConfig),
+            subtitle: this.getLanguageAndRegionSubtitle(),
             iconColor: $r('app.color.yourtube_option_icon_language'),
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onLanguageClick
@@ -70,7 +105,7 @@ export struct OptionsMainPage {
           OptionItem({
             icon: $r('sys.symbol.play_circle'),
             title: $r('app.string.yt_section_playback'),
-            subtitle: this.params.getPlaybackSubtitle(this.params.playbackConfig),
+            subtitle: this.getPlaybackSubtitle(),
             iconColor: $r('app.color.yourtube_theme_primary'),
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onPlaybackClick
@@ -79,7 +114,7 @@ export struct OptionsMainPage {
           OptionItem({
             icon: $r('sys.symbol.paintpalette_fill'),
             title: $r('app.string.yt_option_appearance'),
-            subtitle: this.params.getAppearanceSubtitle(this.params.uiConfig),
+            subtitle: this.getAppearanceSubtitle(),
             iconColor: $r('app.color.yourtube_option_icon_palette'),
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onAppearanceClick
