@@ -107,7 +107,7 @@ struct StateObserver {
     .height('100%')
     // 绑定 key 到配置关键字段，确保任意配置变化时 StateObserver 重建，
     // 从而触发内部 @Builder 内容（OptionsMainPage 等）重新渲染
-    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.showHighResolutions}-${this.playbackConfig.hwdecEnabled}-${this.playbackConfig.cacheSecs}-${this.playbackConfig.demuxerReadaheadSecs}-${this.playbackConfig.demuxerMaxBytes}-${this.playbackConfig.gpuApi}`)
+    .key(`so-${this.uiConfig.darkMode}-${this.uiConfig.colorPreset}-${this.uiConfig.maxConcurrentDownloads}-${this.playbackConfig.defaultQuality}-${this.playbackConfig.mobileQuality}-${this.playbackConfig.hwdecEnabled}-${this.playbackConfig.cacheSecs}-${this.playbackConfig.demuxerReadaheadSecs}-${this.playbackConfig.demuxerMaxBytes}-${this.playbackConfig.gpuApi}`)
   }
 }
 
@@ -1862,8 +1862,7 @@ struct Index {
 
   private getPlaybackSubtitle(config: PlaybackConfig): string {
     const q = this.resourceToString(this.getQualityDisplay(config.defaultQuality));
-    const highRes = config.showHighResolutions ? 'High-res' : '1080p max';
-    return `${q} · ${highRes}`;
+    return q;
   }
 
 

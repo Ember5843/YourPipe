@@ -228,6 +228,7 @@ export struct UIPickerLanguageDialog {
         this.selectedIndex = selectedIndex;
       })
     }
+    .width('85%')
     .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
     .borderRadius(20)
   }

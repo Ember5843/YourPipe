@@ -69,16 +69,6 @@ export struct OptionsPlaybackPage {
             }
           })
 
-          PlaybackToggleRow({
-            title: $r('app.string.yt_setting_show_high_res'),
-            subtitle: $r('app.string.yt_setting_show_high_res_subtitle'),
-            isOn: this.params.playbackConfig.showHighResolutions,
-            themeColor: this.params.themeColor,
-            onChange: (val: boolean) => {
-              this.params.updatePlaybackConfig(cfg => cfg.showHighResolutions = val);
-            }
-          })
-
           if (PiPManager.getInstance().isPiPSupported()) {
             PlaybackSectionTitle({ title: '画中画' })
 

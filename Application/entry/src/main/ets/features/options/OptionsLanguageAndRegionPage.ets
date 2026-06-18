@@ -3,7 +3,7 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { OptionItem } from '../../common/components/OptionItem';
 import { UIConfig } from '../../common/AppState';
-import { LanguagePickerItem, UIPickerLanguageDialog } from '../../common/components/LanguagePickerDialog';
+import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 
 interface OptionsLanguageAndRegionPageParams {
   uiConfig: UIConfig;
@@ -33,23 +33,25 @@ export struct OptionsLanguageAndRegionPage {
     getAppLanguageSubtitle: () => ''
   };
 
-  private appLangDialogCtrl: CustomDialogController | null = null;
-
   private openAppLanguageDialog(): void {
-    this.appLangDialogCtrl = new CustomDialogController({
-      builder: UIPickerLanguageDialog({
-        title: $r('app.string.yt_setting_ui_language'),
-        items: this.params.appLangItems,
-        selectedCode: this.params.uiConfig.userLanguage,
-        onConfirm: (code: string) => {
-          this.params.applyLanguageSelection(code);
-        }
-      }),
-      alignment: DialogAlignment.Center,
-      customStyle: true,
-      autoCancel: true
+    const items = this.params.appLangItems;
+    const currentCode = this.params.uiConfig.userLanguage;
+    const selectedIndex = Math.max(0, items.findIndex(it => it.code === currentCode));
+    const range = items.map(it => it.localizedName);
+
+    this.getUIContext().showTextPickerDialog({
+      range: range,
+      selected: selectedIndex,
+      defaultPickerItemHeight: 36,
+      canLoop: false,
+      onAccept: (value: TextPickerResult) => {
+        const index = Array.isArray(value.index) ? value.index[0] : value.index;
+        const code = items[index].code;
+        this.params.applyLanguageSelection(code);
+      },
+      onCancel: () => {},
+      onChange: (_value: TextPickerResult) => {}
     });
-    this.appLangDialogCtrl.open();
   }
 
   private getContentLangOptions(): SelectOption[] {

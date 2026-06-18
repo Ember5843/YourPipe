@@ -22,9 +22,36 @@ export struct OptionsGoogleAccountPage {
   }
 
   private startLogin(): void {
-    if (this.pushLoginPage) {
-      this.pushLoginPage();
-    }
+    const uiContext = this.getUIContext();
+    uiContext.showAlertDialog({
+      title: '登录须知',
+      message: '欢迎使用我们的应用，登录功能仍在完善，仅供需要解锁会员内容或者被机器人拦截情况下登录，登录状态下，分辨率将最高限制至1080P',
+      autoCancel: true,
+      alignment: DialogAlignment.Center,
+      offset: { dx: 0, dy: -20 },
+      buttonDirection: DialogButtonDirection.HORIZONTAL,
+      buttons: [
+        {
+          value: '取消',
+          action: () => {}
+        },
+        {
+          value: '继续登录',
+          fontColor: $r('app.color.yourtube_theme_primary'),
+          action: () => {
+            if (this.pushLoginPage) {
+              this.pushLoginPage();
+            }
+          }
+        }
+      ],
+      onWillDismiss: (dismissDialogAction: DismissDialogAction) => {
+        if (dismissDialogAction.reason === DismissReason.PRESS_BACK
+          || dismissDialogAction.reason === DismissReason.TOUCH_OUTSIDE) {
+          dismissDialogAction.dismiss();
+        }
+      }
+    });
   }
 
   private signOut(): void {

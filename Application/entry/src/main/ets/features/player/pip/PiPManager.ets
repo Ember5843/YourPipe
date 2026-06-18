@@ -128,7 +128,6 @@ export class PiPManager {
         templateType: PiPWindow.PiPTemplateType.VIDEO_PLAY,
         contentWidth: safeW,
         contentHeight: safeH,
-        controlGroups: [PiPWindow.VideoPlayControlGroup.VIDEO_PREVIOUS_NEXT],
       };
       this.pipController = await PiPWindow.create(config);
       this.registerCallbacks();

@@ -67,6 +67,8 @@ export class AvPlayerController {
   private pendingStartFromSec: number = 0;
   /** 上一次 updateVideoSource 处理过的 source 引用，用于幂等去重。 */
   private lastUpdatedSourceRef: VideoData | null = null;
+  /** 上一次 updateVideoSource 处理过的 videoId，用于幂等去重（引用比较在 @State/@Link 下不可靠）。 */
+  private lastUpdatedVideoId: string = '';
 
   // Error recovery state
   private errorRetryCount: number = 0;
@@ -263,13 +265,16 @@ export class AvPlayerController {
       return;
     }
 
-    // 幂等：PlayerSession 与 AVPlayer.onSourceChange 会先后推同一个 source 引用，
+    // 幂等：PlayerSession 与 AVPlayer.onSourceChange 会先后推同一个 source，
     // 如果 controller 第二次仍跑完整 load 流程会让 MPV 重新建立 timeline / decoder，
     // 直播场景下还会因为 length=0 的 EDL 被 MPV 立刻判 EOF 触发自动 skip。
-    if (this.lastUpdatedSourceRef === newSource) {
-      Logger.debug(TAG, `updateVideoSource ignored: same source reference videoId=${newSource.videoId || 'N/A'}`);
+    // 注意：ArkUI 的 @State/@Link 传递会破坏对象引用一致性，故按 videoId 去重。
+    const newVideoId = newSource.videoId || '';
+    if (newVideoId.length > 0 && this.lastUpdatedVideoId === newVideoId) {
+      Logger.debug(TAG, `updateVideoSource ignored: same videoId=${newVideoId}`);
       return;
     }
+    this.lastUpdatedVideoId = newVideoId;
     this.lastUpdatedSourceRef = newSource;
 
     this.resetPlaybackState();
@@ -292,7 +297,7 @@ export class AvPlayerController {
       }
     }
 
-    Logger.info(TAG, `updateVideoSource: videoId=${newSource.videoId || 'N/A'} streams=${newSource.streams?.length || 0} isLive=${newSource.isLive} subtitles=${newSource.subtitleTracks?.length || 0}`);
+    Logger.info(TAG, `updateVideoSource: videoId=${newSource.videoId || 'N/A'} streams=${newSource.streams?.length || 0} isLive=${newSource.isLive} subtitles=${newSource.subtitleTracks?.length || 0} pendingStart=${this.pendingStartFromSec}s`);
 
     const prefs = PlaybackPreferences.snapshot();
     const searchLanguage = prefs.searchLanguage;
@@ -446,6 +451,7 @@ export class AvPlayerController {
     this.detachBackgroundTaskListener();
     this.resetPlaybackState();
     this.lastUpdatedSourceRef = null;
+    this.lastUpdatedVideoId = '';
     this.errorListeners = [];
     this.waitingForBufferListeners = [];
     this.seekableRangesListeners = [];
@@ -511,8 +517,7 @@ export class AvPlayerController {
   private selectBestVideo(streams: StreamInfo[], live: boolean): StreamInfo | undefined {
     const prefs = PlaybackPreferences.snapshot();
     const targetQuality = live ? prefs.mobileQuality : prefs.defaultQuality;
-    const showHighRes = prefs.showHighResolutions;
-    const maxHeight = this.resolveMaxHeight(targetQuality, showHighRes);
+    const maxHeight = this.resolveMaxHeight(targetQuality);
     const candidates = streams.filter(s => (s.height || this.heightFromQuality(s.quality)) <= maxHeight);
     const usable = candidates.length > 0 ? candidates : streams;
     return usable.slice().sort((a: StreamInfo, b: StreamInfo): number => {
@@ -537,12 +542,12 @@ export class AvPlayerController {
 
   private selectBestVideoEntry(entries: VideoEntry[]): VideoEntry | undefined {
     const prefs = PlaybackPreferences.snapshot();
-    const maxHeight = this.resolveMaxHeight(prefs.defaultQuality, prefs.showHighResolutions);
+    const maxHeight = this.resolveMaxHeight(prefs.defaultQuality);
     const candidate = entries.find(e => e.height <= maxHeight);
     return candidate || (entries.length > 0 ? entries[0] : undefined);
   }
 
-  private resolveMaxHeight(targetQuality: string, showHighRes: boolean): number {
+  private resolveMaxHeight(targetQuality: string): number {
     const cap: Record<string, number> = {
       'best': 9999,
       '1080p': 1080,
@@ -553,7 +558,7 @@ export class AvPlayerController {
       '144p': 144
     };
     const requested = cap[targetQuality] ?? 9999;
-    return showHighRes ? requested : Math.min(requested, 1080);
+    return requested;
   }
 
   private heightFromQuality(quality?: string): number {
@@ -774,7 +779,7 @@ export class AvPlayerController {
         return url;
       }
       const prefs = PlaybackPreferences.snapshot();
-      const maxHeight = this.resolveMaxHeight(prefs.mobileQuality || '480p', prefs.showHighResolutions);
+      const maxHeight = this.resolveMaxHeight(prefs.mobileQuality || '480p');
       const selected = variants
         .filter(v => (v.height || 0) <= maxHeight)
         .sort((a: HlsVariant, b: HlsVariant): number => (b.height || 0) - (a.height || 0) ||

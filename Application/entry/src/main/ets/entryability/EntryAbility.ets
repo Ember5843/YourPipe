@@ -41,7 +41,6 @@ export default class EntryAbility extends UIAbility {
           searchLanguage: ui.searchLanguage && ui.searchLanguage !== 'default' ? ui.searchLanguage : 'en-GB',
           defaultQuality: pb.defaultQuality,
           mobileQuality: pb.mobileQuality,
-          showHighResolutions: pb.showHighResolutions,
         };
       });
       // 注入 MPV 引擎配置提供者

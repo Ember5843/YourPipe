@@ -160,9 +160,10 @@ export struct VideoPlayerPage {
         logger.info(`${TAG} onPipStop while background → pause only`);
         session.controller.syncPause();
       } else {
+        // 前台关闭 PiP：仅释放会话。不调用 closePage()——进入 PiP 时（返回键路径）
+        // 播放页已被 navPathStack.pop() 弹出，此处再 pop 会多触发一次返回动作。
         logger.info(`${TAG} onPipStop while foreground → release session`);
         session.release();
-        this.actionHub.closePage();
       }
     };
 
@@ -703,8 +704,8 @@ export struct VideoPlayerPage {
       Column() {
         Column()
           .width(Const.WIDTH_FULL_PERCENT)
-          .height(this.statusBarHeight)
-          .visibility(this.isImmersive ? Visibility.None : Visibility.Visible)
+          .height(this.isImmersive ? 0 : this.statusBarHeight)
+          .animation({ duration: 300, curve: Curve.EaseInOut })
 
         Flex({
           direction: this.isWideLayout && !this.isFullLandscapeScreen

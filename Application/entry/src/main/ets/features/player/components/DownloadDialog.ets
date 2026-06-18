@@ -251,7 +251,8 @@ export struct DownloadDialog {
       }
       .width('100%')
     }
-    .width('90%')
+    .width('85%')
+    .constraintSize({ maxWidth: 460 })
     .backgroundColor($r('app.color.yourtube_bg_surface'))
     .borderRadius(24)
     .shadow(ShadowStyle.OUTER_DEFAULT_MD)

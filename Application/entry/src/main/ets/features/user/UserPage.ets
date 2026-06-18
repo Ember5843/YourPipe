@@ -26,6 +26,7 @@ const logger = AppLog.getInstance('UserPage');
 export struct UserPage {
   @Prop channel: SearchChannelItem;
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
+  @Consume('safeAreaTop') safeAreaTop: number = 0;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
 
@@ -1065,6 +1066,8 @@ export struct UserPage {
       Stack({ alignContent: Alignment.Top }) {
         Scroll(this.scrollerForScroll) {
           Column() {
+            // 顶部内容退避区域：避让状态栏 + 标题栏（与主页一致）
+            Row().width('100%').height(this.safeAreaTop + 56)
             this.UserInfoSection()
             Tabs({
               barPosition: BarPosition.Start
@@ -1120,6 +1123,7 @@ export struct UserPage {
         this.actionHub.closePage();
       },
       immersiveShadow: true,
+      avoidLayoutSafeArea: true,
       menus: [
         buildTitleMenu($r('sys.symbol.share'), $r('app.string.yt_action_share'), () => {
           this.handleShare();

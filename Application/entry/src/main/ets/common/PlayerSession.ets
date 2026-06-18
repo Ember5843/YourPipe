@@ -369,6 +369,13 @@ export class PlayerSession {
 
   private saveWatchHistory(): void {
     if (!this._watchVideoId) return;
+    // release()/forceReset() 链路上，controller 可能已被 releaseVideo(0) 释放、
+    // vm.currentTime 已被清零。强行落盘会把真实进度覆盖成 0。
+    const state = this._controller.playerState;
+    if (state === PlayerState.RELEASED || state === PlayerState.IDLE) {
+      logger.info(`${TAG} saveWatchHistory skipped: controller state=${state} (already released)`);
+      return;
+    }
     try {
       const progressSec = this._controller.vm.currentTime;
       const durationSec = this._controller.vm.durationTime;

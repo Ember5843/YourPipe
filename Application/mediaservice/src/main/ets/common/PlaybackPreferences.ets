@@ -13,8 +13,6 @@ export interface PlaybackPreferencesSnapshot {
   defaultQuality: string;
   /** 直播 / 受限场景下的清晰度上限。 */
   mobileQuality: string;
-  /** 是否允许 1080p 以上分辨率（关闭则在 1080p 处截顶）。 */
-  showHighResolutions: boolean;
 }
 
 export type PlaybackPreferencesProvider = () => PlaybackPreferencesSnapshot;
@@ -23,7 +21,6 @@ const DEFAULT_SNAPSHOT: PlaybackPreferencesSnapshot = {
   searchLanguage: 'en-GB',
   defaultQuality: 'best',
   mobileQuality: '480p',
-  showHighResolutions: false,
 };
 
 export class PlaybackPreferences {

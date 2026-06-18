@@ -24,6 +24,7 @@ const logger = AppLog.getInstance('PlaylistDetailPage');
 export struct PlaylistDetailPage {
   @Prop playlist: SearchPlaylistItem;
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
+  @Consume('safeAreaTop') safeAreaTop: number = 0;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
@@ -398,6 +399,8 @@ export struct PlaylistDetailPage {
       Stack({ alignContent: Alignment.Top }) {
         Scroll(this.scrollerForScroll) {
           Column() {
+            // 顶部内容退避区域：避让状态栏 + 标题栏（与主页一致）
+            Row().width('100%').height(this.safeAreaTop + 56)
             this.PlaylistInfoSection()
             this.PlaylistVideos()
           }
@@ -422,6 +425,7 @@ export struct PlaylistDetailPage {
         this.actionHub.closePage();
       },
       immersiveShadow: true,
+      avoidLayoutSafeArea: true,
       menus: this.isLocal() ? [] : [
         buildTitleMenu($r('sys.symbol.share'), $r('app.string.yt_action_share'), () => {
           this.handleShare();
