@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "description": "Code snippet validation index",
+  "snippets": [
+    {
+      "file": "02-Basic-Syntax/classes.md",
+      "section": "Declaring a Class",
+      "code_example": "class User { name: string = ''; age: number = 0; }",
+      "validated": true,
+      "validation_tool": "arkts-cli"
+    },
+    {
+      "file": "02-Basic-Syntax/interfaces.md",
+      "section": "Declaring an Interface",
+      "code_example": "interface IShape { getArea(): number; }",
+      "validated": true,
+      "validation_tool": "arkts-cli"
+    },
+    {
+      "file": "02-Basic-Syntax/functions.md",
+      "section": "Function Declaration",
+      "code_example": "function add(a: number, b: number): number { return a + b; }",
+      "validated": true,
+      "validation_tool": "arkts-cli"
+    },
+    {
+      "file": "02-Basic-Syntax/generics.md",
+      "section": "Generic Functions",
+      "code_example": "function identity<T>(arg: T): T { return arg; }",
+      "validated": true,
+      "validation_tool": "arkts-cli"
+    },
+    {
+      "file": "04-Concurrency/taskpool-introduction.md",
+      "section": "Task Creation",
+      "code_example": "let task = new taskpool.Task(func, arg);",
+      "validated": true,
+      "validation_tool": "arkts-cli"
+    }
+  ]
+}

@@ -1,0 +1,265 @@
+{
+  "version": "1.0.0",
+  "description": "ArkTS Language Guide document index",
+  "documents": [
+    {
+      "path": "arkts-language-guide/01-getting-started-with-arkts/arkts-overview.md",
+      "title": "ArkTS Overview",
+      "sections": ["Introduction", "Key Features", "Getting Started"],
+      "keywords": ["arkts", "overview", "introduction", "getting started", "harmonyos"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/classes.md",
+      "title": "Classes",
+      "sections": ["Declaring a Class", "Fields", "Creating Instances", "Methods", "Constructors", "Inheritance"],
+      "keywords": ["class", "field", "method", "constructor", "instance", "inheritance", "extends", "oop"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/interfaces.md",
+      "title": "Interfaces",
+      "sections": ["Declaring an Interface", "Implementing Interfaces", "Interface Properties", "Interface Methods"],
+      "keywords": ["interface", "implement", "contract", "type", "abstract", "declaration"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/functions.md",
+      "title": "Functions",
+      "sections": ["Function Declaration", "Parameters", "Return Types", "Arrow Functions", "Function Overloading"],
+      "keywords": ["function", "parameter", "return", "arrow", "overload", "callback", "lambda"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/generics.md",
+      "title": "Generics",
+      "sections": ["Generic Functions", "Generic Classes", "Generic Interfaces", "Generic Constraints"],
+      "keywords": ["generic", "type parameter", "constraint", "template", "reusable", "typeparam"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/enumerations.md",
+      "title": "Enumerations",
+      "sections": ["Numeric Enums", "String Enums", "Const Enums", "Enum Usage"],
+      "keywords": ["enum", "enumeration", "constant", "union", "literal", "const"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/inheritance.md",
+      "title": "Inheritance",
+      "sections": ["Class Inheritance", "Method Overriding", "Super Keyword", "Abstract Classes"],
+      "keywords": ["inheritance", "extends", "override", "super", "abstract", "polymorphism", "subclass"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/control-flow.md",
+      "title": "Control Flow",
+      "sections": ["If Statements", "Switch Statements", "Loops", "Break and Continue"],
+      "keywords": ["if", "else", "switch", "for", "while", "loop", "break", "continue", "condition"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/error-handling.md",
+      "title": "Error Handling",
+      "sections": ["Try-Catch", "Throw Statements", "Custom Errors", "Error Types"],
+      "keywords": ["try", "catch", "throw", "error", "exception", "handle", "finally"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/collection-types.md",
+      "title": "Collection Types",
+      "sections": ["Arrays", "Tuples", "Maps", "Sets"],
+      "keywords": ["array", "tuple", "map", "set", "collection", "iterable", "list"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/type-casting.md",
+      "title": "Type Casting",
+      "sections": ["Type Assertions", "Type Guards", "Instanceof", "As Operator"],
+      "keywords": ["cast", "assertion", "guard", "instanceof", "as", "type check", "conversion"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/advanced-operators.md",
+      "title": "Advanced Operators",
+      "sections": ["Spread Operator", "Destructuring", "Nullish Coalescing", "Optional Chaining"],
+      "keywords": ["operator", "spread", "destructuring", "nullish", "optional", "chaining"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/strings.md",
+      "title": "Strings",
+      "sections": ["String Literals", "Template Strings", "String Methods"],
+      "keywords": ["string", "template", "literal", "concatenation", "substring"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/initialization.md",
+      "title": "Initialization",
+      "sections": ["Variable Declaration", "Initialization Order", "Default Values"],
+      "keywords": ["initialization", "declaration", "let", "const", "var", "default"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/methods.md",
+      "title": "Methods",
+      "sections": ["Instance Methods", "Static Methods", "Accessor Methods"],
+      "keywords": ["method", "instance", "static", "getter", "setter", "accessor"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/properties.md",
+      "title": "Properties",
+      "sections": ["Instance Properties", "Static Properties", "Computed Properties"],
+      "keywords": ["property", "instance", "static", "computed", "field", "attribute"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/02-basic-syntax/concurrency.md",
+      "title": "Concurrency Basics",
+      "sections": ["Async Basics", "Promise Introduction", "Async Await"],
+      "keywords": ["concurrency", "async", "await", "promise", "asynchronous"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/03-common-library/arkts-json.md",
+      "title": "JSON Processing",
+      "sections": ["JSON Parse", "JSON Stringify", "JSON Types"],
+      "keywords": ["json", "parse", "stringify", "serialize", "deserialize", "object"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/03-common-library/xml-parsing.md",
+      "title": "XML Parsing",
+      "sections": ["XML Parser", "XML Structure", "XML Attributes"],
+      "keywords": ["xml", "parse", "element", "attribute", "node", "tag"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/03-common-library/xml-generation.md",
+      "title": "XML Generation",
+      "sections": ["XML Builder", "XML Serialization"],
+      "keywords": ["xml", "generate", "build", "serialize", "create"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/03-common-library/linear-container.md",
+      "title": "Linear Containers",
+      "sections": ["ArrayList", "LinkedList", "Deque", "Queue", "Stack"],
+      "keywords": ["arraylist", "linkedlist", "deque", "queue", "stack", "container", "linear"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/03-common-library/nonlinear-container.md",
+      "title": "Nonlinear Containers",
+      "sections": ["HashMap", "HashSet", "TreeMap", "TreeSet"],
+      "keywords": ["hashmap", "hashset", "treemap", "treeset", "container", "nonlinear", "map", "set"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/03-common-library/buffer.md",
+      "title": "Buffer",
+      "sections": ["Buffer Operations", "Buffer Encoding"],
+      "keywords": ["buffer", "binary", "encoding", "decode", "encode"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/04-concurrency/taskpool-introduction.md",
+      "title": "TaskPool Introduction",
+      "sections": ["TaskPool Overview", "Task Creation", "Task Execution", "Task Cancellation"],
+      "keywords": ["taskpool", "task", "concurrent", "parallel", "worker thread", "pool"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/04-concurrency/worker-introduction.md",
+      "title": "Worker Introduction",
+      "sections": ["Worker Overview", "Worker Creation", "Worker Communication", "Worker Lifecycle"],
+      "keywords": ["worker", "thread", "message", "postMessage", "background", "lifecycle"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/04-concurrency/async-concurrency-overview.md",
+      "title": "Async Concurrency Overview",
+      "sections": ["Promise", "Async/Await", "Concurrency Model"],
+      "keywords": ["async", "await", "promise", "asynchronous", "non-blocking", "concurrency"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/04-concurrency/sendable-guide.md",
+      "title": "Sendable Guide",
+      "sections": ["Sendable Objects", "Sendable Constraints", "Sendable Usage"],
+      "keywords": ["sendable", "transfer", "shared", "thread-safe", "concurrent"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/05-runtime/arkts-dynamic-import.md",
+      "title": "Dynamic Import",
+      "sections": ["Import Syntax", "Lazy Loading", "Module Resolution"],
+      "keywords": ["import", "dynamic", "lazy", "module", "load", "require"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/05-runtime/arkts-lazy-import.md",
+      "title": "Lazy Import",
+      "sections": ["Lazy Import Syntax", "Lazy Loading Benefits"],
+      "keywords": ["lazy", "import", "load", "defer", "on-demand"],
+      "verification_level": "snippet_validated"
+    },
+    {
+      "path": "arkts-language-guide/05-runtime/gc-introduction.md",
+      "title": "Garbage Collection",
+      "sections": ["GC Overview", "GC Algorithms", "Memory Management"],
+      "keywords": ["gc", "garbage", "collection", "memory", "heap", "cleanup"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/07-compilation-toolchain/bytecode-obfuscation.md",
+      "title": "Bytecode Obfuscation",
+      "sections": ["Obfuscation Overview", "Configuration", "Options"],
+      "keywords": ["obfuscation", "bytecode", "protect", "minify", "security", "proguard"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/07-compilation-toolchain/source-obfuscation.md",
+      "title": "Source Obfuscation",
+      "sections": ["Source Obfuscation Overview", "Configuration", "Best Practices"],
+      "keywords": ["obfuscation", "source", "protect", "minify", "security"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/09-migration-guide/01-typescript-to-arkts/typescript-to-arkts-migration-guide.md",
+      "title": "TypeScript to ArkTS Migration",
+      "sections": ["Migration Overview", "Syntax Differences", "Common Patterns", "Migration Steps"],
+      "keywords": ["migration", "typescript", "arkts", "convert", "upgrade", "ts", "port"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/09-migration-guide/02-other-languages-to-arkts/getting-started-with-arkts-for-java-programmers.md",
+      "title": "ArkTS for Java Programmers",
+      "sections": ["Java to ArkTS", "Key Differences", "Common Patterns"],
+      "keywords": ["java", "arkts", "migration", "programmer", "guide", "comparison"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/09-migration-guide/02-other-languages-to-arkts/getting-started-with-arkts-for-swift-programmers.md",
+      "title": "ArkTS for Swift Programmers",
+      "sections": ["Swift to ArkTS", "Key Differences", "Common Patterns"],
+      "keywords": ["swift", "arkts", "migration", "programmer", "guide", "comparison"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/08-coding-guide-and-practices/01-coding-style-guide/arkts-coding-style-guide.md",
+      "title": "ArkTS Coding Style Guide",
+      "sections": ["Naming Conventions", "Code Formatting", "Best Practices"],
+      "keywords": ["style", "guide", "convention", "formatting", "naming", "best practice"],
+      "verification_level": "doc_only"
+    },
+    {
+      "path": "arkts-language-guide/08-coding-guide-and-practices/02-performant-programming-practices/arkts-high-performance-programming.md",
+      "title": "High Performance Programming",
+      "sections": ["Performance Tips", "Optimization Techniques", "Memory Management"],
+      "keywords": ["performance", "optimization", "memory", "efficient", "fast", "tuning"],
+      "verification_level": "doc_only"
+    }
+  ]
+}
