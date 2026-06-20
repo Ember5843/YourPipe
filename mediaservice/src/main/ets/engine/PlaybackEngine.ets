@@ -11,6 +11,7 @@ export interface PlaybackState {
   isEnded: boolean;
   isLive: boolean;
   isSeekable: boolean;
+  isSystemPaused: boolean;
   currentTime: number;
   duration: number;
   playbackSpeed: number;

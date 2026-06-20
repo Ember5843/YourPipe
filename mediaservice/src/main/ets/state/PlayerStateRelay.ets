@@ -113,21 +113,42 @@ export class PlayerStateRelay {
     const playingChanged = this.prevIsPlaying !== state.isPlaying;
     const errorChanged = this.prevErrorMsg !== state.errorMsg && !!state.errorMsg;
 
-    if (readyChanged && state.isReady && sm.isOneOf(PlayerState.LOADING)) {
-      sm.transition(PlayerState.READY);
-    }
-    if (endedChanged && state.isEnded) {
-      sm.transition(PlayerState.COMPLETED);
-    }
+    // ── 进入 BUFFERING ──
     if (bufferingChanged && state.isBuffering &&
-      sm.isOneOf(PlayerState.PLAYING, PlayerState.READY)) {
+      sm.isOneOf(PlayerState.PLAYING, PlayerState.READY, PlayerState.PAUSED)) {
       sm.forceTransition(PlayerState.BUFFERING);
     }
+
+    // ── 退出 BUFFERING ──
+    if (bufferingChanged && !state.isBuffering &&
+      sm.isOneOf(PlayerState.BUFFERING)) {
+      sm.forceTransition(state.isPlaying ? PlayerState.PLAYING : PlayerState.PAUSED);
+    }
+
+    // ── 变为暂停（用户暂停 / 系统中断 / 缓冲结束但未播放）──
+    if (playingChanged && !state.isPlaying && !state.isEnded &&
+      sm.isOneOf(PlayerState.PLAYING, PlayerState.BUFFERING, PlayerState.READY, PlayerState.COMPLETED)) {
+      sm.transition(PlayerState.PAUSED);
+    }
+
+    // ── 变为播放（暂停后恢复 / 缓冲后恢复 / 完成重播）──
     if (playingChanged && state.isPlaying && !state.isBuffering &&
       sm.isOneOf(PlayerState.READY, PlayerState.PAUSED, PlayerState.BUFFERING,
         PlayerState.COMPLETED)) {
       sm.transition(PlayerState.PLAYING);
     }
+
+    // ── 首次就绪 ──
+    if (readyChanged && state.isReady && sm.isOneOf(PlayerState.LOADING)) {
+      sm.transition(PlayerState.READY);
+    }
+
+    // ── 播放结束 ──
+    if (endedChanged && state.isEnded) {
+      sm.transition(PlayerState.COMPLETED);
+    }
+
+    // ── 进入错误 ──
     if (errorChanged && state.errorMsg &&
       sm.isOneOf(PlayerState.LOADING, PlayerState.PLAYING, PlayerState.PAUSED,
         PlayerState.BUFFERING)) {

@@ -111,6 +111,15 @@ export class AvSessionManager {
       Logger.error(TAG, `unregister listeners failed: ${(e as BusinessError).message}`);
     }
     try {
+      // 先显式推送 STOP 状态再销毁，避免锁屏卡片残留"播放中"
+      if (this.session && this.currentMetadata) {
+        const stopState: avSession.AVPlaybackState = {
+          state: avSession.PlaybackState.PLAYBACK_STATE_STOP,
+          position: { elapsedTime: 0, updateTime: Date.now() },
+          speed: 1.0
+        };
+        this.session.setAVPlaybackState(stopState);
+      }
       await this.session.deactivate();
       await this.session.destroy();
       this.session = undefined;

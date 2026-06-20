@@ -1,11 +1,8 @@
-import { MdkPlayerController as MpvPlayerController, MediaStatus, MediaType, SeekFlag } from '@mediadevkit/libmdk-napi';
+import { MdkPlayerController as MpvPlayerController, MediaStatus, MediaType, SeekFlag, PlaybackState as NativePlaybackState } from '@mediadevkit/libmdk-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
 
 const TAG: string = '[PlayerLog][MpvPlaybackEngine]';
-
-const kStateStopped: number = 0;
-const kStatePlaying: number = 1;
 
 export class MpvPlaybackEngine implements PlaybackEngine {
   private initialized: boolean = false;
@@ -29,7 +26,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private hasError: boolean = false;
   private errorMsg: string = '';
   private lastErrorCategory: PlaybackErrorCategory = 'unknown';
-  private mpvPlaybackState: number = kStateStopped;
   private isLive: boolean = false;
   private playWhenReady: boolean = false;
   private loaded: boolean = false;
@@ -42,6 +38,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private currentSubtitleUrl: string = '';
   private lastKnownPositionMs: number = 0;
   private lastTimeEmitMs: number = 0;
+  private systemFocusPaused: boolean = false;
 
   // 保存配置供 load() 方法使用
   private engineConfig: EngineConfig = {};
@@ -192,7 +189,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.lastPositionMs = 0;
     this.lastDurationMs = 0;
     this.lastKnownPositionMs = 0;
-    this.mpvPlaybackState = kStateStopped;
     this.emitCurrentState();
 
     Logger.info(TAG, `load: startPos=${startPos.toFixed(2)}s isLive=${this.isLive} url=${this.sourceUrl.substring(0, 120)}`);
@@ -263,7 +259,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
     ctrl.pause();
-    this.mpvPlaybackState = kStateStopped;
     this.emitCurrentState();
   }
 
@@ -280,7 +275,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.isEnded = false;
     this.isBuffering = false;
     this.isSeeking = false;
-    this.mpvPlaybackState = kStateStopped;
     this.emitCurrentState();
   }
 
@@ -375,7 +369,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed || this.sourceUrl.length === 0) return;
     ctrl.play();
-    this.mpvPlaybackState = kStatePlaying;
     this.isEnded = false;
     this.emitCurrentState();
   }
@@ -466,8 +459,23 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       if (value > 0) {
         this.lastDurationMs = value;
       }
+    } else if (type === 10) {
+      this.handleFocusEvent(value);
     }
     this.emitCurrentState();
+  }
+
+  private handleFocusEvent(value: number): void {
+    const event = value & 0xFFFF;
+    const forceType = (value >> 16) & 0xFFFF;
+    // event: 0=PAUSE 1=RESUME 2=STOP 3=DUCK 4=UNDUCK
+    // forceType: INTERRUPT_FORCE 或 INTERRUPT_SHARE
+    if (event === 0 || event === 2) {
+      this.systemFocusPaused = true;
+    } else if (event === 1) {
+      this.systemFocusPaused = false;
+    }
+    Logger.info(TAG, `focusEvent: event=${event} forceType=${forceType} systemPaused=${this.systemFocusPaused}`);
   }
 
   private handleStatusUpdate(status: number): void {
@@ -496,15 +504,13 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
     if (ended) {
       this.playWhenReady = false;
-      this.mpvPlaybackState = kStateStopped;
     }
 
     if (invalid && !this.hasError) {
       this.hasError = true;
       this.errorMsg = '[mpv] playback error';
       this.lastErrorCategory = 'network';
-      this.mpvPlaybackState = kStateStopped;
-      this.playWhenReady = false;
+        this.playWhenReady = false;
       Logger.error(TAG, `playback error: status=0x${status.toString(16)}`);
     } else if (!invalid && this.hasError && (loading || loaded || prepared)) {
       this.hasError = false;
@@ -529,9 +535,15 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
 
     // 仅从 native 读取位置和时长（事件已更新，这里做兜底补偿）
-    // 不读 ctrl.getState() —— isPlaying 由本地 mpvPlaybackState 权威决定
     let posMs: number = this.lastPositionMs;
     let durMs: number = this.lastDurationMs;
+    // ★ isPlaying 改为从 native getState() 读取真实 mpv pause 状态。
+    // 旧实现用 this.mpvPlaybackState 当做 true，但以下路径都会绕过本地变量：
+    //   - OHAudio 焦点桥接：player_napi 跳过 ets 直接 set mpv pause 属性
+    //   - 外部 mpv 命令 / lua 脚本等
+    // Native 侧的 ctx.state 在每次 mpv pause 属性变化后由
+    // UpdateStatusFromObservedProperties 自动镜像维护，是唯一真相。
+    let isPlaying: boolean = false;
     if (ctrl !== null && !this.destroyed) {
       const nativePos: number = ctrl.getPosition();
       const nativeDur: number = ctrl.getDuration();
@@ -544,10 +556,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         durMs = nativeDur;
         this.lastDurationMs = nativeDur;
       }
+      // 无源时 native 返回 Stopped，避免误判为"正在播放"
+      isPlaying = this.sourceUrl.length > 0 && ctrl.getState() === NativePlaybackState.Playing;
     }
-
-    // isPlaying 由调用 play()/pause() 时设置的本地 mpvPlaybackState 权威决定
-    const isPlaying: boolean = this.mpvPlaybackState === kStatePlaying;
 
     // pendingSeekMs >= 0 时优先使用跳转目标位置（直到位置事件确认追上了目标，见 onMpvEvent type=1）
     const currentMs: number = (this.pendingSeekMs >= 0) ? this.pendingSeekMs : posMs;
@@ -562,6 +573,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       isEnded: this.isEnded,
       isLive: this.isLive,
       isSeekable: !this.isLive && durMs > 0,
+      isSystemPaused: this.systemFocusPaused,
       currentTime: currentMs > 0 ? currentMs / 1000 : 0,
       duration: durMs > 0 ? durMs / 1000 : 0,
       playbackSpeed: this.playbackSpeed,
@@ -641,7 +653,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.hasError = false;
     this.errorMsg = '';
     this.lastErrorCategory = 'unknown';
-    this.mpvPlaybackState = kStateStopped;
     this.playWhenReady = false;
     this.loaded = false;
     this.preparing = false;
@@ -650,6 +661,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.pendingSubtitleUrl = '';
     this.currentSubtitleUrl = '';
     this.lastKnownPositionMs = 0;
+    this.systemFocusPaused = false;
   }
 
   private describeError(err: Object): string {

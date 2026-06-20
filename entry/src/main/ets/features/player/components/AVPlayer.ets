@@ -18,7 +18,7 @@ import { ConfigurationConstant } from '@kit.AbilityKit';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
-import { AvPlayerController, VideoData, StreamInfo, PlayerState, VideoEntry, SubtitleTrack } from 'mediaservice';
+import { AvPlayerController, VideoData, StreamInfo, PlayerState, StateChangeListener, VideoEntry, SubtitleTrack } from 'mediaservice';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
@@ -74,15 +74,25 @@ export struct VideoPlayer {
   @State castDeviceName: string = '';
 
   /**
-   * controller.isPlaying 变化时，管理屏幕常亮与 UI 自动隐藏
+   * 状态机监听器：在 PLAYING/BUFFERING/READY 时保持屏幕常亮，
+   * 其余状态（PAUSED/COMPLETED/ERROR/IDLE/RELEASED）释放常亮，让系统正常息屏。
+   *
+   * 旧实现把 onPlayingChanged 写成 "@Watch" 风格但从未注册，
+   * 导致 setWindowKeepScreenOn 永远不会被调用、播放中息屏。
    */
-  private onPlayingChanged(isPlaying: boolean): void {
-    this.updateKeepScreenOn();
-    if (isPlaying) { this.scheduleHideControls(); } else { this.clearHideTimer(); }
-  }
+  private keepScreenListener: StateChangeListener = new KeepScreenOnStateListener(this);
 
-  private onBufferingChanged(isBuffering: boolean): void {
-    this.updateKeepScreenOn();
+  // 由 KeepScreenOnStateListener 调用，集中管理屏幕常亮策略。
+  public _onKeepScreenStateChanged(to: PlayerState): void {
+    const shouldKeepOn: boolean = to === PlayerState.PLAYING
+      || to === PlayerState.BUFFERING
+      || to === PlayerState.READY;
+    this.envService.setKeepScreenOn(shouldKeepOn);
+    if (shouldKeepOn) {
+      this.scheduleHideControls();
+    } else {
+      this.clearHideTimer();
+    }
   }
 
   private progressListener = (currentTime: number, durationTime: number) => {
@@ -112,11 +122,6 @@ export struct VideoPlayer {
     }
     this.hasError = errorMsg.length > 0;
   };
-
-  private updateKeepScreenOn(): void {
-    const shouldKeepOn = this.vm.isPlaying || this.vm.isBuffering;
-    this.envService.setKeepScreenOn(shouldKeepOn);
-  }
 
   private getErrorDisplay(errorMsg: string | undefined): string {
     const ctx = this.getUIContext().getHostContext();
@@ -397,6 +402,10 @@ export struct VideoPlayer {
     this.controller.addErrorListener(this.errorListener);
     this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
+    // 屏幕常亮：跟随播放状态机驱动
+    this.controller.addStateListener(this.keepScreenListener);
+    // 立即按当前 vm 状态同步一次（避免错过初始 PLAYING / 引擎已就绪）
+    this.envService.setKeepScreenOn(this.vm.isPlaying || this.vm.isBuffering);
 
     // 同步投屏状态
     this.isCasting = this.vm.isCasting;
@@ -1017,6 +1026,7 @@ export struct VideoPlayer {
         .fontSize(24).width(24).height(24)
         .fontColor([Color.White])
         .opacity(this.vm.isReady && this.hasStreams ? 1 : 0.4)
+        .enabled(this.vm.isReady && this.hasStreams && !this.vm.isBuffering)
         .onClick(() => this.togglePlayback())
 
       Text(secondToTime(Math.floor(
@@ -1126,6 +1136,7 @@ export struct VideoPlayer {
   }
 
   aboutToDisappear(): void {
+    this.controller.removeStateListener(this.keepScreenListener);
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
     this.controller.unsubscribeEnded(this.onEnded);
@@ -1137,5 +1148,15 @@ export struct VideoPlayer {
     clearTimeout(this.brightnessHideTimerId);
     clearTimeout(this.forwardHintTimerId);
     clearTimeout(this.backwardHintTimerId);
+  }
+}
+
+class KeepScreenOnStateListener implements StateChangeListener {
+  private readonly owner: VideoPlayer;
+  constructor(owner: VideoPlayer) {
+    this.owner = owner;
+  }
+  onStateChange(_from: PlayerState, to: PlayerState): void {
+    this.owner._onKeepScreenStateChanged(to);
   }
 }
