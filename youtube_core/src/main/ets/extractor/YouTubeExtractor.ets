@@ -303,8 +303,13 @@ export class YouTubeExtractor {
     // 2. Extract player response
     const playerResponse = this.extractPlayerResponse(html);
 
-    // 2.5 Check playability status
-    this.checkPlayabilityStatus(playerResponse.playabilityStatus);
+    // 2.5 Check playability status (登录态下跳过，由 extractVideoStreams 中 InnerTube 客户端决定)
+    const authManager = AuthSessionManager.getInstance();
+    const hasCookieAuth = authManager?.isSignedIn() === true && !!(authManager?.getCookieString());
+    const watchStatus = playerResponse.playabilityStatus?.status?.toUpperCase();
+    if (!hasCookieAuth || watchStatus !== 'LOGIN_REQUIRED') {
+      this.checkPlayabilityStatus(playerResponse.playabilityStatus);
+    }
 
     // 3. Extract metadata
     const videoInfo = this.extractMetadata(videoId, playerResponse);
@@ -436,7 +441,8 @@ export class YouTubeExtractor {
       }
       if (reasonLower.includes('payment') || reasonLower.includes('paid') || 
           reasonLower.includes('purchase') || reasonLower.includes('rent') || 
-          reasonLower.includes('buy')) {
+          reasonLower.includes('buy') || reasonLower.includes('members-only') ||
+          reasonLower.includes('members')) {
         throw new PaidContentException('Paid content');
       }
       if (reasonLower.includes('country') || reasonLower.includes('geo') || 
@@ -445,6 +451,25 @@ export class YouTubeExtractor {
       }
       if (reasonLower.includes('closed') || reasonLower.includes('terminated')) {
         throw new AccountTerminatedException('Account terminated');
+      }
+      if (reasonLower.includes('unavailable')) {
+        const subreason = this.extractTextFromRuns(
+          playabilityStatus.errorScreen?.playerErrorMessageRenderer?.subreason);
+        if (subreason && (subreason.toLowerCase().includes('country') || 
+            subreason.toLowerCase().includes('region') || 
+            subreason.toLowerCase().includes('available in your'))) {
+          throw new GeographicRestrictionException('Geo restricted');
+        }
+        if (subreason) {
+          throw new ContentNotAvailableException(subreason);
+        }
+        throw new ContentNotAvailableException(reason);
+      }
+      if (reasonLower.includes('this live event')) {
+        throw new LiveStreamOfflineException('Live event not started');
+      }
+      if (reasonLower.includes('premieres in')) {
+        throw new ContentNotAvailableException('Premiere not started');
       }
     }
 
@@ -628,6 +653,17 @@ export class YouTubeExtractor {
     const innertubePlayers = await this.fetchInnertubePlayer(html, videoId);
     this.cachedInnertubePlayers = innertubePlayers;
 
+    // 用主客户端的 playabilityStatus 覆盖 watch 页面（登录态下的匿名检查不可靠）
+    const authManager = AuthSessionManager.getInstance();
+    const hasCookieAuth = authManager?.isSignedIn() === true && !!(authManager?.getCookieString());
+    const primaryPr = hasCookieAuth ? innertubePlayers.safari : innertubePlayers.android;
+    if (primaryPr?.playabilityStatus) {
+      this.checkPlayabilityStatus(primaryPr.playabilityStatus);
+    } else if (!this.cachedAudioStreams.length && !this.cachedVideoOnlyStreams.length) {
+      // 主客户端无响应 + 还没有缓存的流 → 保底抛异常（否则后面会出 SABR-only 检测）
+      logger.warn('[STREAM_DEBUG] Primary InnerTube client returned no playabilityStatus and no cached streams');
+    }
+
     // Extract streaming data from used clients (Safari when logged in, Android otherwise)
     this.safariStreamingData = innertubePlayers.safari?.streamingData;
     this.androidStreamingData = innertubePlayers.android?.streamingData;
@@ -753,28 +789,46 @@ export class YouTubeExtractor {
   async extractVideoStreams(videoId: string): Promise<VideoInfo> {
     logger.info(`Extracting video streams for: ${videoId}`);
 
-    const html = await this.fetchWatchPage(videoId);
+    const authManager = AuthSessionManager.getInstance();
+    const hasCookieAuth = authManager?.isSignedIn() === true && !!(authManager?.getCookieString());
+
+    // 同时发起 watch 页面请求和（非登录态下）visitorData 请求
+    const watchPagePromise = this.fetchWatchPage(videoId);
+    const visitorPromise = !hasCookieAuth ? this.getAndroidVisitorData() : Promise.resolve(undefined);
+
+    const html = await watchPagePromise;
+    const androidVisitor = await visitorPromise;
+
     const watchPlayerResponse = this.extractPlayerResponse(html);
 
-    // Check playability before attempting stream extraction
-    this.checkPlayabilityStatus(watchPlayerResponse.playabilityStatus);
+    const watchStatus = watchPlayerResponse.playabilityStatus?.status?.toUpperCase();
+    if (!hasCookieAuth || watchStatus !== 'LOGIN_REQUIRED') {
+      this.checkPlayabilityStatus(watchPlayerResponse.playabilityStatus);
+    } else {
+      logger.info(`[STREAM_DEBUG] Logged-in user, skipping playability check on anonymous watch page (status=${watchStatus})`);
+    }
 
-    // 先提取元数据（确保即使后续流程失败，元数据也已就绪）
-    const videoInfo = this.extractMetadata(videoId, watchPlayerResponse);
-    videoInfo.playerResponse = watchPlayerResponse;
+    // 元数据提取和流提取可以并行——extractMetadata 只读 watchPlayerResponse，
+    // ensureStreamsAreCached 也依赖 html + watchPlayerResponse，两者无竞态。
+    const [videoInfo] = await Promise.all([
+      Promise.resolve().then(() => {
+        const meta = this.extractMetadata(videoId, watchPlayerResponse);
+        meta.playerResponse = watchPlayerResponse;
+        return meta;
+      }),
+      this.ensureStreamsAreCached(videoId, html, watchPlayerResponse).then(() => {
+        // 字幕提取和 deobfuscateManifestUrl 可以等流提取完成后再做，
+        // 但为了保持代码最小改动，放在这里继续做
+      })
+    ]);
 
-    // Extract streams using ensureStreamsAreCached() pattern (multi-client, batch deobfuscation)
-    await this.ensureStreamsAreCached(videoId, html, watchPlayerResponse);
     videoInfo.streams = [
       ...this.cachedAudioStreams,
       ...this.cachedVideoStreams,
       ...this.cachedVideoOnlyStreams,
     ];
 
-    // 提取字幕轨道 —— 单一提取点。
-    // watch HTML 的 ytInitialPlayerResponse.captions 在反爬下经常被裁剪（baseUrl 为空甚至整个子树缺失）。
-    // InnerTube /player（android-vr / safari）的响应里 captions 子树更完整，优先用 selectBestPlayerResponse 选出的 best PR；
-    // 若 best PR 抽到 0 条则退回 watch PR 兜底。
+    // 字幕提取——不阻塞播放启动，但当前接口合约要求一并返回
     let captionsSource: PlayerResponse = watchPlayerResponse;
     if (this.cachedInnertubePlayers) {
       const bestPr = this.selectBestPlayerResponse(videoId, watchPlayerResponse, this.cachedInnertubePlayers);
@@ -791,7 +845,6 @@ export class YouTubeExtractor {
     videoInfo.playerResponse = captionsSource;
     logger.info(`[SUBTITLE_EXTRACT] final tracks=${videoInfo.subtitleTracks.length} source=${captionsSource === watchPlayerResponse ? 'watch' : 'best-pr'}`);
 
-    // Extract and deobfuscate manifest URLs
     const hlsRaw = this.getHlsManifestUrlFromStreamingData();
     if (hlsRaw) {
       videoInfo.hlsUrl = await this.deobfuscateManifestUrl(hlsRaw);

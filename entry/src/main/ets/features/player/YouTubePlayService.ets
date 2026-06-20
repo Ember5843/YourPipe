@@ -353,11 +353,32 @@ export class YouTubePlayService {
     }
 
     const errorMsg = error.message?.toLowerCase() || '';
-    if (errorMsg.includes('network') || errorMsg.includes('连接')) {
+    const errorName = error.name?.toLowerCase() || '';
+    // HttpError from HttpDownloader (@kit.NetworkKit http module)
+    // http 模块 BusinessError.code 在 message 中的格式：{"code":2300028,"message":"Timeout was reached"}
+    if (errorName === 'httperror') {
+      if (errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('2300009')) {
+        return YouTubeErrorCode.CONTENT_NOT_AVAILABLE;
+      }
+      if (errorMsg.includes('429')) {
+        return YouTubeErrorCode.NETWORK_ERROR;
+      }
       return YouTubeErrorCode.NETWORK_ERROR;
     }
-    if (errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+    // RCP 模块 (@kit.RemoteCommunicationKit) BusinessError 错误码
+    if (errorMsg.includes('1007900028') || errorMsg.includes('2300028') ||
+        errorMsg.includes('timeout')) {
       return YouTubeErrorCode.TIMEOUT;
+    }
+    // 网络连接失败类错误：DNS 解析失败、连接被拒绝、连接重置
+    if (errorMsg.includes('2300006') || errorMsg.includes('2300007')) {
+      return YouTubeErrorCode.NETWORK_ERROR;
+    }
+    // 通用网络错误关键词
+    if (errorMsg.includes('network') || errorMsg.includes('连接') ||
+        errorMsg.includes('econnrefused') || errorMsg.includes('econnreset') ||
+        errorMsg.includes('enotfound') || errorMsg.includes('socket')) {
+      return YouTubeErrorCode.NETWORK_ERROR;
     }
 
     return YouTubeErrorCode.UNKNOWN_ERROR;
@@ -439,7 +460,7 @@ export class YouTubePlayService {
           isRetryable = false;
         } else {
           message = $r('app.string.yt_error_load_video');
-          isRetryable = true;
+          isRetryable = false;
         }
         break;
       default:

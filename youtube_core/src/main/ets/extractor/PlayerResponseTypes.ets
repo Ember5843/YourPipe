@@ -432,6 +432,7 @@ export interface ErrorScreen {
 
 export interface PlayerErrorMessageRenderer {
   reason?: TextRuns;
+  subreason?: TextRuns;
   thumbnail?: ThumbnailData;
   icon?: Icon;
 }
