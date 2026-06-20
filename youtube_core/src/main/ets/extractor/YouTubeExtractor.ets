@@ -808,19 +808,13 @@ export class YouTubeExtractor {
       logger.info(`[STREAM_DEBUG] Logged-in user, skipping playability check on anonymous watch page (status=${watchStatus})`);
     }
 
-    // 元数据提取和流提取可以并行——extractMetadata 只读 watchPlayerResponse，
-    // ensureStreamsAreCached 也依赖 html + watchPlayerResponse，两者无竞态。
-    const [videoInfo] = await Promise.all([
-      Promise.resolve().then(() => {
-        const meta = this.extractMetadata(videoId, watchPlayerResponse);
-        meta.playerResponse = watchPlayerResponse;
-        return meta;
-      }),
-      this.ensureStreamsAreCached(videoId, html, watchPlayerResponse).then(() => {
-        // 字幕提取和 deobfuscateManifestUrl 可以等流提取完成后再做，
-        // 但为了保持代码最小改动，放在这里继续做
-      })
-    ]);
+    // 元数据提取和流提取并行——extractMetadata 是纯同步 CPU 操作，
+    // ensureStreamsAreCached 包含 HTTP 请求，两者不共用可变状态。
+    // 先启动流提取（不 await），同时同步提取元数据，再 await 流提取完成。
+    const streamsPromise = this.ensureStreamsAreCached(videoId, html, watchPlayerResponse);
+    const videoInfo = this.extractMetadata(videoId, watchPlayerResponse);
+    videoInfo.playerResponse = watchPlayerResponse;
+    await streamsPromise;
 
     videoInfo.streams = [
       ...this.cachedAudioStreams,

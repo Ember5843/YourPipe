@@ -101,6 +101,7 @@ struct Index {
   @Provide('safeAreaBottom') safeAreaBottom: number = 0;
   @State topSafeHeight: number = 0;
   @State bottomSafeHeight: number = 0;
+  @State naviIndicatorHeight: number = 0;
   @State activeTabIndex: number = 0;
   @State navPathStack: NavPathStack = new NavPathStack();
   private tabsController: HdsTabsController = new HdsTabsController();
@@ -413,12 +414,17 @@ struct Index {
         this.bottomSafeHeight = this.getUIContext().px2vp(avoidArea.bottomRect.height);
         this.safeAreaBottom = this.bottomSafeHeight;
 
+        const naviArea = windowClass.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
+        this.naviIndicatorHeight = this.getUIContext().px2vp(naviArea.bottomRect.height);
+
         windowClass.on('avoidAreaChange', (data) => {
           if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
             this.topSafeHeight = this.getUIContext().px2vp(data.area.topRect.height);
             this.safeAreaTop = this.topSafeHeight;
             this.bottomSafeHeight = this.getUIContext().px2vp(data.area.bottomRect.height);
             this.safeAreaBottom = this.bottomSafeHeight;
+          } else if (data.type === window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
+            this.naviIndicatorHeight = this.getUIContext().px2vp(data.area.bottomRect.height);
           }
         });
       } catch (exception) {
@@ -1208,20 +1214,13 @@ struct Index {
 
   private buildHdsTabsFloatingStyle(): HdsTabsFloatingStyle {
     const base: HdsTabsFloatingStyle = {
-      barWidth: {
-        smallWidth: 312,
-        mediumWidth: 360,
-        largeWidth: 420
-      },
-      barSideMargin: 0,
-      barBottomMargin: Math.max(this.bottomSafeHeight, 12),
-      adaptToHandedness: true,
-      lightColor: this.THEME_COLOR,
-      thermoCtrl: true
+      barBottomMargin: this.naviIndicatorHeight > 0 ? this.naviIndicatorHeight :
+        $r('sys.float.padding_level8'),
+      systemMaterialEffect: {
+        materialType: hdsMaterial.MaterialType.IMMERSIVE,
+        materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+      }
     };
-    if (this.immersiveMaterialEffect) {
-      base.systemMaterialEffect = this.immersiveMaterialEffect;
-    }
     return base;
   }
 
