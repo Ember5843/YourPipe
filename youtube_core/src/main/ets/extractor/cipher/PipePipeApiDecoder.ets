@@ -1,5 +1,6 @@
 import { http } from '@kit.NetworkKit';
 import { YTCoreLogger } from '../../common/YTCoreLogger';
+import { ApiConfig } from './ApiConfig';
 
 const logger = YTCoreLogger.getInstance('PipePipeApiDecoder');
 
@@ -37,7 +38,6 @@ interface HttpHeaders {
 }
 
 export class PipePipeApiDecoder {
-  private static readonly DECODE_URL = 'https://api.pipepipe.dev/decoder/decode';
   private static readonly TTL_MS = 24 * 60 * 60 * 1000;
 
   private static readonly REQUEST_HEADERS: HttpHeaders = {
@@ -49,6 +49,13 @@ export class PipePipeApiDecoder {
 
   private static sigCache: Map<string, string> = new Map();
   private static nCache: Map<string, string> = new Map();
+
+  /**
+   * 是否正在使用本地解密服务
+   */
+  static isUsingLocalApi(): boolean {
+    return ApiConfig.isUsingLocalApi();
+  }
 
   /**
    * Inject locally-extracted player metadata into the cache.
@@ -105,23 +112,27 @@ export class PipePipeApiDecoder {
       return result;
     }
 
-    let url = `${PipePipeApiDecoder.DECODE_URL}?player=${encodeURIComponent(playerId)}`;
+    const decodeUrl: string = ApiConfig.getDecodeUrl();
+    let url: string = decodeUrl + '?player=' + encodeURIComponent(playerId);
     if (uncachedNs.length > 0) {
-      url += `&n=${uncachedNs.map(encodeURIComponent).join(',')}`;
+      url += '&n=' + uncachedNs.map(encodeURIComponent).join(',');
     }
     if (uncachedSigs.length > 0) {
-      url += `&sig=${uncachedSigs.map(encodeURIComponent).join(',')}`;
+      url += '&sig=' + uncachedSigs.map(encodeURIComponent).join(',');
     }
 
-    logger.info(`decodeBatch: sigs=${uncachedSigs.length}/${sigs.length} n=${uncachedNs.length}/${nParams.length}`);
+    const apiMode: string = ApiConfig.isUsingLocalApi() ? 'LOCAL' : 'REMOTE';
+    logger.info('decodeBatch [' + apiMode + ']: sigs=' + uncachedSigs.length + '/' + sigs.length + ' n=' + uncachedNs.length + '/' + nParams.length);
 
     const httpRequest = http.createHttp();
     try {
+      // 本地 API 超时更短，远程 API 保持原值
+      const timeout = ApiConfig.isUsingLocalApi() ? 30000 : 15000;
       const response = await httpRequest.request(url, {
         method: http.RequestMethod.GET,
         header: PipePipeApiDecoder.REQUEST_HEADERS,
-        connectTimeout: 15000,
-        readTimeout: 15000,
+        connectTimeout: timeout,
+        readTimeout: timeout,
       });
 
       if (response.responseCode !== 200) {

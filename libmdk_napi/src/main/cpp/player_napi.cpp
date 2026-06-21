@@ -910,31 +910,40 @@ void ApplyColorSpace(PlayerContext& ctx, int32_t colorSpace)
                  colorSpace, trc, prim);
 }
 
-// Push the current XComponent surface size to mpv's OHOS VO. mpv reads
-// "ohos-surface-size" (WxH) as the authoritative render size; updating it makes
-// the VO reconfigure to the new geometry. Without this the video stays at its
-// initial size (e.g. pinned to the top-left corner) when the XComponent grows,
-// such as when entering fullscreen. The reconfigure also re-tags the surface
-// HDR (vo_ohos_reset_color_state), so HDR survives the resize.
+// Push the current XComponent surface size to mpv's OHOS VO.
+//
+// The project's AVPlayer uses an inline XComponent (no libraryname, no
+// setXComponentSurfaceRect pinning) sized by .aspectRatio(); when it grows
+// (e.g. entering fullscreen) the surface buffer geometry does NOT change in
+// lock-step, and the rebuilt libmpv.so (GPU-only render path) no longer
+// auto-detects the growth via VOCTRL_CHECK_EVENTS — its ohos_control returns
+// VO_NOTIMPL for everything. So without explicitly pushing the new WxH here,
+// the VO keeps rendering at the initial (small) geometry and the video lands
+// pinned to the top-left corner of the now-larger surface.
+//
+// We set the run-time property "ohos-surface-size" (the property twin of the
+// ohos_surface_size m_geometry option, parallel to android_surface_size).
+// vo_ohos_surface_size() gives this option priority over GET_BUFFER_GEOMETRY,
+// so the VO picks it up on the next reconfig/resize tick and reconfigures the
+// Vulkan swapchain to the new dimensions. This mirrors how the official
+// Android embedding keeps mpv in sync with SurfaceView layout changes.
 void ApplySurfaceSize(PlayerContext& ctx)
 {
-    // Intentionally a no-op for the render size now.
-    //
-    // The render area is decoupled in the ArkTS layer: MdkPlayerView pins the
-    // XComponent surface buffer to the video's native resolution via
-    // setXComponentSurfaceRect, and the compositor scales that fixed buffer to
-    // whatever display size the component takes. So the authoritative surface
-    // size is always the real buffer geometry, which mpv reads via
-    // GET_BUFFER_GEOMETRY in vo_ohos_surface_size; ohos_control polls that on
-    // VOCTRL_CHECK_EVENTS and reconfigures only on a genuine surface change
-    // (e.g. rotation / surface recreation).
-    //
-    // We must NOT push ohos-surface-size here: that option takes precedence over
-    // GET_BUFFER_GEOMETRY, so a stale component-size value would override the
-    // real (pinned) buffer size and desync the render geometry. Kept as a
-    // function so the OnSurfaceChanged / SetVideoSurfaceSize call sites stay
-    // intact and documented.
-    (void)ctx;
+    if (!ctx.mpv || ctx.surfaceWidth <= 0 || ctx.surfaceHeight <= 0) {
+        return;
+    }
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%dx%d", ctx.surfaceWidth, ctx.surfaceHeight);
+    if (ctx.initialized) {
+        LogMpvError("ApplySurfaceSize set ohos-surface-size",
+                    Mpv().set_property_string(ctx.mpv, "ohos-surface-size", buf));
+    } else {
+        LogMpvError("ApplySurfaceSize set ohos-surface-size option",
+                    Mpv().set_option_string(ctx.mpv, "ohos-surface-size", buf));
+    }
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                 "ApplySurfaceSize: %{public}dx%{public}d -> %{public}s",
+                 ctx.surfaceWidth, ctx.surfaceHeight, buf);
 }
 
 void ApplyWindowOption(PlayerContext& ctx)
@@ -1106,6 +1115,7 @@ void DestroyMpv(PlayerContext& ctx)
 
 void SetPause(PlayerContext& ctx, bool pause)
 {
+    ctx.paused.store(pause);
     ctx.state.store(pause ? kStatePaused : kStatePlaying);
     PostCommand(ctx, [pause](PlayerContext& workerCtx) {
         if (!EnsureMpv(workerCtx)) {
