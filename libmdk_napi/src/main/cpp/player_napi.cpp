@@ -740,6 +740,7 @@ PlayerContext* FindActiveAudioPlayer()
 
 // 前向声明：HandleFocusEventLocked 用到的 helper 在本文件后面定义。
 void SetMpvFlagProperty(PlayerContext& ctx, const char* property, int value, const char* action);
+void SetPause(PlayerContext& ctx, bool pause);
 
 void HandleFocusEventLocked(PlayerContext& ctx, int event, int force_type)
 {
@@ -756,21 +757,25 @@ void HandleFocusEventLocked(PlayerContext& ctx, int event, int force_type)
         if (!ctx.paused.load()) {
             ctx.autoPausedBySystem.store(true);
         }
-        SetMpvFlagProperty(ctx, "pause", 1, "focus->pause");
+        // 走 SetPause（同步写 ctx.paused/state + 异步推 mpv），与用户主动暂停统一路径。
+        // 旧实现只调 SetMpvFlagProperty，mpv property observer 异步触发前 ctx.state 仍为
+        // Playing，ets 收到焦点事件立刻 buildState 会读到错误的 isPlaying=true，造成
+        // UI/锁屏卡片短暂闪烁。
+        SetPause(ctx, true);
         break;
     }
     case OHAUDIO_FOCUS_STOP: {
         // 永久失去焦点（其他音乐/视频应用抢占）：不设 autoPausedBySystem，
         // 后续即使意外收到 RESUME 也不会自动恢复，符合官方规范"需用户主动触发"。
         // 系统已强制停止音频流，这里仅同步 mpv 暂停状态。
-        SetMpvFlagProperty(ctx, "pause", 1, "focus->stop");
+        SetPause(ctx, true);
         break;
     }
     case OHAUDIO_FOCUS_RESUME: {
         // 仅恢复"曾经被系统暂停"的播放，不动用户主动暂停 / 永久失焦的状态。
         if (ctx.autoPausedBySystem.load()) {
             ctx.autoPausedBySystem.store(false);
-            SetMpvFlagProperty(ctx, "pause", 0, "focus->resume");
+            SetPause(ctx, false);
         }
         // 顺带清掉残留的 duck（极少数情况下系统会跳过 UNDUCK）
         if (ctx.duckActive.load()) {
@@ -808,18 +813,26 @@ void DispatchFocusEvent(int event, int force_type)
     OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv-focus",
                  "dispatch event=%{public}d forceType=%{public}d", event, force_type);
 
-    PlayerContext* ctx = nullptr;
+    // tsfn 必须在持锁期间复制：锁释放后 player 可能被销毁，裸指针 ctx 会变野指针，
+    // 这里直接读 tsfn 句柄即可（napi_threadsafe_function 自身是线程安全的，调用时
+    // ArkTS 侧只要句柄已 release 就会被忽略）。
+    napi_threadsafe_function tsfn = nullptr;
     {
         std::lock_guard<std::mutex> lock(gMutex);
-        ctx = FindActiveAudioPlayer();
+        PlayerContext* ctx = FindActiveAudioPlayer();
         if (!ctx) {
             return;
         }
         HandleFocusEventLocked(*ctx, event, force_type);
+        tsfn = ctx->tsfn;
+    }
+    if (!tsfn) {
+        return;
     }
     // 广播给 ets：高 16 位 force_type，低 16 位 event，便于 ets 做 UI 同步 / 提示等。
     int64_t combined = (static_cast<int64_t>(force_type) << 16) | static_cast<int64_t>(event);
-    PushEvent(*ctx, kEventFocus, combined);
+    auto* evt = new TsfnEvent{kEventFocus, combined};
+    napi_call_threadsafe_function(tsfn, evt, napi_tsfn_nonblocking);
 }
 
 }  // namespace
