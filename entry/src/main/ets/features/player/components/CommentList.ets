@@ -11,6 +11,7 @@ const logger = AppLog.getInstance('CommentList');
 
 @Component
 export struct CommentList {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Prop @Watch('onVideoIdChanged') videoId: string;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @State comments: CommentItem[] = [];
@@ -178,7 +179,7 @@ export struct CommentList {
   @Builder
   LoadingBuilder() {
     LoadingProgress()
-      .color($r('app.color.yourtube_theme_primary'))
+      .color(this.themePrimary)
       .width(24)
       .height(24)
   }
@@ -261,7 +262,7 @@ export struct CommentList {
         if (item.replyCount > 0) {
           Text(`${item.replyCount} 条回复`)
             .fontSize(12)
-            .fontColor($r('app.color.yourtube_theme_primary'))
+            .fontColor(this.themePrimary)
             .fontWeight(FontWeight.Medium)
             .onClick(() => {
               this.pageInfo.pushPathByName('CommentReplyPage', item);

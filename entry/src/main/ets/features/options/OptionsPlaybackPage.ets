@@ -17,11 +17,12 @@ interface OptionsPlaybackPageParams {
 
 @Component
 export struct OptionsPlaybackPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
 
   @Prop params: OptionsPlaybackPageParams = {
-    themeColor: $r('app.color.yourtube_theme_primary'),
+    themeColor: '#F1680D',
     updatePlaybackConfig: () => {},
     updateUiConfig: () => {},
     getQualityDisplay: (quality) => quality

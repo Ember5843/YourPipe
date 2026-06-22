@@ -11,6 +11,7 @@ function isActiveStatus(status: DownloadStatus): boolean {
 
 @Component
 export struct DownloadPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @StorageLink('downloadTasks') tasks: DownloadTask[] = [];
 
   build() {
@@ -51,6 +52,7 @@ export struct DownloadPage {
 
 @Component
 struct DownloadTaskRow {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @ObjectLink task: DownloadTask;
   private downloadManager: DownloadManager = DownloadManager.getInstance();
   @State exporting: boolean = false;
@@ -78,7 +80,7 @@ struct DownloadTaskRow {
         if (this.task.status === DownloadStatus.COMPLETED) {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
             .fontSize(18)
-            .fontColor([$r('app.color.yourtube_theme_primary')])
+            .fontColor([this.themePrimary])
             .position({ x: 4, y: 4 })
         } else if (this.task.status === DownloadStatus.FAILED) {
           SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
@@ -109,7 +111,7 @@ struct DownloadTaskRow {
         Text(this.task.title)
           .fontSize(14)
           .fontColor(isActiveStatus(this.task.status)
-            ? $r('app.color.yourtube_theme_primary')
+            ? this.themePrimary
             : $r('app.color.yourtube_text_primary'))
           .fontWeight(FontWeight.Medium)
           .maxLines(2)
@@ -172,7 +174,7 @@ struct DownloadTaskRow {
       if (this.task.status === DownloadStatus.COMPLETED) {
         SymbolGlyph($r('sys.symbol.checkmark'))
           .fontSize(16)
-          .fontColor([$r('app.color.yourtube_theme_primary')])
+          .fontColor([this.themePrimary])
       } else if (this.task.status === DownloadStatus.FAILED) {
         SymbolGlyph($r('sys.symbol.xmark'))
           .fontSize(16)
@@ -258,7 +260,7 @@ struct DownloadTaskRow {
       return '#FF4444';
     }
     if (this.task.status === DownloadStatus.COMPLETED || isActiveStatus(this.task.status)) {
-      return $r('app.color.yourtube_theme_primary');
+      return this.themePrimary;
     }
     return $r('app.color.yourtube_text_hint');
   }

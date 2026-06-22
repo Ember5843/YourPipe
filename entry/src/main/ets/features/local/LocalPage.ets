@@ -34,6 +34,7 @@ const SYMBOL_FONT_SIZE: number = 16;
 
 @Component
 export struct LocalPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onSwitchOuterTab: (index: number) => void = (_index: number) => {};
   @StorageLink('watchHistory') history: WatchHistoryItem[] = [];
   /** 当前长按选中要操作的条目，用于驱动 bindContextMenu 显示 */
@@ -85,7 +86,7 @@ export struct LocalPage {
             .fontColor([$r('sys.color.font_primary')]),
           content: $r('app.string.yt_action_delete_record')
         })
-          .contentFontColor($r('app.color.yourtube_theme_primary'))
+          .contentFontColor(this.themePrimary)
           .onClick(() => {
             if (this.contextMenuItem) {
               this.deleteItem(this.contextMenuItem.videoId);
@@ -147,7 +148,7 @@ export struct LocalPage {
             Row() {
               Row()
                 .height(3)
-                .backgroundColor($r('app.color.yourtube_theme_primary'))
+                .backgroundColor(this.themePrimary)
                 .layoutWeight(Math.min(item.progressSec / item.durationSec, 1))
               Row()
                 .height(3)
@@ -252,7 +253,7 @@ export struct LocalPage {
                       message: $r('app.string.yt_confirm_clear_history'),
                       primaryButton: {
                         value: $r('app.string.yt_action_clear'),
-                        fontColor: $r('app.color.yourtube_theme_primary'),
+                        fontColor: this.themePrimary,
                         action: () => { this.clearAll(); }
                       },
                       secondaryButton: {
@@ -354,14 +355,14 @@ export struct LocalPage {
       Text(this.tabTitles[index])
         .fontSize(16)
         .fontColor(this.currentTabIndex === index
-          ? $r('app.color.yourtube_theme_primary')
+          ? this.themePrimary
           : $r('app.color.yourtube_text_secondary'))
         .fontWeight(this.currentTabIndex === index ? FontWeight.Medium : FontWeight.Normal)
         .margin({ top: 12, bottom: 6 })
       Divider()
         .width(36)
         .strokeWidth(2)
-        .color($r('app.color.yourtube_theme_primary'))
+        .color(this.themePrimary)
         .opacity(this.currentTabIndex === index ? 1 : 0)
     }
   }

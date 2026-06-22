@@ -23,6 +23,7 @@ const logger = AppLog.getInstance('SearchPage');
 @Preview
 @Component
 export struct SearchPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
@@ -43,7 +44,6 @@ export struct SearchPage {
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   private isProgrammaticUpdate: boolean = false;
 
-  private readonly THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
   private readonly SUGGESTION_DEBOUNCE_MS: number = 280;
   private readonly MAX_SUGGESTIONS: number = 12;
   private readonly GRID_GUTTER: number = 8;
@@ -186,7 +186,7 @@ export struct SearchPage {
         .padding({left:8})
       Checkbox({ name: key })
         .select(this.selectedOption === key)
-        .selectedColor(this.THEME_COLOR)
+        .selectedColor(this.themePrimary)
         .onChange((value: boolean) => {
           if (this.selectedOption === key) {
             // 点击已选中的选项，保持弹窗打开，不做任何操作
@@ -490,7 +490,7 @@ export struct SearchPage {
       } else if (this.isSuggesting && this.suggestions.length === 0) {
         Row() {
           LoadingProgress()
-            .color($r('app.color.yourtube_theme_primary'))
+            .color(this.themePrimary)
             .width(30)
             .height(30)
         }
@@ -548,7 +548,7 @@ export struct SearchPage {
       if (this.isSearching && this.results.length === 0) {
         Row() {
           LoadingProgress()
-            .color($r('app.color.yourtube_theme_primary'))
+            .color(this.themePrimary)
             .width(36)
             .height(36)
         }
@@ -640,7 +640,7 @@ export struct SearchPage {
                  if (this.isLoadingMore) {
                    Row() {
                      LoadingProgress()
-                       .color($r('app.color.yourtube_theme_primary'))
+                       .color(this.themePrimary)
                        .width(30)
                        .height(30)
                    }
@@ -701,7 +701,7 @@ export struct SearchPage {
                  ListItem() {
                    Row() {
                      LoadingProgress()
-                       .color($r('app.color.yourtube_theme_primary'))
+                       .color(this.themePrimary)
                        .width(30)
                        .height(30)
                    }
@@ -749,7 +749,7 @@ export struct SearchPage {
       })
       .searchButton($r('app.string.yt_placeholder_search'), {
         fontSize: 16,
-        fontColor: this.THEME_COLOR,
+        fontColor: this.themePrimary,
         autoDisable: false
       })
       .onFocus(() => {

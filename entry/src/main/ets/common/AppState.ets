@@ -1,6 +1,7 @@
 import { AppLog } from './AppLog';
 import { PreferencesStore } from './PreferencesStore';
 import { PlaybackConfig } from './PlaybackConfig';
+import { ThemeManager } from './ThemeManager';
 
 const logger = AppLog.getInstance('Persistence');
 
@@ -84,5 +85,6 @@ export class AppState {
     // 初始化播放设置
     const playbackConfig = PlaybackConfig.loadFromPreferences();
     AppStorage.setOrCreate('playbackConfig', playbackConfig);
+    ThemeManager.initFromConfig(config.colorPreset);
   }
 }

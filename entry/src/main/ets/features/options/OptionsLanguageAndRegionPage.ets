@@ -18,13 +18,14 @@ interface OptionsLanguageAndRegionPageParams {
 
 @Component
 export struct OptionsLanguageAndRegionPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
   @Prop params: OptionsLanguageAndRegionPageParams = {
     appLangItems: [] as LanguagePickerItem[],
     contentLangItems: [] as LanguagePickerItem[],
     contentCountryItems: [] as LanguagePickerItem[],
-    themeColor: $r('app.color.yourtube_theme_primary'),
+    themeColor: '#F1680D',
     clickEffectEnabled: null,
     updateUiConfig: () => {},
     reloadHomeForSearchLocaleChange: () => {},

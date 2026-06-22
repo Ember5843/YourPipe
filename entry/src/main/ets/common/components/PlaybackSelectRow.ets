@@ -6,7 +6,7 @@ export struct PlaybackSelectRow {
   @Prop options: Array<SelectOption>;
   @Prop @Watch('onSelectedIndexChange') selectedIndex: number;
   @State selectedValue: string = '';
-  @Prop fontColor: ResourceColor = $r('app.color.yourtube_theme_primary');
+  @Prop fontColor: ResourceColor = '#F1680D';
   onChange?: (index: number) => void;
 
   aboutToAppear() {

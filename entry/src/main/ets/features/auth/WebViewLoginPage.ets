@@ -13,6 +13,7 @@ enum LoginState {
 
 @Component
 export struct WebViewLoginPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onSuccess?: () => void;
   onCancel?: () => void;
   private webController: web_webview.WebviewController = new web_webview.WebviewController();
@@ -173,7 +174,7 @@ export struct WebViewLoginPage {
             Progress({ value: this.progress, total: 100, type: ProgressType.Linear })
               .width('100%')
               .height(3)
-              .color($r('app.color.yourtube_theme_primary'))
+              .color(this.themePrimary)
           }
 
           if (this.state === LoginState.EXTRACTING_POT) {
@@ -215,7 +216,7 @@ export struct WebViewLoginPage {
             .height(44)
             .width('80%')
             .fontSize(15)
-            .backgroundColor($r('app.color.yourtube_theme_primary'))
+            .backgroundColor(this.themePrimary)
             .fontColor(Color.White)
             .onClick(() => {
               this.state = LoginState.LOADING;

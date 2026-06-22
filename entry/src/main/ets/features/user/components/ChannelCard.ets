@@ -18,6 +18,7 @@ const SYMBOL_FONT_SIZE: number = 16;
 
 @Component
 export struct ChannelCard {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Prop channel: SearchChannelItem;
   @Prop typeLabel: ResourceStr = $r('app.string.yt_label_user');
   @Prop showDescription: boolean = true;
@@ -202,7 +203,7 @@ export struct ChannelCard {
         Button(this.getActionLabel())
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_inverse'))
-          .backgroundColor(this.isSubscribed() ? $r('app.color.yourtube_button_disabled') : $r('app.color.yourtube_theme_primary'))
+          .backgroundColor(this.isSubscribed() ? $r('app.color.yourtube_button_disabled') : this.themePrimary)
           .height(28)
           .padding({ left: 10, right: 10 })
           .onClick(() => {

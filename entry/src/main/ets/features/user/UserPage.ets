@@ -24,6 +24,7 @@ const logger = AppLog.getInstance('UserPage');
 
 @Component
 export struct UserPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Prop channel: SearchChannelItem;
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
@@ -69,7 +70,6 @@ export struct UserPage {
   @State displayChannel: SearchChannelItem = new SearchChannelItem(0, '', 'Unknown', '', '', '', '', '#CCCCCC');
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
 
-  private readonly THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
   private readonly BANNER_HEIGHT: number = 70;
   private readonly GRID_SIDE_PADDING: number = 12;
 
@@ -532,7 +532,7 @@ export struct UserPage {
         Button(this.isSubscribed() ? $r('app.string.yt_action_unsubscribe') : $r('app.string.yt_action_subscribe'))
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_inverse'))
-          .backgroundColor(this.isSubscribed() ? $r('app.color.yourtube_button_disabled') : this.THEME_COLOR)
+          .backgroundColor(this.isSubscribed() ? $r('app.color.yourtube_button_disabled') : this.themePrimary)
           .height(28)
           .padding({ left: 10, right: 10 })
           .onClick(() => {
@@ -552,7 +552,7 @@ export struct UserPage {
     Column() {
       Text(label)
         .fontSize(14)
-        .fontColor(this.activeTabIndex === index ? this.THEME_COLOR : $r('app.color.yourtube_button_disabled'))
+        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_button_disabled'))
         .fontWeight(this.activeTabIndex === index ? FontWeight.Medium : FontWeight.Regular)
         .padding({ top: 12, bottom: 10 })
         .width('100%')
@@ -561,7 +561,7 @@ export struct UserPage {
       Rect()
         .height(2)
         .width('100%')
-        .fill(this.activeTabIndex === index ? this.THEME_COLOR : Color.Transparent)
+        .fill(this.activeTabIndex === index ? this.themePrimary : Color.Transparent)
     }
     .width('100%')
     .height('100%')
@@ -574,7 +574,7 @@ export struct UserPage {
       if (this.isLoading) {
         Row() {
           LoadingProgress()
-            .color(this.THEME_COLOR)
+            .color(this.themePrimary)
             .width(30)
             .height(30)
         }
@@ -584,7 +584,7 @@ export struct UserPage {
       } else if (typeof this.errorMessage === 'string' && this.errorMessage.length > 0) {
         Text(this.errorMessage)
           .fontSize(12)
-          .fontColor(this.THEME_COLOR)
+          .fontColor(this.themePrimary)
           .margin({ left: 16, top: 12 })
       } else if (this.videoList.length === 0) {
         Text($r('app.string.yt_empty_no_videos'))
@@ -617,7 +617,7 @@ export struct UserPage {
             if (this.isLoadingMore) {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }
@@ -653,7 +653,7 @@ export struct UserPage {
             ListItem() {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }
@@ -685,7 +685,7 @@ export struct UserPage {
       if (this.isLoadingShorts) {
         Row() {
           LoadingProgress()
-            .color(this.THEME_COLOR)
+            .color(this.themePrimary)
             .width(30)
             .height(30)
         }
@@ -695,7 +695,7 @@ export struct UserPage {
       } else if (typeof this.errorMessageShorts === 'string' && this.errorMessageShorts.length > 0) {
         Text(this.errorMessageShorts)
           .fontSize(12)
-          .fontColor(this.THEME_COLOR)
+          .fontColor(this.themePrimary)
           .margin({ left: 16, top: 12 })
       } else if (this.shortsList.length === 0) {
         Text($r('app.string.yt_empty_no_shorts'))
@@ -728,7 +728,7 @@ export struct UserPage {
             if (this.isLoadingMoreShorts) {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }
@@ -767,7 +767,7 @@ export struct UserPage {
             ListItem() {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }
@@ -800,7 +800,7 @@ export struct UserPage {
       if (this.isLoadingLive) {
         Row() {
           LoadingProgress()
-            .color(this.THEME_COLOR)
+            .color(this.themePrimary)
             .width(30)
             .height(30)
         }
@@ -810,7 +810,7 @@ export struct UserPage {
       } else if (typeof this.errorMessageLive === 'string' && this.errorMessageLive.length > 0) {
         Text(this.errorMessageLive)
           .fontSize(12)
-          .fontColor(this.THEME_COLOR)
+          .fontColor(this.themePrimary)
           .margin({ left: 16, top: 12 })
       } else if (this.liveList.length === 0) {
         Text($r('app.string.yt_empty_no_live'))
@@ -843,7 +843,7 @@ export struct UserPage {
             if (this.isLoadingMoreLive) {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }
@@ -882,7 +882,7 @@ export struct UserPage {
             ListItem() {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }
@@ -915,7 +915,7 @@ export struct UserPage {
       if (this.isLoadingPlaylists) {
         Row() {
           LoadingProgress()
-            .color(this.THEME_COLOR)
+            .color(this.themePrimary)
             .width(30)
             .height(30)
         }
@@ -925,7 +925,7 @@ export struct UserPage {
       } else if (typeof this.errorMessagePlaylists === 'string' && this.errorMessagePlaylists.length > 0) {
         Text(this.errorMessagePlaylists)
           .fontSize(12)
-          .fontColor(this.THEME_COLOR)
+          .fontColor(this.themePrimary)
           .margin({ left: 16, top: 12 })
       } else if (this.playlistList.length === 0) {
         Text($r('app.string.yt_empty_no_playlists'))
@@ -948,7 +948,7 @@ export struct UserPage {
             ListItem() {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }

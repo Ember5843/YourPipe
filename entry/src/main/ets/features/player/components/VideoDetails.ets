@@ -36,6 +36,7 @@ const TAG: string = '[VideoDetails]';
 
 @Component
 export struct VideoDetails {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Prop @Watch('onItemChanged') item: VideoItem;
   @Prop videoDescription: string = '';
   @Prop videoDescriptionError: string = '';
@@ -400,7 +401,7 @@ export struct VideoDetails {
           if (!this.isTitleExpanded && this.item.title.length > 60) {
             Text($r('app.string.yt_action_show_more'))
               .fontSize($r('app.float.font_size_12'))
-              .fontColor($r('app.color.yourtube_theme_primary'))
+              .fontColor(this.themePrimary)
               .margin({ top: 4 })
           }
         }

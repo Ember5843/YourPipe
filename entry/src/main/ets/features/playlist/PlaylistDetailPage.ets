@@ -22,6 +22,7 @@ const logger = AppLog.getInstance('PlaylistDetailPage');
 
 @Component
 export struct PlaylistDetailPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Prop playlist: SearchPlaylistItem;
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
@@ -37,7 +38,6 @@ export struct PlaylistDetailPage {
   @State errorMessage: string = '';
   @State totalCountText: string = '';
 
-  private readonly THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
   private readonly GRID_SIDE_PADDING: number = 12;
 
   private rssFallbackService: SubscriptionFeedService = new SubscriptionFeedService();
@@ -268,7 +268,7 @@ export struct PlaylistDetailPage {
       if (this.isLoading) {
         Row() {
           LoadingProgress()
-            .color(this.THEME_COLOR)
+            .color(this.themePrimary)
             .width(30)
             .height(30)
         }
@@ -278,7 +278,7 @@ export struct PlaylistDetailPage {
       } else if (this.errorMessage.length > 0) {
         Text(this.errorMessage)
           .fontSize(12)
-          .fontColor(this.THEME_COLOR)
+          .fontColor(this.themePrimary)
           .margin({ left: 16, top: 12 })
       } else if (this.videoList.length === 0) {
         Text($r('app.string.yt_empty_no_videos'))
@@ -313,7 +313,7 @@ export struct PlaylistDetailPage {
             if (this.isLoadingMore) {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }
@@ -356,7 +356,7 @@ export struct PlaylistDetailPage {
             ListItem() {
               Row() {
                 LoadingProgress()
-                  .color(this.THEME_COLOR)
+                  .color(this.themePrimary)
                   .width(26)
                   .height(26)
               }

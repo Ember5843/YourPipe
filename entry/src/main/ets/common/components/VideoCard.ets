@@ -17,6 +17,7 @@ const SYMBOL_FONT_SIZE: number = 16;
 
 @Component
 export struct VideoCard {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Prop video: VideoItem;
   @Prop actionLabel: ResourceStr = '';
   @Prop actionType: string = '';
@@ -61,9 +62,9 @@ export struct VideoCard {
 
   private getActionColor(): ResourceColor {
     if (this.useFavoriteToggle) {
-      return this.isFavorited() ? $r('app.color.yourtube_button_disabled') : $r('app.color.yourtube_theme_primary');
+      return this.isFavorited() ? $r('app.color.yourtube_button_disabled') : this.themePrimary;
     }
-    return this.actionType === 'remove' ? $r('app.color.yourtube_button_disabled') : $r('app.color.yourtube_theme_primary');
+    return this.actionType === 'remove' ? $r('app.color.yourtube_button_disabled') : this.themePrimary;
   }
 
   private handleAction(): void {

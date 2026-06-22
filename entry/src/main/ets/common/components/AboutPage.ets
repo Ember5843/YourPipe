@@ -182,6 +182,7 @@ struct SubPageHeader {
 
 @Component
 struct OpenSourcePage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onBack: () => void = () => {};
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
@@ -199,7 +200,7 @@ struct OpenSourcePage {
                   .layoutWeight(1)
                 Text(item.license)
                   .fontSize(11)
-                  .fontColor($r('app.color.yourtube_theme_primary'))
+                  .fontColor(this.themePrimary)
                   .padding({ left: 8, right: 8, top: 3, bottom: 3 })
                   .borderRadius(6)
                   .backgroundColor('#1AD32F2F')
@@ -275,6 +276,7 @@ struct AiModelsPage {
 
 @Component
 struct ChangelogPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onBack: () => void = () => {};
 
   build() {
@@ -291,7 +293,7 @@ struct ChangelogPage {
                 if (index === 0) {
                   Text($r('app.string.yt_about_current_version'))
                     .fontSize(10)
-                    .fontColor($r('app.color.yourtube_theme_primary'))
+                    .fontColor(this.themePrimary)
                     .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                     .borderRadius(4)
                     .backgroundColor('#1AD32F2F')
@@ -304,7 +306,7 @@ struct ChangelogPage {
 
               ForEach(item.changes, (change: string) => {
                 Row({ space: 8 }) {
-                  Text('·').fontSize(16).fontColor($r('app.color.yourtube_theme_primary')).width(12)
+                  Text('·').fontSize(16).fontColor(this.themePrimary).width(12)
                   Text(change)
                     .fontSize(13).fontColor($r('app.color.yourtube_text_secondary'))
                     .layoutWeight(1).lineHeight(20)
@@ -316,7 +318,7 @@ struct ChangelogPage {
             .padding({ left: 16, right: 16, top: 14, bottom: 14 })
             .borderRadius(12)
             .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-            .border(index === 0 ? { width: 1, color: $r('app.color.yourtube_theme_primary'), radius: 12 } : { width: 0 })
+            .border(index === 0 ? { width: 1, color: this.themePrimary, radius: 12 } : { width: 0 })
           }, (item: ChangelogEntry) => item.version)
         }
         .width('100%').padding({ left: 16, right: 16, bottom: 24 })
@@ -335,6 +337,7 @@ struct ChangelogPage {
 
 @Component
 export struct AboutPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onBack?: () => void;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @State private aboutNavStack: NavPathStack = new NavPathStack();
@@ -434,7 +437,7 @@ export struct AboutPage {
                   .width(32).height(32)
                   .textAlign(TextAlign.Center)
                   .borderRadius(8)
-                  .backgroundColor($r('app.color.yourtube_theme_primary'))
+                  .backgroundColor(this.themePrimary)
                 Column({ space: 2 }) {
                   Text('应用包名')
                     .fontSize(13).fontWeight(FontWeight.Medium)

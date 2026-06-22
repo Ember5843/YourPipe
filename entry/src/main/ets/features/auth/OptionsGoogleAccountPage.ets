@@ -3,6 +3,7 @@ import { AuthStateHelper } from '../../common/AuthStateHelper';
 
 @Component
 export struct OptionsGoogleAccountPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onBack?: () => void;
   pushLoginPage?: () => void;
 
@@ -24,7 +25,7 @@ export struct OptionsGoogleAccountPage {
         },
         {
           value: '继续登录',
-          fontColor: $r('app.color.yourtube_theme_primary'),
+          fontColor: this.themePrimary,
           action: () => {
             if (this.pushLoginPage) {
               this.pushLoginPage();
@@ -60,7 +61,7 @@ export struct OptionsGoogleAccountPage {
     Row({ space: 8 }) {
       SymbolGlyph(this.authStatus.stage === AuthStage.SIGNED_IN ? $r('sys.symbol.checkmark_circle') : $r('sys.symbol.info_circle'))
         .fontSize(22)
-        .fontColor([this.authStatus.stage === AuthStage.SIGNED_IN ? $r('app.color.yourtube_theme_primary') : $r('app.color.yourtube_text_quaternary')])
+        .fontColor([this.authStatus.stage === AuthStage.SIGNED_IN ? this.themePrimary : $r('app.color.yourtube_text_quaternary')])
       Text(this.getStatusText())
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
@@ -78,7 +79,7 @@ export struct OptionsGoogleAccountPage {
       .width('100%')
       .fontSize(15)
       .fontWeight(FontWeight.Medium)
-      .backgroundColor($r('app.color.yourtube_theme_primary'))
+      .backgroundColor(this.themePrimary)
       .fontColor(Color.White)
       .onClick(action)
   }

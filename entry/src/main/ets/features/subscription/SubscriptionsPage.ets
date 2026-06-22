@@ -10,6 +10,7 @@ const logger = AppLog.getInstance('SubscriptionsPage');
 
 @Component
 export struct SubscriptionsPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
@@ -77,7 +78,7 @@ export struct SubscriptionsPage {
         if (this.errorMessage.length > 0) {
           Text(this.errorMessage)
             .fontSize(12)
-            .fontColor($r('app.color.yourtube_theme_primary'))
+            .fontColor(this.themePrimary)
             .margin({ left: 16, top: 8 })
         }
         Refresh({ refreshing: $$this.isRefreshing }) {

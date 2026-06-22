@@ -16,6 +16,7 @@ enum DownloadMode {
 
 @CustomDialog
 export struct DownloadDialog {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   controller: CustomDialogController;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
@@ -280,7 +281,7 @@ export struct DownloadDialog {
         Text($r('app.string.yt_action_download'))
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.yourtube_theme_primary'))
+          .fontColor(this.themePrimary)
           .textAlign(TextAlign.Center)
           .layoutWeight(1)
           .height(56)
@@ -306,7 +307,7 @@ export struct DownloadDialog {
     Text(title)
       .fontSize(14)
       .fontWeight(FontWeight.Bold)
-      .fontColor($r('app.color.yourtube_theme_primary'))
+      .fontColor(this.themePrimary)
       .width('100%')
       .margin({ top: 12, bottom: 8 })
   }

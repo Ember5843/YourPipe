@@ -23,6 +23,7 @@ class PlayQueueListListener extends QueueChangeListener {
 
 @Component
 export struct PlayQueueList {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @State queue: VideoItem[] = [];
   @State currentIndex: number = -1;
   @State sourceType: QueueSourceType = QueueSourceType.NONE;
@@ -33,7 +34,6 @@ export struct PlayQueueList {
 
   private manager: PlayQueueManager = PlayQueueManager.getInstance();
   private listScroller: Scroller = new Scroller();
-  private readonly THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
   private boundListener: PlayQueueListListener | null = null;
 
   syncStateToComponent(): void {
@@ -139,7 +139,7 @@ export struct PlayQueueList {
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_secondary'))
         Toggle({ type: ToggleType.Switch, isOn: this.autoPlayEnabled })
-          .selectedColor(this.THEME_COLOR)
+          .selectedColor(this.themePrimary)
           .scale({ x: 0.8, y: 0.8 })
           .margin({ left: 6 })
           .onChange((isOn: boolean) => {
@@ -175,7 +175,7 @@ export struct PlayQueueList {
   LoadingFooter() {
     Row() {
       LoadingProgress()
-        .color(this.THEME_COLOR)
+        .color(this.themePrimary)
         .width(22)
         .height(22)
     }
@@ -251,7 +251,7 @@ export struct PlayQueueList {
         Text(item.title || '')
           .fontSize(14)
           .fontColor(index === this.currentIndex
-            ? this.THEME_COLOR
+            ? this.themePrimary
             : $r('app.color.yourtube_text_primary'))
           .fontWeight(index === this.currentIndex ? FontWeight.Medium : FontWeight.Medium)
           .maxLines(2)

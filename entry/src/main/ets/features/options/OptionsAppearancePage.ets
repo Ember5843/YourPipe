@@ -3,7 +3,7 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
-import { customAnimationUtil } from '../../common/AnimationUtil';
+import { ColorPresetItem, COLOR_PRESETS, ThemeManager } from '../../common/ThemeManager';
 
 interface OptionsAppearancePageParams {
   themeColor: ResourceColor;
@@ -14,9 +14,10 @@ interface OptionsAppearancePageParams {
 @Component
 export struct OptionsAppearancePage {
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageProp('themePrimaryColor') themePrimary: string = COLOR_PRESETS[0].primary;
 
   @Prop params: OptionsAppearancePageParams = {
-    themeColor: $r('app.color.yourtube_theme_primary'),
+    themeColor: '#F1680D',
     applyDarkModeSelection: () => {},
     updateUiConfig: () => {}
   };
@@ -32,6 +33,35 @@ export struct OptionsAppearancePage {
   private getDarkModeIndex(): number {
     return [YourtubeDarkMode.SYSTEM, YourtubeDarkMode.LIGHT, YourtubeDarkMode.DARK]
       .indexOf(this.uiConfig.darkMode);
+  }
+
+  private applyColorPreset(preset: ColorPresetItem): void {
+    this.params.updateUiConfig(cfg => { cfg.colorPreset = preset.id; });
+    ThemeManager.apply(preset.id);
+  }
+
+  @Builder
+  ColorSwatch(preset: ColorPresetItem) {
+    Stack() {
+      Circle({ width: 36, height: 36 })
+        .fill(preset.primary)
+
+      if (this.uiConfig.colorPreset === preset.id) {
+        SymbolGlyph($r('sys.symbol.checkmark'))
+          .fontSize(18)
+          .fontColor([Color.White])
+      }
+    }
+    .width(44)
+    .height(44)
+    .borderRadius(22)
+    .border(this.uiConfig.colorPreset === preset.id
+      ? { width: 2, color: preset.primary, style: BorderStyle.Solid }
+      : { width: 0 })
+    .padding(this.uiConfig.colorPreset === preset.id ? 2 : 4)
+    .onClick(() => {
+      this.applyColorPreset(preset);
+    })
   }
 
   build() {
@@ -50,6 +80,34 @@ export struct OptionsAppearancePage {
               this.params.applyDarkModeSelection(mode);
             }
           })
+
+          PlaybackSectionTitle({ title: '主题色' })
+
+          Column({ space: 12 }) {
+            Row() {
+              Text('当前')
+                .fontSize(13)
+                .fontColor($r('app.color.yourtube_text_secondary'))
+                .layoutWeight(1)
+
+              Text(ThemeManager.getPreset(this.uiConfig.colorPreset).displayName)
+                .fontSize(13)
+                .fontColor(this.themePrimary)
+                .fontWeight(FontWeight.Medium)
+            }
+            .width('100%')
+
+            Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+              ForEach(COLOR_PRESETS, (preset: ColorPresetItem) => {
+                this.ColorSwatch(preset)
+              }, (preset: ColorPresetItem) => preset.id)
+            }
+            .width('100%')
+          }
+          .width('100%')
+          .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+          .backgroundColor($r('app.color.yourtube_bg_surface'))
+          .borderRadius(12)
 
           PlaybackSectionTitle({ title: $r('app.string.yt_setting_home_layout') })
 

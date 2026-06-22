@@ -11,6 +11,7 @@ import { customAnimationUtil } from '../../../common/AnimationUtil';
  */
 @Component
 export struct SavePlaylistSheet {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   /** 当前要保存的视频 */
   @Prop video: VideoItem;
   /** 双向绑定的显隐状态，由外层 bindSheet 持有 */
@@ -52,7 +53,7 @@ export struct SavePlaylistSheet {
         : $r('sys.symbol.circle'))
         .fontSize(22)
         .fontColor([this.containsVideo(queue)
-          ? $r('app.color.yourtube_theme_primary')
+          ? this.themePrimary
           : $r('app.color.yourtube_text_hint')])
         .margin({ right: 12 })
 
@@ -95,7 +96,7 @@ export struct SavePlaylistSheet {
           .fontSize(14)
           .fontColor($r('app.color.yourtube_text_inverse'))
           .backgroundColor(this.newName.trim().length > 0
-            ? $r('app.color.yourtube_theme_primary')
+            ? this.themePrimary
             : $r('app.color.yourtube_button_disabled'))
           .height(40)
           .margin({ left: 10 })
@@ -109,11 +110,11 @@ export struct SavePlaylistSheet {
       Row() {
         SymbolGlyph($r('sys.symbol.plus'))
           .fontSize(22)
-          .fontColor([$r('app.color.yourtube_theme_primary')])
+          .fontColor([this.themePrimary])
           .margin({ right: 12 })
         Text('新建播放列表')
           .fontSize(15)
-          .fontColor($r('app.color.yourtube_theme_primary'))
+          .fontColor(this.themePrimary)
           .fontWeight(FontWeight.Medium)
           .layoutWeight(1)
       }

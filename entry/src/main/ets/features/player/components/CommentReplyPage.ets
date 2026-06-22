@@ -9,6 +9,7 @@ import { buildYourTubeTitleBar } from '../../../common/components/HdsTitleBar';
 
 @Component
 export struct CommentReplyPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @State parentComment: CommentItem | null = null;
   @State replies: CommentItem[] = [];
   @State isLoading: boolean = false;
@@ -126,7 +127,7 @@ export struct CommentReplyPage {
   @Builder
   LoadingBuilder() {
     LoadingProgress()
-      .color($r('app.color.yourtube_theme_primary'))
+      .color(this.themePrimary)
       .width(24)
       .height(24)
   }

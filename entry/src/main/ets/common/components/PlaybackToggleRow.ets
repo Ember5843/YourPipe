@@ -3,7 +3,7 @@ export struct PlaybackToggleRow {
   @Prop title: ResourceStr;
   @Prop subtitle: ResourceStr = '';
   @Prop isOn: boolean;
-  @Prop themeColor: ResourceColor = $r('app.color.yourtube_theme_primary');
+  @Prop themeColor: ResourceColor = '#F1680D';
   onChange?: (val: boolean) => void;
 
   build() {

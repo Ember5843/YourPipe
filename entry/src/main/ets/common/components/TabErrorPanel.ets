@@ -10,6 +10,7 @@
 
 @Component
 export struct TabErrorPanel {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   /** 错误消息（支持字符串或资源 ID） */
   @Prop errorMessage: string | Resource = '';
 
@@ -72,7 +73,7 @@ export struct TabErrorPanel {
         }
         .height(36)
         .padding({ left: 20, right: 20 })
-        .backgroundColor($r('app.color.yourtube_theme_primary'))
+        .backgroundColor(this.themePrimary)
         .borderRadius(18)
         .onClick(() => {
           this.handleRetryClick();

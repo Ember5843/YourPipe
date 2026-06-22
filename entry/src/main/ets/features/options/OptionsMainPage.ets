@@ -23,6 +23,7 @@ interface OptionsMainPageParams {
 
 @Component
 export struct OptionsMainPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageProp('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
@@ -86,7 +87,7 @@ export struct OptionsMainPage {
             icon: $r('sys.symbol.info_circle'),
             title: 'Google 登录',
             subtitle: this.getGoogleAccountSubtitle(),
-            iconColor: $r('app.color.yourtube_theme_primary'),
+            iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onGoogleAccountClick
           })
@@ -106,7 +107,7 @@ export struct OptionsMainPage {
             icon: $r('sys.symbol.play_circle'),
             title: $r('app.string.yt_section_playback'),
             subtitle: this.getPlaybackSubtitle(),
-            iconColor: $r('app.color.yourtube_theme_primary'),
+            iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onPlaybackClick
           })

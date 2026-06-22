@@ -37,6 +37,7 @@ interface MySurfaceRect {
 @Preview
 @Component
 export struct VideoPlayer {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Consume('actionHub') actionHub: ActionHub;
   @StorageProp('navBarHeight') navBarHeight: number = 0;
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
@@ -700,7 +701,7 @@ export struct VideoPlayer {
           Button($r('app.string.yt_action_retry'))
             .height(36)
             .padding({ left: 20, right: 20 })
-            .backgroundColor($r('app.color.yourtube_theme_primary'))
+            .backgroundColor(this.themePrimary)
             .borderRadius(18)
             .margin({ top: 8 })
             .onClick(() => {
@@ -974,7 +975,7 @@ export struct VideoPlayer {
             .font({ size: 13 })
             .fontColor(this.currentColorMode === ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT ? '#1A1A1A' : Color.White)
             .selectedOptionFont({ size: 14, weight: FontWeight.Bold })
-            .selectedOptionFontColor($r('app.color.yourtube_theme_primary'))
+            .selectedOptionFontColor(this.themePrimary)
             .selectedOptionBgColor('#1AD32F2F')
             .optionFont({ size: 14 })
             .optionFontColor($r('app.color.yourtube_text_secondary'))

@@ -4,7 +4,7 @@ export struct OptionItem {
   @Prop title: ResourceStr = '';
   @Prop subtitle: ResourceStr = '';
   @Prop showChevron: boolean = true;
-  @Prop iconColor: ResourceColor = $r('app.color.yourtube_theme_primary');
+  @Prop iconColor: ResourceColor = '#F1680D';
   @Prop clickEffectEnabled: ClickEffect | null = null;
   onClickAction?: () => void;
 

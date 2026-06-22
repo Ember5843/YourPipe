@@ -2,12 +2,12 @@ import { UIConfig } from '../AppState';
 
 @Component
 export struct ErrorPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @State errorMessage: ResourceStr = '';
   onRetry?: () => void = undefined;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   
-  private readonly THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
-  private readonly ERROR_ICON_SIZE: number = 80;
+    private readonly ERROR_ICON_SIZE: number = 80;
   private readonly ERROR_ICON_COLOR: ResourceColor = $r('app.color.yourtube_text_disabled');
   private readonly TITLE_FONT_SIZE: number = 16;
   private readonly MESSAGE_FONT_SIZE: number = 14;
@@ -57,7 +57,7 @@ export struct ErrorPage {
           }
           .width(120)
           .height(40)
-          .backgroundColor(this.THEME_COLOR)
+          .backgroundColor(this.themePrimary)
           .borderRadius(20)
           .onClick(() => {
             if (this.onRetry) {

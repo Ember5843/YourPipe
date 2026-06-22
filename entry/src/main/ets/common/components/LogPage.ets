@@ -39,6 +39,7 @@ function formatLogTime(ms: number): string {
  */
 @Component
 struct SessionCard {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   /** 细粒度绑定到 @Observed LogSession */
   @ObjectLink session: LogSession;
   /** 在列表中的显示序号（由外部按倒序传入，最新 Session 序号最大） */
@@ -58,7 +59,7 @@ struct SessionCard {
           Text(`#${this.displayIndex}`)
             .fontSize(13)
             .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.yourtube_theme_primary'))
+            .fontColor(this.themePrimary)
             .fontFamily('monospace')
 
           Text(formatTimestamp(this.session.startTime))
@@ -146,6 +147,7 @@ struct SessionCard {
 
 @Component
 export struct LogPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   /** 从 Index.ets 的 optionsNavStack 传入，用于返回 */
   onBack?: () => void;
 
@@ -164,7 +166,6 @@ export struct LogPage {
   @State logFilterPattern: string = '';
   @State logFilterError: string = '';
 
-  private readonly THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
 
   // ── 导出单个 Session ──────────────────────────────────────────────────────
   private async exportSession(sessionId: string): Promise<void> {
@@ -293,7 +294,7 @@ export struct LogPage {
           .layoutWeight(1)
 
           Toggle({ type: ToggleType.Switch, isOn: this.uiConfig.enableLogger })
-            .selectedColor(this.THEME_COLOR)
+            .selectedColor(this.themePrimary)
             .onChange(() => {
               this.toggleLogger();
             })

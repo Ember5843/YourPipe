@@ -42,6 +42,7 @@ const TAG: string = '[PlayerLog][VideoPlayerPage]';
 
 @Component
 export struct VideoPlayerPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @StorageProp('selectedVideo') @Watch('onVideoChange') video: VideoItem | null = null;
   @StorageProp('deviceHeight') deviceHeight: number =
     AppStorage.get<number>('deviceHeight') || 0;
@@ -167,15 +168,15 @@ export struct VideoPlayerPage {
       }
     };
 
+    // 进入播放页：重置沉浸全屏标志，由 WindowUtil 全局策略按当前方向决定系统栏
+    this.windowUtil.setPlayerFullscreenImmersive(false);
+
     const initW = this.deviceWidth;
     const initH = this.deviceHeight;
     if (initW > 0 && initH > 0 && initW > initH) {
       this.isWideLayout = true;
       const shortSideVp = this.getUIContext().px2vp(Math.min(initW, initH));
       this.isImmersive = shortSideVp < 600;
-      if (this.isImmersive) {
-        this.windowUtil.disableWindowSystemBar();
-      }
       logger.info(`${TAG} entered in landscape, wide layout, immersive=${this.isImmersive}`);
     }
 
@@ -201,14 +202,10 @@ export struct VideoPlayerPage {
         }
       });
 
-      // 沉浸式：全屏一定沉浸；手机横屏（短边 < 600vp）也沉浸
+      // 沉浸式（仅 UI 用）：全屏一定沉浸；手机横屏（短边 < 600vp）也沉浸
+      // 实际系统栏由 WindowUtil.updateSystemBar() 全局策略统一管理
       const shortSideVp = this.getUIContext().px2vp(Math.min(size.width, size.height));
       this.isImmersive = this.isFullLandscapeScreen || (isLandscape && shortSideVp < 600);
-      if (this.isImmersive) {
-        this.windowUtil.disableWindowSystemBar();
-      } else {
-        this.windowUtil.enableWindowSystemBar();
-      }
       this.notifyFullScreenChange();
     });
 
@@ -281,8 +278,8 @@ export struct VideoPlayerPage {
   }
 
   aboutToDisappear(): void {
-    // 恢复状态栏并恢复全局自动旋转
-    this.windowUtil.enableWindowSystemBar();
+    // 离开播放页：清除沉浸全屏标志，由 WindowUtil 全局策略按方向决定系统栏
+    this.windowUtil.setPlayerFullscreenImmersive(false);
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
     this.windowUtil.registerOffWindowSizeChange();
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
@@ -414,32 +411,31 @@ export struct VideoPlayerPage {
   }
 
   handleFullScreenExit(): void {
-    // 退出沉浸全屏：清掉 manual 标志，恢复系统栏，解除方向锁
+    // 退出沉浸全屏：清掉 manual 标志，解除方向锁
     // 三种来源场景：
     //   - 物理横屏 + 横向视频沉浸：尺寸不变 → 这里直接切宽布局，由 .animation 驱动
     //   - 物理竖屏 + 竖向视频沉浸：尺寸不变 → 这里直接清状态，由 .animation 驱动
     //   - 物理竖屏 + 横向沉浸（之前手动旋转过来）：解锁后系统旋回竖屏，
     //     windowSizeChange 触发，由它接管
     this.isManualFullscreen = false;
-    this.windowUtil.enableWindowSystemBar();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
 
     const isLandscape = this.deviceWidth > this.deviceHeight;
     if (isLandscape) {
-      // 物理横屏：直接切宽布局
+      // 物理横屏：直接切宽布局；窄屏手机横屏保持沉浸（珍惜竖向空间）
       const shortSideVp = this.getUIContext().px2vp(Math.min(this.deviceWidth, this.deviceHeight));
       this.isFullLandscapeScreen = false;
       this.isWideLayout = true;
       this.isImmersive = shortSideVp < 600;
-      if (this.isImmersive) {
-        this.windowUtil.disableWindowSystemBar();
-      }
     } else {
       // 物理竖屏：直接清沉浸状态（竖向视频沉浸全屏退出走这里）
       this.isFullLandscapeScreen = false;
       this.isWideLayout = false;
       this.isImmersive = false;
     }
+
+    // 退出沉浸全屏：清除标志，由 WindowUtil 全局策略按方向决定系统栏
+    this.windowUtil.setPlayerFullscreenImmersive(false);
     this.notifyFullScreenChange();
   }
 
@@ -447,7 +443,7 @@ export struct VideoPlayerPage {
   tabBuilder(index: number, name: string | Resource) {
     Column() {
       Text(name)
-        .fontColor(this.currentTabIndex === index ? $r('app.color.yourtube_theme_primary') : $r('app.color.yourtube_text_secondary'))
+        .fontColor(this.currentTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_secondary'))
         .fontSize(16)
         .fontWeight(this.currentTabIndex === index ? FontWeight.Normal : FontWeight.Medium)
         .lineHeight(22)
@@ -455,7 +451,7 @@ export struct VideoPlayerPage {
       Divider()
         .width(48)
         .strokeWidth(Constants.STROKE_WIDTH)
-        .color($r('app.color.yourtube_theme_primary'))
+        .color(this.themePrimary)
         .opacity(this.currentTabIndex === index ? 1 : 0)
     }
   }
@@ -514,7 +510,7 @@ export struct VideoPlayerPage {
               }
               .height(36)
               .padding({ left: 20, right: 20 })
-              .backgroundColor($r('app.color.yourtube_theme_primary'))
+              .backgroundColor(this.themePrimary)
               .borderRadius(18)
               .onClick(() => { this.retryLoadVideo(); })
             }
@@ -553,7 +549,7 @@ export struct VideoPlayerPage {
           Button($r('app.string.yt_action_retry'))
             .height(32)
             .padding({ left: 16, right: 16 })
-            .backgroundColor($r('app.color.yourtube_theme_primary'))
+            .backgroundColor(this.themePrimary)
             .borderRadius(16)
             .onClick(() => { this.retryLoadVideo(); })
         }
@@ -641,7 +637,7 @@ export struct VideoPlayerPage {
           const willRotate = isLandscapeVideo !== isCurrentLandscape;
 
           this.isManualFullscreen = true;
-          this.windowUtil.disableWindowSystemBar();
+          this.windowUtil.setPlayerFullscreenImmersive(true);
           this.windowUtil.setMainWindowOrientation(targetOrientation);
 
           // 不会发生旋转（窗口尺寸不变）：直接改状态，由容器 .animation() 驱动平滑过渡

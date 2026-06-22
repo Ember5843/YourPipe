@@ -47,6 +47,7 @@ import { PlaybackToggleRow } from '../common/components/PlaybackToggleRow';
 import { PlaybackSectionTitle } from '../common/components/PlaybackSectionTitle';
 import { OptionsMainPage } from '../features/options/OptionsMainPage';
 import { OptionsAppearancePage } from '../features/options/OptionsAppearancePage';
+import { COLOR_PRESETS } from '../common/ThemeManager';
 import { OptionsPlaybackPage } from '../features/options/OptionsPlaybackPage';
 import { OptionsLanguageAndRegionPage } from '../features/options/OptionsLanguageAndRegionPage';
 import { OptionsRecoveryPage } from '../features/options/OptionsRecoveryPage';
@@ -137,7 +138,7 @@ struct Index {
   @State selectedLanguageCode: string = LanguageManager.DEFAULT_LANGUAGE;
   @State systemLanguageCode: string = LanguageManager.LANGUAGE_EN_LATN;
 
-  @State THEME_COLOR: ResourceColor = $r('app.color.yourtube_theme_primary');
+  @StorageProp('themePrimaryColor') themePrimary: string = COLOR_PRESETS[0].primary;
   // 沉浸光感材质效果（首页标题栏 + HdsTabs 底栏共用）。
   // 在 aboutToAppear 里通过 MaterialUtil 检测设备能力后注入；
   // 不支持的设备为 undefined，调用方走降级路径。
@@ -1384,7 +1385,7 @@ struct Index {
             if (this.homeModeNoticeMessage.length > 0) {
               Text(this.homeModeNoticeMessage)
                 .fontSize(12)
-                .fontColor($r('app.color.yourtube_theme_primary'))
+                .fontColor(this.themePrimary)
                 .margin({ top: 8, left: 16, right: 16 })
             }
 
@@ -1538,7 +1539,7 @@ struct Index {
               appLangItems: this.appLangItems,
               contentLangItems: this.contentLangItems,
               contentCountryItems: this.contentCountryItems,
-              themeColor: this.THEME_COLOR,
+              themeColor: this.themePrimary,
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               updateUiConfig: this.updateUiConfig.bind(this),
               reloadHomeForSearchLocaleChange: this.reloadHomeForSearchLocaleChange.bind(this),
@@ -1600,7 +1601,7 @@ struct Index {
       HdsNavDestination() {
           OptionsAppearancePage({
             params: {
-              themeColor: this.THEME_COLOR,
+              themeColor: this.themePrimary,
               applyDarkModeSelection: this.applyDarkModeSelection.bind(this),
               updateUiConfig: this.updateUiConfig.bind(this)
             }
@@ -1682,7 +1683,7 @@ struct Index {
       HdsNavDestination() {
           OptionsPlaybackPage({
             params: {
-              themeColor: this.THEME_COLOR,
+              themeColor: this.themePrimary,
               updatePlaybackConfig: this.updatePlaybackConfig.bind(this),
               updateUiConfig: this.updateUiConfig.bind(this),
               getQualityDisplay: this.getQualityDisplay.bind(this)
@@ -1744,12 +1745,12 @@ struct Index {
     Column({ space: 3 }) {
       SymbolGlyph(iconRes)
         .fontSize(this.activeTabIndex === index ? 23 : 21)
-        .fontColor([this.activeTabIndex === index ? this.THEME_COLOR : $r('app.color.yourtube_text_quaternary')])
+        .fontColor([this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_quaternary')])
         .symbolEffect(customAnimationUtil.isIconEffect(this.uiConfig), this.activeTabIndex === index)
 
       Text(label)
         .fontSize(10)
-        .fontColor(this.activeTabIndex === index ? this.THEME_COLOR : $r('app.color.yourtube_text_quaternary'))
+        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_quaternary'))
         .fontWeight(this.activeTabIndex === index ? FontWeight.Bold : FontWeight.Normal)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -1765,7 +1766,7 @@ struct Index {
 
   @Builder LoadingBuilder() {
     LoadingProgress()
-      .color(this.THEME_COLOR)
+      .color(this.themePrimary)
       .width(40)
       .height(40)
       .margin({ bottom: 15 })

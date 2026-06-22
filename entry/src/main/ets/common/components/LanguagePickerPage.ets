@@ -4,6 +4,7 @@ import { buildYourTubeTitleBar } from './HdsTitleBar';
 
 @Component
 export struct LanguagePickerPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Prop title: ResourceStr = '';
   @Prop items: LanguagePickerItem[] = [];
   @Prop selectedCode: string = '';
@@ -56,7 +57,7 @@ export struct LanguagePickerPage {
                   : $r('sys.symbol.circle'))
                   .fontSize(20)
                   .fontColor([this.selectedCode === item.code
-                    ? $r('app.color.yourtube_theme_primary')
+                    ? this.themePrimary
                     : $r('app.color.yourtube_text_quaternary')])
                   .width(28)
                   .flexShrink(0)
@@ -67,7 +68,7 @@ export struct LanguagePickerPage {
                     .fontSize(15)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(this.selectedCode === item.code
-                      ? $r('app.color.yourtube_theme_primary')
+                      ? this.themePrimary
                       : $r('app.color.yourtube_text_primary'))
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
