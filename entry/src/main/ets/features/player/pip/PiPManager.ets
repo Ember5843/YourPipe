@@ -176,18 +176,35 @@ export class PiPManager {
     const session = PlayerSession.getInstance();
     switch (state) {
       case PiPWindow.PiPState.ABOUT_TO_START:
+        // 即将进入 PiP：系统正在把主页 XComponent 的 surface 接管到悬浮窗，
+        // 此时主页 XComponent 依然在正常渲染最后一帧。若现在就 mount 占位层
+        // 会突然覆盖在画面上，与系统的缩放动画并行造成"闪一下"。延迟到 STARTED
+        // （悬浮窗已就位、主页 surface 已腾空）再 mount，视觉过渡平滑。
+        break;
       case PiPWindow.PiPState.STARTED:
-        // XComponent 方式：系统把播放页 surface 投到悬浮窗，无需迁移节点。
+        // 已进入 PiP：surface 已被悬浮窗接管，主页 XComponent 实际是空帧。
+        // 此时再 mount 占位层填上空白，无闪烁。
         session.setPiPActive(true);
+        break;
+      case PiPWindow.PiPState.ABOUT_TO_STOP:
+        // 即将退出 PiP（关闭、要释放或要恢复都会先走这一步）：系统准备把 surface
+        // 还回主页。提前 unmount 占位层让主页 XComponent 露出，与系统缩放动画
+        // 同步过渡；否则要等到 STOPPED 才 unmount，悬浮窗已消失而占位层还在，
+        // 会出现"先黑屏闪一下再露画面"。
+        session.setPiPActive(false);
         break;
       case PiPWindow.PiPState.ABOUT_TO_RESTORE:
         // 点 PiP 恢复按钮：通知外部（Index）确保 PlayerPage 在栈顶，准备重建。
+        // 占位层已在 ABOUT_TO_STOP 提前隐藏，这里只设置 isRestoring 标记。
         this.isRestoring = true;
         if (this.onPipRestore) {
           this.onPipRestore();
         }
         break;
       case PiPWindow.PiPState.STOPPED:
+        // 兜底：极端情况下没收到 ABOUT_TO_STOP（系统直接 STOPPED），这里再保险
+        // 一次。正常时机已经在 ABOUT_TO_STOP 处理过，这里 setPiPActive(false)
+        // 是幂等的，不会再触发 UI 抖动。
         session.setPiPActive(false);
         // panelActionRestore：恢复到播放页，跳过清理（节点交还播放页继续播）。
         // requestDelete：用户主动关闭 PiP，意图是彻底停止——直接 release（不看前后台），
@@ -215,7 +232,6 @@ export class PiPManager {
         this.isRestoring = false;
         break;
       default:
-        // ABOUT_TO_STOP：节点/页面操作由 onPipStop / 系统处理。
         break;
     }
     for (const cb of this.lifecycleCallbacks) {

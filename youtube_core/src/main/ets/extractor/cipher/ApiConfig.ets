@@ -1,4 +1,4 @@
-/**
+﻿/**
  * API 配置 — 控制解密服务地址切换
  *
  * USE_LOCAL_API = true  → 使用本地 yt-dlp 解密服务（通过 USB hdc reverse 或 WiFi 局域网）
@@ -10,8 +10,8 @@
  */
 
 export class ApiConfig {
-  /** 是否使用本地解密服务 */
-  static readonly USE_LOCAL_API: boolean = true;
+  /** 是否使用本地解密服务（false = 使用远程 PipePipe API） */
+  static readonly USE_LOCAL_API: boolean = false;
 
   /** 本地解密服务地址（USB hdc reverse 模式） */
   static readonly LOCAL_DECODE_URL: string = 'http://127.0.0.1:8899';

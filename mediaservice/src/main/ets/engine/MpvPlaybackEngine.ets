@@ -65,10 +65,12 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       const demuxerMaxBytes = _config.mpvDemuxerMaxBytes ?? 20;
       const gpuApi = _config.mpvGpuApi ?? 'auto';
 
-      // 硬件解码配置
+      // 硬件解码配置：显式用 ohcodec-copy（buffer 模式），配合 native 的 vo=gpu-next。
+      // 不用 auto：auto 依赖 autoprobe 隐式跳过 surface 模式落到 ohcodec-copy，
+      // 而 hwdec_autoprobe_info[] 里只有 ohcodec 没有 ohcodec-copy，行为脆弱。
       if (hwdecEnabled) {
-        ctrl.setProperty('hwdec', 'auto');
-        Logger.info(TAG, 'Hardware decoding enabled: auto');
+        ctrl.setProperty('hwdec', 'ohcodec-copy');
+        Logger.info(TAG, 'Hardware decoding enabled: ohcodec-copy');
       } else {
         ctrl.setProperty('hwdec', 'no');
         Logger.info(TAG, 'Hardware decoding disabled');

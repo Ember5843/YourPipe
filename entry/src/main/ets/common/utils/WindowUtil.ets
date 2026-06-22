@@ -55,11 +55,12 @@ export class WindowUtil {
         AppStorage.setOrCreate('statusBarHeight', uiContext?.px2vp(area.topRect.height));
         AppStorage.setOrCreate('navBarHeight', uiContext?.px2vp(naviBarArea.bottomRect.height));
 
-        // 注册唯一的全局分发器，内部同时通知 BreakpointSystem 和播放页回调
+        // 注册唯一的全局分发器，内部同时通知 BreakpointSystem、系统栏策略和播放页回调
         this.globalSizeChangeHandler = (size: window.Size) => {
           AppStorage.setOrCreate('deviceWidth', size.width);
           AppStorage.setOrCreate('deviceHeight', size.height);
           BreakpointSystem.getInstance().onWindowSizeChange(windowClass);
+          this.updateSystemBar();
           this.playerSizeChangeCallback?.(size);
         };
         windowClass.on('windowSizeChange', this.globalSizeChangeHandler);
@@ -67,6 +68,9 @@ export class WindowUtil {
         windowClass.on('avoidAreaChange', (avoidAreaOption) => {
           WindowUtil.setAvoidArea(avoidAreaOption.type, avoidAreaOption.area);
         });
+
+        // 窗口就绪：按当前方向设置初始系统栏状态
+        this.updateSystemBar();
       } catch (error) {
         Logger.error(TAG, `setWindowStage getWindowProperties failed. Code:${err.code}, message:${err.message}`);
       }
@@ -113,6 +117,46 @@ export class WindowUtil {
     this.mainWindowClass.setWindowSystemBarEnable(['status', 'navigation']).catch((err: BusinessError) => {
       Logger.error(TAG, `enableWindowSystemBar failed, err.code:${err.code}, err.message:${err.message}`);
     });
+  }
+
+  // 播放器沉浸全屏标志：true 时强制隐藏系统栏（覆盖方向/尺寸规则）
+  private isPlayerFullscreenImmersive: boolean = false;
+
+  /**
+   * 设置播放器沉浸全屏标志并立即更新系统栏。
+   * 播放器进入沉浸全屏时传 true，退出全屏/离开播放页时传 false。
+   */
+  setPlayerFullscreenImmersive(value: boolean): void {
+    this.isPlayerFullscreenImmersive = value;
+    this.updateSystemBar();
+  }
+
+  /**
+   * 全局系统栏策略（唯一真相源）：
+   *   窄屏设备（短边 < 600vp）横屏 → 隐藏系统栏（珍惜竖向空间）
+   *   非窄屏设备 / 竖屏 → 显示系统栏
+   *   播放器沉浸全屏 → 强制隐藏（覆盖上述规则）
+   * 在 windowSizeChange、标志变更、页面进出时调用，保证任意时刻状态正确。
+   */
+  updateSystemBar(): void {
+    if (this.mainWindowClass === undefined) {
+      Logger.error(`MainWindowClass is undefined`);
+      return;
+    }
+    try {
+      const rect = this.mainWindowClass.getWindowProperties().windowRect;
+      const isLandscape = rect.width > rect.height;
+      const uiContext = this.mainWindowClass.getUIContext();
+      const shortSideVp = uiContext.px2vp(Math.min(rect.width, rect.height));
+      const shouldHide = this.isPlayerFullscreenImmersive || (isLandscape && shortSideVp < 600);
+      if (shouldHide) {
+        this.disableWindowSystemBar();
+      } else {
+        this.enableWindowSystemBar();
+      }
+    } catch (err) {
+      Logger.error(TAG, `updateSystemBar failed: ${JSON.stringify(err)}`);
+    }
   }
 
   /**
