@@ -62,7 +62,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       const hwdecEnabled = _config.mpvHwdecEnabled ?? true;
       const cacheSecs = _config.mpvCacheSecs ?? 10;
       const demuxerReadaheadSecs = _config.mpvDemuxerReadaheadSecs ?? 8;
-      const demuxerMaxBytes = _config.mpvDemuxerMaxBytes ?? 20;
       const gpuApi = _config.mpvGpuApi ?? 'auto';
 
       // 硬件解码配置：显式用 ohcodec-copy（buffer 模式），配合 native 的 vo=gpu-next。
@@ -82,28 +81,28 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         Logger.info(TAG, `GPU API set to: ${gpuApi}`);
       }
 
-      // 启用内存缓存（不写磁盘），改善seek性能和网络波动容忍度
+      // 内存缓存（不写磁盘）：提升 seek 与网络波动容忍度。
+      // 本地 proxy 回环不限速，mpv 可放开缓冲上限。
       ctrl.setProperty('cache', 'yes');
       ctrl.setProperty('cache-secs', `${cacheSecs}`);
       ctrl.setProperty('cache-on-disk', 'no');
       Logger.info(TAG, `Memory cache configured: ${cacheSecs}s`);
 
-      // 优化缓冲区配置以避免触发YouTube SABR限速
-      // demuxerMaxBytes: 用户可配置，单位 MB
-      const maxBytesValue = demuxerMaxBytes * 1024 * 1024;
+      // demuxer 预读：保留用户配置。
+      // 不再限制 demuxer-max-bytes / demuxer-max-back-bytes / stream-buffer-size：
+      //   这些是 SegmentBase 时代为规避 YouTube SABR 限速加的防御（让 mpv 别一次
+      //   请求过大 Range，配合 RangeProxy 的 10MB 上游截断）。现在 DASH 走本地
+      //   proxy（127.0.0.1），SABR 作用在 proxy→YouTube 这一跳，mpv→proxy 回环
+      //   不受限；且 manifest 已改用 SegmentList（每段 2-5s），mpv 按段请求，由
+      //   proxy 的 10MB 上游截断兜底。去掉后用 mpv 默认值（demuxer-max-bytes=
+      //   150MiB），4K HDR 高码率下 demuxer 能缓存足够时长，不再频繁
+      //   paused-for-cache。
       ctrl.setProperty('demuxer-readahead-secs', `${demuxerReadaheadSecs}`);
-      ctrl.setProperty('demuxer-max-bytes', `${maxBytesValue}`);
-      Logger.info(TAG, `Demuxer configured: readahead=${demuxerReadaheadSecs}s, max=${demuxerMaxBytes}MB`);
+      Logger.info(TAG, `Demuxer readahead=${demuxerReadaheadSecs}s (max-bytes/back/stream-buffer using mpv defaults)`);
 
-      // 回放缓冲降低到5MB，减少seek时的初始请求大小
-      ctrl.setProperty('demuxer-max-back-bytes', '5242880'); // 5MB
-
-      // 精确seek，改善seek精度和用户体验
+      // 精确 seek：framedrop=yes 让 seek 跳过未显示帧的解码，高分辨率下拖动更流畅。
       ctrl.setProperty('hr-seek', 'yes');
-      ctrl.setProperty('hr-seek-framedrop', 'no');
-
-      // 流缓冲保持4MB
-      ctrl.setProperty('stream-buffer-size', '4194304');
+      ctrl.setProperty('hr-seek-framedrop', 'yes');
 
       // FFmpeg HTTP 读到10MB截断后自动重连续传
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
