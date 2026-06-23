@@ -5,7 +5,7 @@ import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
 import { AuthAccountStatus, AuthStage } from 'youtube_core';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 
-const APP_VERSION: string = '0.5.0';
+const APP_VERSION: string = '0.5.1';
 
 interface OptionsMainPageParams {
   clickEffectEnabled: ClickEffect | null;
@@ -79,10 +79,13 @@ export struct OptionsMainPage {
 
   build() {
     Column() {
-      Scroll() {
-        Column({ space: 6 }) {
+      List({ space: 6 }) {
+        ListItem() {
           PlaybackSectionTitle({ title: '首选项' })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           OptionItem({
             icon: $r('sys.symbol.info_circle'),
             title: 'Google 登录',
@@ -91,9 +94,15 @@ export struct OptionsMainPage {
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onGoogleAccountClick
           })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_option_group_settings') })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           OptionItem({
             icon: $r('sys.symbol.translate_c2e'),
             title: $r('app.string.yt_section_language_region'),
@@ -102,7 +111,10 @@ export struct OptionsMainPage {
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onLanguageClick
           })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           OptionItem({
             icon: $r('sys.symbol.play_circle'),
             title: $r('app.string.yt_section_playback'),
@@ -111,7 +123,10 @@ export struct OptionsMainPage {
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onPlaybackClick
           })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           OptionItem({
             icon: $r('sys.symbol.paintpalette_fill'),
             title: $r('app.string.yt_option_appearance'),
@@ -120,9 +135,15 @@ export struct OptionsMainPage {
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onAppearanceClick
           })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_option_group_others') })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           OptionItem({
             icon: $r('sys.symbol.doc_text'),
             title: $r('app.string.yt_option_log'),
@@ -131,7 +152,10 @@ export struct OptionsMainPage {
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onLogClick
           })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           OptionItem({
             icon: $r('sys.symbol.arrow_counterclockwise'),
             title: $r('app.string.yt_option_recovery'),
@@ -140,7 +164,10 @@ export struct OptionsMainPage {
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onRecoveryClick
           })
+        }
+        .padding({ left: 0, right: 0 })
 
+        ListItem() {
           OptionItem({
             icon: $r('sys.symbol.info_circle'),
             title: $r('app.string.yt_option_about'),
@@ -150,13 +177,14 @@ export struct OptionsMainPage {
             onClickAction: this.params.onAboutClick
           })
         }
-        .width('100%')
-        .padding({ left: 16, right: 16, top: 8, bottom: 12 })
+        .padding({ left: 0, right: 0 })
       }
       .width('100%')
       .layoutWeight(1)
+      .padding({ left: 16, right: 16, top: 8, bottom: 12 })
       .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
+      .alignListItem(ListItemAlign.Start)
+      .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')

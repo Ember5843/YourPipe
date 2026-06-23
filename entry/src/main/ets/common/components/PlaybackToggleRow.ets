@@ -4,6 +4,7 @@ export struct PlaybackToggleRow {
   @Prop subtitle: ResourceStr = '';
   @Prop isOn: boolean;
   @Prop themeColor: ResourceColor = '#F1680D';
+  @Prop transparentBackground: boolean = false;
   onChange?: (val: boolean) => void;
 
   build() {
@@ -34,7 +35,7 @@ export struct PlaybackToggleRow {
     .width('100%')
     .constraintSize({ minHeight: 56 })
     .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-    .borderRadius(16)
+    .borderRadius(this.transparentBackground ? 0 : 16)
+    .backgroundColor(this.transparentBackground ? Color.Transparent : $r('app.color.yourtube_bg_surface_muted'))
   }
 }

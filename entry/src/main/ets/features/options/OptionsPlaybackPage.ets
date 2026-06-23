@@ -54,115 +54,182 @@ export struct OptionsPlaybackPage {
 
   build() {
     Column() {
-      Scroll() {
-        Column({ space: 6 }) {
+      List({ space: 6 }) {
+        ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_section_video') })
+        }
+        .padding({ left: 0, right: 0 })
 
-          PlaybackSelectRow({
-            title: $r('app.string.yt_setting_default_quality'),
-            options: this.getQualityOptions(),
-            selectedIndex: VIDEO_QUALITY_CAP_LABELS.indexOf(this.playbackConfig.defaultQuality),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const cap = VIDEO_QUALITY_CAP_LABELS[index];
-              this.params.updatePlaybackConfig(cfg => cfg.defaultQuality = cap);
-            }
-          })
+        ListItemGroup() {
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_default_quality'),
+              options: this.getQualityOptions(),
+              selectedIndex: VIDEO_QUALITY_CAP_LABELS.indexOf(this.playbackConfig.defaultQuality),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const cap = VIDEO_QUALITY_CAP_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.defaultQuality = cap);
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
 
-          if (PiPManager.getInstance().isPiPSupported()) {
+        if (PiPManager.getInstance().isPiPSupported()) {
+          ListItem() {
             PlaybackSectionTitle({ title: '画中画' })
+          }
+          .padding({ left: 0, right: 0 })
 
+          ListItemGroup() {
+            ListItem() {
+              PlaybackToggleRow({
+                title: '返回时进入画中画',
+                subtitle: '按返回键或 home 键时自动弹出画中画窗口',
+                isOn: this.playbackConfig.pipOnReturn,
+                themeColor: this.params.themeColor,
+                transparentBackground: true,
+                onChange: (val: boolean) => {
+                  this.params.updatePlaybackConfig(cfg => cfg.pipOnReturn = val);
+                }
+              })
+            }
+          }
+          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .borderRadius(16)
+          .clip(true)
+        }
+
+        ListItem() {
+          PlaybackSectionTitle({ title: '播放器' })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
             PlaybackToggleRow({
-              title: '返回时进入画中画',
-              subtitle: '按返回键或 home 键时自动弹出画中画窗口',
-              isOn: this.playbackConfig.pipOnReturn,
+              title: '硬件解码',
+              subtitle: '启用硬件加速解码，降低功耗并提升性能',
+              isOn: this.playbackConfig.hwdecEnabled,
               themeColor: this.params.themeColor,
+              transparentBackground: true,
               onChange: (val: boolean) => {
-                this.params.updatePlaybackConfig(cfg => cfg.pipOnReturn = val);
+                this.params.updatePlaybackConfig(cfg => cfg.hwdecEnabled = val);
               }
             })
           }
 
-          PlaybackSectionTitle({ title: '播放器' })
-
-          PlaybackToggleRow({
-            title: '硬件解码',
-            subtitle: '启用硬件加速解码，降低功耗并提升性能',
-            isOn: this.playbackConfig.hwdecEnabled,
-            themeColor: this.params.themeColor,
-            onChange: (val: boolean) => {
-              this.params.updatePlaybackConfig(cfg => cfg.hwdecEnabled = val);
-            }
-          })
-
-          PlaybackSelectRow({
-            title: 'GPU 渲染',
-            options: this.getGpuApiOptions(),
-            selectedIndex: GPU_API_LABELS.indexOf(this.playbackConfig.gpuApi),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const api = GPU_API_LABELS[index];
-              this.params.updatePlaybackConfig(cfg => cfg.gpuApi = api);
-            }
-          })
-
-          PlaybackSectionTitle({ title: '缓冲与网络' })
-
-          PlaybackSelectRow({
-            title: '内存缓存',
-            options: this.getCacheSecsOptions(),
-            selectedIndex: CACHE_SECS_LABELS.indexOf(this.playbackConfig.cacheSecs),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const secs = CACHE_SECS_LABELS[index];
-              this.params.updatePlaybackConfig(cfg => cfg.cacheSecs = secs);
-            }
-          })
-
-          PlaybackSelectRow({
-            title: '预读缓冲',
-            options: this.getReadaheadOptions(),
-            selectedIndex: DEMUXER_READAHEAD_LABELS.indexOf(this.playbackConfig.demuxerReadaheadSecs),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const secs = DEMUXER_READAHEAD_LABELS[index];
-              this.params.updatePlaybackConfig(cfg => cfg.demuxerReadaheadSecs = secs);
-            }
-          })
-
-          PlaybackSelectRow({
-            title: '缓冲区大小',
-            options: this.getMaxBytesOptions(),
-            selectedIndex: DEMUXER_MAX_BYTES_LABELS.indexOf(this.playbackConfig.demuxerMaxBytes),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const bytes = DEMUXER_MAX_BYTES_LABELS[index];
-              this.params.updatePlaybackConfig(cfg => cfg.demuxerMaxBytes = bytes);
-            }
-          })
-
-          PlaybackSectionTitle({ title: '下载' })
-
-          PlaybackSelectRow({
-            title: '并发下载任务',
-            options: this.getConcurrencyOptions(),
-            selectedIndex: DOWNLOAD_CONCURRENCY_VALUES.indexOf(this.uiConfig.maxConcurrentDownloads || 1),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const value = DOWNLOAD_CONCURRENCY_VALUES[index] || 1;
-              this.params.updateUiConfig(cfg => cfg.maxConcurrentDownloads = value);
-            }
-          })
-
-          Blank().height(24)
+          ListItem() {
+            PlaybackSelectRow({
+              title: 'GPU 渲染',
+              options: this.getGpuApiOptions(),
+              selectedIndex: GPU_API_LABELS.indexOf(this.playbackConfig.gpuApi),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const api = GPU_API_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.gpuApi = api);
+              }
+            })
+          }
         }
-        .width('100%')
-        .padding({ left: 16, right: 16 })
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: '缓冲与网络' })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackSelectRow({
+              title: '内存缓存',
+              options: this.getCacheSecsOptions(),
+              selectedIndex: CACHE_SECS_LABELS.indexOf(this.playbackConfig.cacheSecs),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const secs = CACHE_SECS_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.cacheSecs = secs);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: '预读缓冲',
+              options: this.getReadaheadOptions(),
+              selectedIndex: DEMUXER_READAHEAD_LABELS.indexOf(this.playbackConfig.demuxerReadaheadSecs),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const secs = DEMUXER_READAHEAD_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.demuxerReadaheadSecs = secs);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: '缓冲区大小',
+              options: this.getMaxBytesOptions(),
+              selectedIndex: DEMUXER_MAX_BYTES_LABELS.indexOf(this.playbackConfig.demuxerMaxBytes),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const bytes = DEMUXER_MAX_BYTES_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.demuxerMaxBytes = bytes);
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: '下载' })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackSelectRow({
+              title: '并发下载任务',
+              options: this.getConcurrencyOptions(),
+              selectedIndex: DOWNLOAD_CONCURRENCY_VALUES.indexOf(this.uiConfig.maxConcurrentDownloads || 1),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const value = DOWNLOAD_CONCURRENCY_VALUES[index] || 1;
+                this.params.updateUiConfig(cfg => cfg.maxConcurrentDownloads = value);
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
+
+        ListItem() {
+          Column().height(24)
+        }
+        .padding({ left: 0, right: 0 })
       }
       .width('100%')
       .layoutWeight(1)
+      .padding({ left: 16, right: 16 })
       .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
+      .alignListItem(ListItemAlign.Start)
+      .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')

@@ -6,15 +6,14 @@ export struct OptionItem {
   @Prop showChevron: boolean = true;
   @Prop iconColor: ResourceColor = '#F1680D';
   @Prop clickEffectEnabled: ClickEffect | null = null;
+  @Prop transparentBackground: boolean = false;
   onClickAction?: () => void;
 
   @Styles
   RowStyle() {
     .width('100%')
-    .borderRadius(16)
     .constraintSize({ minHeight: 56 })
     .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
   }
 
   build() {
@@ -51,6 +50,8 @@ export struct OptionItem {
       }
     }
     .RowStyle()
+    .borderRadius(this.transparentBackground ? 0 : 16)
+    .backgroundColor(this.transparentBackground ? Color.Transparent : $r('app.color.yourtube_bg_surface_muted'))
     .clickEffect(this.clickEffectEnabled)
     .onClick(() => {
       if (this.onClickAction) {

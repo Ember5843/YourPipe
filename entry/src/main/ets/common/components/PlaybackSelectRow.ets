@@ -7,6 +7,7 @@ export struct PlaybackSelectRow {
   @Prop @Watch('onSelectedIndexChange') selectedIndex: number;
   @State selectedValue: string = '';
   @Prop fontColor: ResourceColor = '#F1680D';
+  @Prop transparentBackground: boolean = false;
   onChange?: (index: number) => void;
 
   aboutToAppear() {
@@ -59,7 +60,7 @@ export struct PlaybackSelectRow {
     .width('100%')
     .constraintSize({ minHeight: 56 })
     .padding({ left: 16, right: 8, top: 4, bottom: 4 })
-    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-    .borderRadius(16)
+    .borderRadius(this.transparentBackground ? 0 : 16)
+    .backgroundColor(this.transparentBackground ? Color.Transparent : $r('app.color.yourtube_bg_surface_muted'))
   }
 }

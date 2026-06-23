@@ -5,8 +5,8 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 
-const APP_VERSION = '0.5.0';
-const APP_BUILD = '1000009';
+const APP_VERSION = '0.5.1';
+const APP_BUILD = '1000010';
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
 
@@ -39,6 +39,17 @@ const AI_MODELS: string[] = [
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.5.1', date: '2026-06-23',
+    changes: [
+      '修复部分已知bug',
+      '对齐PipePipe问题',
+      '修复登录后无法观看的bug',
+      '修复横屏模式信息栏不当弹出的问题',
+      '优化设置页面UI',
+      '完成本地解密逻辑验证，准备实装',
+    ],
+  },
   {
     version: '0.5.0', date: '2026-06-18',
     changes: [

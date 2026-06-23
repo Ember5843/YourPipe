@@ -72,51 +72,67 @@ export struct OptionsLanguageAndRegionPage {
 
   build() {
     Column() {
-      Scroll() {
-        Column({ space: 6 }) {
+      List({ space: 6 }) {
+        ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_section_language') })
-
-          OptionItem({
-            title: $r('app.string.yt_setting_ui_language'),
-            subtitle: this.getAppLanguageSubtitle(),
-            showChevron: true,
-            clickEffectEnabled: this.params.clickEffectEnabled,
-            onClickAction: () => {
-              this.openAppLanguageDialog();
-            }
-          })
-
-          PlaybackSelectRow({
-            title: $r('app.string.yt_setting_content_language'),
-            options: this.getContentLangOptions(),
-            selectedIndex: this.params.contentLangItems.findIndex(it => it.code === this.uiConfig.searchLanguage),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const code = this.params.contentLangItems[index].code;
-              this.params.updateUiConfig(cfg => cfg.searchLanguage = code === 'default' ? 'default' : code);
-              this.params.reloadHomeForSearchLocaleChange();
-            }
-          })
-
-          PlaybackSelectRow({
-            title: $r('app.string.yt_setting_content_region'),
-            options: this.getContentCountryOptions(),
-            selectedIndex: this.params.contentCountryItems.findIndex(it => it.code === this.uiConfig.searchCountry),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const code = this.params.contentCountryItems[index].code;
-              this.params.updateUiConfig(cfg => cfg.searchCountry = code === 'default' ? 'default' : code.toUpperCase());
-              this.params.reloadHomeForSearchLocaleChange();
-            }
-          })
         }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 })
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            OptionItem({
+              title: $r('app.string.yt_setting_ui_language'),
+              subtitle: this.getAppLanguageSubtitle(),
+              showChevron: true,
+              clickEffectEnabled: this.params.clickEffectEnabled,
+              transparentBackground: true,
+              onClickAction: () => {
+                this.openAppLanguageDialog();
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_content_language'),
+              options: this.getContentLangOptions(),
+              selectedIndex: this.params.contentLangItems.findIndex(it => it.code === this.uiConfig.searchLanguage),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const code = this.params.contentLangItems[index].code;
+                this.params.updateUiConfig(cfg => cfg.searchLanguage = code === 'default' ? 'default' : code);
+                this.params.reloadHomeForSearchLocaleChange();
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_content_region'),
+              options: this.getContentCountryOptions(),
+              selectedIndex: this.params.contentCountryItems.findIndex(it => it.code === this.uiConfig.searchCountry),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const code = this.params.contentCountryItems[index].code;
+                this.params.updateUiConfig(cfg => cfg.searchCountry = code === 'default' ? 'default' : code.toUpperCase());
+                this.params.reloadHomeForSearchLocaleChange();
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
       }
       .width('100%')
       .layoutWeight(1)
+      .padding({ left: 16, right: 16, bottom: 12 })
       .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
+      .alignListItem(ListItemAlign.Start)
+      .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')

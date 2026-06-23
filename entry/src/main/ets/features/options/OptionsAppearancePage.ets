@@ -66,68 +66,96 @@ export struct OptionsAppearancePage {
 
   build() {
     Column() {
-      Scroll() {
-        Column({ space: 6 }) {
+      List({ space: 6 }) {
+        ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_dark_mode_title') })
-
-          PlaybackSelectRow({
-            title: $r('app.string.yt_dark_mode_title'),
-            options: this.getDarkModeOptions(),
-            selectedIndex: this.getDarkModeIndex(),
-            fontColor: this.params.themeColor,
-            onChange: (index: number) => {
-              const mode = [YourtubeDarkMode.SYSTEM, YourtubeDarkMode.LIGHT, YourtubeDarkMode.DARK][index];
-              this.params.applyDarkModeSelection(mode);
-            }
-          })
-
-          PlaybackSectionTitle({ title: '主题色' })
-
-          Column({ space: 12 }) {
-            Row() {
-              Text('当前')
-                .fontSize(13)
-                .fontColor($r('app.color.yourtube_text_secondary'))
-                .layoutWeight(1)
-
-              Text(ThemeManager.getPreset(this.uiConfig.colorPreset).displayName)
-                .fontSize(13)
-                .fontColor(this.themePrimary)
-                .fontWeight(FontWeight.Medium)
-            }
-            .width('100%')
-
-            Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
-              ForEach(COLOR_PRESETS, (preset: ColorPresetItem) => {
-                this.ColorSwatch(preset)
-              }, (preset: ColorPresetItem) => preset.id)
-            }
-            .width('100%')
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-          .backgroundColor($r('app.color.yourtube_bg_surface'))
-          .borderRadius(12)
-
-          PlaybackSectionTitle({ title: $r('app.string.yt_setting_home_layout') })
-
-          PlaybackToggleRow({
-            title: $r('app.string.yt_layout_grid'),
-            subtitle: this.uiConfig.homeLayoutMode === 'grid' ? '卡片模式' : '列表模式',
-            isOn: this.uiConfig.homeLayoutMode === 'grid',
-            themeColor: this.params.themeColor,
-            onChange: (val: boolean) => {
-              this.params.updateUiConfig(cfg => { cfg.homeLayoutMode = val ? 'grid' : 'list'; });
-            }
-          })
         }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 })
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_dark_mode_title'),
+              options: this.getDarkModeOptions(),
+              selectedIndex: this.getDarkModeIndex(),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const mode = [YourtubeDarkMode.SYSTEM, YourtubeDarkMode.LIGHT, YourtubeDarkMode.DARK][index];
+                this.params.applyDarkModeSelection(mode);
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
+
+        ListItem() {
+          PlaybackSectionTitle({ title: '主题色' })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            Column({ space: 12 }) {
+              Row() {
+                Text('当前')
+                  .fontSize(13)
+                  .fontColor($r('app.color.yourtube_text_secondary'))
+                  .layoutWeight(1)
+
+                Text(ThemeManager.getPreset(this.uiConfig.colorPreset).displayName)
+                  .fontSize(13)
+                  .fontColor(this.themePrimary)
+                  .fontWeight(FontWeight.Medium)
+              }
+              .width('100%')
+
+              Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+                ForEach(COLOR_PRESETS, (preset: ColorPresetItem) => {
+                  this.ColorSwatch(preset)
+                }, (preset: ColorPresetItem) => preset.id)
+              }
+              .width('100%')
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_setting_home_layout') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_layout_grid'),
+              subtitle: this.uiConfig.homeLayoutMode === 'grid' ? '卡片模式' : '列表模式',
+              isOn: this.uiConfig.homeLayoutMode === 'grid',
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updateUiConfig(cfg => { cfg.homeLayoutMode = val ? 'grid' : 'list'; });
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
       }
       .width('100%')
       .layoutWeight(1)
+      .padding({ left: 16, right: 16, bottom: 12 })
       .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
+      .alignListItem(ListItemAlign.Start)
+      .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')
