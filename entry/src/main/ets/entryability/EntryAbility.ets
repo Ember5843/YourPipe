@@ -141,14 +141,12 @@ export default class EntryAbility extends UIAbility {
     // Ability has brought to foreground
     logger.info('Ability onForeground');
     AppStorage.setOrCreate('isAppBackground', false);
-    this.setContinueState(AbilityConstant.ContinueState.ACTIVE);
   }
 
   onBackground(): void {
     // Ability has back to background
     logger.info('Ability onBackground');
     AppStorage.setOrCreate('isAppBackground', true);
-    this.setContinueState(AbilityConstant.ContinueState.INACTIVE);
     // 后台长时任务由 PlayerStateMachine 统一管理；此处保留兜底注册以应对极端时序
     // （重复注册返回 9800005 会被静默忽略，详见 BackgroundTaskManager）。
     BackgroundTaskManager.startContinuousTask(this.context);
@@ -164,14 +162,6 @@ export default class EntryAbility extends UIAbility {
       return;
     }
     AppStorage.setOrCreate(PlaybackContinuationService.APP_STORAGE_PENDING_KEY, JSON.stringify(payload));
-  }
-
-  private setContinueState(state: AbilityConstant.ContinueState): void {
-    try {
-      this.context.setMissionContinueState(state);
-    } catch (err) {
-      logger.warn(`setMissionContinueState failed: ${JSON.stringify(err)}`);
-    }
   }
 
   private updateBreakpoint(windowWidth: number): void {

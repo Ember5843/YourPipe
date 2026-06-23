@@ -1,6 +1,6 @@
 import { AppLog } from './AppLog';
-import { common } from '@kit.AbilityKit';
-import { AvPlayerController, VideoData, PlayerState } from 'mediaservice';
+import { AbilityConstant, common } from '@kit.AbilityKit';
+import { AvPlayerController, VideoData, PlayerState, StateChangeListener } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { PlayQueueManager } from '../features/player/PlayQueueManager';
@@ -76,7 +76,8 @@ export class PlayerSession {
     this._controller = new AvPlayerController(this._defaultSource);
     this.bindControllerQueueControls();
     this.bindQueueSwitchHandler();
-    logger.debug(`${TAG} PlayerSession created`);
+    this.registerContinueStateListener();
+    logger.debug(`${TAG} Session reset`);
   }
 
   get controller(): AvPlayerController {
@@ -139,6 +140,28 @@ export class PlayerSession {
   private isSessionActive(): boolean {
     const s = this._controller.playerState;
     return s !== PlayerState.RELEASED && s !== PlayerState.IDLE;
+  }
+
+  private continueStateListener: ContinueStateListener | null = null;
+
+  private registerContinueStateListener(): void {
+    this.continueStateListener = new ContinueStateListener(this._context);
+    this._controller.addStateListener(this.continueStateListener);
+    this.handleContinueStateChange(this._controller.playerState);
+  }
+
+  private handleContinueStateChange(to: PlayerState): void {
+    const activeStates: Set<PlayerState> = new Set<PlayerState>([
+      PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.READY
+    ]);
+    const state: AbilityConstant.ContinueState = activeStates.has(to)
+      ? AbilityConstant.ContinueState.ACTIVE
+      : AbilityConstant.ContinueState.INACTIVE;
+    try {
+      this._context.setMissionContinueState(state);
+    } catch (err) {
+      logger.warn(`${TAG} setMissionContinueState(${to}→${state}) failed: ${JSON.stringify(err)}`);
+    }
   }
 
   // ──── Surface 绑定 ────
@@ -451,6 +474,29 @@ export class PlayerSession {
     this._controller = new AvPlayerController(this._defaultSource);
     this.bindControllerQueueControls();
     this.bindQueueSwitchHandler();
+    this.registerContinueStateListener();
     logger.debug(`${TAG} Session reset`);
+  }
+}
+
+class ContinueStateListener implements StateChangeListener {
+  private context: common.UIAbilityContext;
+
+  constructor(context: common.UIAbilityContext) {
+    this.context = context;
+  }
+
+  onStateChange(_from: PlayerState, to: PlayerState): void {
+    const activeStates: Set<PlayerState> = new Set<PlayerState>([
+      PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.READY
+    ]);
+    const state: AbilityConstant.ContinueState = activeStates.has(to)
+      ? AbilityConstant.ContinueState.ACTIVE
+      : AbilityConstant.ContinueState.INACTIVE;
+    try {
+      this.context.setMissionContinueState(state);
+    } catch (err) {
+      logger.warn(`${TAG} setMissionContinueState(${to}→${state}) failed: ${JSON.stringify(err)}`);
+    }
   }
 }

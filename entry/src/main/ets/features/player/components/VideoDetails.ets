@@ -31,6 +31,8 @@ import common from '@ohos.app.ability.common';
 import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSession';
 import { AVCastPickerStyle, avSession } from '@kit.AVSessionKit';
 import type { BusinessError } from '@kit.BasicServicesKit';
+import { systemShare } from '@kit.ShareKit';
+import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 
 const TAG: string = '[VideoDetails]';
 
@@ -545,7 +547,22 @@ export struct VideoDetails {
   }
 
   private shareVideo(): void {
-    const url = `https://youtu.be/${this.item.videoId}`;
-    this.getUIContext().getPromptAction().showToast({ message: `分享: ${url}` });
+    try {
+      const videoId = (this.item.videoId || '').trim();
+      const title = this.item.title || '';
+      const url = videoId ? `https://www.youtube.com/watch?v=${videoId}` : '';
+      const content = url ? `${title}\n${url}` : title;
+      const data: systemShare.SharedData = new systemShare.SharedData({
+        utd: utd.UniformDataType.PLAIN_TEXT,
+        content
+      });
+      const controller: systemShare.ShareController = new systemShare.ShareController(data);
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      controller.show(context, {
+        selectionMode: systemShare.SelectionMode.SINGLE
+      });
+    } catch (err) {
+      Logger.error(TAG, `share video failed: ${JSON.stringify(err)}`);
+    }
   }
 }

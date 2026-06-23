@@ -16,6 +16,8 @@ import { AppLog } from '../../common/AppLog';
 
 import { window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
+import { harmonyShare, systemShare } from '@kit.ShareKit';
+import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { CommonConstants as Const, VideoData } from 'mediaservice';
 import { WindowUtil } from '../../common/utils/WindowUtil';
 import { VideoDetails } from './components/VideoDetails';
@@ -91,10 +93,39 @@ export struct VideoPlayerPage {
   @StorageLink('isPiPActive') isPiPActive: boolean = false;
   /** 播放设置（含 pipOnReturn） */
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
+  @StorageProp('isAppBackground') @Watch('onAppBackgroundChange') isAppBackground: boolean = false;
   private windowUtil: WindowUtil = WindowUtil.getInstance();
   private handleExitFullscreen: () => void = () => {
     this.handleFullScreenExit();
   };
+
+  private knockShareCallback = (sharableTarget: harmonyShare.SharableTarget): void => {
+    try {
+      const video = PlayerSession.getInstance().currentVideo;
+      if (!video || !video.videoId) {
+        return;
+      }
+      const url = `https://www.youtube.com/watch?v=${video.videoId}`;
+      const shareData: systemShare.SharedData = new systemShare.SharedData({
+        utd: utd.UniformDataType.HYPERLINK,
+        content: url,
+        title: video.title || '',
+        description: video.author || '',
+        thumbnailUri: video.thumbnailUrl || ''
+      });
+      sharableTarget.share(shareData);
+    } catch (err) {
+      logger.error(`${TAG} knockShare failed: ${JSON.stringify(err)}`);
+    }
+  };
+
+  private onAppBackgroundChange(): void {
+    if (this.isAppBackground) {
+      harmonyShare.off('knockShare', this.knockShareCallback);
+    } else {
+      harmonyShare.on('knockShare', this.knockShareCallback);
+    }
+  }
 
   private getVideoHeightVp(): number {
     // 宽布局（折叠屏展开/平板横屏）或全屏 → 撑满
@@ -275,9 +306,12 @@ export struct VideoPlayerPage {
         return null;
       }
     });
+
+    harmonyShare.on('knockShare', this.knockShareCallback);
   }
 
   aboutToDisappear(): void {
+    harmonyShare.off('knockShare', this.knockShareCallback);
     // 离开播放页：清除沉浸全屏标志，由 WindowUtil 全局策略按方向决定系统栏
     this.windowUtil.setPlayerFullscreenImmersive(false);
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
