@@ -18,6 +18,8 @@ import { window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { harmonyShare, systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
+import { fileUri, fileIo as fs } from '@kit.CoreFileKit';
+import { http } from '@kit.NetworkKit';
 import { CommonConstants as Const, VideoData } from 'mediaservice';
 import { WindowUtil } from '../../common/utils/WindowUtil';
 import { VideoDetails } from './components/VideoDetails';
@@ -98,6 +100,43 @@ export struct VideoPlayerPage {
   private handleExitFullscreen: () => void = () => {
     this.handleFullScreenExit();
   };
+  private cachedThumbnailUri: string = '';
+
+  private async cacheThumbnail(videoId: string, thumbnailUrl: string): Promise<void> {
+    if (!videoId || !thumbnailUrl) {
+      this.cachedThumbnailUri = '';
+      return;
+    }
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const localPath = `${context.cacheDir}/thumb_${videoId}.jpg`;
+    try {
+      if (fs.accessSync(localPath)) {
+        this.cachedThumbnailUri = fileUri.getUriFromPath(localPath);
+        return;
+      }
+    } catch (_e) {
+    }
+    try {
+      const downloader = http.createHttp();
+      const data = await downloader.request(thumbnailUrl, {
+        method: http.RequestMethod.GET,
+        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        connectTimeout: 5000,
+        readTimeout: 8000,
+      });
+      downloader.destroy();
+      if (data.responseCode === 200 && data.result instanceof ArrayBuffer) {
+        const file = fs.openSync(localPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
+        fs.writeSync(file.fd, data.result);
+        fs.closeSync(file);
+        this.cachedThumbnailUri = fileUri.getUriFromPath(localPath);
+        logger.info(`${TAG} thumbnail cached: ${localPath}`);
+      }
+    } catch (e) {
+      this.cachedThumbnailUri = '';
+      logger.warn(`${TAG} cacheThumbnail failed: ${e}`);
+    }
+  }
 
   private knockShareCallback = (sharableTarget: harmonyShare.SharableTarget): void => {
     try {
@@ -111,7 +150,7 @@ export struct VideoPlayerPage {
         content: url,
         title: video.title || '',
         description: video.author || '',
-        thumbnailUri: video.thumbnailUrl || ''
+        thumbnailUri: this.cachedThumbnailUri || ''
       });
       sharableTarget.share(shareData);
     } catch (err) {
@@ -342,6 +381,8 @@ export struct VideoPlayerPage {
     }
     const session = PlayerSession.getInstance();
     this.isVideoChanging = true;
+
+    this.cacheThumbnail(this.video.videoId, this.video.thumbnailUrl);
 
     // 同视频已就绪：直接同步，使用缓存数据
     if (session.currentVideo?.videoId === this.video?.videoId && session.controller.vm.isReady) {

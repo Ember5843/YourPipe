@@ -26,6 +26,11 @@ export default class EntryAbility extends UIAbility {
   private curBp: string = '';
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate('context', this.context);
+    try {
+      this.context.setMissionContinueState(AbilityConstant.ContinueState.INACTIVE);
+    } catch (err) {
+      logger.warn(`setMissionContinueState(INACTIVE) on create failed: ${JSON.stringify(err)}`);
+    }
     this.handleContinuationWant(want, launchParam);
     try {
       let systemLanguage: string = i18n.System.getSystemLanguage();
