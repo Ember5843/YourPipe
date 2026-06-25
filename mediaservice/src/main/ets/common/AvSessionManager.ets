@@ -41,6 +41,12 @@ export class AvSessionManager {
   public onCastStateChange: ((isCasting: boolean, deviceName: string) => void) | undefined = undefined;
   public onCastPlaybackStateChange: ((state: avSession.AVPlaybackState) => void) | undefined = undefined;
 
+  // Audio focus callbacks (wired by AvPlayerController)
+  public onSystemPause: (() => void) | undefined = undefined;
+  public onSystemResume: (() => void) | undefined = undefined;
+  public onSystemDuck: (() => void) | undefined = undefined;
+  public onSystemUnduck: (() => void) | undefined = undefined;
+
   private constructor() {}
 
   public static getInstance(): AvSessionManager {
@@ -65,14 +71,12 @@ export class AvSessionManager {
       return;
     }
 
-    // Activate AudioSession BEFORE creating any audio stream.
-    // CONCURRENCY_MIX_WITH_OTHERS lowers our stream's focus priority so the
-    // system won't PAUSE/STOP us when transient streams (notifications, etc.)
-    // arrive. Instead it will MIX or DUCK. The native ao_ohaudio.c already
-    // handles DUCK/UNDUCK events (mpv multiply volume 0.2 / 5.0), so ducking
-    // works out of the box. Without this, system default policy PAUSEs media
-    // on ringtone/alarm/VoIP and the user has no "lower volume" option.
-    this.activateAudioSession();
+    // AudioSession is NOT activated here. Activation follows playback state:
+    // AvPlayerController.syncPlay() → activateForPlayback()
+    // AvPlayerController.syncPause() / syncStop() → deactivateForPause()
+    // This way the focus strategy (CONCURRENCY_PAUSE_OTHERS) only applies
+    // while our audio is actively playing, and is released on pause/stop
+    // so background streams can resume normally.
 
     if (this.session) {
       // Already initialized — just reactivate
@@ -107,7 +111,7 @@ export class AvSessionManager {
    * Call when the player is fully stopped/released.
    */
   public async destroy(): Promise<void> {
-    this.deactivateAudioSession();
+    this.deactivateForPause();
     if (!this.session) {
       return;
     }
@@ -386,24 +390,21 @@ export class AvSessionManager {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // AudioSession — audio focus concurrency strategy
+  // AudioSession — audio focus concurrency strategy & interrupt handling
   //
-  // The AVSession only manages the media control card (lock screen / notification
-  // bar). AudioSession is what tells the OS *how* to handle audio focus when
-  // other streams arrive. Without it, the system default policy PAUSEs our
-  // STREAM_USAGE_MOVIE stream on ringtone/alarm/VoIP/notifications, giving the
-  // user no "lower volume" (duck) option.
+  // Follows the official pattern from the HarmonyOS audio focus doc:
+  //   1. Activate with CONCURRENCY_PAUSE_OTHERS BEFORE audio starts.
+  //      Our MOVIE stream will PAUSE (not STOP) background MUSIC/MOVIE/AUDIOBOOK.
+  //   2. Deactivate when playback pauses/stops → releases focus so background
+  //      streams can resume.
+  //   3. Re-activate on next play().
   //
-  // CONCURRENCY_MIX_WITH_OTHERS lowers our stream's focus priority. The system
-  // then prefers MIX or DUCK over PAUSE/STOP for transient interrupters. The
-  // native ao_ohaudio.c + player_napi.cpp already handle DUCK/UNDUCK by
-  // multiplying mpv volume by 0.2 / 5.0, so ducking works end-to-end.
-  //
-  // Must be activated BEFORE the OHAudio renderer is created (i.e. before mpv
-  // load), otherwise the custom strategy does not take effect.
+  // Interrupt events (PAUSE/RESUME/STOP/DUCK/UNDUCK) are delivered via
+  // on('audioSessionStateChanged') and dispatched to AvPlayerController through
+  // the onSystemPause/onSystemResume/onSystemDuck/onSystemUnduck callbacks.
   // ─────────────────────────────────────────────────────────────────────────
 
-  private activateAudioSession(): void {
+  public activateForPlayback(): void {
     if (this.audioSessionActivated) {
       return;
     }
@@ -412,47 +413,80 @@ export class AvSessionManager {
         const audioManager: audio.AudioManager = audio.getAudioManager();
         this.audioSessionManager = audioManager.getSessionManager();
       }
+
+      // 先 off 旧监听，防止重复注册导致同一事件回调多次
+      try {
+        this.audioSessionManager.off('audioSessionDeactivated');
+        this.audioSessionManager.off('audioSessionStateChanged');
+      } catch (_) {}
+
+      this.audioSessionManager.setAudioSessionScene(
+        audio.AudioSessionScene.AUDIO_SESSION_SCENE_MEDIA);
       const strategy: audio.AudioSessionStrategy = {
-        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
+        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_PAUSE_OTHERS
       };
       this.audioSessionManager.activateAudioSession(strategy).then(() => {
         this.audioSessionActivated = true;
-        Logger.info(TAG, 'AudioSession activated: CONCURRENCY_MIX_WITH_OTHERS');
+        Logger.info(TAG, 'AudioSession activated: CONCURRENCY_PAUSE_OTHERS');
       }).catch((e: BusinessError) => {
         Logger.error(TAG, `activateAudioSession failed: code=${e.code}, message=${e.message}`);
       });
-      // Listen for unexpected deactivation (e.g. system reclaim) and re-activate
-      // so the strategy persists across the entire playback session.
+
+      // 系统停用 AudioSession 时不自动重激活——重激活会抢回焦点，
+      // 导致与其他应用反复抢占形成死循环。由用户点播放时自然重激活。
       this.audioSessionManager.on('audioSessionDeactivated',
         (event: audio.AudioSessionDeactivatedEvent) => {
           Logger.info(TAG, `AudioSession deactivated by system: reason=${event.reason}`);
           this.audioSessionActivated = false;
-          // Re-activate if our AVSession is still alive (playback ongoing)
-          if (this.session) {
-            this.activateAudioSession();
-          }
+        });
+
+      this.audioSessionManager.on('audioSessionStateChanged',
+        (event: audio.AudioSessionStateChangedEvent) => {
+          this.handleFocusHint(event.stateChangeHint);
         });
     } catch (e) {
       Logger.error(TAG, `activateAudioSession exception: ${(e as BusinessError).message}`);
     }
   }
 
-  private deactivateAudioSession(): void {
+  public deactivateForPause(): void {
     if (!this.audioSessionManager) {
       return;
     }
     try {
       this.audioSessionManager.off('audioSessionDeactivated');
+      this.audioSessionManager.off('audioSessionStateChanged');
     } catch (e) {
-      Logger.warn(TAG, `off audioSessionDeactivated failed: ${(e as BusinessError).message}`);
+      Logger.warn(TAG, `off audioSession listeners failed: ${(e as BusinessError).message}`);
     }
     if (this.audioSessionActivated) {
       this.audioSessionManager.deactivateAudioSession().then(() => {
-        Logger.info(TAG, 'AudioSession deactivated');
+        Logger.info(TAG, 'AudioSession deactivated — focus released');
       }).catch((e: BusinessError) => {
         Logger.error(TAG, `deactivateAudioSession failed: code=${e.code}, message=${e.message}`);
       });
       this.audioSessionActivated = false;
+    }
+  }
+
+  private handleFocusHint(hint: audio.AudioSessionStateChangeHint): void {
+    Logger.info(TAG, `audioSessionStateChanged: hint=${hint}`);
+    switch (hint) {
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_PAUSE:
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_STOP:
+        this.onSystemPause?.();
+        break;
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_RESUME:
+        this.onSystemResume?.();
+        break;
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_DUCK:
+        this.onSystemDuck?.();
+        break;
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_UNDUCK:
+        this.onSystemUnduck?.();
+        break;
+      default:
+        break;
     }
   }
 }

@@ -65,6 +65,7 @@ export class AvPlayerController {
   private currentLocalMediaSessionId: string = '';
   private pendingDestroySessionId: string = '';
   private pendingStartFromSec: number = 0;
+
   /** 上一次 updateVideoSource 处理过的 source 引用，用于幂等去重。 */
   private lastUpdatedSourceRef: VideoData | null = null;
   /** 上一次 updateVideoSource 处理过的 videoId，用于幂等去重（引用比较在 @State/@Link 下不可靠）。 */
@@ -75,6 +76,11 @@ export class AvPlayerController {
   private isRecovering: boolean = false;
   private readonly MAX_ERROR_RETRIES = 2;
   private lastKnownGoodPosition: number = 0;
+
+  // Audio focus state
+  private systemPausedByFocus: boolean = false;
+  private duckActive: boolean = false;
+  private savedVolume: number = 100;
   public onRequestRefreshStreams?: (videoId: string, resumePos: number) => Promise<VideoData | null>;
   public onErrorNeedsUserAction?: (errorMsg: string) => void;
 
@@ -238,6 +244,36 @@ export class AvPlayerController {
       this.onCastStateChange?.(isCasting, deviceName);
     };
 
+    this.avSessionManager.onSystemPause = () => {
+      Logger.info(TAG, 'System interrupt → pause');
+      this.systemPausedByFocus = true;
+      this.playbackEngine.pause();
+      this.refreshPlaybackState();
+    };
+    this.avSessionManager.onSystemResume = () => {
+      if (this.systemPausedByFocus) {
+        Logger.info(TAG, 'System interrupt resolved → resume');
+        this.systemPausedByFocus = false;
+        this.playbackEngine.play();
+        this.refreshPlaybackState();
+      }
+    };
+    this.avSessionManager.onSystemDuck = () => {
+      if (!this.duckActive) {
+        this.duckActive = true;
+        this.savedVolume = this.playbackEngine.getVolume();
+        this.playbackEngine.setVolume(this.savedVolume * 0.2);
+        Logger.info(TAG, `System duck → volume ${this.savedVolume} → ${this.savedVolume * 0.2}`);
+      }
+    };
+    this.avSessionManager.onSystemUnduck = () => {
+      if (this.duckActive) {
+        this.duckActive = false;
+        this.playbackEngine.setVolume(this.savedVolume);
+        Logger.info(TAG, `System unduck → volume restored to ${this.savedVolume}`);
+      }
+    };
+
     const ok = await this.playbackEngine.initialize(AvPlayerController.engineConfigProvider?.() ?? {});
     if (ok) {
       this.playbackEngine.setStateCallback((state: PlaybackState) => this.onPlaybackStateChange(state));
@@ -330,6 +366,7 @@ export class AvPlayerController {
       this.vm.isBuffering = true;
       this.playbackEngine.load(playbackUrl, 0);
       if (newSource.play || newSource.auto) {
+        this.avSessionManager.activateForPlayback();
         this.playbackEngine.play();
       }
       return;
@@ -352,6 +389,7 @@ export class AvPlayerController {
     this.playbackEngine.load(playbackUrl, this.pendingStartFromSec);
     this.pendingStartFromSec = 0;
     if (newSource.play || newSource.auto) {
+      this.avSessionManager.activateForPlayback();
       this.playbackEngine.play();
     }
   }
@@ -400,19 +438,30 @@ export class AvPlayerController {
 
   public syncPlay(): void {
     if (!this.isActive()) return;
+    this.systemPausedByFocus = false;
     if (this.vm.isEnded) {
       this.playbackEngine.seek(0, true);
       this.vm.isEnded = false;
     }
+    // Activate AudioSession with PAUSE_OTHERS before playing,
+    // so our stream PAUSEs (not STOPs) background audio.
+    this.avSessionManager.activateForPlayback();
     this.playbackEngine.play();
   }
 
   public syncPause(): void {
-    if (this.isActive()) this.playbackEngine.pause();
+    if (!this.isActive()) return;
+    this.systemPausedByFocus = false;
+    this.playbackEngine.pause();
+    // Release focus so background audio can resume.
+    this.avSessionManager.deactivateForPause();
   }
 
   public syncStop(): void {
-    if (this.isActive()) this.playbackEngine.stop();
+    if (!this.isActive()) return;
+    this.systemPausedByFocus = false;
+    this.playbackEngine.stop();
+    this.avSessionManager.deactivateForPause();
   }
 
   public syncSeek(seekTime: number): void {

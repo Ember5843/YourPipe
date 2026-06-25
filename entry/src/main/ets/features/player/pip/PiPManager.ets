@@ -250,9 +250,9 @@ export class PiPManager {
     switch (param.controlType) {
       case PiPWindow.PiPControlType.VIDEO_PLAY_PAUSE: {
         if (param.status === PiPWindow.PiPControlStatus.PLAY) {
-          controller.syncPause();
-        } else {
           controller.syncPlay();
+        } else {
+          controller.syncPause();
         }
         break;
       }
@@ -318,6 +318,24 @@ export class PiPManager {
       logger.info(`${TAG} setAutoStart=${enabled}`);
     } catch (e) {
       logger.warn(`${TAG} setAutoStart failed: ${e}`);
+    }
+  }
+
+  /**
+   * 把 MPV 引擎的实际播放/暂停状态同步给画中画控件，使 PiP 面板的
+   * 播放/暂停按钮显示与真实播放状态一致（PLAY=正在播放→显示暂停按钮）。
+   * 仅在 PiP 控制器已创建时生效；缓冲中不切换，避免按钮抖动。
+   */
+  updatePlayPauseStatus(isPlaying: boolean): void {
+    if (!this.pipController) {
+      return;
+    }
+    try {
+      const status: PiPWindow.PiPControlStatus =
+        isPlaying ? PiPWindow.PiPControlStatus.PLAY : PiPWindow.PiPControlStatus.PAUSE;
+      this.pipController.updatePiPControlStatus(PiPWindow.PiPControlType.VIDEO_PLAY_PAUSE, status);
+    } catch (e) {
+      logger.warn(`${TAG} updatePlayPauseStatus failed: ${e}`);
     }
   }
 

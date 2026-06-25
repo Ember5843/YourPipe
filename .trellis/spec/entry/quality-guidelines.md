@@ -45,6 +45,52 @@ Before reporting a task done, ensure lint passes. Run `build_project` to confirm
 | Business logic in `build()` | Compute in members/services |
 | `console.log` in shipped code | Use `common/AppLog.ets` facade |
 
+## HarmonyOS API pitfalls
+
+### `continuable: true` defaults to ACTIVE
+
+When `module.json5` declares `continuable: true`, the system default `MissionContinueState` is **ACTIVE** from app launch.
+If you want continuation only during specific states (e.g. playback), you MUST call
+`context.setMissionContinueState(INACTIVE)` in `EntryAbility.onCreate` **before** UI loads — otherwise other nearby devices
+see ACTIVE and pop continuation prompts on app entry. Then toggle ACTIVE/INACTIVE via a state listener
+(see `PlayerSession.ContinueStateListener`). Never use `onForeground/onBackground` for this — they fire too late and
+unconditionally.
+
+### Continuation has TWO sides — do not delete either
+
+`EntryAbility` has two continuation callbacks that look similar but serve opposite directions:
+
+- **`onContinue(wantParam)`** — **sender side**. Called when the *other* device taps the continuation icon.
+  Packs playback data via `PlaybackContinuationService.writeWantParam(wantParam)` and returns `AGREE`.
+  Deleting it causes `[JUA1729] 'onContinue' is not implemented` and `OnContinue handle failed` (status 29360300).
+
+- **`handleContinuationWant(want, launchParam)`** — **receiver side**. Called in `onCreate` AND `onNewWant`.
+  Extracts the playback payload from the incoming Want and writes it to `AppStorage['pendingPlaybackContinuation']`.
+  Has a `launchReason === CONTINUATION` guard so normal cold starts return early.
+  `Index.ets:consumePendingPlaybackContinuation()` reads that key and jumps to the player page.
+  Deleting it causes continuation to land on the receiver but only show the home page (no playback, no error toast).
+
+Both must exist for end-to-end continuation. The `setMissionContinueState(INACTIVE)` in `onCreate` only controls
+whether the continuation *icon* appears — it does not affect these callbacks.
+
+### ShareKit `thumbnailUri` only accepts local file URIs
+
+`systemShare.SharedData.thumbnailUri` (and `uri`) accept **only** app-sandbox file URIs (`fileUri.getUriFromPath(...)`)
+or user-file URIs — **not** network URLs (`https://...`). For network thumbnails (e.g. YouTube images), pre-download to
+`context.cacheDir` during `onVideoChange` and pass the local URI. Knock-share has a **3-second timeout**, so downloading
+on-demand in the callback will fail — cache early, use the URI at share time.
+
+### `fileIo` import name
+
+`@kit.CoreFileKit` exports the file system module as `fileIo`, not `fs`. Import as:
+`import { fileIo as fs } from '@kit.CoreFileKit';` (matches `DownloadManager.ets`, `Index.ets`, `AppLogStore.ets`).
+
+### `http.request` typed result
+
+`http.createHttp().request()` returns `result` typed as `Object` (can be string or ArrayBuffer). To satisfy ArkTS
+no-`any` rules, pass `expectDataType: http.HttpDataType.ARRAY_BUFFER` and guard with `instanceof ArrayBuffer` before
+writing to a file — do not use `as` casts.
+
 ## Logging
 
 Use `common/AppLog.ets` (singleton `AppLog.getInstance()`), NOT raw `console`/`hilog`.
@@ -72,3 +118,38 @@ Centralizes log levels and format.
 - [ ] New components in `common/components/` are genuinely shared (2+ callers)
 - [ ] Logging via `AppLog`; no `console.*`
 - [ ] `build_project` succeeds
+
+## Pitfalls (learned the hard way)
+
+### `continuable: true` defaults to ACTIVE — set INACTIVE early
+
+When `module.json5` declares `"continuable": true`, the system **defaults the mission continue state to `ACTIVE`**. If the app does not call `setMissionContinueState(INACTIVE)` before the UI loads, other nearby devices will show the continuation prompt as soon as the app launches.
+
+**Fix**: call `context.setMissionContinueState(AbilityConstant.ContinueState.INACTIVE)` in `EntryAbility.onCreate` at the very top (before `onWindowStageCreate`), then let the playback state listener flip it to `ACTIVE` only during playback. See `EntryAbility.ets` onCreate + `PlayerSession.ets` `ContinueStateListener`.
+
+### ShareKit `thumbnailUri` only accepts local file URIs
+
+`systemShare.SharedData.thumbnailUri` (and `uri`) **do not accept network URLs** (e.g. `https://i.ytimg.com/...`). Passing a network URL silently results in a card with no preview image — only the app icon, title, and description show.
+
+**Fix**: pre-download the image to `context.cacheDir` (or `filesDir`), then convert with `fileUri.getUriFromPath(localPath)` before passing to `SharedData`. Download early (e.g. on video change) so it's ready before the user triggers knock-share — the knock-share callback has a **3-second timeout**.
+
+### `fileIo` import alias — not `fs`
+
+`@kit.CoreFileKit` exports the file IO module as `fileIo`, **not** `fs`. Import with an alias:
+
+```typescript
+import { fileIo as fs, fileUri } from '@kit.CoreFileKit';
+```
+
+### `http.request` return type — use `expectDataType`
+
+`http.createHttp().request()` returns `result: void | string | ArrayBuffer | object` by default, which triggers `arkts-no-any-unknown`. Pass `expectDataType: http.HttpDataType.ARRAY_BUFFER` (or `STRING`) so the return type is narrowed:
+
+```typescript
+const data = await downloader.request(url, {
+  expectDataType: http.HttpDataType.ARRAY_BUFFER,
+  ...
+});
+if (data.result instanceof ArrayBuffer) { ... }
+```
+

@@ -7,6 +7,13 @@ import { SapisidHashUtil } from './SapisidHashUtil';
 
 const logger = YTCoreLogger.getInstance('AuthSessionManager');
 
+export interface AuthBackupState {
+  refreshToken: string;
+  accessToken: string;
+  accessTokenExpiresAt: number;
+  cookieCredentialJson: string;
+}
+
 export class AuthSessionManager {
   private static instance: AuthSessionManager | null = null;
   private static readonly STORAGE_NAME: string = 'yourpipe_auth_poc';
@@ -190,6 +197,27 @@ export class AuthSessionManager {
     } catch (e) {
       logger.error('Failed to persist cookie credential');
     }
+  }
+
+  exportAuthState(): AuthBackupState {
+    return {
+      refreshToken: this.refreshToken,
+      accessToken: this.accessToken,
+      accessTokenExpiresAt: this.accessTokenExpiresAt,
+      cookieCredentialJson: this.cookieCredential ? this.cookieCredential.toJson() : ''
+    };
+  }
+
+  importAuthState(state: AuthBackupState): void {
+    this.refreshToken = state.refreshToken;
+    this.accessToken = state.accessToken;
+    this.accessTokenExpiresAt = state.accessTokenExpiresAt;
+    this.cookieCredential = state.cookieCredentialJson.length > 0
+      ? CookieAuthCredential.fromJson(state.cookieCredentialJson)
+      : null;
+    this.persistRefreshToken();
+    this.persistCookieCredential();
+    logger.info('Auth state imported');
   }
 
   private toUserMessage(code: string): string {

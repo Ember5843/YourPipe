@@ -11,7 +11,6 @@ export interface PlaybackState {
   isEnded: boolean;
   isLive: boolean;
   isSeekable: boolean;
-  isSystemPaused: boolean;
   currentTime: number;
   duration: number;
   playbackSpeed: number;
@@ -71,6 +70,8 @@ export interface PlaybackEngine {
   stop(): void;
   seek(positionSec: number, keyframe: boolean): void;
   setPlaybackSpeed(speed: number): void;
+  setVolume(volume: number): void;
+  getVolume(): number;
 
   switchQuality(source: string, resumePos: number): boolean;
   prebufferTargetQuality(videoUrl: string, audioUrl: string): number;

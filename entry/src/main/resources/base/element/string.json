@@ -1223,6 +1223,106 @@
     {
       "name": "yt_label_members_only",
       "value": "会员"
+    },
+    {
+      "name": "yt_option_data_account",
+      "value": "数据与账号"
+    },
+    {
+      "name": "yt_option_data_account_subtitle",
+      "value": "管理登录状态与本地数据"
+    },
+    {
+      "name": "yt_section_account",
+      "value": "账号"
+    },
+    {
+      "name": "yt_section_data_management",
+      "value": "数据管理"
+    },
+    {
+      "name": "yt_option_google_login",
+      "value": "Google 登录"
+    },
+    {
+      "name": "yt_option_export_data",
+      "value": "导出数据"
+    },
+    {
+      "name": "yt_option_export_data_subtitle",
+      "value": "将本地数据备份为 JSON 文件"
+    },
+    {
+      "name": "yt_option_restore_data",
+      "value": "恢复数据"
+    },
+    {
+      "name": "yt_option_restore_data_subtitle",
+      "value": "从 JSON 备份文件恢复数据"
+    },
+    {
+      "name": "yt_backup_item_settings",
+      "value": "应用设置"
+    },
+    {
+      "name": "yt_backup_item_subscriptions",
+      "value": "订阅"
+    },
+    {
+      "name": "yt_backup_item_favorites",
+      "value": "收藏视频"
+    },
+    {
+      "name": "yt_backup_item_playlists",
+      "value": "收藏的播放列表"
+    },
+    {
+      "name": "yt_backup_item_local_queues",
+      "value": "本地播放列表"
+    },
+    {
+      "name": "yt_backup_item_watch_history",
+      "value": "观看历史"
+    },
+    {
+      "name": "yt_backup_item_search_history",
+      "value": "搜索历史"
+    },
+    {
+      "name": "yt_backup_item_auth",
+      "value": "YouTube 登录状态"
+    },
+    {
+      "name": "yt_backup_export_title",
+      "value": "选择要导出的项目"
+    },
+    {
+      "name": "yt_backup_restore_title",
+      "value": "选择要恢复的项目"
+    },
+    {
+      "name": "yt_backup_confirm_restore",
+      "value": "恢复将覆盖当前选中的本地数据，确定继续吗？"
+    },
+    {
+      "name": "yt_backup_export_success",
+      "value": "导出成功"
+    },
+    {
+      "name": "yt_backup_export_failed",
+      "value": "导出失败"
+    },
+    {
+      "name": "yt_backup_restore_success",
+      "value": "恢复成功"
+    },
+    {
+      "name": "yt_backup_restore_failed",
+      "value": "恢复失败"
+    },
+    {
+      "name": "yt_backup_version_unsupported",
+      "value": "备份文件版本不受支持"
     }
   ]
 }

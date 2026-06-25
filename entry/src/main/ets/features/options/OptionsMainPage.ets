@@ -12,7 +12,7 @@ interface OptionsMainPageParams {
   appLangItems: LanguagePickerItem[];
   contentLangItems: LanguagePickerItem[];
   contentCountryItems: LanguagePickerItem[];
-  onGoogleAccountClick: () => void;
+  onDataAccountClick: () => void;
   onLanguageClick: () => void;
   onPlaybackClick: () => void;
   onAppearanceClick: () => void;
@@ -33,7 +33,7 @@ export struct OptionsMainPage {
     appLangItems: [] as LanguagePickerItem[],
     contentLangItems: [] as LanguagePickerItem[],
     contentCountryItems: [] as LanguagePickerItem[],
-    onGoogleAccountClick: () => {},
+    onDataAccountClick: () => {},
     onLanguageClick: () => {},
     onPlaybackClick: () => {},
     onAppearanceClick: () => {},
@@ -47,11 +47,11 @@ export struct OptionsMainPage {
     return found ? found.localizedName : '跟随系统';
   }
 
-  private getGoogleAccountSubtitle(): string {
+  private getDataAccountSubtitle(): string {
     if (this.authStatus.stage === AuthStage.SIGNED_IN) {
-      return this.authStatus.authMode === 'cookie' ? '已登录 (Cookie)' : '已登录';
+      return this.authStatus.authMode === 'cookie' ? '已登录 (Cookie) · 管理数据与账号' : '已登录 · 管理数据与账号';
     }
-    return '登录以获取个性化推荐';
+    return '管理数据与登录状态';
   }
 
   private getLanguageAndRegionSubtitle(): string {
@@ -87,12 +87,12 @@ export struct OptionsMainPage {
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.info_circle'),
-            title: 'Google 登录',
-            subtitle: this.getGoogleAccountSubtitle(),
+            icon: $r('sys.symbol.person'),
+            title: $r('app.string.yt_option_data_account'),
+            subtitle: this.getDataAccountSubtitle(),
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
-            onClickAction: this.params.onGoogleAccountClick
+            onClickAction: this.params.onDataAccountClick
           })
         }
         .padding({ left: 0, right: 0 })

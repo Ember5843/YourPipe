@@ -51,6 +51,7 @@ import { COLOR_PRESETS } from '../common/ThemeManager';
 import { OptionsPlaybackPage } from '../features/options/OptionsPlaybackPage';
 import { OptionsLanguageAndRegionPage } from '../features/options/OptionsLanguageAndRegionPage';
 import { OptionsRecoveryPage } from '../features/options/OptionsRecoveryPage';
+import { OptionsDataAccountPage } from '../features/options/OptionsDataAccountPage';
 import { LanguagePickerDialog, LanguagePickerItem } from '../common/components/LanguagePickerDialog';
 import { LanguagePickerPage } from '../common/components/LanguagePickerPage';
 import {
@@ -1501,7 +1502,7 @@ struct Index {
               appLangItems: this.appLangItems,
               contentLangItems: this.contentLangItems,
               contentCountryItems: this.contentCountryItems,
-              onGoogleAccountClick: () => { this.pushOptionsPath('google_account'); },
+              onDataAccountClick: () => { this.pushOptionsPath('data_account'); },
               onLanguageClick: () => { this.pushOptionsPath('language'); },
               onPlaybackClick: () => { this.pushOptionsPath('playback'); },
               onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
@@ -1550,6 +1551,26 @@ struct Index {
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
         title: $r('app.string.yt_section_language_region'),
+        onBack: () => {
+          this.popOptionsPath();
+        }
+      }))
+      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .onBackPressed(() => {
+        this.popOptionsPath();
+        return true;
+      })
+    } else if (name === 'data_account') {
+      HdsNavDestination() {
+        OptionsDataAccountPage({
+          params: {
+            onAccountClick: () => { this.pushOptionsPath('google_account'); }
+          }
+        })
+      }
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_data_account'),
         onBack: () => {
           this.popOptionsPath();
         }

@@ -260,6 +260,11 @@ export class YouTubeExtractor {
   // Cached Android visitorData
   private androidVisitorData: string | undefined = undefined;
 
+  // Process-level STS cache. YouTube rarely changes player JS; caching lets the
+  // Safari /player call fire in parallel with the watch-page fetch on subsequent
+  // extractions. (playerId is not cached — it's only consumed by the decode step,
+  // which always re-extracts it fresh from the watch page via extractPlayerMetadata.)
+  private static cachedSignatureTimestamp: number | undefined = undefined;
 
   // Localization settings
   public hl: string = 'en-GB';
@@ -640,17 +645,14 @@ export class YouTubeExtractor {
   private androidCpn: string | undefined;
 
   /**
-   * Ensure streams are cached. If not, fetch and cache them.
+   * Build and cache streams from a fetched InnerTube /player result.
+   * The /player fetch is now driven by extractVideoStreams so it can be parallelized;
+   * this method handles the stream-extraction / deobfuscation / build / fallback logic.
    * Ported from org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor.ensureStreamsAreCached
    */
-  async ensureStreamsAreCached(videoId: string, html: string, watchPlayerResponse: PlayerResponse): Promise<void> {
-    if (this.streamsCachedVideoId === videoId && this.cachedAudioStreams.length + this.cachedVideoOnlyStreams.length > 0) {
-      return;
-    }
-
+  private async buildAndCacheStreams(videoId: string, innertubePlayers: InnertubePlayerResult,
+    watchPlayerResponse: PlayerResponse): Promise<void> {
     this.cachedManifestNResult = null;
-
-    const innertubePlayers = await this.fetchInnertubePlayer(html, videoId);
     this.cachedInnertubePlayers = innertubePlayers;
 
     // 用主客户端的 playabilityStatus 覆盖 watch 页面（登录态下的匿名检查不可靠）
@@ -792,13 +794,33 @@ export class YouTubeExtractor {
     const authManager = AuthSessionManager.getInstance();
     const hasCookieAuth = authManager?.isSignedIn() === true && !!(authManager?.getCookieString());
 
-    // 同时发起 watch 页面请求和（非登录态下）visitorData 请求
+    // 是否已有该视频的缓存流——命中则跳过 /player 与 visitor_id，仅取 watch 元数据
+    const streamsAlreadyCached = this.streamsCachedVideoId === videoId
+      && this.cachedAudioStreams.length + this.cachedVideoOnlyStreams.length > 0;
+
+    // A: watch 页面（元数据、playability、登录态所需 STS）
     const watchPagePromise = this.fetchWatchPage(videoId);
-    const visitorPromise = !hasCookieAuth ? this.getAndroidVisitorData() : Promise.resolve(undefined);
+
+    // B: visitor_id —— 仅 Android 客户端需要（非登录态），且仅当需要提取流时
+    const visitorPromise = (!hasCookieAuth && !streamsAlreadyCached)
+      ? this.getAndroidVisitorData()
+      : Promise.resolve<string | undefined>(undefined);
+
+    // C: /player —— 在依赖就绪后尽早预发，与 watch 页面并行：
+    //   - Safari（登录）：依赖 STS。有进程级缓存 STS → 立即与 A 并行预发；首次无缓存 → 等 A 解析后发。
+    //   - Android（非登录）：依赖 visitorData（B）。B 一就绪即发，与 A 尾部并行（不被 await A 阻塞）。
+    let preFiredPlayerPromise: Promise<InnertubePlayerResult> | undefined;
+    const cachedSts = YouTubeExtractor.cachedSignatureTimestamp;
+    if (!streamsAlreadyCached) {
+      if (hasCookieAuth && cachedSts !== undefined) {
+        preFiredPlayerPromise = this.fetchPlayerClient(videoId, cachedSts, undefined, true);
+      } else if (!hasCookieAuth) {
+        preFiredPlayerPromise = visitorPromise.then((v: string | undefined) =>
+          this.fetchPlayerClient(videoId, undefined, v, false));
+      }
+    }
 
     const html = await watchPagePromise;
-    const androidVisitor = await visitorPromise;
-
     const watchPlayerResponse = this.extractPlayerResponse(html);
 
     const watchStatus = watchPlayerResponse.playabilityStatus?.status?.toUpperCase();
@@ -808,13 +830,33 @@ export class YouTubeExtractor {
       logger.info(`[STREAM_DEBUG] Logged-in user, skipping playability check on anonymous watch page (status=${watchStatus})`);
     }
 
-    // 元数据提取和流提取并行——extractMetadata 是纯同步 CPU 操作，
-    // ensureStreamsAreCached 包含 HTTP 请求，两者不共用可变状态。
-    // 先启动流提取（不 await），同时同步提取元数据，再 await 流提取完成。
-    const streamsPromise = this.ensureStreamsAreCached(videoId, html, watchPlayerResponse);
+    // 从本页 ytcfg 提取新鲜 STS/playerId，更新进程级缓存并喂给解码器（D 之前）
+    const freshSts = this.extractPlayerMetadata(html);
+
+    // 元数据提取（同步 CPU）
     const videoInfo = this.extractMetadata(videoId, watchPlayerResponse);
     videoInfo.playerResponse = watchPlayerResponse;
-    await streamsPromise;
+
+    if (!streamsAlreadyCached) {
+      // 解析 /player 结果：优先用预发的，否则现在发
+      let innertubePlayers: InnertubePlayerResult;
+      if (preFiredPlayerPromise) {
+        innertubePlayers = await preFiredPlayerPromise;
+        // Safari 预发用缓存 STS，若失败且新鲜 STS 不同 → 用新鲜 STS 重试一次（防陈旧）
+        if (hasCookieAuth && !innertubePlayers.safari && freshSts !== undefined && freshSts !== cachedSts) {
+          logger.info('[STREAM_DEBUG] Pre-fired Safari /player with cached STS returned nothing; retrying with fresh STS');
+          innertubePlayers = await this.fetchPlayerClient(videoId, freshSts, undefined, true);
+        }
+      } else if (hasCookieAuth) {
+        // 登录态首次播放，无缓存 STS → 用新鲜 STS 发
+        innertubePlayers = await this.fetchPlayerClient(videoId, freshSts, undefined, true);
+      } else {
+        // 非登录态：visitor_id 已并行获取（缓存命中或刚完成），确保拿到 visitorData 后发
+        const androidVisitor = await visitorPromise;
+        innertubePlayers = await this.fetchPlayerClient(videoId, undefined, androidVisitor, false);
+      }
+      await this.buildAndCacheStreams(videoId, innertubePlayers, watchPlayerResponse);
+    }
 
     videoInfo.streams = [
       ...this.cachedAudioStreams,
@@ -1076,26 +1118,31 @@ export class YouTubeExtractor {
   }
 
   /**
-   * Fetch the primary InnerTube player response.
-   * Mirrors PipePipe exactly: unlogged → Android only, logged in (cookie) → Safari only.
+   * Extract player metadata (STS / playerId) from the watch HTML ytcfg, update the
+   * process-level cache, and feed the decoder. Synchronous — no network.
+   * Split out of fetchInnertubePlayer so the /player call can be fired in parallel
+   * with the watch-page fetch when a cached STS is already available.
+   * Returns the freshly extracted STS (or undefined if ytcfg lacked it).
    */
-  private async fetchInnertubePlayer(html: string, videoId: string): Promise<InnertubePlayerResult> {
-    // Extract player metadata locally from ytcfg (mirrors yt-dlp's extract_ytcfg + _extract_signature_timestamp)
+  private extractPlayerMetadata(html: string): number | undefined {
     const ytcfg = this.parseYtcfgSet(html);
     let localSts: number | undefined;
     let playerId: string | null = null;
 
     if (ytcfg) {
-      // STS: yt-dlp reads ytcfg.STS as integer — direct field access
       const stsValue = ytcfg['STS'];
       if (typeof stsValue === 'number') {
         localSts = stsValue;
       }
-      // PLAYER_JS_URL: yt-dlp reads ytcfg.PLAYER_JS_URL as string
       const playerJsUrl = ytcfg['PLAYER_JS_URL'];
       if (typeof playerJsUrl === 'string') {
         playerId = this.extractPlayerIdFromUrl(playerJsUrl);
       }
+    }
+
+    // Update process-level cache so subsequent extractions can fire /player early
+    if (localSts !== undefined) {
+      YouTubeExtractor.cachedSignatureTimestamp = localSts;
     }
 
     if (localSts !== undefined || playerId) {
@@ -1109,17 +1156,21 @@ export class YouTubeExtractor {
       logger.warn('[METADATA] ytcfg did not contain STS or PLAYER_JS_URL — decode will use API fallback');
     }
 
-    const htmlVisitorData = this.parseYtcfgValue(html, 'VISITOR_DATA');
-    const androidVisitor = await this.getAndroidVisitorData();
-    const visitorData = androidVisitor || htmlVisitorData;
+    return localSts;
+  }
 
+  /**
+   * Fire the InnerTube /player request via Safari (logged in) or Android VR (anonymous).
+   * `visitorData` is only used by the Android client; `sts` only by Safari.
+   * Callers may pass a cached STS to overlap this request with the watch-page fetch.
+   */
+  private async fetchPlayerClient(videoId: string, sts: number | undefined,
+    visitorData: string | undefined, hasCookieAuth: boolean): Promise<InnertubePlayerResult> {
     const result: InnertubePlayerResult = {
       android: undefined, safari: undefined,
       androidCpn: undefined, safariCpn: undefined
     };
 
-    const authManager = AuthSessionManager.getInstance();
-    const hasCookieAuth = authManager?.isSignedIn() === true && !!(authManager?.getCookieString());
     logger.info(`[STREAM_DEBUG] cookie_auth=${hasCookieAuth} → primary client: ${hasCookieAuth ? 'Safari' : 'Android'}`);
 
     const ctx: ClientFetchContext = {
@@ -1127,11 +1178,10 @@ export class YouTubeExtractor {
       hl: this.hl,
       gl: this.gl,
       visitorData: visitorData,
-      signatureTimestamp: localSts
+      signatureTimestamp: sts
     };
 
     if (hasCookieAuth) {
-      // Logged in: Safari client
       try {
         const safariResult = await SafariPlayerClient.fetch(ctx, this.client);
         if (safariResult?.playerResponse) {
@@ -1144,7 +1194,6 @@ export class YouTubeExtractor {
         logger.warn('Safari fetch error:', e);
       }
     } else {
-      // Unlogged: Android client
       try {
         const androidResult = await AndroidPlayerClient.fetch(ctx, this.client);
         if (androidResult?.playerResponse) {

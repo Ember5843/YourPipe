@@ -83,6 +83,13 @@ export struct VideoPlayer {
    */
   private keepScreenListener: StateChangeListener = new KeepScreenOnStateListener(this);
 
+  /**
+   * PiP 播放/暂停按钮同步监听器：把 MPV 状态机的状态变化同步给画中画面板，
+   * 使 PiP 控件显示与真实播放状态一致。
+   * 缓冲(BUFFERING)不切换，避免按钮抖动；其余按 isPlaying 语义推送。
+   */
+  private pipSyncListener: StateChangeListener = new PiPPlayPauseSyncListener(this);
+
   // 由 KeepScreenOnStateListener 调用，集中管理屏幕常亮策略。
   public _onKeepScreenStateChanged(to: PlayerState): void {
     const shouldKeepOn: boolean = to === PlayerState.PLAYING
@@ -94,6 +101,17 @@ export struct VideoPlayer {
     } else {
       this.clearHideTimer();
     }
+  }
+
+  // 由 PiPPlayPauseSyncListener 调用：把 MPV 状态同步到画中画播放/暂停按钮。
+  // PLAYING → PLAY（显示暂停按钮）；PAUSED/COMPLETED/READY/IDLE/ERROR/RELEASED → PAUSE（显示播放按钮）；
+  // BUFFERING 跳过，避免缓冲时按钮来回抖动。
+  public _onPiPStateChanged(to: PlayerState): void {
+    if (to === PlayerState.BUFFERING) {
+      return;
+    }
+    const isPlaying: boolean = to === PlayerState.PLAYING;
+    PiPManager.getInstance().updatePlayPauseStatus(isPlaying);
   }
 
   private progressListener = (currentTime: number, durationTime: number) => {
@@ -405,8 +423,12 @@ export struct VideoPlayer {
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
     // 屏幕常亮：跟随播放状态机驱动
     this.controller.addStateListener(this.keepScreenListener);
+    // PiP 播放/暂停按钮同步：跟随 MPV 状态机驱动
+    this.controller.addStateListener(this.pipSyncListener);
     // 立即按当前 vm 状态同步一次（避免错过初始 PLAYING / 引擎已就绪）
     this.envService.setKeepScreenOn(this.vm.isPlaying || this.vm.isBuffering);
+    // 立即同步一次 PiP 播放/暂停按钮状态（页面恢复/复用时按钮即时对齐）
+    PiPManager.getInstance().updatePlayPauseStatus(this.vm.isPlaying);
 
     // 同步投屏状态
     this.isCasting = this.vm.isCasting;
@@ -1138,6 +1160,7 @@ export struct VideoPlayer {
 
   aboutToDisappear(): void {
     this.controller.removeStateListener(this.keepScreenListener);
+    this.controller.removeStateListener(this.pipSyncListener);
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
     this.controller.unsubscribeEnded(this.onEnded);
@@ -1159,5 +1182,15 @@ class KeepScreenOnStateListener implements StateChangeListener {
   }
   onStateChange(_from: PlayerState, to: PlayerState): void {
     this.owner._onKeepScreenStateChanged(to);
+  }
+}
+
+class PiPPlayPauseSyncListener implements StateChangeListener {
+  private readonly owner: VideoPlayer;
+  constructor(owner: VideoPlayer) {
+    this.owner = owner;
+  }
+  onStateChange(_from: PlayerState, to: PlayerState): void {
+    this.owner._onPiPStateChanged(to);
   }
 }

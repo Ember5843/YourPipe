@@ -38,7 +38,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private currentSubtitleUrl: string = '';
   private lastKnownPositionMs: number = 0;
   private lastTimeEmitMs: number = 0;
-  private systemFocusPaused: boolean = false;
 
   // 保存配置供 load() 方法使用
   private engineConfig: EngineConfig = {};
@@ -303,6 +302,19 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.emitCurrentState();
   }
 
+  setVolume(volume: number): void {
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl !== null && !this.destroyed) ctrl.setVolume(volume);
+  }
+
+  getVolume(): number {
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl === null || this.destroyed) return 100;
+    const raw: string = ctrl.getProperty('volume');
+    const vol: number = parseFloat(raw);
+    return isNaN(vol) ? 100 : vol;
+  }
+
   switchQuality(source: string, resumePos: number): boolean {
     return this.load(source, resumePos);
   }
@@ -460,23 +472,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       if (value > 0) {
         this.lastDurationMs = value;
       }
-    } else if (type === 10) {
-      this.handleFocusEvent(value);
     }
     this.emitCurrentState();
-  }
-
-  private handleFocusEvent(value: number): void {
-    const event = value & 0xFFFF;
-    const forceType = (value >> 16) & 0xFFFF;
-    // event: 0=PAUSE 1=RESUME 2=STOP 3=DUCK 4=UNDUCK
-    // forceType: INTERRUPT_FORCE 或 INTERRUPT_SHARE
-    if (event === 0 || event === 2) {
-      this.systemFocusPaused = true;
-    } else if (event === 1) {
-      this.systemFocusPaused = false;
-    }
-    Logger.info(TAG, `focusEvent: event=${event} forceType=${forceType} systemPaused=${this.systemFocusPaused}`);
   }
 
   private handleStatusUpdate(status: number): void {
@@ -574,7 +571,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       isEnded: this.isEnded,
       isLive: this.isLive,
       isSeekable: !this.isLive && durMs > 0,
-      isSystemPaused: this.systemFocusPaused,
       currentTime: currentMs > 0 ? currentMs / 1000 : 0,
       duration: durMs > 0 ? durMs / 1000 : 0,
       playbackSpeed: this.playbackSpeed,
@@ -662,7 +658,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.pendingSubtitleUrl = '';
     this.currentSubtitleUrl = '';
     this.lastKnownPositionMs = 0;
-    this.systemFocusPaused = false;
   }
 
   private describeError(err: Object): string {

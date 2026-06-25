@@ -36,6 +36,45 @@ export class PreferencesStore {
     });
   }
 
+  /** 获取 PreferencesStore 中的所有键值对（导出用） */
+  static getAllEntries(): Record<string, string> {
+    const result: Record<string, string> = {};
+    if (!PreferencesStore.instance) {
+      return result;
+    }
+    try {
+      const all = PreferencesStore.instance.getAllSync() as Record<string, Object>;
+      for (const key of Object.keys(all)) {
+        const value = all[key];
+        result[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      }
+    } catch (e) {
+      logger.error('Failed to get all preferences entries:', JSON.stringify(e));
+    }
+    return result;
+  }
+
+  /** 批量写入 PreferencesStore（恢复用），会先清空 */
+  static setAllEntries(entries: Record<string, string>): void {
+    if (!PreferencesStore.instance) {
+      return;
+    }
+    try {
+      PreferencesStore.instance.clearSync();
+      for (const key of Object.keys(entries)) {
+        PreferencesStore.instance.putSync(key, entries[key]);
+      }
+      PreferencesStore.instance.flush((err: BusinessError) => {
+        if (err) {
+          logger.error(`Preferences setAllEntries flush failed. Code:${err.code}, message:${err.message}`);
+        }
+      });
+      logger.info('PreferencesStore setAllEntries done');
+    } catch (e) {
+      logger.error('Failed to set all preferences entries:', JSON.stringify(e));
+    }
+  }
+
   /** 清除 PreferencesStore 中的所有数据 */
   static clearAll(): void {
     if (!PreferencesStore.instance) {

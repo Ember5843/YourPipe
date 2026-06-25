@@ -52,6 +52,11 @@ export class SearchHistoryStore {
     SearchHistoryStore.saveSearchHistory([]);
   }
 
+  /** 完全替换所有记录（恢复用） */
+  static replaceAll(items: SearchHistoryItem[]): void {
+    SearchHistoryStore.saveSearchHistory(items.slice(0, SearchHistoryStore.MAX_COUNT));
+  }
+
   private static saveSearchHistory(history: SearchHistoryItem[]): void {
     const json = JSON.stringify(history);
     PreferencesStore.setString(SearchHistoryStore.KEY, json);

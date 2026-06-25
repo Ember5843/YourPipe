@@ -24,12 +24,6 @@ extern "C" {
 #include <libavutil/avutil.h>
 }
 
-// Forward declarations for OHAudio focus bridge (definitions are below). They
-// have C linkage so libmpv (which calls them through ohaudio_set_focus_callback)
-// uses the standard C ABI.
-extern "C" void OhaudioFocusBridge(int event, int force_type);
-extern "C" void OhaudioErrorBridge(int error);
-
 #include <cmath>
 #include <atomic>
 #include <cstdint>
@@ -97,11 +91,6 @@ struct MpvApi {
     mpv_event* (*wait_event)(mpv_handle*, double) = nullptr;
     void (*wakeup)(mpv_handle*) = nullptr;
     int (*stream_cb_add_ro)(mpv_handle*, const char*, void*, mpv_stream_cb_open_ro_fn) = nullptr;
-
-    // OHAudio 焦点回调注册：libmpv 的 ao_ohaudio.c 暴露了一个 setter，
-    // 让 client 层注册自己的 focus / error 回调。
-    using OhaudioSetFocusCb = void(*)(void(*)(int, int), void(*)(int));
-    OhaudioSetFocusCb ohaudio_set_focus_callback = nullptr;
 };
 
 MpvApi& Mpv()
@@ -160,21 +149,6 @@ bool LoadMpv()
     ok = LoadSymbol(api.library, api.wakeup, "mpv_wakeup") && ok;
     ok = LoadSymbol(api.library, api.stream_cb_add_ro, "mpv_stream_cb_add_ro") && ok;
 
-    // OHAudio 焦点回调注册接口（仅本项目的 libmpv 构建有此符号）。可选符号：
-    // 不存在不视为失败，仅意味着这个 .so 没启用焦点桥接。
-    api.ohaudio_set_focus_callback = reinterpret_cast<MpvApi::OhaudioSetFocusCb>(
-        dlsym(api.library, "ohaudio_set_focus_callback"));
-    if (api.ohaudio_set_focus_callback) {
-        // 注册 client 桥接：把硬件焦点事件转成 mpv 公开 API 调用。
-        api.ohaudio_set_focus_callback(OhaudioFocusBridge, OhaudioErrorBridge);
-        OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                     "OHAudio focus bridge installed");
-    } else {
-        OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                     "ohaudio_set_focus_callback not found (focus bridge disabled): %{public}s",
-                     dlerror());
-    }
-
     api.available = ok;
     if (!ok) {
         dlclose(api.library);
@@ -212,16 +186,6 @@ struct PlayerContext {
     int32_t surfaceWidth = 0;
     int32_t surfaceHeight = 0;
     napi_threadsafe_function tsfn = nullptr;
-
-    // 音频焦点桥接状态。OHAudio 中断回调通过 ohaudio_focus_changed 弱符号
-    // 转发到这里，由我们写回 mpv 的 pause / volume，遵循 mpv-android 的
-    // "focus listener → MPVLib.setPropertyBoolean(pause, true)" 标杆模式。
-    //
-    // autoPausedBySystem：标记暂停是被系统中断引起（区分于用户主动暂停），
-    //   只有这种情况下才在 RESUME 时自动恢复，避免覆盖用户的暂停意图。
-    // duckActive：当前是否处于 duck 状态，UNDUCK 时用于决定是否还原音量。
-    std::atomic_bool autoPausedBySystem {false};
-    std::atomic_bool duckActive {false};
 };
 
 mutex gMutex;
@@ -696,162 +660,7 @@ void RunMpvCommand(PlayerContext& ctx, const vector<string>& args, const char* a
     LogMpvError(action, Mpv().command(ctx.mpv, rawArgs.data()));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// 音频焦点桥接（OHAudio interrupt → mpv 公开 API）
-//
-// 设计：libmpv 的 ao_ohaudio.c 把硬件中断事件通过弱符号 ohaudio_focus_changed
-// 转发到这里。我们持有 mpv_handle，按 mpv-android 的 MPVActivity.kt 标杆模式
-// 把焦点变化映射为 mpv 公开 API 调用：
-//   PAUSE/STOP → mpv_set_property("pause", true)
-//   RESUME     → mpv_set_property("pause", false)（仅当之前是被系统暂停的）
-//   DUCK       → mpv_command(["multiply", "volume", "0.2"])
-//   UNDUCK     → mpv_command(["multiply", "volume", "5.0"])（1/0.2）
-//
-// 这样 mpv 内部状态、UI、video 时钟、AVSession 锁屏卡片、ets 的 vm.isPlaying
-// 全部通过单一来源 (mpv 的 pause 属性) 自动同步，符合官方
-// "应用同步音频暂停状态包括对应的播放画面" 规范。
-//
-// 选择"活跃 player"：本应用同时只有一个 mpv 在播音频，遍历 gPlayers 找到
-// 第一个 ctx.mpv != nullptr 且 initialized 的即可。
-// ─────────────────────────────────────────────────────────────────────────
-
-// 与 ao_ohaudio.c 中 ohaudio_focus_event_t 一一对应
-enum {
-    OHAUDIO_FOCUS_PAUSE   = 0,
-    OHAUDIO_FOCUS_RESUME  = 1,
-    OHAUDIO_FOCUS_STOP    = 2,
-    OHAUDIO_FOCUS_DUCK    = 3,
-    OHAUDIO_FOCUS_UNDUCK  = 4,
-};
-
-constexpr int kEventFocus = 10;
-constexpr float kDuckFactor = 0.2f;     // 鸿蒙规范：降到 20%
-
-PlayerContext* FindActiveAudioPlayer()
-{
-    // 调用方需要持有 gMutex
-    for (auto& [id, ptr] : gPlayers) {
-        if (ptr && ptr->mpv && ptr->initialized) {
-            return ptr.get();
-        }
-    }
-    return nullptr;
-}
-
-// 前向声明：HandleFocusEventLocked 用到的 helper 在本文件后面定义。
-void SetMpvFlagProperty(PlayerContext& ctx, const char* property, int value, const char* action);
-void SetPause(PlayerContext& ctx, bool pause);
-
-void HandleFocusEventLocked(PlayerContext& ctx, int event, int force_type)
-{
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv-focus",
-                 "handle event=%{public}d forceType=%{public}d autoPaused=%{public}d duck=%{public}d",
-                 event, force_type,
-                 ctx.autoPausedBySystem.load() ? 1 : 0,
-                 ctx.duckActive.load() ? 1 : 0);
-
-    switch (event) {
-    case OHAUDIO_FOCUS_PAUSE: {
-        // 临时失去焦点（来电/闹钟/VoIP）：记录"被系统暂停"，RESUME 时自动恢复。
-        // 只有当 mpv 当前不是用户主动暂停时才标记，避免覆盖用户的暂停意图。
-        if (!ctx.paused.load()) {
-            ctx.autoPausedBySystem.store(true);
-        }
-        // 走 SetPause（同步写 ctx.paused/state + 异步推 mpv），与用户主动暂停统一路径。
-        // 旧实现只调 SetMpvFlagProperty，mpv property observer 异步触发前 ctx.state 仍为
-        // Playing，ets 收到焦点事件立刻 buildState 会读到错误的 isPlaying=true，造成
-        // UI/锁屏卡片短暂闪烁。
-        SetPause(ctx, true);
-        break;
-    }
-    case OHAUDIO_FOCUS_STOP: {
-        // 永久失去焦点（其他音乐/视频应用抢占）：不设 autoPausedBySystem，
-        // 后续即使意外收到 RESUME 也不会自动恢复，符合官方规范"需用户主动触发"。
-        // 系统已强制停止音频流，这里仅同步 mpv 暂停状态。
-        SetPause(ctx, true);
-        break;
-    }
-    case OHAUDIO_FOCUS_RESUME: {
-        // 仅恢复"曾经被系统暂停"的播放，不动用户主动暂停 / 永久失焦的状态。
-        if (ctx.autoPausedBySystem.load()) {
-            ctx.autoPausedBySystem.store(false);
-            SetPause(ctx, false);
-        }
-        // 顺带清掉残留的 duck（极少数情况下系统会跳过 UNDUCK）
-        if (ctx.duckActive.load()) {
-            ctx.duckActive.store(false);
-            RunMpvCommand(ctx, {"multiply", "volume",
-                std::to_string(1.0f / kDuckFactor)}, "focus->unduck-resume");
-        }
-        break;
-    }
-    case OHAUDIO_FOCUS_DUCK: {
-        if (!ctx.duckActive.load()) {
-            ctx.duckActive.store(true);
-            RunMpvCommand(ctx, {"multiply", "volume", std::to_string(kDuckFactor)},
-                          "focus->duck");
-        }
-        break;
-    }
-    case OHAUDIO_FOCUS_UNDUCK: {
-        if (ctx.duckActive.load()) {
-            ctx.duckActive.store(false);
-            RunMpvCommand(ctx, {"multiply", "volume",
-                std::to_string(1.0f / kDuckFactor)}, "focus->unduck");
-        }
-        break;
-    }
-    default:
-        break;
-    }
-}
-
-// 内部分发：被 extern "C" 包装层调用。处于匿名命名空间内，能直接访问
-// gMutex / FindActiveAudioPlayer / PushEvent / kEventFocus。
-void DispatchFocusEvent(int event, int force_type)
-{
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv-focus",
-                 "dispatch event=%{public}d forceType=%{public}d", event, force_type);
-
-    // tsfn 必须在持锁期间复制：锁释放后 player 可能被销毁，裸指针 ctx 会变野指针，
-    // 这里直接读 tsfn 句柄即可（napi_threadsafe_function 自身是线程安全的，调用时
-    // ArkTS 侧只要句柄已 release 就会被忽略）。
-    napi_threadsafe_function tsfn = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(gMutex);
-        PlayerContext* ctx = FindActiveAudioPlayer();
-        if (!ctx) {
-            return;
-        }
-        HandleFocusEventLocked(*ctx, event, force_type);
-        tsfn = ctx->tsfn;
-    }
-    if (!tsfn) {
-        return;
-    }
-    // 广播给 ets：高 16 位 force_type，低 16 位 event，便于 ets 做 UI 同步 / 提示等。
-    int64_t combined = (static_cast<int64_t>(force_type) << 16) | static_cast<int64_t>(event);
-    auto* evt = new TsfnEvent{kEventFocus, combined};
-    napi_call_threadsafe_function(tsfn, evt, napi_tsfn_nonblocking);
-}
-
 }  // namespace
-
-// 这两个函数桥接 ao_ohaudio.c → DispatchFocusEvent。它们以 C 链接暴露给
-// 同一进程，由我们在 LoadMpv() 后通过 ohaudio_set_focus_callback 主动注册。
-// 不依赖弱符号 / 全局符号绑定，移植性最好。
-extern "C" void OhaudioFocusBridge(int event, int force_type)
-{
-    DispatchFocusEvent(event, force_type);
-}
-
-extern "C" void OhaudioErrorBridge(int error)
-{
-    OH_LOG_Print(LOG_APP, LOG_WARN, 0xFF00, "mpv-focus",
-                 "ohaudio stream error: %{public}d", error);
-    // ao_ohaudio.c 已经调用了 ao_request_reload(ao)，让 mpv 自愈。
-}
-
 namespace {
 
 void SetMpvFlagProperty(PlayerContext& ctx, const char* property, int value, const char* action)

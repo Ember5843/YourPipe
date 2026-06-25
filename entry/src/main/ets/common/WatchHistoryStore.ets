@@ -105,6 +105,12 @@ export class WatchHistoryStore {
     WatchHistoryStore.syncToAppStorage();
   }
 
+  /** 完全替换所有记录（恢复用） */
+  static replaceAll(items: WatchHistoryItem[]): void {
+    WatchHistoryStore.save(items.slice(0, WatchHistoryStore.MAX_COUNT));
+    WatchHistoryStore.syncToAppStorage();
+  }
+
   /** 从 Preferences 加载并同步到 AppStorage（用于应用启动时初始化） */
   static loadToAppStorage(): void {
     const all = WatchHistoryStore.getAll();
