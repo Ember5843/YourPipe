@@ -590,10 +590,27 @@ export class AvPlayerController {
   }
 
   private selectBestVideoEntry(entries: VideoEntry[]): VideoEntry | undefined {
+    if (!entries || entries.length === 0) {
+      return undefined;
+    }
     const prefs = PlaybackPreferences.snapshot();
     const maxHeight = this.resolveMaxHeight(prefs.defaultQuality);
-    const candidate = entries.find(e => e.height <= maxHeight);
-    return candidate || (entries.length > 0 ? entries[0] : undefined);
+    // Prefer hard-decode-friendly codecs (AVC/HEVC) at the target height.
+    // mergedVideoList is sorted height desc then codec; find() would pick the first
+    // matching height which may be VP9/AV1 and fall back to software decode → heat.
+    const underCap = entries.filter(e => e.height <= maxHeight);
+    const pool = underCap.length > 0 ? underCap : entries;
+    return pool.slice().sort((a: VideoEntry, b: VideoEntry): number => {
+      const h = b.height - a.height;
+      if (h !== 0) {
+        return h;
+      }
+      const codec = this.codecPriority(b.stream) - this.codecPriority(a.stream);
+      if (codec !== 0) {
+        return codec;
+      }
+      return (b.stream.bitrate || 0) - (a.stream.bitrate || 0);
+    })[0];
   }
 
   private resolveMaxHeight(targetQuality: string): number {
@@ -617,11 +634,13 @@ export class AvPlayerController {
   }
 
   private codecPriority(stream: StreamInfo): number {
+    // API 23+ OHCodec: AVC/HEVC/VP9/AV1 all have hard-decode paths via ohcodec.
+    // Prefer HEVC/AVC for widest device support; VP9/AV1 next (new in API 23).
     const c = (stream.codecs || '').toLowerCase();
+    if (c.startsWith('hvc1') || c.startsWith('hev1')) return 5;
     if (c.startsWith('avc1') || c.startsWith('avc3')) return 4;
-    if (c.startsWith('hvc1') || c.startsWith('hev1')) return 3;
-    if (c.startsWith('vp9') || c.startsWith('vp09')) return 2;
-    if (c.startsWith('av01')) return 1;
+    if (c.startsWith('vp9') || c.startsWith('vp09')) return 3;
+    if (c.startsWith('av01')) return 2;
     return 0;
   }
 
@@ -734,7 +753,7 @@ export class AvPlayerController {
       }
     });
 
-    const baseUrl = playbackUrl.replace('/manifest.mpd', '');
+    const baseUrl = playbackUrl;
     const vUrl = `${baseUrl}/video/0`;
     const aUrl = `${baseUrl}/audio/0`;
     const durationSec = (durationMs / 1000).toFixed(3);
@@ -1003,6 +1022,21 @@ export class AvPlayerController {
     this.vm.durationTime = state.duration;
     this.vm.playbackSpeed = state.playbackSpeed;
     this.vm.cachedPercent = state.bufferingPercent;
+    this.vm.mediaTitle = state.mediaTitle;
+    this.vm.containerFormat = state.containerFormat;
+    this.vm.videoWidth = state.videoWidth;
+    this.vm.videoHeight = state.videoHeight;
+    this.vm.videoStreamCount = state.videoStreamCount;
+    this.vm.audioStreamCount = state.audioStreamCount;
+    this.vm.subtitleStreamCount = state.subtitleStreamCount;
+    this.vm.videoCodec = state.videoCodec;
+    this.vm.videoBitRate = state.videoBitRate;
+    this.vm.frameRate = state.frameRate;
+    this.vm.audioCodec = state.audioCodec;
+    this.vm.audioBitRate = state.audioBitRate;
+    this.vm.audioChannels = state.audioChannels;
+    this.vm.audioSampleRate = state.audioSampleRate;
+    this.vm.fileSize = state.fileSize;
     const prevErrorMsg = this.vm.errorMsg;
     this.vm.errorMsg = state.errorMsg;
 

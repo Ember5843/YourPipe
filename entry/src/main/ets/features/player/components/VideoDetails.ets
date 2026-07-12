@@ -72,6 +72,22 @@ export struct VideoDetails {
   private descSkeletonTimer: number = -1;
   @State descSkeletonOpacity: number = 0.3;
   @State showSavePlaylistSheet: boolean = false;
+  @State showStreamInfoSheet: boolean = false;
+
+  // ── mpv 实时播放流信息（由 PlayerPage 从 vm 传入）──
+  @Prop mpvVideoWidth: number = 0;
+  @Prop mpvVideoHeight: number = 0;
+  @Prop mpvContainerFormat: string = '';
+  @Prop mpvMediaTitle: string = '';
+  @Prop mpvVideoCodec: string = '';
+  @Prop mpvVideoBitRate: number = 0;
+  @Prop mpvFrameRate: number = 0;
+  @Prop mpvAudioCodec: string = '';
+  @Prop mpvAudioBitRate: number = 0;
+  @Prop mpvAudioChannels: number = 0;
+  @Prop mpvAudioSampleRate: number = 0;
+  @Prop mpvFileSize: number = 0;
+  @Prop mpvDuration: number = 0;
 
   private getEffectiveDesc(): string {
     return (this.videoDescription ?? this.item?.videoDescription) || '';
@@ -343,6 +359,36 @@ export struct VideoDetails {
     return parts.join(' · ');
   }
 
+  private formatBitrate(bps: number): string {
+    if (bps >= 1000000) return `${(bps / 1000000).toFixed(2)} Mbps`;
+    if (bps >= 1000) return `${(bps / 1000).toFixed(0)} kbps`;
+    return `${bps} bps`;
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(2)} GB`;
+    if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${bytes} B`;
+  }
+
+  private formatChannels(ch: number): string {
+    if (ch === 1) return 'Mono (1.0)';
+    if (ch === 2) return 'Stereo (2.0)';
+    if (ch === 6) return '5.1';
+    if (ch === 8) return '7.1';
+    return `${ch} channels`;
+  }
+
+  private formatDuration(sec: number): string {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    const mm = m.toString().padStart(2, '0');
+    const ss = s.toString().padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+  }
+
   @Builder
   ActionButtonRow() {
     Scroll() {
@@ -351,6 +397,8 @@ export struct VideoDetails {
           '投屏', () => { this.openCastPicker(); })
         this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
           $r('app.string.yt_action_download'), () => { this.openDownloadDialog(); })
+        this.ActionButton($r('sys.symbol.info_circle'),
+          '流媒体信息', () => { this.showStreamInfoSheet = true; })
         this.ActionButton($r('sys.symbol.bookmark'),
           '保存到播放列表', () => { this.showSavePlaylistSheet = true; })
         this.ActionButton($r('sys.symbol.play_circle'),
@@ -466,6 +514,13 @@ export struct VideoDetails {
       preferType: SheetType.BOTTOM,
       showClose: false,
     })
+    .bindSheet($$this.showStreamInfoSheet, this.StreamInfoSheetBuilder(), {
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+      dragBar: true,
+      backgroundColor: $r('app.color.yourtube_bg_page'),
+      preferType: SheetType.BOTTOM,
+      showClose: false,
+    })
   }
 
   @Builder
@@ -474,6 +529,115 @@ export struct VideoDetails {
       video: this.item,
       isShow: $showSavePlaylistSheet
     })
+  }
+
+  @Builder
+  StreamInfoSheetBuilder() {
+    this.StreamInfoContent()
+  }
+
+  /** 流信息内容（弹窗） */
+  @Builder
+  StreamInfoContent() {
+    Column({ space: 0 }) {
+      // ── 标题行 ──
+      Row() {
+        SymbolGlyph($r('sys.symbol.info_circle'))
+          .fontSize(16)
+          .fontColor([$r('app.color.yourtube_text_secondary')])
+        Text('流媒体信息')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.yourtube_text_primary'))
+          .margin({ left: 6 })
+      }
+      .width('100%')
+      .margin({ bottom: 10 })
+
+      // ── 容器信息 ──
+      if (this.mpvContainerFormat.length > 0) {
+        this.StreamInfoRow('容器格式', this.mpvContainerFormat.toUpperCase())
+      }
+      if (this.mpvMediaTitle.length > 0) {
+        this.StreamInfoRow('媒体标题', this.mpvMediaTitle)
+      }
+      if (this.mpvDuration > 0) {
+        this.StreamInfoRow('时长', this.formatDuration(this.mpvDuration))
+      }
+      if (this.mpvFileSize > 0) {
+        this.StreamInfoRow('文件大小', this.formatFileSize(this.mpvFileSize))
+      }
+
+      // ── 视频流 ──
+      if (this.mpvVideoWidth > 0) {
+        Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
+        Text('视频')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.yourtube_text_secondary'))
+          .margin({ bottom: 6 })
+        this.StreamInfoRow('分辨率', `${this.mpvVideoWidth} × ${this.mpvVideoHeight}`)
+        if (this.mpvVideoCodec.length > 0) {
+          this.StreamInfoRow('编码', this.mpvVideoCodec)
+        }
+        if (this.mpvVideoBitRate > 0) {
+          this.StreamInfoRow('码率', this.formatBitrate(this.mpvVideoBitRate))
+        }
+        if (this.mpvFrameRate > 0) {
+          this.StreamInfoRow('帧率', `${this.mpvFrameRate.toFixed(2)} fps`)
+        }
+      }
+
+      // ── 音频流 ──
+      if (this.mpvAudioCodec.length > 0 || this.mpvAudioSampleRate > 0) {
+        Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
+        Text('音频')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.yourtube_text_secondary'))
+          .margin({ bottom: 6 })
+        if (this.mpvAudioCodec.length > 0) {
+          this.StreamInfoRow('编码', this.mpvAudioCodec)
+        }
+        if (this.mpvAudioBitRate > 0) {
+          this.StreamInfoRow('码率', this.formatBitrate(this.mpvAudioBitRate))
+        }
+        if (this.mpvAudioChannels > 0) {
+          this.StreamInfoRow('声道', this.formatChannels(this.mpvAudioChannels))
+        }
+        if (this.mpvAudioSampleRate > 0) {
+          this.StreamInfoRow('采样率', `${(this.mpvAudioSampleRate / 1000).toFixed(1)} kHz`)
+        }
+      }
+
+      // ── 无数据占位 ──
+      if (this.mpvVideoWidth === 0 && this.mpvAudioCodec.length === 0 && this.mpvContainerFormat.length === 0) {
+        Text('正在获取流信息...')
+          .fontSize(13)
+          .fontColor($r('app.color.yourtube_text_hint'))
+          .margin({ top: 8 })
+      }
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 16, bottom: 12 })
+  }
+
+  @Builder
+  StreamInfoRow(label: string, value: string) {
+    Row() {
+      Text(label)
+        .fontSize(13)
+        .fontColor($r('app.color.yourtube_text_secondary'))
+        .width(80)
+      Text(value)
+        .fontSize(13)
+        .fontColor($r('app.color.yourtube_text_primary'))
+        .layoutWeight(1)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .padding({ top: 3, bottom: 3 })
   }
 
   @Builder

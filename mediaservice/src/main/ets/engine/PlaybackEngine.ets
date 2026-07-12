@@ -23,6 +23,14 @@ export interface PlaybackState {
   videoStreamCount: number;
   audioStreamCount: number;
   subtitleStreamCount: number;
+  videoCodec: string;
+  videoBitRate: number;
+  frameRate: number;
+  audioCodec: string;
+  audioBitRate: number;
+  audioChannels: number;
+  audioSampleRate: number;
+  fileSize: number;
   errorMsg: string;
   errorCategory?: PlaybackErrorCategory;
   errorCode?: number;

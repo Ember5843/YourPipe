@@ -59,6 +59,17 @@ export interface InnertubePlayerResult {
   safariCpn: string | undefined;
 }
 
+/** One failed InnerTube client fetch (for aggregated error reporting). */
+export class ExtractorStageError {
+  source: string = '';
+  error: Error = new Error('');
+
+  constructor(source: string, error: Error) {
+    this.source = source;
+    this.error = error;
+  }
+}
+
 /** Cached manifest n-decryption result */
 interface ManifestNDecodeResult {
   original: string;
@@ -149,57 +160,6 @@ export interface InnerTubeContext {
 }
 
 /**
- * Android client context (contains client, request, user)
- */
-export interface AndroidClientContext {
-  client: InnerTubeClientContext;
-  request: InnerTubeRequest;
-  user: InnerTubeUser;
-}
-
-/**
- * InnerTube base request payload
- */
-export interface InnerTubeBasePayload {
-  context: InnerTubeContext;
-  videoId: string;
-  contentCheckOk: boolean;
-  racyCheckOk: boolean;
-  cpn: string;
-}
-
-/**
- * WEB embedded request payload
- */
-export interface WebEmbeddedPayload extends InnerTubeBasePayload {
-  thirdParty: ThirdParty;
-  request: InnerTubeRequest;
-  user: InnerTubeUser;
-}
-
-/**
- * Android request payload
- */
-export interface AndroidPayload {
-  context: AndroidClientContext;
-  playerRequest: AndroidPlayerRequest;
-  disablePlayerResponse: boolean;
-}
-
-/**
- * iOS request payload
- */
-export interface IosPayload extends InnerTubeBasePayload {
-}
-
-/**
- * Third party embed info
- */
-export interface ThirdParty {
-  embedUrl: string;
-}
-
-/**
  * InnerTube request config
  */
 export interface InnerTubeRequest {
@@ -212,23 +172,6 @@ export interface InnerTubeRequest {
  */
 export interface InnerTubeUser {
   lockedSafetyMode: boolean;
-}
-
-/**
- * Android player request
- */
-export interface AndroidPlayerRequest {
-  videoId: string;
-  cpn: string;
-  contentCheckOk: boolean;
-  racyCheckOk: boolean;
-}
-
-/**
- * Android player response wrapper
- */
-export interface AndroidReelResponse {
-  playerResponse?: PlayerResponse;
 }
 
 /**
@@ -644,6 +587,10 @@ export class YouTubeExtractor {
   private safariCpn: string | undefined;
   private androidCpn: string | undefined;
 
+  // Aggregated errors across fetch stages (对齐 PipePipe YoutubeStreamExtractor.errors[]).
+  // In allow surfacing root cause when all clients fail; otherwise final exception loses details.
+  private errors: ExtractorStageError[] = [];
+
   /**
    * Build and cache streams from a fetched InnerTube /player result.
    * The /player fetch is now driven by extractVideoStreams so it can be parallelized;
@@ -731,6 +678,13 @@ export class YouTubeExtractor {
 
     // Mirror PipePipe line 1405: SABR check after HLS fallback, skip for live streams
     const isLive = watchPlayerResponse.videoDetails?.isLiveContent === true;
+
+    // Error aggregation gate (对齐 PipePipe L1381-1393):
+    //   当所有 InnerTube 客户端都未返回 streamingData 时，从 errors 汇总抛出带 root cause 的异常，
+    //   避免最终抛出无信息的 generic ContentNotSupportedException。
+    //   SABR-only 与否由后续 guard 判定。
+    this.checkAggregatedErrors(innertubePlayers);
+
     if (!isLive && this.isSabrOnlyResponse(innertubePlayers)
       && this.getHlsManifestUrlFromStreamingData().length === 0) {
       throw new ContentNotSupportedException(
@@ -740,6 +694,28 @@ export class YouTubeExtractor {
     }
 
     this.streamsCachedVideoId = videoId;
+  }
+
+  /**
+   * When every InnerTube client failed and nothing usable was cached, surface
+   * the aggregated root causes instead of a generic "no streams" error.
+   */
+  private checkAggregatedErrors(players: InnertubePlayerResult): void {
+    const hasAnyPlayer = !!(players.android || players.safari);
+    const hasAnyStream = this.cachedAudioStreams.length > 0
+      || this.cachedVideoOnlyStreams.length > 0
+      || this.cachedVideoStreams.length > 0;
+    if (hasAnyPlayer || hasAnyStream || this.errors.length === 0) {
+      return;
+    }
+    const parts: string[] = [];
+    for (const item of this.errors) {
+      const msg = item.error?.message || String(item.error);
+      parts.push(`${item.source}: ${msg}`);
+    }
+    throw new ContentNotSupportedException(
+      `All InnerTube clients failed to return streams. ${parts.join(' | ')}`
+    );
   }
 
   /**
@@ -790,6 +766,9 @@ export class YouTubeExtractor {
    */
   async extractVideoStreams(videoId: string): Promise<VideoInfo> {
     logger.info(`Extracting video streams for: ${videoId}`);
+
+    // 清空上次提取的错误聚合（每次提取都用全新的 errors 列表）
+    this.errors = [];
 
     const authManager = AuthSessionManager.getInstance();
     const hasCookieAuth = authManager?.isSignedIn() === true && !!(authManager?.getCookieString());
@@ -988,6 +967,18 @@ export class YouTubeExtractor {
   }
 
   clearCache(): void {
+    this.streamsCachedVideoId = '';
+    this.cachedAudioStreams = [];
+    this.cachedVideoStreams = [];
+    this.cachedVideoOnlyStreams = [];
+    this.cachedManifestNResult = null;
+    this.cachedInnertubePlayers = undefined;
+    this.safariStreamingData = undefined;
+    this.androidStreamingData = undefined;
+    this.safariCpn = undefined;
+    this.androidCpn = undefined;
+    this.androidVisitorData = undefined;
+    // 注意：cachedSignatureTimestamp 是进程级 STS 缓存，不在此清空，复用提速
     logger.debug('Cache cleared');
   }
 
@@ -1191,6 +1182,7 @@ export class YouTubeExtractor {
           result.safariCpn = safariResult.cpn;
         }
       } catch (e) {
+        this.errors.push(new ExtractorStageError('safari', e as Error));
         logger.warn('Safari fetch error:', e);
       }
     } else {
@@ -1203,6 +1195,7 @@ export class YouTubeExtractor {
           result.androidCpn = androidResult.cpn;
         }
       } catch (e) {
+        this.errors.push(new ExtractorStageError('android', e as Error));
         logger.warn('Android fetch error:', e);
       }
     }
@@ -1255,17 +1248,10 @@ export class YouTubeExtractor {
   /** 从 RYD API 获取点踩数（对标 PipePipe dislikeCall） */
   private async fetchDislikeCount(videoId: string): Promise<number> {
     const url = `https://returnyoutubedislikeapi.com/votes?videoId=${videoId}`;
-    const httpRequest = http.createHttp();
     try {
-      const resp = await httpRequest.request(url, {
-        method: http.RequestMethod.GET,
-        connectTimeout: 8000,
-        readTimeout: 8000,
-      });
+      const resp = await this.client.get(url);
       if (resp.responseCode === 200) {
-        const body = typeof resp.result === 'string'
-          ? resp.result
-          : this.arrayBufferToString(resp.result as ArrayBuffer);
+        const body = resp.result as string;
         interface DislikeData {
           dislikes?: number;
         }
@@ -1274,8 +1260,6 @@ export class YouTubeExtractor {
       }
     } catch (e) {
       logger.warn('fetchDislikeCount failed:', e);
-    } finally {
-      httpRequest.destroy();
     }
     return -1;
   }
@@ -1431,8 +1415,8 @@ export class YouTubeExtractor {
     const hasCookieAuth = AuthSessionManager.getInstance()?.isSignedIn() === true
       && !!(AuthSessionManager.getInstance()?.getCookieString());
     const sourceWeight: Record<string, number> = hasCookieAuth
-      ? { 'safari': 5, 'ios': 4, 'android': 3, 'watch': 1 }
-      : { 'android': 5, 'ios': 4, 'safari': 3, 'watch': 1 };
+      ? { 'safari': 5, 'android': 3, 'watch': 1 }
+      : { 'android': 5, 'safari': 3, 'watch': 1 };
 
     const score = (entry: PlayerCandidate): number[] => {
       const pr = entry.pr;
@@ -2176,15 +2160,6 @@ export class YouTubeExtractor {
       }
     }
     return '';
-  }
-
-  private arrayBufferToString(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let result = '';
-    for (let i = 0; i < bytes.length; i++) {
-      result += String.fromCharCode(bytes[i]);
-    }
-    return result;
   }
 
   private async deobfuscateManifestUrl(manifestUrl: string): Promise<string> {

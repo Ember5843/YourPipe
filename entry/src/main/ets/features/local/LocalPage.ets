@@ -33,12 +33,165 @@ function formatRelativeTime(ts: number): ResourceStr {
 const SYMBOL_FONT_SIZE: number = 16;
 
 @Component
+struct HistoryCard {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @Prop item: WatchHistoryItem;
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @State isShowContextMenu: boolean = false;
+  onOpen: (item: WatchHistoryItem) => void = (_item: WatchHistoryItem) => {};
+
+  private deleteItem(): void {
+    WatchHistoryStore.remove(this.item.videoId);
+    this.isShowContextMenu = false;
+  }
+
+  @Builder
+  deleteMenuBuilder() {
+    Scroll() {
+      Menu() {
+        MenuItem({
+          symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
+            .fontSize(SYMBOL_FONT_SIZE)
+            .fontColor([$r('sys.color.font_primary')]),
+          content: $r('app.string.yt_action_delete_record')
+        })
+          .contentFontColor(this.themePrimary)
+          .onClick(() => {
+            this.deleteItem();
+          });
+      }
+      .backgroundColor($r('app.color.yourtube_bg_surface'))
+      .borderRadius(12)
+      .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+      .width(180)
+      .height('auto')
+    }
+    .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+    .edgeEffect(EdgeEffect.Spring)
+  }
+
+  build() {
+    Row() {
+      // ── 缩略图区域 ──
+      Stack() {
+        if (this.item.thumbnailUrl && this.item.thumbnailUrl.length > 0) {
+          Image(this.item.thumbnailUrl)
+            .width(160)
+            .height(90)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(6)
+            .backgroundColor('#1A1A1A');
+        } else {
+          Rect()
+            .width(160)
+            .height(90)
+            .fill('#1A1A1A')
+            .radius(6);
+        }
+
+        Column() {
+          Blank()
+
+          if (this.item.durationSec > 0) {
+            Row() {
+              Text(formatDuration(this.item.durationSec))
+                .fontSize(10)
+                .fontColor(Color.White)
+                .backgroundColor('rgba(0,0,0,0.75)')
+                .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+                .borderRadius(4)
+                .margin({ left: 4, bottom: this.item.progressSec > 0 ? 5 : 4 });
+              Blank();
+            }
+            .width('100%')
+          }
+
+          if (this.item.durationSec > 0 && this.item.progressSec > 0) {
+            Row() {
+              Row()
+                .height(3)
+                .backgroundColor(this.themePrimary)
+                .layoutWeight(Math.min(this.item.progressSec / this.item.durationSec, 1))
+              Row()
+                .height(3)
+                .backgroundColor('rgba(255,255,255,0.3)')
+                .layoutWeight(1 - Math.min(this.item.progressSec / this.item.durationSec, 1))
+            }
+            .width('100%')
+          }
+        }
+        .width(160)
+        .height(90)
+      }
+      .width(160)
+      .height(90)
+      .margin({ right: 12 });
+
+      // ── 文字信息 ──
+      Column() {
+        Text(this.item.title)
+          .fontSize(14)
+          .fontColor($r('app.color.yourtube_text_primary'))
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .lineHeight(18)
+          .fontWeight(FontWeight.Medium)
+          .margin({ bottom: 4 });
+
+        if (this.item.author && this.item.author.length > 0) {
+          Text(this.item.author)
+            .fontSize(11)
+            .fontColor($r('app.color.yourtube_text_quaternary'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .margin({ bottom: 4 });
+        }
+
+        Text(formatRelativeTime(this.item.lastWatchedAt))
+          .fontSize(11)
+          .fontColor($r('app.color.yourtube_text_hint'));
+      }
+      .layoutWeight(1)
+      .height(90)
+      .alignItems(HorizontalAlign.Start)
+      .justifyContent(FlexAlign.Start);
+    }
+    .width('100%')
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .alignItems(VerticalAlign.Top)
+    .borderRadius(12)
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+    .bindContextMenu(this.isShowContextMenu, this.deleteMenuBuilder, {
+      preview: MenuPreviewMode.IMAGE,
+      previewAnimationOptions: { scale: [1.0, 1.05] },
+      placement: Placement.BottomRight,
+      aboutToAppear: () => {
+        if (this.uiConfig.isVibrate) {
+          customVibrator.vibratorTriggerOfHapticClockTimer();
+        }
+      },
+      aboutToDisappear: () => {
+        this.isShowContextMenu = false;
+      }
+    })
+    .onClick(() => {
+      this.onOpen(this.item);
+    })
+    .gesture(
+      LongPressGesture()
+        .onAction(() => {
+          this.isShowContextMenu = true;
+        })
+    );
+  }
+}
+
+@Component
 export struct LocalPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onSwitchOuterTab: (index: number) => void = (_index: number) => {};
   @StorageLink('watchHistory') history: WatchHistoryItem[] = [];
-  /** 当前长按选中要操作的条目，用于驱动 bindContextMenu 显示 */
-  @State contextMenuItem: WatchHistoryItem | null = null;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
@@ -48,11 +201,6 @@ export struct LocalPage {
   private panOptionRight: PanGestureOptions = new PanGestureOptions({ direction: PanDirection.Right });
 
   private readonly tabTitles: string[] = ['观看记录', '下载'];
-
-  private deleteItem(videoId: string): void {
-    WatchHistoryStore.remove(videoId);
-    this.contextMenuItem = null;
-  }
 
   private clearAll(): void {
     WatchHistoryStore.clear();
@@ -73,160 +221,6 @@ export struct LocalPage {
       item.channelHandle || ''
     );
     this.actionHub.openVideo(video);
-  }
-
-  // ── 长按删除的 ContextMenu，与 VideoCard 风格一致 ──
-  @Builder
-  deleteMenuBuilder() {
-    Scroll() {
-      Menu() {
-        MenuItem({
-          symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
-            .fontSize(SYMBOL_FONT_SIZE)
-            .fontColor([$r('sys.color.font_primary')]),
-          content: $r('app.string.yt_action_delete_record')
-        })
-          .contentFontColor(this.themePrimary)
-          .onClick(() => {
-            if (this.contextMenuItem) {
-              this.deleteItem(this.contextMenuItem.videoId);
-            }
-          });
-      }
-      .backgroundColor($r('app.color.yourtube_bg_surface'))
-      .borderRadius(12)
-      .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
-      .width(180)
-      .height('auto')
-    }
-    .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-    .edgeEffect(EdgeEffect.Spring)
-  }
-
-  @Builder
-  HistoryCard(item: WatchHistoryItem) {
-    Row() {
-      // ── 缩略图区域 ──
-      Stack() {
-        // 底层：图片或占位色块
-        if (item.thumbnailUrl && item.thumbnailUrl.length > 0) {
-          Image(item.thumbnailUrl)
-            .width(160)
-            .height(90)
-            .objectFit(ImageFit.Cover)
-            .borderRadius(6)
-            .backgroundColor('#1A1A1A');
-        } else {
-          Rect()
-            .width(160)
-            .height(90)
-            .fill('#1A1A1A')
-            .radius(6);
-        }
-
-        // 底部叠加层：进度条 + 时长标签
-        Column() {
-          Blank() // 撑满上方空间，把内容推到底部
-
-          // 时长标签 —— 左下角
-          if (item.durationSec > 0) {
-            Row() {
-              Text(formatDuration(item.durationSec))
-                .fontSize(10)
-                .fontColor(Color.White)
-                .backgroundColor('rgba(0,0,0,0.75)')
-                .padding({ left: 4, right: 4, top: 2, bottom: 2 })
-                .borderRadius(4)
-                .margin({ left: 4, bottom: item.progressSec > 0 ? 5 : 4 });
-              Blank();
-            }
-            .width('100%')
-          }
-
-          // YouTube 风格红色进度条（最底部）
-          if (item.durationSec > 0 && item.progressSec > 0) {
-            Row() {
-              Row()
-                .height(3)
-                .backgroundColor(this.themePrimary)
-                .layoutWeight(Math.min(item.progressSec / item.durationSec, 1))
-              Row()
-                .height(3)
-                .backgroundColor('rgba(255,255,255,0.3)')
-                .layoutWeight(1 - Math.min(item.progressSec / item.durationSec, 1))
-            }
-            .width('100%')
-          }
-        }
-        .width(160)
-        .height(90)
-      }
-      .width(160)
-      .height(90)
-      .margin({ right: 12 });
-
-      // ── 文字信息 ──
-      Column() {
-        Text(item.title)
-          .fontSize(14)
-          .fontColor($r('app.color.yourtube_text_primary'))
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .lineHeight(18)
-          .fontWeight(FontWeight.Medium)
-          .margin({ bottom: 4 });
-
-        if (item.author && item.author.length > 0) {
-          Text(item.author)
-            .fontSize(11)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .margin({ bottom: 4 });
-        }
-
-        Text(formatRelativeTime(item.lastWatchedAt))
-          .fontSize(11)
-          .fontColor($r('app.color.yourtube_text_hint'));
-      }
-      .layoutWeight(1)
-      .height(90)
-      .alignItems(HorizontalAlign.Start)
-      .justifyContent(FlexAlign.Start);
-    }
-    .width('100%')
-    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
-    .alignItems(VerticalAlign.Top)
-    .borderRadius(12)
-    .backgroundColor($r('app.color.yourtube_bg_surface'))
-    .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
-    // 与 VideoCard 一致的长按 ContextMenu
-    .bindContextMenu(
-      this.contextMenuItem?.videoId === item.videoId,
-      this.deleteMenuBuilder,
-      {
-        preview: MenuPreviewMode.IMAGE,
-        previewAnimationOptions: { scale: [1.0, 1.05] },
-        placement: Placement.BottomRight,
-        aboutToAppear: () => {
-          if (this.uiConfig.isVibrate) {
-            customVibrator.vibratorTriggerOfHapticClockTimer();
-          }
-        },
-        aboutToDisappear: () => {
-          this.contextMenuItem = null;
-        }
-      }
-    )
-    .onClick(() => {
-      this.openVideo(item);
-    })
-    .gesture(
-      LongPressGesture()
-        .onAction(() => {
-          this.contextMenuItem = item;
-        })
-    );
   }
 
   build() {
@@ -295,7 +289,10 @@ export struct LocalPage {
           // 历史列表
           ForEach(this.history, (item: WatchHistoryItem) => {
             ListItem() {
-              this.HistoryCard(item)
+              HistoryCard({
+                item: item,
+                onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
+              })
             }
           }, (item: WatchHistoryItem) => item.videoId + item.lastWatchedAt)
         }

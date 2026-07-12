@@ -423,11 +423,11 @@ export class AvSessionManager {
       this.audioSessionManager.setAudioSessionScene(
         audio.AudioSessionScene.AUDIO_SESSION_SCENE_MEDIA);
       const strategy: audio.AudioSessionStrategy = {
-        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_PAUSE_OTHERS
+        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_DUCK_OTHERS
       };
       this.audioSessionManager.activateAudioSession(strategy).then(() => {
         this.audioSessionActivated = true;
-        Logger.info(TAG, 'AudioSession activated: CONCURRENCY_PAUSE_OTHERS');
+        Logger.info(TAG, 'AudioSession activated: CONCURRENCY_DUCK_OTHERS');
       }).catch((e: BusinessError) => {
         Logger.error(TAG, `activateAudioSession failed: code=${e.code}, message=${e.message}`);
       });

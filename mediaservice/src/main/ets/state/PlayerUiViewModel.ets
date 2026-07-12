@@ -32,6 +32,22 @@ export class PlayerUiViewModel {
   @Track subtitleText: string = '';
   @Track isCasting: boolean = false;
   @Track castDeviceName: string = '';
+  // 当前实际播放流的实时信息（由 mpv getMediaInfo 提供）
+  @Track mediaTitle: string = '';
+  @Track containerFormat: string = '';
+  @Track videoWidth: number = 0;
+  @Track videoHeight: number = 0;
+  @Track videoStreamCount: number = 0;
+  @Track audioStreamCount: number = 0;
+  @Track subtitleStreamCount: number = 0;
+  @Track videoCodec: string = '';
+  @Track videoBitRate: number = 0;
+  @Track frameRate: number = 0;
+  @Track audioCodec: string = '';
+  @Track audioBitRate: number = 0;
+  @Track audioChannels: number = 0;
+  @Track audioSampleRate: number = 0;
+  @Track fileSize: number = 0;
 
   public reset(): void {
     this.isPlaying = false;
@@ -49,5 +65,20 @@ export class PlayerUiViewModel {
     this.subtitleTracks = [];
     this.currentSubtitleUrl = '';
     this.subtitleText = '';
+    this.mediaTitle = '';
+    this.containerFormat = '';
+    this.videoWidth = 0;
+    this.videoHeight = 0;
+    this.videoStreamCount = 0;
+    this.audioStreamCount = 0;
+    this.subtitleStreamCount = 0;
+    this.videoCodec = '';
+    this.videoBitRate = 0;
+    this.frameRate = 0;
+    this.audioCodec = '';
+    this.audioBitRate = 0;
+    this.audioChannels = 0;
+    this.audioSampleRate = 0;
+    this.fileSize = 0;
   }
 }

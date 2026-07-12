@@ -1,4 +1,5 @@
 import { MdkPlayerController as MpvPlayerController, MediaStatus, MediaType, SeekFlag, PlaybackState as NativePlaybackState } from '@mediadevkit/libmdk-napi';
+import type { MediaInfo } from '@mediadevkit/libmdk-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
 
@@ -41,6 +42,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   // 保存配置供 load() 方法使用
   private engineConfig: EngineConfig = {};
+  /** 上次日志里的 hwdec-current，避免状态轮询刷屏 */
+  private lastLoggedHwdec: string = '';
 
   async initialize(_config: EngineConfig): Promise<boolean> {
     if (this.initialized && this.controller !== null) {
@@ -102,6 +105,16 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       // 精确 seek：framedrop=yes 让 seek 跳过未显示帧的解码，高分辨率下拖动更流畅。
       ctrl.setProperty('hr-seek', 'yes');
       ctrl.setProperty('hr-seek-framedrop', 'yes');
+
+      // 运行时再钉一次省电路径（native EnsureMpv 已设；这里保证 recreate 后仍生效）
+      ctrl.setProperty('scale', 'bilinear');
+      ctrl.setProperty('cscale', 'bilinear');
+      ctrl.setProperty('dscale', 'bilinear');
+      ctrl.setProperty('dither', 'no');
+      ctrl.setProperty('deband', 'no');
+      ctrl.setProperty('hdr-compute-peak', 'no');
+      ctrl.setProperty('video-sync', 'audio');
+      ctrl.setProperty('framedrop', 'vo');
 
       // FFmpeg HTTP 读到10MB截断后自动重连续传
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
@@ -562,6 +575,63 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const currentMs: number = (this.pendingSeekMs >= 0) ? this.pendingSeekMs : posMs;
     const engineState = this.mapEngineState(isPlaying);
 
+    // 从 mpv 读取当前播放流的详细信息（codec/分辨率/码率/帧率等）。
+    let mediaTitle: string = '';
+    let containerFormat: string = '';
+    let videoWidth: number = 0;
+    let videoHeight: number = 0;
+    let videoStreamCount: number = 0;
+    let audioStreamCount: number = 0;
+    let subtitleStreamCount: number = 0;
+    let videoCodec: string = '';
+    let videoBitRate: number = 0;
+    let frameRate: number = 0;
+    let audioCodec: string = '';
+    let audioBitRate: number = 0;
+    let audioChannels: number = 0;
+    let audioSampleRate: number = 0;
+    let fileSize: number = 0;
+    if (ctrl !== null && !this.destroyed && this.isReady && !this.hasError) {
+      try {
+        const info: MediaInfo = ctrl.getMediaInfo();
+        mediaTitle = info.title ?? '';
+        containerFormat = info.format ?? '';
+        const v = info.video.length > 0 ? info.video[0] : null;
+        if (v) {
+          videoWidth = v.width;
+          videoHeight = v.height;
+          videoCodec = v.codec?.codec ?? '';
+          videoBitRate = v.codec?.bitRate ?? 0;
+          frameRate = v.codec?.frameRate ?? info.frameRate ?? 0;
+        }
+        const hwdec = ctrl.getProperty('hwdec-current');
+        if (hwdec.length > 0 && hwdec !== this.lastLoggedHwdec) {
+          this.lastLoggedHwdec = hwdec;
+          const soft = hwdec === 'no' || hwdec.indexOf('ohcodec') < 0;
+          Logger.info(TAG,
+            `decoder: hwdec-current=${hwdec} codec=${videoCodec} ${videoWidth}x${videoHeight}` +
+            `${soft ? ' (software path — thermal risk)' : ' (ohcodec hard path)'}`);
+        }
+        const a = info.audio.length > 0 ? info.audio[0] : null;
+        if (a) {
+          audioCodec = a.codec?.codec ?? '';
+          audioBitRate = a.codec?.bitRate ?? 0;
+          audioChannels = a.codec?.channels ?? 0;
+          audioSampleRate = a.codec?.sampleRate ?? 0;
+        }
+        videoStreamCount = info.video.length;
+        audioStreamCount = info.audio.length;
+        subtitleStreamCount = info.subtitle.length;
+        const fsStr = info.fileSize ?? '';
+        if (fsStr.length > 0) {
+          const parsed = parseInt(fsStr, 10);
+          if (!isNaN(parsed)) fileSize = parsed;
+        }
+      } catch (e) {
+        Logger.debug(TAG, `getMediaInfo failed: ${(e as Error).message}`);
+      }
+    }
+
     return {
       engineState: engineState,
       isPlaying: isPlaying,
@@ -576,13 +646,21 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       playbackSpeed: this.playbackSpeed,
       bufferingPercent: 0,
       uri: this.sourceUrl,
-      mediaTitle: '',
-      containerFormat: '',
-      videoWidth: 0,
-      videoHeight: 0,
-      videoStreamCount: 0,
-      audioStreamCount: 0,
-      subtitleStreamCount: 0,
+      mediaTitle: mediaTitle,
+      containerFormat: containerFormat,
+      videoWidth: videoWidth,
+      videoHeight: videoHeight,
+      videoStreamCount: videoStreamCount,
+      audioStreamCount: audioStreamCount,
+      subtitleStreamCount: subtitleStreamCount,
+      videoCodec: videoCodec,
+      videoBitRate: videoBitRate,
+      frameRate: frameRate,
+      audioCodec: audioCodec,
+      audioBitRate: audioBitRate,
+      audioChannels: audioChannels,
+      audioSampleRate: audioSampleRate,
+      fileSize: fileSize,
       errorMsg: this.errorMsg,
       errorCategory: this.hasError ? this.lastErrorCategory : undefined,
       errorCode: this.hasError ? -1 : undefined,
@@ -641,6 +719,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       this.surfaceId = '';
     }
     this.sourceUrl = '';
+    this.lastLoggedHwdec = '';
     this.lastPositionMs = 0;
     this.lastDurationMs = 0;
     this.isBuffering = false;

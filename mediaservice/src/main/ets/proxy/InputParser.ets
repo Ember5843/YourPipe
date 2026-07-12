@@ -58,9 +58,6 @@ function toResource(raw: RawResource, isAudio: boolean, fallbackUa: string): Str
     isYoutubePlayback: isYoutubeUrl(url),
     isOtf: raw.isOtf ?? false,
     sourceClient: raw.sourceClient ?? '',
-    otfPrepared: false,
-    otfDurationMs: 0,
-    otfSegmentTimeline: [],
   };
 }
 

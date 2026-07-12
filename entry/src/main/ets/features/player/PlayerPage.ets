@@ -661,6 +661,19 @@ export struct VideoPlayerPage {
                     tags: this.videoSource.tags || [],
                     channelId: this.detailChannelId,
                     channelAvatarUrl: this.detailChannelAvatarUrl,
+                    mpvVideoWidth: this.vm.videoWidth,
+                    mpvVideoHeight: this.vm.videoHeight,
+                    mpvContainerFormat: this.vm.containerFormat,
+                    mpvMediaTitle: this.vm.mediaTitle,
+                    mpvVideoCodec: this.vm.videoCodec,
+                    mpvVideoBitRate: this.vm.videoBitRate,
+                    mpvFrameRate: this.vm.frameRate,
+                    mpvAudioCodec: this.vm.audioCodec,
+                    mpvAudioBitRate: this.vm.audioBitRate,
+                    mpvAudioChannels: this.vm.audioChannels,
+                    mpvAudioSampleRate: this.vm.audioSampleRate,
+                    mpvFileSize: this.vm.fileSize,
+                    mpvDuration: this.vm.durationTime,
                   })
                 }
               } else if (item.id === 1) {

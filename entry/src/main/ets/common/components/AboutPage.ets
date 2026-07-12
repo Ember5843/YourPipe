@@ -55,7 +55,7 @@ const CHANGELOG: ChangelogEntry[] = [
     changes: [
       '更换系统播放引擎与第三方FFMpeg至MPVPlayer',
       '恢复高分辨率播放和字幕功能',
-      '支持HEVC硬件解码和AV1 VP9软件解码',
+      '支持HEVC/H.264硬件解码；API 23+ 尝试 VP9/AV1 硬件解码',
       '加入真HDR显示',
       '优化非登录状态下网络传输库能力',
       '优化错误显示',

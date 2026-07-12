@@ -818,11 +818,28 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "gpu-context", "ohosvk");
         SetOptionString(ctx.mpv, "ao", "ohaudio");
         SetOptionString(ctx.mpv, "hwdec", "ohcodec-copy");
-        // Prefer hardware decode (ohcodec: H.264/HEVC/AV1/VP9), but fall back to
-        // ffmpeg software decode when the device has no hardware decoder for the
-        // codec. e.g. this device reports "Failed to get hardware codec
-        // video/vp9", so YouTube VP9/AV1 webm would otherwise show no picture.
+        // Prefer OHCodec hard decode for H.264/HEVC (API 9/10+) and
+        // VP9/AV1/VP8 (API 23+ MIME). If GetCapability(HARDWARE) fails on a
+        // device, lavc falls back to software so playback still works.
         SetOptionString(ctx.mpv, "vd-lavc-software-fallback", "yes");
+        // Prefer ohcodec wrappers when multiple decoders exist for a codec.
+        SetOptionString(ctx.mpv, "hwdec-codecs", "h264,hevc,vp8,vp9,av1");
+        // Thermal / power defaults for mobile OHOS:
+        // gpu-next + ohcodec-copy already uploads every frame to the GPU; keep
+        // libplacebo on the cheap path (bilinear, no deband/dither/HDR peak).
+        // video-sync=audio avoids display-resample's extra GPU work.
+        // framedrop=vo drops late frames instead of decoding every one under load.
+        SetOptionString(ctx.mpv, "scale", "bilinear");
+        SetOptionString(ctx.mpv, "cscale", "bilinear");
+        SetOptionString(ctx.mpv, "dscale", "bilinear");
+        SetOptionString(ctx.mpv, "dither", "no");
+        SetOptionString(ctx.mpv, "deband", "no");
+        SetOptionString(ctx.mpv, "correct-downscaling", "no");
+        SetOptionString(ctx.mpv, "linear-downscaling", "no");
+        SetOptionString(ctx.mpv, "sigmoid-upscaling", "no");
+        SetOptionString(ctx.mpv, "hdr-compute-peak", "no");
+        SetOptionString(ctx.mpv, "video-sync", "audio");
+        SetOptionString(ctx.mpv, "framedrop", "vo");
         // Stop at the last frame instead of unloading the file at EOF, so the
         // user can still seek back and resume (normal video-player behaviour).
         // keep-open-pause=yes (default) means mpv pauses on the last frame.
@@ -833,11 +850,8 @@ bool EnsureMpv(PlayerContext& ctx)
         // missing youtube-dl subprocess, spamming errors. We do not want a
         // player that shells out to external scrapers.
         SetOptionString(ctx.mpv, "ytdl", "no");
-        // msg-level: keep ohos at verbose so the HDR SetColorSpace confirmation
-        // line stays visible; libplacebo/vulkan lowered back to warn now that
-        // the HDR + resize paths are verified (re-add ",libplacebo=v,vulkan=v"
-        // to debug surface/colorspace negotiation again).
-        SetOptionString(ctx.mpv, "msg-level", "all=warn,ohos=v");
+        // Production logging: warn-level only. Raise ohos to v when debugging HDR.
+        SetOptionString(ctx.mpv, "msg-level", "all=warn");
         SetOptionString(ctx.mpv, "osc", "no");
         SetOptionString(ctx.mpv, "input-default-bindings", "no");
         SetOptionString(ctx.mpv, "input-vo-keyboard", "no");

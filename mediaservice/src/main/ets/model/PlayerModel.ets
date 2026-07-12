@@ -224,13 +224,14 @@ export class PlayerModel {
       const hA = ITAG_MAP[a.itag!]?.height || a.height || 0;
       const hB = ITAG_MAP[b.itag!]?.height || b.height || 0;
       if (hB !== hA) return hB - hA; // 主键：分辨率降序
-      // 次键：codec 优先级（与 ResolutionDialog 和 AvPlayerController itag 优先策略一致）
-      // H.264(avc1) > VP9(vp09) > AV1(av01)
+      // 次键：codec 优先级（与 AvPlayerController 一致）
+      // HEVC > H.264 > VP9 > AV1（API 23+ 均可走 ohcodec 硬解）
       const codecPriority = (s: StreamInfo): number => {
         const c = (s.codecs || '').toLowerCase();
-        if (c.startsWith('avc1') || c.startsWith('avc3')) return 3;
-        if (c.startsWith('vp9')  || c.startsWith('vp09')) return 2;
-        if (c.startsWith('av01'))                          return 1;
+        if (c.startsWith('hvc1') || c.startsWith('hev1')) return 5;
+        if (c.startsWith('avc1') || c.startsWith('avc3')) return 4;
+        if (c.startsWith('vp9')  || c.startsWith('vp09')) return 3;
+        if (c.startsWith('av01'))                          return 2;
         return 0;
       };
       return codecPriority(b) - codecPriority(a);
@@ -347,10 +348,10 @@ export class PlayerModel {
     };
 
     const codecSortPriority = (label: string): number => {
+      if (label === 'H265') return 5;
       if (label === 'H264') return 4;
-      if (label === 'H265') return 3;
-      if (label === 'VP9') return 2;
-      if (label === 'AV1') return 1;
+      if (label === 'VP9') return 3;
+      if (label === 'AV1') return 2;
       return 0;
     };
 

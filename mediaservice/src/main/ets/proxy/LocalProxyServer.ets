@@ -2,8 +2,7 @@ import { socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { sessionStore, DashSession } from './SessionStore';
 import { parseInputJson } from './InputParser';
-import { buildDashManifest } from './PlaylistBuilder';
-import { serveRange, serveOtfSegment } from './RangeProxy';
+import { serveRange } from './RangeProxy';
 import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][Server]';
@@ -46,7 +45,7 @@ async function sendText(conn: socket.TCPSocketConnection, status: number, status
   await conn.send({ data: encodeText(hdr + body) });
 }
 
-async function handleConnection(conn: socket.TCPSocketConnection, port: number): Promise<void> {
+async function handleConnection(conn: socket.TCPSocketConnection): Promise<void> {
   return new Promise<void>((resolve) => {
     let rawRequest = '';
 
@@ -85,7 +84,7 @@ async function handleConnection(conn: socket.TCPSocketConnection, port: number):
           return;
         }
 
-        await routeRequest(conn, req.method, parts, req.rangeHeader, session, port);
+        await routeRequest(conn, req.method, parts, req.rangeHeader, session);
       } catch (e) {
         Logger.error(TAG, `handleConnection error: ${e}`);
       } finally {
@@ -107,37 +106,14 @@ async function routeRequest(
   method: string,
   parts: string[],
   rangeHeader: string,
-  session: DashSession,
-  port: number
+  session: DashSession
 ): Promise<void> {
   const segment = parts[2];
 
-  // manifest.mpd
-  if (parts.length === 3 && segment === 'manifest.mpd') {
-    try {
-      const body = method === 'HEAD' ? '' : await buildDashManifest(session, port);
-      await sendText(conn, 200, 'OK', 'application/dash+xml', body);
-    } catch (e) {
-      Logger.error(TAG, `manifest build error: ${(e as Error).message}`);
-      await sendText(conn, 500, 'Manifest Error', 'text/plain', `Manifest generation failed: ${(e as Error).message}`);
-    }
-    return;
-  }
-
-  // video/0, audio/0 — byte-range proxy; video/0/sq/N, audio/0/sq/N — YouTube OTF segment proxy
   if (parts.length >= 4) {
     const idx = parseInt(parts[3], 10) || 0;
     if (segment === 'video' && idx < session.videos.length) {
       const resource = session.videos[idx];
-      if (parts.length >= 6 && parts[4] === 'sq') {
-        const sq = parseInt(parts[5], 10);
-        if (resource.isOtf && !Number.isNaN(sq)) {
-          await serveOtfSegment(conn, resource, sq, method === 'HEAD');
-          return;
-        }
-        await sendText(conn, 400, 'Bad Request', 'text/plain', 'Invalid OTF segment request');
-        return;
-      }
       if (resource.isOtf) {
         Logger.warn(TAG, `OTF resource requested through byte-range endpoint: video/${idx}`);
       }
@@ -146,15 +122,6 @@ async function routeRequest(
     }
     if (segment === 'audio' && session.hasAudio && idx < session.audios.length) {
       const resource = session.audios[idx];
-      if (parts.length >= 6 && parts[4] === 'sq') {
-        const sq = parseInt(parts[5], 10);
-        if (resource.isOtf && !Number.isNaN(sq)) {
-          await serveOtfSegment(conn, resource, sq, method === 'HEAD');
-          return;
-        }
-        await sendText(conn, 400, 'Bad Request', 'text/plain', 'Invalid OTF segment request');
-        return;
-      }
       if (resource.isOtf) {
         Logger.warn(TAG, `OTF resource requested through byte-range endpoint: audio/${idx}`);
       }
@@ -187,7 +154,7 @@ export class LocalProxyServer {
       Logger.info(TAG, `LocalProxyServer started on port ${this.port}`);
 
       this.server.on('connect', (conn: socket.TCPSocketConnection) => {
-        handleConnection(conn, this.port).catch((e: Error) => Logger.error(TAG, `conn error: ${e.message}`));
+        handleConnection(conn).catch((e: Error) => Logger.error(TAG, `conn error: ${e.message}`));
       });
       return true;
     } catch (e) {
@@ -279,7 +246,7 @@ export class LocalProxyServer {
     if (!session) return '';
     const base = `http://127.0.0.1:${this.port}/session/${sessionId}`;
     if (session.type === 'single') return `${base}/resource/main`;
-    return `${base}/manifest.mpd`;
+    return base;
   }
 }
 
