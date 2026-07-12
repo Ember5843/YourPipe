@@ -7,6 +7,7 @@ import { VideoData, StreamInfo } from '../model/VideoData';
 import { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from '../model/PlayerModel';
 import { PlaybackEngine, PlaybackState, EngineConfig } from '../engine/PlaybackEngine';
 import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
+import { VideoHwCaps } from '../engine/VideoHwCaps';
 import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
 import { BackgroundTaskManager } from '../common/BackgroundTaskManager';
@@ -154,6 +155,8 @@ export class AvPlayerController {
   public setIsPlaying(isPlaying: boolean): void { this.vm.isPlaying = isPlaying; }
 
   public getMergedVideoList(): VideoEntry[] {
+    // Full quality list — manual switch is always allowed (including 4K VP9/AV1).
+    // Auto-start still prefers hardware-friendly codecs via selectBestVideoEntry.
     return this.vm.playerModel.getMergedVideoList();
   }
 
@@ -384,10 +387,13 @@ export class AvPlayerController {
 
     this.updateAvSessionMetadata();
     this.vm.isBuffering = true;
-
     this.vm.currentSubtitleUrl = '';
-    this.playbackEngine.load(playbackUrl, this.pendingStartFromSec);
+    const startPos = this.pendingStartFromSec;
     this.pendingStartFromSec = 0;
+    Logger.info(TAG,
+      `load mpv: ${current.video?.height}p codec=${current.video?.codecs} ` +
+      `hw=${VideoHwCaps.isCodecHardwareFriendly(current.video?.codecs)}`);
+    this.playbackEngine.load(playbackUrl, startPos);
     if (newSource.play || newSource.auto) {
       this.avSessionManager.activateForPlayback();
       this.playbackEngine.play();
@@ -409,7 +415,10 @@ export class AvPlayerController {
       return;
     }
 
-    Logger.debug(TAG, `switchQuality: pos=${resumePos.toFixed(2)}s url=${this.describePlaybackUrl(playbackUrl)}`);
+    Logger.info(TAG,
+      `switchQuality: ${videoStream.height}p codec=${videoStream.codecs} itag=${videoStream.itag} ` +
+      `hw=${VideoHwCaps.isCodecHardwareFriendly(videoStream.codecs)} pos=${resumePos.toFixed(2)}s`);
+    // Manual quality switch always allowed (including 4K VP9/AV1). Engine is mpv.
     this.playbackEngine.load(playbackUrl, resumePos);
     if (wasPlaying) {
       this.playbackEngine.play();
@@ -567,9 +576,14 @@ export class AvPlayerController {
     const prefs = PlaybackPreferences.snapshot();
     const targetQuality = live ? prefs.mobileQuality : prefs.defaultQuality;
     const maxHeight = this.resolveMaxHeight(targetQuality);
-    const candidates = streams.filter(s => (s.height || this.heightFromQuality(s.quality)) <= maxHeight);
-    const usable = candidates.length > 0 ? candidates : streams;
-    return usable.slice().sort((a: StreamInfo, b: StreamInfo): number => {
+    const underCap = streams.filter(s => (s.height || this.heightFromQuality(s.quality)) <= maxHeight);
+    // Prefer hardware-decodable codecs when the device reports capability.
+    // Avoid auto-picking 4K VP9 on devices without VP9 hardware (soft-decode heat).
+    const hwFriendly = underCap.filter(s => VideoHwCaps.isCodecHardwareFriendly(s.codecs));
+    const pool = hwFriendly.length > 0
+      ? hwFriendly
+      : (underCap.length > 0 ? underCap : streams);
+    return pool.slice().sort((a: StreamInfo, b: StreamInfo): number => {
       const h = (b.height || this.heightFromQuality(b.quality)) - (a.height || this.heightFromQuality(a.quality));
       if (h !== 0) return h;
       const codec = this.codecPriority(b) - this.codecPriority(a);
@@ -595,12 +609,14 @@ export class AvPlayerController {
     }
     const prefs = PlaybackPreferences.snapshot();
     const maxHeight = this.resolveMaxHeight(prefs.defaultQuality);
-    // Prefer hard-decode-friendly codecs (AVC/HEVC) at the target height.
-    // mergedVideoList is sorted height desc then codec; find() would pick the first
-    // matching height which may be VP9/AV1 and fall back to software decode → heat.
+    // Prefer hard-decode-friendly codecs at the target height.
+    // Skip VP9/AV1 when OHOS reports no hardware capability for that MIME.
     const underCap = entries.filter(e => e.height <= maxHeight);
-    const pool = underCap.length > 0 ? underCap : entries;
-    return pool.slice().sort((a: VideoEntry, b: VideoEntry): number => {
+    const hwFriendly = underCap.filter(e => VideoHwCaps.isCodecHardwareFriendly(e.stream.codecs));
+    const pool = hwFriendly.length > 0
+      ? hwFriendly
+      : (underCap.length > 0 ? underCap : entries);
+    const selected = pool.slice().sort((a: VideoEntry, b: VideoEntry): number => {
       const h = b.height - a.height;
       if (h !== 0) {
         return h;
@@ -611,6 +627,14 @@ export class AvPlayerController {
       }
       return (b.stream.bitrate || 0) - (a.stream.bitrate || 0);
     })[0];
+    if (selected) {
+      const caps = VideoHwCaps.get();
+      Logger.info(TAG,
+        `selectBestVideoEntry: ${selected.resolutionLabel} codec=${selected.stream.codecs} ` +
+        `itag=${selected.stream.itag} hwFriendly=${VideoHwCaps.isCodecHardwareFriendly(selected.stream.codecs)} ` +
+        `caps[avc=${caps.avc},hevc=${caps.hevc},vp9=${caps.vp9},av1=${caps.av1}]`);
+    }
+    return selected;
   }
 
   private resolveMaxHeight(targetQuality: string): number {
@@ -634,14 +658,18 @@ export class AvPlayerController {
   }
 
   private codecPriority(stream: StreamInfo): number {
-    // API 23+ OHCodec: AVC/HEVC/VP9/AV1 all have hard-decode paths via ohcodec.
-    // Prefer HEVC/AVC for widest device support; VP9/AV1 next (new in API 23).
+    // Device-aware: hardware-capable codecs rank above soft-only ones.
+    // Base order: HEVC > H.264 > VP9 > AV1; then boost if HW is available.
     const c = (stream.codecs || '').toLowerCase();
-    if (c.startsWith('hvc1') || c.startsWith('hev1')) return 5;
-    if (c.startsWith('avc1') || c.startsWith('avc3')) return 4;
-    if (c.startsWith('vp9') || c.startsWith('vp09')) return 3;
-    if (c.startsWith('av01')) return 2;
-    return 0;
+    let base = 0;
+    if (c.startsWith('hvc1') || c.startsWith('hev1')) base = 50;
+    else if (c.startsWith('avc1') || c.startsWith('avc3')) base = 40;
+    else if (c.startsWith('vp9') || c.startsWith('vp09')) base = 30;
+    else if (c.startsWith('av01')) base = 20;
+    if (VideoHwCaps.isCodecHardwareFriendly(stream.codecs)) {
+      base += 100;
+    }
+    return base;
   }
 
   private codecToMpv(codec: string): string {

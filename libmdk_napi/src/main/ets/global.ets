@@ -58,3 +58,17 @@ export function setResourceManager(manager: resourceManager.ResourceManager): vo
 export function muxAudioVideo(videoPath: string, audioPath: string, outPath: string): void {
   nativeModule.muxAudioVideo(videoPath, audioPath, outPath);
 }
+
+export interface VideoHwDecoderCaps {
+  probed: boolean;
+  avc: boolean;
+  hevc: boolean;
+  vp9: boolean;
+  av1: boolean;
+  vp8: boolean;
+}
+
+/** Cached OHOS hardware video decoder capability probe. */
+export function probeVideoHwDecoders(): VideoHwDecoderCaps {
+  return nativeModule.probeVideoHwDecoders() as VideoHwDecoderCaps;
+}

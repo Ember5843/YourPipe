@@ -22,6 +22,7 @@ add_library(mdk_napi MODULE
     media_info_napi.cpp
     mux_napi.cpp
     vpe_probe.cpp
+    hwdec_probe.cpp
 )
 
 target_include_directories(mdk_napi PRIVATE "${MPV_SDK_ROOT}/include")

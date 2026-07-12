@@ -17,6 +17,7 @@ export {
   getGlobalOptionInt,
   getGlobalOptionString,
   muxAudioVideo,
+  probeVideoHwDecoders,
   setGlobalOption,
   setGlobalOptionFloat,
   setGlobalOptionInt,
@@ -34,4 +35,5 @@ export {
 	VideoStreamInfo,
 	SubtitleStreamInfo,
 } from './media-info';
+export type { VideoHwDecoderCaps } from './global';
 export { MdkPlayerController } from './controller/MdkPlayerController';

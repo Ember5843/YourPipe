@@ -5,6 +5,7 @@ export { secondToTime } from './src/main/ets/utils/CommUtils';
 export { AvPlayerController, NativeLogBridgeFns } from './src/main/ets/controller/AvPlayerController';
 export { LocalMediaProxy } from './src/main/ets/controller/LocalMediaProxy';
 export { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './src/main/ets/engine/PlaybackEngine';
+export { VideoHwCaps } from './src/main/ets/engine/VideoHwCaps';
 export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from './src/main/ets/model/PlayerModel';
 export { VideoData, StreamInfo, SelectOption } from './src/main/ets/model/VideoData';
 export { SubtitleTrack } from 'youtube_core';

@@ -193,6 +193,18 @@ export interface NativeMdkPlayerModule {
    * background. Throws an Error (with a descriptive message) on failure.
    */
   muxAudioVideo: (videoPath: string, audioPath: string, outPath: string) => void;
+  /**
+   * Probe OHOS hardware video decoder capability (cached after first call).
+   * category HARDWARE for video/avc, hevc, vp9, av01, vp8.
+   */
+  probeVideoHwDecoders: () => {
+    probed: boolean;
+    avc: boolean;
+    hevc: boolean;
+    vp9: boolean;
+    av1: boolean;
+    vp8: boolean;
+  };
   setGlobalOptionString: (key: string, value: string) => void;
   getGlobalOptionString: (key: string) => string | null;
   setGlobalOptionInt: (key: string, value: number) => void;

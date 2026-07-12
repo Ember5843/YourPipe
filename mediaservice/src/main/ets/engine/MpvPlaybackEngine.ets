@@ -66,47 +66,35 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       const demuxerReadaheadSecs = _config.mpvDemuxerReadaheadSecs ?? 8;
       const gpuApi = _config.mpvGpuApi ?? 'auto';
 
-      // 硬件解码配置：显式用 ohcodec-copy（buffer 模式），配合 native 的 vo=gpu-next。
-      // 不用 auto：auto 依赖 autoprobe 隐式跳过 surface 模式落到 ohcodec-copy，
-      // 而 hwdec_autoprobe_info[] 里只有 ohcodec 没有 ohcodec-copy，行为脆弱。
+      // Product path: MPV only. OHCodec surface VO was removed (HarmonyOS 6);
+      // use ohcodec-copy + gpu-next. Prefer hardware; soft fallback for VP9/AV1.
       if (hwdecEnabled) {
+        // Prefer copy path explicitly. "auto" can probe surface-style ohcodec
+        // which is not available without vo_ohcodec.
         ctrl.setProperty('hwdec', 'ohcodec-copy');
-        Logger.info(TAG, 'Hardware decoding enabled: ohcodec-copy');
+        ctrl.setProperty('hwdec-codecs', 'h264,hevc,vp8,vp9,av1');
+        Logger.info(TAG, 'Hardware decoding: ohcodec-copy (mpv product path)');
       } else {
         ctrl.setProperty('hwdec', 'no');
         Logger.info(TAG, 'Hardware decoding disabled');
       }
 
-      // GPU 渲染 API
       if (gpuApi !== 'auto') {
         ctrl.setProperty('gpu-api', gpuApi);
         Logger.info(TAG, `GPU API set to: ${gpuApi}`);
       }
 
-      // 内存缓存（不写磁盘）：提升 seek 与网络波动容忍度。
-      // 本地 proxy 回环不限速，mpv 可放开缓冲上限。
+      // Memory cache for seek / network jitter (local proxy is unthrottled).
       ctrl.setProperty('cache', 'yes');
       ctrl.setProperty('cache-secs', `${cacheSecs}`);
       ctrl.setProperty('cache-on-disk', 'no');
-      Logger.info(TAG, `Memory cache configured: ${cacheSecs}s`);
 
-      // demuxer 预读：保留用户配置。
-      // 不再限制 demuxer-max-bytes / demuxer-max-back-bytes / stream-buffer-size：
-      //   这些是 SegmentBase 时代为规避 YouTube SABR 限速加的防御（让 mpv 别一次
-      //   请求过大 Range，配合 RangeProxy 的 10MB 上游截断）。现在 DASH 走本地
-      //   proxy（127.0.0.1），SABR 作用在 proxy→YouTube 这一跳，mpv→proxy 回环
-      //   不受限；且 manifest 已改用 SegmentList（每段 2-5s），mpv 按段请求，由
-      //   proxy 的 10MB 上游截断兜底。去掉后用 mpv 默认值（demuxer-max-bytes=
-      //   150MiB），4K HDR 高码率下 demuxer 能缓存足够时长，不再频繁
-      //   paused-for-cache。
+      // Demuxer readahead only; leave demuxer-max-bytes at mpv defaults.
       ctrl.setProperty('demuxer-readahead-secs', `${demuxerReadaheadSecs}`);
-      Logger.info(TAG, `Demuxer readahead=${demuxerReadaheadSecs}s (max-bytes/back/stream-buffer using mpv defaults)`);
 
-      // 精确 seek：framedrop=yes 让 seek 跳过未显示帧的解码，高分辨率下拖动更流畅。
+      // Seek + thermal-friendly render (also set in native EnsureMpv).
       ctrl.setProperty('hr-seek', 'yes');
       ctrl.setProperty('hr-seek-framedrop', 'yes');
-
-      // 运行时再钉一次省电路径（native EnsureMpv 已设；这里保证 recreate 后仍生效）
       ctrl.setProperty('scale', 'bilinear');
       ctrl.setProperty('cscale', 'bilinear');
       ctrl.setProperty('dscale', 'bilinear');
@@ -115,8 +103,11 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setProperty('hdr-compute-peak', 'no');
       ctrl.setProperty('video-sync', 'audio');
       ctrl.setProperty('framedrop', 'vo');
+      // Drop late frames under CPU load (soft 4K path) without stalling audio.
+      ctrl.setProperty('vd-lavc-skiploopfilter', 'nonkey');
+      ctrl.setProperty('vd-lavc-skipframe', 'default');
 
-      // FFmpeg HTTP 读到10MB截断后自动重连续传
+      // FFmpeg HTTP reconnect after proxy 10MB range cut (not for HLS — load() overrides).
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
       this.controller = ctrl;
       this.initialized = true;

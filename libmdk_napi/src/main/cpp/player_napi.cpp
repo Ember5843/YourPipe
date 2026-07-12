@@ -13,6 +13,7 @@
 #include <rawfile/raw_file_manager.h>
 
 #include "global_napi.h"
+#include "hwdec_probe.h"
 #include "media_info_napi.h"
 #include "mux_napi.h"
 #include "vpe_probe.h"
@@ -840,6 +841,13 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "hdr-compute-peak", "no");
         SetOptionString(ctx.mpv, "video-sync", "audio");
         SetOptionString(ctx.mpv, "framedrop", "vo");
+        // Soft 4K/VP9 path: skip loopfilter on non-keyframes to cut CPU when
+        // hardware is unavailable (device capability often has no VP9/AV1 HW).
+        SetOptionString(ctx.mpv, "vd-lavc-skiploopfilter", "nonkey");
+        // Product path is MPV only: vo=gpu-next + hwdec=ohcodec-copy.
+        // Surface VO (vo_ohcodec) was removed for HarmonyOS 6 compatibility;
+        // future power wins should restore/improve that inside mpv, not a
+        // second custom decoder stack.
         // Stop at the last frame instead of unloading the file at EOF, so the
         // user can still seek back and resume (normal video-player behaviour).
         // keep-open-pause=yes (default) means mpv pauses on the last frame.
@@ -1775,6 +1783,7 @@ napi_value Init(napi_env env, napi_value exports)
 
     napi_define_properties(env, exports, std::size(descriptors), descriptors);
     RegisterMuxModule(env, exports);
+    RegisterHwdecProbeModule(env, exports);
     return exports;
 }
 
