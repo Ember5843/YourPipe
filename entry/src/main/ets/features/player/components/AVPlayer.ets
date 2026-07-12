@@ -22,6 +22,7 @@ import { AvPlayerController, VideoData, StreamInfo, PlayerState, StateChangeList
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
+import { PlayerPresentation } from '../../../common/PlayerPresentation';
 import { PiPManager } from '../pip/PiPManager';
 import { PlayerUiViewModel } from 'mediaservice';
 
@@ -375,12 +376,10 @@ export struct VideoPlayer {
   onPageVisibilityChange(): void {
     const session = PlayerSession.getInstance();
     const isVisible = this.isPageShow && !this.isAppBackground;
+    // Page hide alone never turns video off (share/cast/PiP must not look like Home).
+    PlayerPresentation.onPlayerPageVisibility(isVisible);
 
     if (!isVisible) {
-      // 后台/页面隐藏：不动 mpv 引擎也不切视频轨。
-      // 切视频轨 / vid=no 都会让 demuxer 重排，回前台时表现为"重新加载"。
-      // Surface 在 XComponent 隐藏时由 OS 自然失效，mpv 内部跳过 swap，
-      // 音频持续，前台恢复时不需要任何重启。
       return;
     }
 

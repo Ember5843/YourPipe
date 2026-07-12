@@ -485,13 +485,19 @@ export class AvPlayerController {
     if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, false);
   }
 
+  private videoOutputEnabled: boolean = true;
+
   public setVideoOutputEnabled(enabled: boolean): void {
-    // 只在 AVPlayer 支持 setMediaMuted 的状态下调用 (prepared/playing/paused/completed)
-    if (this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING, PlayerState.PAUSED,
+    if (this.videoOutputEnabled === enabled) return;
+    if (!this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING, PlayerState.PAUSED,
       PlayerState.BUFFERING, PlayerState.COMPLETED)) {
-      this.playbackEngine.setVideoOutputEnabled(enabled);
+      return;
     }
+    this.videoOutputEnabled = enabled;
+    this.playbackEngine.setVideoOutputEnabled(enabled);
+    Logger.info(TAG, `setVideoOutputEnabled=${enabled}`);
   }
+
 
   public async checkCastState(): Promise<void> {
     await this.avSessionManager.checkCastState();
@@ -1093,6 +1099,7 @@ export class AvPlayerController {
 
   private resetPlaybackState(): void {
     this.vm.reset();
+    this.videoOutputEnabled = true;
     this.lastKnownGoodPosition = 0;
     this.waitingForBufferListeners.forEach(l => l(false));
     this.errorListeners.forEach(l => l(''));

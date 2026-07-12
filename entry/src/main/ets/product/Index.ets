@@ -33,6 +33,7 @@ import { UserPage } from '../features/user/UserPage';
 import { PlaylistDetailPage } from '../features/playlist/PlaylistDetailPage';
 import { VideoDetailPage } from '../features/player/VideoDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
+import { PlayerPresentation } from '../common/PlayerPresentation';
 import { OptionsGoogleAccountPage } from '../features/auth/OptionsGoogleAccountPage';
 import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
 import { AuthStateHelper } from '../common/AuthStateHelper';
@@ -1347,7 +1348,8 @@ struct Index {
               || session.playerState === PlayerState.READY);
           logger.info(`onBackPressed canEnterPiP=${canEnterPiP} | pipOnReturn=${this.playbackConfig.pipOnReturn} supported=${pip.isPiPSupported()} isReady=${pip.isReady} isPiPActive=${session.isPiPActive} state=${session.playerState}`);
           if (canEnterPiP) {
-            // 返回 = 弹 PiP + pop 回上一页（一步到位）。引擎在 PlayerSession 中存活，PiP 悬浮窗续播。
+            // 返回 = 弹 PiP：先锁定 PIP 呈现态（视频保持 ON），再 startPiP + pop。
+            PlayerPresentation.onPipStarted();
             pip.startPiP().catch((e: Error) => {
               logger.warn(`startPiP on back failed: ${e.message}`);
             });

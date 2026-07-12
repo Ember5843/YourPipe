@@ -38,6 +38,16 @@ export type CacheSecs = '5' | '10' | '20' | '30' | '60';
 export type DemuxerReadahead = '5' | '8' | '15' | '30' | '60';
 export type DemuxerMaxBytes = '10' | '20' | '50' | '100';
 export type GpuApi = 'auto' | 'opengl' | 'vulkan';
+export type BackgroundVideoOffDelay = '0' | '5' | '15' | '30' | '60';
+
+export const BACKGROUND_VIDEO_OFF_DELAY_LABELS: BackgroundVideoOffDelay[] = ['0', '5', '15', '30', '60'];
+export const BACKGROUND_VIDEO_OFF_DELAY_DISPLAY: Record<BackgroundVideoOffDelay, string> = {
+  '0': '立即',
+  '5': '5 秒',
+  '15': '15 秒',
+  '30': '30 秒',
+  '60': '60 秒',
+};
 
 export const CACHE_SECS_LABELS: CacheSecs[] = ['5', '10', '20', '30', '60'];
 export const CACHE_SECS_DISPLAY: Record<CacheSecs, string> = {
@@ -64,6 +74,13 @@ export class PlaybackConfig {
   mobileQuality: VideoQualityCap = '480p';
   /** 返回键/home 键时是否自动进入画中画（设备不支持时强制 false） */
   pipOnReturn: boolean = true;
+  /**
+   * 真后台时延迟关闭视频解码，仅保留音频（省电）。
+   * 分享/投屏/PiP 不会关视频。回前台自动恢复。
+   */
+  backgroundAudioOnly: boolean = true;
+  /** 进入后台后多久关视频（秒），0=立即 */
+  backgroundVideoOffDelaySec: BackgroundVideoOffDelay = '15';
 
   // MPV 播放器设置
   /** 硬件解码开关 */
@@ -84,6 +101,8 @@ export class PlaybackConfig {
     next.defaultQuality = this.defaultQuality;
     next.mobileQuality = this.mobileQuality;
     next.pipOnReturn = this.pipOnReturn;
+    next.backgroundAudioOnly = this.backgroundAudioOnly;
+    next.backgroundVideoOffDelaySec = this.backgroundVideoOffDelaySec;
     next.hwdecEnabled = this.hwdecEnabled;
     next.cacheSecs = this.cacheSecs;
     next.demuxerReadaheadSecs = this.demuxerReadaheadSecs;
@@ -97,6 +116,10 @@ export class PlaybackConfig {
     cfg.defaultQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_defaultQuality', 'best'), 'best');
     cfg.mobileQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_mobileQuality', '480p'), '480p');
     cfg.pipOnReturn = PreferencesStore.getString('cfg_pb_pipOnReturn', 'true') === 'true';
+    cfg.backgroundAudioOnly = PreferencesStore.getString('cfg_pb_backgroundAudioOnly', 'true') === 'true';
+    const delay = PreferencesStore.getString('cfg_pb_backgroundVideoOffDelaySec', '15');
+    cfg.backgroundVideoOffDelaySec = BACKGROUND_VIDEO_OFF_DELAY_LABELS.includes(delay as BackgroundVideoOffDelay)
+      ? delay as BackgroundVideoOffDelay : '15';
 
     // MPV 播放器设置
     cfg.hwdecEnabled = PreferencesStore.getString('cfg_pb_hwdecEnabled', 'true') === 'true';
@@ -117,6 +140,8 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_defaultQuality', cfg.defaultQuality);
     PreferencesStore.setString('cfg_pb_mobileQuality', cfg.mobileQuality);
     PreferencesStore.setString('cfg_pb_pipOnReturn', cfg.pipOnReturn ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_backgroundAudioOnly', cfg.backgroundAudioOnly ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_backgroundVideoOffDelaySec', cfg.backgroundVideoOffDelaySec);
 
     // MPV 播放器设置
     PreferencesStore.setString('cfg_pb_hwdecEnabled', cfg.hwdecEnabled ? 'true' : 'false');

@@ -3,7 +3,12 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { UIConfig } from '../../common/AppState';
-import { PlaybackConfig, VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, GPU_API_LABELS, GPU_API_DISPLAY, CACHE_SECS_LABELS, CACHE_SECS_DISPLAY, DEMUXER_READAHEAD_LABELS, DEMUXER_READAHEAD_DISPLAY, DEMUXER_MAX_BYTES_LABELS, DEMUXER_MAX_BYTES_DISPLAY } from '../../common/PlaybackConfig';
+import {
+  PlaybackConfig, VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, GPU_API_LABELS, GPU_API_DISPLAY,
+  CACHE_SECS_LABELS, CACHE_SECS_DISPLAY, DEMUXER_READAHEAD_LABELS, DEMUXER_READAHEAD_DISPLAY,
+  DEMUXER_MAX_BYTES_LABELS, DEMUXER_MAX_BYTES_DISPLAY,
+  BACKGROUND_VIDEO_OFF_DELAY_LABELS, BACKGROUND_VIDEO_OFF_DELAY_DISPLAY, BackgroundVideoOffDelay,
+} from '../../common/PlaybackConfig';
 import { PiPManager } from '../player/pip/PiPManager';
 
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
@@ -50,6 +55,11 @@ export struct OptionsPlaybackPage {
 
   private getConcurrencyOptions(): SelectOption[] {
     return DOWNLOAD_CONCURRENCY_VALUES.map(value => ({ value: value.toString() } as SelectOption));
+  }
+
+  private getBgVideoOffDelayOptions(): SelectOption[] {
+    return BACKGROUND_VIDEO_OFF_DELAY_LABELS.map(
+      s => ({ value: BACKGROUND_VIDEO_OFF_DELAY_DISPLAY[s] } as SelectOption));
   }
 
   build() {
@@ -110,6 +120,36 @@ export struct OptionsPlaybackPage {
         .padding({ left: 0, right: 0 })
 
         ListItemGroup() {
+          ListItem() {
+            PlaybackToggleRow({
+              title: '后台仅音频',
+              subtitle: '真后台时延迟关闭视频解码，只保留声音以省电；分享/投屏/PiP 不受影响',
+              isOn: this.playbackConfig.backgroundAudioOnly,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig(cfg => cfg.backgroundAudioOnly = val);
+              }
+            })
+          }
+
+          if (this.playbackConfig.backgroundAudioOnly) {
+            ListItem() {
+              PlaybackSelectRow({
+                title: '关视频延迟',
+                options: this.getBgVideoOffDelayOptions(),
+                selectedIndex: BACKGROUND_VIDEO_OFF_DELAY_LABELS.indexOf(
+                  this.playbackConfig.backgroundVideoOffDelaySec),
+                fontColor: this.params.themeColor,
+                transparentBackground: true,
+                onChange: (index: number) => {
+                  const d = BACKGROUND_VIDEO_OFF_DELAY_LABELS[index] as BackgroundVideoOffDelay;
+                  this.params.updatePlaybackConfig(cfg => cfg.backgroundVideoOffDelaySec = d);
+                }
+              })
+            }
+          }
+
           ListItem() {
             PlaybackToggleRow({
               title: '硬件解码',

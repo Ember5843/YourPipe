@@ -27,6 +27,7 @@ import { DownloadManager, DownloadTask } from '../../../common/DownloadManager';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
 import { ActionHub } from '../../../common/ActionHub';
+import { PlayerPresentation } from '../../../common/PlayerPresentation';
 import common from '@ohos.app.ability.common';
 import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSession';
 import { AVCastPickerStyle, avSession } from '@kit.AVSessionKit';
@@ -700,17 +701,23 @@ export struct VideoDetails {
   }
 
   private openCastPicker(): void {
+    // OVERLAY: cast panel must not arm BACKGROUND video-off.
+    // Cleared by onAbilityForeground when panel closes.
+    PlayerPresentation.beginOverlay('cast');
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     const pickerHelper = new avSession.AVCastPickerHelper(context);
     pickerHelper.select({
       sessionType: 'video',
       pickerStyle: AVCastPickerStyle.STYLE_PANEL
     }).catch((error: BusinessError) => {
+      PlayerPresentation.endOverlay('cast-error');
       Logger.error(TAG, `Failed to open cast picker: ${JSON.stringify(error)}`);
     });
   }
 
   private shareVideo(): void {
+    // OVERLAY: share sheet may fire ability onBackground; keep video ON.
+    PlayerPresentation.beginOverlay('share');
     try {
       const videoId = (this.item.videoId || '').trim();
       const title = this.item.title || '';
@@ -724,8 +731,12 @@ export struct VideoDetails {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       controller.show(context, {
         selectionMode: systemShare.SelectionMode.SINGLE
+      }).catch((err: Object) => {
+        PlayerPresentation.endOverlay('share-error');
+        Logger.error(TAG, `share video failed: ${JSON.stringify(err)}`);
       });
     } catch (err) {
+      PlayerPresentation.endOverlay('share-throw');
       Logger.error(TAG, `share video failed: ${JSON.stringify(err)}`);
     }
   }

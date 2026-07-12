@@ -44,6 +44,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private engineConfig: EngineConfig = {};
   /** 上次日志里的 hwdec-current，避免状态轮询刷屏 */
   private lastLoggedHwdec: string = '';
+  /** Mirror of vid on/off for background audio-only only (never used on load/seek). */
+  private videoOutputOn: boolean = true;
 
   async initialize(_config: EngineConfig): Promise<boolean> {
     if (this.initialized && this.controller !== null) {
@@ -66,11 +68,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       const demuxerReadaheadSecs = _config.mpvDemuxerReadaheadSecs ?? 8;
       const gpuApi = _config.mpvGpuApi ?? 'auto';
 
-      // Product path: MPV only. OHCodec surface VO was removed (HarmonyOS 6);
-      // use ohcodec-copy + gpu-next. Prefer hardware; soft fallback for VP9/AV1.
+      // Fixed product path (afternoon-stable): gpu-next + ohcodec-copy only.
       if (hwdecEnabled) {
-        // Prefer copy path explicitly. "auto" can probe surface-style ohcodec
-        // which is not available without vo_ohcodec.
         ctrl.setProperty('hwdec', 'ohcodec-copy');
         ctrl.setProperty('hwdec-codecs', 'h264,hevc,vp8,vp9,av1');
         Logger.info(TAG, 'Hardware decoding: ohcodec-copy (mpv product path)');
@@ -342,10 +341,22 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.applyPendingSubtitle();
   }
 
-  setVideoOutputEnabled(_enabled: boolean): void {
-    // 不切换视频轨道：toggling active video tracks 会让 mpv demuxer 重排，
-    // 触发回前台时的"重新加载"。Surface 在 XComponent 隐藏时由 OS 失效，
-    // 显示时自然恢复，mpv 引擎对此无感知。
+  /**
+   * Background audio-only only. Never call around load/seek.
+   * false → vid=no; true → vid=auto. No pause, no resync seek.
+   */
+  setVideoOutputEnabled(enabled: boolean): void {
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl === null || this.destroyed) return;
+    if (enabled === this.videoOutputOn) return;
+    this.videoOutputOn = enabled;
+    if (enabled) {
+      ctrl.setProperty('vid', 'auto');
+      Logger.info(TAG, 'video output ON (vid=auto)');
+    } else {
+      ctrl.setProperty('vid', 'no');
+      Logger.info(TAG, 'video output OFF (vid=no)');
+    }
   }
 
   setHwdecMode(_mode: string): void {}

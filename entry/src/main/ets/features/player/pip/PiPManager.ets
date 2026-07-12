@@ -2,6 +2,7 @@ import { AppLog } from '../../../common/AppLog';
 import { PiPWindow } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { PlayerSession } from '../../../common/PlayerSession';
+import { PlayerPresentation } from '../../../common/PlayerPresentation';
 
 const logger = AppLog.getInstance('PiPManager');
 const TAG: string = '[PiP][PiPManager]';
@@ -185,6 +186,8 @@ export class PiPManager {
         // 已进入 PiP：surface 已被悬浮窗接管，主页 XComponent 实际是空帧。
         // 此时再 mount 占位层填上空白，无闪烁。
         session.setPiPActive(true);
+        // Keep video decode ON for PiP surface (cancel any background off timer).
+        PlayerPresentation.onPipStarted();
         break;
       case PiPWindow.PiPState.ABOUT_TO_STOP:
         // 即将退出 PiP（关闭、要释放或要恢复都会先走这一步）：系统准备把 surface
@@ -213,8 +216,10 @@ export class PiPManager {
         // 其它原因：走 onPipStop 按前后台处理。
         if (reason === 'panelActionRestore') {
           logger.info(`${TAG} STOPPED via panelActionRestore, skip (will restore)`);
+          PlayerPresentation.onPipStopped(true);
         } else if (reason === 'requestDelete') {
           logger.info(`${TAG} STOPPED via requestDelete, release session + destroy pipController`);
+          PlayerPresentation.onPipStopped(false);
           session.release();
           // 销毁 PiPController 本身：它持有已销毁播放页的旧 XComponentController，
           // 若残留，下次播新视频 init() 会复用它，导致系统重绑 surface 失败
@@ -222,13 +227,17 @@ export class PiPManager {
           // destroy 后 isInitialized=false，下次 init 重建绑定新 XComponentController 的干净控制器。
           this.destroy();
         } else if (this.onPipStop) {
+          PlayerPresentation.onPipStopped(false);
           this.onPipStop();
+        } else {
+          PlayerPresentation.onPipStopped(false);
         }
         this.isRestoring = false;
         break;
       case PiPWindow.PiPState.ERROR:
         logger.error(`${TAG} PiP error: ${reason}`);
         session.setPiPActive(false);
+        PlayerPresentation.onPipStopped(false);
         this.isRestoring = false;
         break;
       default:
