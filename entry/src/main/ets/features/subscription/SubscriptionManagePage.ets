@@ -1,24 +1,33 @@
 import { AppLog } from '../../common/AppLog';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
-import { SearchChannelItem } from 'youtube_core';
+import { AuthAccountStatus, AuthSessionManager, AuthStage, SearchChannelItem } from 'youtube_core';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
 import { ChannelCard } from '../../features/user/components/ChannelCard';
 import { ChannelInfoService, ChannelProfile } from '../../features/user/ChannelInfoService';
 import { PreferencesStore } from '../../common/PreferencesStore';
 import { LocalStore } from '../../common/LocalStore';
+import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 
 const logger = AppLog.getInstance('SubscriptionManagePage');
 
 @Component
 export struct SubscriptionManagePage {
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
+  @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State channelMap: Record<string, SearchChannelItem> = {};
+  @State isRefreshing: boolean = false;
+  @State syncMessage: string = '';
   private channelInfoService: ChannelInfoService = new ChannelInfoService();
 
   aboutToAppear(): void {
     this.loadProfiles();
+  }
+
+  private isSignedIn(): boolean {
+    return this.authStatus.stage === AuthStage.SIGNED_IN
+      || AuthSessionManager.getInstance()?.isSignedIn() === true;
   }
 
   private buildPlaceholder(item: SubscriptionUser, index: number): SearchChannelItem {
@@ -79,6 +88,71 @@ export struct SubscriptionManagePage {
     return storedTrim;
   }
 
+  private persistSubscriptions(list: SubscriptionUser[]): void {
+    this.subscriptions = list;
+    PreferencesStore.setString('subscriptionsJson', LocalStore.saveSubscriptions(list));
+  }
+
+  private mergeRemoteChannels(remote: SubscriptionUser[]): number {
+    if (!remote || remote.length === 0) {
+      return 0;
+    }
+    const map: Record<string, SubscriptionUser> = {};
+    this.subscriptions.forEach((item) => {
+      map[item.channelId] = item;
+    });
+    let added = 0;
+    remote.forEach((item) => {
+      const id = (item.channelId || '').trim();
+      if (!id) {
+        return;
+      }
+      const prev = map[id];
+      if (prev) {
+        map[id] = new SubscriptionUser(
+          id,
+          item.displayName || prev.displayName,
+          item.avatarUrl || prev.avatarUrl,
+          item.subscriberText || prev.subscriberText,
+          item.videoCountText || prev.videoCountText,
+          item.description || prev.description,
+          item.thumbnailColor || prev.thumbnailColor
+        );
+      } else {
+        map[id] = item;
+        added += 1;
+      }
+    });
+    const merged: SubscriptionUser[] = [];
+    Object.keys(map).forEach((key) => {
+      merged.push(map[key]);
+    });
+    this.persistSubscriptions(merged);
+    return added;
+  }
+
+  private async syncCloudSubscriptions(): Promise<void> {
+    if (!this.isSignedIn()) {
+      this.syncMessage = '请先登录后再同步关注列表';
+      return;
+    }
+    try {
+      const library = FeedServiceProvider.getInstance().getUserLibraryService();
+      const channels = await library.fetchSubscribedChannels();
+      if (channels.length === 0) {
+        this.syncMessage = '云端关注列表为空';
+        return;
+      }
+      const added = this.mergeRemoteChannels(channels);
+      this.syncMessage = added > 0
+        ? `已同步 ${channels.length} 个关注，新增 ${added}`
+        : `已同步 ${channels.length} 个关注`;
+    } catch (err) {
+      logger.error('syncCloudSubscriptions failed:', JSON.stringify(err));
+      this.syncMessage = '同步关注列表失败';
+    }
+  }
+
   private async loadProfiles(): Promise<void> {
     const nextMap: Record<string, SearchChannelItem> = {};
     const tasks = this.subscriptions.map(async (item, index) => {
@@ -97,6 +171,22 @@ export struct SubscriptionManagePage {
     });
     await Promise.all(tasks);
     this.channelMap = nextMap;
+  }
+
+  private async onPullRefresh(): Promise<void> {
+    // Refresh($$isRefreshing) 已把 isRefreshing 置 true，这里只干活并在 finally 复位。
+    this.syncMessage = '';
+    try {
+      await this.syncCloudSubscriptions();
+      await this.loadProfiles();
+    } catch (err) {
+      logger.error('onPullRefresh failed:', JSON.stringify(err));
+      if (this.syncMessage.length === 0) {
+        this.syncMessage = '刷新失败';
+      }
+    } finally {
+      this.isRefreshing = false;
+    }
   }
 
   private updateSubscriptionProfile(channelId: string, displayName: string, profile: ChannelProfile): void {
@@ -120,57 +210,91 @@ export struct SubscriptionManagePage {
         item.thumbnailColor || ''
       );
     });
-    this.subscriptions = next;
-    PreferencesStore.setString('subscriptionsJson', LocalStore.saveSubscriptions(this.subscriptions));
+    this.persistSubscriptions(next);
   }
 
   build() {
-    List({ space: 4 }) {
-      ListItem() {
-        Text($r('app.string.yt_sub_manage_title'))
-          .fontSize(20)
-          .fontColor($r('app.color.yourtube_text_primary'))
-          .fontWeight(FontWeight.Medium)
-          .margin({ top: 16, bottom: 12 })
-          .padding({ left: 16, right: 16 })
-          .width('100%')
-      }
-
-      if (this.subscriptions.length === 0) {
-        ListItem() {
-          Column() {
-            Text($r('app.string.yt_empty_no_subs'))
-              .fontSize(14)
-              .fontColor($r('app.color.yourtube_text_secondary'))
-              .margin({ top: 20 })
-            Text($r('app.string.yt_empty_subs_hint_alt'))
-              .fontSize(12)
-              .fontColor($r('app.color.yourtube_text_hint'))
-              .margin({ top: 6 })
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Center)
-          .padding({ bottom: 24 })
-        }
-      } else {
-        ForEach(this.subscriptions, (item: SubscriptionUser, index: number) => {
+    // 顶栏避让放在 Refresh 外侧，加载圈从标题栏下方出现（与内容区对齐）。
+    Column() {
+      Refresh({ refreshing: $$this.isRefreshing }) {
+        List({ space: 4 }) {
           ListItem() {
-            ChannelCard({
-              channel: this.channelMap[item.channelId]
-                ? this.channelMap[item.channelId]
-                : this.buildPlaceholder(item, index),
-              typeLabel: $r('app.string.yt_label_user'),
-              showDescription: true,
-              forceActionLabel: $r('app.string.yt_action_unsubscribe')
-            })
+            Column() {
+              Text($r('app.string.yt_sub_manage_title'))
+                .fontSize(20)
+                .fontColor($r('app.color.yourtube_text_primary'))
+                .fontWeight(FontWeight.Medium)
+                .width('100%')
+              if (this.syncMessage.length > 0) {
+                Text(this.syncMessage)
+                  .fontSize(12)
+                  .fontColor($r('app.color.yourtube_text_hint'))
+                  .margin({ top: 6 })
+                  .width('100%')
+              } else if (this.isSignedIn()) {
+                Text('下拉同步 YouTube 关注列表')
+                  .fontSize(12)
+                  .fontColor($r('app.color.yourtube_text_hint'))
+                  .margin({ top: 6 })
+                  .width('100%')
+              }
+            }
+            .alignItems(HorizontalAlign.Start)
+            .margin({ top: 8, bottom: 12 })
+            .padding({ left: 16, right: 16 })
+            .width('100%')
           }
-        }, (item: SubscriptionUser) => item.channelId)
+
+          if (this.subscriptions.length === 0) {
+            ListItem() {
+              Column() {
+                Text($r('app.string.yt_empty_no_subs'))
+                  .fontSize(14)
+                  .fontColor($r('app.color.yourtube_text_secondary'))
+                  .margin({ top: 40 })
+                Text(this.isSignedIn()
+                  ? '已登录，下拉可同步 YouTube 关注'
+                  : $r('app.string.yt_empty_subs_hint_alt'))
+                  .fontSize(12)
+                  .fontColor($r('app.color.yourtube_text_hint'))
+                  .margin({ top: 6 })
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Center)
+              .padding({ bottom: 24 })
+            }
+          } else {
+            ForEach(this.subscriptions, (item: SubscriptionUser, index: number) => {
+              ListItem() {
+                ChannelCard({
+                  channel: this.channelMap[item.channelId]
+                    ? this.channelMap[item.channelId]
+                    : this.buildPlaceholder(item, index),
+                  typeLabel: $r('app.string.yt_label_user'),
+                  showDescription: true,
+                  forceActionLabel: $r('app.string.yt_action_unsubscribe')
+                })
+              }
+            }, (item: SubscriptionUser) => item.channelId)
+          }
+        }
+        .width('100%')
+        .height('100%')
+        .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
+        .edgeEffect(EdgeEffect.Spring)
+        .scrollBar(BarState.Off)
       }
+      .layoutWeight(1)
+      .width('100%')
+      .pullToRefresh(true)
+      .refreshOffset(64)
+      .onRefreshing(() => {
+        this.onPullRefresh();
+      })
     }
     .width('100%')
-    .padding({ left: 12, right: 12, top: this.safeAreaTop + 56, bottom: this.safeAreaBottom + 72 })
-    .edgeEffect(EdgeEffect.Spring)
     .height('100%')
+    .padding({ top: this.safeAreaTop + 56 })
     .backgroundColor($r('app.color.yourtube_bg_page'))
   }
 }

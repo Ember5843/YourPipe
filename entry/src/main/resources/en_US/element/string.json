@@ -1060,14 +1060,22 @@
                        "name":  "yt_home_feed_recommended",
                        "value":  "Recommended"
                    },
-                   {
-                       "name":  "yt_home_feed_kiosk",
-                       "value":  "Live"
-                   },
-                   {
-                       "name":  "yt_option_auth_session",
-                       "value":  "Signed-in browsing"
-                   },
+                    {
+                        "name":  "yt_home_feed_kiosk",
+                        "value":  "Live"
+                    },
+                    {
+                        "name":  "yt_option_sync_library_on_launch",
+                        "value":  "Sync library on launch"
+                    },
+                    {
+                        "name":  "yt_option_sync_library_on_launch_subtitle",
+                        "value":  "When signed in, pull cloud watch history and subscriptions at startup"
+                    },
+                    {
+                        "name":  "yt_option_auth_session",
+                        "value":  "Signed-in browsing"
+                    },
                    {
                        "name":  "yt_option_sign_out",
                        "value":  "Sign out"

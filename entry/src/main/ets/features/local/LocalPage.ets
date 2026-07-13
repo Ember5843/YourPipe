@@ -1,12 +1,16 @@
 import { WatchHistoryStore, WatchHistoryItem } from '../../common/WatchHistoryStore';
 import { DownloadManager, DownloadTask } from '../../common/DownloadManager';
 import { ActionHub } from '../../common/ActionHub';
-import { VideoItem } from 'youtube_core';
+import { AuthAccountStatus, AuthStage, AuthSessionManager, VideoItem } from 'youtube_core';
 import { customVibrator } from '../../common/VibratorUtil';
 import { UIConfig } from '../../common/AppState';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { DownloadPage } from './DownloadPage';
 import { MediaThumb } from '../../common/components/MediaThumb';
+import { FeedServiceProvider } from '../../common/FeedServiceProvider';
+import { AppLog } from '../../common/AppLog';
+
+const logger = AppLog.getInstance('LocalPage');
 
 /** 将秒数格式化为 mm:ss 或 hh:mm:ss */
 function formatDuration(sec: number): string {
@@ -187,14 +191,47 @@ export struct LocalPage {
   onSwitchOuterTab: (index: number) => void = (_index: number) => {};
   @StorageLink('watchHistory') history: WatchHistoryItem[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State currentTabIndex: number = 0;
+  @State isSyncingHistory: boolean = false;
+  @State historySyncMessage: string = '';
   @Consume('actionHub') actionHub: ActionHub;
   private downloadManager: DownloadManager = DownloadManager.getInstance();
   private panOptionRight: PanGestureOptions = new PanGestureOptions({ direction: PanDirection.Right });
 
   private readonly tabTitles: string[] = ['观看记录', '下载'];
+
+  private isSignedIn(): boolean {
+    return this.authStatus.stage === AuthStage.SIGNED_IN
+      || AuthSessionManager.getInstance()?.isSignedIn() === true;
+  }
+
+  /** Refresh($$isRefreshing) 已把 isSyncingHistory 置 true；此处只干活并 finally 复位。 */
+  private async syncCloudHistory(): Promise<void> {
+    this.historySyncMessage = '';
+    if (!this.isSignedIn()) {
+      this.historySyncMessage = '请先登录后再同步云端历史';
+      this.isSyncingHistory = false;
+      return;
+    }
+    try {
+      const service = FeedServiceProvider.getInstance().getUserLibraryService();
+      const page = await service.fetchWatchHistory(1);
+      if (page.items.length > 0) {
+        WatchHistoryStore.mergeRemoteHistory(service.toWatchHistoryItems(page.items));
+        this.historySyncMessage = `已同步云端历史 ${page.items.length} 条（保留本地进度与时间）`;
+      } else {
+        this.historySyncMessage = '云端历史为空';
+      }
+    } catch (err) {
+      logger.error('syncCloudHistory failed:', JSON.stringify(err));
+      this.historySyncMessage = '同步云端历史失败';
+    } finally {
+      this.isSyncingHistory = false;
+    }
+  }
 
   private clearAll(): void {
     WatchHistoryStore.clear();
@@ -221,79 +258,96 @@ export struct LocalPage {
     Tabs({ barPosition: BarPosition.Start }) {
       // ── Tab 0: 观看记录 ──
       TabContent() {
-        List({ space: 8 }) {
-          // 标题行
-          ListItem() {
-            Row() {
-              Text($r('app.string.yt_local_history'))
-                .fontSize(18)
-                .fontColor($r('app.color.yourtube_text_primary'))
-                .fontWeight(FontWeight.Bold)
-                .layoutWeight(1);
-
-              if (this.history.length > 0) {
-                Text($r('app.string.yt_action_clear_all'))
-                  .fontSize(13)
-                  .fontColor($r('app.color.yourtube_text_hint'))
-                  .onClick(() => {
-                    AlertDialog.show({
-                      title: $r('app.string.yt_dialog_clear_history'),
-                      message: $r('app.string.yt_confirm_clear_history'),
-                      primaryButton: {
-                        value: $r('app.string.yt_action_clear'),
-                        fontColor: this.themePrimary,
-                        action: () => { this.clearAll(); }
-                      },
-                      secondaryButton: {
-                        value: $r('app.string.yt_action_cancel'),
-                        action: () => {}
-                      }
-                    });
-                  });
-              }
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Center)
-            .padding({ top: 16, bottom: 12, left: 4, right: 4 });
-          }
-
-          // 空状态
-          if (this.history.length === 0) {
+        Refresh({ refreshing: $$this.isSyncingHistory }) {
+          List({ space: 8 }) {
             ListItem() {
-              Column() {
-                SymbolGlyph($r('sys.symbol.worldclock'))
-                  .fontSize(48)
-                  .fontColor([$r('app.color.yourtube_text_hint')])
-                  .margin({ bottom: 12 });
-                Text($r('app.string.yt_empty_no_history'))
-                  .fontSize(14)
-                  .fontColor($r('app.color.yourtube_text_secondary'));
-                Text($r('app.string.yt_empty_history_hint'))
-                  .fontSize(12)
-                  .fontColor($r('app.color.yourtube_text_hint'))
-                  .margin({ top: 4 });
+              Row() {
+                Text($r('app.string.yt_local_history'))
+                  .fontSize(18)
+                  .fontColor($r('app.color.yourtube_text_primary'))
+                  .fontWeight(FontWeight.Bold)
+                  .layoutWeight(1);
+
+                if (this.history.length > 0) {
+                  Text($r('app.string.yt_action_clear_all'))
+                    .fontSize(13)
+                    .fontColor($r('app.color.yourtube_text_hint'))
+                    .onClick(() => {
+                      AlertDialog.show({
+                        title: $r('app.string.yt_dialog_clear_history'),
+                        message: $r('app.string.yt_confirm_clear_history'),
+                        primaryButton: {
+                          value: $r('app.string.yt_action_clear'),
+                          fontColor: this.themePrimary,
+                          action: () => { this.clearAll(); }
+                        },
+                        secondaryButton: {
+                          value: $r('app.string.yt_action_cancel'),
+                          action: () => {}
+                        }
+                      });
+                    });
+                }
               }
               .width('100%')
-              .alignItems(HorizontalAlign.Center)
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 60, bottom: 40 });
+              .alignItems(VerticalAlign.Center)
+              .padding({ top: 16, bottom: 4, left: 4, right: 4 });
             }
-          }
 
-          // 历史列表
-          ForEach(this.history, (item: WatchHistoryItem) => {
             ListItem() {
-              HistoryCard({
-                item: item,
-                onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
-              })
+              Text(this.historySyncMessage.length > 0
+                ? this.historySyncMessage
+                : (this.isSignedIn() ? '下拉同步 YouTube 观看历史' : '登录后可下拉同步云端历史'))
+                .fontSize(12)
+                .fontColor($r('app.color.yourtube_text_hint'))
+                .padding({ left: 4, right: 4, bottom: 8 });
             }
-          }, (item: WatchHistoryItem) => item.videoId + item.lastWatchedAt)
+
+            if (this.history.length === 0) {
+              ListItem() {
+                Column() {
+                  SymbolGlyph($r('sys.symbol.worldclock'))
+                    .fontSize(48)
+                    .fontColor([$r('app.color.yourtube_text_hint')])
+                    .margin({ bottom: 12 });
+                  Text($r('app.string.yt_empty_no_history'))
+                    .fontSize(14)
+                    .fontColor($r('app.color.yourtube_text_secondary'));
+                  Text(this.isSignedIn()
+                    ? '已登录，下拉可同步云端历史'
+                    : $r('app.string.yt_empty_history_hint'))
+                    .fontSize(12)
+                    .fontColor($r('app.color.yourtube_text_hint'))
+                    .margin({ top: 4 });
+                }
+                .width('100%')
+                .alignItems(HorizontalAlign.Center)
+                .justifyContent(FlexAlign.Center)
+                .padding({ top: 60, bottom: 40 });
+              }
+            }
+
+            ForEach(this.history, (item: WatchHistoryItem) => {
+              ListItem() {
+                HistoryCard({
+                  item: item,
+                  onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
+                })
+              }
+            }, (item: WatchHistoryItem) => item.videoId)
+          }
+          .width('100%')
+          .height('100%')
+          .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
+          .edgeEffect(EdgeEffect.Spring)
         }
         .width('100%')
         .height('100%')
-        .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
-        .edgeEffect(EdgeEffect.Spring)
+        .pullToRefresh(true)
+        .refreshOffset(64)
+        .onRefreshing(() => {
+          this.syncCloudHistory();
+        })
       }
       .tabBar(this.TabBarBuilder(0))
       .gesture(

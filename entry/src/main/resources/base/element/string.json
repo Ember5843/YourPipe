@@ -1336,14 +1336,22 @@
                        "name":  "yt_home_feed_recommended",
                        "value":  "推荐"
                    },
-                   {
-                       "name":  "yt_home_feed_kiosk",
-                       "value":  "直播"
-                   },
-                   {
-                       "name":  "yt_option_auth_session",
-                       "value":  "登录态浏览"
-                   },
+                    {
+                        "name":  "yt_home_feed_kiosk",
+                        "value":  "直播"
+                    },
+                    {
+                        "name":  "yt_option_sync_library_on_launch",
+                        "value":  "启动时同步用户数据"
+                    },
+                    {
+                        "name":  "yt_option_sync_library_on_launch_subtitle",
+                        "value":  "登录后启动时单向拉取云端观看历史与订阅列表"
+                    },
+                    {
+                        "name":  "yt_option_auth_session",
+                        "value":  "登录态浏览"
+                    },
                    {
                        "name":  "yt_option_sign_out",
                        "value":  "退出登录"

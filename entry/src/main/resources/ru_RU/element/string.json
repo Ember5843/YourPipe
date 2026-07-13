@@ -1,1020 +1,1028 @@
 {
-    "string":  [
-                   {
-                       "name":  "module_desc",
-                       "value":  "module description"
-                   },
-                   {
-                       "name":  "EntryAbility_desc",
-                       "value":  "description"
-                   },
-                   {
-                       "name":  "EntryAbility_label",
-                       "value":  "label"
-                   },
-                   {
-                       "name":  "HOME_EXIT_TOAST",
-                       "value":  "Нажмите ещё раз для выхода"
-                   },
-                   {
-                       "name":  "LIVING_LEFT_TEXT",
-                       "value":  "Всего "
-                   },
-                   {
-                       "name":  "LIVING_RIGHT_TEXT",
-                       "value":  " комментариев"
-                   },
-                   {
-                       "name":  "LIVING_WRITE",
-                       "value":  "Написать комментарий"
-                   },
-                   {
-                       "name":  "number_of_viewers",
-                       "value":  "738 600 зрителей"
-                   },
-                   {
-                       "name":  "store_name",
-                       "value":  "Официальная прямая трансляция"
-                   },
-                   {
-                       "name":  "yt_tab_home",
-                       "value":  "Главная"
-                   },
-                   {
-                       "name":  "yt_tab_playlists",
-                       "value":  "Плейлисты"
-                   },
-                   {
-                       "name":  "yt_tab_subscriptions",
-                       "value":  "Подписки"
-                   },
-                   {
-                       "name":  "yt_tab_favorites",
-                       "value":  "Избранное"
-                   },
-                   {
-                       "name":  "yt_tab_local",
-                       "value":  "Локальные"
-                   },
-                   {
-                       "name":  "yt_option_title",
-                       "value":  "Параметры"
-                   },
-                   {
-                       "name":  "yt_option_group_settings",
-                       "value":  "Настройки"
-                   },
-                   {
-                       "name":  "yt_option_group_others",
-                       "value":  "Другое"
-                   },
-                   {
-                       "name":  "yt_option_language",
-                       "value":  "Язык"
-                   },
-                   {
-                       "name":  "yt_option_color",
-                       "value":  "Цвет"
-                   },
-                   {
-                       "name":  "yt_option_color_subtitle",
-                       "value":  "Тема и акцентные цвета"
-                   },
-                   {
-                       "name":  "yt_option_appearance",
-                       "value":  "Внешний вид"
-                   },
-                   {
-                       "name":  "yt_dark_mode_title",
-                       "value":  "Тёмный режим"
-                   },
-                   {
-                       "name":  "yt_dark_mode_system",
-                       "value":  "Как в системе"
-                   },
-                   {
-                       "name":  "yt_dark_mode_system_subtitle",
-                       "value":  "Автоматически переключаться по системным настройкам"
-                   },
-                   {
-                       "name":  "yt_dark_mode_light",
-                       "value":  "Светлая тема"
-                   },
-                   {
-                       "name":  "yt_dark_mode_light_subtitle",
-                       "value":  "Всегда использовать светлую тему"
-                   },
-                   {
-                       "name":  "yt_dark_mode_dark",
-                       "value":  "Тёмная тема"
-                   },
-                   {
-                       "name":  "yt_dark_mode_dark_subtitle",
-                       "value":  "Всегда использовать тёмную тему"
-                   },
-                   {
-                       "name":  "yt_option_log",
-                       "value":  "Журналы"
-                   },
-                   {
-                       "name":  "yt_option_log_subtitle",
-                       "value":  "Просмотр недавних записей"
-                   },
-                   {
-                       "name":  "yt_log_title",
-                       "value":  "Журналы"
-                   },
-                   {
-                       "name":  "yt_log_enable",
-                       "value":  "Включить запись журналов"
-                   },
-                   {
-                       "name":  "yt_log_enable_subtitle",
-                       "value":  "После запуска будет захват журналов работы приложения"
-                   },
-                   {
-                       "name":  "yt_log_disabled_hint",
-                       "value":  "Запись журналов отключена\nВключите переключатель выше для начала захвата"
-                   },
-                   {
-                       "name":  "yt_log_empty",
-                       "value":  "Нет записей журнала"
-                   },
-                   {
-                       "name":  "yt_log_session_active",
-                       "value":  "Запись"
-                   },
-                   {
-                       "name":  "yt_log_session_saved",
-                       "value":  "Сохранено"
-                   },
-                   {
-                       "name":  "yt_log_no_sessions",
-                       "value":  "Нет сессий журнала"
-                   },
-                   {
-                       "name":  "yt_log_delete_all_confirm",
-                       "value":  "Удалить все записи журнала?"
-                   },
-                   {
-                       "name":  "yt_log_delete_confirm_yes",
-                       "value":  "Удалить"
-                   },
-                   {
-                       "name":  "yt_log_delete_confirm_no",
-                       "value":  "Отмена"
-                   },
-                   {
-                       "name":  "yt_option_about",
-                       "value":  "О приложении"
-                   },
-                   {
-                       "name":  "yt_option_about_subtitle",
-                       "value":  "Версия и благодарности"
-                   },
-                   {
-                       "name":  "yt_option_in_development",
-                       "value":  "В разработке"
-                   },
-                   {
-                       "name":  "yt_option_in_development_color",
-                       "value":  "Настройки цветовой темы будут здесь"
-                   },
-                   {
-                       "name":  "yt_lang_follow_system",
-                       "value":  "Как в системе"
-                   },
-                   {
-                       "name":  "yt_lang_simplified",
-                       "value":  "Китайский (упрощённый)"
-                   },
-                   {
-                       "name":  "yt_lang_simplified_subtitle",
-                       "value":  "简体中文"
-                   },
-                   {
-                       "name":  "yt_lang_traditional_hk",
-                       "value":  "Китайский (традиционный, Гонконг)"
-                   },
-                   {
-                       "name":  "yt_lang_traditional_hk_subtitle",
-                       "value":  "繁體中文（香港）"
-                   },
-                   {
-                       "name":  "yt_lang_traditional_tw",
-                       "value":  "Китайский (традиционный, Тайвань)"
-                   },
-                   {
-                       "name":  "yt_lang_traditional_tw_subtitle",
-                       "value":  "繁體中文（台灣）"
-                   },
-                   {
-                       "name":  "yt_lang_english",
-                       "value":  "Английский"
-                   },
-                   {
-                       "name":  "yt_lang_english_subtitle",
-                       "value":  "English"
-                   },
-                   {
-                       "name":  "internet_reason",
-                       "value":  "Запрос сетевых данных"
-                   },
-                   {
-                       "name":  "reason_background",
-                       "value":  "Продолжать воспроизведение в фоновом режиме"
-                   },
-                   {
-                       "name":  "share",
-                       "value":  "Поделиться"
-                   },
-                   {
-                       "name":  "comment",
-                       "value":  "Комментарий"
-                   },
-                   {
-                       "name":  "recommends",
-                       "value":  "Рекомендации"
-                   },
-                   {
-                       "name":  "play_count",
-                       "value":  "120 тыс."
-                   },
-                   {
-                       "name":  "favor_count",
-                       "value":  "70 тыс."
-                   },
-                   {
-                       "name":  "send_barrage",
-                       "value":  "Баллон"
-                   },
-                   {
-                       "name":  "video_name0",
-                       "value":  "@Cat"
-                   },
-                   {
-                       "name":  "video_name1",
-                       "value":  "@Mountaineer"
-                   },
-                   {
-                       "name":  "video_name2",
-                       "value":  "@Nice To Meet You"
-                   },
-                   {
-                       "name":  "video_name3",
-                       "value":  "@Tick"
-                   },
-                   {
-                       "name":  "video_name4",
-                       "value":  "@Faery"
-                   },
-                   {
-                       "name":  "video_description0",
-                       "value":  "#1 #Локальное видео #Разноцветный мир, жизнь — это не только повседневность, но и поэзия с дальними странствиями"
-                   },
-                   {
-                       "name":  "video_description1",
-                       "value":  "#2 #Онлайн-видео #Мечта"
-                   },
-                   {
-                       "name":  "video_description3",
-                       "value":  "#4 #Онлайн-видео #Разноцветный мир, жизнь — это не только повседневность, но и поэзия с дальними странствиями"
-                   },
-                   {
-                       "name":  "video_description4",
-                       "value":  "#5 #Онлайн-видео #Разноцветный мир, жизнь — это не только повседневность, но и поэзия с дальними странствиями"
-                   },
-                   {
-                       "name":  "yt_section_language_region",
-                       "value":  "Язык и регион"
-                   },
-                   {
-                       "name":  "yt_section_playback",
-                       "value":  "Воспроизведение"
-                   },
-                   {
-                       "name":  "yt_section_language",
-                       "value":  "Настройки языка"
-                   },
-                   {
-                       "name":  "yt_setting_ui_language",
-                       "value":  "Язык интерфейса"
-                   },
-                   {
-                       "name":  "yt_setting_content_language",
-                       "value":  "Язык контента"
-                   },
-                   {
-                       "name":  "yt_setting_content_region",
-                       "value":  "Регион контента"
-                   },
-                   {
-                       "name":  "yt_section_video",
-                       "value":  "Настройки видео"
-                   },
-                   {
-                       "name":  "yt_setting_default_quality",
-                       "value":  "Качество видео по умолчанию"
-                   },
-                   {
-                       "name":  "yt_setting_live_quality_cap",
-                       "value":  "Максимальное качество трансляции"
-                   },
-                   {
-                       "name":  "yt_setting_show_high_res",
-                       "value":  "Показывать высокое разрешение (1440p / 4K)"
-                   },
-                   {
-                       "name":  "yt_setting_show_high_res_subtitle",
-                       "value":  "Показывать опцию 4K в выборе качества, требовательно к производительности"
-                   },
-                   {
-                       "name":  "yt_setting_video_codec",
-                       "value":  "Формат кодирования видео"
-                   },
-                   {
-                       "name":  "yt_section_audio",
-                       "value":  "Настройки аудио"
-                   },
-                   {
-                       "name":  "yt_setting_audio_quality",
-                       "value":  "Максимальное качество аудио"
-                   },
-                   {
-                       "name":  "yt_section_decoder",
-                       "value":  "Настройки декодера"
-                   },
-                   {
-                       "name":  "yt_setting_hwdec_mode",
-                       "value":  "Режим аппаратного декодирования"
-                   },
-                   {
-                       "name":  "yt_setting_decoder_fallback",
-                       "value":  "Откат декодера"
-                   },
-                   {
-                       "name":  "yt_setting_decoder_fallback_subtitle",
-                       "value":  "Автоматический откат на программное декодирование при сбое аппаратного"
-                   },
-                   {
-                       "name":  "yt_section_buffer",
-                       "value":  "Стратегия буферизации"
-                   },
-                   {
-                       "name":  "yt_setting_readahead",
-                       "value":  "Длительность предварительной буферизации"
-                   },
-                   {
-                       "name":  "yt_setting_cache_pause",
-                       "value":  "Время ожидания при недостатке буфера"
-                   },
-                   {
-                       "name":  "yt_setting_max_back_bytes",
-                       "value":  "Размер обратного буфера (не перезагружать при Seek назад)"
-                   },
-                   {
-                       "name":  "yt_quality_best",
-                       "value":  "Лучшее качество"
-                   },
-                   {
-                       "name":  "yt_codec_h264_first",
-                       "value":  "Авто (приоритет H.264)"
-                   },
-                   {
-                       "name":  "yt_codec_force_h264",
-                       "value":  "Принудительно H.264"
-                   },
-                   {
-                       "name":  "yt_audio_high",
-                       "value":  "Максимальное (≈256 кбит/с AAC)"
-                   },
-                   {
-                       "name":  "yt_audio_medium",
-                       "value":  "Среднее (≈128 кбит/с AAC)"
-                   },
-                   {
-                       "name":  "yt_audio_low",
-                       "value":  "Экономия трафика (≈48 кбит/с)"
-                   },
-                   {
-                       "name":  "yt_hwdec_auto",
-                       "value":  "Авто (рекомендуется)"
-                   },
-                   {
-                       "name":  "yt_hwdec_auto_safe",
-                       "value":  "Принудительно аппаратное"
-                   },
-                   {
-                       "name":  "yt_hwdec_no",
-                       "value":  "Только программное"
-                   },
-                   {
-                       "name":  "yt_recommended_suffix",
-                       "value":  " (рекомендуется)"
-                   },
-                   {
-                       "name":  "yt_unit_seconds",
-                       "value":  "сек"
-                   },
-                   {
-                       "name":  "yt_unit_mb",
-                       "value":  "МБ"
-                   },
-                   {
-                       "name":  "yt_placeholder_search",
-                       "value":  "Поиск..."
-                   },
-                   {
-                       "name":  "yt_action_favorite",
-                       "value":  "В избранное"
-                   },
-                   {
-                       "name":  "yt_action_unfavorite",
-                       "value":  "Убрать из избранного"
-                   },
-                   {
-                       "name":  "yt_action_subscribe",
-                       "value":  "Подписаться"
-                   },
-                   {
-                       "name":  "yt_action_unsubscribe",
-                       "value":  "Отписаться"
-                   },
-                   {
-                       "name":  "yt_action_share",
-                       "value":  "Поделиться"
-                   },
-                   {
-                       "name":  "yt_action_retry",
-                       "value":  "Повторить"
-                   },
-                   {
-                       "name":  "yt_action_cancel",
-                       "value":  "Отмена"
-                   },
-                   {
-                       "name":  "yt_action_confirm",
-                       "value":  "Подтвердить"
-                   },
-                   {
-                       "name":  "yt_action_delete",
-                       "value":  "Удалить"
-                   },
-                   {
-                       "name":  "yt_action_clear",
-                       "value":  "Очистить"
-                   },
-                   {
-                       "name":  "yt_action_view_author",
-                       "value":  "Просмотр автора"
-                   },
-                   {
-                       "name":  "yt_action_clear_all",
-                       "value":  "Очистить всё"
-                   },
-                   {
-                       "name":  "yt_search_youtube",
-                       "value":  "Поиск YouTube"
-                   },
-                   {
-                       "name":  "yt_search_youtube_music",
-                       "value":  "Поиск YouTube Music"
-                   },
-                   {
-                       "name":  "yt_filter_all",
-                       "value":  "Все"
-                   },
-                   {
-                       "name":  "yt_filter_videos",
-                       "value":  "Видео"
-                   },
-                   {
-                       "name":  "yt_filter_channels",
-                       "value":  "Каналы"
-                   },
-                   {
-                       "name":  "yt_filter_playlists",
-                       "value":  "Плейлисты"
-                   },
-                   {
-                       "name":  "yt_filter_songs",
-                       "value":  "Песни"
-                   },
-                   {
-                       "name":  "yt_filter_albums",
-                       "value":  "Альбомы"
-                   },
-                   {
-                       "name":  "yt_search_history",
-                       "value":  "История поиска"
-                   },
-                   {
-                       "name":  "yt_action_clear_search_history",
-                       "value":  "Очистить историю поиска"
-                   },
-                   {
-                       "name":  "yt_empty_no_search_history",
-                       "value":  "Нет истории поиска"
-                   },
-                   {
-                       "name":  "yt_search_no_results",
-                       "value":  "Ничего не найдено"
-                   },
-                   {
-                       "name":  "yt_error_search_failed",
-                       "value":  "Ошибка поиска, повторите позже"
-                   },
-                   {
-                       "name":  "yt_dialog_delete_search_record",
-                       "value":  "Удалить запись поиска"
-                   },
-                   {
-                       "name":  "yt_confirm_clear_search_history",
-                       "value":  "Очистить всю историю поиска?"
-                   },
-                   {
-                       "name":  "yt_toast_cleared",
-                       "value":  "Очищено"
-                   },
-                   {
-                       "name":  "yt_placeholder_search_content",
-                       "value":  "Поиск контента"
-                   },
-                   {
-                       "name":  "yt_empty_no_content",
-                       "value":  "Нет контента"
-                   },
-                   {
-                       "name":  "yt_video_details",
-                       "value":  "Подробности видео"
-                   },
-                   {
-                       "name":  "yt_error_invalid_video",
-                       "value":  "Нет действительной информации о видео"
-                   },
-                   {
-                       "name":  "yt_notice_direct_link_removed",
-                       "value":  "Функция прямой ссылки удалена, дальнейшая обработка будет единообразной."
-                   },
-                   {
-                       "name":  "yt_dialog_select_quality",
-                       "value":  "Выбор качества"
-                   },
-                   {
-                       "name":  "yt_label_video_track",
-                       "value":  "Видеодорожка"
-                   },
-                   {
-                       "name":  "yt_warn_high_resolution",
-                       "value":  "Это разрешение выше 1440p, на некоторых устройствах возможны проблемы с производительностью"
-                   },
-                   {
-                       "name":  "yt_label_audio_quality",
-                       "value":  "Качество аудио"
-                   },
-                   {
-                       "name":  "yt_player_syncing_buffer",
-                       "value":  "Синхронизация двухдорожечного буфера..."
-                   },
-                   {
-                       "name":  "yt_error_playback_failed",
-                       "value":  "Ошибка воспроизведения"
-                   },
-                   {
-                       "name":  "yt_error_load_video_info",
-                       "value":  "Не удалось получить информацию о видео"
-                   },
-                   {
-                       "name":  "yt_error_load_video",
-                       "value":  "Не удалось загрузить видео"
-                   },
-                   {
-                       "name":  "yt_error_load_exception",
-                       "value":  "Произошла ошибка загрузки"
-                   },
-                   {
-                       "name":  "yt_error_unknown",
-                       "value":  "Неизвестная ошибка"
-                   },
-                   {
-                       "name":  "yt_error_invalid_video_id",
-                       "value":  "Недействительный ID видео"
-                   },
-                   {
-                       "name":  "yt_error_play_error_retry",
-                       "value":  "Ошибка воспроизведения, повторите попытку"
-                   },
-                   {
-                       "name":  "yt_empty_no_comments",
-                       "value":  "Нет комментариев"
-                   },
-                   {
-                       "name":  "yt_label_pinned",
-                       "value":  "Закреплено"
-                   },
-                   {
-                       "name":  "yt_error_load_comments",
-                       "value":  "Не удалось загрузить комментарии"
-                   },
-                   {
-                       "name":  "yt_label_reply",
-                       "value":  "Ответить"
-                   },
-                   {
-                       "name":  "yt_error_load_replies",
-                       "value":  "Не удалось загрузить ответы"
-                   },
-                   {
-                       "name":  "yt_label_like",
-                       "value":  "Нравится"
-                   },
-                   {
-                       "name":  "yt_tab_videos",
-                       "value":  "Видео"
-                   },
-                   {
-                       "name":  "yt_tab_shorts",
-                       "value":  "Shorts"
-                   },
-                   {
-                       "name":  "yt_tab_live",
-                       "value":  "Прямые трансляции"
-                   },
-                   {
-                       "name":  "yt_tab_about",
-                       "value":  "О канале"
-                   },
-                   {
-                       "name":  "yt_empty_no_videos",
-                       "value":  "Нет видео"
-                   },
-                   {
-                       "name":  "yt_empty_no_shorts",
-                       "value":  "Нет Shorts"
-                   },
-                   {
-                       "name":  "yt_empty_no_live",
-                       "value":  "Нет трансляций"
-                   },
-                   {
-                       "name":  "yt_channel_info",
-                       "value":  "Информация о канале"
-                   },
-                   {
-                       "name":  "yt_channel_id",
-                       "value":  "ID канала"
-                   },
-                   {
-                       "name":  "yt_channel_subscribers",
-                       "value":  "Подписчики"
-                   },
-                   {
-                       "name":  "yt_channel_video_count",
-                       "value":  "Количество видео"
-                   },
-                   {
-                       "name":  "yt_channel_description",
-                       "value":  "Описание"
-                   },
-                   {
-                       "name":  "yt_error_load_user_videos",
-                       "value":  "Не удалось загрузить видео пользователя"
-                   },
-                   {
-                       "name":  "yt_error_load_shorts",
-                       "value":  "Не удалось загрузить Shorts"
-                   },
-                   {
-                       "name":  "yt_error_load_live",
-                       "value":  "Не удалось загрузить трансляции"
-                   },
-                   {
-                       "name":  "yt_label_user",
-                       "value":  "Пользователь"
-                   },
-                   {
-                       "name":  "yt_local_history",
-                       "value":  "История просмотров"
-                   },
-                   {
-                       "name":  "yt_dialog_clear_history",
-                       "value":  "Очистить историю"
-                   },
-                   {
-                       "name":  "yt_confirm_clear_history",
-                       "value":  "Очистить всю историю просмотров?"
-                   },
-                   {
-                       "name":  "yt_empty_no_history",
-                       "value":  "Нет истории просмотров"
-                   },
-                   {
-                       "name":  "yt_empty_history_hint",
-                       "value":  "Просмотренные видео появятся здесь"
-                   },
-                   {
-                       "name":  "yt_time_just_now",
-                       "value":  "Только что"
-                   },
-                   {
-                       "name":  "yt_action_delete_record",
-                       "value":  "Удалить запись"
-                   },
-                   {
-                       "name":  "yt_sub_manage_title",
-                       "value":  "Мои подписки"
-                   },
-                   {
-                       "name":  "yt_empty_no_subs",
-                       "value":  "Нет подписок"
-                   },
-                   {
-                       "name":  "yt_empty_subs_hint",
-                       "value":  "Добавьте в \"Управление подписками\""
-                   },
-                   {
-                       "name":  "yt_empty_subs_hint_alt",
-                       "value":  "Подпишитесь на интересных авторов на странице поиска"
-                   },
-                   {
-                       "name":  "yt_error_load_subs",
-                       "value":  "Не удалось загрузить подписки"
-                   },
-                   {
-                       "name":  "yt_fav_videos_title",
-                       "value":  "Мои избранные видео"
-                   },
-                   {
-                       "name":  "yt_fav_playlists_title",
-                       "value":  "Мои избранные плейлисты"
-                   },
-                   {
-                       "name":  "yt_local_playlists_title",
-                       "value":  "Локальные плейлисты"
-                   },
-                   {
-                       "name":  "yt_local_playlists_tag",
-                       "value":  "Локальный"
-                   },
-                   {
-                       "name":  "yt_empty_no_local_playlists",
-                       "value":  "Локальных плейлистов пока нет"
-                   },
-                   {
-                       "name":  "yt_empty_local_playlists_hint",
-                       "value":  "Сохраняйте видео в локальный плейлист из проигрывателя"
-                   },
-                   {
-                       "name":  "yt_empty_no_fav_videos",
-                       "value":  "Нет избранных видео"
-                   },
-                   {
-                       "name":  "yt_empty_no_fav_playlists",
-                       "value":  "Нет избранных плейлистов"
-                   },
-                   {
-                       "name":  "yt_empty_fav_playlists_hint",
-                       "value":  "Добавляйте плейлисты в избранное на странице поиска"
-                   },
-                   {
-                       "name":  "yt_empty_playlists_hint",
-                       "value":  "Добавляйте плейлисты в избранное на странице поиска"
-                   },
-                   {
-                       "name":  "yt_about_current_version",
-                       "value":  "Текущая версия"
-                   },
-                   {
-                       "name":  "yt_about_description",
-                       "value":  "Клиент YouTube с открытым исходным кодом на базе HarmonyOS NEXT\nБез рекламы · Без отслеживания · Полностью локальный анализ"
-                   },
-                   {
-                       "name":  "yt_about_qq_group",
-                       "value":  "Группа QQ"
-                   },
-                   {
-                       "name":  "yt_about_tg_group",
-                       "value":  "Группа Telegram"
-                   },
-                   {
-                       "name":  "yt_about_project_info",
-                       "value":  "Информация о проекте"
-                   },
-                   {
-                       "name":  "yt_about_open_source",
-                       "value":  "Используемые проекты с открытым исходным кодом"
-                   },
-                   {
-                       "name":  "yt_about_ai_models",
-                       "value":  "AI-модели для разработки"
-                   },
-                   {
-                       "name":  "yt_about_changelog",
-                       "value":  "Журнал изменений"
-                   },
-                   {
-                       "name":  "yt_error_load_failed",
-                       "value":  "Ошибка загрузки"
-                   },
-                   {
-                       "name":  "yt_error_play_failed_title",
-                       "value":  "Ошибка воспроизведения"
-                   },
-                   {
-                       "name":  "yt_label_live",
-                       "value":  "В прямом эфире"
-                   },
-                   {
-                       "name":  "yt_error_load_playlists",
-                       "value":  "Не удалось загрузить плейлисты"
-                   },
-                   {
-                       "name":  "yt_error_load_channel_info",
-                       "value":  "Не удалось получить информацию о канале"
-                   },
-                   {
-                       "name":  "yt_tab_description",
-                       "value":  "Описание"
-                   },
-                   {
-                       "name":  "yt_tab_comments",
-                       "value":  "Комментарии"
-                   },
-                   {
-                       "name":  "yt_tab_recommended",
-                       "value":  "Рекомендуемое"
-                   },
-                   {
-                       "name":  "yt_home_search_empty",
-                       "value":  "Автопоиск не дал результатов, попробуйте вручную"
-                   },
-                   {
-                       "name":  "yt_home_recommended_error",
-                       "value":  "Failed to load recommended feed, falling back or try again later"
-                   },
-                   {
-                       "name":  "yt_home_kiosk_error",
-                       "value":  "Ошибка запроса Kiosk, повторите позже"
-                   },
-                   {
-                       "name":  "yt_home_load_error",
-                       "value":  "Ошибка загрузки главной страницы, повторите позже"
-                   },
-                   {
-                       "name":  "yt_player_mode_progressive",
-                       "value":  "Progressive"
-                   },
-                   {
-                       "name":  "yt_player_mode_hls",
-                       "value":  "HLS поток"
-                   },
-                   {
-                       "name":  "yt_player_mode_dash_manifest",
-                       "value":  "DASH поток (Manifest)"
-                   },
-                   {
-                       "name":  "yt_player_mode_dash_track",
-                       "value":  "DASH дорожки (разделение аудио/видео)"
-                   },
-                   {
-                       "name":  "yt_player_default",
-                       "value":  "По умолчанию (Default)"
-                   },
-                   {
-                       "name":  "yt_player_step1_select_mode",
-                       "value":  "1. Выберите режим воспроизведения"
-                   },
-                   {
-                       "name":  "yt_player_step2_select_quality",
-                       "value":  "2. Выберите качество"
-                   },
-                   {
-                       "name":  "yt_player_video_quality",
-                       "value":  "Качество видео"
-                   },
-                   {
-                       "name":  "yt_player_step2_select_manifest",
-                       "value":  "2. Выберите манифест"
-                   },
-                   {
-                       "name":  "yt_player_step2_select_track",
-                       "value":  "2. Выберите дорожку"
-                   },
-                   {
-                       "name":  "yt_player_audio_language_type",
-                       "value":  "Язык / тип аудио"
-                   },
-                   {
-                       "name":  "yt_log_saved_to_downloads",
-                       "value":  "Сохранено в папку загрузок"
-                   },
-                   {
-                       "name":  "yt_feed_popular",
-                       "value":  "Популярное"
-                   },
-                   {
-                       "name":  "yt_feed_recommended",
-                       "value":  "Рекомендуемое"
-                   },
-                   {
-                       "name":  "yt_feed_featured",
-                       "value":  "Избранное"
-                   },
-                   {
-                       "name":  "yt_feed_trending",
-                       "value":  "В тренде"
-                   },
-                   {
-                       "name":  "yt_feed_latest",
-                       "value":  "Новое"
-                   },
-                   {
-                       "name":  "yt_feed_topics",
-                       "value":  "Темы"
-                   },
-                   {
-                       "name":  "yt_suffix_videos",
-                       "value":  "видео"
-                   },
-                   {
-                       "name":  "yt_suffix_shorts",
-                       "value":  "Shorts"
-                   },
-                   {
-                       "name":  "yt_suffix_collections",
-                       "value":  "подборки"
-                   },
-                   {
-                       "name":  "yt_suffix_live",
-                       "value":  "трансляции"
-                   },
-                   {
-                       "name":  "yt_suffix_music",
-                       "value":  "музыка"
-                   },
-                   {
-                       "name":  "yt_suffix_movies",
-                       "value":  "фильмы"
-                   },
-                   {
-                       "name":  "yt_error_no_playable_stream",
-                       "value":  "Не найдено доступных потоков"
-                   },
-                   {
-                       "name":  "yt_error_no_supported_stream",
-                       "value":  "Не найдено поддерживаемых видеопотоков"
-                   },
-                   {
-                       "name":  "new_app_name",
-                       "value":  "YourPipe"
-                   },
-                   {
-                       "name":  "yt_empty_no_playlists",
-                       "value":  "Нет плейлистов"
-                   },
-                   {
-                       "name":  "yt_search_results_from",
-                       "value":  "Результаты поиска для \"%s\""
-                   },
-                   {
-                       "name":  "yt_setting_stream_buffer",
-                       "value":  "TCP Stream Buffer"
-                   },
-                   {
-                       "name":  "yt_setting_seek_keyframe",
-                       "value":  "Fast Seek (Keyframe)"
-                   },
-                   {
-                       "name":  "yt_setting_seek_keyframe_subtitle",
-                       "value":  "Jump to nearest keyframe for faster seek response"
-                   },
-                   {
-                       "name":  "yt_setting_home_feed_after_login",
-                       "value":  "Home content after login"
-                   },
-                   {
-                       "name":  "yt_home_feed_recommended",
-                       "value":  "Recommended"
-                   },
-                   {
-                       "name":  "yt_home_feed_kiosk",
-                       "value":  "Live"
-                   },
-                   {
-                       "name":  "yt_option_auth_session",
-                       "value":  "Signed-in browsing"
-                   },
-                   {
-                       "name":  "yt_option_sign_out",
-                       "value":  "Sign out"
-                   },
-                   {
-                       "name":  "yt_option_sign_out_subtitle",
-                       "value":  "Clear saved login credentials"
-                   },
-                   {
-                       "name":  "yt_confirm_sign_out",
-                       "value":  "Sign out and clear saved login credentials?"
-                   }
-               ]
+    "string": [
+        {
+            "name": "module_desc",
+            "value": "module description"
+        },
+        {
+            "name": "EntryAbility_desc",
+            "value": "description"
+        },
+        {
+            "name": "EntryAbility_label",
+            "value": "label"
+        },
+        {
+            "name": "HOME_EXIT_TOAST",
+            "value": "Нажмите ещё раз для выхода"
+        },
+        {
+            "name": "LIVING_LEFT_TEXT",
+            "value": "Всего "
+        },
+        {
+            "name": "LIVING_RIGHT_TEXT",
+            "value": " комментариев"
+        },
+        {
+            "name": "LIVING_WRITE",
+            "value": "Написать комментарий"
+        },
+        {
+            "name": "number_of_viewers",
+            "value": "738 600 зрителей"
+        },
+        {
+            "name": "store_name",
+            "value": "Официальная прямая трансляция"
+        },
+        {
+            "name": "yt_tab_home",
+            "value": "Главная"
+        },
+        {
+            "name": "yt_tab_playlists",
+            "value": "Плейлисты"
+        },
+        {
+            "name": "yt_tab_subscriptions",
+            "value": "Подписки"
+        },
+        {
+            "name": "yt_tab_favorites",
+            "value": "Избранное"
+        },
+        {
+            "name": "yt_tab_local",
+            "value": "Локальные"
+        },
+        {
+            "name": "yt_option_title",
+            "value": "Параметры"
+        },
+        {
+            "name": "yt_option_group_settings",
+            "value": "Настройки"
+        },
+        {
+            "name": "yt_option_group_others",
+            "value": "Другое"
+        },
+        {
+            "name": "yt_option_language",
+            "value": "Язык"
+        },
+        {
+            "name": "yt_option_color",
+            "value": "Цвет"
+        },
+        {
+            "name": "yt_option_color_subtitle",
+            "value": "Тема и акцентные цвета"
+        },
+        {
+            "name": "yt_option_appearance",
+            "value": "Внешний вид"
+        },
+        {
+            "name": "yt_dark_mode_title",
+            "value": "Тёмный режим"
+        },
+        {
+            "name": "yt_dark_mode_system",
+            "value": "Как в системе"
+        },
+        {
+            "name": "yt_dark_mode_system_subtitle",
+            "value": "Автоматически переключаться по системным настройкам"
+        },
+        {
+            "name": "yt_dark_mode_light",
+            "value": "Светлая тема"
+        },
+        {
+            "name": "yt_dark_mode_light_subtitle",
+            "value": "Всегда использовать светлую тему"
+        },
+        {
+            "name": "yt_dark_mode_dark",
+            "value": "Тёмная тема"
+        },
+        {
+            "name": "yt_dark_mode_dark_subtitle",
+            "value": "Всегда использовать тёмную тему"
+        },
+        {
+            "name": "yt_option_log",
+            "value": "Журналы"
+        },
+        {
+            "name": "yt_option_log_subtitle",
+            "value": "Просмотр недавних записей"
+        },
+        {
+            "name": "yt_log_title",
+            "value": "Журналы"
+        },
+        {
+            "name": "yt_log_enable",
+            "value": "Включить запись журналов"
+        },
+        {
+            "name": "yt_log_enable_subtitle",
+            "value": "После запуска будет захват журналов работы приложения"
+        },
+        {
+            "name": "yt_log_disabled_hint",
+            "value": "Запись журналов отключена\nВключите переключатель выше для начала захвата"
+        },
+        {
+            "name": "yt_log_empty",
+            "value": "Нет записей журнала"
+        },
+        {
+            "name": "yt_log_session_active",
+            "value": "Запись"
+        },
+        {
+            "name": "yt_log_session_saved",
+            "value": "Сохранено"
+        },
+        {
+            "name": "yt_log_no_sessions",
+            "value": "Нет сессий журнала"
+        },
+        {
+            "name": "yt_log_delete_all_confirm",
+            "value": "Удалить все записи журнала?"
+        },
+        {
+            "name": "yt_log_delete_confirm_yes",
+            "value": "Удалить"
+        },
+        {
+            "name": "yt_log_delete_confirm_no",
+            "value": "Отмена"
+        },
+        {
+            "name": "yt_option_about",
+            "value": "О приложении"
+        },
+        {
+            "name": "yt_option_about_subtitle",
+            "value": "Версия и благодарности"
+        },
+        {
+            "name": "yt_option_in_development",
+            "value": "В разработке"
+        },
+        {
+            "name": "yt_option_in_development_color",
+            "value": "Настройки цветовой темы будут здесь"
+        },
+        {
+            "name": "yt_lang_follow_system",
+            "value": "Как в системе"
+        },
+        {
+            "name": "yt_lang_simplified",
+            "value": "Китайский (упрощённый)"
+        },
+        {
+            "name": "yt_lang_simplified_subtitle",
+            "value": "简体中文"
+        },
+        {
+            "name": "yt_lang_traditional_hk",
+            "value": "Китайский (традиционный, Гонконг)"
+        },
+        {
+            "name": "yt_lang_traditional_hk_subtitle",
+            "value": "繁體中文（香港）"
+        },
+        {
+            "name": "yt_lang_traditional_tw",
+            "value": "Китайский (традиционный, Тайвань)"
+        },
+        {
+            "name": "yt_lang_traditional_tw_subtitle",
+            "value": "繁體中文（台灣）"
+        },
+        {
+            "name": "yt_lang_english",
+            "value": "Английский"
+        },
+        {
+            "name": "yt_lang_english_subtitle",
+            "value": "English"
+        },
+        {
+            "name": "internet_reason",
+            "value": "Запрос сетевых данных"
+        },
+        {
+            "name": "reason_background",
+            "value": "Продолжать воспроизведение в фоновом режиме"
+        },
+        {
+            "name": "share",
+            "value": "Поделиться"
+        },
+        {
+            "name": "comment",
+            "value": "Комментарий"
+        },
+        {
+            "name": "recommends",
+            "value": "Рекомендации"
+        },
+        {
+            "name": "play_count",
+            "value": "120 тыс."
+        },
+        {
+            "name": "favor_count",
+            "value": "70 тыс."
+        },
+        {
+            "name": "send_barrage",
+            "value": "Баллон"
+        },
+        {
+            "name": "video_name0",
+            "value": "@Cat"
+        },
+        {
+            "name": "video_name1",
+            "value": "@Mountaineer"
+        },
+        {
+            "name": "video_name2",
+            "value": "@Nice To Meet You"
+        },
+        {
+            "name": "video_name3",
+            "value": "@Tick"
+        },
+        {
+            "name": "video_name4",
+            "value": "@Faery"
+        },
+        {
+            "name": "video_description0",
+            "value": "#1 #Локальное видео #Разноцветный мир, жизнь — это не только повседневность, но и поэзия с дальними странствиями"
+        },
+        {
+            "name": "video_description1",
+            "value": "#2 #Онлайн-видео #Мечта"
+        },
+        {
+            "name": "video_description3",
+            "value": "#4 #Онлайн-видео #Разноцветный мир, жизнь — это не только повседневность, но и поэзия с дальними странствиями"
+        },
+        {
+            "name": "video_description4",
+            "value": "#5 #Онлайн-видео #Разноцветный мир, жизнь — это не только повседневность, но и поэзия с дальними странствиями"
+        },
+        {
+            "name": "yt_section_language_region",
+            "value": "Язык и регион"
+        },
+        {
+            "name": "yt_section_playback",
+            "value": "Воспроизведение"
+        },
+        {
+            "name": "yt_section_language",
+            "value": "Настройки языка"
+        },
+        {
+            "name": "yt_setting_ui_language",
+            "value": "Язык интерфейса"
+        },
+        {
+            "name": "yt_setting_content_language",
+            "value": "Язык контента"
+        },
+        {
+            "name": "yt_setting_content_region",
+            "value": "Регион контента"
+        },
+        {
+            "name": "yt_section_video",
+            "value": "Настройки видео"
+        },
+        {
+            "name": "yt_setting_default_quality",
+            "value": "Качество видео по умолчанию"
+        },
+        {
+            "name": "yt_setting_live_quality_cap",
+            "value": "Максимальное качество трансляции"
+        },
+        {
+            "name": "yt_setting_show_high_res",
+            "value": "Показывать высокое разрешение (1440p / 4K)"
+        },
+        {
+            "name": "yt_setting_show_high_res_subtitle",
+            "value": "Показывать опцию 4K в выборе качества, требовательно к производительности"
+        },
+        {
+            "name": "yt_setting_video_codec",
+            "value": "Формат кодирования видео"
+        },
+        {
+            "name": "yt_section_audio",
+            "value": "Настройки аудио"
+        },
+        {
+            "name": "yt_setting_audio_quality",
+            "value": "Максимальное качество аудио"
+        },
+        {
+            "name": "yt_section_decoder",
+            "value": "Настройки декодера"
+        },
+        {
+            "name": "yt_setting_hwdec_mode",
+            "value": "Режим аппаратного декодирования"
+        },
+        {
+            "name": "yt_setting_decoder_fallback",
+            "value": "Откат декодера"
+        },
+        {
+            "name": "yt_setting_decoder_fallback_subtitle",
+            "value": "Автоматический откат на программное декодирование при сбое аппаратного"
+        },
+        {
+            "name": "yt_section_buffer",
+            "value": "Стратегия буферизации"
+        },
+        {
+            "name": "yt_setting_readahead",
+            "value": "Длительность предварительной буферизации"
+        },
+        {
+            "name": "yt_setting_cache_pause",
+            "value": "Время ожидания при недостатке буфера"
+        },
+        {
+            "name": "yt_setting_max_back_bytes",
+            "value": "Размер обратного буфера (не перезагружать при Seek назад)"
+        },
+        {
+            "name": "yt_quality_best",
+            "value": "Лучшее качество"
+        },
+        {
+            "name": "yt_codec_h264_first",
+            "value": "Авто (приоритет H.264)"
+        },
+        {
+            "name": "yt_codec_force_h264",
+            "value": "Принудительно H.264"
+        },
+        {
+            "name": "yt_audio_high",
+            "value": "Максимальное (≈256 кбит/с AAC)"
+        },
+        {
+            "name": "yt_audio_medium",
+            "value": "Среднее (≈128 кбит/с AAC)"
+        },
+        {
+            "name": "yt_audio_low",
+            "value": "Экономия трафика (≈48 кбит/с)"
+        },
+        {
+            "name": "yt_hwdec_auto",
+            "value": "Авто (рекомендуется)"
+        },
+        {
+            "name": "yt_hwdec_auto_safe",
+            "value": "Принудительно аппаратное"
+        },
+        {
+            "name": "yt_hwdec_no",
+            "value": "Только программное"
+        },
+        {
+            "name": "yt_recommended_suffix",
+            "value": " (рекомендуется)"
+        },
+        {
+            "name": "yt_unit_seconds",
+            "value": "сек"
+        },
+        {
+            "name": "yt_unit_mb",
+            "value": "МБ"
+        },
+        {
+            "name": "yt_placeholder_search",
+            "value": "Поиск..."
+        },
+        {
+            "name": "yt_action_favorite",
+            "value": "В избранное"
+        },
+        {
+            "name": "yt_action_unfavorite",
+            "value": "Убрать из избранного"
+        },
+        {
+            "name": "yt_action_subscribe",
+            "value": "Подписаться"
+        },
+        {
+            "name": "yt_action_unsubscribe",
+            "value": "Отписаться"
+        },
+        {
+            "name": "yt_action_share",
+            "value": "Поделиться"
+        },
+        {
+            "name": "yt_action_retry",
+            "value": "Повторить"
+        },
+        {
+            "name": "yt_action_cancel",
+            "value": "Отмена"
+        },
+        {
+            "name": "yt_action_confirm",
+            "value": "Подтвердить"
+        },
+        {
+            "name": "yt_action_delete",
+            "value": "Удалить"
+        },
+        {
+            "name": "yt_action_clear",
+            "value": "Очистить"
+        },
+        {
+            "name": "yt_action_view_author",
+            "value": "Просмотр автора"
+        },
+        {
+            "name": "yt_action_clear_all",
+            "value": "Очистить всё"
+        },
+        {
+            "name": "yt_search_youtube",
+            "value": "Поиск YouTube"
+        },
+        {
+            "name": "yt_search_youtube_music",
+            "value": "Поиск YouTube Music"
+        },
+        {
+            "name": "yt_filter_all",
+            "value": "Все"
+        },
+        {
+            "name": "yt_filter_videos",
+            "value": "Видео"
+        },
+        {
+            "name": "yt_filter_channels",
+            "value": "Каналы"
+        },
+        {
+            "name": "yt_filter_playlists",
+            "value": "Плейлисты"
+        },
+        {
+            "name": "yt_filter_songs",
+            "value": "Песни"
+        },
+        {
+            "name": "yt_filter_albums",
+            "value": "Альбомы"
+        },
+        {
+            "name": "yt_search_history",
+            "value": "История поиска"
+        },
+        {
+            "name": "yt_action_clear_search_history",
+            "value": "Очистить историю поиска"
+        },
+        {
+            "name": "yt_empty_no_search_history",
+            "value": "Нет истории поиска"
+        },
+        {
+            "name": "yt_search_no_results",
+            "value": "Ничего не найдено"
+        },
+        {
+            "name": "yt_error_search_failed",
+            "value": "Ошибка поиска, повторите позже"
+        },
+        {
+            "name": "yt_dialog_delete_search_record",
+            "value": "Удалить запись поиска"
+        },
+        {
+            "name": "yt_confirm_clear_search_history",
+            "value": "Очистить всю историю поиска?"
+        },
+        {
+            "name": "yt_toast_cleared",
+            "value": "Очищено"
+        },
+        {
+            "name": "yt_placeholder_search_content",
+            "value": "Поиск контента"
+        },
+        {
+            "name": "yt_empty_no_content",
+            "value": "Нет контента"
+        },
+        {
+            "name": "yt_video_details",
+            "value": "Подробности видео"
+        },
+        {
+            "name": "yt_error_invalid_video",
+            "value": "Нет действительной информации о видео"
+        },
+        {
+            "name": "yt_notice_direct_link_removed",
+            "value": "Функция прямой ссылки удалена, дальнейшая обработка будет единообразной."
+        },
+        {
+            "name": "yt_dialog_select_quality",
+            "value": "Выбор качества"
+        },
+        {
+            "name": "yt_label_video_track",
+            "value": "Видеодорожка"
+        },
+        {
+            "name": "yt_warn_high_resolution",
+            "value": "Это разрешение выше 1440p, на некоторых устройствах возможны проблемы с производительностью"
+        },
+        {
+            "name": "yt_label_audio_quality",
+            "value": "Качество аудио"
+        },
+        {
+            "name": "yt_player_syncing_buffer",
+            "value": "Синхронизация двухдорожечного буфера..."
+        },
+        {
+            "name": "yt_error_playback_failed",
+            "value": "Ошибка воспроизведения"
+        },
+        {
+            "name": "yt_error_load_video_info",
+            "value": "Не удалось получить информацию о видео"
+        },
+        {
+            "name": "yt_error_load_video",
+            "value": "Не удалось загрузить видео"
+        },
+        {
+            "name": "yt_error_load_exception",
+            "value": "Произошла ошибка загрузки"
+        },
+        {
+            "name": "yt_error_unknown",
+            "value": "Неизвестная ошибка"
+        },
+        {
+            "name": "yt_error_invalid_video_id",
+            "value": "Недействительный ID видео"
+        },
+        {
+            "name": "yt_error_play_error_retry",
+            "value": "Ошибка воспроизведения, повторите попытку"
+        },
+        {
+            "name": "yt_empty_no_comments",
+            "value": "Нет комментариев"
+        },
+        {
+            "name": "yt_label_pinned",
+            "value": "Закреплено"
+        },
+        {
+            "name": "yt_error_load_comments",
+            "value": "Не удалось загрузить комментарии"
+        },
+        {
+            "name": "yt_label_reply",
+            "value": "Ответить"
+        },
+        {
+            "name": "yt_error_load_replies",
+            "value": "Не удалось загрузить ответы"
+        },
+        {
+            "name": "yt_label_like",
+            "value": "Нравится"
+        },
+        {
+            "name": "yt_tab_videos",
+            "value": "Видео"
+        },
+        {
+            "name": "yt_tab_shorts",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_tab_live",
+            "value": "Прямые трансляции"
+        },
+        {
+            "name": "yt_tab_about",
+            "value": "О канале"
+        },
+        {
+            "name": "yt_empty_no_videos",
+            "value": "Нет видео"
+        },
+        {
+            "name": "yt_empty_no_shorts",
+            "value": "Нет Shorts"
+        },
+        {
+            "name": "yt_empty_no_live",
+            "value": "Нет трансляций"
+        },
+        {
+            "name": "yt_channel_info",
+            "value": "Информация о канале"
+        },
+        {
+            "name": "yt_channel_id",
+            "value": "ID канала"
+        },
+        {
+            "name": "yt_channel_subscribers",
+            "value": "Подписчики"
+        },
+        {
+            "name": "yt_channel_video_count",
+            "value": "Количество видео"
+        },
+        {
+            "name": "yt_channel_description",
+            "value": "Описание"
+        },
+        {
+            "name": "yt_error_load_user_videos",
+            "value": "Не удалось загрузить видео пользователя"
+        },
+        {
+            "name": "yt_error_load_shorts",
+            "value": "Не удалось загрузить Shorts"
+        },
+        {
+            "name": "yt_error_load_live",
+            "value": "Не удалось загрузить трансляции"
+        },
+        {
+            "name": "yt_label_user",
+            "value": "Пользователь"
+        },
+        {
+            "name": "yt_local_history",
+            "value": "История просмотров"
+        },
+        {
+            "name": "yt_dialog_clear_history",
+            "value": "Очистить историю"
+        },
+        {
+            "name": "yt_confirm_clear_history",
+            "value": "Очистить всю историю просмотров?"
+        },
+        {
+            "name": "yt_empty_no_history",
+            "value": "Нет истории просмотров"
+        },
+        {
+            "name": "yt_empty_history_hint",
+            "value": "Просмотренные видео появятся здесь"
+        },
+        {
+            "name": "yt_time_just_now",
+            "value": "Только что"
+        },
+        {
+            "name": "yt_action_delete_record",
+            "value": "Удалить запись"
+        },
+        {
+            "name": "yt_sub_manage_title",
+            "value": "Мои подписки"
+        },
+        {
+            "name": "yt_empty_no_subs",
+            "value": "Нет подписок"
+        },
+        {
+            "name": "yt_empty_subs_hint",
+            "value": "Добавьте в \"Управление подписками\""
+        },
+        {
+            "name": "yt_empty_subs_hint_alt",
+            "value": "Подпишитесь на интересных авторов на странице поиска"
+        },
+        {
+            "name": "yt_error_load_subs",
+            "value": "Не удалось загрузить подписки"
+        },
+        {
+            "name": "yt_fav_videos_title",
+            "value": "Мои избранные видео"
+        },
+        {
+            "name": "yt_fav_playlists_title",
+            "value": "Мои избранные плейлисты"
+        },
+        {
+            "name": "yt_local_playlists_title",
+            "value": "Локальные плейлисты"
+        },
+        {
+            "name": "yt_local_playlists_tag",
+            "value": "Локальный"
+        },
+        {
+            "name": "yt_empty_no_local_playlists",
+            "value": "Локальных плейлистов пока нет"
+        },
+        {
+            "name": "yt_empty_local_playlists_hint",
+            "value": "Сохраняйте видео в локальный плейлист из проигрывателя"
+        },
+        {
+            "name": "yt_empty_no_fav_videos",
+            "value": "Нет избранных видео"
+        },
+        {
+            "name": "yt_empty_no_fav_playlists",
+            "value": "Нет избранных плейлистов"
+        },
+        {
+            "name": "yt_empty_fav_playlists_hint",
+            "value": "Добавляйте плейлисты в избранное на странице поиска"
+        },
+        {
+            "name": "yt_empty_playlists_hint",
+            "value": "Добавляйте плейлисты в избранное на странице поиска"
+        },
+        {
+            "name": "yt_about_current_version",
+            "value": "Текущая версия"
+        },
+        {
+            "name": "yt_about_description",
+            "value": "Клиент YouTube с открытым исходным кодом на базе HarmonyOS NEXT\nБез рекламы · Без отслеживания · Полностью локальный анализ"
+        },
+        {
+            "name": "yt_about_qq_group",
+            "value": "Группа QQ"
+        },
+        {
+            "name": "yt_about_tg_group",
+            "value": "Группа Telegram"
+        },
+        {
+            "name": "yt_about_project_info",
+            "value": "Информация о проекте"
+        },
+        {
+            "name": "yt_about_open_source",
+            "value": "Используемые проекты с открытым исходным кодом"
+        },
+        {
+            "name": "yt_about_ai_models",
+            "value": "AI-модели для разработки"
+        },
+        {
+            "name": "yt_about_changelog",
+            "value": "Журнал изменений"
+        },
+        {
+            "name": "yt_error_load_failed",
+            "value": "Ошибка загрузки"
+        },
+        {
+            "name": "yt_error_play_failed_title",
+            "value": "Ошибка воспроизведения"
+        },
+        {
+            "name": "yt_label_live",
+            "value": "В прямом эфире"
+        },
+        {
+            "name": "yt_error_load_playlists",
+            "value": "Не удалось загрузить плейлисты"
+        },
+        {
+            "name": "yt_error_load_channel_info",
+            "value": "Не удалось получить информацию о канале"
+        },
+        {
+            "name": "yt_tab_description",
+            "value": "Описание"
+        },
+        {
+            "name": "yt_tab_comments",
+            "value": "Комментарии"
+        },
+        {
+            "name": "yt_tab_recommended",
+            "value": "Рекомендуемое"
+        },
+        {
+            "name": "yt_home_search_empty",
+            "value": "Автопоиск не дал результатов, попробуйте вручную"
+        },
+        {
+            "name": "yt_home_recommended_error",
+            "value": "Failed to load recommended feed, falling back or try again later"
+        },
+        {
+            "name": "yt_home_kiosk_error",
+            "value": "Ошибка запроса Kiosk, повторите позже"
+        },
+        {
+            "name": "yt_home_load_error",
+            "value": "Ошибка загрузки главной страницы, повторите позже"
+        },
+        {
+            "name": "yt_player_mode_progressive",
+            "value": "Progressive"
+        },
+        {
+            "name": "yt_player_mode_hls",
+            "value": "HLS поток"
+        },
+        {
+            "name": "yt_player_mode_dash_manifest",
+            "value": "DASH поток (Manifest)"
+        },
+        {
+            "name": "yt_player_mode_dash_track",
+            "value": "DASH дорожки (разделение аудио/видео)"
+        },
+        {
+            "name": "yt_player_default",
+            "value": "По умолчанию (Default)"
+        },
+        {
+            "name": "yt_player_step1_select_mode",
+            "value": "1. Выберите режим воспроизведения"
+        },
+        {
+            "name": "yt_player_step2_select_quality",
+            "value": "2. Выберите качество"
+        },
+        {
+            "name": "yt_player_video_quality",
+            "value": "Качество видео"
+        },
+        {
+            "name": "yt_player_step2_select_manifest",
+            "value": "2. Выберите манифест"
+        },
+        {
+            "name": "yt_player_step2_select_track",
+            "value": "2. Выберите дорожку"
+        },
+        {
+            "name": "yt_player_audio_language_type",
+            "value": "Язык / тип аудио"
+        },
+        {
+            "name": "yt_log_saved_to_downloads",
+            "value": "Сохранено в папку загрузок"
+        },
+        {
+            "name": "yt_feed_popular",
+            "value": "Популярное"
+        },
+        {
+            "name": "yt_feed_recommended",
+            "value": "Рекомендуемое"
+        },
+        {
+            "name": "yt_feed_featured",
+            "value": "Избранное"
+        },
+        {
+            "name": "yt_feed_trending",
+            "value": "В тренде"
+        },
+        {
+            "name": "yt_feed_latest",
+            "value": "Новое"
+        },
+        {
+            "name": "yt_feed_topics",
+            "value": "Темы"
+        },
+        {
+            "name": "yt_suffix_videos",
+            "value": "видео"
+        },
+        {
+            "name": "yt_suffix_shorts",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_suffix_collections",
+            "value": "подборки"
+        },
+        {
+            "name": "yt_suffix_live",
+            "value": "трансляции"
+        },
+        {
+            "name": "yt_suffix_music",
+            "value": "музыка"
+        },
+        {
+            "name": "yt_suffix_movies",
+            "value": "фильмы"
+        },
+        {
+            "name": "yt_error_no_playable_stream",
+            "value": "Не найдено доступных потоков"
+        },
+        {
+            "name": "yt_error_no_supported_stream",
+            "value": "Не найдено поддерживаемых видеопотоков"
+        },
+        {
+            "name": "new_app_name",
+            "value": "YourPipe"
+        },
+        {
+            "name": "yt_empty_no_playlists",
+            "value": "Нет плейлистов"
+        },
+        {
+            "name": "yt_search_results_from",
+            "value": "Результаты поиска для \"%s\""
+        },
+        {
+            "name": "yt_setting_stream_buffer",
+            "value": "TCP Stream Buffer"
+        },
+        {
+            "name": "yt_setting_seek_keyframe",
+            "value": "Fast Seek (Keyframe)"
+        },
+        {
+            "name": "yt_setting_seek_keyframe_subtitle",
+            "value": "Jump to nearest keyframe for faster seek response"
+        },
+        {
+            "name": "yt_setting_home_feed_after_login",
+            "value": "Home content after login"
+        },
+        {
+            "name": "yt_home_feed_recommended",
+            "value": "Recommended"
+        },
+        {
+            "name": "yt_home_feed_kiosk",
+            "value": "Live"
+        },
+        {
+            "name": "yt_option_sync_library_on_launch",
+            "value": "Синхронизация при запуске"
+        },
+        {
+            "name": "yt_option_sync_library_on_launch_subtitle",
+            "value": "При входе подтягивать историю и подписки при запуске"
+        },
+        {
+            "name": "yt_option_auth_session",
+            "value": "Signed-in browsing"
+        },
+        {
+            "name": "yt_option_sign_out",
+            "value": "Sign out"
+        },
+        {
+            "name": "yt_option_sign_out_subtitle",
+            "value": "Clear saved login credentials"
+        },
+        {
+            "name": "yt_confirm_sign_out",
+            "value": "Sign out and clear saved login credentials?"
+        }
+    ]
 }

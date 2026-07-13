@@ -14,7 +14,7 @@ export struct PlaybackToggleRow {
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.yourtube_text_primary'))
-        if (typeof this.subtitle === 'string' && this.subtitle.length > 0) {
+        if (!(typeof this.subtitle === 'string' && this.subtitle.length === 0)) {
           Text(this.subtitle)
             .fontSize(12)
             .fontColor($r('app.color.yourtube_text_quaternary'))

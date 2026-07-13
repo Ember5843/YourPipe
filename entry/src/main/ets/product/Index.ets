@@ -408,10 +408,11 @@ struct Index {
         windowClass.setWindowLayoutFullScreen(true);
         const currentColorMode = AppStorage.get<ConfigurationConstant.ColorMode>('currentColorMode');
         const isDarkMode = currentColorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+        const contentColor = isDarkMode ? '#FFFFFF' : '#000000';
         windowClass.setWindowSystemBarProperties({
-          statusBarContentColor: '#FFFFFF',
+          statusBarContentColor: contentColor,
           navigationBarColor: '#00000000',
-          navigationBarContentColor: isDarkMode ? '#FFFFFF' : '#000000'
+          navigationBarContentColor: contentColor
         });
 
         const type = window.AvoidAreaType.TYPE_SYSTEM;
@@ -447,6 +448,9 @@ struct Index {
     this.homeModeNoticeMessage = '';
     this.loadLiveVideos(true);
     this.consumePendingPlaybackContinuation();
+    if (this.uiConfig.syncUserLibraryOnLaunch !== false) {
+      this.syncUserLibraryAfterLogin();
+    }
   }
 
   private refreshHomeAfterAuthChange(): void {
@@ -499,6 +503,64 @@ struct Index {
 
   private syncSubscriptionsToStorage(): void {
     PreferencesStore.setString('subscriptionsJson', LocalStore.saveSubscriptions(this.subscriptions));
+  }
+
+  /** 登录后用 cookie 同步云端历史 + 订阅频道列表（不阻塞首页）。 */
+  private async syncUserLibraryAfterLogin(): Promise<void> {
+    if (AuthSessionManager.getInstance()?.isSignedIn() !== true) {
+      return;
+    }
+    try {
+      const library = FeedServiceProvider.getInstance().getUserLibraryService();
+      try {
+        const historyPage = await library.fetchWatchHistory(1);
+        if (historyPage.items.length > 0) {
+          WatchHistoryStore.mergeRemoteHistory(library.toWatchHistoryItems(historyPage.items));
+          this.watchHistory = WatchHistoryStore.getAll();
+        }
+      } catch (historyErr) {
+        logger.error('syncUserLibrary history failed:', JSON.stringify(historyErr));
+      }
+      try {
+        const channels = await library.fetchSubscribedChannels();
+        if (channels.length > 0) {
+          const map: Record<string, SubscriptionUser> = {};
+          this.subscriptions.forEach((item) => {
+            map[item.channelId] = item;
+          });
+          channels.forEach((item) => {
+            const id = (item.channelId || '').trim();
+            if (!id) {
+              return;
+            }
+            const prev = map[id];
+            if (prev) {
+              map[id] = new SubscriptionUser(
+                id,
+                item.displayName || prev.displayName,
+                item.avatarUrl || prev.avatarUrl,
+                item.subscriberText || prev.subscriberText,
+                item.videoCountText || prev.videoCountText,
+                item.description || prev.description,
+                item.thumbnailColor || prev.thumbnailColor
+              );
+            } else {
+              map[id] = item;
+            }
+          });
+          const merged: SubscriptionUser[] = [];
+          Object.keys(map).forEach((key) => {
+            merged.push(map[key]);
+          });
+          this.subscriptions = merged;
+          this.syncSubscriptionsToStorage();
+        }
+      } catch (channelErr) {
+        logger.error('syncUserLibrary channels failed:', JSON.stringify(channelErr));
+      }
+    } catch (err) {
+      logger.error('syncUserLibraryAfterLogin failed:', JSON.stringify(err));
+    }
   }
 
   private loadFavoritesFromStorage(): void {
@@ -1440,6 +1502,7 @@ struct Index {
                     HomeRecommendSwiper({
                       videos: this.getHomeBannerVideos()
                     })
+                      .transition(customAnimationUtil.isScaleTran('home_recommend_banner', this.uiConfig))
                   }
                   GridRow({
                     columns: this.getVideoGridColumnCount(),
@@ -1480,6 +1543,7 @@ struct Index {
                     })
                   }
                   .padding({ left: 12, right: 12, bottom: 8 })
+                  .transition(customAnimationUtil.isScaleTran('home_recommend_banner', this.uiConfig))
                 }
                 ForEach(this.getHomeListVideos(), (item: VideoItem) => {
                   ListItem() {
@@ -1671,6 +1735,7 @@ struct Index {
           onSuccess: () => {
             AuthStateHelper.refresh();
             this.refreshHomeAfterAuthChange();
+            this.syncUserLibraryAfterLogin();
             this.popOptionsPath();
           },
           onCancel: () => { this.popOptionsPath(); },

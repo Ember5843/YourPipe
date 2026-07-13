@@ -111,6 +111,83 @@ export class WatchHistoryStore {
     WatchHistoryStore.syncToAppStorage();
   }
 
+  /**
+   * 单向合并云端历史：
+   * - 已有本地条目：保留 lastWatchedAt / progress / duration，只补全元数据
+   * - 仅云端有的条目：按云端顺序用递减时间戳写入（避免全部变成「刚刚」）
+   * - 最终按 lastWatchedAt 降序，避免每次同步把列表顶到最前覆盖本地顺序
+   */
+  static mergeRemoteHistory(remote: WatchHistoryItem[]): void {
+    if (!remote || remote.length === 0) {
+      return;
+    }
+    const local = WatchHistoryStore.getAll();
+    const localMap: Record<string, WatchHistoryItem> = {};
+    local.forEach((item) => {
+      localMap[item.videoId] = item;
+    });
+    const merged: WatchHistoryItem[] = [];
+    const seen: Record<string, boolean> = {};
+    const now = Date.now();
+    // 新云端条目之间间隔 1 分钟，且整体落在「比现有本地最旧还更旧」一侧，避免冲到顶部。
+    let oldestLocal = now;
+    local.forEach((item) => {
+      if (item.lastWatchedAt > 0 && item.lastWatchedAt < oldestLocal) {
+        oldestLocal = item.lastWatchedAt;
+      }
+    });
+    const newBase = Math.min(now - 60_000, oldestLocal - 60_000);
+    let newIndex = 0;
+
+    remote.forEach((item) => {
+      const id = (item.videoId || '').trim();
+      if (!id || seen[id]) {
+        return;
+      }
+      seen[id] = true;
+      const prev = localMap[id];
+      if (prev) {
+        const next: WatchHistoryItem = {
+          videoId: id,
+          title: (item.title && item.title.length > 0) ? item.title : prev.title,
+          author: (item.author && item.author.length > 0) ? item.author : prev.author,
+          thumbnailUrl: (item.thumbnailUrl && item.thumbnailUrl.length > 0) ? item.thumbnailUrl : prev.thumbnailUrl,
+          durationSec: prev.durationSec > 0 ? prev.durationSec : (item.durationSec || 0),
+          progressSec: prev.progressSec,
+          lastWatchedAt: prev.lastWatchedAt > 0 ? prev.lastWatchedAt : (item.lastWatchedAt || now),
+          channelId: prev.channelId || item.channelId || '',
+          channelAvatarUrl: prev.channelAvatarUrl || item.channelAvatarUrl || '',
+          channelHandle: prev.channelHandle || item.channelHandle || ''
+        };
+        merged.push(next);
+      } else {
+        const next: WatchHistoryItem = {
+          videoId: id,
+          title: item.title || id,
+          author: item.author || '',
+          thumbnailUrl: item.thumbnailUrl || '',
+          durationSec: item.durationSec || 0,
+          progressSec: 0,
+          lastWatchedAt: newBase - newIndex * 60_000,
+          channelId: item.channelId || '',
+          channelAvatarUrl: item.channelAvatarUrl || '',
+          channelHandle: item.channelHandle || ''
+        };
+        newIndex += 1;
+        merged.push(next);
+      }
+    });
+
+    local.forEach((item) => {
+      if (!seen[item.videoId]) {
+        merged.push(item);
+      }
+    });
+
+    merged.sort((a: WatchHistoryItem, b: WatchHistoryItem) => b.lastWatchedAt - a.lastWatchedAt);
+    WatchHistoryStore.replaceAll(merged);
+  }
+
   /** 从 Preferences 加载并同步到 AppStorage（用于应用启动时初始化） */
   static loadToAppStorage(): void {
     const all = WatchHistoryStore.getAll();

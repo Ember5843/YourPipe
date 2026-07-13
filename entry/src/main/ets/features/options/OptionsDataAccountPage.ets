@@ -364,10 +364,26 @@ export struct OptionsDataAccountPage {
               }
             })
           }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_option_sync_library_on_launch'),
+              subtitle: $r('app.string.yt_option_sync_library_on_launch_subtitle'),
+              isOn: this.uiConfig.syncUserLibraryOnLaunch !== false,
+              themeColor: this.themePrimary,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updateUiConfig(cfg => {
+                  cfg.syncUserLibraryOnLaunch = val;
+                });
+              }
+            })
+          }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .borderRadius(16)
         .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_section_data_management') })

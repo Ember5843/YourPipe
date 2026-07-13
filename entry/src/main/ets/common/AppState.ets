@@ -25,6 +25,8 @@ export class UIConfig {
   homeLayoutMode: string = 'list';
   /** After login: 'recommended' | 'kiosk'. Signed-out always uses kiosk. */
   homeFeedStyle: string = 'recommended';
+  /** When signed in: pull cloud history + subscription list on app launch (one-way). */
+  syncUserLibraryOnLaunch: boolean = true;
   maxConcurrentDownloads: number = 1;
   constructor() {
   }
@@ -43,6 +45,7 @@ export class UIConfig {
     next.enableLogger = this.enableLogger;
     next.homeLayoutMode = this.homeLayoutMode;
     next.homeFeedStyle = this.homeFeedStyle;
+    next.syncUserLibraryOnLaunch = this.syncUserLibraryOnLaunch;
     next.maxConcurrentDownloads = this.maxConcurrentDownloads;
     return next;
   }
@@ -67,6 +70,8 @@ export class UIConfig {
     config.homeFeedStyle = UIConfig.normalizeHomeFeedStyle(
       PreferencesStore.getString('cfg_homeFeedStyle', 'recommended')
     );
+    config.syncUserLibraryOnLaunch =
+      PreferencesStore.getString('cfg_syncUserLibraryOnLaunch', 'true') !== 'false';
     const maxConcurrentDownloads = parseInt(PreferencesStore.getString('cfg_maxConcurrentDownloads', '1'), 10);
     config.maxConcurrentDownloads = Number.isFinite(maxConcurrentDownloads)
       ? Math.max(1, Math.min(4, maxConcurrentDownloads))
@@ -86,6 +91,10 @@ export class UIConfig {
     PreferencesStore.setString('cfg_enableLogger', config.enableLogger ? 'true' : 'false');
     PreferencesStore.setString('cfg_homeLayoutMode', config.homeLayoutMode);
     PreferencesStore.setString('cfg_homeFeedStyle', UIConfig.normalizeHomeFeedStyle(config.homeFeedStyle));
+    PreferencesStore.setString(
+      'cfg_syncUserLibraryOnLaunch',
+      config.syncUserLibraryOnLaunch !== false ? 'true' : 'false'
+    );
     PreferencesStore.setString('cfg_maxConcurrentDownloads', `${Math.max(1, Math.min(4, Math.round(config.maxConcurrentDownloads || 1)))}`);
   }
 }

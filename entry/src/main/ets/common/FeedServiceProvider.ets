@@ -3,6 +3,7 @@ import { SearchService } from '../features/home/SearchService';
 import { PlaylistService } from '../features/home/PlaylistService';
 import { ChannelService } from '../features/home/ChannelService';
 import { SearchSuggestionService } from '../features/home/SearchSuggestionService';
+import { UserLibraryService } from '../features/user/UserLibraryService';
 import { SearchLocaleManager } from './SearchLocaleManager';
 
 export class FeedServiceProvider {
@@ -12,6 +13,7 @@ export class FeedServiceProvider {
   private playlistService: PlaylistService | null = null;
   private channelService: ChannelService | null = null;
   private searchSuggestionService: SearchSuggestionService | null = null;
+  private userLibraryService: UserLibraryService | null = null;
   private lastLanguage: string = '';
   private lastCountry: string = '';
 
@@ -32,6 +34,7 @@ export class FeedServiceProvider {
       this.playlistService = new PlaylistService(locale.localization, locale.contentCountry);
       this.channelService = new ChannelService(locale.localization, locale.contentCountry);
       this.searchSuggestionService = new SearchSuggestionService(locale.localization, locale.contentCountry);
+      this.userLibraryService = new UserLibraryService(locale.localization, locale.contentCountry);
       this.lastLanguage = lang;
       this.lastCountry = country;
     }
@@ -62,11 +65,17 @@ export class FeedServiceProvider {
     return this.searchSuggestionService!;
   }
 
+  getUserLibraryService(): UserLibraryService {
+    this.ensureServices();
+    return this.userLibraryService!;
+  }
+
   invalidate(): void {
     this.homeFeedService = null;
     this.searchService = null;
     this.playlistService = null;
     this.channelService = null;
     this.searchSuggestionService = null;
+    this.userLibraryService = null;
   }
 }
