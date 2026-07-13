@@ -25,6 +25,8 @@ import { PlayerSession } from '../../../common/PlayerSession';
 import { PlayerPresentation } from '../../../common/PlayerPresentation';
 import { PiPManager } from '../pip/PiPManager';
 import { PlayerUiViewModel } from 'mediaservice';
+import { MediaThumb } from '../../../common/components/MediaThumb';
+import { VideoItem } from 'youtube_core';
 
 const TAG: string = '[PlayerLog][VideoPlayer]';
 
@@ -48,6 +50,9 @@ export struct VideoPlayer {
   @Prop @Watch('calculateSurfaceSize') isFullLandscapeScreen: boolean = false;
   @StorageProp('playerPageVisible') @Watch('onPageVisibilityChange') isPageShow: boolean = false;
   @StorageProp('isAppBackground') @Watch('onPageVisibilityChange') isAppBackground: boolean = false;
+  /** 会话级仅音频：封面层在播控之下，不挡进度条/手势 */
+  @StorageLink('isAudioOnlyMode') isAudioOnlyMode: boolean = false;
+  @StorageProp('selectedVideo') selectedVideo: VideoItem | null = null;
   @Prop index: number = 0;
   @Link @Watch('onSourceChange') curSource: VideoData;
   @Prop @Watch('onIndexChange') curIndex: number = CommonConstants.CURINDEX_DEFAULT_NUM;
@@ -658,6 +663,34 @@ export struct VideoPlayer {
     return topInset + this.ctrlVPad;
   }
 
+  @Builder
+  AudioOnlyCoverLayer() {
+    Stack({ alignContent: Alignment.Center }) {
+      if (this.selectedVideo) {
+        MediaThumb({
+          imageUrl: this.selectedVideo.thumbnailUrl || '',
+          placeholderColor: this.selectedVideo.thumbnailColor || '#000000',
+          thumbId: 'audio_only_thumb_' + this.selectedVideo.id,
+          fillParent: true,
+          borderRadiusVp: 0
+        })
+          .brightness(0.4)
+      } else {
+        Rect()
+          .width('100%')
+          .height('100%')
+          .fill(Color.Black)
+      }
+      SymbolGlyph($r('sys.symbol.speaker_wave_2_fill'))
+        .fontSize(48)
+        .fontColor([Color.White])
+    }
+    .width('100%')
+    .height('100%')
+    .hitTestBehavior(HitTestMode.None)
+    .zIndex(CommonConstants.Z_INDEX_BASE + 0.5)
+  }
+
   build() {
     Stack({ alignContent: Alignment.Center }) {
       // 1. 渲染层（XComponent SURFACE 直渲）
@@ -694,6 +727,11 @@ export struct VideoPlayer {
           }
         })
         .zIndex(CommonConstants.Z_INDEX_BASE)
+
+      // 仅音频封面：叠在 surface 上、播控下；None 穿透保证进度条/双击可点
+      if (this.isAudioOnlyMode) {
+        this.AudioOnlyCoverLayer()
+      }
 
       // 加载中/缓冲提示层
       if (this.vm.isBuffering) {

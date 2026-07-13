@@ -350,14 +350,19 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   setVideoOutputEnabled(enabled: boolean): void {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
-    if (enabled === this.videoOutputOn) return;
+    const force = enabled !== this.videoOutputOn;
     this.videoOutputOn = enabled;
+    // Always push property: after load, media defaults may ignore prior vid=no.
     if (enabled) {
       ctrl.setProperty('vid', 'auto');
-      Logger.info(TAG, 'video output ON (vid=auto)');
+      if (force) {
+        Logger.info(TAG, 'video output ON (vid=auto)');
+      }
     } else {
       ctrl.setProperty('vid', 'no');
-      Logger.info(TAG, 'video output OFF (vid=no)');
+      if (force) {
+        Logger.info(TAG, 'video output OFF (vid=no)');
+      }
     }
   }
 
@@ -436,6 +441,12 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // EDL + delay_open 场景：loadfile 后重新绑定 surface（surface ID 可能已变化）
     if (this.surfaceId.length > 0 && this.controller !== null) {
       this.bindSurface(this.controller, this.surfaceId);
+    }
+
+    // Re-apply audio-only / video-off preference after new media is prepared.
+    if (!this.videoOutputOn && this.controller !== null) {
+      this.controller.setProperty('vid', 'no');
+      Logger.info(TAG, 'video output re-OFF after ready (vid=no)');
     }
 
     if (!this.isLive) {

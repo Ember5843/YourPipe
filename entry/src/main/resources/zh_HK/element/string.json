@@ -1,4 +1,4 @@
-﻿{
+{
     "string": [
         {
             "name": "yt_tab_home",
@@ -1027,7 +1027,11 @@
         {
             "name": "yt_confirm_sign_out",
             "value": "確認退出登入？將清除已儲存的登入資訊。"
-        }
-    ]
+        },
+                    {
+                        "name":  "yt_action_audio_only",
+                        "value":  "僅音訊"
+                    }
+                    ]
 }
 

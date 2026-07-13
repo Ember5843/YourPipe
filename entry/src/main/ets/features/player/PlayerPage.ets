@@ -97,6 +97,8 @@ export struct VideoPlayerPage {
   @State isLoading: boolean = false;
   /** 画中画是否激活（订阅 PlayerSession.isPiPActive → 显示占位层） */
   @StorageLink('isPiPActive') isPiPActive: boolean = false;
+  /** 会话级仅音频：封面 + 耳机层，禁止 PiP */
+  @StorageLink('isAudioOnlyMode') @Watch('onAudioOnlyModeChange') isAudioOnlyMode: boolean = false;
   /** 播放设置（含 pipOnReturn） */
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageProp('isAppBackground') @Watch('onAppBackgroundChange') isAppBackground: boolean = false;
@@ -474,17 +476,29 @@ export struct VideoPlayerPage {
 
   onPageShow(): void {
     this.isPageShow = true;
-
-    // 页面可见时：若开启 pipOnReturn 且设备支持，允许 home 键自动启动 PiP
-    const pip = PiPManager.getInstance();
-    if (pip.isPiPSupported() && this.playbackConfig.pipOnReturn) {
-      pip.setAutoStart(true);
-    }
+    this.syncPiPAutoStart();
 
     const session = PlayerSession.getInstance();
     if (session.isReleased && this.video) {
       logger.info(`${TAG} Session was released while hidden, reloading video`);
       this.onVideoChange();
+    }
+  }
+
+  private onAudioOnlyModeChange(): void {
+    this.syncPiPAutoStart();
+  }
+
+  /** pipOnReturn + 页可见 + 非仅音频 → 允许 Home 自动 PiP */
+  private syncPiPAutoStart(): void {
+    const pip = PiPManager.getInstance();
+    if (this.isPageShow
+      && pip.isPiPSupported()
+      && this.playbackConfig.pipOnReturn
+      && !this.isAudioOnlyMode) {
+      pip.setAutoStart(true);
+    } else {
+      pip.setAutoStart(false);
     }
   }
 

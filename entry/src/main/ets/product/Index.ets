@@ -92,7 +92,7 @@ import {
 } from '../features/player/PlaybackContinuationService';
 
 const logger = AppLog.getInstance('Index');
-const APP_VERSION = '0.5.1';
+const APP_VERSION = '0.5.2';
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 
 
@@ -1442,15 +1442,17 @@ struct Index {
           const session = PlayerSession.getInstance();
           const pip = PiPManager.getInstance();
           // 返回键进入画中画：pipOnReturn 且设备支持且 PiP 已初始化且未激活且播放器处于可播状态
+          // 仅音频会话：禁止 PiP，任何返回直接 release。
           const canEnterPiP = this.playbackConfig.pipOnReturn
             && pip.isPiPSupported()
             && pip.isReady
             && !session.isPiPActive
+            && !session.isAudioOnlyMode
             && (session.playerState === PlayerState.PLAYING
               || session.playerState === PlayerState.PAUSED
               || session.playerState === PlayerState.BUFFERING
               || session.playerState === PlayerState.READY);
-          logger.info(`onBackPressed canEnterPiP=${canEnterPiP} | pipOnReturn=${this.playbackConfig.pipOnReturn} supported=${pip.isPiPSupported()} isReady=${pip.isReady} isPiPActive=${session.isPiPActive} state=${session.playerState}`);
+          logger.info(`onBackPressed canEnterPiP=${canEnterPiP} | pipOnReturn=${this.playbackConfig.pipOnReturn} supported=${pip.isPiPSupported()} isReady=${pip.isReady} isPiPActive=${session.isPiPActive} audioOnly=${session.isAudioOnlyMode} state=${session.playerState}`);
           if (canEnterPiP) {
             // 返回 = 弹 PiP：先锁定 PIP 呈现态（视频保持 ON），再 startPiP + pop。
             PlayerPresentation.onPipStarted();

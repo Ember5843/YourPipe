@@ -45,6 +45,11 @@ export class PlayerSession {
   private _pendingAutoPlay: boolean | null = null;
   /** 画中画是否激活（由 PiPManager.onStateChange 设置） */
   private _isPiPActive: boolean = false;
+  /**
+   * 会话级「仅音频」：关视频轨 + 页内封面层。
+   * 不写 Preferences；release / forceReset 时清除。
+   */
+  private _isAudioOnlyMode: boolean = false;
   /** release() 时调用，用于停止 PiP（避免循环 import，由 PiPManager 注入） */
   onStopPiP: (() => Promise<void>) | null = null;
 
@@ -125,6 +130,44 @@ export class PlayerSession {
       AppStorage.setOrCreate('isPiPActive', active);
       logger.info(`${TAG} isPiPActive=${active}`);
     }
+  }
+
+  get isAudioOnlyMode(): boolean {
+    return this._isAudioOnlyMode;
+  }
+
+  /**
+   * 切换会话级仅音频：立刻 vid on/off；AppStorage 供播放页封面层订阅。
+   * 不处理 PiP autoStart（由 PlayerPage 根据 isAudioOnlyMode 守卫）。
+   */
+  setAudioOnlyMode(enabled: boolean): void {
+    if (this._isAudioOnlyMode === enabled) {
+      return;
+    }
+    this._isAudioOnlyMode = enabled;
+    AppStorage.setOrCreate('isAudioOnlyMode', enabled);
+    logger.info(`${TAG} isAudioOnlyMode=${enabled}`);
+    try {
+      this._controller.setVideoOutputEnabled(!enabled);
+    } catch (e) {
+      logger.warn(`${TAG} setVideoOutputEnabled on audio-only failed: ${e}`);
+    }
+    if (enabled && this._isPiPActive && this.onStopPiP) {
+      this.onStopPiP().catch((err: Error) => {
+        logger.warn(`${TAG} stopPiP on audio-only failed: ${err.message}`);
+      });
+      this.setPiPActive(false);
+    }
+  }
+
+  private clearAudioOnlyMode(): void {
+    if (!this._isAudioOnlyMode) {
+      AppStorage.setOrCreate('isAudioOnlyMode', false);
+      return;
+    }
+    this._isAudioOnlyMode = false;
+    AppStorage.setOrCreate('isAudioOnlyMode', false);
+    logger.info(`${TAG} isAudioOnlyMode cleared`);
   }
 
   setContinuationRestoreOptions(progressSec: number, shouldPlay: boolean): void {
@@ -496,6 +539,7 @@ export class PlayerSession {
       });
       this.setPiPActive(false);
     }
+    this.clearAudioOnlyMode();
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
     this._controller.releaseVideo(0);
@@ -524,6 +568,7 @@ export class PlayerSession {
     // 清 PiP 激活状态：避免会话在 PiP 激活时被 reset 后，_isPiPActive / AppStorage.isPiPActive
     // 残留为 true，导致占位层显示残留或返回键误判已在 PiP。
     this.setPiPActive(false);
+    this.clearAudioOnlyMode();
     this._defaultSource = {
       name: $r('app.string.module_desc'),
       description: '',

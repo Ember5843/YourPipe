@@ -7,8 +7,9 @@ const TAG = '[PlayerPresentation]';
 /**
  * Presentation mode for video on/off (separate from PlayerState).
  *
- * PAGE / OVERLAY / PIP → video always ON
+ * PAGE / OVERLAY / PIP → video ON unless session audio-only
  * BACKGROUND → may turn video OFF after delay (backgroundAudioOnly)
+ * Session audio-only → video always OFF (even on PAGE / ability FG)
  *
  * Never arms video-off from page hide alone. Never touches load/seek.
  */
@@ -66,7 +67,7 @@ export class PlayerPresentation {
     Logger.info(TAG, `beginOverlay hold=${PlayerPresentation.overlayHold} (${reason})`);
     PlayerPresentation.cancelOffTimer();
     PlayerPresentation.mode = PresentationMode.OVERLAY;
-    PlayerPresentation.ensureVideoOn(`overlay:${reason}`);
+    PlayerPresentation.syncVideoForMode(`overlay:${reason}`);
   }
 
   static endOverlay(reason: string): void {
@@ -84,7 +85,7 @@ export class PlayerPresentation {
     }
   }
 
-  /** Page show/hide: never schedule off; only re-sync video ON when foreground. */
+  /** Page show/hide: never schedule off; only re-sync video when foreground. */
   static onPlayerPageVisibility(visible: boolean): void {
     if (!visible) return;
     if (AppStorage.get<boolean>('isAppBackground') === true) return;
@@ -93,7 +94,22 @@ export class PlayerPresentation {
     if (PlayerPresentation.mode !== PresentationMode.OVERLAY) {
       PlayerPresentation.mode = PresentationMode.PAGE;
     }
-    PlayerPresentation.ensureVideoOn('page-visible-fg');
+    PlayerPresentation.syncVideoForMode('page-visible-fg');
+  }
+
+  /** Session audio-only toggled while staying in current presentation mode. */
+  static onAudioOnlyModeChanged(enabled: boolean): void {
+    Logger.info(TAG, `onAudioOnlyModeChanged=${enabled} mode=${PlayerPresentation.mode}`);
+    if (enabled) {
+      PlayerPresentation.cancelOffTimer();
+      PlayerPresentation.applyVideoOff('session-audio-only');
+      return;
+    }
+    // Leaving audio-only: re-apply mode policy (PAGE/PIP/OVERLAY → on; BACKGROUND → arm delay).
+    PlayerPresentation.syncVideoForMode('session-audio-only-off');
+    if (PlayerPresentation.mode === PresentationMode.BACKGROUND) {
+      PlayerPresentation.armBackgroundVideoOff();
+    }
   }
 
   private static enter(next: PresentationMode, reason: string): void {
@@ -105,7 +121,7 @@ export class PlayerPresentation {
       case PresentationMode.OVERLAY:
       case PresentationMode.PIP:
         PlayerPresentation.cancelOffTimer();
-        PlayerPresentation.ensureVideoOn(reason);
+        PlayerPresentation.syncVideoForMode(reason);
         break;
       case PresentationMode.BACKGROUND:
         PlayerPresentation.armBackgroundVideoOff();
@@ -114,6 +130,11 @@ export class PlayerPresentation {
   }
 
   private static armBackgroundVideoOff(): void {
+    // Session audio-only already keeps video off; no need to schedule.
+    if (PlayerSession.getInstance().isAudioOnlyMode) {
+      PlayerPresentation.applyVideoOff('background-session-audio-only');
+      return;
+    }
     const pb = AppStorage.get<PlaybackConfig>('playbackConfig') ?? new PlaybackConfig();
     if (!pb.backgroundAudioOnly) {
       Logger.info(TAG, 'background: audio-only disabled');
@@ -140,12 +161,7 @@ export class PlayerPresentation {
     if (PlayerPresentation.mode !== PresentationMode.BACKGROUND) return;
     if (AppStorage.get<boolean>('isAppBackground') !== true) return;
     if (AppStorage.get<boolean>('isPiPActive') === true || PlayerPresentation.overlayHold > 0) return;
-    try {
-      PlayerSession.getInstance().controller.setVideoOutputEnabled(false);
-      Logger.info(TAG, 'video OFF (BACKGROUND audio-only)');
-    } catch (_e) {
-      // no session
-    }
+    PlayerPresentation.applyVideoOff('BACKGROUND audio-only');
   }
 
   private static cancelOffTimer(): void {
@@ -155,7 +171,29 @@ export class PlayerPresentation {
     }
   }
 
+  /** PAGE / OVERLAY / PIP want video ON unless session audio-only. */
+  private static syncVideoForMode(reason: string): void {
+    if (PlayerSession.getInstance().isAudioOnlyMode) {
+      PlayerPresentation.applyVideoOff(`audio-only:${reason}`);
+      return;
+    }
+    PlayerPresentation.ensureVideoOn(reason);
+  }
+
+  private static applyVideoOff(reason: string): void {
+    try {
+      PlayerSession.getInstance().controller.setVideoOutputEnabled(false);
+      Logger.info(TAG, `video OFF (${reason})`);
+    } catch (_e) {
+      // no session
+    }
+  }
+
   private static ensureVideoOn(reason: string): void {
+    if (PlayerSession.getInstance().isAudioOnlyMode) {
+      Logger.info(TAG, `skip video ON (audio-only) (${reason})`);
+      return;
+    }
     try {
       PlayerSession.getInstance().controller.setVideoOutputEnabled(true);
       Logger.info(TAG, `video ON (${reason})`);

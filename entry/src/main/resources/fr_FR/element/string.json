@@ -1,4 +1,4 @@
-﻿{
+{
     "string": [
         {
             "name": "module_desc",
@@ -1027,7 +1027,11 @@
         {
             "name": "yt_confirm_sign_out",
             "value": "Se deconnecter et effacer les identifiants enregistres ?"
-        }
-    ]
+        },
+                    {
+                        "name":  "yt_action_audio_only",
+                        "value":  "Audio uniquement"
+                    }
+                    ]
 }
 

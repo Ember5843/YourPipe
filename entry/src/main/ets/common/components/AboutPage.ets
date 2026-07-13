@@ -5,8 +5,8 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 
-const APP_VERSION = '0.5.1';
-const APP_BUILD = '1000010';
+const APP_VERSION = '0.5.2';
+const APP_BUILD = '1000011';
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
 
@@ -39,6 +39,16 @@ const AI_MODELS: string[] = [
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.5.2', date: '2026-07-13',
+    changes: [
+      '将「后台播放」改为会话级「仅音频」开关',
+      '仅音频时显示暗化封面与音频图标，可继续调进度与播控',
+      '仅音频时禁止画中画；返回播放页结束会话',
+      '回前台不自动恢复视频，需手动关闭仅音频',
+      '切歌保持仅音频；会话释放后重置',
+    ],
+  },
   {
     version: '0.5.1', date: '2026-06-23',
     changes: [

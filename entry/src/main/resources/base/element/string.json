@@ -1,4 +1,4 @@
-﻿{
+{
     "string":  [
                    {
                        "name":  "module_desc",
@@ -1367,7 +1367,11 @@
                    {
                        "name":  "yt_confirm_sign_out",
                        "value":  "确认退出登录？将清除已保存的登录信息。"
-                   }
-               ]
+                   },
+                    {
+                        "name":  "yt_action_audio_only",
+                        "value":  "仅音频"
+                    }
+                    ]
 }
 

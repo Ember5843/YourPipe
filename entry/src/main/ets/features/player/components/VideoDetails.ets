@@ -75,6 +75,8 @@ export struct VideoDetails {
   @State descSkeletonOpacity: number = 0.3;
   @State showSavePlaylistSheet: boolean = false;
   @State showStreamInfoSheet: boolean = false;
+  /** 会话级仅音频（封面层 + 关视频轨） */
+  @StorageLink('isAudioOnlyMode') isAudioOnlyMode: boolean = false;
 
   // ── mpv 实时播放流信息（由 PlayerPage 从 vm 传入）──
   @Prop mpvVideoWidth: number = 0;
@@ -462,8 +464,7 @@ export struct VideoDetails {
           '流媒体信息', () => { this.showStreamInfoSheet = true; })
         this.ActionButton($r('sys.symbol.bookmark'),
           '保存到播放列表', () => { this.showSavePlaylistSheet = true; })
-        this.ActionButton($r('sys.symbol.play_circle'),
-          '后台播放', () => { this.moveToBackground(); })
+        this.AudioOnlyActionButton()
         this.ActionButton($r('sys.symbol.share'),
           '分享', () => { this.shareVideo(); })
       }
@@ -473,6 +474,35 @@ export struct VideoDetails {
     .width('100%')
     .height(36)
     .margin({ bottom: 14 })
+  }
+
+  @Builder
+  AudioOnlyActionButton() {
+    Button() {
+      Row({ space: 6 }) {
+        SymbolGlyph(this.isAudioOnlyMode
+          ? $r('sys.symbol.speaker_wave_2_fill')
+          : $r('sys.symbol.speaker_wave_2'))
+          .fontSize(14)
+          .fontColor([this.isAudioOnlyMode
+            ? this.themePrimary
+            : $r('app.color.yourtube_text_primary')])
+        Text($r('app.string.yt_action_audio_only'))
+          .fontSize(13)
+          .fontColor(this.isAudioOnlyMode
+            ? this.themePrimary
+            : $r('app.color.yourtube_text_primary'))
+          .fontWeight(FontWeight.Medium)
+      }
+    }
+    .height(36)
+    .backgroundColor(this.isAudioOnlyMode
+      ? $r('app.color.yourtube_bg_surface_muted')
+      : $r('app.color.yourtube_bg_surface'))
+    .borderRadius(18)
+    .padding({ left: 14, right: 14 })
+    .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+    .onClick(() => { this.toggleAudioOnlyMode(); })
   }
 
   @Builder
@@ -746,13 +776,12 @@ export struct VideoDetails {
     .width('100%')
   }
 
-  private moveToBackground(): void {
-    // 回到桌面保活：不碰 vo，不弹画中画，mpv 持续渲染，音频继续播放。
-    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    ctx.moveAbilityToBackground().catch((e: Error) => {
-      Logger.error(TAG, `moveAbilityToBackground failed: ${e.message}`);
-      this.getUIContext().getPromptAction().showToast({ message: '回到桌面失败' });
-    });
+  private toggleAudioOnlyMode(): void {
+    const session = PlayerSession.getInstance();
+    const next = !session.isAudioOnlyMode;
+    session.setAudioOnlyMode(next);
+    // Presentation owns delayed BACKGROUND off-timer + FG re-sync policy.
+    PlayerPresentation.onAudioOnlyModeChanged(next);
   }
 
   private openCastPicker(): void {

@@ -1,4 +1,4 @@
-﻿{
+{
     "string":  [
                    {
                        "name":  "yt_tab_home",
@@ -1091,7 +1091,11 @@
                    {
                        "name":  "yt_confirm_sign_out",
                        "value":  "Sign out and clear saved login credentials?"
-                   }
-               ]
+                   },
+                    {
+                        "name":  "yt_action_audio_only",
+                        "value":  "Audio only"
+                    }
+                    ]
 }
 

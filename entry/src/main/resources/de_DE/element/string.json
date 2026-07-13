@@ -1,4 +1,4 @@
-﻿{
+{
     "string": [
         {
             "name": "module_desc",
@@ -1011,7 +1011,11 @@
         {
             "name": "yt_confirm_sign_out",
             "value": "Abmelden und gespeicherte Anmeldedaten loeschen?"
-        }
-    ]
+        },
+                    {
+                        "name":  "yt_action_audio_only",
+                        "value":  "Nur Audio"
+                    }
+                    ]
 }
 

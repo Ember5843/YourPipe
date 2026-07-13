@@ -488,14 +488,29 @@ export class AvPlayerController {
   private videoOutputEnabled: boolean = true;
 
   public setVideoOutputEnabled(enabled: boolean): void {
-    if (this.videoOutputEnabled === enabled) return;
+    // Always remember desired flag (session audio-only survives load/LOADING).
+    const changed = this.videoOutputEnabled !== enabled;
+    this.videoOutputEnabled = enabled;
+    if (!this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING, PlayerState.PAUSED,
+      PlayerState.BUFFERING, PlayerState.COMPLETED)) {
+      if (changed) {
+        Logger.info(TAG, `setVideoOutputEnabled=${enabled} (deferred until ready)`);
+      }
+      return;
+    }
+    this.playbackEngine.setVideoOutputEnabled(enabled);
+    if (changed) {
+      Logger.info(TAG, `setVideoOutputEnabled=${enabled}`);
+    }
+  }
+
+  /** Re-apply session video on/off after load/ready (new media defaults to vid on). */
+  private applyVideoOutputPreference(): void {
     if (!this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING, PlayerState.PAUSED,
       PlayerState.BUFFERING, PlayerState.COMPLETED)) {
       return;
     }
-    this.videoOutputEnabled = enabled;
-    this.playbackEngine.setVideoOutputEnabled(enabled);
-    Logger.info(TAG, `setVideoOutputEnabled=${enabled}`);
+    this.playbackEngine.setVideoOutputEnabled(this.videoOutputEnabled);
   }
 
 
@@ -514,6 +529,7 @@ export class AvPlayerController {
     this.avSessionManager.destroy();
     this.detachBackgroundTaskListener();
     this.resetPlaybackState();
+    this.videoOutputEnabled = true;
     this.lastUpdatedSourceRef = null;
     this.lastUpdatedVideoId = '';
     this.errorListeners = [];
@@ -1087,6 +1103,11 @@ export class AvPlayerController {
       this.pendingDestroySessionId = '';
     }
 
+    // 仅音频等：load 后引擎可能回到默认 vid=auto，就绪时重放期望值
+    if (state.isReady) {
+      this.applyVideoOutputPreference();
+    }
+
     // 错误监听（手动，需要特殊处理）
     const errorChanged = prevErrorMsg !== state.errorMsg;
     if (errorChanged && state.errorMsg) {
@@ -1099,7 +1120,7 @@ export class AvPlayerController {
 
   private resetPlaybackState(): void {
     this.vm.reset();
-    this.videoOutputEnabled = true;
+    // Keep videoOutputEnabled: session audio-only must survive source switch.
     this.lastKnownGoodPosition = 0;
     this.waitingForBufferListeners.forEach(l => l(false));
     this.errorListeners.forEach(l => l(''));
