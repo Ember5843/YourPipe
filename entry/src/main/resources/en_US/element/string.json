@@ -1,4 +1,4 @@
-{
+﻿{
     "string":  [
                    {
                        "name":  "yt_tab_home",
@@ -627,7 +627,11 @@
                    {
                        "name":  "yt_label_like",
                        "value":  "Like"
-                   },
+                   }        ,
+        {
+            "name": "yt_label_dislike",
+            "value": "Dislike"
+        },
                    {
                        "name":  "yt_tab_videos",
                        "value":  "Videos"
@@ -1090,3 +1094,4 @@
                    }
                ]
 }
+

@@ -7,6 +7,18 @@ import { UIConfig } from '../../common/AppState';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { DownloadPage } from './DownloadPage';
 import { MediaThumb } from '../../common/components/MediaThumb';
+import {
+  MEDIA_CARD_RADIUS,
+  MEDIA_CARD_SHADOW_OFFSET_Y,
+  MEDIA_CARD_SHADOW_RADIUS,
+  MEDIA_LIST_THUMB_GAP,
+  MEDIA_LIST_THUMB_HEIGHT,
+  MEDIA_LIST_THUMB_WIDTH,
+  MEDIA_META_SIZE,
+  MEDIA_THUMB_RADIUS,
+  MEDIA_TITLE_LINE_HEIGHT,
+  MEDIA_TITLE_SIZE
+} from '../../common/components/MediaCardTokens';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { AppLog } from '../../common/AppLog';
 
@@ -66,7 +78,7 @@ struct HistoryCard {
           });
       }
       .backgroundColor($r('app.color.yourtube_bg_surface'))
-      .borderRadius(12)
+      .borderRadius(MEDIA_CARD_RADIUS)
       .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
       .width(180)
       .height('auto')
@@ -82,9 +94,9 @@ struct HistoryCard {
         MediaThumb({
           imageUrl: this.item.thumbnailUrl || '',
           placeholderColor: '#1A1A1A',
-          widthVp: 160,
-          heightVp: 90,
-          borderRadiusVp: 6
+          widthVp: MEDIA_LIST_THUMB_WIDTH,
+          heightVp: MEDIA_LIST_THUMB_HEIGHT,
+          borderRadiusVp: MEDIA_THUMB_RADIUS
         })
 
         Column() {
@@ -118,48 +130,58 @@ struct HistoryCard {
             .width('100%')
           }
         }
-        .width(160)
-        .height(90)
+        .width(MEDIA_LIST_THUMB_WIDTH)
+        .height(MEDIA_LIST_THUMB_HEIGHT)
       }
-      .width(160)
-      .height(90)
-      .margin({ right: 12 });
+      .width(MEDIA_LIST_THUMB_WIDTH)
+      .height(MEDIA_LIST_THUMB_HEIGHT)
+      .margin({ right: MEDIA_LIST_THUMB_GAP });
 
-      // ── 文字信息 ──
+      // ── 文字信息：标题 / 作者 / 时间 分行 ──
       Column() {
         Text(this.item.title)
-          .fontSize(14)
+          .fontSize(MEDIA_TITLE_SIZE)
           .fontColor($r('app.color.yourtube_text_primary'))
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .lineHeight(18)
+          .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
           .fontWeight(FontWeight.Medium)
-          .margin({ bottom: 4 });
+          .width('100%')
+          .margin({ bottom: 2 });
 
         if (this.item.author && this.item.author.length > 0) {
           Text(this.item.author)
-            .fontSize(11)
+            .fontSize(MEDIA_META_SIZE)
             .fontColor($r('app.color.yourtube_text_quaternary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .margin({ bottom: 4 });
+            .width('100%')
+            .margin({ bottom: 2 });
         }
 
         Text(formatRelativeTime(this.item.lastWatchedAt))
-          .fontSize(11)
-          .fontColor($r('app.color.yourtube_text_hint'));
+          .fontSize(MEDIA_META_SIZE)
+          .fontColor($r('app.color.yourtube_text_hint'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%');
       }
       .layoutWeight(1)
-      .height(90)
+      .constraintSize({ minHeight: MEDIA_LIST_THUMB_HEIGHT })
       .alignItems(HorizontalAlign.Start)
       .justifyContent(FlexAlign.Start);
     }
     .width('100%')
     .padding({ left: 10, right: 10, top: 8, bottom: 8 })
     .alignItems(VerticalAlign.Top)
-    .borderRadius(12)
+    .borderRadius(MEDIA_CARD_RADIUS)
     .backgroundColor($r('app.color.yourtube_bg_surface'))
-    .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+    .shadow({
+      radius: MEDIA_CARD_SHADOW_RADIUS,
+      color: $r('app.color.yourtube_shadow'),
+      offsetX: 0,
+      offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
+    })
     .bindContextMenu(this.isShowContextMenu, this.deleteMenuBuilder, {
       preview: MenuPreviewMode.IMAGE,
       previewAnimationOptions: { scale: [1.0, 1.05] },

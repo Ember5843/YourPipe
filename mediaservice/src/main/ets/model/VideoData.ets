@@ -66,6 +66,8 @@ export interface VideoData {
   auto: boolean;
   head: Resource;
   likeCount: string;
+  /** Optional RYD / next-response dislike count for display. */
+  dislikeCount?: string;
   commentCount: string;
   shareCount: string;
   play: boolean;

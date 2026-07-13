@@ -46,6 +46,7 @@ export struct VideoDetails {
   @Prop streams: StreamInfo[] = [];
   @Prop viewCount: number = 0;
   @Prop likeCount: string = '0';
+  @Prop dislikeCount: string = '0';
   @Prop publishDate: string = '';
   @Prop tags: string[] = [];
   @Prop @Watch('onChannelIdentityChanged') channelId: string = '';
@@ -346,18 +347,19 @@ export struct VideoDetails {
     }
   }
 
-  private buildMetadataText(): string {
-    const parts: string[] = [];
-    if (this.viewCount > 0) {
-      parts.push(`${this.formatViewCount(this.viewCount)}次观看`);
-    }
-    if (this.likeCount && this.likeCount !== '0') {
-      parts.push(`${this.likeCount}点赞`);
-    }
-    if (this.publishDate) {
-      parts.push(this.formatRelativeDate(this.publishDate));
-    }
-    return parts.join(' · ');
+  private hasLikeCount(): boolean {
+    return !!(this.likeCount && this.likeCount !== '0' && this.likeCount.length > 0);
+  }
+
+  private hasDislikeCount(): boolean {
+    return !!(this.dislikeCount && this.dislikeCount !== '0' && this.dislikeCount.length > 0);
+  }
+
+  private hasStatsRow(): boolean {
+    return this.viewCount > 0
+      || !!(this.publishDate && this.publishDate.length > 0)
+      || this.hasLikeCount()
+      || this.hasDislikeCount();
   }
 
   private formatBitrate(bps: number): string {
@@ -388,6 +390,64 @@ export struct VideoDetails {
     const mm = m.toString().padStart(2, '0');
     const ss = s.toString().padStart(2, '0');
     return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+  }
+
+  @Builder
+  StatsMetaRow() {
+    // Title-adjacent stats: views / date / like / dislike as one compact strip.
+    Row({ space: 0 }) {
+      if (this.viewCount > 0) {
+        this.StatItem($r('sys.symbol.play_round_rectangle'), `${this.formatViewCount(this.viewCount)}次观看`, false)
+      }
+      if (this.publishDate && this.publishDate.length > 0) {
+        this.StatItem($r('sys.symbol.calendar'), this.formatRelativeDate(this.publishDate), this.viewCount > 0)
+      }
+      if (this.hasLikeCount()) {
+        this.StatItem(
+          $r('sys.symbol.hand_thumbsup'),
+          this.likeCount,
+          this.viewCount > 0 || !!(this.publishDate && this.publishDate.length > 0)
+        )
+      }
+      if (this.hasDislikeCount()) {
+        this.StatItem(
+          $r('sys.symbol.hand_thumbsdown'),
+          this.dislikeCount,
+          this.viewCount > 0
+            || !!(this.publishDate && this.publishDate.length > 0)
+            || this.hasLikeCount()
+        )
+      }
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Center)
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .borderRadius(12)
+    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+    .margin({ top: 8, bottom: 12 })
+  }
+
+  @Builder
+  StatItem(icon: Resource, label: string, showDivider: boolean) {
+    if (showDivider) {
+      Text('·')
+        .fontSize(12)
+        .fontColor($r('app.color.yourtube_text_hint'))
+        .margin({ left: 8, right: 8 })
+    }
+    Row({ space: 4 }) {
+      SymbolGlyph(icon)
+        .fontSize(13)
+        .fontColor([$r('app.color.yourtube_text_secondary')])
+      Text(label)
+        .fontSize(12)
+        .fontColor($r('app.color.yourtube_text_secondary'))
+        .fontWeight(FontWeight.Medium)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .alignItems(VerticalAlign.Center)
+    .constraintSize({ maxWidth: '42%' })
   }
 
   @Builder
@@ -459,14 +519,9 @@ export struct VideoDetails {
         .onClick(() => { this.isTitleExpanded = !this.isTitleExpanded; })
         .alignItems(HorizontalAlign.Start)
 
-        // ── 元数据行 ──
-        if (this.viewCount > 0 || (this.likeCount && this.likeCount !== '0') || this.publishDate) {
-          Text(this.buildMetadataText())
-            .fontSize(13)
-            .fontColor($r('app.color.yourtube_text_secondary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .margin({ top: 6, bottom: 12 })
+        // ── 统计信息：观看 / 发布时间 / 点赞 / 点踩 ──
+        if (this.hasStatsRow()) {
+          this.StatsMetaRow()
         } else {
           Column().height(12)
         }

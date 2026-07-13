@@ -50,6 +50,8 @@ export class PlayerSession {
 
   /** PlayerSession 被 release 销毁时由外部（Index.ets）设置的回调，用于清理 NavStack */
   onSessionReleased?: () => void;
+  /** nextResponse / RYD 点赞点踩等到齐后回调，供播放页刷新 UI */
+  onPlaybackExtrasUpdated?: (source: VideoData) => void;
 
   static getInstance(): PlayerSession {
     if (!PlayerSession.instance) {
@@ -268,6 +270,9 @@ export class PlayerSession {
       if (result.success && result.videoInfo) {
         const videoStream = result.videoInfo.streams?.find((s) => s.hasVideo && s.width && s.height);
         if (this._currentVideo) {
+          if (result.videoInfo.title && this._currentVideo.title !== result.videoInfo.title) {
+            this._currentVideo.title = result.videoInfo.title;
+          }
           if (result.videoInfo.author && this._currentVideo.author !== result.videoInfo.author) {
             this._currentVideo.author = result.videoInfo.author;
           }
@@ -280,6 +285,24 @@ export class PlayerSession {
               this._currentVideo.channelAvatarUrl = avatarUrl;
             }
           }
+          const bestThumb = result.videoInfo.getBestThumbnail();
+          if (bestThumb?.url) {
+            const thumbUrl = normalizeUrl(bestThumb.url);
+            if (thumbUrl.length > 0 && this._currentVideo.thumbnailUrl !== thumbUrl) {
+              this._currentVideo.thumbnailUrl = thumbUrl;
+            }
+          }
+          // Back-fill local history for cloud-synced rows missing author / channel meta.
+          WatchHistoryStore.enrichMetadata(
+            videoId,
+            this._currentVideo.title || '',
+            this._currentVideo.author || '',
+            this._currentVideo.thumbnailUrl || '',
+            result.videoInfo.lengthSeconds || 0,
+            this._currentVideo.channelId || '',
+            this._currentVideo.channelAvatarUrl || '',
+            this._currentVideo.channelHandle || ''
+          );
         }
         const videoSource: VideoData = {
           name: this._defaultSource.name,
@@ -350,6 +373,22 @@ export class PlayerSession {
     }
   }
 
+  private formatStatCount(count: number | undefined): string {
+    if (count === undefined || count === null || count < 0) {
+      return '0';
+    }
+    if (count >= 100000000) {
+      return `${(count / 100000000).toFixed(1)}亿`;
+    }
+    if (count >= 10000) {
+      return `${(count / 10000).toFixed(1)}万`;
+    }
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K`;
+    }
+    return `${count}`;
+  }
+
   private fetchPlaybackExtrasInBackground(playService: YouTubePlayService, videoInfo: VideoInfo): void {
     const videoId = videoInfo.videoId;
     this._activeExtrasVideoId = videoId;
@@ -359,7 +398,32 @@ export class PlayerSession {
       if (!extras || this._currentVideo?.videoId !== videoId || this._activeExtrasVideoId !== videoId) {
         return;
       }
-      logger.info(`${TAG} playback extras done video=${videoId} elapsed=${Date.now() - startedAt}ms like=${extras.likeCount ?? -1} related=${extras.relatedItems?.length || 0}`);
+      logger.info(`${TAG} playback extras done video=${videoId} elapsed=${Date.now() - startedAt}ms like=${extras.likeCount ?? -1} dislike=${extras.dislikeCount ?? -1} related=${extras.relatedItems?.length || 0}`);
+
+      const likeText = (extras.likeCount !== undefined && extras.likeCount >= 0)
+        ? this.formatStatCount(extras.likeCount)
+        : '';
+      const dislikeText = (extras.dislikeCount !== undefined && extras.dislikeCount >= 0)
+        ? this.formatStatCount(extras.dislikeCount)
+        : '';
+      if (likeText.length > 0 || dislikeText.length > 0) {
+        this._defaultSource.likeCount = likeText.length > 0 ? likeText : this._defaultSource.likeCount;
+        this._defaultSource.dislikeCount = dislikeText.length > 0 ? dislikeText : (this._defaultSource.dislikeCount || '0');
+        if (this._cachedVideoSource && this._cachedVideoSource.videoId === videoId) {
+          this._cachedVideoSource.likeCount = this._defaultSource.likeCount;
+          this._cachedVideoSource.dislikeCount = this._defaultSource.dislikeCount;
+        }
+        if (this.onPlaybackExtrasUpdated) {
+          this.onPlaybackExtrasUpdated(this._cachedVideoSource || this._defaultSource);
+        }
+      }
+
+      if (extras.uploaderAvatarUrl && this._currentVideo) {
+        const avatarUrl = normalizeUrl(extras.uploaderAvatarUrl);
+        if (avatarUrl.length > 0) {
+          this._currentVideo.channelAvatarUrl = avatarUrl;
+        }
+      }
 
       const relatedItems = extras.relatedItems;
       if (relatedItems && relatedItems.length > 0) {

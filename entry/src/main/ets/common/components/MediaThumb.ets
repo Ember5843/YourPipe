@@ -115,12 +115,17 @@ export struct MediaThumb {
       }
 
       if (this.showLive && this.isLive) {
-        Text($r('app.string.yt_label_live'))
-          .fontSize(8)
-          .fontColor($r('app.color.yourtube_text_inverse'))
-          .backgroundColor($r('app.color.yourtube_bg_live_tag'))
-          .padding({ left: 4, right: 4, top: 2, bottom: 2 })
-          .borderRadius({ topLeft: 4, bottomRight: 6 })
+        // Reuse player LIVE style: red dot + LIVE label.
+        Row({ space: 4 }) {
+          Circle({ width: 6, height: 6 }).fill('#FF3B30')
+          Text($r('app.string.yt_label_live'))
+            .fontSize(8)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.yourtube_text_inverse'))
+        }
+        .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+        .backgroundColor($r('app.color.yourtube_bg_live_tag'))
+        .borderRadius({ topLeft: 4, bottomRight: 6 })
       }
 
       if (this.isPremium) {

@@ -112,6 +112,59 @@ export class WatchHistoryStore {
   }
 
   /**
+   * 用播放器侧补全到的元数据刷新已有历史条目（不改 lastWatchedAt / progress）。
+   * 用于云端同步条目缺 author 等字段时，在打开视频后回填。
+   */
+  static enrichMetadata(
+    videoId: string,
+    title: string,
+    author: string,
+    thumbnailUrl: string,
+    durationSec: number = 0,
+    channelId: string = '',
+    channelAvatarUrl: string = '',
+    channelHandle: string = ''
+  ): void {
+    const id = (videoId || '').trim();
+    if (!id) {
+      return;
+    }
+    const all = WatchHistoryStore.getAll();
+    let changed = false;
+    const next = all.map((item: WatchHistoryItem) => {
+      if (item.videoId !== id) {
+        return item;
+      }
+      const merged: WatchHistoryItem = {
+        videoId: id,
+        title: (title && title.length > 0) ? title : item.title,
+        author: (author && author.length > 0) ? author : item.author,
+        thumbnailUrl: (thumbnailUrl && thumbnailUrl.length > 0) ? thumbnailUrl : item.thumbnailUrl,
+        durationSec: item.durationSec > 0 ? item.durationSec : (durationSec > 0 ? durationSec : 0),
+        progressSec: item.progressSec,
+        lastWatchedAt: item.lastWatchedAt,
+        channelId: item.channelId || channelId || '',
+        channelAvatarUrl: item.channelAvatarUrl || channelAvatarUrl || '',
+        channelHandle: item.channelHandle || channelHandle || ''
+      };
+      if (merged.title !== item.title
+        || merged.author !== item.author
+        || merged.thumbnailUrl !== item.thumbnailUrl
+        || merged.durationSec !== item.durationSec
+        || merged.channelId !== item.channelId
+        || merged.channelAvatarUrl !== item.channelAvatarUrl
+        || merged.channelHandle !== item.channelHandle) {
+        changed = true;
+      }
+      return merged;
+    });
+    if (changed) {
+      WatchHistoryStore.save(next);
+      WatchHistoryStore.syncToAppStorage();
+    }
+  }
+
+  /**
    * 单向合并云端历史：
    * - 已有本地条目：保留 lastWatchedAt / progress / duration，只补全元数据
    * - 仅云端有的条目：按云端顺序用递减时间戳写入（避免全部变成「刚刚」）

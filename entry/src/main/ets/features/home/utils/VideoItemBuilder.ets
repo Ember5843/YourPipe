@@ -84,75 +84,232 @@ export function buildVideoItemFromShortsLockupViewModel(lockup: Record<string, O
   return new VideoItem(id, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor, channelId, "", "", "");
 }
 
+/**
+ * Live detection aligned with NewPipe/PipePipe YoutubeStreamInfoItemExtractor:
+ * 1) badges.metadataBadgeRenderer style/label
+ * 2) thumbnailOverlays.thumbnailOverlayTimeStatusRenderer style === LIVE
+ * 3) lockup contentImage overlays (badge / bottom badge)
+ * 4) metadata "watching" fallback
+ *
+ * Important: do NOT early-return false when badges exist but are non-live
+ * (e.g. Premium) — continue checking overlays.
+ */
 export function hasLiveBadge(video: Record<string, Object>, liveLabel: string): boolean {
   const badges = video["badges"] as Array<Record<string, Object>>;
   if (badges && badges.length > 0) {
-    return badges.some((badge) => {
-      const badgeRenderer = badge["metadataBadgeRenderer"] as Record<string, Object>;
-      if (!badgeRenderer) return false;
-      const label = badgeRenderer["label"] as string;
-      if (label === "LIVE" || label === "LIVE NOW" || label === liveLabel) return true;
-      const style = badgeRenderer["style"] as string;
-      if (style === "BADGE_STYLE_TYPE_LIVE_NOW" || style === "BADGE_STYLE_TYPE_LIVE") return true;
-      return false;
-    });
+    for (let i = 0; i < badges.length; i++) {
+      const badgeRenderer = badges[i]
+        ? (badges[i]["metadataBadgeRenderer"] as Record<string, Object>)
+        : undefined;
+      if (!badgeRenderer) {
+        continue;
+      }
+      const style = ((badgeRenderer["style"] as string) || "").toUpperCase();
+      if (style === "BADGE_STYLE_TYPE_LIVE_NOW" || style === "BADGE_STYLE_TYPE_LIVE"
+        || style.indexOf("LIVE") >= 0) {
+        return true;
+      }
+      const label = ((badgeRenderer["label"] as string) || "").trim();
+      if (isLiveLabelText(label, liveLabel)) {
+        return true;
+      }
+    }
   }
 
   const overlays = video["thumbnailOverlays"] as Array<Record<string, Object>>;
   if (overlays && overlays.length > 0) {
-    return overlays.some((overlay) => {
-      const timeStatus = overlay["thumbnailOverlayTimeStatusRenderer"] as Record<string, Object>;
+    for (let i = 0; i < overlays.length; i++) {
+      const overlay = overlays[i];
+      const timeStatus = overlay
+        ? (overlay["thumbnailOverlayTimeStatusRenderer"] as Record<string, Object>)
+        : undefined;
       if (timeStatus) {
-        const style = timeStatus["style"] as string;
-        if (style === "LIVE" || style === "DEFAULT") {
-          const text = getTextFromRuns(timeStatus["text"]);
-          if (text === "LIVE" || text === "LIVE NOW" || text === liveLabel) return true;
+        const style = ((timeStatus["style"] as string) || "").toUpperCase();
+        // NewPipe: style.equalsIgnoreCase("LIVE") alone is enough.
+        if (style === "LIVE") {
+          return true;
         }
-      }
-      return false;
-    });
-  }
-
-  const lockupOverlays = getLockupOverlays(video);
-  if (lockupOverlays) {
-    for (let i = 0; i < lockupOverlays.length; i++) {
-      const overlay = lockupOverlays[i];
-      const badgeVm = overlay ? (overlay["thumbnailOverlayBadgeViewModel"] as Record<string, Object>) : undefined;
-      if (badgeVm) {
-        const lockupBadges = badgeVm["thumbnailBadges"] as Array<Record<string, Object>>;
-        if (lockupBadges) {
-          for (let b = 0; b < lockupBadges.length; b++) {
-            const bvm = lockupBadges[b] ? (lockupBadges[b]["thumbnailBadgeViewModel"] as Record<string, Object>) : undefined;
-            if (!bvm) continue;
-            const badgeStyle = (bvm["badgeStyle"] as string) || "";
-            if (badgeStyle.toUpperCase().includes("LIVE")) return true;
-            const badgeText = (bvm["text"] as string) || "";
-            if (badgeText.toLowerCase().includes("live") || badgeText.toLowerCase().includes("bukhoma")) return true;
-            const imageName = (bvm["imageName"] as string) || "";
-            if (imageName === "LIVE") return true;
-          }
-        }
-      }
-      const bottomVm = overlay ? (overlay["thumbnailBottomOverlayViewModel"] as Record<string, Object>) : undefined;
-      if (bottomVm) {
-        const bottomBadges = bottomVm["badges"] as Array<Record<string, Object>>;
-        if (bottomBadges) {
-          for (let b = 0; b < bottomBadges.length; b++) {
-            const bvm = bottomBadges[b] ? (bottomBadges[b]["thumbnailBadgeViewModel"] as Record<string, Object>) : undefined;
-            if (!bvm) continue;
-            const badgeStyle = (bvm["badgeStyle"] as string) || "";
-            if (badgeStyle.toUpperCase().includes("LIVE")) return true;
-            const badgeText = (bvm["text"] as string) || "";
-            if (badgeText.toLowerCase().includes("live") || badgeText.toLowerCase().includes("bukhoma")) return true;
-            const imageName = (bvm["imageName"] as string) || "";
-            if (imageName === "LIVE") return true;
-          }
+        const text = getTextFromRuns(timeStatus["text"]);
+        if (isLiveLabelText(text, liveLabel)) {
+          return true;
         }
       }
     }
   }
 
+  // lockupViewModel path (contentImage.thumbnailViewModel.overlays)
+  if (isLockupLiveFromOverlays(getLockupOverlays(video), liveLabel)) {
+    return true;
+  }
+
+  // Fallback used by PipePipe lockup extractor: localized "watching" metadata.
+  if (hasWatchingMetadata(video)) {
+    return true;
+  }
+
   return false;
+}
+
+function isLiveLabelText(text: string, liveLabel: string): boolean {
+  const raw = (text || "").trim();
+  if (raw.length === 0) {
+    return false;
+  }
+  if (liveLabel && liveLabel.length > 0 && raw === liveLabel) {
+    return true;
+  }
+  const lower = raw.toLowerCase();
+  return lower === "live"
+    || lower === "live now"
+    || lower.indexOf("live") >= 0
+    || lower.indexOf("bukhoma") >= 0
+    || raw.indexOf("直播") >= 0
+    || raw.indexOf("直播中") >= 0;
+}
+
+function isLiveBadgeViewModel(bvm: Record<string, Object>, liveLabel: string): boolean {
+  const badgeStyle = ((bvm["badgeStyle"] as string) || "").toUpperCase();
+  if (badgeStyle.indexOf("LIVE") >= 0) {
+    return true;
+  }
+  const badgeText = (bvm["text"] as string) || "";
+  if (isLiveLabelText(badgeText, liveLabel)) {
+    return true;
+  }
+  // PipePipe: animatedText may be a plain string.
+  const animatedRaw = bvm["animatedText"];
+  if (typeof animatedRaw === "string" && isLiveLabelText(animatedRaw as string, liveLabel)) {
+    return true;
+  }
+  if (animatedRaw && typeof animatedRaw === "object") {
+    const animatedObj = animatedRaw as Record<string, Object>;
+    const animatedContent = (animatedObj["content"] as string) || "";
+    if (isLiveLabelText(animatedContent, liveLabel)) {
+      return true;
+    }
+  }
+  const imageName = (bvm["imageName"] as string) || "";
+  if (imageName.toUpperCase() === "LIVE") {
+    return true;
+  }
+  // PipePipe: icon.sources[].clientResource.imageName === "LIVE"
+  const icon = bvm["icon"] as Record<string, Object>;
+  const sources = icon ? (icon["sources"] as Array<Record<string, Object>>) : undefined;
+  if (sources) {
+    for (let s = 0; s < sources.length; s++) {
+      const client = sources[s]
+        ? (sources[s]["clientResource"] as Record<string, Object>)
+        : undefined;
+      const name = client ? ((client["imageName"] as string) || "") : "";
+      if (name.toUpperCase() === "LIVE") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function isLockupLiveFromOverlays(
+  overlays: Array<Record<string, Object>> | null,
+  liveLabel: string
+): boolean {
+  if (!overlays) {
+    return false;
+  }
+  for (let i = 0; i < overlays.length; i++) {
+    const overlay = overlays[i];
+    const badgeVm = overlay
+      ? (overlay["thumbnailOverlayBadgeViewModel"] as Record<string, Object>)
+      : undefined;
+    if (badgeVm) {
+      const lockupBadges = badgeVm["thumbnailBadges"] as Array<Record<string, Object>>;
+      if (lockupBadges) {
+        for (let b = 0; b < lockupBadges.length; b++) {
+          const bvm = lockupBadges[b]
+            ? (lockupBadges[b]["thumbnailBadgeViewModel"] as Record<string, Object>)
+            : undefined;
+          if (bvm && isLiveBadgeViewModel(bvm, liveLabel)) {
+            return true;
+          }
+        }
+      }
+    }
+    const bottomVm = overlay
+      ? (overlay["thumbnailBottomOverlayViewModel"] as Record<string, Object>)
+      : undefined;
+    if (bottomVm) {
+      const bottomBadges = bottomVm["badges"] as Array<Record<string, Object>>;
+      if (bottomBadges) {
+        for (let b = 0; b < bottomBadges.length; b++) {
+          const bvm = bottomBadges[b]
+            ? (bottomBadges[b]["thumbnailBadgeViewModel"] as Record<string, Object>)
+            : undefined;
+          if (bvm && isLiveBadgeViewModel(bvm, liveLabel)) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function hasWatchingMetadata(video: Record<string, Object>): boolean {
+  // Classic renderer view count text for live often contains "watching".
+  const viewCount = getTextFromRuns(video["viewCountText"])
+    || getTextFromRuns(video["shortViewCountText"])
+    || "";
+  if (containsWatchingIndicator(viewCount)) {
+    return true;
+  }
+  // lockup metadata rows
+  const metadata = video["metadata"] as Record<string, Object>;
+  const lmv = metadata
+    ? (metadata["lockupMetadataViewModel"] as Record<string, Object>)
+    : undefined;
+  const meta = lmv ? (lmv["metadata"] as Record<string, Object>) : undefined;
+  const cmv = meta
+    ? (meta["contentMetadataViewModel"] as Record<string, Object>)
+    : undefined;
+  const rows = cmv
+    ? (cmv["metadataRows"] as Array<Record<string, Object>>)
+    : undefined;
+  if (!rows) {
+    return false;
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const parts = rows[i]
+      ? (rows[i]["metadataParts"] as Array<Record<string, Object>>)
+      : undefined;
+    if (!parts) {
+      continue;
+    }
+    for (let j = 0; j < parts.length; j++) {
+      const text = parts[j] ? (parts[j]["text"] as Record<string, Object>) : undefined;
+      const content = text ? ((text["content"] as string) || "") : "";
+      if (containsWatchingIndicator(content)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function containsWatchingIndicator(text: string): boolean {
+  if (!text || text.trim().length === 0) {
+    return false;
+  }
+  const lower = text.toLowerCase();
+  return lower.indexOf("watching") >= 0
+    || lower.indexOf("viewer") >= 0
+    || lower.indexOf("ababukele") >= 0
+    || lower.indexOf("babukele") >= 0
+    || lower.indexOf("bukele") >= 0
+    || text.indexOf("正在观看") >= 0
+    || text.indexOf("人在看") >= 0
+    || text.indexOf("观看中") >= 0
+    || text.indexOf("位观众") >= 0
+    || text.indexOf("名观众") >= 0;
 }
 
 function getLockupOverlays(video: Record<string, Object>): Array<Record<string, Object>> | null {

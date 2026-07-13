@@ -4,8 +4,20 @@ import { customAnimationUtil } from '../../common/AnimationUtil';
 import { customVibrator } from '../../common/VibratorUtil';
 import { UIConfig } from '../AppState';
 import { Callback } from '@ohos.base';
-import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
+import { curves, LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { MediaThumb } from './MediaThumb';
+import {
+  MEDIA_CARD_RADIUS,
+  MEDIA_CARD_SHADOW_OFFSET_Y,
+  MEDIA_CARD_SHADOW_RADIUS,
+  MEDIA_LIST_THUMB_GAP,
+  MEDIA_LIST_THUMB_HEIGHT,
+  MEDIA_LIST_THUMB_WIDTH,
+  MEDIA_META_SIZE,
+  MEDIA_THUMB_RADIUS,
+  MEDIA_TITLE_LINE_HEIGHT,
+  MEDIA_TITLE_SIZE
+} from './MediaCardTokens';
 
 interface ContextMenuItem {
   symbolStartIcon?: SymbolGlyphModifier;
@@ -15,12 +27,14 @@ interface ContextMenuItem {
 }
 
 const SYMBOL_FONT_SIZE: number = 16;
-const LIST_THUMB_WIDTH: number = 160;
-const LIST_THUMB_HEIGHT: number = 90;
+const ACTION_BTN_HEIGHT: number = 24;
+const ACTION_BTN_RESERVE: number = 28;
 
 /**
  * Shared video content shell.
  * layoutMode: 'list' = horizontal row, 'grid' = vertical card.
+ * Meta is fixed stacked: title / author / viewCount.
+ * Action button pins bottom-end of the meta area (not under text flow).
  */
 @Component
 export struct VideoMediaCard {
@@ -41,6 +55,7 @@ export struct VideoMediaCard {
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @State isShowContextMenu: boolean = false;
+  @State actionScale: number = 1;
 
   private isGrid(): boolean {
     return this.layoutMode === 'grid';
@@ -83,18 +98,38 @@ export struct VideoMediaCard {
     return this.useFavoriteToggle || (typeof this.actionLabel === 'string' && this.actionLabel.length > 0);
   }
 
+  private playActionToggleAnim(): void {
+    if (!this.uiConfig.isAnimation) {
+      this.actionScale = 1;
+      return;
+    }
+    // Press-in then spring back so favorite / unfavorite feels responsive.
+    this.actionScale = 0.86;
+    const duration = Math.max(160, Math.min(this.uiConfig.animationSpeed || 220, 260));
+    this.getUIContext().animateTo({
+      duration: duration,
+      curve: curves.springMotion(0.32, 0.78)
+    }, () => {
+      this.actionScale = 1;
+    });
+  }
+
   private handleAction(): void {
     if (this.useFavoriteToggle) {
       const videoId = this.getVideoId();
       if (!videoId) {
         return;
       }
+      this.playActionToggleAnim();
       if (this.isFavorited()) {
         this.actionHub.removeFavorite(videoId);
       } else {
         this.actionHub.addFavorite(this.video);
       }
       return;
+    }
+    if (this.actionType === 'favorite' || this.actionType === 'remove') {
+      this.playActionToggleAnim();
     }
     if (this.actionType === 'favorite') {
       this.actionHub.addFavorite(this.video);
@@ -187,7 +222,7 @@ export struct VideoMediaCard {
         });
       }
       .backgroundColor($r('app.color.yourtube_bg_surface'))
-      .borderRadius(12)
+      .borderRadius(MEDIA_CARD_RADIUS)
       .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
       .width(180)
       .height('auto')
@@ -204,7 +239,7 @@ export struct VideoMediaCard {
       thumbId: 'thumb_' + this.video.id,
       fillParent: true,
       useAspectRatio: true,
-      borderRadiusVp: 11,
+      borderRadiusVp: MEDIA_THUMB_RADIUS,
       showLive: this.showLiveTag,
       isLive: this.video.isLive,
       isPremium: this.video.isPremium,
@@ -219,125 +254,118 @@ export struct VideoMediaCard {
       imageUrl: this.video.thumbnailUrl || '',
       placeholderColor: this.video.thumbnailColor || '',
       thumbId: 'thumb_' + this.video.id,
-      widthVp: LIST_THUMB_WIDTH,
-      heightVp: LIST_THUMB_HEIGHT,
-      borderRadiusVp: 6,
+      widthVp: MEDIA_LIST_THUMB_WIDTH,
+      heightVp: MEDIA_LIST_THUMB_HEIGHT,
+      borderRadiusVp: MEDIA_THUMB_RADIUS,
       showLive: this.showLiveTag,
       isLive: this.video.isLive,
       isPremium: this.video.isPremium,
       requiresMembership: this.video.requiresMembership,
       typeLabel: this.getTypeLabelText()
     })
-      .margin({ right: 12 })
+      .margin({ right: MEDIA_LIST_THUMB_GAP })
   }
 
+  /** Title / author / viewCount stacked — shared by list and grid. */
   @Builder
-  MetaBlockList() {
+  MetaTextStack() {
     Column() {
       Text(this.video.title)
-        .fontSize(14)
+        .fontSize(MEDIA_TITLE_SIZE)
         .fontColor($r('app.color.yourtube_text_primary'))
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .lineHeight(18)
+        .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
         .fontWeight(FontWeight.Medium)
+        .width('100%')
         .margin({ bottom: 2 })
 
-      Row() {
-        if (this.showAuthor) {
-          Text(this.video.author)
-            .fontSize(11)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .constraintSize({ maxWidth: '60%' })
-        }
-
-        if (this.showViewCount && this.video.viewCount) {
-          Text(`${this.showAuthor ? ' · ' : ''}${this.video.viewCount}`)
-            .fontSize(11)
-            .fontColor($r('app.color.yourtube_text_hint'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
+      if (this.showAuthor && this.video.author && this.video.author.length > 0) {
+        Text(this.video.author)
+          .fontSize(MEDIA_META_SIZE)
+          .fontColor($r('app.color.yourtube_text_quaternary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+          .margin({ bottom: 2 })
       }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
 
-      if (this.hasActionButton()) {
-        Blank()
-        Row() {
-          Button(this.getActionLabel())
-            .fontSize(10)
-            .fontColor($r('app.color.yourtube_text_inverse'))
-            .backgroundColor(this.getActionColor())
-            .height(24)
-            .padding({ left: 10, right: 10 })
-            .onClick(() => {
-              this.handleAction();
-            })
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.End)
-        .margin({ bottom: 2 })
-      }
-    }
-    .layoutWeight(1)
-    .height(LIST_THUMB_HEIGHT)
-    .alignItems(HorizontalAlign.Start)
-  }
-
-  @Builder
-  MetaBlockGrid() {
-    Column() {
-      Text(this.video.title)
-        .fontSize(14)
-        .fontColor($r('app.color.yourtube_text_primary'))
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .lineHeight(18)
-        .fontWeight(FontWeight.Medium)
-
-      Row() {
-        if (this.showAuthor) {
-          Text(this.video.author)
-            .fontSize(11)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .constraintSize({ maxWidth: '60%' })
-        }
-
-        if (this.showViewCount && this.video.viewCount) {
-          Text(`${this.showAuthor ? ' · ' : ''}${this.video.viewCount}`)
-            .fontSize(11)
-            .fontColor($r('app.color.yourtube_text_hint'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-
-      if (this.hasActionButton()) {
-        Row() {
-          Button(this.getActionLabel())
-            .fontSize(10)
-            .fontColor($r('app.color.yourtube_text_inverse'))
-            .backgroundColor(this.getActionColor())
-            .height(24)
-            .padding({ left: 10, right: 10 })
-            .onClick(() => {
-              this.handleAction();
-            })
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.End)
+      if (this.showViewCount && this.video.viewCount && this.video.viewCount.length > 0) {
+        Text(this.video.viewCount)
+          .fontSize(MEDIA_META_SIZE)
+          .fontColor($r('app.color.yourtube_text_hint'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
       }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-    .padding({ top: 8, left: 4, right: 4 })
+  }
+
+  @Builder
+  ActionButton() {
+    Button(this.getActionLabel())
+      .fontSize(10)
+      .fontColor($r('app.color.yourtube_text_inverse'))
+      .backgroundColor(this.getActionColor())
+      .height(ACTION_BTN_HEIGHT)
+      .padding({ left: 10, right: 10 })
+      .scale({ x: this.actionScale, y: this.actionScale })
+      .animation(this.uiConfig.isAnimation
+        ? { duration: 180, curve: curves.springMotion(0.32, 0.78) }
+        : { duration: 0 })
+      .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+      .onClick(() => {
+        this.handleAction();
+      })
+  }
+
+  @Builder
+  MetaBlockList() {
+    // Fixed height matches thumb so action stays bottom-end, independent of text lines.
+    Stack({ alignContent: Alignment.BottomEnd }) {
+      Column() {
+        this.MetaTextStack()
+      }
+      .width('100%')
+      .height('100%')
+      .alignItems(HorizontalAlign.Start)
+      .justifyContent(FlexAlign.Start)
+      .padding({ bottom: this.hasActionButton() ? ACTION_BTN_RESERVE : 0 })
+
+      if (this.hasActionButton()) {
+        this.ActionButton()
+      }
+    }
+    .layoutWeight(1)
+    .height(MEDIA_LIST_THUMB_HEIGHT)
+  }
+
+  @Builder
+  MetaBlockGrid() {
+    // Reserve bottom strip for action so it does not sit mid-flow under text.
+    Stack({ alignContent: Alignment.BottomEnd }) {
+      Column() {
+        this.MetaTextStack()
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      .padding({
+        top: 8,
+        left: 4,
+        right: 4,
+        bottom: this.hasActionButton() ? ACTION_BTN_RESERVE : 4
+      })
+
+      if (this.hasActionButton()) {
+        Row() {
+          this.ActionButton()
+        }
+        .padding({ right: 4 })
+      }
+    }
+    .width('100%')
   }
 
   build() {
@@ -348,9 +376,14 @@ export struct VideoMediaCard {
       }
       .width('100%')
       .padding(8)
-      .borderRadius(12)
+      .borderRadius(MEDIA_CARD_RADIUS)
       .backgroundColor($r('app.color.yourtube_bg_surface'))
-      .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+      .shadow({
+        radius: MEDIA_CARD_SHADOW_RADIUS,
+        color: $r('app.color.yourtube_shadow'),
+        offsetX: 0,
+        offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
+      })
       .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
       .bindContextMenu(this.isShowContextMenu, this.contextMenuBuilder, {
         preview: MenuPreviewMode.IMAGE,
@@ -380,9 +413,14 @@ export struct VideoMediaCard {
       .width('100%')
       .padding({ left: 10, right: 10, top: 8, bottom: 8 })
       .alignItems(VerticalAlign.Top)
-      .borderRadius(12)
+      .borderRadius(MEDIA_CARD_RADIUS)
       .backgroundColor($r('app.color.yourtube_bg_surface'))
-      .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+      .shadow({
+        radius: MEDIA_CARD_SHADOW_RADIUS,
+        color: $r('app.color.yourtube_shadow'),
+        offsetX: 0,
+        offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
+      })
       .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
       .bindContextMenu(this.isShowContextMenu, this.contextMenuBuilder, {
         preview: MenuPreviewMode.IMAGE,

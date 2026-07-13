@@ -1,4 +1,4 @@
-{
+﻿{
     "string": [
         {
             "name": "yt_tab_home",
@@ -627,6 +627,10 @@
         {
             "name": "yt_label_like",
             "value": "讚"
+        }        ,
+        {
+            "name": "yt_label_dislike",
+            "value": "踩"
         },
         {
             "name": "yt_tab_videos",
@@ -1026,3 +1030,4 @@
         }
     ]
 }
+

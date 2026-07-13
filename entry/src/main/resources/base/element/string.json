@@ -1,4 +1,4 @@
-{
+﻿{
     "string":  [
                    {
                        "name":  "module_desc",
@@ -655,7 +655,11 @@
                    {
                        "name":  "yt_label_like",
                        "value":  "赞"
-                   },
+                   }        ,
+        {
+            "name": "yt_label_dislike",
+            "value": "踩"
+        },
                    {
                        "name":  "yt_tab_videos",
                        "value":  "视频"
@@ -1366,3 +1370,4 @@
                    }
                ]
 }
+

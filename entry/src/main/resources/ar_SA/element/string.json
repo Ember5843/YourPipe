@@ -1,4 +1,4 @@
-{
+﻿{
     "string": [
         {
             "name": "module_desc",
@@ -627,6 +627,10 @@
         {
             "name": "yt_label_like",
             "value": "إعجاب"
+        }        ,
+        {
+            "name": "yt_label_dislike",
+            "value": "عدم إعجاب"
         },
         {
             "name": "yt_tab_videos",
@@ -1026,3 +1030,4 @@
         }
     ]
 }
+

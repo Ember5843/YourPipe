@@ -672,7 +672,9 @@ export struct VideoPlayer {
         .onDestroy(() => {
           Logger.info(TAG, 'XComponent onDestroy');
         })
-        .aspectRatio(this.curSource.width && this.curSource.height ? this.curSource.width / this.curSource.height : 16 / 9)
+        // Constrain surface to parent; clip parent so SURFACE cannot paint into status bar.
+        .width(CommonConstants.WIDTH_FULL_PERCENT)
+        .height(CommonConstants.HEIGHT_FULL_PERCENT)
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const pxWidth = Math.round(this.getUIContext().vp2px(Number(newArea.width)));
           const pxHeight = Math.round(this.getUIContext().vp2px(Number(newArea.height)));
@@ -891,6 +893,7 @@ export struct VideoPlayer {
     .height(CommonConstants.HEIGHT_FULL_PERCENT)
     .id('PlayerContainer')
     .backgroundColor(Color.Black)
+    .clip(true)
     .onSizeChange((_old: SizeOptions, newSize: SizeOptions) => {
       const w = newSize.width as number;
       const h = newSize.height as number;
@@ -1020,14 +1023,14 @@ export struct VideoPlayer {
       }
     }
     .width('100%')
-    // 顶部間距策略：
-    // 竖屏——VideoPlayer 在 statusBarHeight 占位下方，ctrlVPad 保证视觉平衡
-    // 横屏全屏——从屏幕物理顶部开始，额外加 statusBarHeight 避开刘海
+    // 顶部间距：
+    // 竖屏非沉浸——PlayerPage 已用 topSafeInset 把视频区整体下移，这里只需 ctrlVPad
+    // 横屏/沉浸全屏——系统栏隐藏或内容贴顶，控件额外加 statusBarHeight 避开刘海
     .padding({
       left: this.ctrlHPad,
       right: this.ctrlHPad,
       top: this.isFullLandscapeScreen
-           ? this.statusBarHeight + this.ctrlVPad
+           ? Math.max(this.statusBarHeight, 0) + this.ctrlVPad
            : this.ctrlVPad,
       bottom: this.ctrlVPad
     })

@@ -118,7 +118,8 @@ export class HomeFeedService {
     }
 
     const rawItems: Array<Record<string, Object>> = getHomeFeedItemsFromTabContent(tabContent);
-    const built = buildHomeKioskVideoItems(rawItems, startId, '');
+    // Pass LIVE so localized kiosk badges can match when style alone is missing.
+    const built = buildHomeKioskVideoItems(rawItems, startId, 'LIVE');
     return {
       items: built.items,
       nextPageToken: built.nextPageToken,
@@ -144,7 +145,7 @@ export class HomeFeedService {
           return;
         }
         const expanded = this.expandContinuationItems(continuationItems);
-        const built = buildHomeKioskVideoItems(expanded, startId + items.length, '');
+        const built = buildHomeKioskVideoItems(expanded, startId + items.length, 'LIVE');
         items = items.concat(built.items);
         nextPageToken = built.nextPageToken ?? nextPageToken;
       });

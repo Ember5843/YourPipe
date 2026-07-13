@@ -2,7 +2,18 @@ import { VideoItem } from 'youtube_core';
 import { VideoBuildResult } from '../model/FeedResult';
 import { ThumbnailPlaceholder } from '../../../common/ThumbnailPlaceholder';
 import { getContinuationToken } from './ContinuationUtils';
-import { getLockupChannelId, getLockupIsLive, getLockupTitle, getLockupUploaderName, getLockupVideoId, getLockupVideoThumbnailUrl, getLockupViewCount, getLockupIsPremium, getLockupRequiresMembership } from './LockupViewModelParser';
+import {
+  getLockupChannelAvatarUrl,
+  getLockupChannelId,
+  getLockupIsLive,
+  getLockupIsPremium,
+  getLockupRequiresMembership,
+  getLockupTitle,
+  getLockupUploaderName,
+  getLockupVideoId,
+  getLockupVideoThumbnailUrl,
+  getLockupViewCount
+} from './LockupViewModelParser';
 import { buildVideoItemFromReelRenderer, buildVideoItemFromRenderer, buildVideoItemFromShortsLockupViewModel } from './VideoItemBuilder';
 
 export function getHomeKioskItemsFromTabContent(tabContent: Record<string, Object> | undefined): Array<Record<string, Object>> {
@@ -82,6 +93,7 @@ function collectHomeFeedLeaves(node: Record<string, Object>, out: Array<Record<s
 
   if (node["richItemRenderer"] || node["gridVideoRenderer"] || node["reelItemRenderer"]
     || node["lockupViewModel"] || node["shortsLockupViewModel"] || node["videoRenderer"]
+    || node["compactVideoRenderer"] || node["videoWithContextRenderer"]
     || node["continuationItemRenderer"]) {
     out.push(node);
     return;
@@ -213,15 +225,20 @@ export function buildHomeKioskVideoItems(
         if (lockupContentType === "LOCKUP_CONTENT_TYPE_VIDEO") {
           const videoId = getLockupVideoId(lockupInRich);
           const title = getLockupTitle(lockupInRich) || "Untitled";
-          const author = getLockupUploaderName(lockupInRich) || "Unknown";
+          // Prefer empty over "Unknown" so history merge/enrich can fill real author later.
+          const author = getLockupUploaderName(lockupInRich) || "";
           const thumbnailUrl = getLockupVideoThumbnailUrl(lockupInRich);
           const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, idCounter);
           const channelId = getLockupChannelId(lockupInRich);
+          const channelAvatarUrl = getLockupChannelAvatarUrl(lockupInRich);
           const viewCount = getLockupViewCount(lockupInRich);
           const isLive = getLockupIsLive(lockupInRich);
           const isPremium = getLockupIsPremium(lockupInRich);
           const requiresMembership = getLockupRequiresMembership(lockupInRich);
-          items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", "", null, isPremium, requiresMembership));
+          items.push(new VideoItem(
+            idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor,
+            channelId, channelAvatarUrl, "", "", null, isPremium, requiresMembership
+          ));
           idCounter += 1;
           return;
         }
@@ -232,8 +249,12 @@ export function buildHomeKioskVideoItems(
           const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, idCounter);
           const author = getLockupUploaderName(lockupInRich) || "";
           const channelId = getLockupChannelId(lockupInRich);
+          const channelAvatarUrl = getLockupChannelAvatarUrl(lockupInRich);
           const viewCount = getLockupViewCount(lockupInRich);
-          items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor, channelId, "", "", ""));
+          items.push(new VideoItem(
+            idCounter, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor,
+            channelId, channelAvatarUrl, "", "", ""
+          ));
           idCounter += 1;
           return;
         }
@@ -246,6 +267,37 @@ export function buildHomeKioskVideoItems(
       if (videoItem) {
         items.push(videoItem);
         idCounter += 1;
+      }
+      return;
+    }
+
+    const compactVideo = content["compactVideoRenderer"] as Record<string, Object>;
+    if (compactVideo) {
+      const videoItem = buildVideoItemFromRenderer(compactVideo, idCounter, liveLabel);
+      if (videoItem) {
+        items.push(videoItem);
+        idCounter += 1;
+      }
+      return;
+    }
+
+    // FEhistory sometimes nests classic video fields under videoWithContextRenderer.
+    const videoWithContext = content["videoWithContextRenderer"] as Record<string, Object>;
+    if (videoWithContext) {
+      const nested = (videoWithContext["videoRenderer"] as Record<string, Object>)
+        || (videoWithContext["headline"] as Record<string, Object>)
+        || videoWithContext;
+      const videoItem = buildVideoItemFromRenderer(nested, idCounter, liveLabel);
+      if (videoItem) {
+        items.push(videoItem);
+        idCounter += 1;
+      } else {
+        // Some payloads put videoId/title on the outer node itself.
+        const outerItem = buildVideoItemFromRenderer(videoWithContext, idCounter, liveLabel);
+        if (outerItem) {
+          items.push(outerItem);
+          idCounter += 1;
+        }
       }
       return;
     }
@@ -277,15 +329,19 @@ export function buildHomeKioskVideoItems(
       if (contentType === "LOCKUP_CONTENT_TYPE_VIDEO") {
         const videoId = getLockupVideoId(lockup);
         const title = getLockupTitle(lockup) || "Untitled";
-        const author = getLockupUploaderName(lockup) || "Unknown";
+        const author = getLockupUploaderName(lockup) || "";
         const thumbnailUrl = getLockupVideoThumbnailUrl(lockup);
         const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, idCounter);
         const channelId = getLockupChannelId(lockup);
+        const channelAvatarUrl = getLockupChannelAvatarUrl(lockup);
         const viewCount = getLockupViewCount(lockup);
         const isLive = getLockupIsLive(lockup);
         const isPremium = getLockupIsPremium(lockup);
         const requiresMembership = getLockupRequiresMembership(lockup);
-        items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", "", null, isPremium, requiresMembership));
+        items.push(new VideoItem(
+          idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor,
+          channelId, channelAvatarUrl, "", "", null, isPremium, requiresMembership
+        ));
         idCounter += 1;
         return;
       }
@@ -297,8 +353,12 @@ export function buildHomeKioskVideoItems(
         const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, idCounter);
         const author = getLockupUploaderName(lockup) || "";
         const channelId = getLockupChannelId(lockup);
+        const channelAvatarUrl = getLockupChannelAvatarUrl(lockup);
         const viewCount = getLockupViewCount(lockup);
-        items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor, channelId, "", "", ""));
+        items.push(new VideoItem(
+          idCounter, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor,
+          channelId, channelAvatarUrl, "", "", ""
+        ));
         idCounter += 1;
         return;
       }

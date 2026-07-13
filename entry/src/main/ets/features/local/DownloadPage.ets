@@ -2,6 +2,18 @@ import { DownloadManager, DownloadTask, DownloadStatus } from '../../common/Down
 import { fileUri, picker } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 import { MediaThumb } from '../../common/components/MediaThumb';
+import {
+  MEDIA_CARD_RADIUS,
+  MEDIA_CARD_SHADOW_OFFSET_Y,
+  MEDIA_CARD_SHADOW_RADIUS,
+  MEDIA_LIST_THUMB_GAP,
+  MEDIA_LIST_THUMB_HEIGHT,
+  MEDIA_LIST_THUMB_WIDTH,
+  MEDIA_META_SIZE,
+  MEDIA_THUMB_RADIUS,
+  MEDIA_TITLE_LINE_HEIGHT,
+  MEDIA_TITLE_SIZE
+} from '../../common/components/MediaCardTokens';
 
 function isActiveStatus(status: DownloadStatus): boolean {
   return status === DownloadStatus.DOWNLOADING_VIDEO ||
@@ -64,9 +76,9 @@ struct DownloadTaskRow {
         MediaThumb({
           imageUrl: this.task.thumbnailUrl || '',
           placeholderColor: '#1A1A1A',
-          widthVp: 160,
-          heightVp: 90,
-          borderRadiusVp: 6
+          widthVp: MEDIA_LIST_THUMB_WIDTH,
+          heightVp: MEDIA_LIST_THUMB_HEIGHT,
+          borderRadiusVp: MEDIA_THUMB_RADIUS
         })
 
         if (this.task.status === DownloadStatus.COMPLETED) {
@@ -87,49 +99,50 @@ struct DownloadTaskRow {
               .fontSize(20)
               .fontColor([Color.White])
           }
-          .width(160)
-          .height(90)
+          .width(MEDIA_LIST_THUMB_WIDTH)
+          .height(MEDIA_LIST_THUMB_HEIGHT)
           .justifyContent(FlexAlign.Center)
           .alignItems(HorizontalAlign.Center)
           .backgroundColor('rgba(0,0,0,0.4)')
-          .borderRadius(6)
+          .borderRadius(MEDIA_THUMB_RADIUS)
         }
       }
-      .width(160)
-      .height(90)
-      .margin({ right: 12 })
+      .width(MEDIA_LIST_THUMB_WIDTH)
+      .height(MEDIA_LIST_THUMB_HEIGHT)
+      .margin({ right: MEDIA_LIST_THUMB_GAP })
 
       Column() {
         Text(this.task.title)
-          .fontSize(14)
+          .fontSize(MEDIA_TITLE_SIZE)
           .fontColor(isActiveStatus(this.task.status)
             ? this.themePrimary
             : $r('app.color.yourtube_text_primary'))
           .fontWeight(FontWeight.Medium)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .lineHeight(18)
+          .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
+          .width('100%')
           .margin({ bottom: 2 })
 
-        Row() {
-          Text(this.task.author || '')
-            .fontSize(11)
+        if (this.task.author && this.task.author.length > 0) {
+          Text(this.task.author)
+            .fontSize(MEDIA_META_SIZE)
             .fontColor($r('app.color.yourtube_text_quaternary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .constraintSize({ maxWidth: '60%' })
-
-          Text(` · ${this.getSubtitle()}`)
-            .fontSize(11)
-            .fontColor(this.getStatusColor())
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+            .margin({ bottom: 2 })
         }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
+
+        Text(this.getSubtitle())
+          .fontSize(MEDIA_META_SIZE)
+          .fontColor(this.getStatusColor())
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
       }
       .layoutWeight(1)
-      .height(90)
+      .constraintSize({ minHeight: MEDIA_LIST_THUMB_HEIGHT })
       .alignItems(HorizontalAlign.Start)
 
       this.ProgressRing()
@@ -137,11 +150,16 @@ struct DownloadTaskRow {
     .width('100%')
     .padding({ left: 10, right: 10, top: 8, bottom: 8 })
     .alignItems(VerticalAlign.Top)
-    .borderRadius(12)
+    .borderRadius(MEDIA_CARD_RADIUS)
     .backgroundColor(isActiveStatus(this.task.status)
       ? $r('app.color.yourtube_bg_surface_muted')
       : $r('app.color.yourtube_bg_surface'))
-    .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+    .shadow({
+      radius: MEDIA_CARD_SHADOW_RADIUS,
+      color: $r('app.color.yourtube_shadow'),
+      offsetX: 0,
+      offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
+    })
     .onClick(() => {
       if (this.task.status === DownloadStatus.COMPLETED) {
         this.exportTaskToDownloads();

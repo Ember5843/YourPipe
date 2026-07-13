@@ -402,11 +402,22 @@ export class SearchService {
   }
 
   private hasLiveBadge(video: Record<string, Object>): boolean {
+    // Keep search in sync with feed/kiosk detection (NewPipe/PipePipe rules).
     const badges = video["badges"] as Array<Record<string, Object>>;
     if (badges) {
       for (const badge of badges) {
         const badgeRenderer = badge["metadataBadgeRenderer"] as Record<string, Object>;
-        if (badgeRenderer && (badgeRenderer["style"] as string) === "BADGE_STYLE_TYPE_LIVE_NOW") {
+        if (!badgeRenderer) {
+          continue;
+        }
+        const style = ((badgeRenderer["style"] as string) || "").toUpperCase();
+        if (style === "BADGE_STYLE_TYPE_LIVE_NOW" || style === "BADGE_STYLE_TYPE_LIVE"
+          || style.indexOf("LIVE") >= 0) {
+          return true;
+        }
+        const label = ((badgeRenderer["label"] as string) || "").toLowerCase();
+        if (label === "live" || label === "live now" || label.indexOf("live") >= 0
+          || ((badgeRenderer["label"] as string) || "").indexOf("直播") >= 0) {
           return true;
         }
       }
@@ -415,8 +426,56 @@ export class SearchService {
     if (thumbnailOverlays) {
       for (const overlay of thumbnailOverlays) {
         const overlayRenderer = overlay["thumbnailOverlayTimeStatusRenderer"] as Record<string, Object>;
-        if (overlayRenderer && (overlayRenderer["style"] as string) === "LIVE") {
-          return true;
+        if (overlayRenderer) {
+          const style = ((overlayRenderer["style"] as string) || "").toUpperCase();
+          if (style === "LIVE") {
+            return true;
+          }
+        }
+      }
+    }
+    // lockup-style overlays nested under contentImage
+    const contentImage = video["contentImage"] as Record<string, Object>;
+    const tvm = contentImage
+      ? (contentImage["thumbnailViewModel"] as Record<string, Object>)
+      : undefined;
+    const overlays = tvm ? (tvm["overlays"] as Array<Record<string, Object>>) : undefined;
+    if (overlays) {
+      for (let i = 0; i < overlays.length; i++) {
+        const overlay = overlays[i];
+        const bottomVm = overlay
+          ? (overlay["thumbnailBottomOverlayViewModel"] as Record<string, Object>)
+          : undefined;
+        const lockupBadges = bottomVm
+          ? (bottomVm["badges"] as Array<Record<string, Object>>)
+          : undefined;
+        if (lockupBadges) {
+          for (let b = 0; b < lockupBadges.length; b++) {
+            const bvm = lockupBadges[b]
+              ? (lockupBadges[b]["thumbnailBadgeViewModel"] as Record<string, Object>)
+              : undefined;
+            const badgeStyle = bvm ? (((bvm["badgeStyle"] as string) || "").toUpperCase()) : "";
+            if (badgeStyle.indexOf("LIVE") >= 0) {
+              return true;
+            }
+          }
+        }
+        const badgeVm = overlay
+          ? (overlay["thumbnailOverlayBadgeViewModel"] as Record<string, Object>)
+          : undefined;
+        const thumbBadges = badgeVm
+          ? (badgeVm["thumbnailBadges"] as Array<Record<string, Object>>)
+          : undefined;
+        if (thumbBadges) {
+          for (let b = 0; b < thumbBadges.length; b++) {
+            const bvm = thumbBadges[b]
+              ? (thumbBadges[b]["thumbnailBadgeViewModel"] as Record<string, Object>)
+              : undefined;
+            const badgeStyle = bvm ? (((bvm["badgeStyle"] as string) || "").toUpperCase()) : "";
+            if (badgeStyle.indexOf("LIVE") >= 0) {
+              return true;
+            }
+          }
         }
       }
     }

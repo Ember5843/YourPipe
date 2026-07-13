@@ -14,6 +14,7 @@
  */
 
 import { window } from '@kit.ArkUI';
+import { ConfigurationConstant } from '@kit.AbilityKit';
 import { Logger } from 'mediaservice';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { BreakpointSystem } from './BreakpointSystem';
@@ -48,11 +49,17 @@ export class WindowUtil {
       try {
         const properties: window.WindowProperties = windowClass.getWindowProperties();
         let area: window.AvoidArea = windowClass.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
+        let cutoutArea: window.AvoidArea = windowClass.getWindowAvoidArea(window.AvoidAreaType.TYPE_CUTOUT);
         let naviBarArea: window.AvoidArea =
           windowClass.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
         AppStorage.setOrCreate('deviceWidth', properties.windowRect.width);
         AppStorage.setOrCreate('deviceHeight', properties.windowRect.height);
-        AppStorage.setOrCreate('statusBarHeight', uiContext?.px2vp(area.topRect.height));
+        // Track system + cutout top separately; UI reads max as statusBarHeight.
+        const topSystemVp = uiContext?.px2vp(area.topRect.height) ?? 0;
+        const topCutoutVp = uiContext?.px2vp(cutoutArea.topRect.height + cutoutArea.topRect.top) ?? 0;
+        AppStorage.setOrCreate('statusBarSystemHeight', topSystemVp);
+        AppStorage.setOrCreate('statusBarCutoutHeight', topCutoutVp);
+        AppStorage.setOrCreate('statusBarHeight', Math.max(topSystemVp, topCutoutVp));
         AppStorage.setOrCreate('navBarHeight', uiContext?.px2vp(naviBarArea.bottomRect.height));
 
         // 注册唯一的全局分发器，内部同时通知 BreakpointSystem、系统栏策略和播放页回调
@@ -78,13 +85,35 @@ export class WindowUtil {
   }
 
   // Get status bar height and indicator height.
+  // Track TYPE_SYSTEM / TYPE_CUTOUT independently; expose max as statusBarHeight
+  // so punch-hole devices still get a non-zero top inset when one type is empty.
+  // When system bars hide (TYPE_SYSTEM → 0), keep last positive system value so
+  // non-immersive portrait can restore the correct spacer after fullscreen.
   public static setAvoidArea(type: window.AvoidAreaType, area: window.AvoidArea): void {
-    const uiContext: UIContext = AppStorage.get<UIContext>('uiContext')!;
-    if (type === window.AvoidAreaType.TYPE_SYSTEM) {
-      AppStorage.setOrCreate('statusBarHeight', uiContext?.px2vp(area.topRect.height));
-    } else {
-      AppStorage.setOrCreate('navBarHeight',  uiContext?.px2vp(area.bottomRect.height));
+    const uiContext: UIContext | undefined = AppStorage.get<UIContext>('uiContext');
+    if (!uiContext) {
+      return;
     }
+    if (type === window.AvoidAreaType.TYPE_SYSTEM) {
+      const topSystemVp = uiContext.px2vp(area.topRect.height);
+      if (topSystemVp > 0) {
+        AppStorage.setOrCreate('statusBarSystemHeight', topSystemVp);
+      }
+      // topSystemVp === 0: bars hidden — leave last positive system height cached
+      WindowUtil.publishStatusBarHeight();
+    } else if (type === window.AvoidAreaType.TYPE_CUTOUT) {
+      const topCutoutVp = uiContext.px2vp(area.topRect.height + area.topRect.top);
+      AppStorage.setOrCreate('statusBarCutoutHeight', topCutoutVp);
+      WindowUtil.publishStatusBarHeight();
+    } else if (type === window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
+      AppStorage.setOrCreate('navBarHeight', uiContext.px2vp(area.bottomRect.height));
+    }
+  }
+
+  private static publishStatusBarHeight(): void {
+    const systemH = AppStorage.get<number>('statusBarSystemHeight') ?? 0;
+    const cutoutH = AppStorage.get<number>('statusBarCutoutHeight') ?? 0;
+    AppStorage.setOrCreate('statusBarHeight', Math.max(systemH, cutoutH));
   }
 
   setMainWindowOrientation(orientation: window.Orientation, callback?: Function): void {
@@ -129,6 +158,38 @@ export class WindowUtil {
   setPlayerFullscreenImmersive(value: boolean): void {
     this.isPlayerFullscreenImmersive = value;
     this.updateSystemBar();
+  }
+
+  /**
+   * Player page sits under a dark video surface: force white status-bar glyphs
+   * so clock / icons remain readable. Pass restore=true when leaving player
+   * to follow light/dark theme again.
+   */
+  setPlayerStatusBarStyle(onPlayerPage: boolean): void {
+    if (this.mainWindowClass === undefined) {
+      Logger.error(`MainWindowClass is undefined`);
+      return;
+    }
+    try {
+      if (onPlayerPage) {
+        this.mainWindowClass.setWindowSystemBarProperties({
+          statusBarContentColor: '#FFFFFF',
+          navigationBarColor: '#00000000',
+          navigationBarContentColor: '#FFFFFF'
+        });
+      } else {
+        const currentColorMode = AppStorage.get<ConfigurationConstant.ColorMode>('currentColorMode');
+        const isDarkMode = currentColorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+        const contentColor = isDarkMode ? '#FFFFFF' : '#000000';
+        this.mainWindowClass.setWindowSystemBarProperties({
+          statusBarContentColor: contentColor,
+          navigationBarColor: '#00000000',
+          navigationBarContentColor: contentColor
+        });
+      }
+    } catch (err) {
+      Logger.error(TAG, `setPlayerStatusBarStyle failed: ${JSON.stringify(err)}`);
+    }
   }
 
   /**

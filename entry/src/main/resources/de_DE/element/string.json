@@ -1,4 +1,4 @@
-{
+﻿{
     "string": [
         {
             "name": "module_desc",
@@ -627,6 +627,10 @@
         {
             "name": "yt_label_like",
             "value": "Gefällt mir"
+        }        ,
+        {
+            "name": "yt_label_dislike",
+            "value": "Mag ich nicht"
         },
         {
             "name": "yt_tab_videos",
@@ -1010,3 +1014,4 @@
         }
     ]
 }
+

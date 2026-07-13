@@ -1,6 +1,18 @@
 import { VideoItem } from 'youtube_core';
 import { PlayQueueManager, QueueSourceType, QueueChangeListener } from '../PlayQueueManager';
 import { MediaThumb } from '../../../common/components/MediaThumb';
+import {
+  MEDIA_CARD_RADIUS,
+  MEDIA_CARD_SHADOW_OFFSET_Y,
+  MEDIA_CARD_SHADOW_RADIUS,
+  MEDIA_LIST_THUMB_GAP,
+  MEDIA_LIST_THUMB_HEIGHT,
+  MEDIA_LIST_THUMB_WIDTH,
+  MEDIA_META_SIZE,
+  MEDIA_THUMB_RADIUS,
+  MEDIA_TITLE_LINE_HEIGHT,
+  MEDIA_TITLE_SIZE
+} from '../../../common/components/MediaCardTokens';
 
 class PlayQueueListListener extends QueueChangeListener {
   private component: PlayQueueList;
@@ -106,17 +118,6 @@ export struct PlayQueueList {
     return `${this.queue.length} videos in queue`;
   }
 
-  private getMetaText(item: VideoItem): string {
-    const parts: string[] = [];
-    if (item.author && item.author.length > 0) {
-      parts.push(item.author);
-    }
-    if (item.viewCount && item.viewCount.length > 0) {
-      parts.push(item.viewCount);
-    }
-    return parts.join('  ·  ');
-  }
-
   @Builder
   QueueHeader() {
     Row() {
@@ -202,9 +203,9 @@ export struct PlayQueueList {
       MediaThumb({
         imageUrl: item.thumbnailUrl || '',
         placeholderColor: item.thumbnailColor || '',
-        widthVp: 160,
-        heightVp: 90,
-        borderRadiusVp: 6,
+        widthVp: MEDIA_LIST_THUMB_WIDTH,
+        heightVp: MEDIA_LIST_THUMB_HEIGHT,
+        borderRadiusVp: MEDIA_THUMB_RADIUS,
         showLive: true,
         isLive: item.isLive
       })
@@ -215,16 +216,16 @@ export struct PlayQueueList {
             .fontSize(20)
             .fontColor([Color.White])
         }
-        .width(160)
-        .height(90)
+        .width(MEDIA_LIST_THUMB_WIDTH)
+        .height(MEDIA_LIST_THUMB_HEIGHT)
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .backgroundColor('rgba(0,0,0,0.4)')
-        .borderRadius(6)
+        .borderRadius(MEDIA_THUMB_RADIUS)
       }
     }
-    .width(160)
-    .height(90)
+    .width(MEDIA_LIST_THUMB_WIDTH)
+    .height(MEDIA_LIST_THUMB_HEIGHT)
   }
 
   @Builder
@@ -234,48 +235,54 @@ export struct PlayQueueList {
 
       Column() {
         Text(item.title || '')
-          .fontSize(14)
+          .fontSize(MEDIA_TITLE_SIZE)
           .fontColor(index === this.currentIndex
             ? this.themePrimary
             : $r('app.color.yourtube_text_primary'))
-          .fontWeight(index === this.currentIndex ? FontWeight.Medium : FontWeight.Medium)
+          .fontWeight(FontWeight.Medium)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .lineHeight(18)
+          .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
+          .width('100%')
           .margin({ bottom: 2 })
 
-        Row() {
-          Text(item.author || '')
-            .fontSize(11)
+        if (item.author && item.author.length > 0) {
+          Text(item.author)
+            .fontSize(MEDIA_META_SIZE)
             .fontColor($r('app.color.yourtube_text_quaternary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .constraintSize({ maxWidth: '60%' })
-
-          if (item.viewCount && item.viewCount.length > 0) {
-            Text(` · ${item.viewCount}`)
-              .fontSize(11)
-              .fontColor($r('app.color.yourtube_text_hint'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
+            .width('100%')
+            .margin({ bottom: 2 })
         }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
+
+        if (item.viewCount && item.viewCount.length > 0) {
+          Text(item.viewCount)
+            .fontSize(MEDIA_META_SIZE)
+            .fontColor($r('app.color.yourtube_text_hint'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+        }
       }
       .layoutWeight(1)
-      .height(90)
+      .constraintSize({ minHeight: MEDIA_LIST_THUMB_HEIGHT })
       .alignItems(HorizontalAlign.Start)
-      .margin({ left: 12 })
+      .margin({ left: MEDIA_LIST_THUMB_GAP })
     }
     .width('100%')
     .padding({ left: 10, right: 10, top: 8, bottom: 8 })
     .alignItems(VerticalAlign.Top)
-    .borderRadius(12)
+    .borderRadius(MEDIA_CARD_RADIUS)
     .backgroundColor(index === this.currentIndex
       ? $r('app.color.yourtube_bg_surface_muted')
       : $r('app.color.yourtube_bg_surface'))
-    .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+    .shadow({
+      radius: MEDIA_CARD_SHADOW_RADIUS,
+      color: $r('app.color.yourtube_shadow'),
+      offsetX: 0,
+      offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
+    })
     .onClick(() => {
       this.switchToVideo(item, index);
     })

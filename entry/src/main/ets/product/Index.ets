@@ -1419,6 +1419,8 @@ struct Index {
         })
       }
       .hideTitleBar(true)
+      // Full-bleed destination: player owns status-bar inset (see PlayerPage top spacer).
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .onShown(() => {
         AppStorage.setOrCreate('playerPageVisible', true);
       })

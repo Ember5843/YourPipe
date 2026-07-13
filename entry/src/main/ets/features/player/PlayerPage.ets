@@ -53,8 +53,10 @@ export struct VideoPlayerPage {
     AppStorage.get<number>('deviceHeight') || 0;
   @StorageProp('deviceWidth') deviceWidth: number =
     AppStorage.get<number>('deviceWidth') || 0;
-  // statusBarHeight 由 WindowUtil 在 avoidAreaChange 时实时更新，包含刘海/状态栏高度
+  // statusBarHeight 由 WindowUtil 在 avoidAreaChange 时实时更新（TYPE_SYSTEM / TYPE_CUTOUT max）
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
+  // Index Provide 的 safeAreaTop 作为兜底，避免 Storage 尚未写入时 inset 为 0
+  @Consume('safeAreaTop') safeAreaTop: number = 0;
   // 三种布局状态：
   //   isFullLandscapeScreen = true  → 沉浸全屏（视频 100%，隐藏系统栏）
   //   isWideLayout         = true  → 平板/折叠屏宽布局（左视频 60% + 右信息 40%）
@@ -88,6 +90,7 @@ export struct VideoPlayerPage {
   @State videoDescriptionError: string | null = null;
   @State errorInfo: ErrorInfo | null = null;
   @State detailLikeCount: string = '0';
+  @State detailDislikeCount: string = '0';
   @State detailChannelId: string = '';
   @State detailChannelAvatarUrl: string = '';
   @State isRetrying: boolean = false;
@@ -185,6 +188,14 @@ export struct VideoPlayerPage {
     return Math.max(200, Math.min(maxHeight, defaultHeight));
   }
 
+  /** Non-immersive top inset under status bar / punch-hole. Immersive → 0. */
+  private getTopSafeInsetVp(): number {
+    if (this.isImmersive) {
+      return 0;
+    }
+    return Math.max(this.statusBarHeight || 0, this.safeAreaTop || 0);
+  }
+
   /**
    * 重试加载视频信息（从获取视频详细信息和流开始）
    */
@@ -209,6 +220,7 @@ export struct VideoPlayerPage {
 
   private syncDetailStateFromSource(source: VideoData): void {
     this.detailLikeCount = source.likeCount || '0';
+    this.detailDislikeCount = source.dislikeCount || '0';
     this.detailChannelId = source.channelId || this.video?.channelId || '';
     this.detailChannelAvatarUrl = this.video?.channelAvatarUrl || '';
   }
@@ -217,6 +229,13 @@ export struct VideoPlayerPage {
     const session = PlayerSession.getInstance();
     this.controller = session.controller;
     this.vm = session.controller.vm;
+    session.onPlaybackExtrasUpdated = (source: VideoData) => {
+      if (!source || (this.video && source.videoId && source.videoId !== this.video.videoId)) {
+        return;
+      }
+      this.videoSource = source;
+      this.syncDetailStateFromSource(source);
+    };
 
     let context: Context = this.getUIContext().getHostContext() as Context;
 
@@ -241,6 +260,8 @@ export struct VideoPlayerPage {
 
     // 进入播放页：重置沉浸全屏标志，由 WindowUtil 全局策略按当前方向决定系统栏
     this.windowUtil.setPlayerFullscreenImmersive(false);
+    // Dark video surface: force white status-bar icons (鸿蒙沉浸式推荐：内容延伸 + 图标对比色)
+    this.windowUtil.setPlayerStatusBarStyle(true);
 
     const initW = this.deviceWidth;
     const initH = this.deviceHeight;
@@ -321,6 +342,7 @@ export struct VideoPlayerPage {
           auto: this.videoSource.auto,
           head: this.videoSource.head,
           likeCount: this.videoSource.likeCount,
+          dislikeCount: this.videoSource.dislikeCount || this.detailDislikeCount || '0',
           commentCount: this.videoSource.commentCount,
           shareCount: this.videoSource.shareCount,
           author: result.videoInfo.author || this.videoSource.author || '',
@@ -351,9 +373,11 @@ export struct VideoPlayerPage {
   }
 
   aboutToDisappear(): void {
+    PlayerSession.getInstance().onPlaybackExtrasUpdated = undefined;
     harmonyShare.off('knockShare', this.knockShareCallback);
-    // 离开播放页：清除沉浸全屏标志，由 WindowUtil 全局策略按方向决定系统栏
+    // 离开播放页：清除沉浸全屏标志，恢复主题状态栏颜色
     this.windowUtil.setPlayerFullscreenImmersive(false);
+    this.windowUtil.setPlayerStatusBarStyle(false);
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
     this.windowUtil.registerOffWindowSizeChange();
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
@@ -408,6 +432,7 @@ export struct VideoPlayerPage {
       this.videoDescriptionError = null;
       this.errorInfo = null;
       this.detailLikeCount = '0';
+      this.detailDislikeCount = '0';
       this.detailChannelId = this.video.channelId || '';
       this.detailChannelAvatarUrl = this.video.channelAvatarUrl || '';
       const newVideoSource = await session.play(this.video);
@@ -659,6 +684,7 @@ export struct VideoPlayerPage {
                     streams: this.videoSource.streams || [],
                     viewCount: this.videoSource.viewCount || 0,
                     likeCount: this.detailLikeCount,
+                    dislikeCount: this.detailDislikeCount,
                     publishDate: this.videoSource.publishDate || '',
                     tags: this.videoSource.tags || [],
                     channelId: this.detailChannelId,
@@ -786,12 +812,18 @@ export struct VideoPlayerPage {
   }
 
   build() {
+    // 非沉浸：视频画面整体下移 topSafeInset，不侵入状态栏/挖孔。
+    // 沉浸全屏：系统栏隐藏，视频铺满。
+    // 顶部 inset 不做高度动画，避免退出全屏时「先全屏再长出黑条」。
+    // 状态栏图标在播放页强制白色（WindowUtil.setPlayerStatusBarStyle）。
+    // XComponent SURFACE 可能溢出布局框，视频区 clip + 顶部黑条盖住避让区。
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
+        // Opaque top spacer: reserves layout space AND paints black under status bar.
         Column()
           .width(Const.WIDTH_FULL_PERCENT)
-          .height(this.isImmersive ? 0 : this.statusBarHeight)
-          .animation({ duration: 300, curve: Curve.EaseInOut })
+          .height(this.getTopSafeInsetVp())
+          .backgroundColor(Color.Black)
 
         Flex({
           direction: this.isWideLayout && !this.isFullLandscapeScreen
@@ -805,6 +837,7 @@ export struct VideoPlayerPage {
           .height(this.isFullLandscapeScreen ? Const.HEIGHT_FULL_PERCENT :
             this.isWideLayout ? Const.HEIGHT_FULL_PERCENT :
             this.getVideoHeightVp())
+          .clip(true)
           // 属性动画：宽布局 ↔ 沉浸全屏（同尺寸切换）需要 300ms 缓动；
           // 系统旋转路径下 windowSizeChange 用 animateTo({duration:0}) 主动禁用，
           // 让系统旋转动画独占，避免双动画打架。
@@ -815,7 +848,22 @@ export struct VideoPlayerPage {
         .width(Const.WIDTH_FULL_PERCENT)
         .layoutWeight(1)
       }
+      .width(Const.WIDTH_FULL_PERCENT)
+      .height(Const.HEIGHT_FULL_PERCENT)
+
+      // Extra cover: if native surface still paints above the spacer, this opaque
+      // bar sits at the very top of the page stack and masks status-bar region.
+      if (!this.isImmersive && this.getTopSafeInsetVp() > 0) {
+        Column()
+          .width(Const.WIDTH_FULL_PERCENT)
+          .height(this.getTopSafeInsetVp())
+          .backgroundColor(Color.Black)
+          .hitTestBehavior(HitTestMode.None)
+      }
     }
+    .width(Const.WIDTH_FULL_PERCENT)
+    .height(Const.HEIGHT_FULL_PERCENT)
     .backgroundColor(Color.Black)
+    .clip(true)
   }
 }
