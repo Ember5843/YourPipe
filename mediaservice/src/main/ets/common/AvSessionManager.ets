@@ -41,11 +41,12 @@ export class AvSessionManager {
   public onCastStateChange: ((isCasting: boolean, deviceName: string) => void) | undefined = undefined;
   public onCastPlaybackStateChange: ((state: avSession.AVPlaybackState) => void) | undefined = undefined;
 
-  // Audio focus callbacks (wired by AvPlayerController)
-  public onSystemPause: (() => void) | undefined = undefined;
-  public onSystemResume: (() => void) | undefined = undefined;
-  public onSystemDuck: (() => void) | undefined = undefined;
-  public onSystemUnduck: (() => void) | undefined = undefined;
+  /**
+   * Unified audio-focus entry for the player controller (scheme A).
+   * AvSessionManager only forwards system hints; policy lives in AvPlayerController.
+   * Stable log tag for filtering: [AudioFocus]
+   */
+  public onAudioFocusHint: ((hint: audio.AudioSessionStateChangeHint) => void) | undefined = undefined;
 
   private constructor() {}
 
@@ -74,9 +75,8 @@ export class AvSessionManager {
     // AudioSession is NOT activated here. Activation follows playback state:
     // AvPlayerController.syncPlay() → activateForPlayback()
     // AvPlayerController.syncPause() / syncStop() → deactivateForPause()
-    // This way the focus strategy (CONCURRENCY_PAUSE_OTHERS) only applies
-    // while our audio is actively playing, and is released on pause/stop
-    // so background streams can resume normally.
+    // Focus strategy (CONCURRENCY_MIX_WITH_OTHERS) applies only while playing;
+    // pause/stop releases the session so background streams can resume.
 
     if (this.session) {
       // Already initialized — just reactivate
@@ -390,31 +390,28 @@ export class AvSessionManager {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // AudioSession — audio focus concurrency strategy & interrupt handling
+  // AudioSession — focus concurrency + interrupt forwarding
   //
-  // Follows the official pattern from the HarmonyOS audio focus doc:
-  //   1. Activate with CONCURRENCY_PAUSE_OTHERS BEFORE audio starts.
-  //      Our MOVIE stream will PAUSE (not STOP) background MUSIC/MOVIE/AUDIOBOOK.
-  //   2. Deactivate when playback pauses/stops → releases focus so background
-  //      streams can resume.
-  //   3. Re-activate on next play().
+  // HarmonyOS AudioSession (mediaservice owns policy, not native MPV):
+  //   1. Activate with CONCURRENCY_MIX_WITH_OTHERS BEFORE play so transient
+  //      streams (nav/TTS) prefer mix/duck over hard pause when allowed.
+  //   2. Deactivate on user pause/stop → release focus for background music.
+  //   3. Re-activate on next play() / system RESUME after temporary PAUSE.
   //
-  // Interrupt events (PAUSE/RESUME/STOP/DUCK/UNDUCK) are delivered via
-  // on('audioSessionStateChanged') and dispatched to AvPlayerController through
-  // the onSystemPause/onSystemResume/onSystemDuck/onSystemUnduck callbacks.
+  // Hints (PAUSE/RESUME/STOP/DUCK/UNDUCK/…) arrive via audioSessionStateChanged
+  // and are forwarded to AvPlayerController.onAudioFocusHint (scheme A).
+  //
+  // Debug logs: filter with [AudioFocus]
   // ─────────────────────────────────────────────────────────────────────────
 
   public activateForPlayback(): void {
-    if (this.audioSessionActivated) {
-      return;
-    }
     try {
       if (!this.audioSessionManager) {
         const audioManager: audio.AudioManager = audio.getAudioManager();
         this.audioSessionManager = audioManager.getSessionManager();
       }
 
-      // 先 off 旧监听，防止重复注册导致同一事件回调多次
+      // Always re-bind listeners; activation is idempotent when already active.
       try {
         this.audioSessionManager.off('audioSessionDeactivated');
         this.audioSessionManager.off('audioSessionStateChanged');
@@ -423,29 +420,33 @@ export class AvSessionManager {
       this.audioSessionManager.setAudioSessionScene(
         audio.AudioSessionScene.AUDIO_SESSION_SCENE_MEDIA);
       const strategy: audio.AudioSessionStrategy = {
-        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_DUCK_OTHERS
+        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
       };
-      this.audioSessionManager.activateAudioSession(strategy).then(() => {
-        this.audioSessionActivated = true;
-        Logger.info(TAG, 'AudioSession activated: CONCURRENCY_DUCK_OTHERS');
-      }).catch((e: BusinessError) => {
-        Logger.error(TAG, `activateAudioSession failed: code=${e.code}, message=${e.message}`);
-      });
 
-      // 系统停用 AudioSession 时不自动重激活——重激活会抢回焦点，
-      // 导致与其他应用反复抢占形成死循环。由用户点播放时自然重激活。
       this.audioSessionManager.on('audioSessionDeactivated',
         (event: audio.AudioSessionDeactivatedEvent) => {
-          Logger.info(TAG, `AudioSession deactivated by system: reason=${event.reason}`);
+          Logger.info(TAG, `[AudioFocus] sessionDeactivated reason=${event.reason}`);
           this.audioSessionActivated = false;
         });
 
       this.audioSessionManager.on('audioSessionStateChanged',
         (event: audio.AudioSessionStateChangedEvent) => {
-          this.handleFocusHint(event.stateChangeHint);
+          this.forwardFocusHint(event.stateChangeHint);
         });
+
+      if (this.audioSessionActivated) {
+        Logger.info(TAG, '[AudioFocus] session already active (MIX_WITH_OTHERS)');
+        return;
+      }
+
+      this.audioSessionManager.activateAudioSession(strategy).then(() => {
+        this.audioSessionActivated = true;
+        Logger.info(TAG, '[AudioFocus] sessionActivated strategy=MIX_WITH_OTHERS scene=MEDIA');
+      }).catch((e: BusinessError) => {
+        Logger.error(TAG, `[AudioFocus] activate failed code=${e.code} message=${e.message}`);
+      });
     } catch (e) {
-      Logger.error(TAG, `activateAudioSession exception: ${(e as BusinessError).message}`);
+      Logger.error(TAG, `[AudioFocus] activate exception: ${(e as BusinessError).message}`);
     }
   }
 
@@ -461,32 +462,39 @@ export class AvSessionManager {
     }
     if (this.audioSessionActivated) {
       this.audioSessionManager.deactivateAudioSession().then(() => {
-        Logger.info(TAG, 'AudioSession deactivated — focus released');
+        Logger.info(TAG, '[AudioFocus] sessionDeactivated reason=user_or_controller');
       }).catch((e: BusinessError) => {
-        Logger.error(TAG, `deactivateAudioSession failed: code=${e.code}, message=${e.message}`);
+        Logger.error(TAG, `[AudioFocus] deactivate failed code=${e.code} message=${e.message}`);
       });
       this.audioSessionActivated = false;
     }
   }
 
-  private handleFocusHint(hint: audio.AudioSessionStateChangeHint): void {
-    Logger.info(TAG, `audioSessionStateChanged: hint=${hint}`);
+  /** Named hint for hilog filtering (keep stable for regex). */
+  public static focusHintName(hint: audio.AudioSessionStateChangeHint): string {
     switch (hint) {
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_PAUSE:
-      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_STOP:
-        this.onSystemPause?.();
-        break;
+        return 'PAUSE';
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_RESUME:
-        this.onSystemResume?.();
-        break;
+        return 'RESUME';
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_STOP:
+        return 'STOP';
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_DUCK:
-        this.onSystemDuck?.();
-        break;
+        return 'DUCK';
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_UNDUCK:
-        this.onSystemUnduck?.();
-        break;
+        return 'UNDUCK';
       default:
-        break;
+        return `UNKNOWN_${hint}`;
+    }
+  }
+
+  private forwardFocusHint(hint: audio.AudioSessionStateChangeHint): void {
+    const name = AvSessionManager.focusHintName(hint);
+    Logger.info(TAG, `[AudioFocus] hint=${name} raw=${hint}`);
+    if (this.onAudioFocusHint) {
+      this.onAudioFocusHint(hint);
+    } else {
+      Logger.warn(TAG, `[AudioFocus] hint=${name} dropped (no onAudioFocusHint handler)`);
     }
   }
 }

@@ -13,6 +13,7 @@ import { AvSessionManager } from '../common/AvSessionManager';
 import { BackgroundTaskManager } from '../common/BackgroundTaskManager';
 import { PlaybackPreferences } from '../common/PlaybackPreferences';
 import { common } from '@kit.AbilityKit';
+import { audio } from '@kit.AudioKit';
 import { PlayerStateRelay, ProgressSubscriber } from '../state/PlayerStateRelay';
 import { PlayerStateMachine, StateChangeListener } from '../state/PlayerStateMachine';
 import { PlayerState } from '../state/PlayerState';
@@ -78,9 +79,13 @@ export class AvPlayerController {
   private readonly MAX_ERROR_RETRIES = 2;
   private lastKnownGoodPosition: number = 0;
 
-  // Audio focus state
+  // Audio focus state (player-side handler for system hints — scheme A)
+  /** Temporary focus loss (PAUSE): auto-resume on RESUME. */
   private systemPausedByFocus: boolean = false;
+  /** Permanent focus loss (STOP): do not auto-resume. */
+  private systemStoppedByFocus: boolean = false;
   private duckActive: boolean = false;
+  /** Snapshot for diagnostics / future UI; system owns duck gain on AudioSession path. */
   private savedVolume: number = 100;
   public onRequestRefreshStreams?: (videoId: string, resumePos: number) => Promise<VideoData | null>;
   public onErrorNeedsUserAction?: (errorMsg: string) => void;
@@ -247,34 +252,9 @@ export class AvPlayerController {
       this.onCastStateChange?.(isCasting, deviceName);
     };
 
-    this.avSessionManager.onSystemPause = () => {
-      Logger.info(TAG, 'System interrupt → pause');
-      this.systemPausedByFocus = true;
-      this.playbackEngine.pause();
-      this.refreshPlaybackState();
-    };
-    this.avSessionManager.onSystemResume = () => {
-      if (this.systemPausedByFocus) {
-        Logger.info(TAG, 'System interrupt resolved → resume');
-        this.systemPausedByFocus = false;
-        this.playbackEngine.play();
-        this.refreshPlaybackState();
-      }
-    };
-    this.avSessionManager.onSystemDuck = () => {
-      if (!this.duckActive) {
-        this.duckActive = true;
-        this.savedVolume = this.playbackEngine.getVolume();
-        this.playbackEngine.setVolume(this.savedVolume * 0.2);
-        Logger.info(TAG, `System duck → volume ${this.savedVolume} → ${this.savedVolume * 0.2}`);
-      }
-    };
-    this.avSessionManager.onSystemUnduck = () => {
-      if (this.duckActive) {
-        this.duckActive = false;
-        this.playbackEngine.setVolume(this.savedVolume);
-        Logger.info(TAG, `System unduck → volume restored to ${this.savedVolume}`);
-      }
+    // Scheme A: single player entry for all system audio-focus hints.
+    this.avSessionManager.onAudioFocusHint = (hint) => {
+      this.handleAudioFocusHint(hint);
     };
 
     const ok = await this.playbackEngine.initialize(AvPlayerController.engineConfigProvider?.() ?? {});
@@ -447,20 +427,20 @@ export class AvPlayerController {
 
   public syncPlay(): void {
     if (!this.isActive()) return;
-    this.systemPausedByFocus = false;
+    this.clearFocusInterruptFlags('user_play');
     if (this.vm.isEnded) {
       this.playbackEngine.seek(0, true);
       this.vm.isEnded = false;
     }
-    // Activate AudioSession with PAUSE_OTHERS before playing,
-    // so our stream PAUSEs (not STOPs) background audio.
+    // Activate AudioSession (MIX_WITH_OTHERS) before play so transient streams
+    // can mix/duck when the system allows it.
     this.avSessionManager.activateForPlayback();
     this.playbackEngine.play();
   }
 
   public syncPause(): void {
     if (!this.isActive()) return;
-    this.systemPausedByFocus = false;
+    this.clearFocusInterruptFlags('user_pause');
     this.playbackEngine.pause();
     // Release focus so background audio can resume.
     this.avSessionManager.deactivateForPause();
@@ -468,9 +448,91 @@ export class AvPlayerController {
 
   public syncStop(): void {
     if (!this.isActive()) return;
-    this.systemPausedByFocus = false;
+    this.clearFocusInterruptFlags('user_stop');
     this.playbackEngine.stop();
     this.avSessionManager.deactivateForPause();
+  }
+
+  /**
+   * Player-side audio focus handler (scheme A).
+   * Stable log prefix for filtering: [AudioFocus]
+   *
+   * PAUSE  → temporary: freeze timeline, auto-resume on RESUME
+   * STOP   → permanent: freeze timeline, no auto-resume
+   * DUCK   → lower volume (~20%), keep playing
+   * UNDUCK → restore volume
+   * RESUME → only after temporary PAUSE; re-activate session then play
+   */
+  private handleAudioFocusHint(hint: audio.AudioSessionStateChangeHint): void {
+    const name = AvSessionManager.focusHintName(hint);
+    switch (hint) {
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_PAUSE:
+        this.systemPausedByFocus = true;
+        this.systemStoppedByFocus = false;
+        this.playbackEngine.pause();
+        this.refreshPlaybackState();
+        Logger.info(TAG, `[AudioFocus] action=pause kind=temporary hint=${name}`);
+        break;
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_STOP:
+        this.systemPausedByFocus = false;
+        this.systemStoppedByFocus = true;
+        this.playbackEngine.pause();
+        this.refreshPlaybackState();
+        // Permanent loss: release session so other apps can keep focus.
+        this.avSessionManager.deactivateForPause();
+        Logger.info(TAG, `[AudioFocus] action=pause kind=permanent hint=${name}`);
+        break;
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_RESUME:
+        if (this.systemStoppedByFocus) {
+          Logger.info(TAG, `[AudioFocus] action=ignore_resume reason=permanent_stop hint=${name}`);
+          break;
+        }
+        if (!this.systemPausedByFocus) {
+          Logger.info(TAG, `[AudioFocus] action=ignore_resume reason=not_system_paused hint=${name}`);
+          break;
+        }
+        this.systemPausedByFocus = false;
+        // Docs: after temporary PAUSE, re-activate session before resuming.
+        this.avSessionManager.activateForPlayback();
+        this.playbackEngine.play();
+        this.refreshPlaybackState();
+        Logger.info(TAG, `[AudioFocus] action=resume hint=${name}`);
+        break;
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_DUCK:
+        // AudioSession path: system FORCE-ducks stream gain (~20%). Do NOT also
+        // set mpv volume — double duck (0.2×0.2) sounds like mute.
+        if (!this.duckActive) {
+          this.duckActive = true;
+          this.savedVolume = this.playbackEngine.getVolume();
+          Logger.info(TAG,
+            `[AudioFocus] action=duck mode=system_gain mpvVolume=${this.savedVolume} (no setVolume)`);
+        } else {
+          Logger.info(TAG, `[AudioFocus] action=duck_skip already_active mpvVolume=${this.playbackEngine.getVolume()}`);
+        }
+        break;
+      case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_UNDUCK:
+        // System restores stream gain; keep mpv volume unchanged.
+        if (this.duckActive) {
+          this.duckActive = false;
+          Logger.info(TAG,
+            `[AudioFocus] action=unduck mode=system_gain mpvVolume=${this.playbackEngine.getVolume()} saved=${this.savedVolume}`);
+        } else {
+          Logger.info(TAG, `[AudioFocus] action=unduck_skip not_active`);
+        }
+        break;
+      default:
+        Logger.info(TAG, `[AudioFocus] action=unhandled hint=${name} raw=${hint}`);
+        break;
+    }
+  }
+
+  private clearFocusInterruptFlags(reason: string): void {
+    if (this.systemPausedByFocus || this.systemStoppedByFocus) {
+      Logger.info(TAG,
+        `[AudioFocus] action=clear_flags reason=${reason} temp=${this.systemPausedByFocus} perm=${this.systemStoppedByFocus}`);
+    }
+    this.systemPausedByFocus = false;
+    this.systemStoppedByFocus = false;
   }
 
   public syncSeek(seekTime: number): void {
