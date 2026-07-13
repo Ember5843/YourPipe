@@ -1,6 +1,7 @@
 import { YTCoreLogger } from '../common/YTCoreLogger';
 import {
   fixThumbnailUrl,
+  pickHighestThumbnailUrl,
   getTextFromObject,
   parseDurationString,
   generateContentPlaybackNonce,
@@ -685,8 +686,17 @@ export class YouTubeExtractor {
     //   SABR-only 与否由后续 guard 判定。
     this.checkAggregatedErrors(innertubePlayers);
 
-    if (!isLive && this.isSabrOnlyResponse(innertubePlayers)
-      && this.getHlsManifestUrlFromStreamingData().length === 0) {
+        // SABR guard 详细诊断日志
+    const hlsUrl = this.getHlsManifestUrlFromStreamingData();
+    const isSabr = this.isSabrOnlyResponse(innertubePlayers);
+    const safariSd = innertubePlayers.safari?.streamingData;
+    const androidSd = innertubePlayers.android?.streamingData;
+    logger.info(`[STREAM_DEBUG] SABR guard trigger: isLive=${isLive} isSabr=${isSabr} hlsLen=${hlsUrl.length} `
+      + `safariAdaptive=${safariSd?.adaptiveFormats?.length ?? 0} safariFormats=${safariSd?.formats?.length ?? 0} `
+      + `safariHasHlsField=${!!safariSd?.hlsManifestUrl} `
+      + `androidAdaptive=${androidSd?.adaptiveFormats?.length ?? 0} androidFormats=${androidSd?.formats?.length ?? 0}`);
+
+    if (!isLive && isSabr && hlsUrl.length === 0) {
       throw new ContentNotSupportedException(
         'YouTube returned SABR-only streaming data without usable stream URLs. '
         + 'Try logging in to get HLS fallback streams.'
@@ -795,7 +805,7 @@ export class YouTubeExtractor {
         preFiredPlayerPromise = this.fetchPlayerClient(videoId, cachedSts, undefined, true);
       } else if (!hasCookieAuth) {
         preFiredPlayerPromise = visitorPromise.then((v: string | undefined) =>
-          this.fetchPlayerClient(videoId, undefined, v, false));
+          this.fetchPlayerClientWithFallback(videoId, undefined, v, false));
       }
     }
 
@@ -831,8 +841,9 @@ export class YouTubeExtractor {
         innertubePlayers = await this.fetchPlayerClient(videoId, freshSts, undefined, true);
       } else {
         // 非登录态：visitor_id 已并行获取（缓存命中或刚完成），确保拿到 visitorData 后发
+        // fetchPlayerClientWithFallback 内部：Android 主路，Android streamingData == null 时匿名 Safari 兜底
         const androidVisitor = await visitorPromise;
-        innertubePlayers = await this.fetchPlayerClient(videoId, undefined, androidVisitor, false);
+        innertubePlayers = await this.fetchPlayerClientWithFallback(videoId, undefined, androidVisitor, false);
       }
       await this.buildAndCacheStreams(videoId, innertubePlayers, watchPlayerResponse);
     }
@@ -1203,6 +1214,61 @@ export class YouTubeExtractor {
     return result;
   }
 
+  /**
+   * 未登录态专用的客户端调用：先发 Android VR，Android 完全无 streamingData 时
+   * 匿名调一次 Safari 作为兑底（对齐 PipePipe onFetchPage L1371-1379）。
+   *   - 主路：Android VR（匿名）—— 依赖 visitorData + UA，不需 cookie
+   *   - 兑底：Safari（匿名）—— addLoggedInHeaders 看到 hasTokens()==false 不注入 Cookie
+   * 已登录态不调此方法（与 PipePipe 一致，保留现 fetchPlayerClient 行为）。
+   */
+  private async fetchPlayerClientWithFallback(
+    videoId: string,
+    sts: number | undefined,
+    visitorData: string | undefined,
+    hasCookieAuth: boolean
+  ): Promise<InnertubePlayerResult> {
+    if (hasCookieAuth) {
+      // 已登录保持原行为（PipePipe 已登录也不调 Android 兑底）
+      return await this.fetchPlayerClient(videoId, sts, undefined, true);
+    }
+
+    // 未登录：先发 Android VR
+    const result = await this.fetchPlayerClient(videoId, undefined, visitorData, false);
+    const androidSd = result.android?.streamingData;
+    if (androidSd) {
+      // Android 有 streamingData（SABR-only 或正常）—— 与 PipePipe 一致，不兑底
+      return result;
+    }
+
+    // Android streamingData 为 null：匿名 Safari 兑底一次
+    logger.warn('[STREAM_DEBUG] Unlogged Android returned no streamingData; falling back to anonymous Safari');
+    try {
+      const safariCtx: ClientFetchContext = {
+        videoId: videoId,
+        hl: this.hl,
+        gl: this.gl,
+        visitorData: undefined,
+        signatureTimestamp: sts
+      };
+      const safariResult = await SafariPlayerClient.fetch(safariCtx, this.client, false);
+      if (safariResult?.playerResponse) {
+        const sd = safariResult.streamingData;
+        logger.info(`[STREAM_DEBUG] Safari fallback: status=${safariResult.playerResponse.playabilityStatus?.status}, formats=${sd?.formats?.length || 0}, adaptive=${sd?.adaptiveFormats?.length || 0}`);
+        const merged: InnertubePlayerResult = {
+          android: result.android,
+          androidCpn: result.androidCpn,
+          safari: safariResult.playerResponse,
+          safariCpn: safariResult.cpn
+        };
+        return merged;
+      }
+    } catch (e) {
+      this.errors.push(new ExtractorStageError('safari-fallback', e as Error));
+      logger.warn('Safari fallback error:', e);
+    }
+    return result;
+  }
+
   /** 获取 next 端点响应（对标 PipePipe nextDataCall） */
   private async fetchNextResponse(videoId: string): Promise<NextResponse | null> {
     const url = `${ClientsConstants.YOUTUBEI_V1_URL}next?prettyPrint=false`;
@@ -1344,10 +1410,10 @@ export class YouTubeExtractor {
     if (videoInfo.channelId) {
       videoInfo.uploaderUrl = `https://www.youtube.com/channel/${videoInfo.channelId}`;
     }
-    // uploaderAvatarUrl: last thumbnail in owner.thumbnail.thumbnails
+    // uploaderAvatarUrl: highest resolution from owner.thumbnail.thumbnails
     const thumbs = owner.thumbnail?.thumbnails || [];
     if (thumbs.length > 0) {
-      videoInfo.uploaderAvatarUrl = thumbs[thumbs.length - 1].url;
+      videoInfo.uploaderAvatarUrl = pickHighestThumbnailUrl(thumbs as Array<Record<string, Object>>);
     }
     // uploaderSubscriberCount: subscriberCountText
     const subText = this.extractNextText(owner.subscriberCountText);
@@ -1367,7 +1433,7 @@ export class YouTubeExtractor {
     item.channelId = r.channelId;
     const thumbs = r.thumbnail?.thumbnails || [];
     if (thumbs.length > 0) {
-      item.thumbnailUrl = thumbs[thumbs.length - 1].url;
+      item.thumbnailUrl = pickHighestThumbnailUrl(thumbs as Array<Record<string, Object>>);
     }
     const lenText = this.extractNextText(r.lengthText);
     if (lenText) {
@@ -1391,7 +1457,7 @@ export class YouTubeExtractor {
     const item = new RelatedVideoInfo(videoId, title, author);
     const src = lv.thumbnail?.thumbnailViewModel?.image?.sources || [];
     if (src.length > 0) {
-      item.thumbnailUrl = src[src.length - 1].url;
+      item.thumbnailUrl = pickHighestThumbnailUrl(src as Array<Record<string, Object>>);
     }
     return item;
   }

@@ -48,10 +48,20 @@ export struct OptionsMainPage {
   }
 
   private getDataAccountSubtitle(): string {
-    if (this.authStatus.stage === AuthStage.SIGNED_IN) {
-      return this.authStatus.authMode === 'cookie' ? '已登录 (Cookie) · 管理数据与账号' : '已登录 · 管理数据与账号';
+    const hasCred = this.authStatus.hasCredential
+      || this.authStatus.hasCookieCredential
+      || this.authStatus.hasRefreshToken
+      || this.authStatus.stage === AuthStage.SIGNED_IN;
+    if (!hasCred) {
+      return '管理数据与登录状态';
     }
-    return '管理数据与登录状态';
+    if (this.authStatus.authEnabled === false) {
+      return '已保存登录 · 无痕浏览中';
+    }
+    if (this.authStatus.authMode === 'cookie') {
+      return '已登录 (Cookie) · 管理数据与账号';
+    }
+    return '已登录 · 管理数据与账号';
   }
 
   private getLanguageAndRegionSubtitle(): string {
@@ -87,7 +97,7 @@ export struct OptionsMainPage {
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.person'),
+            icon: $r('sys.symbol.person_crop_circle_fill'),
             title: $r('app.string.yt_option_data_account'),
             subtitle: this.getDataAccountSubtitle(),
             iconColor: this.themePrimary,
@@ -104,10 +114,10 @@ export struct OptionsMainPage {
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.translate_c2e'),
+            icon: $r('sys.symbol.globe_and_keyboard'),
             title: $r('app.string.yt_section_language_region'),
             subtitle: this.getLanguageAndRegionSubtitle(),
-            iconColor: $r('app.color.yourtube_option_icon_language'),
+            iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onLanguageClick
           })
@@ -116,7 +126,7 @@ export struct OptionsMainPage {
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.play_circle'),
+            icon: $r('sys.symbol.play_circle_fill'),
             title: $r('app.string.yt_section_playback'),
             subtitle: this.getPlaybackSubtitle(),
             iconColor: this.themePrimary,
@@ -131,7 +141,7 @@ export struct OptionsMainPage {
             icon: $r('sys.symbol.paintpalette_fill'),
             title: $r('app.string.yt_option_appearance'),
             subtitle: this.getAppearanceSubtitle(),
-            iconColor: $r('app.color.yourtube_option_icon_palette'),
+            iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onAppearanceClick
           })
@@ -145,10 +155,10 @@ export struct OptionsMainPage {
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.doc_text'),
+            icon: $r('sys.symbol.doc_plaintext'),
             title: $r('app.string.yt_option_log'),
             subtitle: $r('app.string.yt_option_log_subtitle'),
-            iconColor: $r('app.color.yourtube_option_icon_log'),
+            iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onLogClick
           })
@@ -157,10 +167,10 @@ export struct OptionsMainPage {
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.arrow_counterclockwise'),
+            icon: $r('sys.symbol.arrow_counterclockwise_clock'),
             title: $r('app.string.yt_option_recovery'),
             subtitle: $r('app.string.yt_option_reset_settings_subtitle'),
-            iconColor: $r('app.color.yourtube_option_icon_palette'),
+            iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onRecoveryClick
           })
@@ -169,10 +179,10 @@ export struct OptionsMainPage {
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.info_circle'),
+            icon: $r('sys.symbol.info_circle_fill'),
             title: $r('app.string.yt_option_about'),
             subtitle: 'v' + APP_VERSION,
-            iconColor: $r('app.color.yourtube_option_icon_about'),
+            iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onAboutClick
           })

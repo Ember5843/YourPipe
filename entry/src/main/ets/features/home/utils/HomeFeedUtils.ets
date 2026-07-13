@@ -38,6 +38,131 @@ export function getHomeKioskItemsFromTabContent(tabContent: Record<string, Objec
   return [];
 }
 
+/**
+ * Flatten personalized home / multi-shelf browse responses into leaf item nodes.
+ * Falls back to the kiosk-oriented extractor when no multi-section structure is found.
+ */
+export function getHomeFeedItemsFromTabContent(tabContent: Record<string, Object> | undefined): Array<Record<string, Object>> {
+  if (!tabContent) return [];
+
+  const richGrid = tabContent["richGridRenderer"] as Record<string, Object>;
+  if (richGrid) {
+    const contents = richGrid["contents"] as Array<Record<string, Object>>;
+    if (contents && contents.length > 0) {
+      return expandHomeFeedNodes(contents);
+    }
+  }
+
+  const sectionList = tabContent["sectionListRenderer"] as Record<string, Object>;
+  if (sectionList) {
+    const sections = sectionList["contents"] as Array<Record<string, Object>>;
+    if (sections && sections.length > 0) {
+      const expanded = expandHomeFeedNodes(sections);
+      if (expanded.length > 0) {
+        return expanded;
+      }
+    }
+  }
+
+  return getHomeKioskItemsFromTabContent(tabContent);
+}
+
+function expandHomeFeedNodes(nodes: Array<Record<string, Object>>): Array<Record<string, Object>> {
+  const result: Array<Record<string, Object>> = [];
+  nodes.forEach((node) => {
+    collectHomeFeedLeaves(node, result);
+  });
+  return result;
+}
+
+function collectHomeFeedLeaves(node: Record<string, Object>, out: Array<Record<string, Object>>): void {
+  if (!node) {
+    return;
+  }
+
+  if (node["richItemRenderer"] || node["gridVideoRenderer"] || node["reelItemRenderer"]
+    || node["lockupViewModel"] || node["shortsLockupViewModel"] || node["videoRenderer"]
+    || node["continuationItemRenderer"]) {
+    out.push(node);
+    return;
+  }
+
+  const itemSection = node["itemSectionRenderer"] as Record<string, Object>;
+  if (itemSection) {
+    const contents = itemSection["contents"] as Array<Record<string, Object>>;
+    if (contents) {
+      contents.forEach((c) => collectHomeFeedLeaves(c, out));
+    }
+    return;
+  }
+
+  const richSection = node["richSectionRenderer"] as Record<string, Object>;
+  if (richSection) {
+    const content = richSection["content"] as Record<string, Object>;
+    if (content) {
+      const richShelf = content["richShelfRenderer"] as Record<string, Object>;
+      if (richShelf) {
+        const shelfContents = richShelf["contents"] as Array<Record<string, Object>>;
+        if (shelfContents) {
+          shelfContents.forEach((c) => collectHomeFeedLeaves(c, out));
+        }
+        return;
+      }
+      collectHomeFeedLeaves(content, out);
+    }
+    return;
+  }
+
+  const shelf = node["shelfRenderer"] as Record<string, Object>;
+  if (shelf) {
+    const shelfContent = shelf["content"] as Record<string, Object>;
+    if (shelfContent) {
+      const grid = shelfContent["gridRenderer"] as Record<string, Object>;
+      if (grid) {
+        const items = grid["items"] as Array<Record<string, Object>>;
+        if (items) {
+          items.forEach((c) => collectHomeFeedLeaves(c, out));
+        }
+        return;
+      }
+      const expanded = shelfContent["expandedShelfContentsRenderer"] as Record<string, Object>;
+      if (expanded) {
+        const items = expanded["items"] as Array<Record<string, Object>>;
+        if (items) {
+          items.forEach((c) => collectHomeFeedLeaves(c, out));
+        }
+        return;
+      }
+      const horizontal = shelfContent["horizontalListRenderer"] as Record<string, Object>;
+      if (horizontal) {
+        const items = horizontal["items"] as Array<Record<string, Object>>;
+        if (items) {
+          items.forEach((c) => collectHomeFeedLeaves(c, out));
+        }
+        return;
+      }
+    }
+    return;
+  }
+
+  const grid = node["gridRenderer"] as Record<string, Object>;
+  if (grid) {
+    const items = grid["items"] as Array<Record<string, Object>>;
+    if (items) {
+      items.forEach((c) => collectHomeFeedLeaves(c, out));
+    }
+    return;
+  }
+
+  const richGrid = node["richGridRenderer"] as Record<string, Object>;
+  if (richGrid) {
+    const contents = richGrid["contents"] as Array<Record<string, Object>>;
+    if (contents) {
+      contents.forEach((c) => collectHomeFeedLeaves(c, out));
+    }
+  }
+}
+
 export function buildHomeKioskVideoItems(
   rawItems: Array<Record<string, Object>>,
   startId: number,
@@ -113,6 +238,16 @@ export function buildHomeKioskVideoItems(
           return;
         }
       }
+    }
+
+    const videoRenderer = content["videoRenderer"] as Record<string, Object>;
+    if (videoRenderer) {
+      const videoItem = buildVideoItemFromRenderer(videoRenderer, idCounter, liveLabel);
+      if (videoItem) {
+        items.push(videoItem);
+        idCounter += 1;
+      }
+      return;
     }
 
     const gridVideo = content["gridVideoRenderer"] as Record<string, Object>;

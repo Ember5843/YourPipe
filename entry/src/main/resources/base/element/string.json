@@ -1,1328 +1,1360 @@
-﻿{
-  "string": [
-    {
-      "name": "module_desc",
-      "value": "module description"
-    },
-    {
-      "name": "EntryAbility_desc",
-      "value": "description"
-    },
-    {
-      "name": "EntryAbility_label",
-      "value": "label"
-    },
-    {
-      "name": "HOME_EXIT_TOAST",
-      "value": "Go back and exit the app again"
-    },
-    {
-      "name": "LIVING_LEFT_TEXT",
-      "value": "A total of "
-    },
-    {
-      "name": "LIVING_RIGHT_TEXT",
-      "value": " comments"
-    },
-    {
-      "name": "LIVING_WRITE",
-      "value": "Write a comment"
-    },
-    {
-      "name": "number_of_viewers",
-      "value": "738,600 people watch"
-    },
-    {
-      "name": "store_name",
-      "value": "Official live broadcast room"
-    },
-    {
-      "name": "yt_tab_home",
-      "value": "首页"
-    },
-    {
-      "name": "yt_tab_playlists",
-      "value": "播放列表"
-    },
-    {
-      "name": "yt_tab_subscriptions",
-      "value": "订阅"
-    },
-    {
-      "name": "yt_tab_favorites",
-      "value": "收藏"
-    },
-    {
-      "name": "yt_tab_local",
-      "value": "本地"
-    },
-    {
-      "name": "yt_option_title",
-      "value": "选项"
-    },
-    {
-      "name": "yt_option_group_settings",
-      "value": "设置"
-    },
-    {
-      "name": "yt_option_group_others",
-      "value": "其他"
-    },
-    {
-      "name": "yt_option_language",
-      "value": "语言调整"
-    },
-    {
-      "name": "yt_option_color",
-      "value": "颜色调整"
-    },
-    {
-      "name": "yt_option_color_subtitle",
-      "value": "主题色与强调色"
-    },
-    {
-      "name": "yt_option_appearance",
-      "value": "外观"
-    },
-    {
-      "name": "yt_dark_mode_title",
-      "value": "深色模式"
-    },
-    {
-      "name": "yt_dark_mode_system",
-      "value": "跟随系统"
-    },
-    {
-      "name": "yt_dark_mode_system_subtitle",
-      "value": "根据系统设置自动切换"
-    },
-    {
-      "name": "yt_dark_mode_light",
-      "value": "浅色模式"
-    },
-    {
-      "name": "yt_dark_mode_light_subtitle",
-      "value": "始终使用浅色主题"
-    },
-    {
-      "name": "yt_dark_mode_dark",
-      "value": "深色模式"
-    },
-    {
-      "name": "yt_dark_mode_dark_subtitle",
-      "value": "始终使用深色主题"
-    },
-    {
-      "name": "yt_setting_home_layout",
-      "value": "首页布局"
-    },
-    {
-      "name": "yt_layout_grid",
-      "value": "卡片模式"
-    },
-    {
-      "name": "yt_layout_list",
-      "value": "列表模式"
-    },
-    {
-      "name": "yt_option_log",
-      "value": "日志"
-    },
-    {
-      "name": "yt_option_log_subtitle",
-      "value": "查看最近运行记录"
-    },
-    {
-      "name": "yt_log_title",
-      "value": "日志"
-    },
-    {
-      "name": "yt_log_enable",
-      "value": "开启日志记录"
-    },
-    {
-      "name": "yt_log_enable_subtitle",
-      "value": "启动后将捕获应用运行日志"
-    },
-    {
-      "name": "yt_log_disabled_hint",
-      "value": "日志记录未开启\n在上方打开开关以开始捕获"
-    },
-    {
-      "name": "yt_log_empty",
-      "value": "暂无日志记录"
-    },
-    {
-      "name": "yt_log_session_active",
-      "value": "记录中"
-    },
-    {
-      "name": "yt_log_session_saved",
-      "value": "已保存"
-    },
-    {
-      "name": "yt_log_no_sessions",
-      "value": "暂无日志会话"
-    },
-    {
-      "name": "yt_log_delete_all_confirm",
-      "value": "删除所有日志记录？"
-    },
-    {
-      "name": "yt_log_delete_confirm_yes",
-      "value": "删除"
-    },
-    {
-      "name": "yt_log_delete_confirm_no",
-      "value": "取消"
-    },
-    {
-      "name": "yt_option_about",
-      "value": "关于"
-    },
-    {
-      "name": "yt_option_about_subtitle",
-      "value": "版本与致谢信息"
-    },
-    {
-      "name": "yt_option_in_development",
-      "value": "功能开发中"
-    },
-    {
-      "name": "yt_option_in_development_color",
-      "value": "颜色主题选项将在这里显示"
-    },
-    {
-      "name": "yt_lang_follow_system",
-      "value": "跟随系统"
-    },
-    {
-      "name": "yt_lang_simplified",
-      "value": "简体中文"
-    },
-    {
-      "name": "yt_lang_simplified_subtitle",
-      "value": "简体中文"
-    },
-    {
-      "name": "yt_lang_traditional_hk",
-      "value": "繁體中文（香港）"
-    },
-    {
-      "name": "yt_lang_traditional_hk_subtitle",
-      "value": "繁體中文（香港）"
-    },
-    {
-      "name": "yt_lang_traditional_tw",
-      "value": "繁體中文（台灣）"
-    },
-    {
-      "name": "yt_lang_traditional_tw_subtitle",
-      "value": "繁體中文（台灣）"
-    },
-    {
-      "name": "yt_lang_english",
-      "value": "英语"
-    },
-    {
-      "name": "yt_lang_english_subtitle",
-      "value": "English"
-    },
-    {
-      "name": "internet_reason",
-      "value": "Request network data"
-    },
-        {
-      "name": "reason_background",
-      "value": "keep video background running"
-    },
 {
-      "name": "share",
-      "value": "share"
-    },
-    {
-      "name": "comment",
-      "value": "comment"
-    },
-    {
-      "name": "recommends",
-      "value": "recommends"
-    },
-    {
-      "name": "play_count",
-      "value": "120k"
-    },
-    {
-      "name": "favor_count",
-      "value": "70k"
-    },
-    {
-      "name": "send_barrage",
-      "value": "barrage"
-    },
-    {
-      "name": "video_name0",
-      "value": "@Cat"
-    },
-    {
-      "name": "video_name1",
-      "value": "@Mountaineer"
-    },
-    {
-      "name": "video_name2",
-      "value": "@Nice To Meet You"
-    },
-    {
-      "name": "video_name3",
-      "value": "@Tick"
-    },
-    {
-      "name": "video_name4",
-      "value": "@Faery"
-    },
-    {
-      "name": "video_description0",
-      "value": "#1 #Local video #Colorful world, life is not only the immediate existence, but also poetry and distance"
-    },
-    {
-      "name": "video_description1",
-      "value": "#2 #Online video #Dream"
-    },
-    {
-      "name": "video_description3",
-      "value": "#4 #Online video #Colorful world, life is not only the immediate existence, but also poetry and distance"
-    },
-    {
-      "name": "video_description4",
-      "value": "#5 #Online video #Colorful world, life is not only the immediate existence, but also poetry and distance"
-    },
-    {
-      "name": "yt_section_language_region",
-      "value": "语言与地区"
-    },
-    {
-      "name": "yt_section_playback",
-      "value": "播放"
-    },
-    {
-      "name": "yt_section_language",
-      "value": "语言设置"
-    },
-    {
-      "name": "yt_setting_ui_language",
-      "value": "应用 UI 语言"
-    },
-    {
-      "name": "yt_setting_content_language",
-      "value": "内容语言"
-    },
-    {
-      "name": "yt_setting_content_region",
-      "value": "内容地区"
-    },
-    {
-      "name": "yt_section_video",
-      "value": "视频设置"
-    },
-    {
-      "name": "yt_setting_default_quality",
-      "value": "默认视频清晰度"
-    },
-    {
-      "name": "yt_setting_live_quality_cap",
-      "value": "直播清晰度上限"
-    },
-    {
-      "name": "yt_setting_show_high_res",
-      "value": "显示高分辨率（1440p / 4K）"
-    },
-    {
-      "name": "yt_setting_show_high_res_subtitle",
-      "value": "在清晰度选择器中显示 4K 选项，性能要求较高"
-    },
-    {
-      "name": "yt_setting_video_codec",
-      "value": "视频编码格式"
-    },
-    {
-      "name": "yt_section_audio",
-      "value": "音频设置"
-    },
-    {
-      "name": "yt_setting_audio_quality",
-      "value": "音频质量上限"
-    },
-    {
-      "name": "yt_section_decoder",
-      "value": "解码器设置"
-    },
-    {
-      "name": "yt_setting_hwdec_mode",
-      "value": "硬件解码模式"
-    },
-    {
-      "name": "yt_setting_decoder_fallback",
-      "value": "解码器回退"
-    },
-    {
-      "name": "yt_setting_decoder_fallback_subtitle",
-      "value": "硬解失败时自动回退到软解，避免黑屏"
-    },
-    {
-      "name": "yt_section_buffer",
-      "value": "缓冲策略"
-    },
-    {
-      "name": "yt_setting_readahead",
-      "value": "前向缓冲时长"
-    },
-    {
-      "name": "yt_setting_cache_pause",
-      "value": "缓冲不足恢复等待时长"
-    },
-    {
-      "name": "yt_setting_max_back_bytes",
-      "value": "后向缓冲大小 (向后 Seek 不重拉流)"
-    },
-    {
-      "name": "yt_quality_best",
-      "value": "最高画质"
-    },
-    {
-      "name": "yt_codec_h264_first",
-      "value": "自动（H.264 优先）"
-    },
-    {
-      "name": "yt_codec_force_h264",
-      "value": "强制 H.264"
-    },
-    {
-      "name": "yt_codec_av1",
-      "value": "AV1"
-    },
-    {
-      "name": "yt_audio_high",
-      "value": "最高（≈256kbps AAC）"
-    },
-    {
-      "name": "yt_audio_medium",
-      "value": "中等（≈128kbps AAC）"
-    },
-    {
-      "name": "yt_audio_low",
-      "value": "省流（≈48kbps）"
-    },
-    {
-      "name": "yt_hwdec_auto",
-      "value": "自动（推荐）"
-    },
-    {
-      "name": "yt_hwdec_auto_safe",
-      "value": "强制硬解"
-    },
-    {
-      "name": "yt_hwdec_no",
-      "value": "仅软解"
-    },
-    {
-      "name": "yt_recommended_suffix",
-      "value": "（推荐）"
-    },
-    {
-      "name": "yt_unit_seconds",
-      "value": "秒"
-    },
-    {
-      "name": "yt_unit_mb",
-      "value": "MB"
-    },
-    {
-      "name": "yt_placeholder_search",
-      "value": "搜索"
-    },
-    {
-      "name": "yt_action_favorite",
-      "value": "收藏"
-    },
-    {
-      "name": "yt_action_unfavorite",
-      "value": "取消收藏"
-    },
-    {
-      "name": "yt_action_subscribe",
-      "value": "订阅"
-    },
-    {
-      "name": "yt_action_unsubscribe",
-      "value": "取消订阅"
-    },
-    {
-      "name": "yt_action_share",
-      "value": "分享"
-    },
-    {
-      "name": "yt_action_retry",
-      "value": "重试"
-    },
-    {
-      "name": "yt_action_open_browser",
-      "value": "在浏览器中打开"
-    },
-    {
-      "name": "yt_action_show_more",
-      "value": "显示更多"
-    },
-    {
-      "name": "yt_action_show_less",
-      "value": "收起"
-    },
-    {
-      "name": "yt_action_cancel",
-      "value": "取消"
-    },
-    {
-      "name": "yt_action_confirm",
-      "value": "确定"
-    },
-    {
-      "name": "yt_action_delete",
-      "value": "删除"
-    },
-    {
-      "name": "yt_action_clear",
-      "value": "清空"
-    },
-    {
-      "name": "yt_action_view_author",
-      "value": "查看作者"
-    },
-    {
-      "name": "yt_action_clear_all",
-      "value": "全部清空"
-    },
-    {
-      "name": "yt_search_youtube",
-      "value": "YouTube搜索"
-    },
-    {
-      "name": "yt_search_youtube_music",
-      "value": "YouTube Music搜索"
-    },
-    {
-      "name": "yt_filter_all",
-      "value": "全部"
-    },
-    {
-      "name": "yt_filter_videos",
-      "value": "视频"
-    },
-    {
-      "name": "yt_filter_channels",
-      "value": "频道"
-    },
-    {
-      "name": "yt_filter_playlists",
-      "value": "播放列表"
-    },
-    {
-      "name": "yt_filter_songs",
-      "value": "歌曲"
-    },
-    {
-      "name": "yt_filter_albums",
-      "value": "专辑"
-    },
-    {
-      "name": "yt_search_history",
-      "value": "搜索历史"
-    },
-    {
-      "name": "yt_action_clear_search_history",
-      "value": "清空搜索历史"
-    },
-    {
-      "name": "yt_empty_no_search_history",
-      "value": "暂无搜索历史"
-    },
-    {
-      "name": "yt_search_no_results",
-      "value": "没有找到相关内容"
-    },
-    {
-      "name": "yt_error_search_failed",
-      "value": "搜索失败，请稍后重试"
-    },
-    {
-      "name": "yt_dialog_delete_search_record",
-      "value": "删除搜索记录"
-    },
-    {
-      "name": "yt_confirm_clear_search_history",
-      "value": "确定要清空所有搜索历史吗？"
-    },
-    {
-      "name": "yt_toast_cleared",
-      "value": "已清空"
-    },
-    {
-      "name": "yt_placeholder_search_content",
-      "value": "搜索内容"
-    },
-    {
-      "name": "yt_empty_no_content",
-      "value": "暂无内容"
-    },
-    {
-      "name": "yt_video_details",
-      "value": "视频详情"
-    },
-    {
-      "name": "yt_error_invalid_video",
-      "value": "无有效视频信息"
-    },
-    {
-      "name": "yt_notice_direct_link_removed",
-      "value": "直链功能已移除，后续统一处理。"
-    },
-    {
-      "name": "yt_dialog_select_quality",
-      "value": "选择清晰度"
-    },
-    {
-      "name": "yt_label_video_track",
-      "value": "视频轨道"
-    },
-    {
-      "name": "yt_warn_high_resolution",
-      "value": "此清晰度超过 1440p，在部分设备上可能出现性能问题或播放卡顿"
-    },
-    {
-      "name": "yt_label_audio_quality",
-      "value": "音频质量"
-    },
-    {
-      "name": "yt_player_syncing_buffer",
-      "value": "正在同步双轨道缓存..."
-    },
-    {
-      "name": "yt_error_playback_failed",
-      "value": "播放失败"
-    },
-    {
-      "name": "yt_error_load_video_info",
-      "value": "视频信息获取失败"
-    },
-    {
-      "name": "yt_error_load_video",
-      "value": "视频加载失败"
-    },
-    {
-      "name": "yt_error_load_exception",
-      "value": "加载发生异常"
-    },
-    {
-      "name": "yt_error_unknown",
-      "value": "未知错误"
-    },
-    {
-      "name": "yt_error_invalid_video_id",
-      "value": "无效的视频ID"
-    },
-    {
-      "name": "yt_error_play_error_retry",
-      "value": "播放出错，请重试"
-    },
-    {
-      "name": "yt_empty_no_comments",
-      "value": "暂无评论"
-    },
-    {
-      "name": "yt_label_pinned",
-      "value": "置顶"
-    },
-    {
-      "name": "yt_error_load_comments",
-      "value": "加载评论失败"
-    },
-    {
-      "name": "yt_label_reply",
-      "value": "回复"
-    },
-    {
-      "name": "yt_error_load_replies",
-      "value": "加载回复失败"
-    },
-    {
-      "name": "yt_label_like",
-      "value": "赞"
-    },
-    {
-      "name": "yt_tab_videos",
-      "value": "视频"
-    },
-    {
-      "name": "yt_tab_shorts",
-      "value": "短视频"
-    },
-    {
-      "name": "yt_tab_live",
-      "value": "直播"
-    },
-    {
-      "name": "yt_tab_about",
-      "value": "关于"
-    },
-    {
-      "name": "yt_empty_no_videos",
-      "value": "暂无视频"
-    },
-    {
-      "name": "yt_empty_no_shorts",
-      "value": "暂无短视频"
-    },
-    {
-      "name": "yt_empty_no_live",
-      "value": "暂无直播"
-    },
-    {
-      "name": "yt_channel_info",
-      "value": "频道信息"
-    },
-    {
-      "name": "yt_channel_id",
-      "value": "频道 ID"
-    },
-    {
-      "name": "yt_channel_subscribers",
-      "value": "订阅数"
-    },
-    {
-      "name": "yt_channel_video_count",
-      "value": "视频数"
-    },
-    {
-      "name": "yt_channel_description",
-      "value": "简介"
-    },
-    {
-      "name": "yt_error_load_user_videos",
-      "value": "加载用户视频失败"
-    },
-    {
-      "name": "yt_error_load_shorts",
-      "value": "加载短视频失败"
-    },
-    {
-      "name": "yt_error_load_live",
-      "value": "加载直播失败"
-    },
-    {
-      "name": "yt_label_user",
-      "value": "用户"
-    },
-    {
-      "name": "yt_local_history",
-      "value": "观看历史"
-    },
-    {
-      "name": "yt_dialog_clear_history",
-      "value": "清空历史"
-    },
-    {
-      "name": "yt_confirm_clear_history",
-      "value": "确定要清空全部观看记录吗？"
-    },
-    {
-      "name": "yt_empty_no_history",
-      "value": "暂无观看记录"
-    },
-    {
-      "name": "yt_empty_history_hint",
-      "value": "看过的视频会出现在这里"
-    },
-    {
-      "name": "yt_time_just_now",
-      "value": "刚刚"
-    },
-    {
-      "name": "yt_action_delete_record",
-      "value": "删除记录"
-    },
-    {
-      "name": "yt_sub_manage_title",
-      "value": "我订阅的作者"
-    },
-    {
-      "name": "yt_empty_no_subs",
-      "value": "暂无订阅用户"
-    },
-    {
-      "name": "yt_empty_subs_hint",
-      "value": "请在\"订阅管理\"中添加"
-    },
-    {
-      "name": "yt_empty_subs_hint_alt",
-      "value": "在搜索页订阅感兴趣的作者"
-    },
-    {
-      "name": "yt_error_load_subs",
-      "value": "加载订阅失败"
-    },
-    {
-      "name": "yt_fav_videos_title",
-      "value": "我收藏的视频"
-    },
-    {
-      "name": "yt_fav_playlists_title",
-      "value": "我收藏的播放列表"
-    },
-    {
-      "name": "yt_local_playlists_title",
-      "value": "本地播放列表"
-    },
-    {
-      "name": "yt_local_playlists_tag",
-      "value": "本地"
-    },
-    {
-      "name": "yt_empty_no_local_playlists",
-      "value": "暂无本地播放列表"
-    },
-    {
-      "name": "yt_empty_local_playlists_hint",
-      "value": "在播放页保存视频到本地播放列表"
-    },
-    {
-      "name": "yt_empty_no_fav_videos",
-      "value": "暂无收藏的视频"
-    },
-    {
-      "name": "yt_empty_no_fav_playlists",
-      "value": "暂无收藏的播放列表"
-    },
-    {
-      "name": "yt_empty_fav_playlists_hint",
-      "value": "在搜索页收藏感兴趣的播放列表"
-    },
-    {
-      "name": "yt_empty_playlists_hint",
-      "value": "在搜索页收藏感兴趣的播放列表"
-    },
-    {
-      "name": "yt_about_current_version",
-      "value": "当前版本"
-    },
-    {
-      "name": "yt_about_description",
-      "value": "基于鸿蒙 HarmonyOS NEXT 的开源 YouTube 客户端\n无广告 · 无跟踪 · 完全本地解析"
-    },
-    {
-      "name": "yt_about_qq_group",
-      "value": "QQ 群组"
-    },
-    {
-      "name": "yt_about_tg_group",
-      "value": "Telegram 群组"
-    },
-    {
-      "name": "yt_about_project_info",
-      "value": "项目信息"
-    },
-    {
-      "name": "yt_about_open_source",
-      "value": "使用的开源项目"
-    },
-    {
-      "name": "yt_about_ai_models",
-      "value": "开发辅助 AI 模型"
-    },
-    {
-      "name": "yt_about_changelog",
-      "value": "更新日志"
-    },
-    {
-      "name": "yt_error_load_failed",
-      "value": "加载失败"
-    },
-    {
-      "name": "yt_error_play_failed_title",
-      "value": "播放失败"
-    },
-    {
-      "name": "yt_label_live",
-      "value": "直播"
-    },
-    {
-      "name": "yt_label_loading",
-      "value": "加载中..."
-    },
-    {
-      "name": "yt_error_load_playlists",
-      "value": "加载播放列表失败"
-    },
-    {
-      "name": "yt_error_load_channel_info",
-      "value": "频道信息获取失败"
-    },
-    {
-      "name": "yt_tab_description",
-      "value": "简介"
-    },
-    {
-      "name": "yt_tab_comments",
-      "value": "评论"
-    },
-    {
-      "name": "yt_tab_recommended",
-      "value": "推荐"
-    },
-    {
-      "name": "yt_home_search_empty",
-      "value": "自动搜索无结果，请手动搜索"
-    },
-    {
-      "name": "yt_home_kiosk_error",
-      "value": "Kiosk 请求失败，请稍后重试"
-    },
-    {
-      "name": "yt_home_load_error",
-      "value": "主页加载失败，请稍后重试"
-    },
-    {
-      "name": "yt_player_mode_progressive",
-      "value": "渐进式 (Progressive)"
-    },
-    {
-      "name": "yt_player_mode_hls",
-      "value": "HLS 串流"
-    },
-    {
-      "name": "yt_player_mode_dash_manifest",
-      "value": "DASH 串流 (Manifest)"
-    },
-    {
-      "name": "yt_player_mode_dash_track",
-      "value": "DASH 轨道 (音视频分离)"
-    },
-    {
-      "name": "yt_player_default",
-      "value": "默认 (Default)"
-    },
-    {
-      "name": "yt_player_step1_select_mode",
-      "value": "1. 选择播放模式"
-    },
-    {
-      "name": "yt_player_step2_select_quality",
-      "value": "2. 选择清晰度"
-    },
-    {
-      "name": "yt_player_video_quality",
-      "value": "视频清晰度"
-    },
-    {
-      "name": "yt_player_step2_select_manifest",
-      "value": "2. 选择资源清单"
-    },
-    {
-      "name": "yt_player_step2_select_track",
-      "value": "2. 选择音视频轨道"
-    },
-    {
-      "name": "yt_player_audio_language_type",
-      "value": "音频语言 / 类型"
-    },
-    {
-      "name": "yt_log_saved_to_downloads",
-      "value": "已保存至下载目录"
-    },
-    {
-      "name": "yt_feed_popular",
-      "value": "热门"
-    },
-    {
-      "name": "yt_feed_recommended",
-      "value": "推荐"
-    },
-    {
-      "name": "yt_feed_featured",
-      "value": "精选"
-    },
-    {
-      "name": "yt_feed_trending",
-      "value": "趋势"
-    },
-    {
-      "name": "yt_feed_latest",
-      "value": "最新"
-    },
-    {
-      "name": "yt_feed_topics",
-      "value": "话题"
-    },
-    {
-      "name": "yt_suffix_videos",
-      "value": "视频"
-    },
-    {
-      "name": "yt_suffix_shorts",
-      "value": "短片"
-    },
-    {
-      "name": "yt_suffix_collections",
-      "value": "合集"
-    },
-    {
-      "name": "yt_suffix_live",
-      "value": "直播"
-    },
-    {
-      "name": "yt_suffix_music",
-      "value": "音乐"
-    },
-    {
-      "name": "yt_suffix_movies",
-      "value": "电影"
-    },
-    {
-      "name": "yt_error_no_playable_stream",
-      "value": "未找到可播放的流"
-    },
-    {
-      "name": "yt_error_no_supported_stream",
-      "value": "没有找到可支持的视频流"
-    },
-    {
-      "name": "yt_error_age_restricted",
-      "value": "此视频有年龄限制"
-    },
-    {
-      "name": "yt_error_age_restricted_hint",
-      "value": "需要在浏览器中登录 YouTube 账号才能观看"
-    },
-    {
-      "name": "yt_error_geo_restricted",
-      "value": "此内容在你所在的地区不可用"
-    },
-    {
-      "name": "yt_error_geo_restricted_hint",
-      "value": "视频发布者限制了播放地区"
-    },
-    {
-      "name": "yt_error_paid_content",
-      "value": "此视频为付费内容"
-    },
-    {
-      "name": "yt_error_paid_content_hint",
-      "value": "需要购买或租借才能观看"
-    },
-    {
-      "name": "yt_error_premium_content",
-      "value": "此内容仅限 YouTube Premium 会员"
-    },
-    {
-      "name": "yt_error_premium_content_hint",
-      "value": "需要订阅 YouTube Premium 才能播放"
-    },
-    {
-      "name": "yt_error_private_content",
-      "value": "此视频为私密视频"
-    },
-    {
-      "name": "yt_error_private_content_hint",
-      "value": "只有获得授权的用户才能观看"
-    },
-    {
-      "name": "yt_error_login_required",
-      "value": "需要登录才能观看"
-    },
-    {
-      "name": "yt_error_login_required_hint",
-      "value": "请在浏览器中登录 YouTube 账号"
-    },
-    {
-      "name": "yt_error_account_terminated",
-      "value": "此频道已被终止"
-    },
-    {
-      "name": "yt_error_account_terminated_hint",
-      "value": "该账号因违反 YouTube 政策已被封禁"
-    },
-    {
-      "name": "yt_error_live_offline",
-      "value": "直播已结束"
-    },
-    {
-      "name": "yt_error_live_offline_hint",
-      "value": "此直播流已下线或尚未开始"
-    },
-    {
-      "name": "yt_error_content_not_supported",
-      "value": "不支持此类型的内容"
-    },
-    {
-      "name": "yt_error_content_not_supported_hint",
-      "value": "该视频格式暂不支持播放"
-    },
-    {
-      "name": "yt_error_network",
-      "value": "网络连接失败"
-    },
-    {
-      "name": "yt_error_network_hint",
-      "value": "请检查网络连接后重试"
-    },
-    {
-      "name": "yt_error_timeout",
-      "value": "请求超时"
-    },
-    {
-      "name": "yt_error_timeout_hint",
-      "value": "服务器响应过慢，请稍后重试"
-    },
-    {
-      "name": "yt_error_extraction_failed",
-      "value": "解析视频信息失败"
-    },
-    {
-      "name": "yt_error_extraction_failed_hint",
-      "value": "无法获取视频播放数据"
-    },
-    {
-      "name": "yt_error_cipher_failed",
-      "value": "解密视频流失败"
-    },
-    {
-      "name": "yt_error_cipher_failed_hint",
-      "value": "签名算法更新，请等待应用更新"
-    },
-    {
-      "name": "new_app_name",
-      "value": "YourPipe"
-    },
-    {
-      "name": "yt_empty_no_playlists",
-      "value": "暂无播放列表"
-    },
-    {
-      "name": "yt_search_results_from",
-      "value": "来自 \"%s\" 的搜索结果"
-    },
-    {
-      "name": "yt_option_group_recovery",
-      "value": "恢复"
-    },
-    {
-      "name": "yt_option_reset_settings",
-      "value": "恢复所有配置"
-    },
-    {
-      "name": "yt_option_reset_settings_subtitle",
-      "value": "将所有设置重置为默认值"
-    },
-    {
-      "name": "yt_option_clear_all_data",
-      "value": "清除应用全部数据"
-    },
-    {
-      "name": "yt_option_clear_all_data_subtitle",
-      "value": "删除所有存储的数据，包括历史记录和缓存"
-    },
-    {
-      "name": "yt_toast_reset_settings_done",
-      "value": "已恢复默认设置"
-    },
-    {
-      "name": "yt_toast_clear_all_data_done",
-      "value": "已清除所有数据"
-    },
-    {
-      "name": "yt_option_recovery",
-      "value": "恢复"
-    },
-    {
-      "name": "yt_confirm_reset_settings",
-      "value": "确定要恢复所有配置为默认值吗？此操作不可撤销。"
-    },
-    {
-      "name": "yt_confirm_clear_all_data",
-      "value": "确定要清除应用全部数据吗？此操作将删除所有历史记录、收藏、订阅和设置，不可撤销。"
-    },
-    {
-      "name": "yt_setting_stream_buffer",
-      "value": "TCP 流缓冲大小"
-    },
-    {
-      "name": "yt_setting_seek_keyframe",
-      "value": "快速跳转（关键帧）"
-    },
-    {
-      "name": "yt_setting_seek_keyframe_subtitle",
-      "value": "跳转到最近的关键帧以加快响应速度"
-    },
-    {
-      "name": "yt_action_download",
-      "value": "下载"
-    },
-    {
-      "name": "yt_download_title",
-      "value": "下载视频"
-    },
-    {
-      "name": "yt_download_step1_mode",
-      "value": "步骤 1: 选择下载模式"
-    },
-    {
-      "name": "yt_download_step2_quality",
-      "value": "步骤 2: 选择清晰度"
-    },
-    {
-      "name": "yt_download_step2_tracks",
-      "value": "步骤 2: 选择轨道"
-    },
-    {
-      "name": "yt_download_mode_progressive",
-      "value": "合并流 (Progressive)"
-    },
-    {
-      "name": "yt_download_mode_dash",
-      "value": "分离轨道 (DASH)"
-    },
-    {
-      "name": "yt_download_mode_hls",
-      "value": "HLS 流"
-    },
-    {
-      "name": "yt_download_progressive_hint",
-      "value": "推荐：视频和音频已合并，无需额外处理"
-    },
-    {
-      "name": "yt_download_dash_hint",
-      "value": "视频和音频分别下载后自动合并"
-    },
-    {
-      "name": "yt_download_estimated_size",
-      "value": "预计大小"
-    },
-    {
-      "name": "yt_download_empty",
-      "value": "暂无下载任务"
-    },
-    {
-      "name": "yt_download_empty_hint",
-      "value": "在视频页面点击下载按钮开始下载"
-    },
-    {
-      "name": "yt_label_progressive",
-      "value": "合并流质量"
-    },
-    {
-      "name": "yt_label_premium",
-      "value": "付费"
-    },
-    {
-      "name": "yt_label_members_only",
-      "value": "会员"
-    },
-    {
-      "name": "yt_option_data_account",
-      "value": "数据与账号"
-    },
-    {
-      "name": "yt_option_data_account_subtitle",
-      "value": "管理登录状态与本地数据"
-    },
-    {
-      "name": "yt_section_account",
-      "value": "账号"
-    },
-    {
-      "name": "yt_section_data_management",
-      "value": "数据管理"
-    },
-    {
-      "name": "yt_option_google_login",
-      "value": "Google 登录"
-    },
-    {
-      "name": "yt_option_export_data",
-      "value": "导出数据"
-    },
-    {
-      "name": "yt_option_export_data_subtitle",
-      "value": "将本地数据备份为 JSON 文件"
-    },
-    {
-      "name": "yt_option_restore_data",
-      "value": "恢复数据"
-    },
-    {
-      "name": "yt_option_restore_data_subtitle",
-      "value": "从 JSON 备份文件恢复数据"
-    },
-    {
-      "name": "yt_backup_item_settings",
-      "value": "应用设置"
-    },
-    {
-      "name": "yt_backup_item_subscriptions",
-      "value": "订阅"
-    },
-    {
-      "name": "yt_backup_item_favorites",
-      "value": "收藏视频"
-    },
-    {
-      "name": "yt_backup_item_playlists",
-      "value": "收藏的播放列表"
-    },
-    {
-      "name": "yt_backup_item_local_queues",
-      "value": "本地播放列表"
-    },
-    {
-      "name": "yt_backup_item_watch_history",
-      "value": "观看历史"
-    },
-    {
-      "name": "yt_backup_item_search_history",
-      "value": "搜索历史"
-    },
-    {
-      "name": "yt_backup_item_auth",
-      "value": "YouTube 登录状态"
-    },
-    {
-      "name": "yt_backup_export_title",
-      "value": "选择要导出的项目"
-    },
-    {
-      "name": "yt_backup_restore_title",
-      "value": "选择要恢复的项目"
-    },
-    {
-      "name": "yt_backup_confirm_restore",
-      "value": "恢复将覆盖当前选中的本地数据，确定继续吗？"
-    },
-    {
-      "name": "yt_backup_export_success",
-      "value": "导出成功"
-    },
-    {
-      "name": "yt_backup_export_failed",
-      "value": "导出失败"
-    },
-    {
-      "name": "yt_backup_restore_success",
-      "value": "恢复成功"
-    },
-    {
-      "name": "yt_backup_restore_failed",
-      "value": "恢复失败"
-    },
-    {
-      "name": "yt_backup_version_unsupported",
-      "value": "备份文件版本不受支持"
-    }
-  ]
+    "string":  [
+                   {
+                       "name":  "module_desc",
+                       "value":  "module description"
+                   },
+                   {
+                       "name":  "EntryAbility_desc",
+                       "value":  "description"
+                   },
+                   {
+                       "name":  "EntryAbility_label",
+                       "value":  "label"
+                   },
+                   {
+                       "name":  "HOME_EXIT_TOAST",
+                       "value":  "Go back and exit the app again"
+                   },
+                   {
+                       "name":  "LIVING_LEFT_TEXT",
+                       "value":  "A total of "
+                   },
+                   {
+                       "name":  "LIVING_RIGHT_TEXT",
+                       "value":  " comments"
+                   },
+                   {
+                       "name":  "LIVING_WRITE",
+                       "value":  "Write a comment"
+                   },
+                   {
+                       "name":  "number_of_viewers",
+                       "value":  "738,600 people watch"
+                   },
+                   {
+                       "name":  "store_name",
+                       "value":  "Official live broadcast room"
+                   },
+                   {
+                       "name":  "yt_tab_home",
+                       "value":  "首页"
+                   },
+                   {
+                       "name":  "yt_tab_playlists",
+                       "value":  "播放列表"
+                   },
+                   {
+                       "name":  "yt_tab_subscriptions",
+                       "value":  "订阅"
+                   },
+                   {
+                       "name":  "yt_tab_favorites",
+                       "value":  "收藏"
+                   },
+                   {
+                       "name":  "yt_tab_local",
+                       "value":  "本地"
+                   },
+                   {
+                       "name":  "yt_option_title",
+                       "value":  "选项"
+                   },
+                   {
+                       "name":  "yt_option_group_settings",
+                       "value":  "设置"
+                   },
+                   {
+                       "name":  "yt_option_group_others",
+                       "value":  "其他"
+                   },
+                   {
+                       "name":  "yt_option_language",
+                       "value":  "语言调整"
+                   },
+                   {
+                       "name":  "yt_option_color",
+                       "value":  "颜色调整"
+                   },
+                   {
+                       "name":  "yt_option_color_subtitle",
+                       "value":  "主题色与强调色"
+                   },
+                   {
+                       "name":  "yt_option_appearance",
+                       "value":  "外观"
+                   },
+                   {
+                       "name":  "yt_dark_mode_title",
+                       "value":  "深色模式"
+                   },
+                   {
+                       "name":  "yt_dark_mode_system",
+                       "value":  "跟随系统"
+                   },
+                   {
+                       "name":  "yt_dark_mode_system_subtitle",
+                       "value":  "根据系统设置自动切换"
+                   },
+                   {
+                       "name":  "yt_dark_mode_light",
+                       "value":  "浅色模式"
+                   },
+                   {
+                       "name":  "yt_dark_mode_light_subtitle",
+                       "value":  "始终使用浅色主题"
+                   },
+                   {
+                       "name":  "yt_dark_mode_dark",
+                       "value":  "深色模式"
+                   },
+                   {
+                       "name":  "yt_dark_mode_dark_subtitle",
+                       "value":  "始终使用深色主题"
+                   },
+                   {
+                       "name":  "yt_setting_home_layout",
+                       "value":  "首页布局"
+                   },
+                   {
+                       "name":  "yt_layout_grid",
+                       "value":  "卡片模式"
+                   },
+                   {
+                       "name":  "yt_layout_list",
+                       "value":  "列表模式"
+                   },
+                   {
+                       "name":  "yt_option_log",
+                       "value":  "日志"
+                   },
+                   {
+                       "name":  "yt_option_log_subtitle",
+                       "value":  "查看最近运行记录"
+                   },
+                   {
+                       "name":  "yt_log_title",
+                       "value":  "日志"
+                   },
+                   {
+                       "name":  "yt_log_enable",
+                       "value":  "开启日志记录"
+                   },
+                   {
+                       "name":  "yt_log_enable_subtitle",
+                       "value":  "启动后将捕获应用运行日志"
+                   },
+                   {
+                       "name":  "yt_log_disabled_hint",
+                       "value":  "日志记录未开启\n在上方打开开关以开始捕获"
+                   },
+                   {
+                       "name":  "yt_log_empty",
+                       "value":  "暂无日志记录"
+                   },
+                   {
+                       "name":  "yt_log_session_active",
+                       "value":  "记录中"
+                   },
+                   {
+                       "name":  "yt_log_session_saved",
+                       "value":  "已保存"
+                   },
+                   {
+                       "name":  "yt_log_no_sessions",
+                       "value":  "暂无日志会话"
+                   },
+                   {
+                       "name":  "yt_log_delete_all_confirm",
+                       "value":  "删除所有日志记录？"
+                   },
+                   {
+                       "name":  "yt_log_delete_confirm_yes",
+                       "value":  "删除"
+                   },
+                   {
+                       "name":  "yt_log_delete_confirm_no",
+                       "value":  "取消"
+                   },
+                   {
+                       "name":  "yt_option_about",
+                       "value":  "关于"
+                   },
+                   {
+                       "name":  "yt_option_about_subtitle",
+                       "value":  "版本与致谢信息"
+                   },
+                   {
+                       "name":  "yt_option_in_development",
+                       "value":  "功能开发中"
+                   },
+                   {
+                       "name":  "yt_option_in_development_color",
+                       "value":  "颜色主题选项将在这里显示"
+                   },
+                   {
+                       "name":  "yt_lang_follow_system",
+                       "value":  "跟随系统"
+                   },
+                   {
+                       "name":  "yt_lang_simplified",
+                       "value":  "简体中文"
+                   },
+                   {
+                       "name":  "yt_lang_simplified_subtitle",
+                       "value":  "简体中文"
+                   },
+                   {
+                       "name":  "yt_lang_traditional_hk",
+                       "value":  "繁體中文（香港）"
+                   },
+                   {
+                       "name":  "yt_lang_traditional_hk_subtitle",
+                       "value":  "繁體中文（香港）"
+                   },
+                   {
+                       "name":  "yt_lang_traditional_tw",
+                       "value":  "繁體中文（台灣）"
+                   },
+                   {
+                       "name":  "yt_lang_traditional_tw_subtitle",
+                       "value":  "繁體中文（台灣）"
+                   },
+                   {
+                       "name":  "yt_lang_english",
+                       "value":  "英语"
+                   },
+                   {
+                       "name":  "yt_lang_english_subtitle",
+                       "value":  "English"
+                   },
+                   {
+                       "name":  "internet_reason",
+                       "value":  "Request network data"
+                   },
+                   {
+                       "name":  "reason_background",
+                       "value":  "keep video background running"
+                   },
+                   {
+                       "name":  "share",
+                       "value":  "share"
+                   },
+                   {
+                       "name":  "comment",
+                       "value":  "comment"
+                   },
+                   {
+                       "name":  "recommends",
+                       "value":  "recommends"
+                   },
+                   {
+                       "name":  "play_count",
+                       "value":  "120k"
+                   },
+                   {
+                       "name":  "favor_count",
+                       "value":  "70k"
+                   },
+                   {
+                       "name":  "send_barrage",
+                       "value":  "barrage"
+                   },
+                   {
+                       "name":  "video_name0",
+                       "value":  "@Cat"
+                   },
+                   {
+                       "name":  "video_name1",
+                       "value":  "@Mountaineer"
+                   },
+                   {
+                       "name":  "video_name2",
+                       "value":  "@Nice To Meet You"
+                   },
+                   {
+                       "name":  "video_name3",
+                       "value":  "@Tick"
+                   },
+                   {
+                       "name":  "video_name4",
+                       "value":  "@Faery"
+                   },
+                   {
+                       "name":  "video_description0",
+                       "value":  "#1 #Local video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+                   },
+                   {
+                       "name":  "video_description1",
+                       "value":  "#2 #Online video #Dream"
+                   },
+                   {
+                       "name":  "video_description3",
+                       "value":  "#4 #Online video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+                   },
+                   {
+                       "name":  "video_description4",
+                       "value":  "#5 #Online video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+                   },
+                   {
+                       "name":  "yt_section_language_region",
+                       "value":  "语言与地区"
+                   },
+                   {
+                       "name":  "yt_section_playback",
+                       "value":  "播放"
+                   },
+                   {
+                       "name":  "yt_section_language",
+                       "value":  "语言设置"
+                   },
+                   {
+                       "name":  "yt_setting_ui_language",
+                       "value":  "应用 UI 语言"
+                   },
+                   {
+                       "name":  "yt_setting_content_language",
+                       "value":  "内容语言"
+                   },
+                   {
+                       "name":  "yt_setting_content_region",
+                       "value":  "内容地区"
+                   },
+                   {
+                       "name":  "yt_section_video",
+                       "value":  "视频设置"
+                   },
+                   {
+                       "name":  "yt_setting_default_quality",
+                       "value":  "默认视频清晰度"
+                   },
+                   {
+                       "name":  "yt_setting_live_quality_cap",
+                       "value":  "直播清晰度上限"
+                   },
+                   {
+                       "name":  "yt_setting_show_high_res",
+                       "value":  "显示高分辨率（1440p / 4K）"
+                   },
+                   {
+                       "name":  "yt_setting_show_high_res_subtitle",
+                       "value":  "在清晰度选择器中显示 4K 选项，性能要求较高"
+                   },
+                   {
+                       "name":  "yt_setting_video_codec",
+                       "value":  "视频编码格式"
+                   },
+                   {
+                       "name":  "yt_section_audio",
+                       "value":  "音频设置"
+                   },
+                   {
+                       "name":  "yt_setting_audio_quality",
+                       "value":  "音频质量上限"
+                   },
+                   {
+                       "name":  "yt_section_decoder",
+                       "value":  "解码器设置"
+                   },
+                   {
+                       "name":  "yt_setting_hwdec_mode",
+                       "value":  "硬件解码模式"
+                   },
+                   {
+                       "name":  "yt_setting_decoder_fallback",
+                       "value":  "解码器回退"
+                   },
+                   {
+                       "name":  "yt_setting_decoder_fallback_subtitle",
+                       "value":  "硬解失败时自动回退到软解，避免黑屏"
+                   },
+                   {
+                       "name":  "yt_section_buffer",
+                       "value":  "缓冲策略"
+                   },
+                   {
+                       "name":  "yt_setting_readahead",
+                       "value":  "前向缓冲时长"
+                   },
+                   {
+                       "name":  "yt_setting_cache_pause",
+                       "value":  "缓冲不足恢复等待时长"
+                   },
+                   {
+                       "name":  "yt_setting_max_back_bytes",
+                       "value":  "后向缓冲大小 (向后 Seek 不重拉流)"
+                   },
+                   {
+                       "name":  "yt_quality_best",
+                       "value":  "最高画质"
+                   },
+                   {
+                       "name":  "yt_codec_h264_first",
+                       "value":  "自动（H.264 优先）"
+                   },
+                   {
+                       "name":  "yt_codec_force_h264",
+                       "value":  "强制 H.264"
+                   },
+                   {
+                       "name":  "yt_codec_av1",
+                       "value":  "AV1"
+                   },
+                   {
+                       "name":  "yt_audio_high",
+                       "value":  "最高（≈256kbps AAC）"
+                   },
+                   {
+                       "name":  "yt_audio_medium",
+                       "value":  "中等（≈128kbps AAC）"
+                   },
+                   {
+                       "name":  "yt_audio_low",
+                       "value":  "省流（≈48kbps）"
+                   },
+                   {
+                       "name":  "yt_hwdec_auto",
+                       "value":  "自动（推荐）"
+                   },
+                   {
+                       "name":  "yt_hwdec_auto_safe",
+                       "value":  "强制硬解"
+                   },
+                   {
+                       "name":  "yt_hwdec_no",
+                       "value":  "仅软解"
+                   },
+                   {
+                       "name":  "yt_recommended_suffix",
+                       "value":  "（推荐）"
+                   },
+                   {
+                       "name":  "yt_unit_seconds",
+                       "value":  "秒"
+                   },
+                   {
+                       "name":  "yt_unit_mb",
+                       "value":  "MB"
+                   },
+                   {
+                       "name":  "yt_placeholder_search",
+                       "value":  "搜索"
+                   },
+                   {
+                       "name":  "yt_action_favorite",
+                       "value":  "收藏"
+                   },
+                   {
+                       "name":  "yt_action_unfavorite",
+                       "value":  "取消收藏"
+                   },
+                   {
+                       "name":  "yt_action_subscribe",
+                       "value":  "订阅"
+                   },
+                   {
+                       "name":  "yt_action_unsubscribe",
+                       "value":  "取消订阅"
+                   },
+                   {
+                       "name":  "yt_action_share",
+                       "value":  "分享"
+                   },
+                   {
+                       "name":  "yt_action_retry",
+                       "value":  "重试"
+                   },
+                   {
+                       "name":  "yt_action_open_browser",
+                       "value":  "在浏览器中打开"
+                   },
+                   {
+                       "name":  "yt_action_show_more",
+                       "value":  "显示更多"
+                   },
+                   {
+                       "name":  "yt_action_show_less",
+                       "value":  "收起"
+                   },
+                   {
+                       "name":  "yt_action_cancel",
+                       "value":  "取消"
+                   },
+                   {
+                       "name":  "yt_action_confirm",
+                       "value":  "确定"
+                   },
+                   {
+                       "name":  "yt_action_delete",
+                       "value":  "删除"
+                   },
+                   {
+                       "name":  "yt_action_clear",
+                       "value":  "清空"
+                   },
+                   {
+                       "name":  "yt_action_view_author",
+                       "value":  "查看作者"
+                   },
+                   {
+                       "name":  "yt_action_clear_all",
+                       "value":  "全部清空"
+                   },
+                   {
+                       "name":  "yt_search_youtube",
+                       "value":  "YouTube搜索"
+                   },
+                   {
+                       "name":  "yt_search_youtube_music",
+                       "value":  "YouTube Music搜索"
+                   },
+                   {
+                       "name":  "yt_filter_all",
+                       "value":  "全部"
+                   },
+                   {
+                       "name":  "yt_filter_videos",
+                       "value":  "视频"
+                   },
+                   {
+                       "name":  "yt_filter_channels",
+                       "value":  "频道"
+                   },
+                   {
+                       "name":  "yt_filter_playlists",
+                       "value":  "播放列表"
+                   },
+                   {
+                       "name":  "yt_filter_songs",
+                       "value":  "歌曲"
+                   },
+                   {
+                       "name":  "yt_filter_albums",
+                       "value":  "专辑"
+                   },
+                   {
+                       "name":  "yt_search_history",
+                       "value":  "搜索历史"
+                   },
+                   {
+                       "name":  "yt_action_clear_search_history",
+                       "value":  "清空搜索历史"
+                   },
+                   {
+                       "name":  "yt_empty_no_search_history",
+                       "value":  "暂无搜索历史"
+                   },
+                   {
+                       "name":  "yt_search_no_results",
+                       "value":  "没有找到相关内容"
+                   },
+                   {
+                       "name":  "yt_error_search_failed",
+                       "value":  "搜索失败，请稍后重试"
+                   },
+                   {
+                       "name":  "yt_dialog_delete_search_record",
+                       "value":  "删除搜索记录"
+                   },
+                   {
+                       "name":  "yt_confirm_clear_search_history",
+                       "value":  "确定要清空所有搜索历史吗？"
+                   },
+                   {
+                       "name":  "yt_toast_cleared",
+                       "value":  "已清空"
+                   },
+                   {
+                       "name":  "yt_placeholder_search_content",
+                       "value":  "搜索内容"
+                   },
+                   {
+                       "name":  "yt_empty_no_content",
+                       "value":  "暂无内容"
+                   },
+                   {
+                       "name":  "yt_video_details",
+                       "value":  "视频详情"
+                   },
+                   {
+                       "name":  "yt_error_invalid_video",
+                       "value":  "无有效视频信息"
+                   },
+                   {
+                       "name":  "yt_notice_direct_link_removed",
+                       "value":  "直链功能已移除，后续统一处理。"
+                   },
+                   {
+                       "name":  "yt_dialog_select_quality",
+                       "value":  "选择清晰度"
+                   },
+                   {
+                       "name":  "yt_label_video_track",
+                       "value":  "视频轨道"
+                   },
+                   {
+                       "name":  "yt_warn_high_resolution",
+                       "value":  "此清晰度超过 1440p，在部分设备上可能出现性能问题或播放卡顿"
+                   },
+                   {
+                       "name":  "yt_label_audio_quality",
+                       "value":  "音频质量"
+                   },
+                   {
+                       "name":  "yt_player_syncing_buffer",
+                       "value":  "正在同步双轨道缓存..."
+                   },
+                   {
+                       "name":  "yt_error_playback_failed",
+                       "value":  "播放失败"
+                   },
+                   {
+                       "name":  "yt_error_load_video_info",
+                       "value":  "视频信息获取失败"
+                   },
+                   {
+                       "name":  "yt_error_load_video",
+                       "value":  "视频加载失败"
+                   },
+                   {
+                       "name":  "yt_error_load_exception",
+                       "value":  "加载发生异常"
+                   },
+                   {
+                       "name":  "yt_error_unknown",
+                       "value":  "未知错误"
+                   },
+                   {
+                       "name":  "yt_error_invalid_video_id",
+                       "value":  "无效的视频ID"
+                   },
+                   {
+                       "name":  "yt_error_play_error_retry",
+                       "value":  "播放出错，请重试"
+                   },
+                   {
+                       "name":  "yt_empty_no_comments",
+                       "value":  "暂无评论"
+                   },
+                   {
+                       "name":  "yt_label_pinned",
+                       "value":  "置顶"
+                   },
+                   {
+                       "name":  "yt_error_load_comments",
+                       "value":  "加载评论失败"
+                   },
+                   {
+                       "name":  "yt_label_reply",
+                       "value":  "回复"
+                   },
+                   {
+                       "name":  "yt_error_load_replies",
+                       "value":  "加载回复失败"
+                   },
+                   {
+                       "name":  "yt_label_like",
+                       "value":  "赞"
+                   },
+                   {
+                       "name":  "yt_tab_videos",
+                       "value":  "视频"
+                   },
+                   {
+                       "name":  "yt_tab_shorts",
+                       "value":  "短视频"
+                   },
+                   {
+                       "name":  "yt_tab_live",
+                       "value":  "直播"
+                   },
+                   {
+                       "name":  "yt_tab_about",
+                       "value":  "关于"
+                   },
+                   {
+                       "name":  "yt_empty_no_videos",
+                       "value":  "暂无视频"
+                   },
+                   {
+                       "name":  "yt_empty_no_shorts",
+                       "value":  "暂无短视频"
+                   },
+                   {
+                       "name":  "yt_empty_no_live",
+                       "value":  "暂无直播"
+                   },
+                   {
+                       "name":  "yt_channel_info",
+                       "value":  "频道信息"
+                   },
+                   {
+                       "name":  "yt_channel_id",
+                       "value":  "频道 ID"
+                   },
+                   {
+                       "name":  "yt_channel_subscribers",
+                       "value":  "订阅数"
+                   },
+                   {
+                       "name":  "yt_channel_video_count",
+                       "value":  "视频数"
+                   },
+                   {
+                       "name":  "yt_channel_description",
+                       "value":  "简介"
+                   },
+                   {
+                       "name":  "yt_error_load_user_videos",
+                       "value":  "加载用户视频失败"
+                   },
+                   {
+                       "name":  "yt_error_load_shorts",
+                       "value":  "加载短视频失败"
+                   },
+                   {
+                       "name":  "yt_error_load_live",
+                       "value":  "加载直播失败"
+                   },
+                   {
+                       "name":  "yt_label_user",
+                       "value":  "用户"
+                   },
+                   {
+                       "name":  "yt_local_history",
+                       "value":  "观看历史"
+                   },
+                   {
+                       "name":  "yt_dialog_clear_history",
+                       "value":  "清空历史"
+                   },
+                   {
+                       "name":  "yt_confirm_clear_history",
+                       "value":  "确定要清空全部观看记录吗？"
+                   },
+                   {
+                       "name":  "yt_empty_no_history",
+                       "value":  "暂无观看记录"
+                   },
+                   {
+                       "name":  "yt_empty_history_hint",
+                       "value":  "看过的视频会出现在这里"
+                   },
+                   {
+                       "name":  "yt_time_just_now",
+                       "value":  "刚刚"
+                   },
+                   {
+                       "name":  "yt_action_delete_record",
+                       "value":  "删除记录"
+                   },
+                   {
+                       "name":  "yt_sub_manage_title",
+                       "value":  "我订阅的作者"
+                   },
+                   {
+                       "name":  "yt_empty_no_subs",
+                       "value":  "暂无订阅用户"
+                   },
+                   {
+                       "name":  "yt_empty_subs_hint",
+                       "value":  "请在\"订阅管理\"中添加"
+                   },
+                   {
+                       "name":  "yt_empty_subs_hint_alt",
+                       "value":  "在搜索页订阅感兴趣的作者"
+                   },
+                   {
+                       "name":  "yt_error_load_subs",
+                       "value":  "加载订阅失败"
+                   },
+                   {
+                       "name":  "yt_fav_videos_title",
+                       "value":  "我收藏的视频"
+                   },
+                   {
+                       "name":  "yt_fav_playlists_title",
+                       "value":  "我收藏的播放列表"
+                   },
+                   {
+                       "name":  "yt_local_playlists_title",
+                       "value":  "本地播放列表"
+                   },
+                   {
+                       "name":  "yt_local_playlists_tag",
+                       "value":  "本地"
+                   },
+                   {
+                       "name":  "yt_empty_no_local_playlists",
+                       "value":  "暂无本地播放列表"
+                   },
+                   {
+                       "name":  "yt_empty_local_playlists_hint",
+                       "value":  "在播放页保存视频到本地播放列表"
+                   },
+                   {
+                       "name":  "yt_empty_no_fav_videos",
+                       "value":  "暂无收藏的视频"
+                   },
+                   {
+                       "name":  "yt_empty_no_fav_playlists",
+                       "value":  "暂无收藏的播放列表"
+                   },
+                   {
+                       "name":  "yt_empty_fav_playlists_hint",
+                       "value":  "在搜索页收藏感兴趣的播放列表"
+                   },
+                   {
+                       "name":  "yt_empty_playlists_hint",
+                       "value":  "在搜索页收藏感兴趣的播放列表"
+                   },
+                   {
+                       "name":  "yt_about_current_version",
+                       "value":  "当前版本"
+                   },
+                   {
+                       "name":  "yt_about_description",
+                       "value":  "基于鸿蒙 HarmonyOS NEXT 的开源 YouTube 客户端\n无广告 · 无跟踪 · 完全本地解析"
+                   },
+                   {
+                       "name":  "yt_about_qq_group",
+                       "value":  "QQ 群组"
+                   },
+                   {
+                       "name":  "yt_about_tg_group",
+                       "value":  "Telegram 群组"
+                   },
+                   {
+                       "name":  "yt_about_project_info",
+                       "value":  "项目信息"
+                   },
+                   {
+                       "name":  "yt_about_open_source",
+                       "value":  "使用的开源项目"
+                   },
+                   {
+                       "name":  "yt_about_ai_models",
+                       "value":  "开发辅助 AI 模型"
+                   },
+                   {
+                       "name":  "yt_about_changelog",
+                       "value":  "更新日志"
+                   },
+                   {
+                       "name":  "yt_error_load_failed",
+                       "value":  "加载失败"
+                   },
+                   {
+                       "name":  "yt_error_play_failed_title",
+                       "value":  "播放失败"
+                   },
+                   {
+                       "name":  "yt_label_live",
+                       "value":  "直播"
+                   },
+                   {
+                       "name":  "yt_label_loading",
+                       "value":  "加载中..."
+                   },
+                   {
+                       "name":  "yt_error_load_playlists",
+                       "value":  "加载播放列表失败"
+                   },
+                   {
+                       "name":  "yt_error_load_channel_info",
+                       "value":  "频道信息获取失败"
+                   },
+                   {
+                       "name":  "yt_tab_description",
+                       "value":  "简介"
+                   },
+                   {
+                       "name":  "yt_tab_comments",
+                       "value":  "评论"
+                   },
+                   {
+                       "name":  "yt_tab_recommended",
+                       "value":  "推荐"
+                   },
+                   {
+                       "name":  "yt_home_search_empty",
+                       "value":  "自动搜索无结果，请手动搜索"
+                   },
+                   {
+                       "name":  "yt_home_recommended_error",
+                       "value":  "推荐源加载失败，已回退或请稍后重试"
+                   },
+                   {
+                       "name":  "yt_home_kiosk_error",
+                       "value":  "Kiosk 请求失败，请稍后重试"
+                   },
+                   {
+                       "name":  "yt_home_load_error",
+                       "value":  "主页加载失败，请稍后重试"
+                   },
+                   {
+                       "name":  "yt_player_mode_progressive",
+                       "value":  "渐进式 (Progressive)"
+                   },
+                   {
+                       "name":  "yt_player_mode_hls",
+                       "value":  "HLS 串流"
+                   },
+                   {
+                       "name":  "yt_player_mode_dash_manifest",
+                       "value":  "DASH 串流 (Manifest)"
+                   },
+                   {
+                       "name":  "yt_player_mode_dash_track",
+                       "value":  "DASH 轨道 (音视频分离)"
+                   },
+                   {
+                       "name":  "yt_player_default",
+                       "value":  "默认 (Default)"
+                   },
+                   {
+                       "name":  "yt_player_step1_select_mode",
+                       "value":  "1. 选择播放模式"
+                   },
+                   {
+                       "name":  "yt_player_step2_select_quality",
+                       "value":  "2. 选择清晰度"
+                   },
+                   {
+                       "name":  "yt_player_video_quality",
+                       "value":  "视频清晰度"
+                   },
+                   {
+                       "name":  "yt_player_step2_select_manifest",
+                       "value":  "2. 选择资源清单"
+                   },
+                   {
+                       "name":  "yt_player_step2_select_track",
+                       "value":  "2. 选择音视频轨道"
+                   },
+                   {
+                       "name":  "yt_player_audio_language_type",
+                       "value":  "音频语言 / 类型"
+                   },
+                   {
+                       "name":  "yt_log_saved_to_downloads",
+                       "value":  "已保存至下载目录"
+                   },
+                   {
+                       "name":  "yt_feed_popular",
+                       "value":  "热门"
+                   },
+                   {
+                       "name":  "yt_feed_recommended",
+                       "value":  "推荐"
+                   },
+                   {
+                       "name":  "yt_feed_featured",
+                       "value":  "精选"
+                   },
+                   {
+                       "name":  "yt_feed_trending",
+                       "value":  "趋势"
+                   },
+                   {
+                       "name":  "yt_feed_latest",
+                       "value":  "最新"
+                   },
+                   {
+                       "name":  "yt_feed_topics",
+                       "value":  "话题"
+                   },
+                   {
+                       "name":  "yt_suffix_videos",
+                       "value":  "视频"
+                   },
+                   {
+                       "name":  "yt_suffix_shorts",
+                       "value":  "短片"
+                   },
+                   {
+                       "name":  "yt_suffix_collections",
+                       "value":  "合集"
+                   },
+                   {
+                       "name":  "yt_suffix_live",
+                       "value":  "直播"
+                   },
+                   {
+                       "name":  "yt_suffix_music",
+                       "value":  "音乐"
+                   },
+                   {
+                       "name":  "yt_suffix_movies",
+                       "value":  "电影"
+                   },
+                   {
+                       "name":  "yt_error_no_playable_stream",
+                       "value":  "未找到可播放的流"
+                   },
+                   {
+                       "name":  "yt_error_no_supported_stream",
+                       "value":  "没有找到可支持的视频流"
+                   },
+                   {
+                       "name":  "yt_error_age_restricted",
+                       "value":  "此视频有年龄限制"
+                   },
+                   {
+                       "name":  "yt_error_age_restricted_hint",
+                       "value":  "需要在浏览器中登录 YouTube 账号才能观看"
+                   },
+                   {
+                       "name":  "yt_error_geo_restricted",
+                       "value":  "此内容在你所在的地区不可用"
+                   },
+                   {
+                       "name":  "yt_error_geo_restricted_hint",
+                       "value":  "视频发布者限制了播放地区"
+                   },
+                   {
+                       "name":  "yt_error_paid_content",
+                       "value":  "此视频为付费内容"
+                   },
+                   {
+                       "name":  "yt_error_paid_content_hint",
+                       "value":  "需要购买或租借才能观看"
+                   },
+                   {
+                       "name":  "yt_error_premium_content",
+                       "value":  "此内容仅限 YouTube Premium 会员"
+                   },
+                   {
+                       "name":  "yt_error_premium_content_hint",
+                       "value":  "需要订阅 YouTube Premium 才能播放"
+                   },
+                   {
+                       "name":  "yt_error_private_content",
+                       "value":  "此视频为私密视频"
+                   },
+                   {
+                       "name":  "yt_error_private_content_hint",
+                       "value":  "只有获得授权的用户才能观看"
+                   },
+                   {
+                       "name":  "yt_error_login_required",
+                       "value":  "需要登录才能观看"
+                   },
+                   {
+                       "name":  "yt_error_login_required_hint",
+                       "value":  "请在浏览器中登录 YouTube 账号"
+                   },
+                   {
+                       "name":  "yt_error_account_terminated",
+                       "value":  "此频道已被终止"
+                   },
+                   {
+                       "name":  "yt_error_account_terminated_hint",
+                       "value":  "该账号因违反 YouTube 政策已被封禁"
+                   },
+                   {
+                       "name":  "yt_error_live_offline",
+                       "value":  "直播已结束"
+                   },
+                   {
+                       "name":  "yt_error_live_offline_hint",
+                       "value":  "此直播流已下线或尚未开始"
+                   },
+                   {
+                       "name":  "yt_error_content_not_supported",
+                       "value":  "不支持此类型的内容"
+                   },
+                   {
+                       "name":  "yt_error_content_not_supported_hint",
+                       "value":  "该视频格式暂不支持播放"
+                   },
+                   {
+                       "name":  "yt_error_network",
+                       "value":  "网络连接失败"
+                   },
+                   {
+                       "name":  "yt_error_network_hint",
+                       "value":  "请检查网络连接后重试"
+                   },
+                   {
+                       "name":  "yt_error_timeout",
+                       "value":  "请求超时"
+                   },
+                   {
+                       "name":  "yt_error_timeout_hint",
+                       "value":  "服务器响应过慢，请稍后重试"
+                   },
+                   {
+                       "name":  "yt_error_extraction_failed",
+                       "value":  "解析视频信息失败"
+                   },
+                   {
+                       "name":  "yt_error_extraction_failed_hint",
+                       "value":  "无法获取视频播放数据"
+                   },
+                   {
+                       "name":  "yt_error_cipher_failed",
+                       "value":  "解密视频流失败"
+                   },
+                   {
+                       "name":  "yt_error_cipher_failed_hint",
+                       "value":  "签名算法更新，请等待应用更新"
+                   },
+                   {
+                       "name":  "new_app_name",
+                       "value":  "YourPipe"
+                   },
+                   {
+                       "name":  "yt_empty_no_playlists",
+                       "value":  "暂无播放列表"
+                   },
+                   {
+                       "name":  "yt_search_results_from",
+                       "value":  "来自 \"%s\" 的搜索结果"
+                   },
+                   {
+                       "name":  "yt_option_group_recovery",
+                       "value":  "恢复"
+                   },
+                   {
+                       "name":  "yt_option_reset_settings",
+                       "value":  "恢复所有配置"
+                   },
+                   {
+                       "name":  "yt_option_reset_settings_subtitle",
+                       "value":  "将所有设置重置为默认值"
+                   },
+                   {
+                       "name":  "yt_option_clear_all_data",
+                       "value":  "清除应用全部数据"
+                   },
+                   {
+                       "name":  "yt_option_clear_all_data_subtitle",
+                       "value":  "删除所有存储的数据，包括历史记录和缓存"
+                   },
+                   {
+                       "name":  "yt_toast_reset_settings_done",
+                       "value":  "已恢复默认设置"
+                   },
+                   {
+                       "name":  "yt_toast_clear_all_data_done",
+                       "value":  "已清除所有数据"
+                   },
+                   {
+                       "name":  "yt_option_recovery",
+                       "value":  "恢复"
+                   },
+                   {
+                       "name":  "yt_confirm_reset_settings",
+                       "value":  "确定要恢复所有配置为默认值吗？此操作不可撤销。"
+                   },
+                   {
+                       "name":  "yt_confirm_clear_all_data",
+                       "value":  "确定要清除应用全部数据吗？此操作将删除所有历史记录、收藏、订阅和设置，不可撤销。"
+                   },
+                   {
+                       "name":  "yt_setting_stream_buffer",
+                       "value":  "TCP 流缓冲大小"
+                   },
+                   {
+                       "name":  "yt_setting_seek_keyframe",
+                       "value":  "快速跳转（关键帧）"
+                   },
+                   {
+                       "name":  "yt_setting_seek_keyframe_subtitle",
+                       "value":  "跳转到最近的关键帧以加快响应速度"
+                   },
+                   {
+                       "name":  "yt_action_download",
+                       "value":  "下载"
+                   },
+                   {
+                       "name":  "yt_download_title",
+                       "value":  "下载视频"
+                   },
+                   {
+                       "name":  "yt_download_step1_mode",
+                       "value":  "步骤 1: 选择下载模式"
+                   },
+                   {
+                       "name":  "yt_download_step2_quality",
+                       "value":  "步骤 2: 选择清晰度"
+                   },
+                   {
+                       "name":  "yt_download_step2_tracks",
+                       "value":  "步骤 2: 选择轨道"
+                   },
+                   {
+                       "name":  "yt_download_mode_progressive",
+                       "value":  "合并流 (Progressive)"
+                   },
+                   {
+                       "name":  "yt_download_mode_dash",
+                       "value":  "分离轨道 (DASH)"
+                   },
+                   {
+                       "name":  "yt_download_mode_hls",
+                       "value":  "HLS 流"
+                   },
+                   {
+                       "name":  "yt_download_progressive_hint",
+                       "value":  "推荐：视频和音频已合并，无需额外处理"
+                   },
+                   {
+                       "name":  "yt_download_dash_hint",
+                       "value":  "视频和音频分别下载后自动合并"
+                   },
+                   {
+                       "name":  "yt_download_estimated_size",
+                       "value":  "预计大小"
+                   },
+                   {
+                       "name":  "yt_download_empty",
+                       "value":  "暂无下载任务"
+                   },
+                   {
+                       "name":  "yt_download_empty_hint",
+                       "value":  "在视频页面点击下载按钮开始下载"
+                   },
+                   {
+                       "name":  "yt_label_progressive",
+                       "value":  "合并流质量"
+                   },
+                   {
+                       "name":  "yt_label_premium",
+                       "value":  "付费"
+                   },
+                   {
+                       "name":  "yt_label_members_only",
+                       "value":  "会员"
+                   },
+                   {
+                       "name":  "yt_option_data_account",
+                       "value":  "数据与账号"
+                   },
+                   {
+                       "name":  "yt_option_data_account_subtitle",
+                       "value":  "管理登录状态与本地数据"
+                   },
+                   {
+                       "name":  "yt_section_account",
+                       "value":  "账号"
+                   },
+                   {
+                       "name":  "yt_section_data_management",
+                       "value":  "数据管理"
+                   },
+                   {
+                       "name":  "yt_option_google_login",
+                       "value":  "Google 登录"
+                   },
+                   {
+                       "name":  "yt_option_export_data",
+                       "value":  "导出数据"
+                   },
+                   {
+                       "name":  "yt_option_export_data_subtitle",
+                       "value":  "将本地数据备份为 JSON 文件"
+                   },
+                   {
+                       "name":  "yt_option_restore_data",
+                       "value":  "恢复数据"
+                   },
+                   {
+                       "name":  "yt_option_restore_data_subtitle",
+                       "value":  "从 JSON 备份文件恢复数据"
+                   },
+                   {
+                       "name":  "yt_backup_item_settings",
+                       "value":  "应用设置"
+                   },
+                   {
+                       "name":  "yt_backup_item_subscriptions",
+                       "value":  "订阅"
+                   },
+                   {
+                       "name":  "yt_backup_item_favorites",
+                       "value":  "收藏视频"
+                   },
+                   {
+                       "name":  "yt_backup_item_playlists",
+                       "value":  "收藏的播放列表"
+                   },
+                   {
+                       "name":  "yt_backup_item_local_queues",
+                       "value":  "本地播放列表"
+                   },
+                   {
+                       "name":  "yt_backup_item_watch_history",
+                       "value":  "观看历史"
+                   },
+                   {
+                       "name":  "yt_backup_item_search_history",
+                       "value":  "搜索历史"
+                   },
+                   {
+                       "name":  "yt_backup_item_auth",
+                       "value":  "YouTube 登录状态"
+                   },
+                   {
+                       "name":  "yt_backup_export_title",
+                       "value":  "选择要导出的项目"
+                   },
+                   {
+                       "name":  "yt_backup_restore_title",
+                       "value":  "选择要恢复的项目"
+                   },
+                   {
+                       "name":  "yt_backup_confirm_restore",
+                       "value":  "恢复将覆盖当前选中的本地数据，确定继续吗？"
+                   },
+                   {
+                       "name":  "yt_backup_export_success",
+                       "value":  "导出成功"
+                   },
+                   {
+                       "name":  "yt_backup_export_failed",
+                       "value":  "导出失败"
+                   },
+                   {
+                       "name":  "yt_backup_restore_success",
+                       "value":  "恢复成功"
+                   },
+                   {
+                       "name":  "yt_backup_restore_failed",
+                       "value":  "恢复失败"
+                   },
+                   {
+                       "name":  "yt_backup_version_unsupported",
+                       "value":  "备份文件版本不受支持"
+                   },
+                   {
+                       "name":  "yt_setting_home_feed_after_login",
+                       "value":  "登录后的主页内容"
+                   },
+                   {
+                       "name":  "yt_home_feed_recommended",
+                       "value":  "推荐"
+                   },
+                   {
+                       "name":  "yt_home_feed_kiosk",
+                       "value":  "直播"
+                   },
+                   {
+                       "name":  "yt_option_auth_session",
+                       "value":  "登录态浏览"
+                   },
+                   {
+                       "name":  "yt_option_sign_out",
+                       "value":  "退出登录"
+                   },
+                   {
+                       "name":  "yt_option_sign_out_subtitle",
+                       "value":  "清除已保存的登录信息"
+                   },
+                   {
+                       "name":  "yt_confirm_sign_out",
+                       "value":  "确认退出登录？将清除已保存的登录信息。"
+                   }
+               ]
 }

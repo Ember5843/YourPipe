@@ -1,988 +1,1020 @@
-﻿{
-  "string": [
-    {
-      "name": "module_desc",
-      "value": "module description"
-    },
-    {
-      "name": "EntryAbility_desc",
-      "value": "description"
-    },
-    {
-      "name": "EntryAbility_label",
-      "value": "label"
-    },
-    {
-      "name": "HOME_EXIT_TOAST",
-      "value": "Appuyez encore pour quitter"
-    },
-    {
-      "name": "LIVING_LEFT_TEXT",
-      "value": "Total : "
-    },
-    {
-      "name": "LIVING_RIGHT_TEXT",
-      "value": " commentaires"
-    },
-    {
-      "name": "LIVING_WRITE",
-      "value": "Écrire un commentaire"
-    },
-    {
-      "name": "number_of_viewers",
-      "value": "738 600 spectateurs"
-    },
-    {
-      "name": "store_name",
-      "value": "Salle de diffusion officielle"
-    },
-    {
-      "name": "yt_tab_home",
-      "value": "Accueil"
-    },
-    {
-      "name": "yt_tab_playlists",
-      "value": "Playlists"
-    },
-    {
-      "name": "yt_tab_subscriptions",
-      "value": "Abonnements"
-    },
-    {
-      "name": "yt_tab_favorites",
-      "value": "Favoris"
-    },
-    {
-      "name": "yt_tab_local",
-      "value": "Local"
-    },
-    {
-      "name": "yt_option_title",
-      "value": "Options"
-    },
-    {
-      "name": "yt_option_group_settings",
-      "value": "Paramètres"
-    },
-    {
-      "name": "yt_option_group_others",
-      "value": "Autres"
-    },
-    {
-      "name": "yt_option_language",
-      "value": "Langue"
-    },
-    {
-      "name": "yt_option_color",
-      "value": "Couleur"
-    },
-    {
-      "name": "yt_option_color_subtitle",
-      "value": "Thème et couleurs d'accent"
-    },
-    {
-      "name": "yt_option_appearance",
-      "value": "Apparence"
-    },
-    {
-      "name": "yt_dark_mode_title",
-      "value": "Mode sombre"
-    },
-    {
-      "name": "yt_dark_mode_system",
-      "value": "Suivre le système"
-    },
-    {
-      "name": "yt_dark_mode_system_subtitle",
-      "value": "Basculer automatiquement selon les paramètres système"
-    },
-    {
-      "name": "yt_dark_mode_light",
-      "value": "Thème clair"
-    },
-    {
-      "name": "yt_dark_mode_light_subtitle",
-      "value": "Toujours utiliser le thème clair"
-    },
-    {
-      "name": "yt_dark_mode_dark",
-      "value": "Thème sombre"
-    },
-    {
-      "name": "yt_dark_mode_dark_subtitle",
-      "value": "Toujours utiliser le thème sombre"
-    },
-    {
-      "name": "yt_option_log",
-      "value": "Journaux"
-    },
-    {
-      "name": "yt_option_log_subtitle",
-      "value": "Afficher les journaux récents"
-    },
-    {
-      "name": "yt_log_title",
-      "value": "Journaux"
-    },
-    {
-      "name": "yt_log_enable",
-      "value": "Activer l'enregistrement des journaux"
-    },
-    {
-      "name": "yt_log_enable_subtitle",
-      "value": "Capturer les journaux d'exécution après le démarrage"
-    },
-    {
-      "name": "yt_log_disabled_hint",
-      "value": "L'enregistrement des journaux est désactivé\nActivez le commutateur ci-dessus pour commencer"
-    },
-    {
-      "name": "yt_log_empty",
-      "value": "Aucun journal"
-    },
-    {
-      "name": "yt_log_session_active",
-      "value": "Enregistrement"
-    },
-    {
-      "name": "yt_log_session_saved",
-      "value": "Enregistré"
-    },
-    {
-      "name": "yt_log_no_sessions",
-      "value": "Aucune session de journal"
-    },
-    {
-      "name": "yt_log_delete_all_confirm",
-      "value": "Supprimer tous les journaux ?"
-    },
-    {
-      "name": "yt_log_delete_confirm_yes",
-      "value": "Supprimer"
-    },
-    {
-      "name": "yt_log_delete_confirm_no",
-      "value": "Annuler"
-    },
-    {
-      "name": "yt_option_about",
-      "value": "À propos"
-    },
-    {
-      "name": "yt_option_about_subtitle",
-      "value": "Version et remerciements"
-    },
-    {
-      "name": "yt_option_in_development",
-      "value": "En développement"
-    },
-    {
-      "name": "yt_option_in_development_color",
-      "value": "Les options de thème de couleur s'afficheront ici"
-    },
-    {
-      "name": "yt_lang_follow_system",
-      "value": "Suivre le système"
-    },
-    {
-      "name": "yt_lang_simplified",
-      "value": "Chinois (simplifié)"
-    },
-    {
-      "name": "yt_lang_simplified_subtitle",
-      "value": "简体中文"
-    },
-    {
-      "name": "yt_lang_traditional_hk",
-      "value": "Chinois (traditionnel, Hong Kong)"
-    },
-    {
-      "name": "yt_lang_traditional_hk_subtitle",
-      "value": "繁體中文（香港）"
-    },
-    {
-      "name": "yt_lang_traditional_tw",
-      "value": "Chinois (traditionnel, Taïwan)"
-    },
-    {
-      "name": "yt_lang_traditional_tw_subtitle",
-      "value": "繁體中文（台灣）"
-    },
-    {
-      "name": "yt_lang_english",
-      "value": "Anglais"
-    },
-    {
-      "name": "yt_lang_english_subtitle",
-      "value": "English"
-    },
-    {
-      "name": "internet_reason",
-      "value": "Demander des données réseau"
-    },
-        {
-      "name": "reason_background",
-      "value": "Maintenir la lecture en arriere-plan"
-    },
 {
-      "name": "share",
-      "value": "Partager"
-    },
-    {
-      "name": "comment",
-      "value": "Commentaire"
-    },
-    {
-      "name": "recommends",
-      "value": "Recommandations"
-    },
-    {
-      "name": "play_count",
-      "value": "120 k"
-    },
-    {
-      "name": "favor_count",
-      "value": "70 k"
-    },
-    {
-      "name": "send_barrage",
-      "value": "Danmaku"
-    },
-    {
-      "name": "video_name0",
-      "value": "@Cat"
-    },
-    {
-      "name": "video_name1",
-      "value": "@Mountaineer"
-    },
-    {
-      "name": "video_name2",
-      "value": "@Nice To Meet You"
-    },
-    {
-      "name": "video_name3",
-      "value": "@Tick"
-    },
-    {
-      "name": "video_name4",
-      "value": "@Faery"
-    },
-    {
-      "name": "video_description0",
-      "value": "#1 #Vidéo locale #Monde coloré, la vie n'est pas seulement le présent, mais aussi la poésie et le lointain"
-    },
-    {
-      "name": "video_description1",
-      "value": "#2 #Vidéo en ligne #Rêve"
-    },
-    {
-      "name": "video_description3",
-      "value": "#4 #Vidéo en ligne #Monde coloré, la vie n'est pas seulement le présent, mais aussi la poésie et le lointain"
-    },
-    {
-      "name": "video_description4",
-      "value": "#5 #Vidéo en ligne #Monde coloré, la vie n'est pas seulement le présent, mais aussi la poésie et le lointain"
-    },
-    {
-      "name": "yt_section_language_region",
-      "value": "Langue et région"
-    },
-    {
-      "name": "yt_section_playback",
-      "value": "Lecture"
-    },
-    {
-      "name": "yt_section_language",
-      "value": "Paramètres de langue"
-    },
-    {
-      "name": "yt_setting_ui_language",
-      "value": "Langue de l'application"
-    },
-    {
-      "name": "yt_setting_content_language",
-      "value": "Langue du contenu"
-    },
-    {
-      "name": "yt_setting_content_region",
-      "value": "Région du contenu"
-    },
-    {
-      "name": "yt_section_video",
-      "value": "Paramètres vidéo"
-    },
-    {
-      "name": "yt_setting_default_quality",
-      "value": "Qualité vidéo par défaut"
-    },
-    {
-      "name": "yt_setting_live_quality_cap",
-      "value": "Limite de qualité du direct"
-    },
-    {
-      "name": "yt_setting_show_high_res",
-      "value": "Afficher haute résolution (1440p / 4K)"
-    },
-    {
-      "name": "yt_setting_show_high_res_subtitle",
-      "value": "Afficher l'option 4K dans le sélecteur de qualité, exigeant en performance"
-    },
-    {
-      "name": "yt_setting_video_codec",
-      "value": "Codec vidéo"
-    },
-    {
-      "name": "yt_section_audio",
-      "value": "Paramètres audio"
-    },
-    {
-      "name": "yt_setting_audio_quality",
-      "value": "Qualité audio maximale"
-    },
-    {
-      "name": "yt_section_decoder",
-      "value": "Paramètres du décodeur"
-    },
-    {
-      "name": "yt_setting_hwdec_mode",
-      "value": "Mode décodage matériel"
-    },
-    {
-      "name": "yt_setting_decoder_fallback",
-      "value": "Retour au décodeur logiciel"
-    },
-    {
-      "name": "yt_setting_decoder_fallback_subtitle",
-      "value": "Retour automatique au décodage logiciel en cas d'échec matériel"
-    },
-    {
-      "name": "yt_section_buffer",
-      "value": "Stratégie de mise en mémoire tampon"
-    },
-    {
-      "name": "yt_setting_readahead",
-      "value": "Durée de préchargement"
-    },
-    {
-      "name": "yt_setting_cache_pause",
-      "value": "Temps d'attente en cas de tampon insuffisant"
-    },
-    {
-      "name": "yt_setting_max_back_bytes",
-      "value": "Taille du tampon arrière (pas de rechargement lors du retour arrière)"
-    },
-    {
-      "name": "yt_quality_best",
-      "value": "Meilleure qualité"
-    },
-    {
-      "name": "yt_codec_h264_first",
-      "value": "Automatique (H.264 prioritaire)"
-    },
-    {
-      "name": "yt_codec_force_h264",
-      "value": "Forcer H.264"
-    },
-    {
-      "name": "yt_audio_high",
-      "value": "Maximale (≈256 kbps AAC)"
-    },
-    {
-      "name": "yt_audio_medium",
-      "value": "Moyenne (≈128 kbps AAC)"
-    },
-    {
-      "name": "yt_audio_low",
-      "value": "Économie de données (≈48 kbps)"
-    },
-    {
-      "name": "yt_hwdec_auto",
-      "value": "Automatique (recommandé)"
-    },
-    {
-      "name": "yt_hwdec_auto_safe",
-      "value": "Forcer le matériel"
-    },
-    {
-      "name": "yt_hwdec_no",
-      "value": "Logiciel uniquement"
-    },
-    {
-      "name": "yt_recommended_suffix",
-      "value": " (recommandé)"
-    },
-    {
-      "name": "yt_unit_seconds",
-      "value": "s"
-    },
-    {
-      "name": "yt_unit_mb",
-      "value": "Mo"
-    },
-    {
-      "name": "yt_placeholder_search",
-      "value": "Rechercher..."
-    },
-    {
-      "name": "yt_action_favorite",
-      "value": "Ajouter aux favoris"
-    },
-    {
-      "name": "yt_action_unfavorite",
-      "value": "Retirer des favoris"
-    },
-    {
-      "name": "yt_action_subscribe",
-      "value": "S'abonner"
-    },
-    {
-      "name": "yt_action_unsubscribe",
-      "value": "Se désabonner"
-    },
-    {
-      "name": "yt_action_share",
-      "value": "Partager"
-    },
-    {
-      "name": "yt_action_retry",
-      "value": "Réessayer"
-    },
-    {
-      "name": "yt_action_cancel",
-      "value": "Annuler"
-    },
-    {
-      "name": "yt_action_confirm",
-      "value": "Confirmer"
-    },
-    {
-      "name": "yt_action_delete",
-      "value": "Supprimer"
-    },
-    {
-      "name": "yt_action_clear",
-      "value": "Vider"
-    },
-    {
-      "name": "yt_action_view_author",
-      "value": "Voir l'auteur"
-    },
-    {
-      "name": "yt_action_clear_all",
-      "value": "Tout vider"
-    },
-    {
-      "name": "yt_search_youtube",
-      "value": "Rechercher sur YouTube"
-    },
-    {
-      "name": "yt_search_youtube_music",
-      "value": "Rechercher sur YouTube Music"
-    },
-    {
-      "name": "yt_filter_all",
-      "value": "Tout"
-    },
-    {
-      "name": "yt_filter_videos",
-      "value": "Vidéos"
-    },
-    {
-      "name": "yt_filter_channels",
-      "value": "Chaînes"
-    },
-    {
-      "name": "yt_filter_playlists",
-      "value": "Playlists"
-    },
-    {
-      "name": "yt_filter_songs",
-      "value": "Titres"
-    },
-    {
-      "name": "yt_filter_albums",
-      "value": "Albums"
-    },
-    {
-      "name": "yt_search_history",
-      "value": "Historique de recherche"
-    },
-    {
-      "name": "yt_action_clear_search_history",
-      "value": "Vider l'historique de recherche"
-    },
-    {
-      "name": "yt_empty_no_search_history",
-      "value": "Aucun historique de recherche"
-    },
-    {
-      "name": "yt_search_no_results",
-      "value": "Aucun résultat trouvé"
-    },
-    {
-      "name": "yt_error_search_failed",
-      "value": "Échec de la recherche, veuillez réessayer plus tard"
-    },
-    {
-      "name": "yt_dialog_delete_search_record",
-      "value": "Supprimer l'enregistrement de recherche"
-    },
-    {
-      "name": "yt_confirm_clear_search_history",
-      "value": "Vider tout l'historique de recherche ?"
-    },
-    {
-      "name": "yt_toast_cleared",
-      "value": "Vidé"
-    },
-    {
-      "name": "yt_placeholder_search_content",
-      "value": "Rechercher du contenu"
-    },
-    {
-      "name": "yt_empty_no_content",
-      "value": "Aucun contenu"
-    },
-    {
-      "name": "yt_video_details",
-      "value": "Détails de la vidéo"
-    },
-    {
-      "name": "yt_error_invalid_video",
-      "value": "Aucune information vidéo valide"
-    },
-    {
-      "name": "yt_notice_direct_link_removed",
-      "value": "La fonction de lien direct a été supprimée, traitement unifié à suivre."
-    },
-    {
-      "name": "yt_dialog_select_quality",
-      "value": "Choisir la qualité"
-    },
-    {
-      "name": "yt_label_video_track",
-      "value": "Piste vidéo"
-    },
-    {
-      "name": "yt_warn_high_resolution",
-      "value": "Cette résolution dépasse 1440p, des problèmes de performance peuvent survenir sur certains appareils"
-    },
-    {
-      "name": "yt_label_audio_quality",
-      "value": "Qualité audio"
-    },
-    {
-      "name": "yt_player_syncing_buffer",
-      "value": "Synchronisation du tampon double piste..."
-    },
-    {
-      "name": "yt_error_playback_failed",
-      "value": "Échec de la lecture"
-    },
-    {
-      "name": "yt_error_load_video_info",
-      "value": "Impossible de charger les informations vidéo"
-    },
-    {
-      "name": "yt_error_load_video",
-      "value": "Impossible de charger la vidéo"
-    },
-    {
-      "name": "yt_error_load_exception",
-      "value": "Une erreur de chargement s'est produite"
-    },
-    {
-      "name": "yt_error_unknown",
-      "value": "Erreur inconnue"
-    },
-    {
-      "name": "yt_error_invalid_video_id",
-      "value": "ID vidéo invalide"
-    },
-    {
-      "name": "yt_error_play_error_retry",
-      "value": "Erreur de lecture, veuillez réessayer"
-    },
-    {
-      "name": "yt_empty_no_comments",
-      "value": "Aucun commentaire"
-    },
-    {
-      "name": "yt_label_pinned",
-      "value": "Épinglé"
-    },
-    {
-      "name": "yt_error_load_comments",
-      "value": "Impossible de charger les commentaires"
-    },
-    {
-      "name": "yt_label_reply",
-      "value": "Répondre"
-    },
-    {
-      "name": "yt_error_load_replies",
-      "value": "Impossible de charger les réponses"
-    },
-    {
-      "name": "yt_label_like",
-      "value": "J'aime"
-    },
-    {
-      "name": "yt_tab_videos",
-      "value": "Vidéos"
-    },
-    {
-      "name": "yt_tab_shorts",
-      "value": "Shorts"
-    },
-    {
-      "name": "yt_tab_live",
-      "value": "Direct"
-    },
-    {
-      "name": "yt_tab_about",
-      "value": "À propos"
-    },
-    {
-      "name": "yt_empty_no_videos",
-      "value": "Aucune vidéo"
-    },
-    {
-      "name": "yt_empty_no_shorts",
-      "value": "Aucun Shorts"
-    },
-    {
-      "name": "yt_empty_no_live",
-      "value": "Aucun direct"
-    },
-    {
-      "name": "yt_channel_info",
-      "value": "Infos chaîne"
-    },
-    {
-      "name": "yt_channel_id",
-      "value": "ID de la chaîne"
-    },
-    {
-      "name": "yt_channel_subscribers",
-      "value": "Abonnés"
-    },
-    {
-      "name": "yt_channel_video_count",
-      "value": "Nombre de vidéos"
-    },
-    {
-      "name": "yt_channel_description",
-      "value": "Description"
-    },
-    {
-      "name": "yt_error_load_user_videos",
-      "value": "Impossible de charger les vidéos de l'utilisateur"
-    },
-    {
-      "name": "yt_error_load_shorts",
-      "value": "Impossible de charger les Shorts"
-    },
-    {
-      "name": "yt_error_load_live",
-      "value": "Impossible de charger les directs"
-    },
-    {
-      "name": "yt_label_user",
-      "value": "Utilisateur"
-    },
-    {
-      "name": "yt_local_history",
-      "value": "Historique de visionnage"
-    },
-    {
-      "name": "yt_dialog_clear_history",
-      "value": "Vider l'historique"
-    },
-    {
-      "name": "yt_confirm_clear_history",
-      "value": "Vider tout l'historique de visionnage ?"
-    },
-    {
-      "name": "yt_empty_no_history",
-      "value": "Aucun historique de visionnage"
-    },
-    {
-      "name": "yt_empty_history_hint",
-      "value": "Les vidéos regardées apparaîtront ici"
-    },
-    {
-      "name": "yt_time_just_now",
-      "value": "À l'instant"
-    },
-    {
-      "name": "yt_action_delete_record",
-      "value": "Supprimer l'enregistrement"
-    },
-    {
-      "name": "yt_sub_manage_title",
-      "value": "Mes abonnements"
-    },
-    {
-      "name": "yt_empty_no_subs",
-      "value": "Aucun abonnement"
-    },
-    {
-      "name": "yt_empty_subs_hint",
-      "value": "Veuillez ajouter dans \"Gestion des abonnements\""
-    },
-    {
-      "name": "yt_empty_subs_hint_alt",
-      "value": "Abonnez-vous à des auteurs intéressants sur la page de recherche"
-    },
-    {
-      "name": "yt_error_load_subs",
-      "value": "Impossible de charger les abonnements"
-    },
-    {
-      "name": "yt_fav_videos_title",
-      "value": "Mes vidéos favorites"
-    },
-    {
-      "name": "yt_fav_playlists_title",
-      "value": "Mes playlists favorites"
-    },
-    {
-      "name": "yt_local_playlists_title",
-      "value": "Playlists locales"
-    },
-    {
-      "name": "yt_local_playlists_tag",
-      "value": "Locale"
-    },
-    {
-      "name": "yt_empty_no_local_playlists",
-      "value": "Aucune playlist locale"
-    },
-    {
-      "name": "yt_empty_local_playlists_hint",
-      "value": "Enregistrez des vidéos dans une playlist locale depuis le lecteur"
-    },
-    {
-      "name": "yt_empty_no_fav_videos",
-      "value": "Aucune vidéo favorite"
-    },
-    {
-      "name": "yt_empty_no_fav_playlists",
-      "value": "Aucune playlist favorite"
-    },
-    {
-      "name": "yt_empty_fav_playlists_hint",
-      "value": "Ajoutez des playlists en favoris sur la page de recherche"
-    },
-    {
-      "name": "yt_empty_playlists_hint",
-      "value": "Ajoutez des playlists en favoris sur la page de recherche"
-    },
-    {
-      "name": "yt_about_current_version",
-      "value": "Version actuelle"
-    },
-    {
-      "name": "yt_about_description",
-      "value": "Client YouTube open source basé sur HarmonyOS NEXT\nSans publicité · Sans suivi · Analyse entièrement locale"
-    },
-    {
-      "name": "yt_about_qq_group",
-      "value": "Groupe QQ"
-    },
-    {
-      "name": "yt_about_tg_group",
-      "value": "Groupe Telegram"
-    },
-    {
-      "name": "yt_about_project_info",
-      "value": "Informations sur le projet"
-    },
-    {
-      "name": "yt_about_open_source",
-      "value": "Projets open source utilisés"
-    },
-    {
-      "name": "yt_about_ai_models",
-      "value": "Modèles IA pour le développement"
-    },
-    {
-      "name": "yt_about_changelog",
-      "value": "Journal des modifications"
-    },
-    {
-      "name": "yt_error_load_failed",
-      "value": "Échec du chargement"
-    },
-    {
-      "name": "yt_error_play_failed_title",
-      "value": "Lecture échouée"
-    },
-    {
-      "name": "yt_label_live",
-      "value": "En direct"
-    },
-    {
-      "name": "yt_error_load_playlists",
-      "value": "Impossible de charger les playlists"
-    },
-    {
-      "name": "yt_error_load_channel_info",
-      "value": "Impossible de charger les infos de la chaîne"
-    },
-    {
-      "name": "yt_tab_description",
-      "value": "Description"
-    },
-    {
-      "name": "yt_tab_comments",
-      "value": "Commentaires"
-    },
-    {
-      "name": "yt_tab_recommended",
-      "value": "Recommandé"
-    },
-    {
-      "name": "yt_home_search_empty",
-      "value": "La recherche automatique n'a donné aucun résultat, veuillez rechercher manuellement"
-    },
-    {
-      "name": "yt_home_kiosk_error",
-      "value": "Échec de la requête Kiosk, veuillez réessayer plus tard"
-    },
-    {
-      "name": "yt_home_load_error",
-      "value": "Échec du chargement de l'accueil, veuillez réessayer plus tard"
-    },
-    {
-      "name": "yt_player_mode_progressive",
-      "value": "Progressive"
-    },
-    {
-      "name": "yt_player_mode_hls",
-      "value": "Flux HLS"
-    },
-    {
-      "name": "yt_player_mode_dash_manifest",
-      "value": "Flux DASH (Manifest)"
-    },
-    {
-      "name": "yt_player_mode_dash_track",
-      "value": "Pistes DASH (audio/vidéo séparés)"
-    },
-    {
-      "name": "yt_player_default",
-      "value": "Par défaut (Default)"
-    },
-    {
-      "name": "yt_player_step1_select_mode",
-      "value": "1. Choisir le mode de lecture"
-    },
-    {
-      "name": "yt_player_step2_select_quality",
-      "value": "2. Choisir la qualité"
-    },
-    {
-      "name": "yt_player_video_quality",
-      "value": "Qualité vidéo"
-    },
-    {
-      "name": "yt_player_step2_select_manifest",
-      "value": "2. Choisir le manifeste"
-    },
-    {
-      "name": "yt_player_step2_select_track",
-      "value": "2. Choisir la piste"
-    },
-    {
-      "name": "yt_player_audio_language_type",
-      "value": "Langue / type audio"
-    },
-    {
-      "name": "yt_log_saved_to_downloads",
-      "value": "Enregistré dans le dossier Téléchargements"
-    },
-    {
-      "name": "yt_feed_popular",
-      "value": "Populaire"
-    },
-    {
-      "name": "yt_feed_recommended",
-      "value": "Recommandé"
-    },
-    {
-      "name": "yt_feed_featured",
-      "value": "En vedette"
-    },
-    {
-      "name": "yt_feed_trending",
-      "value": "Tendances"
-    },
-    {
-      "name": "yt_feed_latest",
-      "value": "Derniers"
-    },
-    {
-      "name": "yt_feed_topics",
-      "value": "Sujets"
-    },
-    {
-      "name": "yt_suffix_videos",
-      "value": "vidéos"
-    },
-    {
-      "name": "yt_suffix_shorts",
-      "value": "Shorts"
-    },
-    {
-      "name": "yt_suffix_collections",
-      "value": "collections"
-    },
-    {
-      "name": "yt_suffix_live",
-      "value": "directs"
-    },
-    {
-      "name": "yt_suffix_music",
-      "value": "musique"
-    },
-    {
-      "name": "yt_suffix_movies",
-      "value": "films"
-    },
-    {
-      "name": "yt_error_no_playable_stream",
-      "value": "Aucun flux lisible trouvé"
-    },
-    {
-      "name": "yt_error_no_supported_stream",
-      "value": "Aucun flux vidéo pris en charge trouvé"
-    },
-    {
-      "name": "new_app_name",
-      "value": "YourPipe"
-    },
-    {
-      "name": "yt_empty_no_playlists",
-      "value": "Aucune playlist"
-    },
-    {
-      "name": "yt_search_results_from",
-      "value": "Résultats de recherche pour \"%s\""
-    },
-    {
-      "name": "yt_setting_stream_buffer",
-      "value": "TCP Stream Buffer"
-    },
-    {
-      "name": "yt_setting_seek_keyframe",
-      "value": "Fast Seek (Keyframe)"
-    },
-    {
-      "name": "yt_setting_seek_keyframe_subtitle",
-      "value": "Jump to nearest keyframe for faster seek response"
-    }
-  ]
+    "string":  [
+                   {
+                       "name":  "module_desc",
+                       "value":  "module description"
+                   },
+                   {
+                       "name":  "EntryAbility_desc",
+                       "value":  "description"
+                   },
+                   {
+                       "name":  "EntryAbility_label",
+                       "value":  "label"
+                   },
+                   {
+                       "name":  "HOME_EXIT_TOAST",
+                       "value":  "Appuyez encore pour quitter"
+                   },
+                   {
+                       "name":  "LIVING_LEFT_TEXT",
+                       "value":  "Total : "
+                   },
+                   {
+                       "name":  "LIVING_RIGHT_TEXT",
+                       "value":  " commentaires"
+                   },
+                   {
+                       "name":  "LIVING_WRITE",
+                       "value":  "Écrire un commentaire"
+                   },
+                   {
+                       "name":  "number_of_viewers",
+                       "value":  "738 600 spectateurs"
+                   },
+                   {
+                       "name":  "store_name",
+                       "value":  "Salle de diffusion officielle"
+                   },
+                   {
+                       "name":  "yt_tab_home",
+                       "value":  "Accueil"
+                   },
+                   {
+                       "name":  "yt_tab_playlists",
+                       "value":  "Playlists"
+                   },
+                   {
+                       "name":  "yt_tab_subscriptions",
+                       "value":  "Abonnements"
+                   },
+                   {
+                       "name":  "yt_tab_favorites",
+                       "value":  "Favoris"
+                   },
+                   {
+                       "name":  "yt_tab_local",
+                       "value":  "Local"
+                   },
+                   {
+                       "name":  "yt_option_title",
+                       "value":  "Options"
+                   },
+                   {
+                       "name":  "yt_option_group_settings",
+                       "value":  "Paramètres"
+                   },
+                   {
+                       "name":  "yt_option_group_others",
+                       "value":  "Autres"
+                   },
+                   {
+                       "name":  "yt_option_language",
+                       "value":  "Langue"
+                   },
+                   {
+                       "name":  "yt_option_color",
+                       "value":  "Couleur"
+                   },
+                   {
+                       "name":  "yt_option_color_subtitle",
+                       "value":  "Thème et couleurs d\u0027accent"
+                   },
+                   {
+                       "name":  "yt_option_appearance",
+                       "value":  "Apparence"
+                   },
+                   {
+                       "name":  "yt_dark_mode_title",
+                       "value":  "Mode sombre"
+                   },
+                   {
+                       "name":  "yt_dark_mode_system",
+                       "value":  "Suivre le système"
+                   },
+                   {
+                       "name":  "yt_dark_mode_system_subtitle",
+                       "value":  "Basculer automatiquement selon les paramètres système"
+                   },
+                   {
+                       "name":  "yt_dark_mode_light",
+                       "value":  "Thème clair"
+                   },
+                   {
+                       "name":  "yt_dark_mode_light_subtitle",
+                       "value":  "Toujours utiliser le thème clair"
+                   },
+                   {
+                       "name":  "yt_dark_mode_dark",
+                       "value":  "Thème sombre"
+                   },
+                   {
+                       "name":  "yt_dark_mode_dark_subtitle",
+                       "value":  "Toujours utiliser le thème sombre"
+                   },
+                   {
+                       "name":  "yt_option_log",
+                       "value":  "Journaux"
+                   },
+                   {
+                       "name":  "yt_option_log_subtitle",
+                       "value":  "Afficher les journaux récents"
+                   },
+                   {
+                       "name":  "yt_log_title",
+                       "value":  "Journaux"
+                   },
+                   {
+                       "name":  "yt_log_enable",
+                       "value":  "Activer l\u0027enregistrement des journaux"
+                   },
+                   {
+                       "name":  "yt_log_enable_subtitle",
+                       "value":  "Capturer les journaux d\u0027exécution après le démarrage"
+                   },
+                   {
+                       "name":  "yt_log_disabled_hint",
+                       "value":  "L\u0027enregistrement des journaux est désactivé\nActivez le commutateur ci-dessus pour commencer"
+                   },
+                   {
+                       "name":  "yt_log_empty",
+                       "value":  "Aucun journal"
+                   },
+                   {
+                       "name":  "yt_log_session_active",
+                       "value":  "Enregistrement"
+                   },
+                   {
+                       "name":  "yt_log_session_saved",
+                       "value":  "Enregistré"
+                   },
+                   {
+                       "name":  "yt_log_no_sessions",
+                       "value":  "Aucune session de journal"
+                   },
+                   {
+                       "name":  "yt_log_delete_all_confirm",
+                       "value":  "Supprimer tous les journaux ?"
+                   },
+                   {
+                       "name":  "yt_log_delete_confirm_yes",
+                       "value":  "Supprimer"
+                   },
+                   {
+                       "name":  "yt_log_delete_confirm_no",
+                       "value":  "Annuler"
+                   },
+                   {
+                       "name":  "yt_option_about",
+                       "value":  "À propos"
+                   },
+                   {
+                       "name":  "yt_option_about_subtitle",
+                       "value":  "Version et remerciements"
+                   },
+                   {
+                       "name":  "yt_option_in_development",
+                       "value":  "En développement"
+                   },
+                   {
+                       "name":  "yt_option_in_development_color",
+                       "value":  "Les options de thème de couleur s\u0027afficheront ici"
+                   },
+                   {
+                       "name":  "yt_lang_follow_system",
+                       "value":  "Suivre le système"
+                   },
+                   {
+                       "name":  "yt_lang_simplified",
+                       "value":  "Chinois (simplifié)"
+                   },
+                   {
+                       "name":  "yt_lang_simplified_subtitle",
+                       "value":  "简体中文"
+                   },
+                   {
+                       "name":  "yt_lang_traditional_hk",
+                       "value":  "Chinois (traditionnel, Hong Kong)"
+                   },
+                   {
+                       "name":  "yt_lang_traditional_hk_subtitle",
+                       "value":  "繁體中文（香港）"
+                   },
+                   {
+                       "name":  "yt_lang_traditional_tw",
+                       "value":  "Chinois (traditionnel, Taïwan)"
+                   },
+                   {
+                       "name":  "yt_lang_traditional_tw_subtitle",
+                       "value":  "繁體中文（台灣）"
+                   },
+                   {
+                       "name":  "yt_lang_english",
+                       "value":  "Anglais"
+                   },
+                   {
+                       "name":  "yt_lang_english_subtitle",
+                       "value":  "English"
+                   },
+                   {
+                       "name":  "internet_reason",
+                       "value":  "Demander des données réseau"
+                   },
+                   {
+                       "name":  "reason_background",
+                       "value":  "Maintenir la lecture en arriere-plan"
+                   },
+                   {
+                       "name":  "share",
+                       "value":  "Partager"
+                   },
+                   {
+                       "name":  "comment",
+                       "value":  "Commentaire"
+                   },
+                   {
+                       "name":  "recommends",
+                       "value":  "Recommandations"
+                   },
+                   {
+                       "name":  "play_count",
+                       "value":  "120 k"
+                   },
+                   {
+                       "name":  "favor_count",
+                       "value":  "70 k"
+                   },
+                   {
+                       "name":  "send_barrage",
+                       "value":  "Danmaku"
+                   },
+                   {
+                       "name":  "video_name0",
+                       "value":  "@Cat"
+                   },
+                   {
+                       "name":  "video_name1",
+                       "value":  "@Mountaineer"
+                   },
+                   {
+                       "name":  "video_name2",
+                       "value":  "@Nice To Meet You"
+                   },
+                   {
+                       "name":  "video_name3",
+                       "value":  "@Tick"
+                   },
+                   {
+                       "name":  "video_name4",
+                       "value":  "@Faery"
+                   },
+                   {
+                       "name":  "video_description0",
+                       "value":  "#1 #Vidéo locale #Monde coloré, la vie n\u0027est pas seulement le présent, mais aussi la poésie et le lointain"
+                   },
+                   {
+                       "name":  "video_description1",
+                       "value":  "#2 #Vidéo en ligne #Rêve"
+                   },
+                   {
+                       "name":  "video_description3",
+                       "value":  "#4 #Vidéo en ligne #Monde coloré, la vie n\u0027est pas seulement le présent, mais aussi la poésie et le lointain"
+                   },
+                   {
+                       "name":  "video_description4",
+                       "value":  "#5 #Vidéo en ligne #Monde coloré, la vie n\u0027est pas seulement le présent, mais aussi la poésie et le lointain"
+                   },
+                   {
+                       "name":  "yt_section_language_region",
+                       "value":  "Langue et région"
+                   },
+                   {
+                       "name":  "yt_section_playback",
+                       "value":  "Lecture"
+                   },
+                   {
+                       "name":  "yt_section_language",
+                       "value":  "Paramètres de langue"
+                   },
+                   {
+                       "name":  "yt_setting_ui_language",
+                       "value":  "Langue de l\u0027application"
+                   },
+                   {
+                       "name":  "yt_setting_content_language",
+                       "value":  "Langue du contenu"
+                   },
+                   {
+                       "name":  "yt_setting_content_region",
+                       "value":  "Région du contenu"
+                   },
+                   {
+                       "name":  "yt_section_video",
+                       "value":  "Paramètres vidéo"
+                   },
+                   {
+                       "name":  "yt_setting_default_quality",
+                       "value":  "Qualité vidéo par défaut"
+                   },
+                   {
+                       "name":  "yt_setting_live_quality_cap",
+                       "value":  "Limite de qualité du direct"
+                   },
+                   {
+                       "name":  "yt_setting_show_high_res",
+                       "value":  "Afficher haute résolution (1440p / 4K)"
+                   },
+                   {
+                       "name":  "yt_setting_show_high_res_subtitle",
+                       "value":  "Afficher l\u0027option 4K dans le sélecteur de qualité, exigeant en performance"
+                   },
+                   {
+                       "name":  "yt_setting_video_codec",
+                       "value":  "Codec vidéo"
+                   },
+                   {
+                       "name":  "yt_section_audio",
+                       "value":  "Paramètres audio"
+                   },
+                   {
+                       "name":  "yt_setting_audio_quality",
+                       "value":  "Qualité audio maximale"
+                   },
+                   {
+                       "name":  "yt_section_decoder",
+                       "value":  "Paramètres du décodeur"
+                   },
+                   {
+                       "name":  "yt_setting_hwdec_mode",
+                       "value":  "Mode décodage matériel"
+                   },
+                   {
+                       "name":  "yt_setting_decoder_fallback",
+                       "value":  "Retour au décodeur logiciel"
+                   },
+                   {
+                       "name":  "yt_setting_decoder_fallback_subtitle",
+                       "value":  "Retour automatique au décodage logiciel en cas d\u0027échec matériel"
+                   },
+                   {
+                       "name":  "yt_section_buffer",
+                       "value":  "Stratégie de mise en mémoire tampon"
+                   },
+                   {
+                       "name":  "yt_setting_readahead",
+                       "value":  "Durée de préchargement"
+                   },
+                   {
+                       "name":  "yt_setting_cache_pause",
+                       "value":  "Temps d\u0027attente en cas de tampon insuffisant"
+                   },
+                   {
+                       "name":  "yt_setting_max_back_bytes",
+                       "value":  "Taille du tampon arrière (pas de rechargement lors du retour arrière)"
+                   },
+                   {
+                       "name":  "yt_quality_best",
+                       "value":  "Meilleure qualité"
+                   },
+                   {
+                       "name":  "yt_codec_h264_first",
+                       "value":  "Automatique (H.264 prioritaire)"
+                   },
+                   {
+                       "name":  "yt_codec_force_h264",
+                       "value":  "Forcer H.264"
+                   },
+                   {
+                       "name":  "yt_audio_high",
+                       "value":  "Maximale (≈256 kbps AAC)"
+                   },
+                   {
+                       "name":  "yt_audio_medium",
+                       "value":  "Moyenne (≈128 kbps AAC)"
+                   },
+                   {
+                       "name":  "yt_audio_low",
+                       "value":  "Économie de données (≈48 kbps)"
+                   },
+                   {
+                       "name":  "yt_hwdec_auto",
+                       "value":  "Automatique (recommandé)"
+                   },
+                   {
+                       "name":  "yt_hwdec_auto_safe",
+                       "value":  "Forcer le matériel"
+                   },
+                   {
+                       "name":  "yt_hwdec_no",
+                       "value":  "Logiciel uniquement"
+                   },
+                   {
+                       "name":  "yt_recommended_suffix",
+                       "value":  " (recommandé)"
+                   },
+                   {
+                       "name":  "yt_unit_seconds",
+                       "value":  "s"
+                   },
+                   {
+                       "name":  "yt_unit_mb",
+                       "value":  "Mo"
+                   },
+                   {
+                       "name":  "yt_placeholder_search",
+                       "value":  "Rechercher..."
+                   },
+                   {
+                       "name":  "yt_action_favorite",
+                       "value":  "Ajouter aux favoris"
+                   },
+                   {
+                       "name":  "yt_action_unfavorite",
+                       "value":  "Retirer des favoris"
+                   },
+                   {
+                       "name":  "yt_action_subscribe",
+                       "value":  "S\u0027abonner"
+                   },
+                   {
+                       "name":  "yt_action_unsubscribe",
+                       "value":  "Se désabonner"
+                   },
+                   {
+                       "name":  "yt_action_share",
+                       "value":  "Partager"
+                   },
+                   {
+                       "name":  "yt_action_retry",
+                       "value":  "Réessayer"
+                   },
+                   {
+                       "name":  "yt_action_cancel",
+                       "value":  "Annuler"
+                   },
+                   {
+                       "name":  "yt_action_confirm",
+                       "value":  "Confirmer"
+                   },
+                   {
+                       "name":  "yt_action_delete",
+                       "value":  "Supprimer"
+                   },
+                   {
+                       "name":  "yt_action_clear",
+                       "value":  "Vider"
+                   },
+                   {
+                       "name":  "yt_action_view_author",
+                       "value":  "Voir l\u0027auteur"
+                   },
+                   {
+                       "name":  "yt_action_clear_all",
+                       "value":  "Tout vider"
+                   },
+                   {
+                       "name":  "yt_search_youtube",
+                       "value":  "Rechercher sur YouTube"
+                   },
+                   {
+                       "name":  "yt_search_youtube_music",
+                       "value":  "Rechercher sur YouTube Music"
+                   },
+                   {
+                       "name":  "yt_filter_all",
+                       "value":  "Tout"
+                   },
+                   {
+                       "name":  "yt_filter_videos",
+                       "value":  "Vidéos"
+                   },
+                   {
+                       "name":  "yt_filter_channels",
+                       "value":  "Chaînes"
+                   },
+                   {
+                       "name":  "yt_filter_playlists",
+                       "value":  "Playlists"
+                   },
+                   {
+                       "name":  "yt_filter_songs",
+                       "value":  "Titres"
+                   },
+                   {
+                       "name":  "yt_filter_albums",
+                       "value":  "Albums"
+                   },
+                   {
+                       "name":  "yt_search_history",
+                       "value":  "Historique de recherche"
+                   },
+                   {
+                       "name":  "yt_action_clear_search_history",
+                       "value":  "Vider l\u0027historique de recherche"
+                   },
+                   {
+                       "name":  "yt_empty_no_search_history",
+                       "value":  "Aucun historique de recherche"
+                   },
+                   {
+                       "name":  "yt_search_no_results",
+                       "value":  "Aucun résultat trouvé"
+                   },
+                   {
+                       "name":  "yt_error_search_failed",
+                       "value":  "Échec de la recherche, veuillez réessayer plus tard"
+                   },
+                   {
+                       "name":  "yt_dialog_delete_search_record",
+                       "value":  "Supprimer l\u0027enregistrement de recherche"
+                   },
+                   {
+                       "name":  "yt_confirm_clear_search_history",
+                       "value":  "Vider tout l\u0027historique de recherche ?"
+                   },
+                   {
+                       "name":  "yt_toast_cleared",
+                       "value":  "Vidé"
+                   },
+                   {
+                       "name":  "yt_placeholder_search_content",
+                       "value":  "Rechercher du contenu"
+                   },
+                   {
+                       "name":  "yt_empty_no_content",
+                       "value":  "Aucun contenu"
+                   },
+                   {
+                       "name":  "yt_video_details",
+                       "value":  "Détails de la vidéo"
+                   },
+                   {
+                       "name":  "yt_error_invalid_video",
+                       "value":  "Aucune information vidéo valide"
+                   },
+                   {
+                       "name":  "yt_notice_direct_link_removed",
+                       "value":  "La fonction de lien direct a été supprimée, traitement unifié à suivre."
+                   },
+                   {
+                       "name":  "yt_dialog_select_quality",
+                       "value":  "Choisir la qualité"
+                   },
+                   {
+                       "name":  "yt_label_video_track",
+                       "value":  "Piste vidéo"
+                   },
+                   {
+                       "name":  "yt_warn_high_resolution",
+                       "value":  "Cette résolution dépasse 1440p, des problèmes de performance peuvent survenir sur certains appareils"
+                   },
+                   {
+                       "name":  "yt_label_audio_quality",
+                       "value":  "Qualité audio"
+                   },
+                   {
+                       "name":  "yt_player_syncing_buffer",
+                       "value":  "Synchronisation du tampon double piste..."
+                   },
+                   {
+                       "name":  "yt_error_playback_failed",
+                       "value":  "Échec de la lecture"
+                   },
+                   {
+                       "name":  "yt_error_load_video_info",
+                       "value":  "Impossible de charger les informations vidéo"
+                   },
+                   {
+                       "name":  "yt_error_load_video",
+                       "value":  "Impossible de charger la vidéo"
+                   },
+                   {
+                       "name":  "yt_error_load_exception",
+                       "value":  "Une erreur de chargement s\u0027est produite"
+                   },
+                   {
+                       "name":  "yt_error_unknown",
+                       "value":  "Erreur inconnue"
+                   },
+                   {
+                       "name":  "yt_error_invalid_video_id",
+                       "value":  "ID vidéo invalide"
+                   },
+                   {
+                       "name":  "yt_error_play_error_retry",
+                       "value":  "Erreur de lecture, veuillez réessayer"
+                   },
+                   {
+                       "name":  "yt_empty_no_comments",
+                       "value":  "Aucun commentaire"
+                   },
+                   {
+                       "name":  "yt_label_pinned",
+                       "value":  "Épinglé"
+                   },
+                   {
+                       "name":  "yt_error_load_comments",
+                       "value":  "Impossible de charger les commentaires"
+                   },
+                   {
+                       "name":  "yt_label_reply",
+                       "value":  "Répondre"
+                   },
+                   {
+                       "name":  "yt_error_load_replies",
+                       "value":  "Impossible de charger les réponses"
+                   },
+                   {
+                       "name":  "yt_label_like",
+                       "value":  "J\u0027aime"
+                   },
+                   {
+                       "name":  "yt_tab_videos",
+                       "value":  "Vidéos"
+                   },
+                   {
+                       "name":  "yt_tab_shorts",
+                       "value":  "Shorts"
+                   },
+                   {
+                       "name":  "yt_tab_live",
+                       "value":  "Direct"
+                   },
+                   {
+                       "name":  "yt_tab_about",
+                       "value":  "À propos"
+                   },
+                   {
+                       "name":  "yt_empty_no_videos",
+                       "value":  "Aucune vidéo"
+                   },
+                   {
+                       "name":  "yt_empty_no_shorts",
+                       "value":  "Aucun Shorts"
+                   },
+                   {
+                       "name":  "yt_empty_no_live",
+                       "value":  "Aucun direct"
+                   },
+                   {
+                       "name":  "yt_channel_info",
+                       "value":  "Infos chaîne"
+                   },
+                   {
+                       "name":  "yt_channel_id",
+                       "value":  "ID de la chaîne"
+                   },
+                   {
+                       "name":  "yt_channel_subscribers",
+                       "value":  "Abonnés"
+                   },
+                   {
+                       "name":  "yt_channel_video_count",
+                       "value":  "Nombre de vidéos"
+                   },
+                   {
+                       "name":  "yt_channel_description",
+                       "value":  "Description"
+                   },
+                   {
+                       "name":  "yt_error_load_user_videos",
+                       "value":  "Impossible de charger les vidéos de l\u0027utilisateur"
+                   },
+                   {
+                       "name":  "yt_error_load_shorts",
+                       "value":  "Impossible de charger les Shorts"
+                   },
+                   {
+                       "name":  "yt_error_load_live",
+                       "value":  "Impossible de charger les directs"
+                   },
+                   {
+                       "name":  "yt_label_user",
+                       "value":  "Utilisateur"
+                   },
+                   {
+                       "name":  "yt_local_history",
+                       "value":  "Historique de visionnage"
+                   },
+                   {
+                       "name":  "yt_dialog_clear_history",
+                       "value":  "Vider l\u0027historique"
+                   },
+                   {
+                       "name":  "yt_confirm_clear_history",
+                       "value":  "Vider tout l\u0027historique de visionnage ?"
+                   },
+                   {
+                       "name":  "yt_empty_no_history",
+                       "value":  "Aucun historique de visionnage"
+                   },
+                   {
+                       "name":  "yt_empty_history_hint",
+                       "value":  "Les vidéos regardées apparaîtront ici"
+                   },
+                   {
+                       "name":  "yt_time_just_now",
+                       "value":  "À l\u0027instant"
+                   },
+                   {
+                       "name":  "yt_action_delete_record",
+                       "value":  "Supprimer l\u0027enregistrement"
+                   },
+                   {
+                       "name":  "yt_sub_manage_title",
+                       "value":  "Mes abonnements"
+                   },
+                   {
+                       "name":  "yt_empty_no_subs",
+                       "value":  "Aucun abonnement"
+                   },
+                   {
+                       "name":  "yt_empty_subs_hint",
+                       "value":  "Veuillez ajouter dans \"Gestion des abonnements\""
+                   },
+                   {
+                       "name":  "yt_empty_subs_hint_alt",
+                       "value":  "Abonnez-vous à des auteurs intéressants sur la page de recherche"
+                   },
+                   {
+                       "name":  "yt_error_load_subs",
+                       "value":  "Impossible de charger les abonnements"
+                   },
+                   {
+                       "name":  "yt_fav_videos_title",
+                       "value":  "Mes vidéos favorites"
+                   },
+                   {
+                       "name":  "yt_fav_playlists_title",
+                       "value":  "Mes playlists favorites"
+                   },
+                   {
+                       "name":  "yt_local_playlists_title",
+                       "value":  "Playlists locales"
+                   },
+                   {
+                       "name":  "yt_local_playlists_tag",
+                       "value":  "Locale"
+                   },
+                   {
+                       "name":  "yt_empty_no_local_playlists",
+                       "value":  "Aucune playlist locale"
+                   },
+                   {
+                       "name":  "yt_empty_local_playlists_hint",
+                       "value":  "Enregistrez des vidéos dans une playlist locale depuis le lecteur"
+                   },
+                   {
+                       "name":  "yt_empty_no_fav_videos",
+                       "value":  "Aucune vidéo favorite"
+                   },
+                   {
+                       "name":  "yt_empty_no_fav_playlists",
+                       "value":  "Aucune playlist favorite"
+                   },
+                   {
+                       "name":  "yt_empty_fav_playlists_hint",
+                       "value":  "Ajoutez des playlists en favoris sur la page de recherche"
+                   },
+                   {
+                       "name":  "yt_empty_playlists_hint",
+                       "value":  "Ajoutez des playlists en favoris sur la page de recherche"
+                   },
+                   {
+                       "name":  "yt_about_current_version",
+                       "value":  "Version actuelle"
+                   },
+                   {
+                       "name":  "yt_about_description",
+                       "value":  "Client YouTube open source basé sur HarmonyOS NEXT\nSans publicité · Sans suivi · Analyse entièrement locale"
+                   },
+                   {
+                       "name":  "yt_about_qq_group",
+                       "value":  "Groupe QQ"
+                   },
+                   {
+                       "name":  "yt_about_tg_group",
+                       "value":  "Groupe Telegram"
+                   },
+                   {
+                       "name":  "yt_about_project_info",
+                       "value":  "Informations sur le projet"
+                   },
+                   {
+                       "name":  "yt_about_open_source",
+                       "value":  "Projets open source utilisés"
+                   },
+                   {
+                       "name":  "yt_about_ai_models",
+                       "value":  "Modèles IA pour le développement"
+                   },
+                   {
+                       "name":  "yt_about_changelog",
+                       "value":  "Journal des modifications"
+                   },
+                   {
+                       "name":  "yt_error_load_failed",
+                       "value":  "Échec du chargement"
+                   },
+                   {
+                       "name":  "yt_error_play_failed_title",
+                       "value":  "Lecture échouée"
+                   },
+                   {
+                       "name":  "yt_label_live",
+                       "value":  "En direct"
+                   },
+                   {
+                       "name":  "yt_error_load_playlists",
+                       "value":  "Impossible de charger les playlists"
+                   },
+                   {
+                       "name":  "yt_error_load_channel_info",
+                       "value":  "Impossible de charger les infos de la chaîne"
+                   },
+                   {
+                       "name":  "yt_tab_description",
+                       "value":  "Description"
+                   },
+                   {
+                       "name":  "yt_tab_comments",
+                       "value":  "Commentaires"
+                   },
+                   {
+                       "name":  "yt_tab_recommended",
+                       "value":  "Recommandé"
+                   },
+                   {
+                       "name":  "yt_home_search_empty",
+                       "value":  "La recherche automatique n\u0027a donné aucun résultat, veuillez rechercher manuellement"
+                   },
+                   {
+                       "name":  "yt_home_recommended_error",
+                       "value":  "Echec du fil recommande, bascule ou reessayez plus tard"
+                   },
+                   {
+                       "name":  "yt_home_kiosk_error",
+                       "value":  "Échec de la requête Kiosk, veuillez réessayer plus tard"
+                   },
+                   {
+                       "name":  "yt_home_load_error",
+                       "value":  "Échec du chargement de l\u0027accueil, veuillez réessayer plus tard"
+                   },
+                   {
+                       "name":  "yt_player_mode_progressive",
+                       "value":  "Progressive"
+                   },
+                   {
+                       "name":  "yt_player_mode_hls",
+                       "value":  "Flux HLS"
+                   },
+                   {
+                       "name":  "yt_player_mode_dash_manifest",
+                       "value":  "Flux DASH (Manifest)"
+                   },
+                   {
+                       "name":  "yt_player_mode_dash_track",
+                       "value":  "Pistes DASH (audio/vidéo séparés)"
+                   },
+                   {
+                       "name":  "yt_player_default",
+                       "value":  "Par défaut (Default)"
+                   },
+                   {
+                       "name":  "yt_player_step1_select_mode",
+                       "value":  "1. Choisir le mode de lecture"
+                   },
+                   {
+                       "name":  "yt_player_step2_select_quality",
+                       "value":  "2. Choisir la qualité"
+                   },
+                   {
+                       "name":  "yt_player_video_quality",
+                       "value":  "Qualité vidéo"
+                   },
+                   {
+                       "name":  "yt_player_step2_select_manifest",
+                       "value":  "2. Choisir le manifeste"
+                   },
+                   {
+                       "name":  "yt_player_step2_select_track",
+                       "value":  "2. Choisir la piste"
+                   },
+                   {
+                       "name":  "yt_player_audio_language_type",
+                       "value":  "Langue / type audio"
+                   },
+                   {
+                       "name":  "yt_log_saved_to_downloads",
+                       "value":  "Enregistré dans le dossier Téléchargements"
+                   },
+                   {
+                       "name":  "yt_feed_popular",
+                       "value":  "Populaire"
+                   },
+                   {
+                       "name":  "yt_feed_recommended",
+                       "value":  "Recommandé"
+                   },
+                   {
+                       "name":  "yt_feed_featured",
+                       "value":  "En vedette"
+                   },
+                   {
+                       "name":  "yt_feed_trending",
+                       "value":  "Tendances"
+                   },
+                   {
+                       "name":  "yt_feed_latest",
+                       "value":  "Derniers"
+                   },
+                   {
+                       "name":  "yt_feed_topics",
+                       "value":  "Sujets"
+                   },
+                   {
+                       "name":  "yt_suffix_videos",
+                       "value":  "vidéos"
+                   },
+                   {
+                       "name":  "yt_suffix_shorts",
+                       "value":  "Shorts"
+                   },
+                   {
+                       "name":  "yt_suffix_collections",
+                       "value":  "collections"
+                   },
+                   {
+                       "name":  "yt_suffix_live",
+                       "value":  "directs"
+                   },
+                   {
+                       "name":  "yt_suffix_music",
+                       "value":  "musique"
+                   },
+                   {
+                       "name":  "yt_suffix_movies",
+                       "value":  "films"
+                   },
+                   {
+                       "name":  "yt_error_no_playable_stream",
+                       "value":  "Aucun flux lisible trouvé"
+                   },
+                   {
+                       "name":  "yt_error_no_supported_stream",
+                       "value":  "Aucun flux vidéo pris en charge trouvé"
+                   },
+                   {
+                       "name":  "new_app_name",
+                       "value":  "YourPipe"
+                   },
+                   {
+                       "name":  "yt_empty_no_playlists",
+                       "value":  "Aucune playlist"
+                   },
+                   {
+                       "name":  "yt_search_results_from",
+                       "value":  "Résultats de recherche pour \"%s\""
+                   },
+                   {
+                       "name":  "yt_setting_stream_buffer",
+                       "value":  "TCP Stream Buffer"
+                   },
+                   {
+                       "name":  "yt_setting_seek_keyframe",
+                       "value":  "Fast Seek (Keyframe)"
+                   },
+                   {
+                       "name":  "yt_setting_seek_keyframe_subtitle",
+                       "value":  "Jump to nearest keyframe for faster seek response"
+                   },
+                   {
+                       "name":  "yt_setting_home_feed_after_login",
+                       "value":  "Contenu d\u0027accueil apres connexion"
+                   },
+                   {
+                       "name":  "yt_home_feed_recommended",
+                       "value":  "Recommande"
+                   },
+                   {
+                       "name":  "yt_home_feed_kiosk",
+                       "value":  "Live"
+                   },
+                   {
+                       "name":  "yt_option_auth_session",
+                       "value":  "Navigation connectee"
+                   },
+                   {
+                       "name":  "yt_option_sign_out",
+                       "value":  "Se deconnecter"
+                   },
+                   {
+                       "name":  "yt_option_sign_out_subtitle",
+                       "value":  "Effacer les identifiants enregistres"
+                   },
+                   {
+                       "name":  "yt_confirm_sign_out",
+                       "value":  "Se deconnecter et effacer les identifiants enregistres ?"
+                   }
+               ]
 }

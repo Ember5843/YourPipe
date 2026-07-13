@@ -6,6 +6,7 @@ import { customVibrator } from '../../common/VibratorUtil';
 import { UIConfig } from '../../common/AppState';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { DownloadPage } from './DownloadPage';
+import { MediaThumb } from '../../common/components/MediaThumb';
 
 /** 将秒数格式化为 mm:ss 或 hh:mm:ss */
 function formatDuration(sec: number): string {
@@ -74,20 +75,13 @@ struct HistoryCard {
     Row() {
       // ── 缩略图区域 ──
       Stack() {
-        if (this.item.thumbnailUrl && this.item.thumbnailUrl.length > 0) {
-          Image(this.item.thumbnailUrl)
-            .width(160)
-            .height(90)
-            .objectFit(ImageFit.Cover)
-            .borderRadius(6)
-            .backgroundColor('#1A1A1A');
-        } else {
-          Rect()
-            .width(160)
-            .height(90)
-            .fill('#1A1A1A')
-            .radius(6);
-        }
+        MediaThumb({
+          imageUrl: this.item.thumbnailUrl || '',
+          placeholderColor: '#1A1A1A',
+          widthVp: 160,
+          heightVp: 90,
+          borderRadiusVp: 6
+        })
 
         Column() {
           Blank()
@@ -267,7 +261,7 @@ export struct LocalPage {
           if (this.history.length === 0) {
             ListItem() {
               Column() {
-                SymbolGlyph($r('sys.symbol.clock'))
+                SymbolGlyph($r('sys.symbol.worldclock'))
                   .fontSize(48)
                   .fontColor([$r('app.color.yourtube_text_hint')])
                   .margin({ bottom: 12 });

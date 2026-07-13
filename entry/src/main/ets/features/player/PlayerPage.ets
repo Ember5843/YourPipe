@@ -38,6 +38,7 @@ import { PlayQueueList } from './components/PlayQueueList';
 import { PlayQueueManager, QueueSourceType } from './PlayQueueManager';
 import { PiPManager } from './pip/PiPManager';
 import { PlaybackConfig } from '../../common/PlaybackConfig';
+import { MediaThumb } from '../../common/components/MediaThumb';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
 
 const logger = AppLog.getInstance('PlayerPage');
@@ -534,13 +535,14 @@ export struct VideoPlayerPage {
   @Builder
   VideoPlaceholder() {
     Stack({ alignContent: Alignment.Center }) {
-      if (this.video && this.video.thumbnailUrl) {
-        Image(this.video.thumbnailUrl)
-          .id('thumb_' + this.video.id)
-          .geometryTransition('thumb_' + this.video.id, { follow: true })
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Cover)
+      if (this.video) {
+        MediaThumb({
+          imageUrl: this.video.thumbnailUrl || '',
+          placeholderColor: this.video.thumbnailColor || '#000000',
+          thumbId: 'thumb_' + this.video.id,
+          fillParent: true,
+          borderRadiusVp: 0
+        })
           .brightness(0.4)
       } else {
         Rect()

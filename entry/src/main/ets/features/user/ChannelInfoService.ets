@@ -419,23 +419,30 @@ export class ChannelInfoService {
     }
     let bestUrl: string = '';
     let bestArea: number = -1;
-    list.forEach((item) => {
-      const record = this.asRecord(item);
-      const url = this.asString(record?.['url']);
+    for (let i = 0; i < list.length; i++) {
+      const record = this.asRecord(list[i]);
+      const url = this.normalizeUrl(this.asString(record?.['url']));
+      if (!url) {
+        continue;
+      }
       const width = this.asNumber(record?.['width']);
       const height = this.asNumber(record?.['height']);
-      const area = (width > 0 && height > 0) ? width * height : -1;
-      if (!url) {
-        return;
+      let area = 0;
+      if (width > 0 && height > 0) {
+        area = width * height;
+      } else if (width > 0) {
+        area = width * 1000;
+      } else if (height > 0) {
+        area = height * 1000;
+      } else {
+        // No dimensions: later entries usually higher quality
+        area = i;
       }
-      if (area > bestArea) {
+      if (area >= bestArea) {
         bestArea = area;
         bestUrl = url;
       }
-      if (bestArea < 0 && !bestUrl) {
-        bestUrl = url;
-      }
-    });
+    }
     return bestUrl;
   }
 

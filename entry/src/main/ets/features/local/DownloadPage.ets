@@ -1,6 +1,7 @@
 import { DownloadManager, DownloadTask, DownloadStatus } from '../../common/DownloadManager';
 import { fileUri, picker } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
+import { MediaThumb } from '../../common/components/MediaThumb';
 
 function isActiveStatus(status: DownloadStatus): boolean {
   return status === DownloadStatus.DOWNLOADING_VIDEO ||
@@ -17,7 +18,7 @@ export struct DownloadPage {
   build() {
     if (this.tasks.length === 0) {
       Column() {
-        SymbolGlyph($r('sys.symbol.arrowshape_down_to_line_fill'))
+        SymbolGlyph($r('sys.symbol.download_fill'))
           .fontSize(48)
           .fontColor([$r('app.color.yourtube_text_hint')])
           .margin({ bottom: 12 })
@@ -60,22 +61,13 @@ struct DownloadTaskRow {
   build() {
     Row() {
       Stack({ alignContent: Alignment.BottomEnd }) {
-        if (this.task.thumbnailUrl && this.task.thumbnailUrl.length > 0) {
-          Image(this.task.thumbnailUrl)
-            .width(160)
-            .height(90)
-            .objectFit(ImageFit.Cover)
-            .borderRadius(6)
-            .backgroundColor(this.task.thumbnailUrl.length > 0
-              ? $r('app.color.yourtube_icon_hint')
-              : '#1A1A1A')
-        } else {
-          Rect()
-            .width(160)
-            .height(90)
-            .fill('#1A1A1A')
-            .radius(6)
-        }
+        MediaThumb({
+          imageUrl: this.task.thumbnailUrl || '',
+          placeholderColor: '#1A1A1A',
+          widthVp: 160,
+          heightVp: 90,
+          borderRadiusVp: 6
+        })
 
         if (this.task.status === DownloadStatus.COMPLETED) {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
@@ -95,8 +87,8 @@ struct DownloadTaskRow {
               .fontSize(20)
               .fontColor([Color.White])
           }
-          .width('100%')
-          .height('100%')
+          .width(160)
+          .height(90)
           .justifyContent(FlexAlign.Center)
           .alignItems(HorizontalAlign.Center)
           .backgroundColor('rgba(0,0,0,0.4)')

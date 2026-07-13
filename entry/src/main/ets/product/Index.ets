@@ -24,6 +24,7 @@ import { KioskPageResult } from '../features/home/HomeFeedService';
 import { ChannelInfoService } from '../features/user/ChannelInfoService';
 import { VideoCard } from '../common/components/VideoCard';
 import { VideoCardGrid } from '../common/components/VideoCardGrid';
+import { HomeRecommendSwiper } from '../features/home/components/HomeRecommendSwiper';
 import { ErrorPage } from '../common/components/ErrorPage';
 import { SearchPage } from '../features/search/SearchPage';
 import { SubscriptionManagePage } from '../features/subscription/SubscriptionManagePage';
@@ -131,6 +132,7 @@ struct Index {
   @State nextPageToken: string | null = null;
   @State kioskNextPageToken: string | null = null;
   @State kioskVisitorData: string = '';
+  @State homeFeedSource: string = 'kiosk';
   @State homeMode: string = 'kiosk';
   @State currentQuery: string = "";
   @State lastLoadedQuery: string = '';
@@ -139,6 +141,7 @@ struct Index {
   @State optionsDepth: number = 0;
   @State selectedLanguageCode: string = LanguageManager.DEFAULT_LANGUAGE;
   @State systemLanguageCode: string = LanguageManager.LANGUAGE_EN_LATN;
+  private webViewLoginBackHandler: (() => boolean) | null = null;
 
   @StorageProp('themePrimaryColor') themePrimary: string = COLOR_PRESETS[0].primary;
   // 沉浸光感材质效果（首页标题栏 + HdsTabs 底栏共用）。
@@ -296,6 +299,7 @@ struct Index {
     // 2. 清除登录状态（独立的 Preferences 数据库）
     AuthSessionManager.getInstance()?.signOut();
     AuthStateHelper.refresh();
+    this.refreshHomeAfterAuthChange();
 
     // 3. 清除所有 Preferences 数据库
     PreferencesStore.clearAll();
@@ -438,10 +442,24 @@ struct Index {
     this.homeMode = 'kiosk';
     this.kioskNextPageToken = null;
     this.kioskVisitorData = '';
+    this.homeFeedSource = 'kiosk';
     this.homeErrorMessage = '';
     this.homeModeNoticeMessage = '';
     this.loadLiveVideos(true);
     this.consumePendingPlaybackContinuation();
+  }
+
+  private refreshHomeAfterAuthChange(): void {
+    this.homeMode = 'kiosk';
+    this.kioskNextPageToken = null;
+    this.kioskVisitorData = '';
+    this.homeFeedSource = 'kiosk';
+    this.nextPageToken = null;
+    this.lastLoadedQuery = '';
+    this.homeErrorMessage = '';
+    this.homeModeNoticeMessage = '';
+    this.videoList = [];
+    this.loadLiveVideos(true);
   }
 
   private onPendingContinuationChanged(): void {
@@ -734,6 +752,7 @@ struct Index {
     this.lastLoadedQuery = '';
     this.kioskNextPageToken = null;
     this.kioskVisitorData = '';
+    this.homeFeedSource = 'kiosk';
     this.videoList = [];
     if (!this.currentQuery || this.currentQuery.trim().length === 0) {
       this.currentQuery = this.getRefreshQuery();
@@ -780,6 +799,7 @@ struct Index {
     FeedServiceProvider.getInstance().invalidate();
     this.kioskNextPageToken = null;
     this.kioskVisitorData = '';
+    this.homeFeedSource = 'kiosk';
     this.nextPageToken = null;
     this.lastLoadedQuery = '';
     this.homeMode = 'kiosk';
@@ -812,11 +832,19 @@ struct Index {
           this.isLoadingMore = true;
         }
         const homeService = FeedServiceProvider.getInstance().getHomeFeedService();
+        const useAuthContinuation = this.homeFeedSource === 'recommended';
+        const feedStyle = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle);
         const kioskResult = reset
-          ? await homeService.fetchHomeKioskInitial(startId)
-          : await homeService.fetchHomeKioskNext(this.kioskNextPageToken ?? '', this.kioskVisitorData, startId);
+          ? await homeService.fetchHomeKioskInitial(startId, feedStyle)
+          : await homeService.fetchHomeKioskNext(
+            this.kioskNextPageToken ?? '',
+            this.kioskVisitorData,
+            startId,
+            useAuthContinuation
+          );
         if (reset) {
           this.videoList = kioskResult.items;
+          this.homeFeedSource = kioskResult.source || 'kiosk';
         } else {
           this.videoList = this.videoList.concat(kioskResult.items);
         }
@@ -864,7 +892,18 @@ struct Index {
     } catch (err) {
       logger.error('fetchSearchPage failed:', JSON.stringify(err));
       if (reset && this.homeMode === 'kiosk') {
-        this.homeErrorMessage = this.formatHomeRequestError(err as Object, getContext().resourceManager.getStringSync($r('app.string.yt_home_kiosk_error').id));
+        const wantedRecommended = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle) === 'recommended'
+          && AuthSessionManager.getInstance()?.isSignedIn() === true;
+        const fallbackRes = wantedRecommended
+          ? $r('app.string.yt_home_recommended_error')
+          : $r('app.string.yt_home_kiosk_error');
+        this.homeErrorMessage = this.formatHomeRequestError(
+          err as Object,
+          getContext().resourceManager.getStringSync(fallbackRes.id)
+        );
+        if (wantedRecommended) {
+          this.homeFeedSource = 'recommended';
+        }
       } else {
         this.homeErrorMessage = this.formatHomeRequestError(err as Object, getContext().resourceManager.getStringSync($r('app.string.yt_home_load_error').id));
       }
@@ -1232,16 +1271,16 @@ struct Index {
       Stack({ alignContent: Alignment.TopStart }) {
         HdsTabs({ controller: this.tabsController }) {
           TabContent() { this.TabContentSection(0) }
-            .tabBar(this.TabBarBuilder($r('sys.symbol.TV_tv'), $r('app.string.yt_tab_home'), 0))
+            .tabBar(this.TabBarBuilder($r('sys.symbol.house_fill'), $r('app.string.yt_tab_home'), 0))
 
           TabContent() { this.TabContentSection(1) }
-            .tabBar(this.TabBarBuilder($r('sys.symbol.square_grid_2x2'), $r('app.string.yt_tab_subscriptions'), 1))
+            .tabBar(this.TabBarBuilder($r('sys.symbol.person_2_fill'), $r('app.string.yt_tab_subscriptions'), 1))
 
           TabContent() { this.TabContentSection(2) }
-            .tabBar(this.TabBarBuilder($r('sys.symbol.bookmark'), $r('app.string.yt_tab_favorites'), 2))
+            .tabBar(this.TabBarBuilder($r('sys.symbol.heart_fill'), $r('app.string.yt_tab_favorites'), 2))
 
           TabContent() { this.TabContentSection(3) }
-            .tabBar(this.TabBarBuilder($r('sys.symbol.folder'), $r('app.string.yt_tab_local'), 3))
+            .tabBar(this.TabBarBuilder($r('sys.symbol.folder_fill'), $r('app.string.yt_tab_local'), 3))
         }
         .barPosition(BarPosition.End)
         .vertical(false)
@@ -1275,7 +1314,7 @@ struct Index {
       onBack: () => {
         this.showOptions = true;
       },
-      backIcon: $r('sys.symbol.square_grid_2x2'),
+      backIcon: $r('sys.symbol.gearshape_fill'),
       backLabel: $r('app.string.yt_option_title'),
       materialEffect: this.immersiveMaterialEffect,
       avoidLayoutSafeArea: true,
@@ -1394,36 +1433,54 @@ struct Index {
 
             if (this.uiConfig.homeLayoutMode === 'grid') {
               Scroll(this.homeGridScroller) {
-                GridRow({
-                  columns: this.getVideoGridColumnCount(),
-                  gutter: { x: 8, y: 8 }
-                }) {
-                  ForEach(this.videoList, (item: VideoItem) => {
-                    GridCol({ span: 1 }) {
-                      VideoCardGrid({
-                        video: item,
-                        actionLabel: $r('app.string.yt_action_favorite'),
-                        actionType: 'favorite',
-                        useFavoriteToggle: true
-                      })
-                    }
-                    .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                  }, (item: VideoItem) => item.id.toString())
+                Column({ space: 12 }) {
+                  Column().width('100%').height(this.topSafeHeight + 56)
+                  if (this.shouldShowHomeRecommendBanner()) {
+                    HomeRecommendSwiper({
+                      videos: this.getHomeBannerVideos()
+                    })
+                  }
+                  GridRow({
+                    columns: this.getVideoGridColumnCount(),
+                    gutter: { x: 8, y: 8 }
+                  }) {
+                    ForEach(this.getHomeListVideos(), (item: VideoItem) => {
+                      GridCol({ span: 1 }) {
+                        VideoCardGrid({
+                          video: item,
+                          actionLabel: $r('app.string.yt_action_favorite'),
+                          actionType: 'favorite',
+                          useFavoriteToggle: true
+                        })
+                      }
+                      .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
+                    }, (item: VideoItem) => item.id.toString())
+                  }
+                  .width('100%')
+                  Column().width('100%').height(this.bottomSafeHeight + 72)
                 }
                 .width('100%')
+                .padding({ left: 12, right: 12 })
               }
               .width('100%')
               .layoutWeight(1)
               .clip(false)
               .backgroundColor($r('app.color.yourtube_bg_page'))
-              .padding({ left: 12, right: 12, top: this.topSafeHeight + 56, bottom: this.bottomSafeHeight + 72 })
               .edgeEffect(EdgeEffect.Spring)
               .onReachEnd(() => {
                 this.loadLiveVideos(false);
               })
             } else {
               List({ scroller: this.homeListScroller, space: 4 }) {
-                ForEach(this.videoList, (item: VideoItem) => {
+                if (this.shouldShowHomeRecommendBanner()) {
+                  ListItem() {
+                    HomeRecommendSwiper({
+                      videos: this.getHomeBannerVideos()
+                    })
+                  }
+                  .padding({ left: 12, right: 12, bottom: 8 })
+                }
+                ForEach(this.getHomeListVideos(), (item: VideoItem) => {
                   ListItem() {
                     VideoCard({
                       video: item,
@@ -1432,6 +1489,7 @@ struct Index {
                       useFavoriteToggle: true
                     })
                   }
+                  .padding({ left: 12, right: 12 })
                   .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
                 }, (item: VideoItem) => item.id.toString())
                 if (this.isLoadingMore) {
@@ -1448,7 +1506,8 @@ struct Index {
               .layoutWeight(1)
               .clip(false)
               .backgroundColor($r('app.color.yourtube_bg_page'))
-              .padding({ left: 12, right: 12, top: this.topSafeHeight + 56, bottom: this.bottomSafeHeight + 72 })
+              .contentStartOffset(this.topSafeHeight + 56)
+              .contentEndOffset(this.bottomSafeHeight + 72)
               .edgeEffect(EdgeEffect.Spring)
               .onReachEnd(() => {
                 this.loadLiveVideos(false);
@@ -1566,7 +1625,10 @@ struct Index {
       HdsNavDestination() {
         OptionsDataAccountPage({
           params: {
-            onAccountClick: () => { this.pushOptionsPath('google_account'); }
+            onLoginClick: () => { this.pushOptionsPath('webview_login'); },
+            updateUiConfig: this.updateUiConfig.bind(this),
+            onHomeFeedStyleChanged: () => { this.refreshHomeAfterAuthChange(); },
+            onAuthChanged: () => { this.refreshHomeAfterAuthChange(); }
           }
         })
       }
@@ -1586,7 +1648,8 @@ struct Index {
       HdsNavDestination() {
         OptionsGoogleAccountPage({
           onBack: () => { this.popOptionsPath(); },
-          pushLoginPage: () => { this.pushOptionsPath('webview_login'); }
+          pushLoginPage: () => { this.pushOptionsPath('webview_login'); },
+          onAuthChanged: () => { this.refreshHomeAfterAuthChange(); }
         })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
@@ -1604,19 +1667,34 @@ struct Index {
     } else if (name === 'webview_login') {
       HdsNavDestination() {
         WebViewLoginPage({
-          onSuccess: () => { AuthStateHelper.refresh(); this.popOptionsPath(); },
-          onCancel: () => { this.popOptionsPath(); }
+          onSuccess: () => {
+            AuthStateHelper.refresh();
+            this.refreshHomeAfterAuthChange();
+            this.popOptionsPath();
+          },
+          onCancel: () => { this.popOptionsPath(); },
+          onRegisterBackHandler: (handler: () => boolean) => {
+            this.webViewLoginBackHandler = handler;
+          }
         })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
         title: 'YouTube 登录',
         onBack: () => {
+          if (this.webViewLoginBackHandler && this.webViewLoginBackHandler()) {
+            return;
+          }
+          this.webViewLoginBackHandler = null;
           this.popOptionsPath();
         }
       }))
       .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
       .onBackPressed(() => {
+        if (this.webViewLoginBackHandler && this.webViewLoginBackHandler()) {
+          return true;
+        }
+        this.webViewLoginBackHandler = null;
         this.popOptionsPath();
         return true;
       })
@@ -1768,13 +1846,13 @@ struct Index {
     Column({ space: 3 }) {
       SymbolGlyph(iconRes)
         .fontSize(this.activeTabIndex === index ? 23 : 21)
-        .fontColor([this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_quaternary')])
+        .fontColor([this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary')])
         .symbolEffect(customAnimationUtil.isIconEffect(this.uiConfig), this.activeTabIndex === index)
 
       Text(label)
         .fontSize(10)
-        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_quaternary'))
-        .fontWeight(this.activeTabIndex === index ? FontWeight.Bold : FontWeight.Normal)
+        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary'))
+        .fontWeight(this.activeTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
@@ -1793,6 +1871,40 @@ struct Index {
       .width(40)
       .height(40)
       .margin({ bottom: 15 })
+  }
+
+  private homeBannerMax: number = 6;
+
+  private shouldShowHomeRecommendBanner(): boolean {
+    return this.homeMode === 'kiosk'
+      && this.homeFeedSource === 'recommended'
+      && this.videoList.length > 0;
+  }
+
+  private getHomeBannerVideos(): VideoItem[] {
+    if (!this.shouldShowHomeRecommendBanner()) {
+      return [];
+    }
+    const limit = Math.min(this.homeBannerMax, this.videoList.length);
+    return this.videoList.slice(0, limit);
+  }
+
+  private getHomeListVideos(): VideoItem[] {
+    if (!this.shouldShowHomeRecommendBanner()) {
+      return this.videoList;
+    }
+    const bannerIds: string[] = [];
+    const banners = this.getHomeBannerVideos();
+    for (let i = 0; i < banners.length; i++) {
+      const id = (banners[i].videoId || banners[i].id.toString()).trim();
+      if (id.length > 0) {
+        bannerIds.push(id);
+      }
+    }
+    return this.videoList.filter((item: VideoItem) => {
+      const id = (item.videoId || item.id.toString()).trim();
+      return bannerIds.indexOf(id) < 0;
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────

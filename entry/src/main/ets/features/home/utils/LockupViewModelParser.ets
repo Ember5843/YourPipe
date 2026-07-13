@@ -1,4 +1,4 @@
-import { normalizeUrl } from './ThumbnailUtils';
+import { pickBestThumbUrl } from './ThumbnailUtils';
 
 export function getLockupTitle(lockup: Record<string, Object>): string {
   const metadata = lockup["metadata"] as Record<string, Object>;
@@ -90,9 +90,7 @@ export function getLockupVideoThumbnailUrl(lockup: Record<string, Object>): stri
   const image = tvm ? (tvm["image"] as Record<string, Object>) : undefined;
   const sources = image ? (image["sources"] as Array<Record<string, Object>>) : undefined;
   if (!sources || sources.length === 0) return "";
-  const last = sources[sources.length - 1];
-  const url = last ? (last["url"] as string) : "";
-  return normalizeUrl(url || "");
+  return pickBestThumbUrl(sources);
 }
 
 export function getLockupViewCount(lockup: Record<string, Object>): string {
@@ -308,7 +306,5 @@ export function getLockupPlaylistCoverUrl(lockup: Record<string, Object>): strin
   const image = tvm ? (tvm["image"] as Record<string, Object>) : undefined;
   const sources = image ? (image["sources"] as Array<Record<string, Object>>) : undefined;
   if (!sources || sources.length === 0) return "";
-  const last = sources[sources.length - 1];
-  const url = last ? (last["url"] as string) : "";
-  return normalizeUrl(url || "");
+  return pickBestThumbUrl(sources);
 }

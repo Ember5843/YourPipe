@@ -543,7 +543,7 @@ export struct AboutPage {
             .width('100%').padding({ left: 4, top: 8, bottom: 4 })
 
             OptionItem({
-              icon: $r('sys.symbol.translate_c2e'),
+              icon: $r('sys.symbol.translate'),
               title: $r('app.string.yt_about_open_source'),
               subtitle: `${OPEN_SOURCE_ITEMS.length} 个项目`,
               iconColor: $r('app.color.yourtube_option_icon_language'),

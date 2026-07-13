@@ -1,5 +1,5 @@
 import { getTextFromRuns } from './TextUtils';
-import { getThumbnailUrlFromThumbnailObject, normalizeUrl } from './ThumbnailUtils';
+import { getThumbnailUrlFromThumbnailObject, pickBestThumbUrl } from './ThumbnailUtils';
 
 export function getPlaylistCoverUrl(playlist: Record<string, Object>): string {
   const wrappers = playlist["thumbnails"] as Array<Record<string, Object>>;
@@ -7,9 +7,8 @@ export function getPlaylistCoverUrl(playlist: Record<string, Object>): string {
     const first = wrappers[0] as Record<string, Object>;
     const nested = first ? (first["thumbnails"] as Array<Record<string, Object>>) : undefined;
     if (nested && nested.length > 0) {
-      const last = nested[nested.length - 1];
-      const url = last ? (last["url"] as string) : "";
-      if (url) return normalizeUrl(url);
+      const url = pickBestThumbUrl(nested);
+      if (url) return url;
     }
   }
   const thumbnail = playlist["thumbnail"] as Record<string, Object>;

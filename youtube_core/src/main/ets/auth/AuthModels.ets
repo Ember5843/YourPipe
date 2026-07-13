@@ -34,6 +34,10 @@ export class AuthAccountStatus {
   accessTokenExpiresAt: number = 0;
   hasRefreshToken: boolean = false;
   hasCookieCredential: boolean = false;
+  /** Credential exists (cookie or refresh token), regardless of private mode. */
+  hasCredential: boolean = false;
+  /** When false, requests stay anonymous (private browsing) while credentials are kept. */
+  authEnabled: boolean = true;
   lastError: string = '';
   lastErrorCode: string = '';
   pollIntervalMs: number = 3000;

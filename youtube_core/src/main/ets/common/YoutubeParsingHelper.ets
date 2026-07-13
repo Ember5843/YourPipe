@@ -20,6 +20,66 @@ export function fixThumbnailUrl(url: string | undefined): string {
 }
 
 /**
+ * Always pick the highest-resolution thumbnail from a list of {url,width?,height?} objects.
+ * Prefer width*height; upgrade standard /vi/{id}/ stills to maxresdefault.
+ */
+export function pickHighestThumbnailUrl(
+  candidates: Array<Record<string, Object>>
+): string {
+  if (!candidates || candidates.length === 0) {
+    return '';
+  }
+  let bestUrl = '';
+  let bestScore = -1;
+  for (let i = 0; i < candidates.length; i++) {
+    const item = candidates[i] as Record<string, Object>;
+    if (!item) {
+      continue;
+    }
+    const raw = (item['url'] as string) || '';
+    const url = fixThumbnailUrl(raw);
+    if (url.length === 0) {
+      continue;
+    }
+    const width = Number(item['width'] ?? 0);
+    const height = Number(item['height'] ?? 0);
+    let score = 0;
+    if (width > 0 && height > 0) {
+      score = width * height;
+    } else if (width > 0) {
+      score = width * 1000;
+    } else if (height > 0) {
+      score = height * 1000;
+    } else {
+      const lower = url.toLowerCase();
+      if (lower.indexOf('maxresdefault') >= 0) {
+        score = 100000;
+      } else if (lower.indexOf('hq720') >= 0) {
+        score = 90000;
+      } else if (lower.indexOf('sddefault') >= 0) {
+        score = 80000;
+      } else if (lower.indexOf('hqdefault') >= 0) {
+        score = 70000;
+      } else if (lower.indexOf('mqdefault') >= 0) {
+        score = 60000;
+      } else {
+        score = i;
+      }
+    }
+    if (score >= bestScore) {
+      bestScore = score;
+      bestUrl = url;
+    }
+  }
+  // Upgrade standard video stills to maxres when possible
+  const match = /(?:^https?:\/\/)?(?:i\d*\.)?ytimg\.com\/vi(?:_webp)?\/([^/]+)\//i.exec(bestUrl);
+  if (match && match[1] && match[1].length > 0) {
+    return `https://i.ytimg.com/vi/${match[1]}/maxresdefault.jpg`;
+  }
+  return bestUrl;
+}
+
+/**
  * Extract text from a JSON object that may contain simpleText or runs.
  * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.getTextFromObject
  */

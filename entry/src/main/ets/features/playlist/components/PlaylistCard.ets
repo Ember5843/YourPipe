@@ -6,6 +6,7 @@ import { customVibrator } from '../../../common/VibratorUtil';
 import { UIConfig } from '../../../common/AppState';
 import { Callback } from '@ohos.base';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
+import { MediaThumb } from '../../../common/components/MediaThumb';
 
 interface ContextMenuItem {
   symbolStartIcon?: SymbolGlyphModifier;
@@ -90,7 +91,7 @@ export struct PlaylistCard {
     }
     if (this.isFavorited()) {
       items.push({
-        symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.star_fill'))
+        symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.heart_fill'))
           .fontSize(SYMBOL_FONT_SIZE)
           .fontColor([$r('sys.color.font_primary')]),
         content: $r('app.string.yt_action_unfavorite'),
@@ -103,7 +104,7 @@ export struct PlaylistCard {
       });
     } else {
       items.push({
-        symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.star'))
+        symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.heart'))
           .fontSize(SYMBOL_FONT_SIZE)
           .fontColor([$r('sys.color.font_primary')]),
         content: $r('app.string.yt_action_favorite'),
@@ -151,36 +152,24 @@ export struct PlaylistCard {
     .edgeEffect(EdgeEffect.Spring);
   }
 
+  private getTypeLabelText(): string {
+    if (typeof this.typeLabel === 'string') {
+      return this.typeLabel;
+    }
+    return '';
+  }
+
   build() {
     Row() {
-      Stack({ alignContent: Alignment.TopStart }) {
-        if (this.playlist.coverUrl && this.playlist.coverUrl.length > 0) {
-          Image(this.playlist.coverUrl)
-            .width(160)
-            .height(90)
-            .objectFit(ImageFit.Cover)
-            .borderRadius(6)
-            .backgroundColor(this.playlist.thumbnailColor || $r('app.color.yourtube_icon_hint'));
-        } else {
-          Rect()
-            .width(160)
-            .height(90)
-            .fill(this.playlist.thumbnailColor || $r('app.color.yourtube_icon_hint'))
-            .radius(6);
-        }
-
-        if (typeof this.typeLabel === 'string' && this.typeLabel.length > 0) {
-          Text(this.typeLabel)
-            .fontSize(8)
-            .fontColor($r('app.color.yourtube_text_inverse'))
-            .backgroundColor($r('app.color.yourtube_bg_tag'))
-            .padding({ left: 4, right: 4, top: 2, bottom: 2 })
-            .borderRadius({ topLeft: 6, bottomRight: 6 });
-        }
-      }
-      .width(160)
-      .height(90)
-      .margin({ right: 12 });
+      MediaThumb({
+        imageUrl: this.playlist.coverUrl || '',
+        placeholderColor: this.playlist.thumbnailColor || '',
+        widthVp: 160,
+        heightVp: 90,
+        borderRadiusVp: 6,
+        typeLabel: this.getTypeLabelText()
+      })
+        .margin({ right: 12 });
 
       Column() {
         Text(this.playlist.name || 'Untitled')

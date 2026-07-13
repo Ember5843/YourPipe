@@ -3,7 +3,7 @@ import { ContentCountry, Localization, fetchSearchContinuation, fetchSearchPage 
 import { getLockupChannelId, getLockupPlaylistCoverUrl, getLockupPlaylistId, getLockupTitle, getLockupUploaderName, getLockupVideoId, getLockupVideoThumbnailUrl } from './utils/LockupViewModelParser';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
 import { getTextFromRuns } from './utils/TextUtils';
-import { getThumbnailUrl, getThumbnailUrlFromThumbnailObject } from './utils/ThumbnailUtils';
+import { getThumbnailUrlFromThumbnailObject, pickBestThumbUrl } from './utils/ThumbnailUtils';
 import { getContinuationToken } from './utils/ContinuationUtils';
 import { buildVideoItemFromReelRenderer, buildVideoItemFromRenderer, buildVideoItemFromShortsLockupViewModel } from './utils/VideoItemBuilder';
 import { MusicSearchService } from './MusicSearchService';
@@ -222,7 +222,7 @@ export class SearchService {
           "Unknown";
         const viewCount = getTextFromRuns(video["viewCountText"]) || "";
         const isLive = this.hasLiveBadge(video);
-        const thumbnailUrl = getThumbnailUrl(video["thumbnail"] as Record<string, Object>);
+        const thumbnailUrl = getThumbnailUrlFromThumbnailObject(video["thumbnail"] as Record<string, Object>);
         const channelId = this.getChannelId(video);
         const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, idCounter);
         items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive,
@@ -379,8 +379,7 @@ export class SearchService {
       const firstThumbnail = thumbnail[0];
       const thumbnails = firstThumbnail ? (firstThumbnail["thumbnails"] as Array<Record<string, Object>>) : undefined;
       if (thumbnails && thumbnails.length > 0) {
-        const last = thumbnails[thumbnails.length - 1];
-        coverUrl = getThumbnailUrl(last);
+        coverUrl = pickBestThumbUrl(thumbnails);
       }
     }
     const placeholderColor = ThumbnailPlaceholder.pickColor(playlistId || title, idCounter);

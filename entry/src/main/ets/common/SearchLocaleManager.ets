@@ -68,17 +68,7 @@ export class SearchLocaleManager {
 
   /** 克隆 UIConfig，确保 AppStorage 得到新的对象引用，触发 @StorageLink 响应更新 */
   private static cloneConfig(src: UIConfig): UIConfig {
-    const next = new UIConfig();
-    next.darkMode = src.darkMode;
-    next.userLanguage = src.userLanguage;
-    next.systemLanguage = src.systemLanguage;
-    next.searchLanguage = src.searchLanguage;
-    next.searchCountry = src.searchCountry;
-    next.colorPreset = src.colorPreset;
-    next.isVibrate = src.isVibrate;
-    next.isAnimation = src.isAnimation;
-    next.animationSpeed = src.animationSpeed;
-    return next;
+    return src.clone();
   }
 
   private static getConfig(uiConfig?: UIConfig): UIConfig {

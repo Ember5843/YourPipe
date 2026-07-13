@@ -148,7 +148,16 @@ export class SubscriptionFeedService {
   private matchThumbnail(text: string): string {
     const regex = /<media:thumbnail[^>]*url="([^"]+)"/i;
     const match = regex.exec(text);
-    return match ? match[1] : '';
+    const url = match ? match[1] : '';
+    if (!url) {
+      return '';
+    }
+    // Always upgrade RSS stills (usually hqdefault) to maxres.
+    const idMatch = /\/vi\/([^/]+)\//.exec(url);
+    if (idMatch && idMatch[1]) {
+      return `https://i.ytimg.com/vi/${idMatch[1]}/maxresdefault.jpg`;
+    }
+    return url;
   }
 
   private decodeXml(input: string): string {

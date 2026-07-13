@@ -6,6 +6,7 @@ import { YoutubeSearchQueryHandlerFactory } from "../common/YoutubeSearchQueryHa
 import { SearchContentFilter } from "../model/SearchContentFilter";
 import { Utils } from "../common/Utils";
 import { HttpDownloader } from "../network/HttpDownloader";
+import { AuthSessionManager } from "../auth/AuthSessionManager";
 import { http } from "@kit.NetworkKit";
 import { JSON } from "@kit.ArkTS";
 
@@ -99,7 +100,10 @@ async function getMusicClientInfoHeaders(localization: Localization): Promise<Re
   return headers;
 }
 
-async function getYoutubeHeaders(localization: Localization): Promise<Record<string, string[]>> {
+async function getYoutubeHeaders(
+  localization: Localization,
+  withAuth: boolean = false
+): Promise<Record<string, string[]>> {
   const headers: Record<string, string[]> = {};
   const infoHeaders: Record<string, string[]> = await getClientInfoHeaders(localization);
   Object.entries(infoHeaders).forEach((entry) => {
@@ -108,7 +112,27 @@ async function getYoutubeHeaders(localization: Localization): Promise<Record<str
     headers[key] = value;
   });
   headers['Cookie'] = ["SOCS=CAISAiAD"];
+  if (withAuth) {
+    await applyAuthHeaders(headers);
+  }
   return headers;
+}
+
+async function applyAuthHeaders(headers: Record<string, string[]>): Promise<void> {
+  const authSession = AuthSessionManager.getInstance();
+  if (!authSession || !authSession.isSignedIn()) {
+    return;
+  }
+  const cookieStr = authSession.getCookieString();
+  if (cookieStr && cookieStr.length > 0) {
+    headers['Cookie'] = [cookieStr];
+    headers['X-Origin'] = ['https://www.youtube.com'];
+    headers['DNT'] = ['1'];
+  }
+  const authorization = await authSession.getAuthorizationHeader();
+  if (authorization && authorization.length > 0) {
+    headers['Authorization'] = [authorization];
+  }
 }
 
 async function getYoutubeMusicHeaders(localization: Localization): Promise<Record<string, string[]>> {
@@ -187,9 +211,10 @@ async function getJsonPostResponse(
   endpoint: string,
   body: string,
   localization: Localization,
-  apiKey?: string
+  apiKey?: string,
+  withAuth: boolean = false
 ): Promise<Object | null> {
-  const headers = await getYoutubeHeaders(localization);
+  const headers = await getYoutubeHeaders(localization, withAuth);
   const params: string[] = [DISABLE_PRETTY_PRINT_PARAMETER];
   if (apiKey && apiKey.length > 0) {
     params.unshift(`key=${apiKey}`);
@@ -324,7 +349,8 @@ export async function fetchBrowsePage(
   contentCountry: ContentCountry,
   browseId: string,
   params: string,
-  visitorData?: string
+  visitorData?: string,
+  withAuth: boolean = false
 ): Promise<Object | null> {
   let id = browseId;
   let ajaxJson: Object | null = null;
@@ -344,7 +370,9 @@ export async function fetchBrowsePage(
     const response = await getJsonPostResponse(
       "browse",
       JSON.stringify(jsonStruct),
-      localization
+      localization,
+      undefined,
+      withAuth
     );
     
     if (!response) {
@@ -404,7 +432,8 @@ export async function fetchBrowseContinuation(
   localization: Localization,
   contentCountry: ContentCountry,
   continuationToken: string,
-  visitorData?: string
+  visitorData?: string,
+  withAuth: boolean = false
 ): Promise<Object | null> {
   const jsonStruct: Record<string, Object> = await prepareDesktopJsonBuilder(
     localization,
@@ -415,7 +444,9 @@ export async function fetchBrowseContinuation(
   return getJsonPostResponse(
     "browse",
     JSON.stringify(jsonStruct),
-    localization
+    localization,
+    undefined,
+    withAuth
   );
 }
 

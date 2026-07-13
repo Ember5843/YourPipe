@@ -39,7 +39,11 @@ interface SafariPayload {
 }
 
 export class SafariPlayerClient {
-  static async fetch(ctx: ClientFetchContext, httpClient: YouTubeHttpClient): Promise<ClientFetchResult | undefined> {
+  static async fetch(
+    ctx: ClientFetchContext,
+    httpClient: YouTubeHttpClient,
+    useAuthHeaders: boolean = true
+  ): Promise<ClientFetchResult | undefined> {
     if (!ctx.signatureTimestamp) {
       logger.warn('No signatureTimestamp, skipping Safari client');
       return undefined;
@@ -68,9 +72,11 @@ export class SafariPlayerClient {
     const url = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
 
     try {
-      // SafariPlayerClient 是登录态下的主流提取客户端，显式 opt-in 注入登录头
-      // （对齐 PipePipe getSafariPostResponseAsync → addLoggedInHeaders）
-      const response = await httpClient.postJson(url, payload, headers, true);
+      // 已登录主路：useAuthHeaders=true 显式 opt-in 注入登录头
+      //   （对齐 PipePipe getSafariPostResponseAsync → addLoggedInHeaders）
+      // 未登录兜底：useAuthHeaders=false 跳过 Cookie/Authorization 注入
+      //   （对齐 PipePipe 匿名 Safari 兜底路径）
+      const response = await httpClient.postJson(url, payload, headers, useAuthHeaders);
       if (response && response.responseCode === 200) {
         const pr = JSON.parse(response.result as string) as PlayerResponse;
         if (pr?.streamingData) {

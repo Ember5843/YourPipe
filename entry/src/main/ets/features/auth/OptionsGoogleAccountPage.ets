@@ -6,6 +6,7 @@ export struct OptionsGoogleAccountPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onBack?: () => void;
   pushLoginPage?: () => void;
+  onAuthChanged?: () => void;
 
   @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
 
@@ -13,7 +14,7 @@ export struct OptionsGoogleAccountPage {
     const uiContext = this.getUIContext();
     uiContext.showAlertDialog({
       title: '登录须知',
-      message: '欢迎使用我们的应用，登录功能仍在完善，目前暂不支持获取Youtube账号数据，仅供需要解锁会员内容或者被机器人拦截情况下登录，登录状态下，分辨率将最高限制至1080P',
+      message: '登录后可尝试加载个性化首页推荐，并用于解锁会员内容或绕过机器人拦截。订阅/历史等账号数据仍在完善中。登录状态下分辨率最高限制为 1080P。',
       autoCancel: true,
       alignment: DialogAlignment.Center,
       offset: { dx: 0, dy: -20 },
@@ -45,6 +46,9 @@ export struct OptionsGoogleAccountPage {
   private signOut(): void {
     AuthSessionManager.getInstance()?.signOut();
     AuthStateHelper.refresh();
+    if (this.onAuthChanged) {
+      this.onAuthChanged();
+    }
   }
 
   private getStatusText(): string {
@@ -109,12 +113,12 @@ export struct OptionsGoogleAccountPage {
   @Builder SignedInView() {
     Column({ space: 12 }) {
       if (this.authStatus.authMode === 'cookie') {
-        Text('已通过 Cookie 方式登录')
+        Text('已通过 Cookie 方式登录。首页将优先加载个性化推荐，失败时回退到直播源。')
           .fontSize(14)
           .fontColor($r('app.color.yourtube_text_quaternary'))
           .width('100%')
       } else {
-        Text('已通过 OAuth 方式登录')
+        Text('已通过 OAuth 方式登录。首页将优先加载个性化推荐，失败时回退到直播源。')
           .fontSize(14)
           .fontColor($r('app.color.yourtube_text_quaternary'))
           .width('100%')

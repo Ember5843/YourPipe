@@ -1,7 +1,7 @@
 import { SearchPlaylistItem, VideoItem } from 'youtube_core';
 import { VideoBuildResult } from './model/FeedResult';
 import { ContentCountry, Localization, fetchBrowseContinuation, fetchBrowsePage } from 'youtube_core';
-import { getThumbnailUrl, normalizeUrl } from './utils/ThumbnailUtils';
+import { pickBestThumbUrl } from './utils/ThumbnailUtils';
 import { getContinuationToken, getPlaylistContinuationToken } from './utils/ContinuationUtils';
 import { buildVideoItemFromRenderer } from './utils/VideoItemBuilder';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
@@ -177,9 +177,7 @@ export class PlaylistService {
     if (!thumbnail) return "";
     const thumbnails = thumbnail["thumbnails"] as Array<Record<string, Object>>;
     if (!thumbnails || thumbnails.length === 0) return "";
-    const last = thumbnails[thumbnails.length - 1];
-    const url = last ? (last["url"] as string) : "";
-    return normalizeUrl(url || "");
+    return pickBestThumbUrl(thumbnails);
   }
 
   private getPlaylistCoverFromSidebar(root: Record<string, Object>): string {
@@ -193,9 +191,7 @@ export class PlaylistService {
     const thumb = videoThumbnail ? (videoThumbnail["thumbnail"] as Record<string, Object>) : undefined;
     const thumbnails = thumb ? (thumb["thumbnails"] as Array<Record<string, Object>>) : undefined;
     if (!thumbnails || thumbnails.length === 0) return "";
-    const last = thumbnails[thumbnails.length - 1];
-    const url = last ? (last["url"] as string) : "";
-    return normalizeUrl(url || "");
+    return pickBestThumbUrl(thumbnails);
   }
 
   private getCoverFromFirstPlaylistVideo(rawItems: Array<Record<string, Object>>): string {
@@ -206,9 +202,7 @@ export class PlaylistService {
     if (!thumbnail) return "";
     const thumbnails = thumbnail["thumbnails"] as Array<Record<string, Object>>;
     if (!thumbnails || thumbnails.length === 0) return "";
-    const last = thumbnails[thumbnails.length - 1];
-    const url = last ? (last["url"] as string) : "";
-    return normalizeUrl(url || "");
+    return pickBestThumbUrl(thumbnails);
   }
 
   private getFirstTabContent(twoColumn: Record<string, Object> | undefined): Record<string, Object> | undefined {

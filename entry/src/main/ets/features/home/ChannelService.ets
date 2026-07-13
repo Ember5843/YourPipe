@@ -3,7 +3,7 @@ import { SearchPlaylistItem } from 'youtube_core';
 import { ContentCountry, Localization, fetchBrowseContinuation, fetchBrowsePage } from 'youtube_core';
 import { getPlaylistContinuationToken } from './utils/ContinuationUtils';
 import { buildHomeKioskVideoItems, getHomeKioskItemsFromTabContent } from './utils/HomeFeedUtils';
-import { getThumbnailUrl } from './utils/ThumbnailUtils';
+import { pickBestThumbUrl } from './utils/ThumbnailUtils';
 import { buildVideoItemFromReelRenderer, buildVideoItemFromRenderer } from './utils/VideoItemBuilder';
 import { getLockupPlaylistCoverUrl, getLockupPlaylistId, getLockupTitle, getLockupUploaderName } from './utils/LockupViewModelParser';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
@@ -295,9 +295,7 @@ export class ChannelService {
     if (!thumbnail) return "";
     const thumbnails = thumbnail["thumbnails"] as Array<Record<string, Object>>;
     if (!thumbnails || thumbnails.length === 0) return "";
-    const last = thumbnails[thumbnails.length - 1];
-    const url = last ? (last["url"] as string) : "";
-    return this.normalizeUrl(url || "");
+    return pickBestThumbUrl(thumbnails);
   }
 
   private normalizeUrl(input: string): string {

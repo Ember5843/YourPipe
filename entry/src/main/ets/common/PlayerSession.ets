@@ -21,7 +21,8 @@ const logger = AppLog.getInstance('PlayerSession');
 const TAG = '[PlayerSession]';
 
 function getFallbackThumbnailUrl(videoId: string): string {
-  return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '';
+  // Prefer maxres (highest). Client may 404 on some videos; UI has placeholder.
+  return videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : '';
 }
 
 export class PlayerSession {

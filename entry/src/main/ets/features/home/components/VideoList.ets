@@ -14,6 +14,7 @@
  */
 
 import { CommonConstants, VideoData } from 'mediaservice';
+import { MediaThumb } from '../../../common/components/MediaThumb';
 
 @Component({ freezeWhenInactive: true })
 export struct VideoList {
@@ -37,11 +38,12 @@ export struct VideoList {
           ForEach(this.sources, (item: VideoData, index: number) => {
             ListItem() {
               Flex({ direction: FlexDirection.Row }) {
-                Image(item.head || $r('app.media.image_thumbnail_1'))
-                  .height($r('app.float.list_img_height'))
-                  .width($r('app.float.list_img_width'))
-                  .objectFit(ImageFit.Cover)
-                  .borderRadius($r('app.float.list_img_radius'))
+                MediaThumb({
+                  imageUrl: item.head || '',
+                  widthVp: 160,
+                  heightVp: 90,
+                  borderRadiusVp: 6
+                })
                 Column() {
                   Text() {
                     if (index === this.currentIndex) {

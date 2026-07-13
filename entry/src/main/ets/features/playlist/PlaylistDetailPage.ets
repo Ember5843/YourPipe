@@ -14,6 +14,7 @@ import { StoredLocalQueue } from '../../common/PlaylistModel';
 import { SubscriptionFeedService } from '../../features/subscription/SubscriptionFeedService';
 import { VideoCard } from '../../common/components/VideoCard';
 import { VideoCardGrid } from '../../common/components/VideoCardGrid';
+import { MediaThumb } from '../../common/components/MediaThumb';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
 import { PlayQueueSourceHint } from '../player/PlayQueueManager';
@@ -196,20 +197,13 @@ export struct PlaylistDetailPage {
   PlaylistInfoSection() {
     Column() {
       Row() {
-        if (this.playlist.coverUrl && this.playlist.coverUrl.length > 0) {
-          Image(this.playlist.coverUrl)
-            .width(96)
-            .height(96)
-            .objectFit(ImageFit.Cover)
-            .borderRadius(8)
-            .backgroundColor(this.playlist.thumbnailColor || $r('app.color.yourtube_icon_hint'))
-        } else {
-          Rect()
-            .width(96)
-            .height(96)
-            .fill(this.playlist.thumbnailColor || $r('app.color.yourtube_icon_hint'))
-            .radius(8)
-        }
+        MediaThumb({
+          imageUrl: this.playlist.coverUrl || '',
+          placeholderColor: this.playlist.thumbnailColor || '',
+          widthVp: 96,
+          heightVp: 96,
+          borderRadiusVp: 8
+        })
 
         Column() {
           Text(this.playlist.name || 'Untitled')

@@ -1,5 +1,6 @@
 import { VideoItem } from 'youtube_core';
 import { PlayQueueManager, QueueSourceType, QueueChangeListener } from '../PlayQueueManager';
+import { MediaThumb } from '../../../common/components/MediaThumb';
 
 class PlayQueueListListener extends QueueChangeListener {
   private component: PlayQueueList;
@@ -157,7 +158,7 @@ export struct PlayQueueList {
   @Builder
   EmptyState() {
     Column() {
-      SymbolGlyph($r('sys.symbol.list_bullet'))
+      SymbolGlyph($r('sys.symbol.list_bullet_square'))
         .fontSize(36)
         .fontColor([$r('app.color.yourtube_text_hint')])
         .margin({ bottom: 8 })
@@ -197,30 +198,16 @@ export struct PlayQueueList {
 
   @Builder
   Thumbnail(item: VideoItem, isPlaying: boolean) {
-    Stack({ alignContent: Alignment.BottomEnd }) {
-      if (item.thumbnailUrl && item.thumbnailUrl.length > 0) {
-        Image(item.thumbnailUrl)
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Cover)
-          .borderRadius(6)
-          .backgroundColor(item.thumbnailColor || $r('app.color.yourtube_icon_hint'))
-      } else {
-        Rect()
-          .width('100%')
-          .height('100%')
-          .fill(item.thumbnailColor || $r('app.color.yourtube_icon_hint'))
-          .radius(6)
-      }
-
-      if (item.isLive) {
-        Text($r('app.string.yt_label_live'))
-          .fontSize(8)
-          .fontColor($r('app.color.yourtube_text_inverse'))
-          .backgroundColor($r('app.color.yourtube_bg_live_tag'))
-          .padding({ left: 4, right: 4, top: 2, bottom: 2 })
-          .borderRadius({ topLeft: 4, bottomRight: 6 })
-      }
+    Stack({ alignContent: Alignment.Center }) {
+      MediaThumb({
+        imageUrl: item.thumbnailUrl || '',
+        placeholderColor: item.thumbnailColor || '',
+        widthVp: 160,
+        heightVp: 90,
+        borderRadiusVp: 6,
+        showLive: true,
+        isLive: item.isLive
+      })
 
       if (isPlaying) {
         Column() {
@@ -228,8 +215,8 @@ export struct PlayQueueList {
             .fontSize(20)
             .fontColor([Color.White])
         }
-        .width('100%')
-        .height('100%')
+        .width(160)
+        .height(90)
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .backgroundColor('rgba(0,0,0,0.4)')
@@ -238,8 +225,6 @@ export struct PlayQueueList {
     }
     .width(160)
     .height(90)
-    .borderRadius(6)
-    .clip(true)
   }
 
   @Builder

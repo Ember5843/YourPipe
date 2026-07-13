@@ -1,7 +1,11 @@
 import { VideoItem } from 'youtube_core';
 import { ThumbnailPlaceholder } from '../../../common/ThumbnailPlaceholder';
 import { getTextFromRuns } from './TextUtils';
-import { getThumbnailUrlFromThumbnailObject, getShortsLockupThumbnailUrl } from './ThumbnailUtils';
+import {
+  getThumbnailUrlFromThumbnailObject,
+  getShortsLockupThumbnailUrl,
+  getThumbnailUrl as getThumbFromRenderer
+} from './ThumbnailUtils';
 import { getLockupUploaderName, getLockupChannelId, getLockupViewCount, getLockupRequiresMembership } from './LockupViewModelParser';
 
 export function buildVideoItemFromRenderer(
@@ -25,7 +29,7 @@ export function buildVideoItemFromRenderer(
   const isLive = hasLiveBadge(renderer, liveLabel);
   const isPremium = hasPremiumBadge(renderer);
   const requiresMembership = hasMembershipBadge(renderer);
-  const thumbnailUrl = getThumbnailUrl(renderer);
+  const thumbnailUrl = getThumbFromRenderer(renderer);
   const channelId = getChannelId(renderer);
   const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, id);
   return new VideoItem(id, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", "", null, isPremium, requiresMembership);
@@ -214,25 +218,4 @@ export function getChannelId(video: Record<string, Object>): string {
   return browseId || "";
 }
 
-function getThumbnailUrl(video: Record<string, Object>): string {
-  const thumbnail = video["thumbnail"] as Record<string, Object>;
-  if (!thumbnail) return "";
-  const thumbnails = thumbnail["thumbnails"] as Array<Record<string, Object>>;
-  if (!thumbnails || thumbnails.length === 0) return "";
-  const last = thumbnails[thumbnails.length - 1];
-  const url = last ? (last["url"] as string) : "";
-  return normalizeUrl(url || "");
-}
 
-function normalizeUrl(input: string): string {
-  if (!input) return "";
-  const url = input.trim();
-  if (url.length === 0) return "";
-  if (url.startsWith('//')) {
-    return `https:${url}`;
-  }
-  if (url.startsWith('http://')) {
-    return `https://${url.slice('http://'.length)}`;
-  }
-  return url;
-}

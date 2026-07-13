@@ -19,6 +19,7 @@ export class AuthSessionManager {
   private static readonly STORAGE_NAME: string = 'yourpipe_auth_poc';
   private static readonly REFRESH_TOKEN_KEY: string = 'refresh_token';
   private static readonly COOKIE_CREDENTIAL_KEY: string = 'cookie_auth_credential';
+  private static readonly AUTH_ENABLED_KEY: string = 'auth_enabled';
   private static readonly REFRESH_MARGIN_MS: number = 60000;
 
   private context: Context;
@@ -27,6 +28,8 @@ export class AuthSessionManager {
   private accessToken: string = '';
   private accessTokenExpiresAt: number = 0;
   private cookieCredential: CookieAuthCredential | null = null;
+  /** When false, keep credentials but do not attach auth to requests (private browsing). */
+  private authEnabled: boolean = true;
 
   private constructor(context: Context) {
     this.context = context;
@@ -47,6 +50,8 @@ export class AuthSessionManager {
 
   getStatus(): AuthAccountStatus {
     const status = new AuthAccountStatus();
+    status.authEnabled = this.authEnabled;
+    status.hasCredential = this.hasCredential();
     if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
       status.stage = AuthStage.SIGNED_IN;
       status.authMode = 'cookie';
@@ -62,14 +67,39 @@ export class AuthSessionManager {
     return status;
   }
 
-  isSignedIn(): boolean {
+  hasCredential(): boolean {
     if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
       return true;
     }
     return this.refreshToken.length > 0;
   }
 
+  isAuthEnabled(): boolean {
+    return this.authEnabled;
+  }
+
+  setAuthEnabled(enabled: boolean): AuthAccountStatus {
+    this.authEnabled = enabled;
+    this.persistAuthEnabled();
+    logger.info(`Auth enabled set to ${enabled}`);
+    return this.getStatus();
+  }
+
+  /**
+   * Whether requests should attach login credentials.
+   * False when private browsing is on, even if a credential is stored.
+   */
+  isSignedIn(): boolean {
+    if (!this.authEnabled) {
+      return false;
+    }
+    return this.hasCredential();
+  }
+
   async getAuthorizationHeader(): Promise<string | undefined> {
+    if (!this.authEnabled) {
+      return undefined;
+    }
     if (this.cookieCredential && this.cookieCredential.sapiSid.length > 0) {
       return await SapisidHashUtil.generate(this.cookieCredential.sapiSid);
     }
@@ -121,13 +151,18 @@ export class AuthSessionManager {
     this.accessToken = '';
     this.accessTokenExpiresAt = 0;
     this.cookieCredential = null;
+    this.authEnabled = true;
     this.persistRefreshToken();
     this.persistCookieCredential();
+    this.persistAuthEnabled();
     logger.info('Signed out');
     return this.getStatus();
   }
 
   getCookieString(): string | undefined {
+    if (!this.authEnabled) {
+      return undefined;
+    }
     if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
       return this.cookieCredential.cookies;
     }
@@ -135,6 +170,9 @@ export class AuthSessionManager {
   }
 
   getPotToken(): string | undefined {
+    if (!this.authEnabled) {
+      return undefined;
+    }
     if (this.cookieCredential && this.cookieCredential.potToken.length > 0) {
       return this.cookieCredential.potToken;
     }
@@ -143,7 +181,9 @@ export class AuthSessionManager {
 
   saveCookieCredential(credential: CookieAuthCredential): AuthAccountStatus {
     this.cookieCredential = credential;
+    this.authEnabled = true;
     this.persistCookieCredential();
+    this.persistAuthEnabled();
     logger.info('Cookie credential saved');
     return this.getStatus();
   }
@@ -173,6 +213,8 @@ export class AuthSessionManager {
           logger.info('Cookie credential loaded');
         }
       }
+      const enabledRaw = storage.getSync(AuthSessionManager.AUTH_ENABLED_KEY, 'true') as string;
+      this.authEnabled = enabledRaw !== 'false';
     } catch (e) {
       logger.error('Failed to load auth state');
     }
@@ -196,6 +238,16 @@ export class AuthSessionManager {
       storage.flush();
     } catch (e) {
       logger.error('Failed to persist cookie credential');
+    }
+  }
+
+  private persistAuthEnabled(): void {
+    try {
+      const storage = preferences.getPreferencesSync(this.context, { name: AuthSessionManager.STORAGE_NAME });
+      storage.putSync(AuthSessionManager.AUTH_ENABLED_KEY, this.authEnabled ? 'true' : 'false');
+      storage.flush();
+    } catch (e) {
+      logger.error('Failed to persist auth enabled');
     }
   }
 

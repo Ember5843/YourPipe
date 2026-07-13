@@ -16,6 +16,7 @@ export struct WebViewLoginPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onSuccess?: () => void;
   onCancel?: () => void;
+  onRegisterBackHandler?: (handler: () => boolean) => void;
   private webController: web_webview.WebviewController = new web_webview.WebviewController();
   private authSession: AuthSessionManager | null = AuthSessionManager.getInstance();
   private extractedCookies: string = '';
@@ -25,6 +26,33 @@ export struct WebViewLoginPage {
   @State private errorMessage: string = '';
   private hasDetectedLogin: boolean = false;
   private hasExtractedPot: boolean = false;
+
+  aboutToAppear(): void {
+    if (this.onRegisterBackHandler) {
+      this.onRegisterBackHandler((): boolean => this.handleBack());
+    }
+  }
+
+  aboutToDisappear(): void {
+    if (this.onRegisterBackHandler) {
+      this.onRegisterBackHandler((): boolean => false);
+    }
+  }
+
+  private handleBack(): boolean {
+    if (this.state !== LoginState.LOADING && this.state !== LoginState.EXTRACTING_POT) {
+      return false;
+    }
+    try {
+      if (this.webController.accessBackward()) {
+        this.webController.backward();
+        return true;
+      }
+    } catch (e) {
+      logger.warn('WebView backward failed');
+    }
+    return false;
+  }
 
   private static readonly LOGIN_URL: string =
     'https://accounts.google.com/ServiceLogin?service=youtube&continue=https://www.youtube.com/';

@@ -11,6 +11,7 @@ interface OptionsRecoveryPageParams {
 @Component
 export struct OptionsRecoveryPage {
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
 
   @Prop params: OptionsRecoveryPageParams = {
     onResetSettingsClick: () => {},
@@ -28,10 +29,10 @@ export struct OptionsRecoveryPage {
         ListItemGroup() {
           ListItem() {
             OptionItem({
-              icon: $r('sys.symbol.arrow_counterclockwise'),
+              icon: $r('sys.symbol.arrow_counterclockwise_clock'),
               title: $r('app.string.yt_option_reset_settings'),
               subtitle: $r('app.string.yt_option_reset_settings_subtitle'),
-              iconColor: $r('app.color.yourtube_option_icon_palette'),
+              iconColor: this.themePrimary,
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               transparentBackground: true,
               onClickAction: this.params.onResetSettingsClick

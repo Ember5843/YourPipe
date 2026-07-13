@@ -2,6 +2,7 @@ import { ActionHub } from '../../common/ActionHub';
 import { VideoItem } from 'youtube_core';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
+import { MediaThumb } from '../../common/components/MediaThumb';
 
 @Component
 export struct VideoDetailPage {
@@ -60,14 +61,18 @@ export struct VideoDetailPage {
             .fontSize(12)
             .fontColor($r('app.color.yourtube_text_quaternary'))
             .margin({ top: 6 })
-          if (this.video.thumbnailUrl && this.video.thumbnailUrl.length > 0) {
-            Image(this.video.thumbnailUrl)
-              .width('100%')
-              .height(180)
-              .margin({ top: 12 })
-              .borderRadius(8)
-              .objectFit(ImageFit.Cover)
-          }
+          MediaThumb({
+            imageUrl: this.video.thumbnailUrl || '',
+            placeholderColor: this.video.thumbnailColor || '',
+            fillParent: true,
+            useAspectRatio: true,
+            borderRadiusVp: 8,
+            showLive: true,
+            isLive: this.video.isLive,
+            isPremium: this.video.isPremium,
+            requiresMembership: this.video.requiresMembership
+          })
+            .margin({ top: 12 })
         }
         .padding({ left: 16, right: 16, top: 16 })
 
@@ -89,7 +94,7 @@ export struct VideoDetailPage {
       },
       menus: this.video ? [
         buildTitleMenu(
-          this.isFavorited() ? $r('sys.symbol.bookmark_fill') : $r('sys.symbol.bookmark'),
+          this.isFavorited() ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'),
           this.isFavorited() ? $r('app.string.yt_action_unfavorite') : $r('app.string.yt_action_favorite'),
           () => {
             this.handleFavorite();
