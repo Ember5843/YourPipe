@@ -819,31 +819,9 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "gpu-context", "ohosvk");
         SetOptionString(ctx.mpv, "ao", "ohaudio");
         SetOptionString(ctx.mpv, "hwdec", "ohcodec-copy");
-        // Prefer OHCodec hard decode for H.264/HEVC (API 9/10+) and
-        // VP9/AV1/VP8 (API 23+ MIME). If GetCapability(HARDWARE) fails on a
-        // device, lavc falls back to software so playback still works.
+        // Prefer hardware decode (ohcodec), fall back to ffmpeg software when
+        // the device has no hardware decoder for the codec (0.5.1 defaults).
         SetOptionString(ctx.mpv, "vd-lavc-software-fallback", "yes");
-        // Prefer ohcodec wrappers when multiple decoders exist for a codec.
-        SetOptionString(ctx.mpv, "hwdec-codecs", "h264,hevc,vp8,vp9,av1");
-        // Thermal / power defaults for mobile OHOS:
-        // gpu-next + ohcodec-copy already uploads every frame to the GPU; keep
-        // libplacebo on the cheap path (bilinear, no deband/dither/HDR peak).
-        // video-sync=audio avoids display-resample's extra GPU work.
-        // framedrop=vo drops late frames instead of decoding every one under load.
-        SetOptionString(ctx.mpv, "scale", "bilinear");
-        SetOptionString(ctx.mpv, "cscale", "bilinear");
-        SetOptionString(ctx.mpv, "dscale", "bilinear");
-        SetOptionString(ctx.mpv, "dither", "no");
-        SetOptionString(ctx.mpv, "deband", "no");
-        SetOptionString(ctx.mpv, "correct-downscaling", "no");
-        SetOptionString(ctx.mpv, "linear-downscaling", "no");
-        SetOptionString(ctx.mpv, "sigmoid-upscaling", "no");
-        SetOptionString(ctx.mpv, "hdr-compute-peak", "no");
-        SetOptionString(ctx.mpv, "video-sync", "audio");
-        SetOptionString(ctx.mpv, "framedrop", "vo");
-        // Soft 4K/VP9 path: skip loopfilter on non-keyframes to cut CPU when
-        // hardware is unavailable (device capability often has no VP9/AV1 HW).
-        SetOptionString(ctx.mpv, "vd-lavc-skiploopfilter", "nonkey");
         // Product path: vo=gpu-next + hwdec=ohcodec-copy only.
         // Background audio-only uses vid=no at app layer, not a VO switch.
         // Stop at the last frame instead of unloading the file at EOF, so the
@@ -856,8 +834,8 @@ bool EnsureMpv(PlayerContext& ctx)
         // missing youtube-dl subprocess, spamming errors. We do not want a
         // player that shells out to external scrapers.
         SetOptionString(ctx.mpv, "ytdl", "no");
-        // Production logging: warn-level only. Raise ohos to v when debugging HDR.
-        SetOptionString(ctx.mpv, "msg-level", "all=warn");
+        // 0.5.1 logging: warn by default; ohos=v for HDR/native-window diagnostics.
+        SetOptionString(ctx.mpv, "msg-level", "all=warn,ohos=v");
         SetOptionString(ctx.mpv, "osc", "no");
         SetOptionString(ctx.mpv, "input-default-bindings", "no");
         SetOptionString(ctx.mpv, "input-vo-keyboard", "no");

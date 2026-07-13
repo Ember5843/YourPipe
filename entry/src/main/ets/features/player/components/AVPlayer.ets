@@ -42,6 +42,8 @@ export struct VideoPlayer {
   @Consume('actionHub') actionHub: ActionHub;
   @StorageProp('navBarHeight') navBarHeight: number = 0;
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
+  // Index Provide fallback when Storage statusBarHeight is 0 (bars hidden / mid-rotate).
+  @Consume('safeAreaTop') safeAreaTop: number = 0;
   @StorageProp('currentColorMode') currentColorMode: number = ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET;
   @Prop @Watch('calculateSurfaceSize') isFullLandscapeScreen: boolean = false;
   @StorageProp('playerPageVisible') @Watch('onPageVisibilityChange') isPageShow: boolean = false;
@@ -650,6 +652,12 @@ export struct VideoPlayer {
     return 'Auto';
   }
 
+  /** Fullscreen top pad: status/cutout + base pad; min 24vp when avoid-area reports 0. */
+  private getFullscreenTopPad(): number {
+    const topInset = Math.max(this.statusBarHeight || 0, this.safeAreaTop || 0, 24);
+    return topInset + this.ctrlVPad;
+  }
+
   build() {
     Stack({ alignContent: Alignment.Center }) {
       // 1. 渲染层（XComponent SURFACE 直渲）
@@ -672,9 +680,11 @@ export struct VideoPlayer {
         .onDestroy(() => {
           Logger.info(TAG, 'XComponent onDestroy');
         })
-        // Constrain surface to parent; clip parent so SURFACE cannot paint into status bar.
-        .width(CommonConstants.WIDTH_FULL_PERCENT)
-        .height(CommonConstants.HEIGHT_FULL_PERCENT)
+        // 0.5.1 / 9150bd0: layout by video aspect, NOT 100%×100%.
+        // Full-bleed surface makes width/height thrash on rotate/fullscreen and
+        // rebuilds NativeWindow (black frames + janky PiP geometry).
+        .aspectRatio(this.curSource.width && this.curSource.height
+          ? this.curSource.width / this.curSource.height : 16 / 9)
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const pxWidth = Math.round(this.getUIContext().vp2px(Number(newArea.width)));
           const pxHeight = Math.round(this.getUIContext().vp2px(Number(newArea.height)));
@@ -1025,12 +1035,12 @@ export struct VideoPlayer {
     .width('100%')
     // 顶部间距：
     // 竖屏非沉浸——PlayerPage 已用 topSafeInset 把视频区整体下移，这里只需 ctrlVPad
-    // 横屏/沉浸全屏——系统栏隐藏或内容贴顶，控件额外加 statusBarHeight 避开刘海
+    // 横屏/沉浸全屏——内容贴顶，顶部控件必须再让出状态栏/挖孔（bars 隐藏时 height 可能为 0）
     .padding({
       left: this.ctrlHPad,
       right: this.ctrlHPad,
       top: this.isFullLandscapeScreen
-           ? Math.max(this.statusBarHeight, 0) + this.ctrlVPad
+           ? this.getFullscreenTopPad()
            : this.ctrlVPad,
       bottom: this.ctrlVPad
     })

@@ -68,45 +68,38 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       const demuxerReadaheadSecs = _config.mpvDemuxerReadaheadSecs ?? 8;
       const gpuApi = _config.mpvGpuApi ?? 'auto';
 
-      // Fixed product path (afternoon-stable): gpu-next + ohcodec-copy only.
+      // 0.5.1 product path: ohcodec-copy + gpu-next (native EnsureMpv).
+      // Explicit ohcodec-copy (buffer mode); avoid hwdec=auto autoprobe fragility.
       if (hwdecEnabled) {
         ctrl.setProperty('hwdec', 'ohcodec-copy');
-        ctrl.setProperty('hwdec-codecs', 'h264,hevc,vp8,vp9,av1');
-        Logger.info(TAG, 'Hardware decoding: ohcodec-copy (mpv product path)');
+        Logger.info(TAG, 'Hardware decoding enabled: ohcodec-copy');
       } else {
         ctrl.setProperty('hwdec', 'no');
         Logger.info(TAG, 'Hardware decoding disabled');
       }
 
+      // GPU 渲染 API
       if (gpuApi !== 'auto') {
         ctrl.setProperty('gpu-api', gpuApi);
         Logger.info(TAG, `GPU API set to: ${gpuApi}`);
       }
 
-      // Memory cache for seek / network jitter (local proxy is unthrottled).
+      // 内存缓存（不写磁盘）：提升 seek 与网络波动容忍度。
+      // 本地 proxy 回环不限速，mpv 可放开缓冲上限。
       ctrl.setProperty('cache', 'yes');
       ctrl.setProperty('cache-secs', `${cacheSecs}`);
       ctrl.setProperty('cache-on-disk', 'no');
+      Logger.info(TAG, `Memory cache configured: ${cacheSecs}s`);
 
-      // Demuxer readahead only; leave demuxer-max-bytes at mpv defaults.
+      // demuxer 预读：保留用户配置；max-bytes 用 mpv 默认。
       ctrl.setProperty('demuxer-readahead-secs', `${demuxerReadaheadSecs}`);
+      Logger.info(TAG, `Demuxer readahead=${demuxerReadaheadSecs}s (max-bytes/back/stream-buffer using mpv defaults)`);
 
-      // Seek + thermal-friendly render (also set in native EnsureMpv).
+      // 精确 seek：hr-seek-framedrop 让 seek 跳过未显示帧的解码。
       ctrl.setProperty('hr-seek', 'yes');
       ctrl.setProperty('hr-seek-framedrop', 'yes');
-      ctrl.setProperty('scale', 'bilinear');
-      ctrl.setProperty('cscale', 'bilinear');
-      ctrl.setProperty('dscale', 'bilinear');
-      ctrl.setProperty('dither', 'no');
-      ctrl.setProperty('deband', 'no');
-      ctrl.setProperty('hdr-compute-peak', 'no');
-      ctrl.setProperty('video-sync', 'audio');
-      ctrl.setProperty('framedrop', 'vo');
-      // Drop late frames under CPU load (soft 4K path) without stalling audio.
-      ctrl.setProperty('vd-lavc-skiploopfilter', 'nonkey');
-      ctrl.setProperty('vd-lavc-skipframe', 'default');
 
-      // FFmpeg HTTP reconnect after proxy 10MB range cut (not for HLS — load() overrides).
+      // FFmpeg HTTP 读到 10MB 截断后自动重连续传（HLS load() 会覆盖）。
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
       this.controller = ctrl;
       this.initialized = true;

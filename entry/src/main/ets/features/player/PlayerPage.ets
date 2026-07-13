@@ -105,6 +105,11 @@ export struct VideoPlayerPage {
     this.handleFullScreenExit();
   };
   private cachedThumbnailUri: string = '';
+  /**
+   * Cross-orient exit only: keep full layout until portrait size settles,
+   * so we never flash landscape-wide mid-rotate (0.5.1 gap).
+   */
+  private pendingOrientationSettle: boolean = false;
 
   private async cacheThumbnail(videoId: string, thumbnailUrl: string): Promise<void> {
     if (!videoId || !thumbnailUrl) {
@@ -272,33 +277,11 @@ export struct VideoPlayerPage {
       logger.info(`${TAG} entered in landscape, wide layout, immersive=${this.isImmersive}`);
     }
 
-    // 让系统旋转动画完整驱动布局：windowSizeChange 用 animateTo({duration:0})
-    // 显式禁用属性动画，让系统旋转动画独占；否则属性动画会跟系统旋转动画打架。
-    // isManualFullscreen 是权威标志，由按钮路径维护；这里只读取它决定布局，不修改。
+    // 0.5.1 混合动画：
+    //   跨向旋转 → animateTo(0) 禁用属性动画，系统旋转独占
+    //   同向 full↔wide → 直接改状态，由容器 .animation(300) 驱动
     this.windowUtil.registerOnWindowSizeChange((size) => {
-      const isLandscape = size.width > size.height;
-
-      animateTo({ duration: 0 }, () => {
-        if (this.isManualFullscreen) {
-          // 用户主动沉浸全屏：任何方向都铺满（兼容竖向视频沉浸全屏）
-          this.isFullLandscapeScreen = true;
-          this.isWideLayout = false;
-        } else if (isLandscape) {
-          // 系统横屏：宽布局分栏
-          this.isFullLandscapeScreen = false;
-          this.isWideLayout = true;
-        } else {
-          // 系统竖屏：普通布局
-          this.isFullLandscapeScreen = false;
-          this.isWideLayout = false;
-        }
-      });
-
-      // 沉浸式（仅 UI 用）：全屏一定沉浸；手机横屏（短边 < 600vp）也沉浸
-      // 实际系统栏由 WindowUtil.updateSystemBar() 全局策略统一管理
-      const shortSideVp = this.getUIContext().px2vp(Math.min(size.width, size.height));
-      this.isImmersive = this.isFullLandscapeScreen || (isLandscape && shortSideVp < 600);
-      this.notifyFullScreenChange();
+      this.onPlayerWindowSizeChange(size.width, size.height);
     });
 
     await this.onVideoChange();
@@ -511,31 +494,80 @@ export struct VideoPlayerPage {
     }
   }
 
+  /** Compute layout flags from window size + manual fullscreen intent. */
+  private applyLayoutForWindowSize(widthPx: number, heightPx: number): void {
+    const isLandscape = widthPx > heightPx;
+    const shortSideVp = this.getUIContext().px2vp(Math.min(widthPx, heightPx));
+
+    if (this.isManualFullscreen) {
+      this.isFullLandscapeScreen = true;
+      this.isWideLayout = false;
+      this.isImmersive = true;
+    } else if (isLandscape) {
+      this.isFullLandscapeScreen = false;
+      this.isWideLayout = true;
+      this.isImmersive = shortSideVp < 600;
+    } else {
+      this.isFullLandscapeScreen = false;
+      this.isWideLayout = false;
+      this.isImmersive = false;
+    }
+    this.windowUtil.setPlayerFullscreenImmersive(this.isManualFullscreen || this.isFullLandscapeScreen);
+    this.notifyFullScreenChange();
+  }
+
+  private onPlayerWindowSizeChange(widthPx: number, heightPx: number): void {
+    // 0.5.1: duration:0 disables container .animation so system rotate owns the frame.
+    // Do not invent intermediate layouts — apply flags from final width/height only.
+    this.pendingOrientationSettle = false;
+    animateTo({ duration: 0 }, () => {
+      this.applyLayoutForWindowSize(widthPx, heightPx);
+    });
+  }
+
+  private enterImmersiveFullscreen(): void {
+    // 0.5.1: fixed LANDSCAPE / PORTRAIT (not USER_ROTATION_*) — cleaner rotate anim.
+    const isLandscapeVideo = !!(this.videoSource.width && this.videoSource.height
+      && this.videoSource.width > this.videoSource.height);
+    const targetOrientation = isLandscapeVideo
+      ? window.Orientation.LANDSCAPE
+      : window.Orientation.PORTRAIT;
+    const isCurrentLandscape = this.deviceWidth > this.deviceHeight;
+    const willRotate = isLandscapeVideo !== isCurrentLandscape;
+
+    this.isManualFullscreen = true;
+    this.pendingOrientationSettle = false;
+    this.windowUtil.setPlayerFullscreenImmersive(true);
+    this.windowUtil.setMainWindowOrientation(targetOrientation);
+
+    // 同向（尺寸不变）：直接改状态 → 容器 .animation(300)
+    // 跨向：只等 windowSizeChange + animateTo(0)，系统旋转独占
+    if (!willRotate) {
+      this.isWideLayout = false;
+      this.isFullLandscapeScreen = true;
+      this.isImmersive = true;
+      this.notifyFullScreenChange();
+    }
+  }
+
   handleFullScreenExit(): void {
-    // 退出沉浸全屏：清掉 manual 标志，解除方向锁
-    // 三种来源场景：
-    //   - 物理横屏 + 横向视频沉浸：尺寸不变 → 这里直接切宽布局，由 .animation 驱动
-    //   - 物理竖屏 + 竖向视频沉浸：尺寸不变 → 这里直接清状态，由 .animation 驱动
-    //   - 物理竖屏 + 横向沉浸（之前手动旋转过来）：解锁后系统旋回竖屏，
-    //     windowSizeChange 触发，由它接管
+    // 0.5.1 exit path: clear manual, unlock rotation, snap layout immediately.
+    // Same-orient uses .animation(300); cross-orient sizeChange uses animateTo(0).
     this.isManualFullscreen = false;
+    this.pendingOrientationSettle = false;
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
 
     const isLandscape = this.deviceWidth > this.deviceHeight;
     if (isLandscape) {
-      // 物理横屏：直接切宽布局；窄屏手机横屏保持沉浸（珍惜竖向空间）
       const shortSideVp = this.getUIContext().px2vp(Math.min(this.deviceWidth, this.deviceHeight));
       this.isFullLandscapeScreen = false;
       this.isWideLayout = true;
       this.isImmersive = shortSideVp < 600;
     } else {
-      // 物理竖屏：直接清沉浸状态（竖向视频沉浸全屏退出走这里）
       this.isFullLandscapeScreen = false;
       this.isWideLayout = false;
       this.isImmersive = false;
     }
-
-    // 退出沉浸全屏：清除标志，由 WindowUtil 全局策略按方向决定系统栏
     this.windowUtil.setPlayerFullscreenImmersive(false);
     this.notifyFullScreenChange();
   }
@@ -665,7 +697,6 @@ export struct VideoPlayerPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Black)
-    .transition(TransitionEffect.OPACITY.animation({ duration: 300, curve: Curve.EaseInOut }))
   }
 
   // ── 信息面板（详情 + 评论 Tab），手机竖屏和平板横屏复用 ──
@@ -741,30 +772,7 @@ export struct VideoPlayerPage {
             this.handleFullScreenExit();
             return;
           }
-          // 进入沉浸全屏：根据视频比例选目标方向
-          //   横向视频 → LANDSCAPE
-          //   竖向视频（短视频）→ PORTRAIT（不旋转，竖向沉浸全屏）
-          const isLandscapeVideo = this.videoSource.width && this.videoSource.height
-            && this.videoSource.width > this.videoSource.height;
-          const targetOrientation = isLandscapeVideo
-            ? window.Orientation.LANDSCAPE
-            : window.Orientation.PORTRAIT;
-          const isCurrentLandscape = this.deviceWidth > this.deviceHeight;
-          const willRotate = isLandscapeVideo !== isCurrentLandscape;
-
-          this.isManualFullscreen = true;
-          this.windowUtil.setPlayerFullscreenImmersive(true);
-          this.windowUtil.setMainWindowOrientation(targetOrientation);
-
-          // 不会发生旋转（窗口尺寸不变）：直接改状态，由容器 .animation() 驱动平滑过渡
-          // 适用：竖屏+竖向视频、横屏宽布局+横向视频
-          // 会旋转的路径交给 windowSizeChange 处理
-          if (!willRotate) {
-            this.isWideLayout = false;
-            this.isFullLandscapeScreen = true;
-            this.isImmersive = true;
-            this.notifyFullScreenChange();
-          }
+          this.enterImmersiveFullscreen();
         },
         onRetry: () => {
           this.retryLoadVideo();
@@ -838,9 +846,7 @@ export struct VideoPlayerPage {
             this.isWideLayout ? Const.HEIGHT_FULL_PERCENT :
             this.getVideoHeightVp())
           .clip(true)
-          // 属性动画：宽布局 ↔ 沉浸全屏（同尺寸切换）需要 300ms 缓动；
-          // 系统旋转路径下 windowSizeChange 用 animateTo({duration:0}) 主动禁用，
-          // 让系统旋转动画独占，避免双动画打架。
+          // 0.5.1：同向宽布局↔沉浸 300ms；跨向时 windowSizeChange 用 animateTo(0) 关掉本动画
           .animation({ duration: 300, curve: Curve.EaseInOut })
 
           this.InfoPanel()
