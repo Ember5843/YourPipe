@@ -672,10 +672,9 @@ export struct VideoPlayer {
         .onDestroy(() => {
           Logger.info(TAG, 'XComponent onDestroy');
         })
-        // 始终铺满播放区域：由 mpv pan/scan + ohos-surface-size 负责适配，
-        // 避免仅 aspectRatio 时 surface 缓冲偏小导致非全屏发糊。
-        .width('100%')
-        .height('100%')
+        // 0.5.1 路径：surface 按视频显示区域（aspectRatio）布局，再推 ohos-surface-size。
+        // 比 100% 铺满后在 VO 内 letterbox 更清晰（像素预算用在画面本身）。
+        .aspectRatio(this.curSource.width && this.curSource.height ? this.curSource.width / this.curSource.height : 16 / 9)
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const pxWidth = Math.round(this.getUIContext().vp2px(Number(newArea.width)));
           const pxHeight = Math.round(this.getUIContext().vp2px(Number(newArea.height)));

@@ -91,22 +91,21 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       // Demuxer readahead only; leave demuxer-max-bytes at mpv defaults.
       ctrl.setProperty('demuxer-readahead-secs', `${demuxerReadaheadSecs}`);
 
-      // Seek + render quality: better filters for windowed downscale sharpness.
+      // Seek + balanced render (aligned with 0.5.1 + light mobile defaults):
+      // bilinear is cheap on gpu-next/ohcodec-copy; avoid lanczos on phone.
+      // correct-downscaling keeps windowed downscale from looking mushy.
       ctrl.setProperty('hr-seek', 'yes');
       ctrl.setProperty('hr-seek-framedrop', 'yes');
-      ctrl.setProperty('scale', 'lanczos');
-      ctrl.setProperty('cscale', 'lanczos');
-      ctrl.setProperty('dscale', 'mitchell');
+      ctrl.setProperty('scale', 'bilinear');
+      ctrl.setProperty('cscale', 'bilinear');
+      ctrl.setProperty('dscale', 'bilinear');
       ctrl.setProperty('correct-downscaling', 'yes');
-      ctrl.setProperty('linear-downscaling', 'yes');
+      ctrl.setProperty('linear-downscaling', 'no');
       ctrl.setProperty('dither', 'no');
       ctrl.setProperty('deband', 'no');
       ctrl.setProperty('hdr-compute-peak', 'no');
       ctrl.setProperty('video-sync', 'audio');
       ctrl.setProperty('framedrop', 'vo');
-      // Keep aspect fit inside the full-size surface (letterbox, no stretch).
-      ctrl.setProperty('keepaspect', 'yes');
-      ctrl.setProperty('panscan', '0');
       // Drop late frames under CPU load (soft 4K path) without stalling audio.
       ctrl.setProperty('vd-lavc-skiploopfilter', 'nonkey');
       ctrl.setProperty('vd-lavc-skipframe', 'default');
