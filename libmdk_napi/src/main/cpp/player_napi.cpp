@@ -819,23 +819,31 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "gpu-context", "ohosvk");
         SetOptionString(ctx.mpv, "ao", "ohaudio");
         SetOptionString(ctx.mpv, "hwdec", "ohcodec-copy");
-        // Prefer hardware decode (ohcodec), fall back to ffmpeg software when
-        // the device has no hardware decoder for the codec (0.5.1 defaults).
+        // Prefer OHCodec; lavc falls back to software when HW is missing.
         SetOptionString(ctx.mpv, "vd-lavc-software-fallback", "yes");
-        // Product path: vo=gpu-next + hwdec=ohcodec-copy only.
+        SetOptionString(ctx.mpv, "hwdec-codecs", "h264,hevc,vp8,vp9,av1");
+        // Cheap libplacebo path: rotate/fullscreen reconfig stays light.
+        // video-sync=audio avoids display-resample GPU work; framedrop=vo
+        // drops late frames under brief spikes instead of backlog stutter.
+        SetOptionString(ctx.mpv, "scale", "bilinear");
+        SetOptionString(ctx.mpv, "cscale", "bilinear");
+        SetOptionString(ctx.mpv, "dscale", "bilinear");
+        SetOptionString(ctx.mpv, "dither", "no");
+        SetOptionString(ctx.mpv, "deband", "no");
+        SetOptionString(ctx.mpv, "correct-downscaling", "no");
+        SetOptionString(ctx.mpv, "linear-downscaling", "no");
+        SetOptionString(ctx.mpv, "sigmoid-upscaling", "no");
+        SetOptionString(ctx.mpv, "hdr-compute-peak", "no");
+        SetOptionString(ctx.mpv, "video-sync", "audio");
+        SetOptionString(ctx.mpv, "framedrop", "vo");
+        // Soft VP9/AV1: skip loopfilter on non-keyframes (no quality hit on HW).
+        SetOptionString(ctx.mpv, "vd-lavc-skiploopfilter", "nonkey");
+        // Product path: vo=gpu-next + hwdec=ohcodec-copy.
         // Background audio-only uses vid=no at app layer, not a VO switch.
-        // Stop at the last frame instead of unloading the file at EOF, so the
-        // user can still seek back and resume (normal video-player behaviour).
-        // keep-open-pause=yes (default) means mpv pauses on the last frame.
         SetOptionString(ctx.mpv, "keep-open", "yes");
         SetOptionString(ctx.mpv, "keep-open-pause", "yes");
-        // Plain media player: never fall back to youtube-dl/yt-dlp. Without this,
-        // libmpv's built-in ytdl_hook runs on any open failure and spawns a
-        // missing youtube-dl subprocess, spamming errors. We do not want a
-        // player that shells out to external scrapers.
         SetOptionString(ctx.mpv, "ytdl", "no");
-        // 0.5.1 logging: warn by default; ohos=v for HDR/native-window diagnostics.
-        SetOptionString(ctx.mpv, "msg-level", "all=warn,ohos=v");
+        SetOptionString(ctx.mpv, "msg-level", "all=warn");
         SetOptionString(ctx.mpv, "osc", "no");
         SetOptionString(ctx.mpv, "input-default-bindings", "no");
         SetOptionString(ctx.mpv, "input-vo-keyboard", "no");
