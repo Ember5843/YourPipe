@@ -825,22 +825,25 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "vd-lavc-software-fallback", "yes");
         // Prefer ohcodec wrappers when multiple decoders exist for a codec.
         SetOptionString(ctx.mpv, "hwdec-codecs", "h264,hevc,vp8,vp9,av1");
-        // Thermal / power defaults for mobile OHOS:
-        // gpu-next + ohcodec-copy already uploads every frame to the GPU; keep
-        // libplacebo on the cheap path (bilinear, no deband/dither/HDR peak).
+        // Render quality defaults for mobile OHOS:
+        // gpu-next + ohcodec-copy already uploads every frame to the GPU.
+        // Prefer sharper windowed downscale (mitchell/lanczos) over soft bilinear;
+        // keep deband/dither/HDR peak off for thermal headroom.
         // video-sync=audio avoids display-resample's extra GPU work.
         // framedrop=vo drops late frames instead of decoding every one under load.
-        SetOptionString(ctx.mpv, "scale", "bilinear");
-        SetOptionString(ctx.mpv, "cscale", "bilinear");
-        SetOptionString(ctx.mpv, "dscale", "bilinear");
+        SetOptionString(ctx.mpv, "scale", "lanczos");
+        SetOptionString(ctx.mpv, "cscale", "lanczos");
+        SetOptionString(ctx.mpv, "dscale", "mitchell");
         SetOptionString(ctx.mpv, "dither", "no");
         SetOptionString(ctx.mpv, "deband", "no");
-        SetOptionString(ctx.mpv, "correct-downscaling", "no");
-        SetOptionString(ctx.mpv, "linear-downscaling", "no");
+        SetOptionString(ctx.mpv, "correct-downscaling", "yes");
+        SetOptionString(ctx.mpv, "linear-downscaling", "yes");
         SetOptionString(ctx.mpv, "sigmoid-upscaling", "no");
         SetOptionString(ctx.mpv, "hdr-compute-peak", "no");
         SetOptionString(ctx.mpv, "video-sync", "audio");
         SetOptionString(ctx.mpv, "framedrop", "vo");
+        SetOptionString(ctx.mpv, "keepaspect", "yes");
+        SetOptionString(ctx.mpv, "panscan", "0");
         // Soft 4K/VP9 path: skip loopfilter on non-keyframes to cut CPU when
         // hardware is unavailable (device capability often has no VP9/AV1 HW).
         SetOptionString(ctx.mpv, "vd-lavc-skiploopfilter", "nonkey");

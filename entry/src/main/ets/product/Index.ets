@@ -1255,13 +1255,14 @@ struct Index {
   }
 
   private buildHdsTabsFloatingStyle(): HdsTabsFloatingStyle {
+    const effect = this.immersiveMaterialEffect ?? {
+      materialType: hdsMaterial.MaterialType.IMMERSIVE,
+      materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+    };
     const base: HdsTabsFloatingStyle = {
       barBottomMargin: this.naviIndicatorHeight > 0 ? this.naviIndicatorHeight :
         $r('sys.float.padding_level8'),
-      systemMaterialEffect: {
-        materialType: hdsMaterial.MaterialType.IMMERSIVE,
-        materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
-      }
+      systemMaterialEffect: effect
     };
     return base;
   }
@@ -1846,12 +1847,13 @@ struct Index {
     Column({ space: 3 }) {
       SymbolGlyph(iconRes)
         .fontSize(this.activeTabIndex === index ? 23 : 21)
-        .fontColor([this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary')])
+        // 未选中用系统主文字色，配合 HdsTabs 沉浸材质的智能反色；选中保持主题色
+        .fontColor([this.activeTabIndex === index ? this.themePrimary : $r('sys.color.font_primary')])
         .symbolEffect(customAnimationUtil.isIconEffect(this.uiConfig), this.activeTabIndex === index)
 
       Text(label)
         .fontSize(10)
-        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary'))
+        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('sys.color.font_primary'))
         .fontWeight(this.activeTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })

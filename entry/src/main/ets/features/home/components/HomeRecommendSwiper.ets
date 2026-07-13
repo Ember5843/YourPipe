@@ -31,21 +31,23 @@ struct HomeRecommendBannerPage {
         borderRadiusVp: 12
       })
 
-      Column() {
-        Text(this.getTitle())
-          .width('100%')
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Color.White)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-      .width('100%')
-      .padding({ left: 12, right: 12, top: 28, bottom: 14 })
-      .linearGradient({
-        angle: 180,
-        colors: [['#00000000', 0.0], ['#CC000000', 1.0]]
-      })
+      // 底部深色渐变：同时衬托标题与 Swiper 指示点，避免封面干扰
+      Column()
+        .width('100%')
+        .height(88)
+        .linearGradient({
+          angle: 180,
+          colors: [['#00000000', 0.0], ['#99000000', 0.45], ['#E6000000', 1.0]]
+        })
+
+      Text(this.getTitle())
+        .width('100%')
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Color.White)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .padding({ left: 12, right: 12, bottom: 30 })
     }
     .width('100%')
     .aspectRatio(16 / 9)
@@ -78,8 +80,12 @@ export struct HomeRecommendSwiper {
     .interval(4000)
     .indicator(
       Indicator.dot()
-        .color($r('app.color.yourtube_text_quaternary'))
+        .color('rgba(255,255,255,0.45)')
         .selectedColor(this.themePrimary)
+        .itemWidth(6)
+        .itemHeight(6)
+        .selectedItemWidth(14)
+        .selectedItemHeight(6)
     )
     .itemSpace(0)
     .borderRadius(12)

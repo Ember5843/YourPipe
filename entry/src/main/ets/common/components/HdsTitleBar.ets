@@ -33,17 +33,35 @@ export interface YourTubeTitleBarOptions {
 }
 
 export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavigationTitleBarOptions {
+  // 沉浸光感开启时走 IMMERSIVE_GRADIENT_BLUR：标题/图标随底层内容智能反色，
+  // 并从透明态白字过渡到滚动后的主文字色（系统智能反色 + 材质）。
+  const useImmersiveContrast: boolean = options.materialEffect !== undefined;
   const iconStyle: HdsNavigationIconItemStyle = {
     backgroundColor: $r('app.color.yourtube_bg_surface_muted'),
     iconColor: $r('app.color.yourtube_text_primary'),
     textColor: $r('app.color.yourtube_text_primary')
   };
+  const originalIconStyle: HdsNavigationIconItemStyle = useImmersiveContrast
+    ? {
+      backgroundColor: 'rgba(255,255,255,0.22)',
+      iconColor: Color.White,
+      textColor: Color.White
+    }
+    : iconStyle;
   const titleStyle: HdsNavigationTitleStyle = {
     mainTitleColor: $r('app.color.yourtube_text_primary'),
     subTitleColor: $r('app.color.yourtube_text_secondary'),
     mainTitleShadowColor: options.immersiveShadow ? $r('app.color.yourtube_shadow') : Color.Transparent,
     subTitleShadowColor: options.immersiveShadow ? $r('app.color.yourtube_shadow') : Color.Transparent
   };
+  const originalTitleStyle: HdsNavigationTitleStyle = useImmersiveContrast
+    ? {
+      mainTitleColor: Color.White,
+      subTitleColor: 'rgba(255,255,255,0.78)',
+      mainTitleShadowColor: 'rgba(0,0,0,0.35)',
+      subTitleShadowColor: 'rgba(0,0,0,0.28)'
+    }
+    : titleStyle;
   const title: HdsNavigationTitle = {
     mainTitle: options.title,
     subTitle: options.subtitle
@@ -81,7 +99,7 @@ export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavi
   }
 
   const transparentBackground: HdsNavigationBackgroundStyle = {
-    backgroundColor: $r('app.color.yourtube_titlebar_bg'),
+    backgroundColor: useImmersiveContrast ? Color.Transparent : $r('app.color.yourtube_titlebar_bg'),
     maskExtraHeight: 0,
     blurRadius: 24
   };
@@ -99,10 +117,10 @@ export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavi
   const originalStyle: HdsNavigationTitleBarStyle = {
     backgroundStyle: transparentBackground,
     contentStyle: {
-      titleStyle,
-      menuStyle: iconStyle,
-      backIconStyle: iconStyle,
-      subIconStyle: iconStyle,
+      titleStyle: originalTitleStyle,
+      menuStyle: originalIconStyle,
+      backIconStyle: originalIconStyle,
+      subIconStyle: originalIconStyle,
       dividerStyle: transparentDivider
     }
   };
@@ -123,7 +141,9 @@ export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavi
   const style: TitleBarStyleOptions = {
     scrollEffectOpts: {
       enableScrollEffect: true,
-      scrollEffectType: ScrollEffectType.GRADIENT_BLUR
+      scrollEffectType: useImmersiveContrast
+        ? ScrollEffectType.IMMERSIVE_GRADIENT_BLUR
+        : ScrollEffectType.GRADIENT_BLUR
     },
     systemMaterialEffect,
     originalStyle,
