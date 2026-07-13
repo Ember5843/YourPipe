@@ -672,8 +672,6 @@ export struct VideoPlayer {
         .onDestroy(() => {
           Logger.info(TAG, 'XComponent onDestroy');
         })
-        // 0.5.1 路径：surface 按视频显示区域（aspectRatio）布局，再推 ohos-surface-size。
-        // 比 100% 铺满后在 VO 内 letterbox 更清晰（像素预算用在画面本身）。
         .aspectRatio(this.curSource.width && this.curSource.height ? this.curSource.width / this.curSource.height : 16 / 9)
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const pxWidth = Math.round(this.getUIContext().vp2px(Number(newArea.width)));

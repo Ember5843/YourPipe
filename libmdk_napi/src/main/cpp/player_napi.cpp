@@ -825,9 +825,9 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "vd-lavc-software-fallback", "yes");
         // Prefer ohcodec wrappers when multiple decoders exist for a codec.
         SetOptionString(ctx.mpv, "hwdec-codecs", "h264,hevc,vp8,vp9,av1");
-        // Balanced mobile defaults (0.5.1-compatible quality + thermal headroom):
-        // gpu-next + ohcodec-copy already uploads every frame to the GPU.
-        // bilinear is cheap; correct-downscaling=yes avoids mushy windowed scale.
+        // Thermal / power defaults for mobile OHOS:
+        // gpu-next + ohcodec-copy already uploads every frame to the GPU; keep
+        // libplacebo on the cheap path (bilinear, no deband/dither/HDR peak).
         // video-sync=audio avoids display-resample's extra GPU work.
         // framedrop=vo drops late frames instead of decoding every one under load.
         SetOptionString(ctx.mpv, "scale", "bilinear");
@@ -835,7 +835,7 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "dscale", "bilinear");
         SetOptionString(ctx.mpv, "dither", "no");
         SetOptionString(ctx.mpv, "deband", "no");
-        SetOptionString(ctx.mpv, "correct-downscaling", "yes");
+        SetOptionString(ctx.mpv, "correct-downscaling", "no");
         SetOptionString(ctx.mpv, "linear-downscaling", "no");
         SetOptionString(ctx.mpv, "sigmoid-upscaling", "no");
         SetOptionString(ctx.mpv, "hdr-compute-peak", "no");

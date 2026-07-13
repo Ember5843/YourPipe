@@ -91,16 +91,12 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       // Demuxer readahead only; leave demuxer-max-bytes at mpv defaults.
       ctrl.setProperty('demuxer-readahead-secs', `${demuxerReadaheadSecs}`);
 
-      // Seek + balanced render (aligned with 0.5.1 + light mobile defaults):
-      // bilinear is cheap on gpu-next/ohcodec-copy; avoid lanczos on phone.
-      // correct-downscaling keeps windowed downscale from looking mushy.
+      // Seek + thermal-friendly render (also set in native EnsureMpv).
       ctrl.setProperty('hr-seek', 'yes');
       ctrl.setProperty('hr-seek-framedrop', 'yes');
       ctrl.setProperty('scale', 'bilinear');
       ctrl.setProperty('cscale', 'bilinear');
       ctrl.setProperty('dscale', 'bilinear');
-      ctrl.setProperty('correct-downscaling', 'yes');
-      ctrl.setProperty('linear-downscaling', 'no');
       ctrl.setProperty('dither', 'no');
       ctrl.setProperty('deband', 'no');
       ctrl.setProperty('hdr-compute-peak', 'no');
