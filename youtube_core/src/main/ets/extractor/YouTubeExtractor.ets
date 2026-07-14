@@ -225,9 +225,10 @@ export class YouTubeExtractor {
   private cachedNextResponse: NextResponse | null = null;
   private cachedNextVideoId: string = '';
 
-  // Localization settings
-  public hl: string = 'en-GB';
-  public gl: string = 'US';
+  // Localization (defaults match Localization.DEFAULT / ContentCountry.DEFAULT;
+  // entry YouTubePlayService overwrites from SearchLocaleManager before each request).
+  public hl: string = 'en';
+  public gl: string = 'GB';
 
   constructor(context: common.UIAbilityContext) {
     this.context = context;
@@ -297,7 +298,9 @@ export class YouTubeExtractor {
    * @returns HTML string
    */
   async fetchWatchPage(videoId: string): Promise<string> {
-    const watchUrl = `https://www.youtube.com/watch?v=${videoId}&bpctr=9999999999&has_verified=1&hl=en`;
+    const hlParam = encodeURIComponent(this.hl || 'en');
+    const watchUrl =
+      `https://www.youtube.com/watch?v=${videoId}&bpctr=9999999999&has_verified=1&hl=${hlParam}`;
     logger.debug(`Fetching watch page: ${watchUrl}`);
 
     const response = await this.client.get(watchUrl);

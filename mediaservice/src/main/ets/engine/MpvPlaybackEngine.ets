@@ -201,7 +201,17 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // HLS (live or DVR replay): reconnect_at_eof 会让 FFmpeg 在每个 segment EOF 时死循环重连
     // 同一 URL，而非让 HLS demuxer 正常切换到下一个 segment。HLS 流必须禁用。
     const isHls = this.looksHls(this.sourceUrl);
-    if (isHls) {
+    const isLocalDash = this.sourceUrl.startsWith('http://127.0.0.1:')
+      && this.sourceUrl.indexOf('/manifest.mpd') >= 0;
+    if (isLocalDash) {
+      // A static MPD and each DASH fragment are finite resources. Their EOF is the normal
+      // resource boundary; reconnect_at_eof loops on the MPD forever before opening init/media.
+      ctrl.setProperty('demuxer-lavf-o',
+        'reconnect_at_eof=0,reconnect_streamed=0,reconnect_delay_max=3');
+      ctrl.setProperty('demuxer-readahead-secs', `${this.engineConfig.mpvDemuxerReadaheadSecs ?? 8}`);
+      ctrl.setProperty('cache-secs', `${this.engineConfig.mpvCacheSecs ?? 10}`);
+      Logger.info(TAG, 'Local DASH: EOF reconnect disabled');
+    } else if (isHls) {
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_delay_max=3');
       // HLS 需要更大的缓冲，使用用户配置的 2-3 倍
       const hlsReadaheadMultiplier = 3;

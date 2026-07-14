@@ -23,6 +23,7 @@ import {
 import { StreamInfo, SubtitleTrack, sabrSessionStore } from 'mediaservice';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
+import { SabrWebViewPoTokenProvider } from './SabrWebViewPoTokenProvider';
 
 const logger = AppLog.getInstance('YouTubePlayService');
 
@@ -91,7 +92,9 @@ export class YouTubePlayService {
     try {
       this.extractor = new YouTubeExtractor(this.context);
       await this.extractor.initialize();
+      this.syncExtractorLocale();
       sabrSessionStore.setHttpClient(this.extractor.getHttpClient());
+      sabrSessionStore.setPoTokenProvider(SabrWebViewPoTokenProvider.getInstance());
       logger.info(`${TAG} YouTubePlayService initialized`);
     } catch (e) {
       this.extractor = undefined;
@@ -101,11 +104,28 @@ export class YouTubePlayService {
     }
   }
 
+  /** Apply settings → extractor hl/gl + HTTP client Accept-Language. */
+  private syncExtractorLocale(): void {
+    if (!this.extractor) {
+      return;
+    }
+    const bundle = SearchLocaleManager.getSearchLocaleBundle();
+    const hl = bundle.localization.getLanguageCode();
+    const gl = bundle.contentCountry.getCountryCode();
+    this.extractor.hl = hl;
+    this.extractor.gl = gl;
+    const httpClient = this.extractor.getHttpClient();
+    httpClient.setLocalization(bundle.localization);
+    httpClient.setContentCountry(bundle.contentCountry);
+    logger.info(`${TAG} locale synced hl=${hl} gl=${gl}`);
+  }
+
   /**
    * 获取视频评论
    */
   async fetchComments(videoId: string, nextPageToken: string | null = null): Promise<CommentResponse> {
     if (!this.extractor) await this.initialize();
+    this.syncExtractorLocale();
     return await this.extractor!.fetchComments(videoId, nextPageToken);
   }
 
@@ -114,12 +134,14 @@ export class YouTubePlayService {
    */
   async fetchCommentReplies(replyContinuation: string): Promise<CommentResponse> {
     if (!this.extractor) await this.initialize();
+    this.syncExtractorLocale();
     return await this.extractor!.fetchCommentReplies(replyContinuation);
   }
 
   async refreshStreams(videoId: string): Promise<YouTubePlayResult> {
     logger.info(`${TAG} refreshStreams() called for ${videoId}`);
     if (!this.extractor) await this.initialize();
+    this.syncExtractorLocale();
 
     try {
       const videoInfo = await this.extractor!.extractVideoStreams(videoId);
@@ -192,6 +214,7 @@ export class YouTubePlayService {
 
   async fetchPlaybackExtras(videoId: string): Promise<VideoInfo | null> {
     if (!this.extractor) await this.initialize();
+    this.syncExtractorLocale();
     try {
       return await this.extractor!.fetchPlaybackExtras(videoId);
     } catch (e) {
@@ -202,6 +225,7 @@ export class YouTubePlayService {
 
   async fetchPlaybackExtrasFor(videoInfo: VideoInfo): Promise<VideoInfo | null> {
     if (!this.extractor) await this.initialize();
+    this.syncExtractorLocale();
     try {
       return await this.extractor!.fetchPlaybackExtras(videoInfo.videoId, videoInfo.playerResponse);
     } catch (e) {
@@ -214,14 +238,7 @@ export class YouTubePlayService {
     logger.info(`${TAG} play() called for ${videoIdOrUrl}`);
     if (!this.extractor) await this.initialize();
 
-    // Sync localization settings from AppStorage before extracting streams
-    if (this.extractor) {
-      const uiConfig = AppStorage.get('uiConfig') as Record<string, string> | undefined;
-      if (uiConfig) {
-        this.extractor.hl = SearchLocaleManager.resolveSearchLanguage();
-        this.extractor.gl = SearchLocaleManager.resolveSearchCountry();
-      }
-    }
+    this.syncExtractorLocale();
 
     const videoId = this.extractVideoId(videoIdOrUrl);
     if (!videoId) {

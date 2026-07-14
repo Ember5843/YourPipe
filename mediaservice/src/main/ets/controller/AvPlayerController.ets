@@ -849,7 +849,9 @@ export class AvPlayerController {
         return '';
       }
       this.currentLocalMediaSessionId = sessionId;
-      return this.composeDualEdl(playbackUrl, video, audio, resolvedDuration);
+      // SABR is exposed as a synthetic DASH manifest with exact init/media segment URLs.
+      // MPV remains the DASH demuxer/player; the proxy owns segment demand, seeks and EOF.
+      return playbackUrl;
     } catch (e) {
       Logger.error(TAG, `buildSabrDualEdlUrl failed: ${e}`);
       return '';

@@ -7,7 +7,7 @@
  */
 
 export interface PlaybackPreferencesSnapshot {
-  /** UI 偏好语言，用于字幕语言匹配，例如 "en-GB"。 */
+  /** Content language for subtitle matching (YouTube hl), e.g. "zh-CN" / "en". */
   searchLanguage: string;
   /** 默认清晰度上限：'best' | '1080p' | '720p' | '480p' | '360p' | '240p' | '144p' */
   defaultQuality: string;
@@ -17,8 +17,9 @@ export interface PlaybackPreferencesSnapshot {
 
 export type PlaybackPreferencesProvider = () => PlaybackPreferencesSnapshot;
 
+/** Fallback only when entry has not injected a provider yet. */
 const DEFAULT_SNAPSHOT: PlaybackPreferencesSnapshot = {
-  searchLanguage: 'en-GB',
+  searchLanguage: 'en',
   defaultQuality: 'best',
   mobileQuality: '480p',
 };

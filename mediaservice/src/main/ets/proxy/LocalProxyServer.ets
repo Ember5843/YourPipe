@@ -4,6 +4,7 @@ import { sessionStore, DashSession } from './SessionStore';
 import { parseInputJson } from './InputParser';
 import { serveRange } from './RangeProxy';
 import { serveSabrRange } from '../sabr/SabrProxyServe';
+import { buildSabrDashManifest, serveSabrDashSegment } from '../sabr/SabrDashProxy';
 import { sabrSessionStore } from '../sabr/SabrSessionStore';
 import Logger from '../utils/Logger';
 
@@ -111,6 +112,33 @@ async function routeRequest(
   session: DashSession
 ): Promise<void> {
   const segment = parts[2];
+
+  if (session.type === 'sabr-dual' && segment === 'manifest.mpd') {
+    const manifest = buildSabrDashManifest(session);
+    if (!manifest) {
+      await sendText(conn, 500, 'Internal Server Error', 'text/plain', 'SABR manifest unavailable');
+      return;
+    }
+    await sendText(conn, 200, 'OK', 'application/dash+xml', method === 'HEAD' ? '' : manifest);
+    return;
+  }
+
+  // Exact DASH segment facade: /session/{id}/sabr/{video|audio}/{init|sequence}.
+  // EOF is decided by SABR metadata in readSegment, not inferred from a short byte-range body.
+  if (session.type === 'sabr-dual' && segment === 'sabr' && parts.length >= 5) {
+    const track = parts[3];
+    const segmentName = parts[4];
+    if (track === 'video' && session.sabrVideoBuffer) {
+      await serveSabrDashSegment(conn, session.sabrVideoBuffer, segmentName,
+        session.video.mimeType || 'video/mp4', method === 'HEAD');
+      return;
+    }
+    if (track === 'audio' && session.sabrAudioBuffer) {
+      await serveSabrDashSegment(conn, session.sabrAudioBuffer, segmentName,
+        session.audio.mimeType || 'audio/mp4', method === 'HEAD');
+      return;
+    }
+  }
 
   if (session.type === 'sabr-dual' && parts.length >= 4) {
     const idx = parseInt(parts[3], 10) || 0;
@@ -274,6 +302,7 @@ export class LocalProxyServer {
     if (!session) return '';
     const base = `http://127.0.0.1:${this.port}/session/${sessionId}`;
     if (session.type === 'single') return `${base}/resource/main`;
+    if (session.type === 'sabr-dual') return `${base}/manifest.mpd`;
     return base;
   }
 }

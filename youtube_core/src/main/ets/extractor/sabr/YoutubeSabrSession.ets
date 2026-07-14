@@ -45,6 +45,10 @@ export class YoutubeSabrSession {
   /** Serialize pumps — concurrent A/V ensureReady must not dual-fire rn=1. */
   private pumpBusy: boolean = false;
   private pumpWaiters: Array<() => void> = [];
+  /** Server-requested cooldown (Date.now() deadline). Honored before every POST. */
+  private backoffUntilMs: number = 0;
+  private consecutiveNoMedia: number = 0;
+  private poTokenWarmup?: Promise<boolean>;
 
   constructor(
     info: YoutubeSabrInfo,
@@ -112,6 +116,39 @@ export class YoutubeSabrSession {
     return keys;
   }
 
+  /** Remaining server backoff ms (0 if clear). */
+  getBackoffRemainingMs(): number {
+    return Math.max(0, this.backoffUntilMs - Date.now());
+  }
+
+  isInBackoff(): boolean {
+    return this.getBackoffRemainingMs() > 0;
+  }
+
+  /** True only when initialization metadata proves the requested media sequence is past EOF. */
+  isBeyondEnd(request: SabrSegmentRequest): boolean {
+    if (request.initSegment) {
+      return false;
+    }
+    const format = request.itag === this.audioFormat.itag ? this.audioFormat
+      : (request.itag === this.videoFormat.itag ? this.videoFormat : undefined);
+    if (!format) {
+      return false;
+    }
+    const endSegment = this.streamState.getEndSegment(format);
+    return endSegment > 0 && request.sequenceNumber > endSegment;
+  }
+
+  isComplete(requestItag?: number): boolean {
+    if (requestItag === this.audioFormat.itag) {
+      return this.streamState.isComplete(this.audioFormat);
+    }
+    if (requestItag === this.videoFormat.itag) {
+      return this.streamState.isComplete(this.videoFormat);
+    }
+    return this.streamState.isComplete();
+  }
+
   /**
    * Ensure a segment is available (init or media sequence). Pumps the session until found or budget spent.
    */
@@ -123,8 +160,30 @@ export class YoutubeSabrSession {
     if (cached) {
       return cached;
     }
+    if (this.isBeyondEnd(request)) {
+      throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`);
+    }
+
+    // A DASH reader requests the target segment directly on seek. Move SABR's reported
+    // contiguous edge near that target instead of downloading the skipped span first.
+    const requestFormat = request.itag === this.audioFormat.itag ? this.audioFormat
+      : (request.itag === this.videoFormat.itag ? this.videoFormat : undefined);
+    const requestTargetMs = !request.initSegment && requestFormat
+      ? this.streamState.getSegmentStartMs(requestFormat, request.sequenceNumber) : 0;
+    const cachedTailSequence = request.initSegment ? 0 : this.getMaxCachedSequence(request.itag);
+    // DASH normally asks for the segment immediately after the cached tail as read-ahead.
+    // Audio segments are about 10s long, so a time-only +8s test misclassified every normal
+    // audio prefetch as a seek and reset both tracks. A real forward seek skips sequence numbers.
+    const sequentialReadAhead = cachedTailSequence > 0
+      && request.sequenceNumber <= cachedTailSequence + 1;
+    if (requestFormat
+      && !sequentialReadAhead
+      && requestTargetMs > this.streamState.getBufferedEndMs(requestFormat) + 8000) {
+      this.prepareForForwardJump(requestTargetMs);
+    }
 
     let policyOnly = 0;
+    let holeRecoveryApplied = false;
     for (let attempt = 0; attempt < MAX_REQUESTS_PER_SEGMENT; attempt++) {
       if (this.closed) {
         throw new SabrProtocolException('SABR session closed');
@@ -134,6 +193,9 @@ export class YoutubeSabrSession {
       if (hit) {
         return hit;
       }
+      if (this.isBeyondEnd(request)) {
+        throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`);
+      }
       if (decoded.sabrError) {
         throw new SabrProtocolException(
           `SABR error while fetching ${request.cacheKey()}: ${decoded.sabrError}`);
@@ -142,14 +204,30 @@ export class YoutubeSabrSession {
         throw new SabrProtocolException(
           `SABR reload requested (not auto-reprobed yet): ${decoded.summarizeNoMediaResponse()}`);
       }
+      // SABR can send later segments while leaving the exact requested sequence as a hole.
+      // Rewind the advertised range once so the server is told honestly to refill that hole.
+      const observedAheadHole = !request.initSegment && this.hasCachedMediaAfter(request);
+      if (!request.initSegment && requestFormat && !holeRecoveryApplied
+        && (observedAheadHole
+          || requestTargetMs + 500 < this.streamState.getBufferedEndMs(requestFormat))) {
+        holeRecoveryApplied = true;
+        if (observedAheadHole) {
+          this.backoffUntilMs = 0;
+          this.consecutiveNoMedia = 0;
+          this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
+        } else {
+          this.prepareForRewind(requestTargetMs);
+        }
+        logger.info(`[SABR] recover hole itag=${request.itag} seq=${request.sequenceNumber} `
+          + `targetMs=${requestTargetMs} observedAhead=${observedAheadHole}`);
+        continue;
+      }
       if (decoded.isProtectionBoundaryNoMediaResponse()) {
         const applied = await this.applyPoTokenForProtectedResponse();
         if (!applied) {
+          // No PO yet: stop immediately. Caller must serve cache / wait, not free-pump.
           throw new SabrProtocolException(
             `SABR protected no-media: ${decoded.summarizeNoMediaResponse()}`);
-        }
-        if (decoded.backoffTimeMs > 0) {
-          await sleepMs(Math.min(decoded.backoffTimeMs, MAX_BACKOFF_MS));
         }
         continue;
       }
@@ -159,13 +237,11 @@ export class YoutubeSabrSession {
           throw new SabrProtocolException(
             `SABR repeated policy-only responses: ${decoded.summarizeNoMediaResponse()}`);
         }
-        if (decoded.backoffTimeMs > 0) {
-          await sleepMs(Math.min(decoded.backoffTimeMs, MAX_BACKOFF_MS));
-        }
         continue;
       }
-      if (decoded.backoffTimeMs > 0) {
-        await sleepMs(Math.min(decoded.backoffTimeMs, 2000));
+      if (this.consecutiveNoMedia >= MAX_POLICY_ONLY_RESPONSES && decoded.isNoMediaResponse()) {
+        throw new SabrProtocolException(
+          `SABR repeated no-media: ${decoded.summarizeNoMediaResponse()}`);
       }
     }
     throw new SabrProtocolException(`SABR segment not available: ${request.cacheKey()}`);
@@ -197,7 +273,13 @@ export class YoutubeSabrSession {
     if (this.closed) {
       throw new SabrProtocolException('SABR session closed');
     }
-    await this.maybeApplyPoToken(false);
+
+    // Always honor server backoff before the next POST (prevents rn++ storm).
+    const waitMs = this.getBackoffRemainingMs();
+    if (waitMs > 0) {
+      logger.info(`[SABR] honor backoff ${waitMs}ms before rn=${this.requestNumber + 1}`);
+      await sleepMs(Math.min(waitMs, MAX_BACKOFF_MS));
+    }
 
     const isFirst = this.requestNumber === 0
       && !this.streamState.isInitialized(this.audioFormat)
@@ -246,30 +328,59 @@ export class YoutubeSabrSession {
     }
     this.evictCacheIfNeeded();
 
-    if (decoded.isProtectionBoundaryNoMediaResponse()) {
-      await this.applyPoTokenForProtectedResponse();
-    }
     if (decoded.segments.length > 0) {
       this.redirectCount = 0;
       this.poTokenRefreshes = 0;
+      this.consecutiveNoMedia = 0;
+      this.backoffUntilMs = 0;
+      if (decoded.streamProtectionStatus >= 2 && !this.streamState.getRawPoToken()) {
+        this.startPoTokenWarmup();
+      }
+    } else {
+      this.consecutiveNoMedia++;
+      this.scheduleBackoff(decoded.backoffTimeMs);
     }
 
     logger.info(`[SABR] pump segments=${decoded.segments.length} `
       + `cache=${this.segmentCache.size}/${this.cachedBytes} `
+      + `seq=${summarizeSegmentSequences(decoded)} `
       + `protection=${decoded.streamProtectionStatus} `
       + `policy=${decoded.nextRequestPolicy?.summarize() || 'none'} `
-      + `reload=${decoded.reloadRequested}`);
+      + `reload=${decoded.reloadRequested} noMedia=${this.consecutiveNoMedia}`);
     return decoded;
   }
 
+  private scheduleBackoff(serverMs: number): void {
+    let ms = serverMs > 0 ? serverMs : 0;
+    if (ms <= 0 && this.consecutiveNoMedia > 0) {
+      // Floor when server says nothing but keeps returning empty (avoid spin).
+      ms = Math.min(500 * this.consecutiveNoMedia, 2000);
+    }
+    if (ms <= 0) {
+      return;
+    }
+    const capped = Math.min(ms, MAX_BACKOFF_MS);
+    const until = Date.now() + capped;
+    if (until > this.backoffUntilMs) {
+      this.backoffUntilMs = until;
+      logger.info(`[SABR] schedule backoff ${capped}ms (until=${this.backoffUntilMs})`);
+    }
+  }
+
   prepareForRewind(targetMs: number): void {
+    this.backoffUntilMs = 0;
+    this.consecutiveNoMedia = 0;
     this.streamState.prepareForSeek(targetMs);
     this.evictOutsideWindow(targetMs);
   }
 
   prepareForForwardJump(targetMs: number): void {
+    this.backoffUntilMs = 0;
+    this.consecutiveNoMedia = 0;
     this.streamState.prepareForSeek(targetMs);
     this.evictOutsideWindow(targetMs);
+    this.setPlayHeadMs(targetMs);
+    logger.info(`[SABR] prepare seek targetMs=${Math.floor(targetMs)}`);
   }
 
   private ingestAndCacheSegment(segment: SabrMediaSegment): void {
@@ -313,6 +424,31 @@ export class YoutubeSabrSession {
       this.segmentCache.delete(key);
       this.cachedBytes -= segment.getLength();
     }
+  }
+
+  private hasCachedMediaAfter(request: SabrSegmentRequest): boolean {
+    if (request.initSegment) {
+      return false;
+    }
+    let found = false;
+    this.segmentCache.forEach((segment: SabrMediaSegment) => {
+      if (segment.header.itag === request.itag && !segment.header.initSegment
+        && segment.header.sequenceNumber > request.sequenceNumber) {
+        found = true;
+      }
+    });
+    return found;
+  }
+
+  private getMaxCachedSequence(itag: number): number {
+    let maxSequence = 0;
+    this.segmentCache.forEach((segment: SabrMediaSegment) => {
+      if (segment.header.itag === itag && !segment.header.initSegment
+        && segment.header.sequenceNumber > maxSequence) {
+        maxSequence = segment.header.sequenceNumber;
+      }
+    });
+    return maxSequence;
   }
 
   private evictOutsideWindow(targetMs: number): void {
@@ -388,6 +524,12 @@ export class YoutubeSabrSession {
   }
 
   private async applyPoTokenForProtectedResponse(): Promise<boolean> {
+    if (this.poTokenWarmup) {
+      const warmed = await this.poTokenWarmup;
+      if (warmed || !!this.streamState.getRawPoToken()) {
+        return true;
+      }
+    }
     if (await this.maybeApplyPoToken(false)) {
       return true;
     }
@@ -397,6 +539,39 @@ export class YoutubeSabrSession {
     }
     return false;
   }
+
+  private startPoTokenWarmup(): void {
+    if (this.poTokenWarmup || this.streamState.getRawPoToken() || !this.poTokenProvider) {
+      return;
+    }
+    logger.info('[SABR] PO token warmup started');
+    this.poTokenWarmup = this.maybeApplyPoToken(false).then((applied: boolean): boolean => {
+      this.poTokenWarmup = undefined;
+      return applied;
+    }).catch((e: Error): boolean => {
+      this.poTokenWarmup = undefined;
+      logger.warn('[SABR] PO token warmup failed:', e);
+      return false;
+    });
+  }
+}
+
+function summarizeSegmentSequences(decoded: SabrDecodedResponse): string {
+  const byItag: Map<number, number[]> = new Map();
+  for (const segment of decoded.segments) {
+    if (segment.header.initSegment || segment.header.sequenceNumber < 0) {
+      continue;
+    }
+    const values = byItag.get(segment.header.itag) ?? [];
+    values.push(segment.header.sequenceNumber);
+    byItag.set(segment.header.itag, values);
+  }
+  const groups: string[] = [];
+  byItag.forEach((values: number[], itag: number) => {
+    values.sort((a: number, b: number): number => a - b);
+    groups.push(`${itag}:${values.join(',')}`);
+  });
+  return groups.length > 0 ? groups.join('|') : '-';
 }
 
 function toUint8Array(result: Object | string | ArrayBuffer | undefined): Uint8Array {

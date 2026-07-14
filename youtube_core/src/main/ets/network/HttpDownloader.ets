@@ -362,6 +362,27 @@ export class HttpDownloader {
   }
 
   /**
+   * Build Accept-Language without duplicating region when language already has one
+   * (e.g. hl=zh-CN + gl=CN must not become zh-CN-CN).
+   */
+  private buildAcceptLanguage(localization: Localization): string {
+    const langCode = (localization.getLanguageCode() || '').trim();
+    if (!langCode) {
+      return 'en';
+    }
+    const countryCode = (localization.getCountryCode() || '').trim();
+    if (!countryCode) {
+      return langCode;
+    }
+    // Language tag already contains a region/script suffix (zh-CN, en-GB, es-419, sr-Latn).
+    if (langCode.indexOf('-') >= 0) {
+      const primary = langCode.split('-')[0];
+      return `${langCode},${primary};q=0.9`;
+    }
+    return `${langCode}-${countryCode},${langCode};q=0.9`;
+  }
+
+  /**
    * 处理请求头（合并默认头、添加 Accept-Language）
    */
   public processHeaders(
@@ -373,12 +394,7 @@ export class HttpDownloader {
 
     // 添加本地化头（Accept-Language）
     if (localization) {
-      const langCode = localization.getLanguageCode()
-      const countryCode = localization.getCountryCode()
-      const acceptLanguage = countryCode
-        ? `${langCode}-${countryCode},${langCode};q=0.9`
-        : langCode
-      headers['Accept-Language'] = acceptLanguage
+      headers['Accept-Language'] = this.buildAcceptLanguage(localization);
     }
     // 合并自定义头（覆盖默认头）
     if (customHeaders) {
@@ -533,11 +549,7 @@ export class HttpDownloader {
   ): Record<string, string | string[]> {
     const headers: Record<string, string | string[]> = {};
     if (localization) {
-      const langCode = localization.getLanguageCode();
-      const countryCode = localization.getCountryCode();
-      headers['Accept-Language'] = countryCode
-        ? `${langCode}-${countryCode},${langCode};q=0.9`
-        : langCode;
+      headers['Accept-Language'] = this.buildAcceptLanguage(localization);
     }
     if (customHeaders) {
       Object.keys(customHeaders).forEach((key: string) => {

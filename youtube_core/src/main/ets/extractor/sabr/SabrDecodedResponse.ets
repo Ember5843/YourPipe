@@ -52,15 +52,24 @@ export class SabrContextSendingPolicy {
 }
 
 export class SabrFormatInitMeta {
+  videoId?: string;
   itag: number = -1;
   lastModified: number = -1;
   xtags?: string;
   endTimeMs: number = -1;
   endSegmentNumber: number = -1;
   mimeType?: string;
+  initRangeStart: number = -1;
+  initRangeEnd: number = -1;
+  indexRangeStart: number = -1;
+  indexRangeEnd: number = -1;
+  field8: number = -1;
+  durationUnits: number = -1;
+  durationTimescale: number = -1;
 
   summarize(): string {
-    return `itag=${this.itag} endMs=${this.endTimeMs} endSeq=${this.endSegmentNumber}`;
+    return `itag=${this.itag} endMs=${this.endTimeMs} endSeq=${this.endSegmentNumber} `
+      + `duration=${this.durationUnits}/${this.durationTimescale}`;
   }
 }
 

@@ -1,5 +1,6 @@
 import {
   SabrMediaSegment,
+  SabrPoTokenProvider,
   SabrSegmentRequest,
   YoutubeSabrFormatMeta,
   YoutubeSabrInfo,
@@ -32,9 +33,14 @@ export interface SabrLease {
 class SabrSessionStoreImpl {
   private leases: Map<string, SabrLease> = new Map();
   private httpClient?: YouTubeHttpClient;
+  private poTokenProvider?: SabrPoTokenProvider;
 
   setHttpClient(client: YouTubeHttpClient): void {
     this.httpClient = client;
+  }
+
+  setPoTokenProvider(provider?: SabrPoTokenProvider): void {
+    this.poTokenProvider = provider;
   }
 
   makeKey(videoId: string, audioItag: number, videoItag: number): string {
@@ -58,7 +64,7 @@ class SabrSessionStoreImpl {
       throw new Error('SabrSessionStore: YouTubeHttpClient not set');
     }
     const session = new YoutubeSabrSession(
-      info, audioFormat, videoFormat, this.httpClient, undefined, useAuth);
+      info, audioFormat, videoFormat, this.httpClient, this.poTokenProvider, useAuth);
     const lease: SabrLease = {
       key: key,
       session: session,

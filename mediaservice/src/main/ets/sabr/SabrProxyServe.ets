@@ -39,35 +39,48 @@ export async function serveSabrRange(
     }
   }
 
-  // Cap single response to 2MB to force progressive pump without huge allocations
-  const MAX_CHUNK = 2 * 1024 * 1024;
+  // Keep individual reads small. MPV opens the EDL video input before audio; a large first
+  // read can otherwise block on several SABR pumps and delay audio-track probing for seconds.
+  const MAX_CHUNK = 256 * 1024;
   if (end < 0) {
     end = start + MAX_CHUNK - 1;
   } else if (end - start + 1 > MAX_CHUNK) {
     end = start + MAX_CHUNK - 1;
   }
 
+  // Do not 416 before readRange — cold-seek may remap absurd lavf offsets.
   const data = await buffer.readRange(start, end);
-  if (data.length === 0 && start > 0) {
-    // Beyond known data — 416 or empty
-    const known = buffer.getContentLength();
-    if (known > 0 && start >= known) {
-      const hdr = `HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */${known}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`;
+  const knownLen = buffer.getContentLength();
+
+  if (data.length === 0) {
+    // Still empty after pump/seek: open-ended empty 206 keeps demuxer alive better than 416
+    // when protection stalls mid-stream.
+    if (isRange || start > 0) {
+      const totalStr = knownLen > 0 ? String(knownLen) : '*';
+      const hdr = `HTTP/1.1 206 Partial Content\r\n`
+        + `Content-Type: ${mimeType || 'application/octet-stream'}\r\n`
+        + `Accept-Ranges: bytes\r\n`
+        + `Content-Range: bytes ${start}-${Math.max(0, start - 1)}/${totalStr}\r\n`
+        + `Content-Length: 0\r\n`
+        + `Connection: close\r\n\r\n`;
+      Logger.warn(TAG, `serve empty itag=${buffer.getItag()} range=${start}- known=${knownLen}`);
       await conn.send({ data: encodeText(hdr) });
       return;
     }
   }
 
-  const actualEnd = start + Math.max(0, data.length) - 1;
-  const knownLen = buffer.getContentLength();
-  const totalStr = knownLen > actualEnd ? String(knownLen) : '*';
+  // After cold-seek remaps absurd offsets, the bytes returned are from the post-seek window
+  // (starting near init). Report that window so Content-Range stays self-consistent.
+  const serveStart = (data.length > 0 && knownLen > 0 && start >= knownLen) ? 0 : start;
+  const actualEnd = serveStart + Math.max(0, data.length) - 1;
+  const totalStr = knownLen > 0 ? String(Math.max(knownLen, actualEnd + 1)) : '*';
 
   let header: string;
-  if (isRange || start > 0) {
+  if (isRange || serveStart > 0) {
     header = `HTTP/1.1 206 Partial Content\r\n`
       + `Content-Type: ${mimeType || 'application/octet-stream'}\r\n`
       + `Accept-Ranges: bytes\r\n`
-      + `Content-Range: bytes ${start}-${Math.max(start, actualEnd)}/${totalStr}\r\n`
+      + `Content-Range: bytes ${serveStart}-${Math.max(serveStart, actualEnd)}/${totalStr}\r\n`
       + `Content-Length: ${data.length}\r\n`
       + `Connection: close\r\n\r\n`;
   } else {
@@ -78,10 +91,10 @@ export async function serveSabrRange(
       + `Connection: close\r\n\r\n`;
   }
 
-  Logger.info(TAG, `serve itag=${buffer.getItag()} range=${start}-${actualEnd} len=${data.length} known=${knownLen}`);
+  Logger.info(TAG, `serve itag=${buffer.getItag()} req=${start} serve=${serveStart}-${actualEnd} `
+    + `len=${data.length} known=${knownLen}`);
   await conn.send({ data: encodeText(header) });
   if (data.length > 0) {
-    // Send body in chunks
     const body = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
     await conn.send({ data: body });
   }

@@ -124,8 +124,15 @@ export struct PlaylistDetailPage {
           this.totalCountText = result.totalCountText;
         }
       } else {
-        const fallback = await this.rssFallbackService.fetchPlaylistVideos(playlistId, this.playlist.name || playlistId);
-        this.videoList = fallback;
+        // RSS is a best-effort fallback; many playlists (private/Music/new layouts) return 404.
+        try {
+          const fallback = await this.rssFallbackService.fetchPlaylistVideos(
+            playlistId, this.playlist.name || playlistId);
+          this.videoList = fallback;
+        } catch (rssErr) {
+          logger.error('RSS playlist fallback failed:', JSON.stringify(rssErr));
+          this.videoList = [];
+        }
         this.nextPageToken = null;
         this.visitorData = '';
       }

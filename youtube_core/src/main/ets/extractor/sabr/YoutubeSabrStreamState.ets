@@ -8,6 +8,7 @@ import {
 import { SabrMediaHeader } from './SabrMediaHeader';
 import { SabrMediaSegment } from './SabrMediaSegment';
 import { YoutubeSabrFormatMeta } from './YoutubeSabrInfo';
+import { parseMp4SegmentIndex, SabrSegmentIndex } from './SabrMp4SegmentIndex';
 
 export const SABR_TRACK_BOTH = 0;
 export const SABR_TRACK_AUDIO_ONLY = 1;
@@ -17,10 +18,17 @@ class FormatProgress {
   format: YoutubeSabrFormatMeta;
   initReceived: boolean = false;
   firstSequence: number = -1;
-  lastSequence: number = -1;
+  /** Highest sequence received without a hole from sequence 1. */
+  lastSequence: number = 0;
   startTimeMs: number = 0;
   bufferedEndMs: number = 0;
   lastDurationMs: number = 0;
+  endSegmentNumber: number = -1;
+  endTimeMs: number = -1;
+  averageDurationMs: number = 5000;
+  private aheadSegments: Map<number, number> = new Map();
+  private metadata?: SabrFormatInitMeta;
+  private segmentIndex?: SabrSegmentIndex;
 
   constructor(format: YoutubeSabrFormatMeta) {
     this.format = format;
@@ -32,11 +40,22 @@ class FormatProgress {
       return true;
     }
     if (header.sequenceNumber >= 0) {
-      if (this.firstSequence < 0) {
+      if (this.firstSequence < 0 || header.sequenceNumber < this.firstSequence) {
         this.firstSequence = header.sequenceNumber;
       }
-      if (header.sequenceNumber > this.lastSequence) {
+      if (header.sequenceNumber === this.lastSequence + 1) {
         this.lastSequence = header.sequenceNumber;
+      } else if (header.sequenceNumber > this.lastSequence + 1) {
+        this.aheadSegments.set(header.sequenceNumber,
+          header.startMs + Math.max(0, header.durationMs));
+      }
+      while (this.aheadSegments.has(this.lastSequence + 1)) {
+        this.lastSequence++;
+        const promotedEnd = this.aheadSegments.get(this.lastSequence) ?? 0;
+        this.aheadSegments.delete(this.lastSequence);
+        if (promotedEnd > this.bufferedEndMs) {
+          this.bufferedEndMs = promotedEnd;
+        }
       }
     }
     if (header.startMs >= 0) {
@@ -44,7 +63,7 @@ class FormatProgress {
         this.startTimeMs = Math.min(this.startTimeMs || header.startMs, header.startMs);
       }
       const end = header.startMs + Math.max(0, header.durationMs);
-      if (end > this.bufferedEndMs) {
+      if (header.sequenceNumber <= this.lastSequence && end > this.bufferedEndMs) {
         this.bufferedEndMs = end;
       }
       if (header.durationMs > 0) {
@@ -56,25 +75,47 @@ class FormatProgress {
   }
 
   observeSegment(segment: SabrMediaSegment): boolean {
-    return this.observeHeader(segment.header);
+    const changed = this.observeHeader(segment.header);
+    if (segment.header.initSegment && !this.segmentIndex) {
+      const mime = this.metadata?.mimeType ?? this.format.mimeType ?? '';
+      if (mime.indexOf('mp4') >= 0) {
+        try {
+          this.segmentIndex = parseMp4SegmentIndex(segment.data,
+            this.metadata?.indexRangeStart ?? -1, this.metadata?.indexRangeEnd ?? -1);
+          if (this.endSegmentNumber <= 0) {
+            this.endSegmentNumber = this.segmentIndex.size();
+          }
+          return true;
+        } catch (_) {
+          // Keep the duration/count fallback for formats whose init data has no SIDX.
+        }
+      }
+    }
+    return changed;
   }
 
   observeMetadata(meta: SabrFormatInitMeta): boolean {
-    if (meta.endTimeMs > this.bufferedEndMs) {
-      this.bufferedEndMs = meta.endTimeMs;
-    }
-    if (meta.endSegmentNumber > this.lastSequence) {
-      this.lastSequence = meta.endSegmentNumber;
+    // This is the resource boundary, not download progress. Advertising it as buffered makes
+    // YouTube correctly stop sending media after the first response.
+    this.metadata = meta;
+    this.endTimeMs = meta.endTimeMs;
+    this.endSegmentNumber = meta.endSegmentNumber;
+    if (meta.durationUnits > 0 && meta.durationTimescale > 0 && meta.endSegmentNumber > 0) {
+      const totalMs = meta.durationUnits * 1000 / meta.durationTimescale;
+      this.averageDurationMs = Math.max(1, Math.floor(totalMs / meta.endSegmentNumber));
+    } else if (meta.endSegmentNumber > 0 && (this.format.approxDurationMs ?? 0) > 0) {
+      this.averageDurationMs = Math.max(1,
+        Math.floor((this.format.approxDurationMs ?? 0) / meta.endSegmentNumber));
     }
     return true;
   }
 
   addBufferedRange(ranges: SabrBufferedRange[]): void {
-    if (!this.initReceived && this.lastSequence < 0) {
+    if (!this.initReceived || this.lastSequence <= 0) {
       return;
     }
     const startSeq = this.firstSequence >= 0 ? this.firstSequence : 0;
-    const endSeq = this.lastSequence >= 0 ? this.lastSequence : 0;
+    const endSeq = this.lastSequence;
     const duration = Math.max(0, this.bufferedEndMs - this.startTimeMs);
     ranges.push(SabrBufferedRange.fromProgress(
       this.format,
@@ -95,7 +136,73 @@ class FormatProgress {
     }
     // Soft reset sequence tracking near seek target; next headers re-fill.
     this.firstSequence = -1;
-    this.lastSequence = -1;
+    this.lastSequence = Math.max(0, this.getSegmentNumberAtOrAfterTimeMs(targetMs) - 1);
+    this.aheadSegments.clear();
+  }
+
+  /**
+   * Cold seek: claim everything before target as buffered so the server streams
+   * from target instead of filling the skipped span (PipePipe jumpBufferedTo).
+   */
+  jumpTo(targetMs: number): void {
+    const t = Math.max(0, targetMs);
+    if (t > this.bufferedEndMs) {
+      this.bufferedEndMs = t;
+    } else {
+      this.bufferedEndMs = t;
+    }
+    this.startTimeMs = 0;
+    const endSeq = Math.max(0, this.getSegmentNumberAtOrAfterTimeMs(t) - 1);
+    this.firstSequence = endSeq > 0 ? 1 : -1;
+    this.lastSequence = endSeq;
+    this.aheadSegments.clear();
+  }
+
+  getEndSegmentNumber(): number {
+    return this.endSegmentNumber;
+  }
+
+  getSegmentStartMs(sequenceNumber: number): number {
+    if (sequenceNumber <= 1) {
+      return 0;
+    }
+    const indexed = this.segmentIndex?.getEntry(sequenceNumber);
+    if (indexed) {
+      return indexed.startMs;
+    }
+    return Math.max(0, sequenceNumber - 1) * this.averageDurationMs;
+  }
+
+  getSegmentEndMs(sequenceNumber: number): number {
+    const indexed = this.segmentIndex?.getEntry(sequenceNumber);
+    if (indexed) {
+      return indexed.getEndMs();
+    }
+    if (sequenceNumber <= 0) {
+      return -1;
+    }
+    return sequenceNumber * this.averageDurationMs;
+  }
+
+  getSegmentNumberAtOrAfterTimeMs(timeMs: number): number {
+    if (timeMs <= 0) {
+      return 1;
+    }
+    if (this.segmentIndex) {
+      for (let sequence = 1; sequence <= this.segmentIndex.size(); sequence++) {
+        const entry = this.segmentIndex.getEntry(sequence);
+        if (entry && entry.getEndMs() > timeMs) {
+          return sequence;
+        }
+      }
+      return Math.max(1, this.segmentIndex.size() + 1);
+    }
+    return Math.max(1, Math.floor(timeMs / Math.max(1, this.averageDurationMs)) + 1);
+  }
+
+  isComplete(): boolean {
+    return this.initReceived && this.endSegmentNumber >= 0
+      && this.lastSequence >= this.endSegmentNumber;
   }
 }
 
@@ -228,6 +335,40 @@ export class YoutubeSabrStreamState {
     return Math.min(this.audio.getBufferedEndMs(), this.video.getBufferedEndMs());
   }
 
+  getBufferedEndMs(format: YoutubeSabrFormatMeta): number {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getBufferedEndMs() : 0;
+  }
+
+  getEndSegment(format: YoutubeSabrFormatMeta): number {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getEndSegmentNumber() : -1;
+  }
+
+  getSegmentStartMs(format: YoutubeSabrFormatMeta, sequenceNumber: number): number {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getSegmentStartMs(sequenceNumber) : 0;
+  }
+
+  getSegmentEndMs(format: YoutubeSabrFormatMeta, sequenceNumber: number): number {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getSegmentEndMs(sequenceNumber) : -1;
+  }
+
+  getSegmentNumberAtOrAfterTimeMs(format: YoutubeSabrFormatMeta, timeMs: number): number {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getSegmentNumberAtOrAfterTimeMs(timeMs) : 1;
+  }
+
+  isComplete(format?: YoutubeSabrFormatMeta): boolean {
+    if (format) {
+      const progress = this.findProgressForItag(format.itag);
+      return !!progress && progress.isComplete();
+    }
+    return (!this.isAudioEnabled() || this.audio.isComplete())
+      && (!this.isVideoEnabled() || this.video.isComplete());
+  }
+
   isInitialized(format: YoutubeSabrFormatMeta): boolean {
     const progress = this.findProgressForItag(format.itag);
     return !!progress && progress.initReceived;
@@ -320,10 +461,29 @@ export class YoutubeSabrStreamState {
   }
 
   prepareForSeek(targetMs: number): void {
+    const t = Math.max(0, targetMs);
+    this.setPlayerTimeMsOverride(t);
+    this.clearPlaybackCookie();
+    const edge = this.getMinBufferedEndMs();
+    if (t + 500 < edge) {
+      this.audio.shrinkTo(t);
+      this.video.shrinkTo(t);
+    } else {
+      this.audio.jumpTo(t);
+      this.video.jumpTo(t);
+    }
+  }
+
+  /** Re-advertise one track immediately before an observed cache hole. */
+  prepareForMissingSegment(format: YoutubeSabrFormatMeta, sequenceNumber: number): void {
+    const progress = this.findProgressForItag(format.itag);
+    if (!progress || sequenceNumber <= 0) {
+      return;
+    }
+    const targetMs = progress.getSegmentStartMs(sequenceNumber);
+    progress.jumpTo(targetMs);
     this.setPlayerTimeMsOverride(targetMs);
     this.clearPlaybackCookie();
-    this.audio.shrinkTo(targetMs);
-    this.video.shrinkTo(targetMs);
   }
 
   private isAudioEnabled(): boolean {

@@ -14,6 +14,7 @@ export * from './src/main/ets/extractor/clients/ClientTypes';
 export * from './src/main/ets/extractor/clients/ConfiguredPlayerClient';
 export * from './src/main/ets/extractor/sabr/YoutubeSabrInfo';
 export * from './src/main/ets/extractor/sabr/YoutubeSabrSession';
+export * from './src/main/ets/extractor/sabr/YoutubeSabrStreamState';
 export * from './src/main/ets/extractor/sabr/SabrMediaSegment';
 export * from './src/main/ets/extractor/sabr/SabrPoTokenProvider';
 export * from './src/main/ets/extractor/sabr/SabrProtocolException';

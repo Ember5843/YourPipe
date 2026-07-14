@@ -3,8 +3,14 @@ import { ContentCountry } from 'youtube_core';
 
 export class YoutubeData {
 
-  // 对应 Java 中的 SUPPORTED_LANGUAGES
-  // 这里保留了你提供的注释掉的部分，只开启了 en-GB，你可以根据需要解开注释
+  /**
+   * YouTube content languages (picker_ajax action_language_json=1).
+   * Codes must stay full tags (zh-CN / en-GB); UI uses getLocalizationCode().
+   * Aligns with NewPipeExtractor YoutubeService.SUPPORTED_LANGUAGES (uncommented set)
+   * and NewPipe app language_codes (content language setting).
+   * Note: PipePipe hard-codes "zu" in extractor to suppress auto-translated titles —
+   * YourPipe intentionally keeps real user languages.
+   */
   public static readonly SUPPORTED_LANGUAGES: Localization[] = Localization.listFrom(
     "en-GB", "af", "am", "ar", "az", "be", "bg", "bn", "bs", "ca", "cs", "da", "de",
     "el", "en", "es", "es-419", "es-US", "et", "eu", "fa", "fi", "fil", "fr",
@@ -15,8 +21,11 @@ export class YoutubeData {
     "uk", "ur", "uz", "vi", "zh-CN", "zh-HK", "zh-TW", "zu"
   );
 
-  // 对应 Java 中的 SUPPORTED_COUNTRIES
-  // https://www.youtube.com/picker_ajax?action_country_json=1
+  /**
+   * YouTube content countries (picker_ajax action_country_json=1).
+   * Matches NewPipeExtractor YoutubeService.SUPPORTED_COUNTRIES
+   * (includes KH/LA; PipePipe's list omits those two).
+   */
   public static readonly SUPPORTED_COUNTRIES: ContentCountry[] = ContentCountry.listFrom(
     "DZ", "AR", "AU", "AT", "AZ", "BH", "BD", "BY", "BE", "BO", "BA", "BR", "BG", "KH",
     "CA", "CL", "CO", "CR", "HR", "CY", "CZ", "DK", "DO", "EC", "EG", "SV", "EE", "FI",

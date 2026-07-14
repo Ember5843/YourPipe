@@ -1,7 +1,7 @@
-import { i18n } from '@kit.LocalizationKit';
 import { ContentCountry } from 'youtube_core';
 import { Localization } from 'youtube_core';
 import { fetchBrowsePage } from 'youtube_core';
+import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 
 export class ChannelDetails {
   description: string;
@@ -97,10 +97,9 @@ export class ChannelInfoService {
   }
 
   private resolveLocale(): LocaleContext {
-    const language: string = i18n.System.getSystemLanguage();
-    const localization = new Localization(language || Localization.DEFAULT.getLanguageCode(), 'GB');
-    const contentCountry = new ContentCountry('GB');
-    return new LocaleContext(localization, contentCountry);
+    // Align with SearchLocaleManager / feed services (not hard-coded en/GB).
+    const bundle = SearchLocaleManager.getSearchLocaleBundle();
+    return new LocaleContext(bundle.localization, bundle.contentCountry);
   }
 
   private extractDescription(root: Record<string, Object>): string {

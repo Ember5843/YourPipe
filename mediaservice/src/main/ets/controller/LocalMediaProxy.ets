@@ -149,8 +149,9 @@ export class LocalMediaProxy {
     Logger.info(TAG, `createSabrDualSession: video=${videoItag} audio=${audioItag} durationMs=${durationMs}`);
     try {
       const lease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth);
-      const videoBuf = new SabrTrackBuffer(lease, false);
-      const audioBuf = new SabrTrackBuffer(lease, true);
+      const dur = durationMs || video.approxDurationMs || audio.approxDurationMs || 0;
+      const videoBuf = new SabrTrackBuffer(lease, false, dur);
+      const audioBuf = new SabrTrackBuffer(lease, true, dur);
       // Warm once (serialized pump), then attach buffers — avoid dual parallel rn=1.
       await videoBuf.ensureReady();
       await audioBuf.ensureReady();

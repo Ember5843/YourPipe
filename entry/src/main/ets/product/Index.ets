@@ -36,6 +36,7 @@ import { VideoDetailPage } from '../features/player/VideoDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
 import { PlayerPresentation } from '../common/PlayerPresentation';
 import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
+import { SabrPoTokenWebRuntime } from '../features/player/SabrPoTokenWebRuntime';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { customAnimationUtil } from '../common/AnimationUtil';
 import { LanguageManager } from '../common/LanguageManager';
@@ -198,12 +199,12 @@ struct Index {
       return new LanguagePickerItem(code, native, native);
     });
 
-    // 内容语言（YouTube SUPPORTED_LANGUAGES）- 使用固定名称
+    // 内容语言（YouTube SUPPORTED_LANGUAGES / NewPipe language_codes）
+    // Must use getLocalizationCode() — getLanguageCode() drops region (zh-CN → zh).
     const defaultLangItem: LanguagePickerItem = new LanguagePickerItem('default', followSystem, followSystem);
     const langMapped: LanguagePickerItem[] = YoutubeData.SUPPORTED_LANGUAGES.map((l): LanguagePickerItem => {
-      const code = l.getLanguageCode();
+      const code = l.getLocalizationCode();
       let native = code;
-      // 使用固定的语言名称，避免翻译
       if (code === 'zh-CN') {
         native = '简体中文';
       } else if (code === 'zh-HK') {
@@ -211,8 +212,10 @@ struct Index {
       } else if (code === 'zh-TW') {
         native = '繁體中文（台灣）';
       } else {
-        // 使用语言自己的原生名称
-        try { native = i18n.System.getDisplayLanguage(code, code.split('-')[0]); } catch (_e) {}
+        try {
+          native = i18n.System.getDisplayLanguage(code, code.split('-')[0]);
+        } catch (_e) {
+        }
       }
       return new LanguagePickerItem(code, native, native);
     });
@@ -1376,6 +1379,9 @@ struct Index {
       .height('100%')
       .backgroundColor($r('app.color.yourtube_bg_page'))
 
+      SabrPoTokenWebRuntime()
+        .position({ x: 0, y: 0 })
+
     }
     .id('mainNavigation')
     .mode(NavigationMode.Stack)
@@ -1439,7 +1445,9 @@ struct Index {
       })
       .onDisAppear(() => {
         this.isRepliesOpen = false;
-        this.showOptions = false;
+        // Do NOT force-close the options sheet here. Player pop animation can
+        // finish after the user already opened settings on the main page, which
+        // would set showOptions=false and make the sheet flash then dismiss.
       })
       .onBackPressed(() => {
         if (this.isRepliesOpen) {

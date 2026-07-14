@@ -39,6 +39,11 @@ class StreamProtectionResult {
   maxRetries: number = -1;
 }
 
+class FormatByteRange {
+  start: number = -1;
+  end: number = -1;
+}
+
 /**
  * Decode buffered UMP body into control fields + assembled media segments.
  * MVP: whole-body path (acceptable for lower resolutions; stream later for 4K).
@@ -268,7 +273,9 @@ function decodeFormatInitMeta(data: Uint8Array): SabrFormatInitMeta {
   const meta = new SabrFormatInitMeta();
   for (const field of sabrReadFields(data)) {
     if (field.number === 1 && field.wireType === WIRE_LENGTH_DELIMITED) {
-      // formatId message
+      meta.videoId = field.getString();
+    } else if (field.number === 2 && field.wireType === WIRE_LENGTH_DELIMITED) {
+      // Nested FormatId. Field 1 is the video id, not this message.
       for (const inner of sabrReadFields(field.getBytes())) {
         if (inner.number === 1) {
           meta.itag = inner.varint | 0;
@@ -278,15 +285,41 @@ function decodeFormatInitMeta(data: Uint8Array): SabrFormatInitMeta {
           meta.xtags = inner.getString();
         }
       }
-    } else if (field.number === 2) {
+    } else if (field.number === 3 && field.wireType === WIRE_VARINT) {
       meta.endTimeMs = field.varint;
-    } else if (field.number === 3) {
+    } else if (field.number === 4 && field.wireType === WIRE_VARINT) {
       meta.endSegmentNumber = field.varint | 0;
-    } else if (field.number === 4 && field.wireType === WIRE_LENGTH_DELIMITED) {
+    } else if (field.number === 5 && field.wireType === WIRE_LENGTH_DELIMITED) {
       meta.mimeType = field.getString();
+    } else if (field.number === 6 && field.wireType === WIRE_LENGTH_DELIMITED) {
+      const range = decodeFormatByteRange(field.getBytes());
+      meta.initRangeStart = range.start;
+      meta.initRangeEnd = range.end;
+    } else if (field.number === 7 && field.wireType === WIRE_LENGTH_DELIMITED) {
+      const range = decodeFormatByteRange(field.getBytes());
+      meta.indexRangeStart = range.start;
+      meta.indexRangeEnd = range.end;
+    } else if (field.number === 8 && field.wireType === WIRE_VARINT) {
+      meta.field8 = field.varint;
+    } else if (field.number === 9 && field.wireType === WIRE_VARINT) {
+      meta.durationUnits = field.varint;
+    } else if (field.number === 10 && field.wireType === WIRE_VARINT) {
+      meta.durationTimescale = field.varint;
     }
   }
   return meta;
+}
+
+function decodeFormatByteRange(data: Uint8Array): FormatByteRange {
+  const range = new FormatByteRange();
+  for (const field of sabrReadFields(data)) {
+    if ((field.number === 1 || field.number === 3) && field.wireType === WIRE_VARINT) {
+      range.start = field.varint;
+    } else if ((field.number === 2 || field.number === 4) && field.wireType === WIRE_VARINT) {
+      range.end = field.varint;
+    }
+  }
+  return range;
 }
 
 function summarizeOpaque(data: Uint8Array, label: string): string {

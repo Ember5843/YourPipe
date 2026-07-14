@@ -45,7 +45,8 @@ export function getLockupPlaylistId(lockup: Record<string, Object>): string {
   const browseEndpoint = innertubeCommand ? (innertubeCommand["browseEndpoint"] as Record<string, Object>) : undefined;
   const browseId = browseEndpoint ? (browseEndpoint["browseId"] as string) : "";
   if (browseId) {
-    return browseId;
+    // App models store raw list ids; browse requests add the VL prefix at the service boundary.
+    return browseId.startsWith("VL") ? browseId.substring(2) : browseId;
   }
 
   return "";
