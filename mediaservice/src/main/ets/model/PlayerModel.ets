@@ -45,7 +45,7 @@ export interface VideoEntry {
   height: number;
   resolutionLabel: string;
   codecLabel: string;
-  deliveryMethod: 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP';
+  deliveryMethod: 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP' | 'SABR';
   requiresSeparateAudio: boolean;
 }
 
@@ -354,11 +354,17 @@ export class PlayerModel {
       }
     }
 
-    const getDeliveryFromBucket = (stream: StreamInfo): string => {
+    const getDeliveryFromBucket = (stream: StreamInfo): 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP' | 'SABR' => {
       const d = (stream.deliveryMethod || '').toUpperCase();
-      if (d === 'SABR' || stream.kind?.toLowerCase() === 'sabr') return 'SABR';
-      if (this.categorizedStreams.video.includes(stream)) return 'DASH';
-      if (this.categorizedStreams.hlsManifest.includes(stream)) return 'HLS';
+      if (d === 'SABR' || stream.kind?.toLowerCase() === 'sabr') {
+        return 'SABR';
+      }
+      if (this.categorizedStreams.video.includes(stream)) {
+        return 'DASH';
+      }
+      if (this.categorizedStreams.hlsManifest.includes(stream)) {
+        return 'HLS';
+      }
       return 'PROGRESSIVE_HTTP';
     };
 

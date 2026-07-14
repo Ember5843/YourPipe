@@ -1,3 +1,5 @@
+import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
+
 export interface StreamResource {
   id: string;
   url: string;
@@ -23,15 +25,6 @@ export interface StreamResource {
 
 export type SessionType = 'single' | 'youtube-dual' | 'sabr-dual';
 
-/** Opaque SABR track readers attached by LocalMediaProxy (avoid circular import type). */
-export interface SabrTrackReader {
-  ensureReady: () => Promise<void>;
-  readRange: (start: number, end: number) => Promise<Uint8Array>;
-  getContentLength: () => number;
-  getItag: () => number;
-  resetForSeek: (targetMs: number) => void;
-}
-
 export interface DashSession {
   id: string;
   type: SessionType;
@@ -47,8 +40,8 @@ export interface DashSession {
   refreshUrls?: () => Promise<boolean>;
   /** SABR lease key for session store release. */
   sabrLeaseKey?: string;
-  sabrVideoBuffer?: SabrTrackReader;
-  sabrAudioBuffer?: SabrTrackReader;
+  sabrVideoBuffer?: SabrTrackBuffer;
+  sabrAudioBuffer?: SabrTrackBuffer;
 }
 
 function emptyResource(): StreamResource {

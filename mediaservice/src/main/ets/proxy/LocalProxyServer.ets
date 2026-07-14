@@ -4,7 +4,6 @@ import { sessionStore, DashSession } from './SessionStore';
 import { parseInputJson } from './InputParser';
 import { serveRange } from './RangeProxy';
 import { serveSabrRange } from '../sabr/SabrProxyServe';
-import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
 import { sabrSessionStore } from '../sabr/SabrSessionStore';
 import Logger from '../utils/Logger';
 
@@ -117,12 +116,12 @@ async function routeRequest(
     const idx = parseInt(parts[3], 10) || 0;
     if (segment === 'video' && session.sabrVideoBuffer) {
       const mime = session.videos[idx]?.mimeType || session.video.mimeType || 'video/mp4';
-      await serveSabrRange(conn, session.sabrVideoBuffer as SabrTrackBuffer, rangeHeader, mime);
+      await serveSabrRange(conn, session.sabrVideoBuffer, rangeHeader, mime);
       return;
     }
     if (segment === 'audio' && session.sabrAudioBuffer) {
       const mime = session.audios[idx]?.mimeType || session.audio.mimeType || 'audio/mp4';
-      await serveSabrRange(conn, session.sabrAudioBuffer as SabrTrackBuffer, rangeHeader, mime);
+      await serveSabrRange(conn, session.sabrAudioBuffer, rangeHeader, mime);
       return;
     }
   }

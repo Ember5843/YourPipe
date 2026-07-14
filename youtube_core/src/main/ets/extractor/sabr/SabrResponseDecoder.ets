@@ -25,6 +25,20 @@ export const PART_STREAM_PROTECTION_STATUS = 58;
 export const PART_SABR_CONTEXT_UPDATE = 57;
 export const PART_SABR_CONTEXT_SENDING_POLICY = 59;
 
+class OpenMediaAssembly {
+  header: SabrMediaHeader;
+  chunks: Uint8Array[] = [];
+
+  constructor(header: SabrMediaHeader) {
+    this.header = header;
+  }
+}
+
+class StreamProtectionResult {
+  status: number = -1;
+  maxRetries: number = -1;
+}
+
 /**
  * Decode buffered UMP body into control fields + assembled media segments.
  * MVP: whole-body path (acceptable for lower resolutions; stream later for 4K).
@@ -36,7 +50,7 @@ export function sabrDecodeBody(data: Uint8Array): SabrDecodedResponse {
 
 export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
   const decoded = new SabrDecodedResponse();
-  const open = new Map<number, { header: SabrMediaHeader; chunks: Uint8Array[] }>();
+  const open = new Map<number, OpenMediaAssembly>();
 
   for (const part of parts) {
     try {
@@ -44,7 +58,7 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
         case PART_MEDIA_HEADER: {
           const header = SabrMediaHeader.decode(part.data);
           decoded.mediaHeaders.push(header);
-          open.set(header.headerId, { header: header, chunks: [] });
+          open.set(header.headerId, new OpenMediaAssembly(header));
           break;
         }
         case PART_MEDIA: {
@@ -194,17 +208,16 @@ function decodeRedirect(data: Uint8Array): SabrRedirectInfo {
   return redirect;
 }
 
-function decodeStreamProtection(data: Uint8Array): { status: number; maxRetries: number } {
-  let status = -1;
-  let maxRetries = -1;
+function decodeStreamProtection(data: Uint8Array): StreamProtectionResult {
+  const result = new StreamProtectionResult();
   for (const field of sabrReadFields(data)) {
     if (field.number === 1 && field.wireType === WIRE_VARINT) {
-      status = field.varint | 0;
+      result.status = field.varint | 0;
     } else if (field.number === 2 && field.wireType === WIRE_VARINT) {
-      maxRetries = field.varint | 0;
+      result.maxRetries = field.varint | 0;
     }
   }
-  return { status: status, maxRetries: maxRetries };
+  return result;
 }
 
 function decodeContextUpdate(data: Uint8Array): SabrContextUpdate {
