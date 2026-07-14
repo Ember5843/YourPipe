@@ -93,18 +93,14 @@ export class SabrProtoWriter {
   }
 
   private writeVarint(value: number): void {
-    let remaining = value >>> 0;
-    // Support values larger than 32-bit via number (lossy above 2^53; enough for SABR fields).
-    if (value > 0xFFFFFFFF) {
-      remaining = value;
-    }
+    // Always use Math.floor path so values > 2^32 (lastModified) are not truncated by >>>.
+    let remaining = value < 0 ? 0 : Math.floor(value);
     while (true) {
       if (remaining < 0x80) {
         this.chunks.push(remaining & 0xff);
         return;
       }
       this.chunks.push((remaining & 0x7f) | 0x80);
-      // Use division for >32bit friendliness in JS number path
       remaining = Math.floor(remaining / 128);
     }
   }

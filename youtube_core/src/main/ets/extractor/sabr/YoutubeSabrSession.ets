@@ -211,9 +211,14 @@ export class YoutubeSabrSession {
     const url = YoutubeSabrRequestBuilder.withSabrSessionParameters(
       this.serverAbrStreamingUrl, this.info.cpn, this.requestNumber);
 
-    logger.info(`[SABR] POST rn=${this.requestNumber + 1} body=${body.length} urlLen=${url.length}`);
-
     const headers = this.buildSabrHeaders();
+    const hasUstreamer = !!(this.info.videoPlaybackUstreamerConfig
+      && this.info.videoPlaybackUstreamerConfig.length > 0);
+    logger.info(`[SABR] POST rn=${this.requestNumber + 1} body=${body.length} urlLen=${url.length} `
+      + `profile=${this.info.profile} ustreamer=${hasUstreamer} `
+      + `a=${this.audioFormat.itag} v=${this.videoFormat.itag} `
+      + `lmA=${this.audioFormat.lastModified || 0} lmV=${this.videoFormat.lastModified || 0}`);
+
     const response = await this.httpClient.postBinary(url, body, headers, this.useAuth);
     const status = response.responseCode;
     const contentType = extractContentType(response.header);
@@ -335,28 +340,28 @@ export class YoutubeSabrSession {
     this.cacheOrder = keep;
   }
 
-  // PipePipe buildSabrHeaders: mweb/web are web-like (no Content-Type / visitor).
+  // PipePipe buildSabrHeaders (web-like mweb/web omit visitor).
+  // OHOS net.http needs Content-Type for binary POST body delivery; PipePipe omits it on
+  // OkHttp (MediaType null). Keep protobuf CT so the body is actually sent.
   private buildSabrHeaders(): Record<string, string> {
     const webLike = this.info.profile === 'mweb' || this.info.profile === 'web';
     const ua = this.info.profile === 'web'
       ? ClientsConstants.WEB_USER_AGENT
       : ClientsConstants.MWEB_USER_AGENT;
-    if (webLike) {
-      const webHeaders: Record<string, string> = {};
-      webHeaders['Accept'] = '*/*';
-      webHeaders['Accept-Language'] = 'en-US,en;q=0.9';
-      webHeaders['User-Agent'] = ua;
-      webHeaders['Origin'] = 'https://www.youtube.com';
-      webHeaders['Referer'] = 'https://www.youtube.com/';
-      return webHeaders;
-    }
     const headers: Record<string, string> = {};
     headers['Content-Type'] = 'application/x-protobuf';
-    headers['Accept'] = 'application/vnd.yt-ump';
-    headers['Accept-Encoding'] = 'identity';
     headers['User-Agent'] = ua;
-    if (this.info.visitorData) {
-      headers['X-Goog-Visitor-Id'] = this.info.visitorData;
+    if (webLike) {
+      headers['Accept'] = '*/*';
+      headers['Accept-Language'] = 'en-US,en;q=0.9';
+      headers['Origin'] = 'https://www.youtube.com';
+      headers['Referer'] = 'https://www.youtube.com/';
+    } else {
+      headers['Accept'] = 'application/vnd.yt-ump';
+      headers['Accept-Encoding'] = 'identity';
+      if (this.info.visitorData) {
+        headers['X-Goog-Visitor-Id'] = this.info.visitorData;
+      }
     }
     return headers;
   }

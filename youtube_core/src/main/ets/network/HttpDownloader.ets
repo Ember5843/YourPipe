@@ -440,11 +440,13 @@ export class HttpDownloader {
         logger.debug(`POST-BIN ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
         const requestHeaders = this.processBinaryHeaders(headers, localization);
         const httpRequest = http.createHttp();
-        const bodyBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+        // Fresh copy: avoid SharedArrayBuffer / subarray offset issues on OHOS HTTP.
+        const bodyCopy = new ArrayBuffer(data.length);
+        new Uint8Array(bodyCopy).set(data);
         const httpOptions: http.HttpRequestOptions = {
           'method': http.RequestMethod.POST,
           'header': requestHeaders,
-          'extraData': bodyBuffer,
+          'extraData': bodyCopy,
           'expectDataType': http.HttpDataType.ARRAY_BUFFER,
           'connectTimeout': 30000,
           'readTimeout': 60000,
@@ -461,13 +463,30 @@ export class HttpDownloader {
         });
         httpRequest.destroy();
         if (response.responseCode && response.responseCode >= 400) {
+          let errBody = '';
+          try {
+            if (typeof response.result === 'string') {
+              errBody = (response.result as string).substring(0, 300);
+            } else if (response.result instanceof ArrayBuffer) {
+              const u8 = new Uint8Array(response.result as ArrayBuffer);
+              const n = Math.min(u8.length, 200);
+              let s = '';
+              for (let i = 0; i < n; i++) {
+                s += String.fromCharCode(u8[i]);
+              }
+              errBody = s;
+            }
+          } catch (_e) {
+            errBody = '';
+          }
+          logger.error(`POST-BIN HTTP ${response.responseCode} bodySnippet=${errBody}`);
           const httpError = new HttpError(
             `HTTP ${response.responseCode}`,
             url,
             'POST',
             response.responseCode,
             `HTTP ${response.responseCode}`,
-            undefined
+            errBody
           );
           // 403 on SABR is not recoverable by blind retry (often wrong headers/body).
           if (response.responseCode === 403) {
