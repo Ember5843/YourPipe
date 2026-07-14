@@ -121,6 +121,7 @@ export class YouTubeHttpClient {
 
   /**
    * Binary POST for SABR (protobuf body, UMP ARRAY_BUFFER response).
+   * Does not inject browser page defaults or application/json — caller owns headers.
    */
   async postBinary(
     url: string,
@@ -128,7 +129,27 @@ export class YouTubeHttpClient {
     customHeaders?: Record<string, string | string[]>,
     withAuth: boolean = false
   ): Promise<http.HttpResponse> {
-    const headers = await this.prepareHeaders(customHeaders, url, withAuth);
+    // Minimal cookie/auth only — SABR googlevideo rejects wrong browser/API defaults.
+    const headers: Record<string, string | string[]> = {};
+    if (customHeaders) {
+      const keys = Object.keys(customHeaders);
+      for (let i = 0; i < keys.length; i++) {
+        headers[keys[i]] = customHeaders[keys[i]];
+      }
+    }
+    if (withAuth) {
+      const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
+      if (activeAuthSession && activeAuthSession.isSignedIn()) {
+        const cookieStr = activeAuthSession.getCookieString();
+        if (cookieStr) {
+          headers['Cookie'] = cookieStr;
+        }
+        const authorization = await activeAuthSession.getAuthorizationHeader();
+        if (authorization && authorization.length > 0) {
+          headers['Authorization'] = authorization;
+        }
+      }
+    }
     const response = await this.downloader.postBinary(url, data, headers, this.localization);
     this.saveCookiesFromResponse(response, url);
     return response;

@@ -42,6 +42,9 @@ export class YoutubeSabrSession {
   private playHeadMs: number = 0;
   private closed: boolean = false;
   private useAuth: boolean = false;
+  /** Serialize pumps — concurrent A/V ensureReady must not dual-fire rn=1. */
+  private pumpBusy: boolean = false;
+  private pumpWaiters: Array<() => void> = [];
 
   constructor(
     info: YoutubeSabrInfo,
@@ -170,8 +173,27 @@ export class YoutubeSabrSession {
 
   /**
    * One POST + UMP decode + cache ingest. Returns decoded control summary.
+   * Serialized so concurrent track buffers cannot race the request counter.
    */
   async pumpOnce(): Promise<SabrDecodedResponse> {
+    while (this.pumpBusy) {
+      await new Promise<void>((resolve: () => void) => {
+        this.pumpWaiters.push(resolve);
+      });
+    }
+    this.pumpBusy = true;
+    try {
+      return await this.pumpOnceLocked();
+    } finally {
+      this.pumpBusy = false;
+      const next = this.pumpWaiters.shift();
+      if (next) {
+        next();
+      }
+    }
+  }
+
+  private async pumpOnceLocked(): Promise<SabrDecodedResponse> {
     if (this.closed) {
       throw new SabrProtocolException('SABR session closed');
     }
@@ -186,7 +208,7 @@ export class YoutubeSabrSession {
       : YoutubeSabrRequestBuilder.buildFollowUpMediaRequest(
         this.info, this.audioFormat, this.videoFormat, this.streamState);
 
-    let url = YoutubeSabrRequestBuilder.withSabrSessionParameters(
+    const url = YoutubeSabrRequestBuilder.withSabrSessionParameters(
       this.serverAbrStreamingUrl, this.info.cpn, this.requestNumber);
 
     logger.info(`[SABR] POST rn=${this.requestNumber + 1} body=${body.length} urlLen=${url.length}`);
@@ -313,18 +335,26 @@ export class YoutubeSabrSession {
     this.cacheOrder = keep;
   }
 
+  // PipePipe buildSabrHeaders: mweb/web are web-like (no Content-Type / visitor).
   private buildSabrHeaders(): Record<string, string> {
+    const webLike = this.info.profile === 'mweb' || this.info.profile === 'web';
     const ua = this.info.profile === 'web'
       ? ClientsConstants.WEB_USER_AGENT
       : ClientsConstants.MWEB_USER_AGENT;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/x-protobuf',
-      'Accept': 'application/vnd.yt-ump',
-      'Accept-Encoding': 'identity',
-      'User-Agent': ua,
-      'Origin': 'https://www.youtube.com',
-      'Referer': 'https://www.youtube.com/'
-    };
+    if (webLike) {
+      const webHeaders: Record<string, string> = {};
+      webHeaders['Accept'] = '*/*';
+      webHeaders['Accept-Language'] = 'en-US,en;q=0.9';
+      webHeaders['User-Agent'] = ua;
+      webHeaders['Origin'] = 'https://www.youtube.com';
+      webHeaders['Referer'] = 'https://www.youtube.com/';
+      return webHeaders;
+    }
+    const headers: Record<string, string> = {};
+    headers['Content-Type'] = 'application/x-protobuf';
+    headers['Accept'] = 'application/vnd.yt-ump';
+    headers['Accept-Encoding'] = 'identity';
+    headers['User-Agent'] = ua;
     if (this.info.visitorData) {
       headers['X-Goog-Visitor-Id'] = this.info.visitorData;
     }

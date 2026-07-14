@@ -192,9 +192,10 @@ export class YoutubeSabrRequestBuilder {
 }
 
 function replaceOrAppendQuery(url: string, key: string, value: string): string {
+  // PipePipe setQueryParameter: raw value (cpn/rn are unreserved).
   const re = new RegExp(`([?&])${key}=[^&]*`);
   if (re.test(url)) {
-    return url.replace(re, `$1${key}=${encodeURIComponent(value)}`);
+    return url.replace(re, `$1${key}=${value}`);
   }
-  return url + (url.indexOf('?') >= 0 ? '&' : '?') + `${key}=${encodeURIComponent(value)}`;
+  return url + (url.indexOf('?') >= 0 ? '&' : '?') + `${key}=${value}`;
 }

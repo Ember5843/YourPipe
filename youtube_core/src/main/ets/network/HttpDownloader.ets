@@ -433,13 +433,12 @@ export class HttpDownloader {
   ): Promise<http.HttpResponse> {
     let lastError: HttpError | null = null;
     let attempt = 0;
+    // SABR web-like posts must not inject default application/json Content-Type.
     while (attempt < (enableRetry ? HttpDownloader.MAX_RETRIES : 1)) {
       attempt++;
       try {
         logger.debug(`POST-BIN ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
-        const requestHeaders = this.processHeaders(headers, localization);
-        requestHeaders['Accept-Encoding'] = 'identity';
-        // Avoid default application/json from processHeaders when Content-Type already set.
+        const requestHeaders = this.processBinaryHeaders(headers, localization);
         const httpRequest = http.createHttp();
         const bodyBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
         const httpOptions: http.HttpRequestOptions = {
@@ -470,6 +469,10 @@ export class HttpDownloader {
             `HTTP ${response.responseCode}`,
             undefined
           );
+          // 403 on SABR is not recoverable by blind retry (often wrong headers/body).
+          if (response.responseCode === 403) {
+            throw httpError;
+          }
           if (httpError.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
             await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
             continue;
@@ -480,6 +483,9 @@ export class HttpDownloader {
       } catch (err) {
         if (err instanceof HttpError) {
           lastError = err;
+          if (err.responseCode === 403) {
+            throw err;
+          }
           if (err.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
             await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
             continue;
@@ -496,6 +502,38 @@ export class HttpDownloader {
       }
     }
     throw lastError || new HttpError('Unknown error', url, 'POST');
+  }
+
+  /**
+   * Headers for binary POST: no default Content-Type: application/json.
+   * Only Accept-Language from localization + caller headers.
+   */
+  private processBinaryHeaders(
+    customHeaders?: Record<string, string[] | string>,
+    localization?: Localization
+  ): Record<string, string | string[]> {
+    const headers: Record<string, string | string[]> = {};
+    if (localization) {
+      const langCode = localization.getLanguageCode();
+      const countryCode = localization.getCountryCode();
+      headers['Accept-Language'] = countryCode
+        ? `${langCode}-${countryCode},${langCode};q=0.9`
+        : langCode;
+    }
+    if (customHeaders) {
+      Object.keys(customHeaders).forEach((key: string) => {
+        const value = customHeaders[key];
+        if (Array.isArray(value)) {
+          const nonEmpty = value.filter(item => typeof item === 'string' && item.trim() !== '');
+          if (nonEmpty.length > 0) {
+            headers[key] = nonEmpty.join(',');
+          }
+        } else if (typeof value === 'string' && value.trim() !== '') {
+          headers[key] = value;
+        }
+      });
+    }
+    return headers;
   }
 
   // 便捷方法：HEAD 请求

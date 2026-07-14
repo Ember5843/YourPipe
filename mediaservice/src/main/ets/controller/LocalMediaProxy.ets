@@ -151,8 +151,9 @@ export class LocalMediaProxy {
       const lease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth);
       const videoBuf = new SabrTrackBuffer(lease, false);
       const audioBuf = new SabrTrackBuffer(lease, true);
-      // Prefetch inits so first MPV open is less likely to stall cold.
-      await Promise.all([videoBuf.ensureReady(), audioBuf.ensureReady()]);
+      // Warm once (serialized pump), then attach buffers — avoid dual parallel rn=1.
+      await videoBuf.ensureReady();
+      await audioBuf.ensureReady();
 
       const session = makeEmptySession('');
       session.type = 'sabr-dual';
