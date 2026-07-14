@@ -104,19 +104,15 @@ export class YouTubePlayService {
     }
   }
 
-  /** Apply settings → extractor hl/gl + HTTP client Accept-Language. */
+  /** Playback-only: sync stream extract hl/gl from content language/region settings. */
   private syncExtractorLocale(): void {
     if (!this.extractor) {
       return;
     }
-    const bundle = SearchLocaleManager.getSearchLocaleBundle();
-    const hl = bundle.localization.getLanguageCode();
-    const gl = bundle.contentCountry.getCountryCode();
+    const hl = SearchLocaleManager.resolveSearchLanguage();
+    const gl = SearchLocaleManager.resolveSearchCountry();
     this.extractor.hl = hl;
     this.extractor.gl = gl;
-    const httpClient = this.extractor.getHttpClient();
-    httpClient.setLocalization(bundle.localization);
-    httpClient.setContentCountry(bundle.contentCountry);
     logger.info(`${TAG} locale synced hl=${hl} gl=${gl}`);
   }
 

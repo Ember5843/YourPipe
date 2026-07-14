@@ -67,11 +67,8 @@ export function parseHlsMasterManifest(manifestContent: string, videoId: string)
         audioTrackId = audioContentId;
         const langPart = audioContentId.split('.')[0];
         audioLocale = langPart.split('-')[0];
-        if (acont === 'original') {
-          audioTrackName = langPart + ' (original)';
-        } else {
-          audioTrackName = langPart;
-        }
+        // Raw id only — no synthesized "(original)" label.
+        audioTrackName = audioContentId;
 
         if (!audioTrackUrls.has(audioTrackId) || acont === 'original') {
           audioTrackUrls.set(audioTrackId, streamUrl);

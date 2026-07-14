@@ -18,7 +18,16 @@ import { ConfigurationConstant } from '@kit.AbilityKit';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
-import { AvPlayerController, VideoData, StreamInfo, PlayerState, StateChangeListener, VideoEntry, SubtitleTrack } from 'mediaservice';
+import {
+  AvPlayerController,
+  VideoData,
+  StreamInfo,
+  PlayerState,
+  StateChangeListener,
+  VideoEntry,
+  SubtitleTrack,
+  SelectOption
+} from 'mediaservice';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
@@ -643,6 +652,22 @@ export struct VideoPlayer {
     }
   }
 
+  @Builder
+  AudioMenu() {
+    Menu() {
+      ForEach(this.controller.getAudioStreamList(), (stream: StreamInfo, index: number) => {
+        MenuItem({
+          content: (this.getSelectedAudioIndex() === index ? '\u2713 ' : '')
+            + this.controller.getAudioStreamLabel(stream)
+        })
+          .onClick(() => {
+            this.controller.switchToAudioIndex(index);
+          })
+      }, (stream: StreamInfo, index: number) =>
+        `${stream.itag || 0}_${stream.audioTrackId || ''}_${stream.bitrate || 0}_${index}`)
+    }
+  }
+
   private getSelectedVideoIndex(): number {
     const list = this.controller.getMergedVideoList();
     const current = this.vm.playerModel.currentVideoStream;
@@ -657,6 +682,19 @@ export struct VideoPlayer {
       return `${list[idx].resolutionLabel} (${list[idx].codecLabel})`;
     }
     return 'Auto';
+  }
+
+  private getSelectedAudioIndex(): number {
+    return this.controller.getCurrentAudioIndex();
+  }
+
+  private getCurrentAudioLabel(): string {
+    const list = this.controller.getAudioStreamList();
+    const idx = this.getSelectedAudioIndex();
+    if (idx >= 0 && idx < list.length) {
+      return this.controller.getAudioStreamLabel(list[idx]);
+    }
+    return 'Audio';
   }
 
   /**
@@ -1045,8 +1083,16 @@ export struct VideoPlayer {
 
       Blank()
 
-      // 右侧操作栏 (字幕 + 清晰度 + 播放速度)
-      Row({ space: 20 }) {
+      // 右侧操作栏 (音轨 Menu + 清晰度 + 播放速度) — Menu 不占横向宽度
+      Row({ space: 16 }) {
+        if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 0) {
+          Text('Audio')
+            .fontSize(16)
+            .fontColor(Color.White)
+            .fontWeight(FontWeight.Medium)
+            .bindMenu(this.AudioMenu())
+        }
+
         // 清晰度选择（直播时隐藏）
         if (!this.curSource.isLive) {
           Select(
@@ -1066,6 +1112,7 @@ export struct VideoPlayer {
             .menuBackgroundColor($r('app.color.yourtube_bg_surface'))
             .backgroundColor(Color.Transparent)
             .arrowModifier(this.qualityArrowModifier)
+            .constraintSize({ maxWidth: 120 })
             .onSelect((index: number) => {
               const entry = this.controller.getMergedVideoList()[index];
               if (entry) {

@@ -18,12 +18,6 @@ import Logger from '../utils/Logger';
 
 const TAG: string = '[PlayerLog][PlayerModel]';
 
-interface TrackRank {
-  trackId: string;
-  score: number;
-  streams: StreamInfo[];
-}
-
 // 流分类接口
 export interface StreamCategories {
   audio: StreamInfo[];
@@ -47,6 +41,11 @@ export interface VideoEntry {
   codecLabel: string;
   deliveryMethod: 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP' | 'SABR';
   requiresSeparateAudio: boolean;
+}
+
+export interface AudioTrackOption {
+  trackId: string;
+  label: string;
 }
 
 // YouTube itag 映射表 (2024-2026 完整版)
@@ -249,55 +248,11 @@ export class PlayerModel {
       };
       return codecPriority(b) - codecPriority(a);
     });
-    
-    // 音频分组与排序 (Audio grouping and sorting matching NewPipe)
-    // 1. Group streams by audioTrackId
-    const trackGroups = new Map<string, StreamInfo[]>();
-    this.categorizedStreams.audio.forEach(stream => {
-      const trackId = stream.audioTrackId || '';
-      if (!trackGroups.has(trackId)) {
-        trackGroups.set(trackId, []);
-      }
-      trackGroups.get(trackId)!.push(stream);
-    });
 
-    // 2. Rank each track
-    const trackRanks: TrackRank[] = Array.from(trackGroups.entries()).map((entry: [string, StreamInfo[]]) => {
-      const trackId = entry[0];
-      const trackStreams = entry[1];
-      const s = trackStreams[0]; // Representative stream for the track
-      let score = 0;
-      const lang = s.audioLanguage?.toLowerCase() || '';
-      const type = s.audioTrackType?.toUpperCase() || '';
-      const prefLang = preferredLanguage?.toLowerCase() || '';
-      
-      // a. Language match
-      if (prefLang && lang.startsWith(prefLang)) {
-        score += 1000;
-      } else if (lang.startsWith('en')) {
-        score += 10; // English fallback
-      }
-      
-      // b. Track type match (NewPipe default: ORIGINAL > DUBBED > DESCRIPTIVE)
-      if (type === 'ORIGINAL') {
-        score += 100;
-      } else if (type === 'DUBBED') {
-        score += 50;
-      } else if (type === 'DESCRIPTIVE') {
-        score += 10;
-      }
-      
-      const rank: TrackRank = { trackId: trackId, score: score, streams: trackStreams };
-      return rank;
-    });
-
-    // Sort tracks by score descending
-    trackRanks.sort((a, b) => b.score - a.score);
-
-    // 3. Sort streams within each track and flatten
-    const sortedAudioStreams: StreamInfo[] = [];
-    // 优先高码率 AAC(140/141)，其次 Opus(251/250)
-    // 如果调用方传入了 audioMaxBitrate，过滤掉超出上限的 itag
+    // Flat audio list for UI Select (no language grouping).
+    // Order: track label, then preferred itag, then bitrate.
+    // preferredLanguage only affects auto default via original-first in controller.
+    void preferredLanguage;
     const rawPreferredAudioItags = [141, 140, 258, 256, 251, 250, 249, 172, 171];
     const preferredAudioItags = (audioMaxBitrate !== undefined && audioMaxBitrate < 9999)
       ? rawPreferredAudioItags.filter(itag => {
@@ -306,24 +261,27 @@ export class PlayerModel {
         })
       : rawPreferredAudioItags;
 
-    trackRanks.forEach(track => {
-      track.streams.sort((a, b) => {
-        // Format rank
-        let rankA = preferredAudioItags.indexOf(a.itag || -1);
-        let rankB = preferredAudioItags.indexOf(b.itag || -1);
-        if (rankA === -1) rankA = 999;
-        if (rankB === -1) rankB = 999;
-        if (rankA !== rankB) return rankA - rankB;
-
-        // Bitrate fallback
-        const bA = ITAG_MAP[a.itag!]?.bitrate || a.bitrate || 0;
-        const bB = ITAG_MAP[b.itag!]?.bitrate || b.bitrate || 0;
-        return bB - bA;
-      });
-      sortedAudioStreams.push(...track.streams);
+    this.categorizedStreams.audio.sort((a, b) => {
+      const nameA = (a.audioTrackName || a.audioLanguage || a.audioTrackId || '').toLowerCase();
+      const nameB = (b.audioTrackName || b.audioLanguage || b.audioTrackId || '').toLowerCase();
+      if (nameA !== nameB) {
+        return nameA.localeCompare(nameB);
+      }
+      let rankA = preferredAudioItags.indexOf(a.itag || -1);
+      let rankB = preferredAudioItags.indexOf(b.itag || -1);
+      if (rankA === -1) rankA = 999;
+      if (rankB === -1) rankB = 999;
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      const bA = ITAG_MAP[a.itag!]?.bitrate || a.bitrate || 0;
+      const bB = ITAG_MAP[b.itag!]?.bitrate || b.bitrate || 0;
+      return bB - bA;
     });
-
-    this.categorizedStreams.audio = sortedAudioStreams;
+    Logger.info(TAG, `audio streams listed: ${this.categorizedStreams.audio.length} `
+      + this.categorizedStreams.audio.map((s) =>
+        `${s.audioTrackName || s.audioLanguage || s.audioTrackId || '-'}[${s.itag}]`
+      ).join(', '));
 
     const codecShortName = (codecs?: string): string => {
       if (!codecs) return '';
@@ -412,4 +370,47 @@ export class PlayerModel {
   public getCurrentStreams(): CurrentStreams { return { video: this.currentVideoStream, audio: this.currentAudioStream, manifest: this.currentManifestStream }; }
   public updateVideoStream(stream: StreamInfo | undefined): void { this.currentVideoStream = stream; }
   public updateAudioStream(stream: StreamInfo | undefined): void { this.currentAudioStream = stream; }
+
+  /** Flat list of all audio streams for UI Select (like quality list). */
+  public getAudioStreamList(): StreamInfo[] {
+    return this.categorizedStreams.audio.slice();
+  }
+
+  /** Raw API text only — no codec/language synthesis. */
+  public getAudioStreamLabel(stream: StreamInfo | undefined): string {
+    if (!stream) {
+      return 'Audio';
+    }
+    const name = (stream.audioTrackName || '').trim();
+    if (name.length > 0) {
+      return name;
+    }
+    const lang = (stream.audioLanguage || '').trim();
+    if (lang.length > 0) {
+      return lang;
+    }
+    const id = (stream.audioTrackId || '').trim();
+    if (id.length > 0) {
+      return id;
+    }
+    if (stream.itag !== undefined) {
+      return `${stream.itag}`;
+    }
+    return 'Audio';
+  }
+
+  public getCurrentAudioIndex(): number {
+    const list = this.categorizedStreams.audio;
+    const cur = this.currentAudioStream;
+    if (!cur) {
+      return 0;
+    }
+    const idx = list.findIndex((s: StreamInfo) =>
+      s === cur
+      || (s.itag === cur.itag
+        && (s.audioTrackId || '') === (cur.audioTrackId || '')
+        && (s.bitrate || 0) === (cur.bitrate || 0))
+    );
+    return idx >= 0 ? idx : 0;
+  }
 }

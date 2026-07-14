@@ -118,7 +118,9 @@ export class LocalMediaProxy {
       return '';
     }
     let videoFmt: YoutubeSabrFormatMeta | undefined = info.findFormatByItag(videoItag);
-    let audioFmt: YoutubeSabrFormatMeta | undefined = info.findFormatByItag(audioItag);
+    // Same itag can exist for multiple languages — must match audioTrackId.
+    let audioFmt: YoutubeSabrFormatMeta | undefined =
+      info.findFormatByItagAndTrack(audioItag, audio.audioTrackId);
     if (!videoFmt) {
       videoFmt = {
         itag: videoItag,
@@ -133,6 +135,7 @@ export class LocalMediaProxy {
         approxDurationMs: video.approxDurationMs
       };
     }
+    // Always pin selected track identity onto the format meta used for SABR POSTs.
     if (!audioFmt) {
       audioFmt = {
         itag: audioItag,
@@ -143,10 +146,38 @@ export class LocalMediaProxy {
         codecs: audio.codecs,
         audioTrackId: audio.audioTrackId,
         audioTrackName: audio.audioTrackName,
+        isOriginalAudio: (audio.audioTrackType || '').toLowerCase() === 'original',
         approxDurationMs: audio.approxDurationMs
       };
+    } else if (audio.audioTrackId && audioFmt.audioTrackId !== audio.audioTrackId) {
+      // Defensive: itag-only fallback returned a different language track.
+      audioFmt = {
+        itag: audioFmt.itag,
+        mimeType: audio.mimeType || audioFmt.mimeType,
+        bitrate: audio.bitrate ?? audioFmt.bitrate,
+        width: audioFmt.width,
+        height: audioFmt.height,
+        lastModified: audioFmt.lastModified,
+        xtags: audioFmt.xtags,
+        isAudio: true,
+        isVideo: false,
+        qualityLabel: audioFmt.qualityLabel,
+        codecs: audio.codecs || audioFmt.codecs,
+        audioTrackId: audio.audioTrackId,
+        audioTrackName: audio.audioTrackName || audioFmt.audioTrackName,
+        isOriginalAudio: (audio.audioTrackType || '').toLowerCase() === 'original'
+          || audioFmt.isOriginalAudio,
+        initializationUrl: audioFmt.initializationUrl,
+        initRangeStart: audioFmt.initRangeStart,
+        initRangeEnd: audioFmt.initRangeEnd,
+        contentLength: audio.contentLength ?? audioFmt.contentLength,
+        approxDurationMs: audio.approxDurationMs ?? audioFmt.approxDurationMs,
+        drc: audioFmt.drc
+      };
     }
-    Logger.info(TAG, `createSabrDualSession: video=${videoItag} audio=${audioItag} durationMs=${durationMs}`);
+    Logger.info(TAG, `createSabrDualSession: video=${videoItag} audio=${audioItag} `
+      + `track=${audio.audioTrackId || audioFmt.audioTrackId || '-'} `
+      + `name=${audio.audioTrackName || audioFmt.audioTrackName || '-'} durationMs=${durationMs}`);
     try {
       const lease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth);
       const dur = durationMs || video.approxDurationMs || audio.approxDurationMs || 0;

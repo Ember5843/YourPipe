@@ -199,12 +199,12 @@ struct Index {
       return new LanguagePickerItem(code, native, native);
     });
 
-    // 内容语言（YouTube SUPPORTED_LANGUAGES / NewPipe language_codes）
-    // Must use getLocalizationCode() — getLanguageCode() drops region (zh-CN → zh).
+    // 内容语言（YouTube SUPPORTED_LANGUAGES）- 使用固定名称
     const defaultLangItem: LanguagePickerItem = new LanguagePickerItem('default', followSystem, followSystem);
     const langMapped: LanguagePickerItem[] = YoutubeData.SUPPORTED_LANGUAGES.map((l): LanguagePickerItem => {
-      const code = l.getLocalizationCode();
+      const code = l.getLanguageCode();
       let native = code;
+      // 使用固定的语言名称，避免翻译
       if (code === 'zh-CN') {
         native = '简体中文';
       } else if (code === 'zh-HK') {
@@ -212,10 +212,8 @@ struct Index {
       } else if (code === 'zh-TW') {
         native = '繁體中文（台灣）';
       } else {
-        try {
-          native = i18n.System.getDisplayLanguage(code, code.split('-')[0]);
-        } catch (_e) {
-        }
+        // 使用语言自己的原生名称
+        try { native = i18n.System.getDisplayLanguage(code, code.split('-')[0]); } catch (_e) {}
       }
       return new LanguagePickerItem(code, native, native);
     });

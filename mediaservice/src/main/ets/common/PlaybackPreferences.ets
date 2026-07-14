@@ -7,7 +7,10 @@
  */
 
 export interface PlaybackPreferencesSnapshot {
-  /** Content language for subtitle matching (YouTube hl), e.g. "zh-CN" / "en". */
+  /**
+   * Preferred audio language for track ranking (also used lightly for subtitle hints).
+   * PipePipe default is "original"; explicit content languages use codes like "zh" / "en".
+   */
   searchLanguage: string;
   /** 默认清晰度上限：'best' | '1080p' | '720p' | '480p' | '360p' | '240p' | '144p' */
   defaultQuality: string;
@@ -17,9 +20,8 @@ export interface PlaybackPreferencesSnapshot {
 
 export type PlaybackPreferencesProvider = () => PlaybackPreferencesSnapshot;
 
-/** Fallback only when entry has not injected a provider yet. */
 const DEFAULT_SNAPSHOT: PlaybackPreferencesSnapshot = {
-  searchLanguage: 'en',
+  searchLanguage: 'original',
   defaultQuality: 'best',
   mobileQuality: '480p',
 };

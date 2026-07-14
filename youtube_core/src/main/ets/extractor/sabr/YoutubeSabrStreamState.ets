@@ -200,6 +200,19 @@ class FormatProgress {
     return Math.max(1, Math.floor(timeMs / Math.max(1, this.averageDurationMs)) + 1);
   }
 
+  getPlaybackInitializationData(data: Uint8Array): Uint8Array {
+    const start = this.metadata?.initRangeStart ?? -1;
+    const end = this.metadata?.initRangeEnd ?? -1;
+    // UMP initialization media may contain both the decoder initialization bytes and the
+    // following SIDX index range. DASH already owns the segment timeline, so expose only the
+    // initialization byte range to the player. This also keeps hierarchical SIDX boxes away
+    // from FFmpeg builds that reject reference_type=1 while opening the track.
+    if (start >= 0 && end >= start && end < data.length) {
+      return data.subarray(start, end + 1);
+    }
+    return data;
+  }
+
   isComplete(): boolean {
     return this.initReceived && this.endSegmentNumber >= 0
       && this.lastSequence >= this.endSegmentNumber;
@@ -358,6 +371,11 @@ export class YoutubeSabrStreamState {
   getSegmentNumberAtOrAfterTimeMs(format: YoutubeSabrFormatMeta, timeMs: number): number {
     const progress = this.findProgressForItag(format.itag);
     return progress ? progress.getSegmentNumberAtOrAfterTimeMs(timeMs) : 1;
+  }
+
+  getPlaybackInitializationData(format: YoutubeSabrFormatMeta, data: Uint8Array): Uint8Array {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getPlaybackInitializationData(data) : data;
   }
 
   isComplete(format?: YoutubeSabrFormatMeta): boolean {

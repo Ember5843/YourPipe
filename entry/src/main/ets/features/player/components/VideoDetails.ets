@@ -311,10 +311,14 @@ export struct VideoDetails {
   }
 
   private async fetchChannelInfo() {
-    const channelId = this.channelId || this.item.channelId || '';
+    const channelId = (this.channelId || this.item.channelId || '').trim();
     const avatarUrl = this.channelAvatarUrl || this.item.channelAvatarUrl || '';
     Logger.debug(TAG, `[fetchChannelInfo] Starting, channelId=${channelId}`);
-    if (!channelId || !this.channelInfoService) {
+    // Channel browse requires UC… ids; empty / non-channel ids only produce 400 noise.
+    if (!channelId || !channelId.startsWith('UC') || !this.channelInfoService) {
+      if (channelId && !channelId.startsWith('UC')) {
+        Logger.warn(TAG, `[fetchChannelInfo] skip non-channel id: ${channelId}`);
+      }
       return;
     }
 

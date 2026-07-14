@@ -225,10 +225,9 @@ export class YouTubeExtractor {
   private cachedNextResponse: NextResponse | null = null;
   private cachedNextVideoId: string = '';
 
-  // Localization (defaults match Localization.DEFAULT / ContentCountry.DEFAULT;
-  // entry YouTubePlayService overwrites from SearchLocaleManager before each request).
-  public hl: string = 'en';
-  public gl: string = 'GB';
+  // Localization settings (playback path overwrites via YouTubePlayService)
+  public hl: string = 'en-GB';
+  public gl: string = 'US';
 
   constructor(context: common.UIAbilityContext) {
     this.context = context;
@@ -298,9 +297,7 @@ export class YouTubeExtractor {
    * @returns HTML string
    */
   async fetchWatchPage(videoId: string): Promise<string> {
-    const hlParam = encodeURIComponent(this.hl || 'en');
-    const watchUrl =
-      `https://www.youtube.com/watch?v=${videoId}&bpctr=9999999999&has_verified=1&hl=${hlParam}`;
+    const watchUrl = `https://www.youtube.com/watch?v=${videoId}&bpctr=9999999999&has_verified=1&hl=en`;
     logger.debug(`Fetching watch page: ${watchUrl}`);
 
     const response = await this.client.get(watchUrl);
@@ -636,7 +633,13 @@ export class YouTubeExtractor {
       if (!baseUrl) {
         continue;
       }
-      const cleanUrl = baseUrl
+      // WEB/MWEB /player can return `/api/timedtext?...` while watch HTML usually returned
+      // an absolute URL. MPV cannot resolve that path against youtube.com (the media source is
+      // our loopback DASH proxy), so normalize it before handing the track to the player.
+      const absoluteBaseUrl = baseUrl.startsWith('//')
+        ? `https:${baseUrl}`
+        : (baseUrl.startsWith('/') ? `https://www.youtube.com${baseUrl}` : baseUrl);
+      const cleanUrl = absoluteBaseUrl
         .replace(/([?&])fmt=[^&]*/g, '$1')
         .replace(/([?&])tlang=[^&]*/g, '$1')
         .replace(/\?&/, '?')
@@ -926,7 +929,14 @@ export class YouTubeExtractor {
           durationMs: fmt.approxDurationMs,
           isLive: false,
           isOtf: false,
-          audioLanguage: undefined,
+          // Locale from track id (e.g. "en.0" / "zh-Hans.4") — required for language ranking.
+          audioLanguage: (() => {
+            const id = fmt.audioTrackId || '';
+            if (!id) {
+              return undefined;
+            }
+            return id.split('.')[0].split('-')[0] || undefined;
+          })(),
           audioTrackId: fmt.audioTrackId,
           audioTrackName: fmt.audioTrackName,
           audioTrackType: fmt.isOriginalAudio ? 'original' : undefined,
@@ -1006,9 +1016,15 @@ export class YouTubeExtractor {
         codecs = codecMatch[1];
       }
       const track = fmt.audioTrack;
-      const displayName = track?.displayName;
-      const isOriginal = !!displayName
-        && (displayName.toLowerCase().includes('original') || displayName.includes('yokuqala'));
+      const displayName = (track?.displayName || '').trim();
+      const trackId = track?.id || '';
+      const langPart = trackId.length > 0 ? trackId.split('.')[0] : '';
+      const audioLocale = langPart.length > 0 ? langPart.split('-')[0] : undefined;
+      const isOriginal = (!!displayName
+        && (displayName.toLowerCase().includes('original')
+          || displayName.toLowerCase().includes('default')
+          || displayName.includes('yokuqala')))
+        || track?.audioIsDefault === true;
       let initStart: number | undefined = undefined;
       let initEnd: number | undefined = undefined;
       if (fmt.initRange?.start !== undefined) {
@@ -1041,9 +1057,10 @@ export class YouTubeExtractor {
         isVideo: isVideo && !isAudio,
         qualityLabel: fmt.qualityLabel,
         codecs: codecs,
-        audioTrackId: track?.id,
-        audioTrackName: displayName,
-        isOriginalAudio: isOriginal || track?.audioIsDefault === true,
+        audioTrackId: trackId || undefined,
+        // Prefer raw YouTube displayName; else raw track id — no synthesized labels.
+        audioTrackName: displayName.length > 0 ? displayName : (trackId || undefined),
+        isOriginalAudio: isOriginal,
         initializationUrl: fmt.url,
         initRangeStart: initStart,
         initRangeEnd: initEnd,
@@ -1202,11 +1219,12 @@ export class YouTubeExtractor {
       this.assertPlayerResponseVideoId(webMetaPr, videoId);
     }
 
-    // Metadata from WEB $fields player only (no watch HTML merge on stream path).
+    // Prefer WEB $fields for title/desc; fill missing ids from stream player (meta may be UNPLAYABLE).
     const metaBase: PlayerResponse = webMetaPr
       ?? innertubePlayers.player
       ?? ({ videoDetails: { videoId: videoId } } as PlayerResponse);
     const videoInfo = this.extractMetadata(videoId, metaBase);
+    this.fillMissingIdentityFromPlayer(videoInfo, innertubePlayers.player);
     videoInfo.playerResponse = metaBase;
 
     const streamPr = innertubePlayers.player;
@@ -1837,19 +1855,44 @@ export class YouTubeExtractor {
     if (!owner) {
       return;
     }
-    // uploaderUrl: channelId already in videoInfo, build URL
+    // Prefer channel id from owner browseEndpoint when metadata path left it empty.
+    if (!videoInfo.channelId) {
+      const browseId = this.getNestedValue(
+        owner as Object,
+        'navigationEndpoint.browseEndpoint.browseId'
+      ) as string;
+      if (browseId && browseId.startsWith('UC')) {
+        videoInfo.channelId = browseId;
+      }
+    }
     if (videoInfo.channelId) {
       videoInfo.uploaderUrl = `https://www.youtube.com/channel/${videoInfo.channelId}`;
     }
-    // uploaderAvatarUrl: highest resolution from owner.thumbnail.thumbnails
     const thumbs = owner.thumbnail?.thumbnails || [];
     if (thumbs.length > 0) {
       videoInfo.uploaderAvatarUrl = pickHighestThumbnailUrl(thumbs as Array<Record<string, Object>>);
     }
-    // uploaderSubscriberCount: subscriberCountText
     const subText = this.extractNextText(owner.subscriberCountText);
     if (subText) {
       videoInfo.uploaderSubscriberCount = parseSubscriberCount(subText);
+    }
+  }
+
+  /** When WEB metadata is UNPLAYABLE / partial, recover channelId/author from stream player. */
+  private fillMissingIdentityFromPlayer(videoInfo: VideoInfo, streamPr?: PlayerResponse): void {
+    if (!streamPr) {
+      return;
+    }
+    const vd = streamPr.videoDetails;
+    const micro = streamPr.microformat?.playerMicroformatRenderer;
+    if (!videoInfo.channelId) {
+      videoInfo.channelId = vd?.channelId || micro?.externalChannelId || '';
+    }
+    if (!videoInfo.author) {
+      videoInfo.author = vd?.author || micro?.ownerChannelName || '';
+    }
+    if (videoInfo.channelId && !videoInfo.uploaderUrl) {
+      videoInfo.uploaderUrl = `https://www.youtube.com/channel/${videoInfo.channelId}`;
     }
   }
 
@@ -2423,11 +2466,11 @@ export class YouTubeExtractor {
     const audioTrack = formatData.audioTrack;
     if (audioTrack.id) {
       const audioTrackId = audioTrack.id;
-      const displayName = audioTrack.displayName || '';
+      const displayName = (audioTrack.displayName || '').trim();
       const langPart = audioTrackId.split('.')[0];
       const audioLocale = langPart.split('-')[0];
-      const isDefault = displayName.includes('original') || displayName.includes('yokuqala');
-      const audioTrackName = isDefault ? langPart + ' (original)' : langPart;
+      // Raw API text only: displayName, else track id (no synthesized "(original)").
+      const audioTrackName = displayName.length > 0 ? displayName : audioTrackId;
       itagInfo.setAudioTrackInfo(audioTrackId, audioTrackName, audioLocale);
     }
   }

@@ -9,7 +9,6 @@ import { UIConfig } from '../common/AppState';
 import { PlaybackConfig } from '../common/PlaybackConfig';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
-import { SearchLocaleManager } from '../common/SearchLocaleManager';
 import { BackgroundTaskManager, AvPlayerController } from 'mediaservice';
 import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
 import { AuthSessionManager, YTCoreLogger, YoutubePlayerClientConfig } from 'youtube_core';
@@ -45,11 +44,14 @@ export default class EntryAbility extends UIAbility {
       PlaybackPreferences.setProvider(() => {
         const ui = AppStorage.get<UIConfig>('uiConfig') ?? new UIConfig();
         const pb = AppStorage.get<PlaybackConfig>('playbackConfig') ?? new PlaybackConfig();
-        // Resolve through SearchLocaleManager so default follows app/system locale
-        // instead of hard-coded en-GB (PipePipe preferred localization).
-        const resolvedLang = SearchLocaleManager.resolveSearchLanguage(ui);
+        // Audio track ranking (PipePipe preferred_audio_language default "original").
+        // Only use content language when user explicitly set it — never force en-GB.
+        const contentLang = (ui.searchLanguage || '').trim();
+        const preferredAudio = contentLang.length > 0 && contentLang !== 'default'
+          ? contentLang
+          : 'original';
         return {
-          searchLanguage: resolvedLang,
+          searchLanguage: preferredAudio,
           defaultQuality: pb.defaultQuality,
           mobileQuality: pb.mobileQuality,
         };

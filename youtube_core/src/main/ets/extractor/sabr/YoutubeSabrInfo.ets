@@ -98,4 +98,23 @@ export class YoutubeSabrInfo {
     }
     return undefined;
   }
+
+  /**
+   * Multi-language audio reuses the same itag (e.g. 140) with different audioTrackId.
+   * Prefer exact itag+track match; fall back to first itag only when track is empty.
+   */
+  findFormatByItagAndTrack(
+    itag: number,
+    audioTrackId?: string
+  ): YoutubeSabrFormatMeta | undefined {
+    const track = (audioTrackId || '').trim();
+    if (track.length > 0) {
+      for (const format of this.formats) {
+        if (format.itag === itag && (format.audioTrackId || '') === track) {
+          return format;
+        }
+      }
+    }
+    return this.findFormatByItag(itag);
+  }
 }

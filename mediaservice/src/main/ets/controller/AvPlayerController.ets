@@ -175,9 +175,60 @@ export class AvPlayerController {
     let audio: StreamInfo | undefined = undefined;
     if (entry.requiresSeparateAudio) {
       const cats = this.vm.playerModel.getStreamCategories();
-      audio = this.selectBestCompatibleAudio(entry.stream, cats.audio);
+      // Keep current audio track when switching video quality.
+      const curAudio = this.vm.playerModel.getCurrentStreams().audio;
+      const currentTrackId = (curAudio?.audioTrackId || curAudio?.audioLanguage || '').trim();
+      if (currentTrackId.length > 0) {
+        const sameTrack = cats.audio.filter((s: StreamInfo) => {
+          const id = (s.audioTrackId || s.audioLanguage || '').trim();
+          return id === currentTrackId;
+        });
+        audio = this.selectBestCompatibleAudio(entry.stream, sameTrack.length > 0 ? sameTrack : cats.audio);
+      } else {
+        audio = this.selectBestCompatibleAudio(entry.stream, cats.audio);
+      }
     }
     await this.switchQuality(entry.stream, audio);
+  }
+
+  public getAudioStreamList(): StreamInfo[] {
+    return this.vm.playerModel.getAudioStreamList();
+  }
+
+  public getCurrentAudioIndex(): number {
+    return this.vm.playerModel.getCurrentAudioIndex();
+  }
+
+  public getAudioStreamLabel(stream: StreamInfo | undefined): string {
+    return this.vm.playerModel.getAudioStreamLabel(stream);
+  }
+
+  /** Switch to a specific audio stream (by list index); keeps video + resume position. */
+  public async switchToAudioIndex(index: number): Promise<void> {
+    if (!this.isActive()) {
+      return;
+    }
+    const list = this.getAudioStreamList();
+    if (index < 0 || index >= list.length) {
+      return;
+    }
+    const audio = list[index];
+    const video = this.vm.playerModel.getCurrentStreams().video;
+    if (!video || !audio) {
+      return;
+    }
+    const cur = this.vm.playerModel.getCurrentStreams().audio;
+    if (cur && cur.itag === audio.itag
+      && (cur.audioTrackId || '') === (audio.audioTrackId || '')
+      && (cur.bitrate || 0) === (audio.bitrate || 0)) {
+      return;
+    }
+    // Honor exact user pick: do not re-rank by language. Compatibility may still
+    // reject container mismatch and fall back inside switchQuality.
+    Logger.info(TAG, `switchToAudioIndex: ${index} `
+      + `${audio.audioTrackName || audio.audioLanguage || '-'} itag=${audio.itag} `
+      + `track=${audio.audioTrackId || '-'}`);
+    await this.switchQuality(video, audio);
   }
 
   public setRefreshHandler(handler: (videoId: string, resumePos: number) => Promise<VideoData | null>): void {
@@ -646,9 +697,13 @@ export class AvPlayerController {
 
     const label = `${video.resolutionLabel} [${video.stream.itag}]`;
     if (video.deliveryMethod === 'SABR') {
-      Logger.info(TAG, `Selected SABR: video=${label}${audio ? ` audio=${audio.quality || audio.codecs} [${audio.itag}]` : ' (no audio)'}`);
+      Logger.info(TAG, `Selected SABR: video=${label}${audio
+        ? ` audio=${audio.audioTrackName || audio.audioLanguage || audio.codecs} [${audio.itag}] track=${audio.audioTrackId || '-'}`
+        : ' (no audio)'}`);
     } else if (video.deliveryMethod === 'DASH') {
-      Logger.info(TAG, `Selected DASH separated: video=${label}${audio ? ` audio=${audio.quality} [${audio.itag}]` : ' (no audio)'}`);
+      Logger.info(TAG, `Selected DASH separated: video=${label}${audio
+        ? ` audio=${audio.audioTrackName || audio.quality} [${audio.itag}] track=${audio.audioTrackId || '-'}`
+        : ' (no audio)'}`);
     } else if (video.deliveryMethod === 'HLS') {
       Logger.info(TAG, `Selected HLS variant: ${label}`);
     } else {
@@ -1109,17 +1164,59 @@ export class AvPlayerController {
     return kind === 'video_only' || delivery === 'DASH' || videoStream.initRangeStart !== undefined;
   }
 
+  /**
+   * Auto-pick audio for video: prefer original track, then higher bitrate,
+   * among container-compatible candidates. UI lists every stream; this is default only.
+   */
   private selectBestCompatibleAudio(videoStream: StreamInfo, audioStreams: StreamInfo[]): StreamInfo | undefined {
     const candidates = this.compatibleAudioCandidates(videoStream, audioStreams);
-    if (candidates.length === 0) return undefined;
-    return candidates.slice().sort((a: StreamInfo, b: StreamInfo): number => (b.bitrate || 0) - (a.bitrate || 0))[0];
+    if (candidates.length === 0) {
+      return undefined;
+    }
+    const isOriginal = (s: StreamInfo): boolean => {
+      const type = (s.audioTrackType || '').toUpperCase();
+      const name = (s.audioTrackName || '').toLowerCase();
+      return type === 'ORIGINAL'
+        || name.indexOf('original') >= 0
+        || name.indexOf('default') >= 0;
+    };
+    return candidates.slice().sort((a: StreamInfo, b: StreamInfo): number => {
+      const oa = isOriginal(a) ? 1 : 0;
+      const ob = isOriginal(b) ? 1 : 0;
+      if (oa !== ob) {
+        return ob - oa;
+      }
+      return (b.bitrate || 0) - (a.bitrate || 0);
+    })[0];
   }
 
   private ensureCompatibleAudio(videoStream: StreamInfo, requestedAudio?: StreamInfo): StreamInfo | undefined {
     if (requestedAudio && this.isAudioCompatibleWithVideo(videoStream, requestedAudio)) {
       return requestedAudio;
     }
-    return this.selectBestCompatibleAudio(videoStream, this.vm.playerModel.categorizedStreams.audio) || requestedAudio;
+    // Container mismatch: stay on same track id if another itag of that track is compatible.
+    if (requestedAudio) {
+      const trackId = (requestedAudio.audioTrackId || '').trim();
+      if (trackId.length > 0) {
+        const sameTrack = this.vm.playerModel.categorizedStreams.audio.filter((s: StreamInfo) =>
+          (s.audioTrackId || '') === trackId
+        );
+        const sameCompat = this.selectBestCompatibleAudio(videoStream, sameTrack);
+        if (sameCompat) {
+          Logger.info(TAG, `ensureCompatibleAudio: remapped to same track=${trackId} itag=${sameCompat.itag}`);
+          return sameCompat;
+        }
+      }
+    }
+    const fallback = this.selectBestCompatibleAudio(videoStream, this.vm.playerModel.categorizedStreams.audio);
+    if (requestedAudio && fallback
+      && ((requestedAudio.audioTrackId || '') !== (fallback.audioTrackId || '')
+        || requestedAudio.itag !== fallback.itag)) {
+      Logger.warn(TAG, `ensureCompatibleAudio: fell back from `
+        + `${requestedAudio.audioTrackName || requestedAudio.audioTrackId || '-'}[${requestedAudio.itag}] `
+        + `to ${fallback.audioTrackName || fallback.audioTrackId || '-'}[${fallback.itag}]`);
+    }
+    return fallback || requestedAudio;
   }
 
   private compatibleAudioCandidates(videoStream: StreamInfo, audioStreams: StreamInfo[]): StreamInfo[] {

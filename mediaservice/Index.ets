@@ -7,7 +7,8 @@ export { LocalMediaProxy } from './src/main/ets/controller/LocalMediaProxy';
 export { sabrSessionStore } from './src/main/ets/sabr/SabrSessionStore';
 export { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './src/main/ets/engine/PlaybackEngine';
 export { VideoHwCaps } from './src/main/ets/engine/VideoHwCaps';
-export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from './src/main/ets/model/PlayerModel';
+export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry, AudioTrackOption } from './src/main/ets/model/PlayerModel';
+// AudioTrackOption kept for compatibility; UI now lists StreamInfo via getAudioStreamList.
 export { VideoData, StreamInfo, SelectOption } from './src/main/ets/model/VideoData';
 export { SubtitleTrack } from 'youtube_core';
 export { BackgroundTaskManager } from './src/main/ets/common/BackgroundTaskManager';

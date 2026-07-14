@@ -66,6 +66,16 @@ export class SabrTrackBuffer {
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const segment = await this.lease.session.fetchSegment(request);
+        if (initSegment) {
+          const format = this.isAudio ? this.lease.audioFormat : this.lease.videoFormat;
+          const playbackData = this.lease.session.getStreamState()
+            .getPlaybackInitializationData(format, segment.data);
+          if (playbackData.length !== segment.data.length) {
+            Logger.info(TAG, `trim init itag=${this.getItag()} `
+              + `bytes=${segment.data.length}->${playbackData.length}`);
+          }
+          return playbackData;
+        }
         return segment.data;
       } catch (e) {
         if (this.lease.session.isBeyondEnd(request)
@@ -195,15 +205,17 @@ export class SabrTrackBuffer {
       ? this.estimatedTotalBytes
       : Math.max(this.extentEnd() * 4, initLen + 1);
     const windowEnd = Math.max(this.totalKnownBytes, this.mediaBaseByte, this.extentEnd());
-    // A bitrate/content-length estimate can be slightly shorter than the actual fragmented
-    // stream. Do not turn a normal read in that known tail into a seek-to-duration operation.
+    // Still inside/near the known progressive window: keep pumping, never cold-seek.
     if (start <= windowEnd + 256 * 1024) {
       return false;
     }
-    // Past advertised end (lavf bogus seek) or far past contiguous window.
+    // Past advertised Content-Length: lavf often probes with absurd offsets (>> est).
+    // Mapping those to ratio=1 seeks to the *end* of the video (start-from-last-frame bug).
+    // Treat as EOF instead — serve empty range, do not prepareSeek(duration).
     if (start >= est) {
-      return true;
+      return false;
     }
+    // Legitimate mid-file jump far past the contiguous window.
     return start > windowEnd + 256 * 1024;
   }
 
@@ -212,9 +224,13 @@ export class SabrTrackBuffer {
     const est = this.estimatedTotalBytes > initLen
       ? this.estimatedTotalBytes
       : Math.max(this.extentEnd() * 4, initLen + 1024 * 1024);
-    // Clamp ratio so absurd lavf offsets (e.g. 682MB vs 96MB) map into [0, duration].
-    const ratio = Math.min(1, Math.max(0, start / Math.max(est, 1)));
-    const targetMs = ratio * this.durationMs;
+    // Only called for start < est (see shouldColdSeek). Keep ratio strictly in [0, 1).
+    const ratio = Math.min(0.999, Math.max(0, start / Math.max(est, 1)));
+    let targetMs = ratio * this.durationMs;
+    // Never land on exact duration (mpv would open at EOF and look "stuck at end").
+    if (this.durationMs > 2000) {
+      targetMs = Math.min(targetMs, this.durationMs - 1000);
+    }
     Logger.info(TAG, `cold seek itag=${this.getItag()} byte=${start} est=${est} `
       + `ratio=${ratio.toFixed(3)} → ${Math.floor(targetMs)}ms`);
     this.resetForSeek(targetMs);
