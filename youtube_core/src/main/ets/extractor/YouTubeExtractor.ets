@@ -381,8 +381,9 @@ export class YouTubeExtractor {
   }
 
   /**
-   * PipePipe getWebPlayerResponse LOGIN_REQUIRED / age-gate handling for the
-   * fields-limited WEB metadata player (not the stream client).
+   * PipePipe getWebPlayerResponse: only LOGIN_REQUIRED / age-gate hard-fail here.
+   * WEB $fields metadata often returns UNPLAYABLE while the stream client (mweb)
+   * is still OK — do not abort the whole extract on metadata status alone.
    */
   private checkWebMetadataPlayability(playabilityStatus: PlayabilityStatus | undefined): void {
     if (!playabilityStatus) {
@@ -407,8 +408,9 @@ export class YouTubeExtractor {
       }
       throw new SignInConfirmNotBotException(reason || 'Login required / anti-bot');
     }
-    // Non-LOGIN failures still use the shared mapper (private/geo/paid/etc. are rare here).
-    this.checkPlayabilityStatus(playabilityStatus);
+    // Soft: metadata WEB may be blocked/unplayable while stream player has streamingData.
+    const reason = this.resolvePlayabilityReason(playabilityStatus);
+    logger.warn(`[META] WEB metadata playability ignored status=${status} reason=${reason || '(none)'}`);
   }
 
   private assertPlayerResponseVideoId(playerResponse: PlayerResponse, videoId: string): void {
