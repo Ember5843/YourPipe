@@ -184,6 +184,7 @@ export class YoutubeSabrSession {
 
     let policyOnly = 0;
     let holeRecoveryApplied = false;
+    let policyRecoveryApplied = false;
     for (let attempt = 0; attempt < MAX_REQUESTS_PER_SEGMENT; attempt++) {
       if (this.closed) {
         throw new SabrProtocolException('SABR session closed');
@@ -234,6 +235,21 @@ export class YoutubeSabrSession {
       if (decoded.isPolicyOnlyResponse()) {
         policyOnly++;
         if (policyOnly >= MAX_POLICY_ONLY_RESPONSES) {
+          // PipePipe's stream pump repositions an outstanding near-edge demand when the
+          // server keeps acknowledging policy but returns no media. Without that step we
+          // resend the same buffered range and playback cookie forever, then expose a
+          // broken proxy response to the player. Re-advertise only the demanded track;
+          // keep the companion timeline intact so normal A/V read-ahead can continue.
+          if (!request.initSegment && requestFormat && !policyRecoveryApplied) {
+            policyRecoveryApplied = true;
+            policyOnly = 0;
+            this.backoffUntilMs = 0;
+            this.consecutiveNoMedia = 0;
+            this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
+            logger.info(`[SABR] recover policy-only itag=${request.itag} `
+              + `seq=${request.sequenceNumber} targetMs=${requestTargetMs}`);
+            continue;
+          }
           throw new SabrProtocolException(
             `SABR repeated policy-only responses: ${decoded.summarizeNoMediaResponse()}`);
         }

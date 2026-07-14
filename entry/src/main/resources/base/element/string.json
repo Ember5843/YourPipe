@@ -1375,6 +1375,10 @@
                     {
                         "name":  "yt_action_audio_only_play",
                         "value":  "仅音频播放"
+                    },
+                    {
+                        "name":  "yt_player_subtitle_off",
+                        "value":  "关闭字幕"
                     }
                     ]
 }

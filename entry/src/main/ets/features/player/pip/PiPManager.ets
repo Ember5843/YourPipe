@@ -3,6 +3,7 @@ import { PiPWindow } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { PlayerSession } from '../../../common/PlayerSession';
 import { PlayerPresentation } from '../../../common/PlayerPresentation';
+import { AvPlayerController, PlaybackState } from 'mediaservice';
 
 const logger = AppLog.getInstance('PiPManager');
 const TAG: string = '[PiP][PiPManager]';
@@ -41,6 +42,14 @@ export class PiPManager {
   /** 与 Index.ets 的 HdsNavigation id 一致，用于 PiP 还原时恢复原页面 */
   private navigationId: string = 'mainNavigation';
   private lifecycleCallbacks: PiPLifecycleCallback[] = [];
+  private playbackStateController: AvPlayerController | null = null;
+  private hasPlaybackState: boolean = false;
+  private lastIsPlaying: boolean = false;
+  private playbackStateListener = (state: PlaybackState): void => {
+    this.hasPlaybackState = true;
+    this.lastIsPlaying = state.isPlaying;
+    this.applyPlaybackStateToPiP();
+  };
 
   /** PiP 关闭时回调（移植 0.4.0）：由 PlayerSession 注入，区分后台暂停/前台释放 */
   onPipStop: (() => void) | null = null;
@@ -100,8 +109,10 @@ export class PiPManager {
    * videoWidth/videoHeight 用于计算 PiP 窗口比例（必须大于 0）。
    */
   async init(ctx: common.UIAbilityContext, videoWidth: number, videoHeight: number): Promise<boolean> {
+    this.attachPlaybackStateSource();
     if (this.isInitialized && this.pipController) {
       this.updateContentSize(videoWidth, videoHeight);
+      this.applyPlaybackStateToPiP();
       return true;
     }
     if (this.isCreatingController) {
@@ -134,6 +145,7 @@ export class PiPManager {
       this.registerCallbacks();
       this.pipController.setAutoStartEnabled(false);
       this.isInitialized = true;
+      this.applyPlaybackStateToPiP();
       logger.info(`${TAG} init success, pipController created`);
       return true;
     } catch (e) {
@@ -188,6 +200,7 @@ export class PiPManager {
         session.setPiPActive(true);
         // Keep video decode ON for PiP surface (cancel any background off timer).
         PlayerPresentation.onPipStarted();
+        this.applyPlaybackStateToPiP();
         break;
       case PiPWindow.PiPState.ABOUT_TO_STOP:
         // 即将退出 PiP（关闭、要释放或要恢复都会先走这一步）：系统准备把 surface
@@ -336,9 +349,33 @@ export class PiPManager {
    * 仅在 PiP 控制器已创建时生效；缓冲中不切换，避免按钮抖动。
    */
   updatePlayPauseStatus(isPlaying: boolean): void {
-    if (!this.pipController) {
-      return;
+    // Compatibility entry for callers without a full PlaybackState. Cache the
+    // value so controller creation / STARTED can replay it instead of dropping it.
+    this.hasPlaybackState = true;
+    this.lastIsPlaying = isPlaying;
+    this.applyPlayPauseStatus(isPlaying);
+  }
+
+  private attachPlaybackStateSource(): void {
+    const controller: AvPlayerController = PlayerSession.getInstance().controller;
+    if (this.playbackStateController === controller) return;
+    if (this.playbackStateController) {
+      this.playbackStateController.unsubscribePlaybackState(this.playbackStateListener);
     }
+    this.playbackStateController = controller;
+    controller.subscribePlaybackState(this.playbackStateListener);
+    const state: PlaybackState = controller.getPlaybackState();
+    this.hasPlaybackState = true;
+    this.lastIsPlaying = state.isPlaying;
+  }
+
+  private applyPlaybackStateToPiP(): void {
+    if (!this.hasPlaybackState) return;
+    this.applyPlayPauseStatus(this.lastIsPlaying);
+  }
+
+  private applyPlayPauseStatus(isPlaying: boolean): void {
+    if (!this.pipController) return;
     try {
       const status: PiPWindow.PiPControlStatus =
         isPlaying ? PiPWindow.PiPControlStatus.PLAY : PiPWindow.PiPControlStatus.PAUSE;

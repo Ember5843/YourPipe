@@ -1035,6 +1035,10 @@
                     {
                         "name":  "yt_action_audio_only_play",
                         "value":  "僅音訊播放"
+                    },
+                    {
+                        "name":  "yt_player_subtitle_off",
+                        "value":  "關閉字幕"
                     }
                     ]
 }

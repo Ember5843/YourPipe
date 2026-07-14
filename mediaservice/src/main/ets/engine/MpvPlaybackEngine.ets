@@ -274,7 +274,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
     ctrl.pause();
-    this.emitCurrentState();
   }
 
   stop(): void {
@@ -284,13 +283,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
     ctrl.stop();
-    this.loaded = false;
-    this.preparing = false;
-    this.isReady = false;
-    this.isEnded = false;
-    this.isBuffering = false;
-    this.isSeeking = false;
-    this.emitCurrentState();
   }
 
   seek(positionSec: number, keyframe: boolean): void {
@@ -415,7 +407,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (ctrl === null || this.destroyed || this.sourceUrl.length === 0) return;
     ctrl.play();
     this.isEnded = false;
-    this.emitCurrentState();
   }
 
   private seekInternal(targetMs: number, keyframe: boolean): void {

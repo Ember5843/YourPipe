@@ -70,7 +70,7 @@ export const GPU_API_DISPLAY: Record<GpuApi, string> = {
 };
 
 export class PlaybackConfig {
-  defaultQuality: VideoQualityCap = 'best';
+  defaultQuality: VideoQualityCap = '480p';
   mobileQuality: VideoQualityCap = '480p';
   /** 返回键/home 键时是否自动进入画中画（设备不支持时强制 false） */
   pipOnReturn: boolean = true;
@@ -113,7 +113,7 @@ export class PlaybackConfig {
 
   static loadFromPreferences(): PlaybackConfig {
     const cfg = new PlaybackConfig();
-    cfg.defaultQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_defaultQuality', 'best'), 'best');
+    cfg.defaultQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_defaultQuality', '480p'), '480p');
     cfg.mobileQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_mobileQuality', '480p'), '480p');
     cfg.pipOnReturn = PreferencesStore.getString('cfg_pb_pipOnReturn', 'true') === 'true';
     cfg.backgroundAudioOnly = PreferencesStore.getString('cfg_pb_backgroundAudioOnly', 'true') === 'true';

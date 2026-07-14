@@ -1019,6 +1019,10 @@
                     {
                         "name":  "yt_action_audio_only_play",
                         "value":  "Nur Audio abspielen"
+                    },
+                    {
+                        "name":  "yt_player_subtitle_off",
+                        "value":  "Untertitel aus"
                     }
                     ]
 }

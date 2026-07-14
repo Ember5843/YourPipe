@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import { componentUtils, SymbolGlyphModifier } from '@kit.ArkUI';
+import { componentUtils, LengthMetrics } from '@kit.ArkUI';
 import { ConfigurationConstant } from '@kit.AbilityKit';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
@@ -25,8 +25,7 @@ import {
   PlayerState,
   StateChangeListener,
   VideoEntry,
-  SubtitleTrack,
-  SelectOption
+  SubtitleTrack
 } from 'mediaservice';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
@@ -79,7 +78,6 @@ export struct VideoPlayer {
   // 才能让 vm 内部字段（isPlaying / isReady / ...）的变化触发 UI 重渲染。
   @Link vm: PlayerUiViewModel;
   private lastController?: AvPlayerController;
-  private qualityArrowModifier: SymbolGlyphModifier = new SymbolGlyphModifier();
   @State hasStreams: boolean = false;
   @State hasError: boolean = false;
   @State isWaitingForDualBuffer: boolean = false;
@@ -100,13 +98,6 @@ export struct VideoPlayer {
    */
   private keepScreenListener: StateChangeListener = new KeepScreenOnStateListener(this);
 
-  /**
-   * PiP 播放/暂停按钮同步监听器：把 MPV 状态机的状态变化同步给画中画面板，
-   * 使 PiP 控件显示与真实播放状态一致。
-   * 缓冲(BUFFERING)不切换，避免按钮抖动；其余按 isPlaying 语义推送。
-   */
-  private pipSyncListener: StateChangeListener = new PiPPlayPauseSyncListener(this);
-
   // 由 KeepScreenOnStateListener 调用，集中管理屏幕常亮策略。
   public _onKeepScreenStateChanged(to: PlayerState): void {
     const shouldKeepOn: boolean = to === PlayerState.PLAYING
@@ -118,17 +109,6 @@ export struct VideoPlayer {
     } else {
       this.clearHideTimer();
     }
-  }
-
-  // 由 PiPPlayPauseSyncListener 调用：把 MPV 状态同步到画中画播放/暂停按钮。
-  // PLAYING → PLAY（显示暂停按钮）；PAUSED/COMPLETED/READY/IDLE/ERROR/RELEASED → PAUSE（显示播放按钮）；
-  // BUFFERING 跳过，避免缓冲时按钮来回抖动。
-  public _onPiPStateChanged(to: PlayerState): void {
-    if (to === PlayerState.BUFFERING) {
-      return;
-    }
-    const isPlaying: boolean = to === PlayerState.PLAYING;
-    PiPManager.getInstance().updatePlayPauseStatus(isPlaying);
   }
 
   private progressListener = (currentTime: number, durationTime: number) => {
@@ -448,8 +428,6 @@ export struct VideoPlayer {
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
     // 屏幕常亮：跟随播放状态机驱动
     this.controller.addStateListener(this.keepScreenListener);
-    // PiP 播放/暂停按钮同步：跟随 MPV 状态机驱动
-    this.controller.addStateListener(this.pipSyncListener);
     // 立即按当前 vm 状态同步一次（避免错过初始 PLAYING / 引擎已就绪）
     this.envService.setKeepScreenOn(this.vm.isPlaying || this.vm.isBuffering);
     // 立即同步一次 PiP 播放/暂停按钮状态（页面恢复/复用时按钮即时对齐）
@@ -461,8 +439,6 @@ export struct VideoPlayer {
 
     // 初始化流状态
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
-
-    this.qualityArrowModifier.fontSize(13).fontColor(['#CCCCCC']);
 
     this.preCalculateRects();
     this.calculateSurfaceSize();
@@ -625,31 +601,51 @@ export struct VideoPlayer {
     Menu() {
       ForEach([0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0], (speed: number) => {
         MenuItem({ content: speed + 'x' })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
           .onClick(() => {
             this.controller.setPlaybackSpeed(speed);
           })
       })
     }
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .borderRadius(12)
+    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+    .width(180)
   }
 
   @Builder
   SubtitleMenu() {
     Menu() {
       MenuItem({
-        content: (this.vm.currentSubtitleUrl === '' ? '\u2713 ' : '') + '关闭字幕'
+        content: $r('app.string.yt_player_subtitle_off'),
+        endIcon: this.vm.currentSubtitleUrl === '' ? $r('sys.symbol.checkmark') : ''
       })
+        .contentFontColor($r('sys.color.font_primary'))
+        .contentFont({ size: 14 })
+        .backgroundColor(this.vm.currentSubtitleUrl === ''
+          ? $r('app.color.yourtube_bg_surface_muted') : Color.Transparent)
         .onClick(() => {
           this.controller.switchSubtitle('');
         })
       ForEach(this.vm.subtitleTracks, (track: SubtitleTrack) => {
         MenuItem({
-          content: (this.vm.currentSubtitleUrl === track.url ? '\u2713 ' : '') + track.name
+          content: this.getSubtitleLabel(track),
+          endIcon: this.vm.currentSubtitleUrl === track.url ? $r('sys.symbol.checkmark') : ''
         })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .backgroundColor(this.vm.currentSubtitleUrl === track.url
+            ? $r('app.color.yourtube_bg_surface_muted') : Color.Transparent)
           .onClick(() => {
             this.controller.switchSubtitle(track.url);
           })
       }, (track: SubtitleTrack) => track.url)
     }
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .borderRadius(12)
+    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+    .width(220)
   }
 
   @Builder
@@ -657,15 +653,47 @@ export struct VideoPlayer {
     Menu() {
       ForEach(this.controller.getAudioStreamList(), (stream: StreamInfo, index: number) => {
         MenuItem({
-          content: (this.getSelectedAudioIndex() === index ? '\u2713 ' : '')
-            + this.controller.getAudioStreamLabel(stream)
+          content: this.getAudioLabel(stream),
+          endIcon: this.getSelectedAudioIndex() === index ? $r('sys.symbol.checkmark') : ''
         })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .backgroundColor(this.getSelectedAudioIndex() === index
+            ? $r('app.color.yourtube_bg_surface_muted') : Color.Transparent)
           .onClick(() => {
             this.controller.switchToAudioIndex(index);
           })
       }, (stream: StreamInfo, index: number) =>
-        `${stream.itag || 0}_${stream.audioTrackId || ''}_${stream.bitrate || 0}_${index}`)
+        `${stream.itag ?? ''}_${stream.audioTrackId || ''}_${stream.sourceClient || ''}_${index}`)
     }
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .borderRadius(12)
+    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+    .width(220)
+  }
+
+  @Builder
+  VideoMenu() {
+    Menu() {
+      ForEach(this.controller.getMergedVideoList(), (entry: VideoEntry, index: number) => {
+        MenuItem({
+          content: this.getVideoLabel(entry.stream),
+          endIcon: this.getSelectedVideoIndex() === index ? $r('sys.symbol.checkmark') : ''
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .backgroundColor(this.getSelectedVideoIndex() === index
+            ? $r('app.color.yourtube_bg_surface_muted') : Color.Transparent)
+          .onClick(() => {
+            this.controller.switchToVideoEntry(entry);
+          })
+      }, (entry: VideoEntry, index: number) =>
+        `${entry.stream.itag ?? ''}_${entry.stream.audioTrackId || ''}_${entry.stream.sourceClient || ''}_${index}`)
+    }
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .borderRadius(12)
+    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+    .width(220)
   }
 
   private getSelectedVideoIndex(): number {
@@ -675,26 +703,30 @@ export struct VideoPlayer {
     return idx >= 0 ? idx : 0;
   }
 
-  private getCurrentQualityLabel(): string {
-    const list = this.controller.getMergedVideoList();
-    const idx = this.getSelectedVideoIndex();
-    if (idx >= 0 && idx < list.length) {
-      return `${list[idx].resolutionLabel} (${list[idx].codecLabel})`;
-    }
-    return 'Auto';
+  private getSubtitleLabel(track: SubtitleTrack): string {
+    return [track.name, track.languageCode, track.kind]
+      .filter((value: string | undefined): boolean => !!value && value.trim().length > 0)
+      .join(' · ');
+  }
+
+  private getAudioLabel(stream: StreamInfo): string {
+    return stream.audioTrackName?.trim()
+      || stream.audioLanguage?.trim()
+      || stream.audioTrackId?.trim()
+      || stream.codecs?.trim()
+      || 'Audio';
+  }
+
+  private getVideoLabel(stream: StreamInfo): string {
+    const values: string[] = [];
+    if (stream.quality?.trim()) values.push(stream.quality);
+    if (stream.itag !== undefined) values.push(`itag ${stream.itag}`);
+    if (stream.codecs?.trim()) values.push(stream.codecs);
+    return values.join(' · ');
   }
 
   private getSelectedAudioIndex(): number {
     return this.controller.getCurrentAudioIndex();
-  }
-
-  private getCurrentAudioLabel(): string {
-    const list = this.controller.getAudioStreamList();
-    const idx = this.getSelectedAudioIndex();
-    if (idx >= 0 && idx < list.length) {
-      return this.controller.getAudioStreamLabel(list[idx]);
-    }
-    return 'Audio';
   }
 
   /**
@@ -1072,53 +1104,35 @@ export struct VideoPlayer {
           this.actionHub.closePage();
         })
 
-      // 字幕按钮（仅在可用字幕轨道时显示）
-      if (this.vm.subtitleTracks.length > 0) {
-        Text('CC')
-          .fontSize(16)
-          .fontColor(Color.White)
-          .fontWeight(FontWeight.Medium)
-          .bindMenu(this.SubtitleMenu())
-      }
-
       Blank()
 
-      // 右侧操作栏 (音轨 Menu + 清晰度 + 播放速度) — Menu 不占横向宽度
-      Row({ space: 16 }) {
+      // 右侧操作栏：入口统一使用 SymbolGlyph，展开后使用 Menu。
+      Row({ space: 8 }) {
+        if (this.vm.subtitleTracks.length > 0) {
+          SymbolGlyph($r('sys.symbol.AI_subtitles'))
+            .fontSize(24)
+            .fontColor([Color.White])
+            .width(40)
+            .height(40)
+            .bindMenu(this.SubtitleMenu())
+        }
+
         if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 0) {
-          Text('Audio')
-            .fontSize(16)
-            .fontColor(Color.White)
-            .fontWeight(FontWeight.Medium)
+          SymbolGlyph($r('sys.symbol.speaker_wave_2'))
+            .fontSize(24)
+            .fontColor([Color.White])
+            .width(40)
+            .height(40)
             .bindMenu(this.AudioMenu())
         }
 
-        // 清晰度选择（直播时隐藏）
-        if (!this.curSource.isLive) {
-          Select(
-            this.controller.getMergedVideoList().map((e: VideoEntry) =>
-              ({ value: `${e.resolutionLabel} (${e.codecLabel})` } as SelectOption)
-            )
-          )
-            .selected(this.getSelectedVideoIndex())
-            .value(this.getCurrentQualityLabel())
-            .font({ size: 13 })
-            .fontColor(this.currentColorMode === ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT ? '#1A1A1A' : Color.White)
-            .selectedOptionFont({ size: 14, weight: FontWeight.Bold })
-            .selectedOptionFontColor(this.themePrimary)
-            .selectedOptionBgColor('#1AD32F2F')
-            .optionFont({ size: 14 })
-            .optionFontColor($r('app.color.yourtube_text_secondary'))
-            .menuBackgroundColor($r('app.color.yourtube_bg_surface'))
-            .backgroundColor(Color.Transparent)
-            .arrowModifier(this.qualityArrowModifier)
-            .constraintSize({ maxWidth: 120 })
-            .onSelect((index: number) => {
-              const entry = this.controller.getMergedVideoList()[index];
-              if (entry) {
-                this.controller.switchToVideoEntry(entry);
-              }
-            })
+        if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
+          SymbolGlyph($r('sys.symbol.resolution_video'))
+            .fontSize(24)
+            .fontColor([Color.White])
+            .width(40)
+            .height(40)
+            .bindMenu(this.VideoMenu())
         }
 
         // 播放速度
@@ -1126,6 +1140,8 @@ export struct VideoPlayer {
           .fontSize(16)
           .fontColor(Color.White)
           .fontWeight(FontWeight.Medium)
+          .height(40)
+          .padding({ left: 6, right: 6 })
           .bindMenu(this.SpeedMenu())
       }
     }
@@ -1269,7 +1285,6 @@ export struct VideoPlayer {
 
   aboutToDisappear(): void {
     this.controller.removeStateListener(this.keepScreenListener);
-    this.controller.removeStateListener(this.pipSyncListener);
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
     this.controller.unsubscribeEnded(this.onEnded);
@@ -1291,15 +1306,5 @@ class KeepScreenOnStateListener implements StateChangeListener {
   }
   onStateChange(_from: PlayerState, to: PlayerState): void {
     this.owner._onKeepScreenStateChanged(to);
-  }
-}
-
-class PiPPlayPauseSyncListener implements StateChangeListener {
-  private readonly owner: VideoPlayer;
-  constructor(owner: VideoPlayer) {
-    this.owner = owner;
-  }
-  onStateChange(_from: PlayerState, to: PlayerState): void {
-    this.owner._onPiPStateChanged(to);
   }
 }

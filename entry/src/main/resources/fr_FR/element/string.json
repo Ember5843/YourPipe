@@ -1035,6 +1035,10 @@
                     {
                         "name":  "yt_action_audio_only_play",
                         "value":  "Lire audio uniquement"
+                    },
+                    {
+                        "name":  "yt_player_subtitle_off",
+                        "value":  "Sous-titres désactivés"
                     }
                     ]
 }

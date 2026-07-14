@@ -14,6 +14,7 @@ import { audio } from '@kit.AudioKit';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { image } from '@kit.ImageKit';
+import { PlaybackEngineState } from '../engine/PlaybackEngine';
 
 const TAG = '[AvSessionManager]';
 
@@ -24,6 +25,8 @@ export class AvSessionManager {
   private currentMetadata: avSession.AVMetadata | undefined = undefined;
   private audioSessionManager: audio.AudioSessionManager | undefined = undefined;
   private audioSessionActivated: boolean = false;
+  private pendingPlaybackState: avSession.AVPlaybackState | null = null;
+  private playbackStateWriteInFlight: boolean = false;
 
   // Callbacks wired up by AvPlayerController
   public onPlayCommand: (() => void) | undefined = undefined;
@@ -253,6 +256,7 @@ export class AvSessionManager {
    * @param isCompleted Whether playback reached natural EOF
    */
   public setPlaybackState(
+    engineState: PlaybackEngineState,
     isPlaying: boolean,
     positionSec: number,
     speed: number,
@@ -263,14 +267,15 @@ export class AvSessionManager {
       return;
     }
     let playbackState: avSession.PlaybackState;
-    if (isBuffering) {
-      // Highest priority: stalled or seek in flight — freeze the system progress bar
-      playbackState = avSession.PlaybackState.PLAYBACK_STATE_BUFFERING;
-    } else if (isCompleted) {
+    if (isCompleted) {
       // Natural EOF — system card may show replay button
       playbackState = avSession.PlaybackState.PLAYBACK_STATE_COMPLETED;
-    } else if (isPlaying) {
+    } else if (engineState === 'buffering' || isBuffering) {
+      playbackState = avSession.PlaybackState.PLAYBACK_STATE_BUFFERING;
+    } else if (engineState === 'playing' || isPlaying) {
       playbackState = avSession.PlaybackState.PLAYBACK_STATE_PLAY;
+    } else if (engineState === 'stopped') {
+      playbackState = avSession.PlaybackState.PLAYBACK_STATE_STOP;
     } else {
       playbackState = avSession.PlaybackState.PLAYBACK_STATE_PAUSE;
     }
@@ -282,10 +287,21 @@ export class AvSessionManager {
       },
       speed: speed
     };
+    this.pendingPlaybackState = state;
+    this.flushPlaybackState();
+  }
+
+  private flushPlaybackState(): void {
+    if (this.playbackStateWriteInFlight || !this.session || !this.pendingPlaybackState) return;
+    const state: avSession.AVPlaybackState = this.pendingPlaybackState;
+    this.pendingPlaybackState = null;
+    this.playbackStateWriteInFlight = true;
     this.session.setAVPlaybackState(state, (err: BusinessError) => {
+      this.playbackStateWriteInFlight = false;
       if (err) {
         Logger.error(TAG, `setAVPlaybackState failed: code=${err.code}, message=${err.message}`);
       }
+      this.flushPlaybackState();
     });
   }
 
@@ -393,8 +409,8 @@ export class AvSessionManager {
   // AudioSession — focus concurrency + interrupt forwarding
   //
   // HarmonyOS AudioSession (mediaservice owns policy, not native MPV):
-  //   1. Activate with CONCURRENCY_MIX_WITH_OTHERS BEFORE play so transient
-  //      streams (nav/TTS) prefer mix/duck over hard pause when allowed.
+  //   1. Activate with the default MEDIA concurrency policy before play so an
+  //      existing media player yields audio focus instead of mixing with us.
   //   2. Deactivate on user pause/stop → release focus for background music.
   //   3. Re-activate on next play() / system RESUME after temporary PAUSE.
   //
@@ -420,7 +436,7 @@ export class AvSessionManager {
       this.audioSessionManager.setAudioSessionScene(
         audio.AudioSessionScene.AUDIO_SESSION_SCENE_MEDIA);
       const strategy: audio.AudioSessionStrategy = {
-        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
+        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_DEFAULT
       };
 
       this.audioSessionManager.on('audioSessionDeactivated',
@@ -435,13 +451,13 @@ export class AvSessionManager {
         });
 
       if (this.audioSessionActivated) {
-        Logger.info(TAG, '[AudioFocus] session already active (MIX_WITH_OTHERS)');
+        Logger.info(TAG, '[AudioFocus] session already active (DEFAULT)');
         return;
       }
 
       this.audioSessionManager.activateAudioSession(strategy).then(() => {
         this.audioSessionActivated = true;
-        Logger.info(TAG, '[AudioFocus] sessionActivated strategy=MIX_WITH_OTHERS scene=MEDIA');
+        Logger.info(TAG, '[AudioFocus] sessionActivated strategy=DEFAULT scene=MEDIA');
       }).catch((e: BusinessError) => {
         Logger.error(TAG, `[AudioFocus] activate failed code=${e.code} message=${e.message}`);
       });

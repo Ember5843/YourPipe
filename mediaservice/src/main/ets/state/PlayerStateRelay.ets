@@ -21,6 +21,7 @@ import Logger from '../utils/Logger';
 const TAG: string = '[PlayerStateRelay]';
 
 export type ProgressSubscriber = (currentTime: number, durationTime: number) => void;
+export type PlaybackStateSubscriber = (state: PlaybackState) => void;
 
 export class PlayerStateRelay {
   private stateMachine: PlayerStateMachine | null = null;
@@ -28,6 +29,7 @@ export class PlayerStateRelay {
 
   // Progress throttling
   private progressSubscribers: Set<ProgressSubscriber> = new Set();
+  private playbackStateSubscribers: Set<PlaybackStateSubscriber> = new Set();
   private lastPublishedCurrentTime: number = -1;
   private lastPublishedDuration: number = -1;
 
@@ -35,7 +37,13 @@ export class PlayerStateRelay {
   private endedSubscribers: Set<() => void> = new Set();
 
   // AVSession push throttling
-  private lastAvSessionState: PlaybackState | null = null;
+  private hasAvSessionState: boolean = false;
+  private lastAvSessionIsPlaying: boolean = false;
+  private lastAvSessionIsBuffering: boolean = false;
+  private lastAvSessionIsSeeking: boolean = false;
+  private lastAvSessionIsEnded: boolean = false;
+  private lastAvSessionErrorMsg: string = '';
+  private lastAvSessionPlaybackSpeed: number = 1;
   private avSessionPushScheduled: boolean = false;
 
   // Edge-detection cache for state machine
@@ -59,6 +67,12 @@ export class PlayerStateRelay {
    * 引擎每次状态变更时调用（事件驱动，非轮询）
    */
   onStateChange(state: PlaybackState): void {
+    // Publish the exact MPV snapshot to consumers which must match the page's
+    // vm.isPlaying semantics (PiP, external presentation surfaces, etc.).
+    for (const cb of this.playbackStateSubscribers) {
+      try { cb(state); } catch (e) { Logger.warn(TAG, `playbackStateSubscriber error: ${e}`); }
+    }
+
     // 1. 状态机转换
     this.syncStateMachine(state);
 
@@ -87,6 +101,14 @@ export class PlayerStateRelay {
 
   unsubscribeProgress(cb: ProgressSubscriber): void {
     this.progressSubscribers.delete(cb);
+  }
+
+  subscribePlaybackState(cb: PlaybackStateSubscriber): void {
+    this.playbackStateSubscribers.add(cb);
+  }
+
+  unsubscribePlaybackState(cb: PlaybackStateSubscriber): void {
+    this.playbackStateSubscribers.delete(cb);
   }
 
   subscribeEnded(cb: () => void): void {
@@ -157,15 +179,14 @@ export class PlayerStateRelay {
   }
 
   private shouldPushToAvSession(state: PlaybackState): boolean {
-    const prev = this.lastAvSessionState;
-    if (!prev) return true;
+    if (!this.hasAvSessionState) return true;
 
-    return prev.isPlaying !== state.isPlaying
-      || prev.isBuffering !== state.isBuffering
-      || prev.isSeeking !== state.isSeeking
-      || prev.isEnded !== state.isEnded
-      || prev.errorMsg !== state.errorMsg
-      || prev.playbackSpeed !== state.playbackSpeed
+    return this.lastAvSessionIsPlaying !== state.isPlaying
+      || this.lastAvSessionIsBuffering !== state.isBuffering
+      || this.lastAvSessionIsSeeking !== state.isSeeking
+      || this.lastAvSessionIsEnded !== state.isEnded
+      || this.lastAvSessionErrorMsg !== state.errorMsg
+      || this.lastAvSessionPlaybackSpeed !== state.playbackSpeed
       || (this.prevDuration === 0 && state.duration > 0);
   }
 
@@ -178,13 +199,22 @@ export class PlayerStateRelay {
       const session: AvSessionManager | null = this.avSession;
       if (session === null) return;
       session.setPlaybackState(
+        state.engineState,
         state.isPlaying,
         state.currentTime,
         state.playbackSpeed,
         state.isBuffering || state.isSeeking,
         state.isEnded
       );
-      this.lastAvSessionState = state;
+      // Cache values instead of retaining an engine-owned state object. This keeps
+      // edge detection reliable even if an engine later reuses/mutates snapshots.
+      this.hasAvSessionState = true;
+      this.lastAvSessionIsPlaying = state.isPlaying;
+      this.lastAvSessionIsBuffering = state.isBuffering;
+      this.lastAvSessionIsSeeking = state.isSeeking;
+      this.lastAvSessionIsEnded = state.isEnded;
+      this.lastAvSessionErrorMsg = state.errorMsg;
+      this.lastAvSessionPlaybackSpeed = state.playbackSpeed;
     };
 
     // 立即推（非节流），状态变化需要第一时间同步到锁屏

@@ -14,7 +14,7 @@ import { BackgroundTaskManager } from '../common/BackgroundTaskManager';
 import { PlaybackPreferences } from '../common/PlaybackPreferences';
 import { common } from '@kit.AbilityKit';
 import { audio } from '@kit.AudioKit';
-import { PlayerStateRelay, ProgressSubscriber } from '../state/PlayerStateRelay';
+import { PlayerStateRelay, ProgressSubscriber, PlaybackStateSubscriber } from '../state/PlayerStateRelay';
 import { PlayerStateMachine, StateChangeListener } from '../state/PlayerStateMachine';
 import { PlayerState } from '../state/PlayerState';
 import { PlayerUiViewModel } from '../state/PlayerUiViewModel';
@@ -138,6 +138,14 @@ export class AvPlayerController {
   public unsubscribeProgress(listener: ProgressSubscriber): void {
     this.stateRelay.unsubscribeProgress(listener);
   }
+
+  public subscribePlaybackState(listener: PlaybackStateSubscriber): void {
+    this.stateRelay.subscribePlaybackState(listener);
+  }
+
+  public unsubscribePlaybackState(listener: PlaybackStateSubscriber): void {
+    this.stateRelay.unsubscribePlaybackState(listener);
+  }
   public subscribeEnded(listener: () => void): void {
     this.stateRelay.subscribeEnded(listener);
   }
@@ -173,7 +181,7 @@ export class AvPlayerController {
 
   public async switchToVideoEntry(entry: VideoEntry): Promise<void> {
     let audio: StreamInfo | undefined = undefined;
-    if (entry.requiresSeparateAudio) {
+    if (this.requiresSeparateAudio(entry.stream)) {
       const cats = this.vm.playerModel.getStreamCategories();
       // Keep current audio track when switching video quality.
       const curAudio = this.vm.playerModel.getCurrentStreams().audio;
@@ -192,15 +200,41 @@ export class AvPlayerController {
   }
 
   public getAudioStreamList(): StreamInfo[] {
-    return this.vm.playerModel.getAudioStreamList();
+    const all = this.vm.playerModel.getAudioStreamList();
+    const video = this.vm.playerModel.getCurrentStreams().video;
+    const groups: Map<string, StreamInfo[]> = new Map();
+    for (const stream of all) {
+      // audioTrackId is the stable identity for original/dubbed tracks. Fall back to
+      // locale/name only for older responses which do not expose an id.
+      const key = (stream.audioTrackId || stream.audioLanguage || stream.audioTrackName || 'default').trim();
+      const group = groups.get(key) || [];
+      group.push(stream);
+      groups.set(key, group);
+    }
+    const representatives: StreamInfo[] = [];
+    groups.forEach((group: StreamInfo[]) => {
+      const selected = video
+        ? this.selectBestCompatibleAudio(video, group)
+        : group.slice().sort((a: StreamInfo, b: StreamInfo): number =>
+          this.audioFormatPriority(b) - this.audioFormatPriority(a))[0];
+      if (selected) {
+        representatives.push(selected);
+      }
+    });
+    return representatives;
   }
 
   public getCurrentAudioIndex(): number {
-    return this.vm.playerModel.getCurrentAudioIndex();
-  }
-
-  public getAudioStreamLabel(stream: StreamInfo | undefined): string {
-    return this.vm.playerModel.getAudioStreamLabel(stream);
+    const list = this.getAudioStreamList();
+    const current = this.vm.playerModel.getCurrentStreams().audio;
+    if (!current) {
+      return 0;
+    }
+    const currentKey = (current.audioTrackId || current.audioLanguage
+      || current.audioTrackName || 'default').trim();
+    const index = list.findIndex((stream: StreamInfo) =>
+      (stream.audioTrackId || stream.audioLanguage || stream.audioTrackName || 'default').trim() === currentKey);
+    return index >= 0 ? index : 0;
   }
 
   /** Switch to a specific audio stream (by list index); keeps video + resume position. */
@@ -262,11 +296,9 @@ export class AvPlayerController {
     await this.avSessionManager.init();
     this.avSessionManager.onPlayCommand = () => {
       this.syncPlay();
-      this.refreshPlaybackState();
     };
     this.avSessionManager.onPauseCommand = () => {
       this.syncPause();
-      this.refreshPlaybackState();
     };
     this.avSessionManager.onSeekCommand = (positionSec: number) => {
       this.playbackEngine.seek(positionSec, false);
@@ -294,8 +326,7 @@ export class AvPlayerController {
       this.onPreviousCommand?.();
     };
     this.avSessionManager.onStopCommand = () => {
-      this.playbackEngine.stop();
-      this.refreshPlaybackState();
+      this.syncStop();
     };
     this.avSessionManager.onCastStateChange = (isCasting: boolean, deviceName: string) => {
       this.vm.isCasting = isCasting;
@@ -482,8 +513,7 @@ export class AvPlayerController {
       this.playbackEngine.seek(0, true);
       this.vm.isEnded = false;
     }
-    // Activate AudioSession (MIX_WITH_OTHERS) before play so transient streams
-    // can mix/duck when the system allows it.
+    // Activate the default MEDIA AudioSession before play so other media yields focus.
     this.avSessionManager.activateForPlayback();
     this.playbackEngine.play();
   }
@@ -520,14 +550,12 @@ export class AvPlayerController {
         this.systemPausedByFocus = true;
         this.systemStoppedByFocus = false;
         this.playbackEngine.pause();
-        this.refreshPlaybackState();
         Logger.info(TAG, `[AudioFocus] action=pause kind=temporary hint=${name}`);
         break;
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_STOP:
         this.systemPausedByFocus = false;
         this.systemStoppedByFocus = true;
         this.playbackEngine.pause();
-        this.refreshPlaybackState();
         // Permanent loss: release session so other apps can keep focus.
         this.avSessionManager.deactivateForPause();
         Logger.info(TAG, `[AudioFocus] action=pause kind=permanent hint=${name}`);
@@ -545,7 +573,6 @@ export class AvPlayerController {
         // Docs: after temporary PAUSE, re-activate session before resuming.
         this.avSessionManager.activateForPlayback();
         this.playbackEngine.play();
-        this.refreshPlaybackState();
         Logger.info(TAG, `[AudioFocus] action=resume hint=${name}`);
         break;
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_DUCK:
@@ -689,22 +716,23 @@ export class AvPlayerController {
     }
 
     let audio: StreamInfo | undefined = undefined;
-    if (video.requiresSeparateAudio) {
+    if (this.requiresSeparateAudio(video.stream)) {
       audio = this.selectBestCompatibleAudio(video.stream, categories.audio);
     }
     this.vm.playerModel.updateVideoStream(video.stream);
     this.vm.playerModel.updateAudioStream(audio);
 
-    const label = `${video.resolutionLabel} [${video.stream.itag}]`;
-    if (video.deliveryMethod === 'SABR') {
+    const label = `${video.stream.quality || '-'} [${video.stream.itag}]`;
+    const delivery = (video.stream.deliveryMethod || '').toUpperCase();
+    if (delivery === 'SABR') {
       Logger.info(TAG, `Selected SABR: video=${label}${audio
         ? ` audio=${audio.audioTrackName || audio.audioLanguage || audio.codecs} [${audio.itag}] track=${audio.audioTrackId || '-'}`
         : ' (no audio)'}`);
-    } else if (video.deliveryMethod === 'DASH') {
+    } else if (delivery === 'DASH') {
       Logger.info(TAG, `Selected DASH separated: video=${label}${audio
         ? ` audio=${audio.audioTrackName || audio.quality} [${audio.itag}] track=${audio.audioTrackId || '-'}`
         : ' (no audio)'}`);
-    } else if (video.deliveryMethod === 'HLS') {
+    } else if (delivery === 'HLS') {
       Logger.info(TAG, `Selected HLS variant: ${label}`);
     } else {
       Logger.info(TAG, `Selected progressive: ${label}`);
@@ -716,7 +744,7 @@ export class AvPlayerController {
     const prefs = PlaybackPreferences.snapshot();
     const targetQuality = live ? prefs.mobileQuality : prefs.defaultQuality;
     const maxHeight = this.resolveMaxHeight(targetQuality);
-    const underCap = streams.filter(s => (s.height || this.heightFromQuality(s.quality)) <= maxHeight);
+    const underCap = streams.filter(s => (s.height || 0) <= maxHeight);
     // Prefer hardware-decodable codecs when the device reports capability.
     // Avoid auto-picking 4K VP9 on devices without VP9 hardware (soft-decode heat).
     const hwFriendly = underCap.filter(s => VideoHwCaps.isCodecHardwareFriendly(s.codecs));
@@ -724,7 +752,7 @@ export class AvPlayerController {
       ? hwFriendly
       : (underCap.length > 0 ? underCap : streams);
     return pool.slice().sort((a: StreamInfo, b: StreamInfo): number => {
-      const h = (b.height || this.heightFromQuality(b.quality)) - (a.height || this.heightFromQuality(a.quality));
+      const h = (b.height || 0) - (a.height || 0);
       if (h !== 0) return h;
       const codec = this.codecPriority(b) - this.codecPriority(a);
       if (codec !== 0) return codec;
@@ -751,13 +779,13 @@ export class AvPlayerController {
     const maxHeight = this.resolveMaxHeight(prefs.defaultQuality);
     // Prefer hard-decode-friendly codecs at the target height.
     // Skip VP9/AV1 when OHOS reports no hardware capability for that MIME.
-    const underCap = entries.filter(e => e.height <= maxHeight);
+    const underCap = entries.filter(e => (e.stream.height || 0) <= maxHeight);
     const hwFriendly = underCap.filter(e => VideoHwCaps.isCodecHardwareFriendly(e.stream.codecs));
     const pool = hwFriendly.length > 0
       ? hwFriendly
       : (underCap.length > 0 ? underCap : entries);
     const selected = pool.slice().sort((a: VideoEntry, b: VideoEntry): number => {
-      const h = b.height - a.height;
+      const h = (b.stream.height || 0) - (a.stream.height || 0);
       if (h !== 0) {
         return h;
       }
@@ -770,7 +798,7 @@ export class AvPlayerController {
     if (selected) {
       const caps = VideoHwCaps.get();
       Logger.info(TAG,
-        `selectBestVideoEntry: ${selected.resolutionLabel} codec=${selected.stream.codecs} ` +
+        `selectBestVideoEntry: ${selected.stream.quality || '-'} codec=${selected.stream.codecs} ` +
         `itag=${selected.stream.itag} hwFriendly=${VideoHwCaps.isCodecHardwareFriendly(selected.stream.codecs)} ` +
         `caps[avc=${caps.avc},hevc=${caps.hevc},vp9=${caps.vp9},av1=${caps.av1}]`);
     }
@@ -791,10 +819,9 @@ export class AvPlayerController {
     return requested;
   }
 
-  private heightFromQuality(quality?: string): number {
-    if (!quality) return 0;
-    const match = quality.match(/(\d{3,4})p/);
-    return match ? Number(match[1]) : 0;
+  private requiresSeparateAudio(stream: StreamInfo): boolean {
+    return (stream.hasVideo === true && stream.hasAudio !== true)
+      || stream.kind?.toLowerCase() === 'video_only';
   }
 
   private codecPriority(stream: StreamInfo): number {
@@ -1186,8 +1213,21 @@ export class AvPlayerController {
       if (oa !== ob) {
         return ob - oa;
       }
-      return (b.bitrate || 0) - (a.bitrate || 0);
+      return this.audioFormatPriority(b) - this.audioFormatPriority(a);
     })[0];
+  }
+
+  private audioFormatPriority(stream: StreamInfo): number {
+    const codecs = (stream.codecs || '').toLowerCase();
+    const mime = (stream.mimeType || '').toLowerCase();
+    // Prefer the broadly compatible regular AAC stream over ultra-low HE-AAC variants.
+    // For a WebM video, compatibleAudioCandidates filters this group to Opus first.
+    let score = 0;
+    if (stream.itag === 140) score += 1000000;
+    else if (codecs.includes('mp4a') || mime.includes('audio/mp4')) score += 500000;
+    else if (codecs.includes('opus') || mime.includes('audio/webm')) score += 300000;
+    if (stream.itag === 599 || stream.itag === 600) score -= 200000;
+    return score + (stream.bitrate || 0);
   }
 
   private ensureCompatibleAudio(videoStream: StreamInfo, requestedAudio?: StreamInfo): StreamInfo | undefined {

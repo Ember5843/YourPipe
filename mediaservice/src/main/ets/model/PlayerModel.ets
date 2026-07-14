@@ -36,11 +36,6 @@ export interface CurrentStreams {
 
 export interface VideoEntry {
   stream: StreamInfo;
-  height: number;
-  resolutionLabel: string;
-  codecLabel: string;
-  deliveryMethod: 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP' | 'SABR';
-  requiresSeparateAudio: boolean;
 }
 
 export interface AudioTrackOption {
@@ -186,171 +181,63 @@ export class PlayerModel {
       progressive: []
     };
 
-    streams.forEach(stream => {
-      const itagMeta = stream.itag ? ITAG_MAP[stream.itag] : undefined;
+    this.mergedVideoList = [];
+
+    streams.forEach((stream: StreamInfo) => {
       const kind = stream.kind?.toLowerCase() || '';
       const delivery = stream.deliveryMethod?.toUpperCase() || '';
 
-      // SABR: classify as separated A/V when bootstrap present; skip bare stubs.
+      // Manifests are control resources, not selectable media entries.
+      if (kind === 'manifest_hls' || (delivery === 'HLS' && !stream.hasVideo)) {
+        this.categorizedStreams.hlsManifest.push(stream);
+        return;
+      }
+      if (kind === 'manifest_dash') {
+        this.categorizedStreams.dashManifest.push(stream);
+        return;
+      }
+
+      // SABR stubs without bootstrap cannot be played.
       if (kind === 'sabr' || delivery === 'SABR') {
         if (!stream.sabrInfo || !stream.sabrInfo.serverAbrStreamingUrl) {
           return;
         }
-        if (stream.hasVideo && !stream.hasAudio) {
+      }
+
+      // Classify only with fields explicitly returned by the extractor.
+      if (stream.hasVideo === true) {
+        if (stream.hasAudio === true) {
+          this.categorizedStreams.progressive.push(stream);
+        } else {
           this.categorizedStreams.video.push(stream);
-        } else if (stream.hasAudio && !stream.hasVideo) {
-          this.categorizedStreams.audio.push(stream);
         }
+        this.mergedVideoList.push({ stream } as VideoEntry);
+        return;
+      }
+      if (stream.hasAudio === true) {
+        this.categorizedStreams.audio.push(stream);
         return;
       }
 
-      // 1. 优先根据 ITAG 元数据分类
-      if (itagMeta) {
-        if (itagMeta.type === 'muxed') {
-          this.categorizedStreams.progressive.push(stream);
-          return;
-        } else if (itagMeta.type === 'video') {
-          this.categorizedStreams.video.push(stream);
-          return;
-        } else if (itagMeta.type === 'audio') {
-          this.categorizedStreams.audio.push(stream);
-          return;
-        }
-      }
-
-      // 2. 兜底逻辑：根据 kind 或 deliveryMethod 识别
-      if (kind === 'progressive' || delivery === 'PROGRESSIVE_HTTP') {
+      // Older responses may omit hasVideo/hasAudio but still provide an explicit kind.
+      if (kind === 'progressive') {
         this.categorizedStreams.progressive.push(stream);
-      } else if (kind === 'manifest_hls' || delivery === 'HLS') {
-        this.categorizedStreams.hlsManifest.push(stream);
-      } else if (kind === 'manifest_dash') {
-        this.categorizedStreams.dashManifest.push(stream);
-      } else if (kind === 'video_only' || (delivery === 'DASH' && stream.videoQuality)) {
+        this.mergedVideoList.push({ stream } as VideoEntry);
+      } else if (kind === 'video_only') {
         this.categorizedStreams.video.push(stream);
-      } else if (kind === 'audio_only' || (delivery === 'DASH' && stream.audioQuality)) {
+        this.mergedVideoList.push({ stream } as VideoEntry);
+      } else if (kind === 'audio_only') {
         this.categorizedStreams.audio.push(stream);
       }
     });
 
-    this.categorizedStreams.video.sort((a, b) => {
-      const hA = ITAG_MAP[a.itag!]?.height || a.height || 0;
-      const hB = ITAG_MAP[b.itag!]?.height || b.height || 0;
-      if (hB !== hA) return hB - hA; // 主键：分辨率降序
-      // 次键：codec 优先级（与 AvPlayerController 一致）
-      // HEVC/H.264 优先；VP9/AV1 靠后（无硬解时选流侧会再过滤）
-      const codecPriority = (s: StreamInfo): number => {
-        const c = (s.codecs || '').toLowerCase();
-        if (c.startsWith('hvc1') || c.startsWith('hev1')) return 50;
-        if (c.startsWith('avc1') || c.startsWith('avc3')) return 40;
-        if (c.startsWith('vp9')  || c.startsWith('vp09')) return 30;
-        if (c.startsWith('av01'))                          return 20;
-        return 0;
-      };
-      return codecPriority(b) - codecPriority(a);
-    });
-
-    // Flat audio list for UI Select (no language grouping).
-    // Order: track label, then preferred itag, then bitrate.
-    // preferredLanguage only affects auto default via original-first in controller.
+    // UI lists intentionally preserve response order.
     void preferredLanguage;
-    const rawPreferredAudioItags = [141, 140, 258, 256, 251, 250, 249, 172, 171];
-    const preferredAudioItags = (audioMaxBitrate !== undefined && audioMaxBitrate < 9999)
-      ? rawPreferredAudioItags.filter(itag => {
-          const meta = ITAG_MAP[itag];
-          return !meta || !meta.bitrate || meta.bitrate <= audioMaxBitrate;
-        })
-      : rawPreferredAudioItags;
-
-    this.categorizedStreams.audio.sort((a, b) => {
-      const nameA = (a.audioTrackName || a.audioLanguage || a.audioTrackId || '').toLowerCase();
-      const nameB = (b.audioTrackName || b.audioLanguage || b.audioTrackId || '').toLowerCase();
-      if (nameA !== nameB) {
-        return nameA.localeCompare(nameB);
-      }
-      let rankA = preferredAudioItags.indexOf(a.itag || -1);
-      let rankB = preferredAudioItags.indexOf(b.itag || -1);
-      if (rankA === -1) rankA = 999;
-      if (rankB === -1) rankB = 999;
-      if (rankA !== rankB) {
-        return rankA - rankB;
-      }
-      const bA = ITAG_MAP[a.itag!]?.bitrate || a.bitrate || 0;
-      const bB = ITAG_MAP[b.itag!]?.bitrate || b.bitrate || 0;
-      return bB - bA;
-    });
+    void audioMaxBitrate;
     Logger.info(TAG, `audio streams listed: ${this.categorizedStreams.audio.length} `
       + this.categorizedStreams.audio.map((s) =>
         `${s.audioTrackName || s.audioLanguage || s.audioTrackId || '-'}[${s.itag}]`
       ).join(', '));
-
-    const codecShortName = (codecs?: string): string => {
-      if (!codecs) return '';
-      const c = codecs.toLowerCase();
-      if (c.startsWith('av01')) return 'AV1';
-      if (c.startsWith('vp9') || c.startsWith('vp09')) return 'VP9';
-      if (c.startsWith('hvc1') || c.startsWith('hev1')) return 'H265';
-      if (c.startsWith('avc1') || c.startsWith('avc3')) return 'H264';
-      return codecs.split('.')[0].toUpperCase();
-    };
-
-    const heightOf = (s: StreamInfo): number => {
-      return ITAG_MAP[s.itag!]?.height || s.height || 0;
-    };
-
-    const dedupVideoMap = new Map<string, StreamInfo>();
-    const bucketsToMerge: StreamInfo[][] = [
-      this.categorizedStreams.progressive,
-      this.categorizedStreams.hlsManifest,
-      this.categorizedStreams.video,
-    ];
-    for (const bucket of bucketsToMerge) {
-      for (const stream of bucket) {
-        const h = heightOf(stream);
-        const codec = codecShortName(stream.codecs);
-        const key = `${codec}|${h}`;
-        dedupVideoMap.set(key, stream);
-      }
-    }
-
-    const getDeliveryFromBucket = (stream: StreamInfo): 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP' | 'SABR' => {
-      const d = (stream.deliveryMethod || '').toUpperCase();
-      if (d === 'SABR' || stream.kind?.toLowerCase() === 'sabr') {
-        return 'SABR';
-      }
-      if (this.categorizedStreams.video.includes(stream)) {
-        return 'DASH';
-      }
-      if (this.categorizedStreams.hlsManifest.includes(stream)) {
-        return 'HLS';
-      }
-      return 'PROGRESSIVE_HTTP';
-    };
-
-    const codecSortPriority = (label: string): number => {
-      if (label === 'H265') return 50;
-      if (label === 'H264') return 40;
-      if (label === 'VP9') return 30;
-      if (label === 'AV1') return 20;
-      return 0;
-    };
-
-    this.mergedVideoList = Array.from(dedupVideoMap.values())
-      .map(stream => {
-        const h = heightOf(stream);
-        const codec = codecShortName(stream.codecs);
-        const delivery = getDeliveryFromBucket(stream);
-        return {
-          stream, height: h,
-          resolutionLabel: stream.quality || '',
-          codecLabel: codec || 'Unknown',
-          deliveryMethod: delivery,
-          requiresSeparateAudio: delivery !== 'PROGRESSIVE_HTTP' && delivery !== 'HLS',
-        } as VideoEntry;
-      })
-      .sort((a, b) => {
-        if (b.height !== a.height) return b.height - a.height;
-        return codecSortPriority(b.codecLabel) - codecSortPriority(a.codecLabel);
-      });
 
     Logger.info(TAG, `Streams categorized: 
       Audio: ${this.categorizedStreams.audio.length}, 
@@ -374,29 +261,6 @@ export class PlayerModel {
   /** Flat list of all audio streams for UI Select (like quality list). */
   public getAudioStreamList(): StreamInfo[] {
     return this.categorizedStreams.audio.slice();
-  }
-
-  /** Raw API text only — no codec/language synthesis. */
-  public getAudioStreamLabel(stream: StreamInfo | undefined): string {
-    if (!stream) {
-      return 'Audio';
-    }
-    const name = (stream.audioTrackName || '').trim();
-    if (name.length > 0) {
-      return name;
-    }
-    const lang = (stream.audioLanguage || '').trim();
-    if (lang.length > 0) {
-      return lang;
-    }
-    const id = (stream.audioTrackId || '').trim();
-    if (id.length > 0) {
-      return id;
-    }
-    if (stream.itag !== undefined) {
-      return `${stream.itag}`;
-    }
-    return 'Audio';
   }
 
   public getCurrentAudioIndex(): number {

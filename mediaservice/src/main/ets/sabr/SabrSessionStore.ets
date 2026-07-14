@@ -13,7 +13,9 @@ const TAG = '[SabrSessionStore]';
 
 export interface SabrSessionKey {
   videoId: string;
+  profile: string;
   audioItag: number;
+  audioTrackId: string;
   videoItag: number;
 }
 
@@ -28,7 +30,8 @@ export interface SabrLease {
 
 /**
  * Process-wide SABR session registry (PipePipe SabrSessionStore subset).
- * One session = one audio+video itag pair.
+ * One session = one client profile + audio track + video format combination.
+ * Multi-language audio reuses the same itag, so audioTrackId is part of the identity.
  */
 class SabrSessionStoreImpl {
   private leases: Map<string, SabrLease> = new Map();
@@ -43,8 +46,14 @@ class SabrSessionStoreImpl {
     this.poTokenProvider = provider;
   }
 
-  makeKey(videoId: string, audioItag: number, videoItag: number): string {
-    return `${videoId}|a${audioItag}|v${videoItag}`;
+  makeKey(
+    videoId: string,
+    profile: string,
+    audioItag: number,
+    audioTrackId: string | undefined,
+    videoItag: number
+  ): string {
+    return `${videoId}|p${profile}|a${audioItag}|t${audioTrackId || '-'}|v${videoItag}`;
   }
 
   acquire(
@@ -53,7 +62,8 @@ class SabrSessionStoreImpl {
     videoFormat: YoutubeSabrFormatMeta,
     useAuth: boolean = false
   ): SabrLease {
-    const key = this.makeKey(info.videoId, audioFormat.itag, videoFormat.itag);
+    const key = this.makeKey(
+      info.videoId, info.profile, audioFormat.itag, audioFormat.audioTrackId, videoFormat.itag);
     const existing = this.leases.get(key);
     if (existing) {
       existing.refCount++;

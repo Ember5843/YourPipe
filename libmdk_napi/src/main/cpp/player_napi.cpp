@@ -397,7 +397,9 @@ void ResetObservedPlaybackState(PlayerContext& ctx)
     ctx.pausedForCache.store(false);
     ctx.seeking.store(false);
     ctx.eofReached.store(false);
-    ctx.paused.store(true);
+    // Do not reset ctx.paused here. "pause" is an observed MPV property and
+    // START_FILE does not necessarily change it, so MPV may emit no follow-up
+    // property event. Retaining the last observed value keeps MPV authoritative.
 }
 
 void UpdateStatusFromObservedProperties(PlayerContext& ctx)
@@ -943,8 +945,10 @@ void DestroyMpv(PlayerContext& ctx)
 
 void SetPause(PlayerContext& ctx, bool pause)
 {
-    ctx.paused.store(pause);
-    ctx.state.store(pause ? kStatePaused : kStatePlaying);
+    // MPV is the single source of truth. Do not publish the requested state here:
+    // the command is asynchronous and may not have taken effect yet. The observed
+    // "pause" property updates ctx.paused/ctx.state and emits the callback only
+    // after MPV confirms the actual value.
     PostCommand(ctx, [pause](PlayerContext& workerCtx) {
         if (!EnsureMpv(workerCtx)) {
             return;
@@ -1274,8 +1278,6 @@ napi_value Stop(napi_env env, napi_callback_info info)
     size_t argc = 1; napi_value args[1];
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     lockFor(ToString(env, args[0]), [](PlayerContext& ctx) {
-        ctx.state.store(kStateStopped);
-        SetMediaStatus(ctx, kStatusUnloaded, "stop");
         PostCommand(ctx, [](PlayerContext& workerCtx) {
             if (!EnsureMpv(workerCtx)) {
                 return;
