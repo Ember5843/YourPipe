@@ -433,8 +433,11 @@ export struct AboutPage {
           // ── App 身份区 ──────────────────────────────────────
           Column({ space: 14 }) {
             Image($r('app.media.app_icon'))
-              .borderRadius(20)
-              .shadow({ radius: 20, color: '#22000000', offsetX: 0, offsetY: 6 })
+              .width(72)
+              .height(72)
+              .objectFit(ImageFit.Cover)
+              .borderRadius(16)
+              .shadow({ radius: 12, color: '#22000000', offsetX: 0, offsetY: 4 })
 
             Column({ space: 4 }) {
               Text('YourPipe')

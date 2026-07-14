@@ -35,7 +35,6 @@ import { PlaylistDetailPage } from '../features/playlist/PlaylistDetailPage';
 import { VideoDetailPage } from '../features/player/VideoDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
 import { PlayerPresentation } from '../common/PlayerPresentation';
-import { OptionsGoogleAccountPage } from '../features/auth/OptionsGoogleAccountPage';
 import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { customAnimationUtil } from '../common/AnimationUtil';
@@ -672,8 +671,8 @@ struct Index {
     this.actionHub.openSearch = () => {
       this.openSearchPage();
     };
-    this.actionHub.openVideo = async (video: VideoItem, sourceHint?: PlayQueueSourceHint) => {
-      await this.openVideoDetail(video, sourceHint);
+    this.actionHub.openVideo = async (video: VideoItem, sourceHint?: PlayQueueSourceHint, audioOnly?: boolean) => {
+      await this.openVideoDetail(video, sourceHint, false, audioOnly === true);
     };
     this.actionHub.openChannel = async (channel: SearchChannelItem) => {
       this.openUserPage(channel);
@@ -1003,9 +1002,14 @@ struct Index {
     this.navPathStack.pushPath({ name: 'SearchPage' });
   }
 
-  private async openVideoDetail(video: VideoItem, sourceHint?: PlayQueueSourceHint, preserveQueue: boolean = false): Promise<void> {
+  private async openVideoDetail(
+    video: VideoItem,
+    sourceHint?: PlayQueueSourceHint,
+    preserveQueue: boolean = false,
+    audioOnly: boolean = false
+  ): Promise<void> {
     const queueManager = PlayQueueManager.getInstance();
-    logger.info(`openVideoDetail: video=${video.videoId} source=${sourceHint ? sourceHint.type : 'adhoc'} queueType=${queueManager.sourceType}`);
+    logger.info(`openVideoDetail: video=${video.videoId} source=${sourceHint ? sourceHint.type : 'adhoc'} queueType=${queueManager.sourceType} audioOnly=${audioOnly}`);
 
     // 冷启动：从列表/作者页点视频进入播放页时，彻底重置上一次的播放状态，等价于"应用首次播放"，
     // 杜绝关闭 PiP 等残留影响本次。队列内切换走 session.play()、PiP 恢复走 onPipRestore，
@@ -1057,6 +1061,11 @@ struct Index {
     }
 
     const session = PlayerSession.getInstance();
+    // forceReset 会清仅音频；长按「仅音频播放」需在重置后再打开会话开关。
+    if (audioOnly) {
+      session.setAudioOnlyMode(true);
+      PlayerPresentation.onAudioOnlyModeChanged(true);
+    }
 
     this.selectedVideo = video;
     this.showOptions = false;
@@ -1395,6 +1404,7 @@ struct Index {
       preferType: SheetType.CENTER,
       showClose: false,
       scrollSizeMode: ScrollSizeMode.CONTINUOUS,
+      radiusRenderStrategy: RenderStrategy.OFFSCREEN,
       onDisappear: () => {
         this.clearOptionsPath();
       }
@@ -1503,6 +1513,7 @@ struct Index {
                 Column({ space: 12 }) {
                   Column().width('100%').height(this.topSafeHeight + 56)
                   if (this.shouldShowHomeRecommendBanner()) {
+                    // Banner manages its own side inset so wide peek can use more of the row.
                     HomeRecommendSwiper({
                       videos: this.getHomeBannerVideos()
                     })
@@ -1525,10 +1536,10 @@ struct Index {
                     }, (item: VideoItem) => item.id.toString())
                   }
                   .width('100%')
+                  .padding({ left: 12, right: 12 })
                   Column().width('100%').height(this.bottomSafeHeight + 72)
                 }
                 .width('100%')
-                .padding({ left: 12, right: 12 })
               }
               .width('100%')
               .layoutWeight(1)
@@ -1546,7 +1557,8 @@ struct Index {
                       videos: this.getHomeBannerVideos()
                     })
                   }
-                  .padding({ left: 12, right: 12, bottom: 8 })
+                  // Side inset owned by HomeRecommendSwiper (wide: smaller pad + larger peeks).
+                  .padding({ bottom: 8 })
                   .transition(customAnimationUtil.isScaleTran('home_recommend_banner', this.uiConfig))
                 }
                 ForEach(this.getHomeListVideos(), (item: VideoItem) => {
@@ -1641,11 +1653,12 @@ struct Index {
               onAboutClick: () => { this.pushOptionsPath('about_page'); }
             }
           })
+          .width('100%')
+          .layoutWeight(1)
       }
       .width('100%')
       .height('100%')
       .backgroundColor(Color.Transparent)
-      .borderRadius({ topLeft: 20, topRight: 20 })
     }
     .mode(NavigationMode.Stack)
     .navDestination(this.OptionsPageMap)
@@ -1657,6 +1670,7 @@ struct Index {
       } : undefined
     }))
     .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+    .clip(true)
   }
 
 
@@ -1704,26 +1718,6 @@ struct Index {
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
         title: $r('app.string.yt_option_data_account'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
-    } else if (name === 'google_account') {
-      HdsNavDestination() {
-        OptionsGoogleAccountPage({
-          onBack: () => { this.popOptionsPath(); },
-          pushLoginPage: () => { this.pushOptionsPath('webview_login'); },
-          onAuthChanged: () => { this.refreshHomeAfterAuthChange(); }
-        })
-      }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: 'Google 登录',
         onBack: () => {
           this.popOptionsPath();
         }

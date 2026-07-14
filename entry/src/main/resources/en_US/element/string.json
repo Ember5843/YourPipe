@@ -1095,6 +1095,10 @@
                     {
                         "name":  "yt_action_audio_only",
                         "value":  "Audio only"
+                    },
+                    {
+                        "name":  "yt_action_audio_only_play",
+                        "value":  "Play audio only"
                     }
                     ]
 }

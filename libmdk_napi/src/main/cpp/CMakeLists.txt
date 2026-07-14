@@ -4,6 +4,37 @@ project(mdk_napi)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ---------------------------------------------------------------------------
+# x86_64: emulator UI/debug stub (no vendored libmpv/FFmpeg for this ABI yet)
+# arm64-v8a: full product path
+# ---------------------------------------------------------------------------
+if(OHOS_ARCH STREQUAL "x86_64")
+    message(STATUS "libmdk_napi: building x86_64 STUB (emulator UI only, no real playback)")
+
+    # Keep target name for build-profile externalNativeOptions.targets
+    add_library(mpv_ohcodec_shim SHARED
+        mpv_ohcodec_shim.cpp
+    )
+
+    add_library(mdk_napi MODULE
+        player_napi_stub.cpp
+    )
+
+    target_link_libraries(mdk_napi
+        ace_napi.z
+        ace_ndk.z
+        hilog_ndk.z
+    )
+
+    add_dependencies(mdk_napi mpv_ohcodec_shim)
+    add_custom_command(TARGET mdk_napi POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:mpv_ohcodec_shim>"
+                "$<TARGET_FILE_DIR:mdk_napi>/$<TARGET_FILE_NAME:mpv_ohcodec_shim>"
+    )
+    return()
+endif()
+
 set(MPV_SDK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/mpv-sdk")
 set(MPV_LIB_DIR "${MPV_SDK_ROOT}/lib/${OHOS_ARCH}")
 
@@ -11,6 +42,10 @@ set(MPV_LIB_DIR "${MPV_SDK_ROOT}/lib/${OHOS_ARCH}")
 # libav* use in napi — e.g. muxing an audio file + video file into one output.
 set(FFMPEG_SDK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/ffmpeg-sdk")
 set(FFMPEG_LIB_DIR "${FFMPEG_SDK_ROOT}/lib/${OHOS_ARCH}")
+
+if(NOT EXISTS "${MPV_LIB_DIR}/libmpv.so.2")
+    message(FATAL_ERROR "Missing ${MPV_LIB_DIR}/libmpv.so.2 — only arm64-v8a is vendored; x86_64 uses the stub path above.")
+endif()
 
 add_library(mpv_ohcodec_shim SHARED
     mpv_ohcodec_shim.cpp

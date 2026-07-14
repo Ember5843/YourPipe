@@ -217,7 +217,8 @@ export class PlayerSession {
   async ensureInitialized(): Promise<void> {
     if (this._controller.playerState === PlayerState.RELEASED) {
       logger.warn(`${TAG} ensureInitialized called after release, reinitializing`);
-      this.resetSession();
+      // Keep session audio-only across engine re-create (e.g. open with audio-only then play()).
+      this.resetSession(true);
     }
     await this._controller.initAVPlayer();
   }
@@ -269,7 +270,9 @@ export class PlayerSession {
 
   async play(video: VideoItem): Promise<VideoData | null> {
     if (!this.isSessionActive()) {
-      this.resetSession();
+      // Critical: openVideoDetail may setAudioOnlyMode(true) before play().
+      // Rebuilding the engine must not wipe that session preference.
+      this.resetSession(true);
     }
 
     const videoId = video.videoId || YOUTUBE_VIDEO_ID;
@@ -554,10 +557,16 @@ export class PlayerSession {
     logger.info(`${TAG} forceReset() called`);
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
-    this.resetSession();
+    this.resetSession(false);
   }
 
-  private resetSession(): void {
+  /**
+   * @param preserveAudioOnly when true, keep isAudioOnlyMode and re-apply
+   *   video-off on the new controller (used by play/ensureInitialized).
+   *   forceReset/release always pass false.
+   */
+  private resetSession(preserveAudioOnly: boolean = false): void {
+    const keepAudioOnly = preserveAudioOnly && this._isAudioOnlyMode;
     this._controller.releaseVideo(0);
     this._currentVideo = null;
     this._watchVideoId = '';
@@ -585,7 +594,19 @@ export class PlayerSession {
     this.bindControllerQueueControls();
     this.bindQueueSwitchHandler();
     this.registerContinueStateListener();
-    logger.debug(`${TAG} Session reset`);
+    if (keepAudioOnly) {
+      // Re-arm after clear: AppStorage + deferred vid=no on the new controller.
+      this._isAudioOnlyMode = true;
+      AppStorage.setOrCreate('isAudioOnlyMode', true);
+      try {
+        this._controller.setVideoOutputEnabled(false);
+      } catch (e) {
+        logger.warn(`${TAG} re-apply audio-only after reset failed: ${e}`);
+      }
+      logger.info(`${TAG} Session reset (audio-only preserved)`);
+    } else {
+      logger.debug(`${TAG} Session reset`);
+    }
   }
 }
 

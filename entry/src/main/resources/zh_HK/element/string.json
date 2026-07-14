@@ -1031,6 +1031,10 @@
                     {
                         "name":  "yt_action_audio_only",
                         "value":  "僅音訊"
+                    },
+                    {
+                        "name":  "yt_action_audio_only_play",
+                        "value":  "僅音訊播放"
                     }
                     ]
 }

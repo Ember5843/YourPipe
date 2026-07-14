@@ -167,8 +167,8 @@ export class WatchHistoryStore {
   /**
    * 单向合并云端历史：
    * - 已有本地条目：保留 lastWatchedAt / progress / duration，只补全元数据
-   * - 仅云端有的条目：按云端顺序用递减时间戳写入（避免全部变成「刚刚」）
-   * - 最终按 lastWatchedAt 降序，避免每次同步把列表顶到最前覆盖本地顺序
+   * - 仅云端有的条目：按云端列表顺序（最新在前）从 now 递减赋时间戳，保证最新在顶部
+   * - 最终按 lastWatchedAt 降序；已见过的条目时间戳不变，重复同步不会乱序冲顶
    */
   static mergeRemoteHistory(remote: WatchHistoryItem[]): void {
     if (!remote || remote.length === 0) {
@@ -182,14 +182,9 @@ export class WatchHistoryStore {
     const merged: WatchHistoryItem[] = [];
     const seen: Record<string, boolean> = {};
     const now = Date.now();
-    // 新云端条目之间间隔 1 分钟，且整体落在「比现有本地最旧还更旧」一侧，避免冲到顶部。
-    let oldestLocal = now;
-    local.forEach((item) => {
-      if (item.lastWatchedAt > 0 && item.lastWatchedAt < oldestLocal) {
-        oldestLocal = item.lastWatchedAt;
-      }
-    });
-    const newBase = Math.min(now - 60_000, oldestLocal - 60_000);
+    // FEhistory 为最新在前；仅对新条目按序递减赋时（间隔 1 分钟），最新在顶部。
+    // 不要压到「比本地最旧还更旧」——那会把整页云端历史沉到列表底部。
+    const newBase = now;
     let newIndex = 0;
 
     remote.forEach((item) => {

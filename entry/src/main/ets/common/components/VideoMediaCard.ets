@@ -194,6 +194,15 @@ export struct VideoMediaCard {
       });
     }
     items.push({
+      symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.earphone'))
+        .fontSize(SYMBOL_FONT_SIZE)
+        .fontColor([$r('sys.color.font_primary')]),
+      content: $r('app.string.yt_action_audio_only_play'),
+      callback: () => {
+        this.actionHub.openVideo(this.video, undefined, true);
+      }
+    });
+    items.push({
       symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.share'))
         .fontSize(SYMBOL_FONT_SIZE)
         .fontColor([$r('sys.color.font_primary')]),

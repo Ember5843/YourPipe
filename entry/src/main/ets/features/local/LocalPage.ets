@@ -57,15 +57,48 @@ struct HistoryCard {
   @State isShowContextMenu: boolean = false;
   onOpen: (item: WatchHistoryItem) => void = (_item: WatchHistoryItem) => {};
 
+  @Consume('actionHub') actionHub: ActionHub = new ActionHub();
+
+  private toVideoItem(): VideoItem {
+    return new VideoItem(
+      0,
+      this.item.videoId,
+      this.item.title,
+      this.item.author,
+      '',
+      this.item.thumbnailUrl,
+      false,
+      '#1A1A1A',
+      this.item.channelId || '',
+      this.item.channelAvatarUrl || '',
+      this.item.channelHandle || ''
+    );
+  }
+
   private deleteItem(): void {
     WatchHistoryStore.remove(this.item.videoId);
     this.isShowContextMenu = false;
   }
 
+  private openAudioOnly(): void {
+    this.isShowContextMenu = false;
+    this.actionHub.openVideo(this.toVideoItem(), undefined, true);
+  }
+
   @Builder
-  deleteMenuBuilder() {
+  historyMenuBuilder() {
     Scroll() {
       Menu() {
+        MenuItem({
+          symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.earphone'))
+            .fontSize(SYMBOL_FONT_SIZE)
+            .fontColor([$r('sys.color.font_primary')]),
+          content: $r('app.string.yt_action_audio_only_play')
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .onClick(() => {
+            this.openAudioOnly();
+          });
         MenuItem({
           symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
             .fontSize(SYMBOL_FONT_SIZE)
@@ -182,7 +215,7 @@ struct HistoryCard {
       offsetX: 0,
       offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
     })
-    .bindContextMenu(this.isShowContextMenu, this.deleteMenuBuilder, {
+    .bindContextMenu(this.isShowContextMenu, this.historyMenuBuilder, {
       preview: MenuPreviewMode.IMAGE,
       previewAnimationOptions: { scale: [1.0, 1.05] },
       placement: Placement.BottomRight,
@@ -259,7 +292,7 @@ export struct LocalPage {
     WatchHistoryStore.clear();
   }
 
-  private openVideo(item: WatchHistoryItem): void {
+  private openVideo(item: WatchHistoryItem, audioOnly: boolean = false): void {
     const video = new VideoItem(
       0,
       item.videoId,
@@ -273,7 +306,7 @@ export struct LocalPage {
       item.channelAvatarUrl || '',
       item.channelHandle || ''
     );
-    this.actionHub.openVideo(video);
+    this.actionHub.openVideo(video, undefined, audioOnly);
   }
 
   build() {

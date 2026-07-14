@@ -300,13 +300,12 @@ export class AvPlayerController {
     this.deferCurrentSessionDestroy();
     this.curSource = newSource;
     this.curIndex = newSource.index;
-    // 用视频原始分辨率给引擎播种 surface 几何：load() 在 aboutToAppear 阶段就跑，
-    // 早于 NodeContainer.onAreaChange / onSurfaceChanged，UI 喂不进尺寸会导致
-    // mpv video chain 初始化报 "Failed to get height and width"。视频原生尺寸不依赖布局，
-    // 设给 NativeWindow buffer geometry 足以让 chain 起来，之后 onAreaChange 再用真实像素精修。
-    if (newSource.width && newSource.height && newSource.width > 0 && newSource.height > 0) {
-      this.playbackEngine.resizeSurface(newSource.width, newSource.height);
-    }
+    // 不要用视频原生分辨率播种 ohos-surface-size。
+    // 该属性必须等于 XComponent 布局像素（AVPlayer onAreaChange → resizeSurface）。
+    // 用 stream WxH 会在小窗阶段把 VO 配成「片源分辨率」而非「窗口像素」，
+    // 画面被软缩放/压小，全屏 onAreaChange 才纠正——表现为小窗糊、全屏立刻清晰。
+    // video chain 缺宽高时依赖：① 上次布局缓存 ② XComponent onAreaChange ③ native
+    // OnSurfaceChanged；切勿用片源尺寸顶替布局尺寸。
     this.vm.subtitleTracks = newSource.subtitleTracks || [];
     // 优先从 newSource 的流信息中恢复 duration，避免后续 resolveDurationMs 取到 0
     if (newSource.streams && newSource.streams.length > 0) {

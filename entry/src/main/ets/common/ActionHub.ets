@@ -14,7 +14,7 @@ export enum ActionHubEvent {
 
 export class ActionHub {
   openSearch: () => void = () => {};
-  openVideo: (video: VideoItem, sourceHint?: PlayQueueSourceHint) => void = () => {};
+  openVideo: (video: VideoItem, sourceHint?: PlayQueueSourceHint, audioOnly?: boolean) => void = () => {};
   openChannel: (channel: SearchChannelItem) => void = () => {};
   openChannelById: (channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string) => void = () => {};
   openPlaylist: (playlist: SearchPlaylistItem) => void = () => {};

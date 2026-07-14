@@ -420,6 +420,16 @@ export struct VideoPlayer {
     this.isWaitingForDualBuffer = false;
     this.curSource.error = undefined;
 
+    // 先拿主窗口，再注册 keep-screen / 状态监听。
+    // 旧顺序在 mainWin 未就绪时调用 setKeepScreenOn，会把 lastKeepScreenOn 置 true
+    // 却不下发系统 API，后续同值又被短路 → 播放中自动息屏。
+    await this.envService.init(context);
+    const brightness = await this.envService.getBrightness(context);
+    this.gestureBrightnessValue = brightness;
+    const volInfo = this.envService.getVolume();
+    this.gestureVolumeValue = volInfo.volume / volInfo.maxVolume;
+    this.screenHeight = AppStorage.get<number>('deviceHeight') || 0;
+
     // 注册进度监听（节流后的 currentTime/durationTime）
     this.controller.subscribeProgress(this.progressListener);
     this.controller.subscribeEnded(this.onEnded);
@@ -442,14 +452,6 @@ export struct VideoPlayer {
 
     // 初始化流状态
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
-
-    // 初始化环境服务
-    await this.envService.init(context);
-    const brightness = await this.envService.getBrightness(context);
-    this.gestureBrightnessValue = brightness;
-    const volInfo = this.envService.getVolume();
-    this.gestureVolumeValue = volInfo.volume / volInfo.maxVolume;
-    this.screenHeight = AppStorage.get<number>('deviceHeight') || 0;
 
     this.qualityArrowModifier.fontSize(13).fontColor(['#CCCCCC']);
 
@@ -657,9 +659,19 @@ export struct VideoPlayer {
     return 'Auto';
   }
 
-  /** Fullscreen top pad: status/cutout + base pad; min 24vp when avoid-area reports 0. */
+  /**
+   * Immersive fullscreen top pad.
+   *
+   * Do NOT use AppStorage statusBarHeight here: WindowUtil keeps the last
+   * positive TYPE_SYSTEM height after bars hide (for portrait restore). That
+   * portrait cache (~40–50vp) is wrong in landscape immersive — notch moves
+   * to the side, top should only clear cutout/rounded corner.
+   *
+   * Use TYPE_CUTOUT top only + base pad (0 when no top cutout).
+   */
   private getFullscreenTopPad(): number {
-    const topInset = Math.max(this.statusBarHeight || 0, this.safeAreaTop || 0, 24);
+    const cutoutH = AppStorage.get<number>('statusBarCutoutHeight') ?? 0;
+    const topInset = cutoutH > 0 ? cutoutH : 0;
     return topInset + this.ctrlVPad;
   }
 
@@ -681,7 +693,7 @@ export struct VideoPlayer {
           .height('100%')
           .fill(Color.Black)
       }
-      SymbolGlyph($r('sys.symbol.speaker_wave_2_fill'))
+      SymbolGlyph($r('sys.symbol.earphone'))
         .fontSize(48)
         .fontColor([Color.White])
     }
@@ -1072,8 +1084,8 @@ export struct VideoPlayer {
     }
     .width('100%')
     // 顶部间距：
-    // 竖屏非沉浸——PlayerPage 已用 topSafeInset 把视频区整体下移，这里只需 ctrlVPad
-    // 横屏/沉浸全屏——内容贴顶，顶部控件必须再让出状态栏/挖孔（bars 隐藏时 height 可能为 0）
+    // 竖屏非沉浸——PlayerPage 已用 topSafeInset 下移视频区，这里只需 ctrlVPad
+    // 沉浸全屏——只加顶部 cutout（横屏通常为 0）+ ctrlVPad，勿用缓存的竖屏状态栏高
     .padding({
       left: this.ctrlHPad,
       right: this.ctrlHPad,

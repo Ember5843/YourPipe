@@ -29,6 +29,8 @@ export class PlayerEnvironmentService {
     try {
       this.mainWin = await window.getLastWindow(context);
       this.screenHeight = this.mainWin.getWindowProperties().windowRect.height;
+      // 可能在 init 前已收到 keep-on 意图（状态机先于窗口就绪），补发一次
+      this.applyPendingKeepScreenOn();
     } catch (e) {
       Logger.warn(TAG, `Failed to get main window: ${(e as Error).message}`);
     }
@@ -112,15 +114,23 @@ export class PlayerEnvironmentService {
     }
   }
 
-  /** 设置 KeepScreenOn */
+  /** 设置 KeepScreenOn（窗口未就绪时只记意图，init 后再真正下发） */
   setKeepScreenOn(keepOn: boolean): void {
-    if (keepOn === this.lastKeepScreenOn) return;
+    if (keepOn === this.lastKeepScreenOn && this.mainWin) return;
     this.lastKeepScreenOn = keepOn;
     if (this.mainWin) {
       this.mainWin.setWindowKeepScreenOn(keepOn).catch((e: Error) => {
         Logger.warn(TAG, `setWindowKeepScreenOn failed: ${e.message}`);
       });
     }
+  }
+
+  /** init 完成后按缓存意图补发一次 KeepScreenOn */
+  private applyPendingKeepScreenOn(): void {
+    if (this.lastKeepScreenOn === undefined || !this.mainWin) return;
+    this.mainWin.setWindowKeepScreenOn(this.lastKeepScreenOn).catch((e: Error) => {
+      Logger.warn(TAG, `setWindowKeepScreenOn(pending) failed: ${e.message}`);
+    });
   }
 
   /** 订阅屏幕事件 */

@@ -480,13 +480,12 @@ export struct VideoDetails {
   AudioOnlyActionButton() {
     Button() {
       Row({ space: 6 }) {
-        SymbolGlyph(this.isAudioOnlyMode
-          ? $r('sys.symbol.speaker_wave_2_fill')
-          : $r('sys.symbol.speaker_wave_2'))
+        SymbolGlyph($r('sys.symbol.earphone'))
           .fontSize(14)
           .fontColor([this.isAudioOnlyMode
             ? this.themePrimary
             : $r('app.color.yourtube_text_primary')])
+          .fontWeight(this.isAudioOnlyMode ? FontWeight.Bold : FontWeight.Normal)
         Text($r('app.string.yt_action_audio_only'))
           .fontSize(13)
           .fontColor(this.isAudioOnlyMode

@@ -188,8 +188,14 @@ export struct OptionsMainPage {
           })
         }
         .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          Column().height(24)
+        }
+        .padding({ left: 0, right: 0 })
       }
       .width('100%')
+      .height('100%')
       .layoutWeight(1)
       .padding({ left: 16, right: 16, top: 8, bottom: 12 })
       .edgeEffect(EdgeEffect.Spring)
