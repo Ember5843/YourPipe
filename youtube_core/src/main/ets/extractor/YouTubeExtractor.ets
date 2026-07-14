@@ -871,8 +871,14 @@ export class YouTubeExtractor {
     if (!serverAbr) {
       return false;
     }
+    const serverAbrBefore = serverAbr;
     try {
       serverAbr = await this.deobfuscateManifestUrl(serverAbr);
+      if (serverAbr !== serverAbrBefore) {
+        logger.info(`[SABR] serverAbr n-deobfuscated len ${serverAbrBefore.length}->${serverAbr.length}`);
+      } else if (/[?&]n=/.test(serverAbrBefore) || /\/n\//.test(serverAbrBefore)) {
+        logger.warn('[SABR] serverAbr still has encrypted n (decode may have failed)');
+      }
     } catch (e) {
       logger.warn('[SABR] n-deobfuscate serverAbr failed:', e);
     }
@@ -2662,30 +2668,56 @@ export class YouTubeExtractor {
     return '';
   }
 
+  /**
+   * Deobfuscate n-param on manifest / serverAbr URLs.
+   * PipePipe maybeDeobfuscateNParameter: query n= first, then path /n/.
+   * SABR serverAbrStreamingUrl uses query form (…&n=XXXX&…).
+   */
   private async deobfuscateManifestUrl(manifestUrl: string): Promise<string> {
-    const matcher = /\/n\/([^/]+)/.exec(manifestUrl);
-    if (matcher) {
-      const encryptedN = matcher[1];
-
-      // 优先使用批量解密时已缓存的结果
-      if (this.cachedManifestNResult && this.cachedManifestNResult.original === encryptedN) {
-        return manifestUrl.replace('/n/' + encryptedN, '/n/' + this.cachedManifestNResult.decoded);
+    // 1) Query form: [?&]n=VALUE (SABR / googlevideo progressive)
+    const queryMatch = /([?&])n=([^&]+)/.exec(manifestUrl);
+    if (queryMatch) {
+      const encryptedN = decodeURIComponent(queryMatch[2]);
+      const decryptedN = await this.resolveDecryptedN(encryptedN);
+      if (decryptedN) {
+        const start = queryMatch.index + queryMatch[1].length + 2; // past "n="
+        const end = start + queryMatch[2].length;
+        const encoded = encodeURIComponent(decryptedN);
+        logger.info(`[N-DEOBF] query n applied len ${encryptedN.length}->${decryptedN.length}`);
+        return manifestUrl.substring(0, start) + encoded + manifestUrl.substring(end);
       }
+      logger.warn(`[N-DEOBF] query n decrypt failed for len=${encryptedN.length}`);
+    }
 
-      // 未命中缓存（极少见：manifest n 与 itag n 完全无交集），单独请求
-      try {
-        const result = await YoutubeJavaScriptPlayerManager.deobfuscateBatch(
-          [], [encryptedN]
-        );
-        const decryptedN = result.n[encryptedN];
-        if (decryptedN) {
-          return manifestUrl.replace('/n/' + encryptedN, '/n/' + decryptedN);
-        }
-      } catch (e) {
-        logger.warn('deobfuscateManifestUrl failed:', e);
+    // 2) Path form: /n/VALUE (HLS/DASH manifests)
+    const pathMatch = /\/n\/([^/]+)/.exec(manifestUrl);
+    if (pathMatch) {
+      const encryptedN = pathMatch[1];
+      const decryptedN = await this.resolveDecryptedN(encryptedN);
+      if (decryptedN) {
+        logger.info(`[N-DEOBF] path n applied len ${encryptedN.length}->${decryptedN.length}`);
+        return manifestUrl.replace('/n/' + encryptedN, '/n/' + decryptedN);
       }
+      logger.warn(`[N-DEOBF] path n decrypt failed for len=${encryptedN.length}`);
     }
     return manifestUrl;
+  }
+
+  private async resolveDecryptedN(encryptedN: string): Promise<string | undefined> {
+    if (this.cachedManifestNResult && this.cachedManifestNResult.original === encryptedN) {
+      return this.cachedManifestNResult.decoded;
+    }
+    try {
+      const result = await YoutubeJavaScriptPlayerManager.deobfuscateBatch([], [encryptedN]);
+      const decryptedN = result.n[encryptedN];
+      if (decryptedN) {
+        this.cachedManifestNResult = { original: encryptedN, decoded: decryptedN } as ManifestNDecodeResult;
+        return decryptedN;
+      }
+    } catch (e) {
+      logger.warn('resolveDecryptedN failed:', e);
+    }
+    return undefined;
   }
 
   private prepareInnerTubeContext(clientType: 'WEB' | 'ANDROID' = 'ANDROID'): InnerTubeContext {
