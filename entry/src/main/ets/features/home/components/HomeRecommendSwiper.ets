@@ -11,8 +11,8 @@ import { MediaThumb } from '../../../common/components/MediaThumb';
  * Swiper.prevMargin/nextMargin alone can only expose one neighbor each side;
  * displayCount is what actually increases visible card count.
  */
-/** Banner is edge-to-edge on all form factors (no side white gutters). */
-const BANNER_OUTER_PAD_VP: number = 0;
+/** Phone banner follows the same horizontal inset as the home video list. */
+const BANNER_PHONE_OUTER_PAD_VP: number = 12;
 /** Preferred card width when packing multiple into one viewport. */
 const BANNER_CARD_TARGET_VP: number = 300;
 const BANNER_CARD_MIN_VP: number = 220;
@@ -87,6 +87,7 @@ struct HomeRecommendBannerPage {
 export struct HomeRecommendSwiper {
   @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @StorageProp('deviceWidth') deviceWidthPx: number = 0;
+  @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm';
   @Prop videos: VideoItem[] = [];
   onOpenVideo?: (video: VideoItem) => void;
 
@@ -96,8 +97,11 @@ export struct HomeRecommendSwiper {
   }
 
   private getContentWidthVp(): number {
-    // Full device width: no side gutters so phone single-card fills the row.
-    return Math.max(200, this.getDeviceWidthVp() - BANNER_OUTER_PAD_VP * 2);
+    return Math.max(200, this.getDeviceWidthVp() - this.getOuterPadVp() * 2);
+  }
+
+  private getOuterPadVp(): number {
+    return this.currentBreakpoint === 'sm' ? BANNER_PHONE_OUTER_PAD_VP : 0;
   }
 
   /**
@@ -137,7 +141,8 @@ export struct HomeRecommendSwiper {
   }
 
   private getItemSpaceVp(): number {
-    return this.getDisplayCount() > 1 ? BANNER_ITEM_SPACE_VP : 0;
+    // Keep adjacent cards visually separated during a phone swipe as well.
+    return this.videos.length > 1 ? BANNER_ITEM_SPACE_VP : 0;
   }
 
   private getPeekVp(): number {
@@ -155,37 +160,41 @@ export struct HomeRecommendSwiper {
   }
 
   build() {
-    Swiper() {
-      ForEach(this.videos, (video: VideoItem) => {
-        HomeRecommendBannerPage({
-          video: video,
-          bannerHeightVp: this.getBannerHeightVp(),
-          onOpenVideo: this.onOpenVideo
-        })
-      }, (video: VideoItem) => `banner_${video.videoId || video.id}`)
+    Row() {
+      Swiper() {
+        ForEach(this.videos, (video: VideoItem) => {
+          HomeRecommendBannerPage({
+            video: video,
+            bannerHeightVp: this.getBannerHeightVp(),
+            onOpenVideo: this.onOpenVideo
+          })
+        }, (video: VideoItem) => `banner_${video.videoId || video.id}`)
+      }
+      .width('100%')
+      .height(this.getBannerHeightVp())
+      // Multi-card: one viewport shows N full recommendations (plus optional side peeks).
+      .displayCount(this.getDisplayCount())
+      .loop(this.videos.length > this.getDisplayCount())
+      .autoPlay(this.videos.length > this.getDisplayCount())
+      .interval(4000)
+      .itemSpace(this.getItemSpaceVp())
+      .prevMargin(this.getPeekVp())
+      .nextMargin(this.getPeekVp())
+      .indicator(
+        Indicator.dot()
+          .color('rgba(255,255,255,0.45)')
+          .selectedColor(this.themePrimary)
+          .itemWidth(6)
+          .itemHeight(6)
+          .selectedItemWidth(14)
+          .selectedItemHeight(6)
+      )
+      .borderRadius(this.getDisplayCount() > 1 || this.getOuterPadVp() > 0 ? 12 : 0)
+      .clip(false)
     }
     .width('100%')
     .height(this.getBannerHeightVp())
-    // Multi-card: one viewport shows N full recommendations (plus optional side peeks).
-    .displayCount(this.getDisplayCount())
-    .loop(this.videos.length > this.getDisplayCount())
-    .autoPlay(this.videos.length > this.getDisplayCount())
-    .interval(4000)
-    .itemSpace(this.getItemSpaceVp())
-    .prevMargin(this.getPeekVp())
-    .nextMargin(this.getPeekVp())
-    .indicator(
-      Indicator.dot()
-        .color('rgba(255,255,255,0.45)')
-        .selectedColor(this.themePrimary)
-        .itemWidth(6)
-        .itemHeight(6)
-        .selectedItemWidth(14)
-        .selectedItemHeight(6)
-    )
-    .borderRadius(this.getDisplayCount() > 1 ? 12 : 0)
-    .clip(false)
-    .margin({ left: BANNER_OUTER_PAD_VP, right: BANNER_OUTER_PAD_VP })
+    .padding({ left: this.getOuterPadVp(), right: this.getOuterPadVp() })
     .visibility(this.videos.length > 0 ? Visibility.Visible : Visibility.None)
   }
 }

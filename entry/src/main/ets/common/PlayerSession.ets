@@ -331,13 +331,9 @@ export class PlayerSession {
               this._currentVideo.channelAvatarUrl = avatarUrl;
             }
           }
-          const bestThumb = result.videoInfo.getBestThumbnail();
-          if (bestThumb?.url) {
-            const thumbUrl = normalizeUrl(bestThumb.url);
-            if (thumbUrl.length > 0 && this._currentVideo.thumbnailUrl !== thumbUrl) {
-              this._currentVideo.thumbnailUrl = thumbUrl;
-            }
-          }
+          // Keep the thumbnail selected by the feed stable throughout startup.
+          // Replacing it while the loading cover is visible restarts MediaThumb's
+          // fallback chain and produces a black flash between image requests.
           // Back-fill local history for cloud-synced rows missing author / channel meta.
           WatchHistoryStore.enrichMetadata(
             videoId,
@@ -395,7 +391,7 @@ export class PlayerSession {
         videoSource.play = shouldPlay;
         videoSource.auto = shouldPlay;
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
-        this._controller.updateVideoSource(videoSource);
+        await this._controller.updateVideoSource(videoSource);
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
         this.startWatchSaveTimer();
         return videoSource;

@@ -1,7 +1,9 @@
 import { SelectOption } from 'mediaservice';
+import { ThemeColorUtil } from '../ThemeColorUtil';
 
 @Component
 export struct PlaybackSelectRow {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Prop title: ResourceStr;
   @Prop options: Array<SelectOption>;
   @Prop @Watch('onSelectedIndexChange') selectedIndex: number;
@@ -49,6 +51,9 @@ export struct PlaybackSelectRow {
         .font({ size: 14 })
         .fontColor(this.fontColor)
         .selectedOptionFont({ size: 14 })
+        .selectedOptionFontColor(this.themePrimary)
+        .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
+        .optionBgColor($r('app.color.yourtube_bg_surface'))
         .optionFont({ size: 14 })
         .backgroundColor(Color.Transparent)
         .onSelect((index: number) => {

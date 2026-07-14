@@ -18,10 +18,11 @@ export class YoutubeJavaScriptPlayerManager {
 
   static async deobfuscateBatch(
     sigs: string[],
-    nParams: string[]
+    nParams: string[],
+    playerId?: string
   ): Promise<SolveResult> {
-    const meta = await PipePipeApiDecoder.getLatestPlayer();
-    const result = await PipePipeApiDecoder.decodeBatch(meta.playerId, sigs, nParams);
+    const resolvedPlayerId = playerId || (await PipePipeApiDecoder.getLatestPlayer()).playerId;
+    const result = await PipePipeApiDecoder.decodeBatch(resolvedPlayerId, sigs, nParams);
     return result;
   }
 

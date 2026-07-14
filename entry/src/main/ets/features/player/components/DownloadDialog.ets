@@ -1,5 +1,6 @@
 import { StreamInfo, SelectOption, StreamCategories, PlayerModel } from 'mediaservice';
 import { UIConfig } from '../../../common/AppState';
+import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
 
 export interface DownloadSelection {
   video?: StreamInfo;
@@ -88,6 +89,9 @@ export struct DownloadDialog {
             Select(this.getModeOptions())
               .value(this.getModeLabel(this.selectedMode))
               .font({ size: 16 })
+              .selectedOptionFontColor(this.themePrimary)
+              .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
+              .optionBgColor($r('app.color.yourtube_bg_surface'))
               .width('100%')
               .height(44)
               .backgroundColor($r('app.color.yourtube_bg_page'))
@@ -180,6 +184,9 @@ export struct DownloadDialog {
                 Select(this.getVideoOptions())
                   .value(this.selectedDashVideo)
                   .font({ size: 15 })
+                  .selectedOptionFontColor(this.themePrimary)
+                  .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
+                  .optionBgColor($r('app.color.yourtube_bg_surface'))
                   .width('100%')
                   .height(40)
                   .backgroundColor($r('app.color.yourtube_bg_page'))
@@ -203,6 +210,9 @@ export struct DownloadDialog {
                   Select(this.audioTrackOptions)
                     .value(this.selectedAudioTrack)
                     .font({ size: 15 })
+                    .selectedOptionFontColor(this.themePrimary)
+                    .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
+                    .optionBgColor($r('app.color.yourtube_bg_surface'))
                     .width('100%')
                     .height(40)
                     .backgroundColor($r('app.color.yourtube_bg_page'))
@@ -228,6 +238,9 @@ export struct DownloadDialog {
                 Select(this.getAudioOptions())
                   .value(this.selectedDashAudio)
                   .font({ size: 15 })
+                  .selectedOptionFontColor(this.themePrimary)
+                  .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
+                  .optionBgColor($r('app.color.yourtube_bg_surface'))
                   .width('100%')
                   .height(40)
                   .backgroundColor($r('app.color.yourtube_bg_page'))
@@ -328,6 +341,9 @@ export struct DownloadDialog {
       Select(streams.map((stream: StreamInfo) => ({ value: this.getStreamLabel(stream) } as SelectOption)))
         .value(selectedValue)
         .font({ size: 15 })
+        .selectedOptionFontColor(this.themePrimary)
+        .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
+        .optionBgColor($r('app.color.yourtube_bg_surface'))
         .width('100%')
         .height(40)
         .backgroundColor($r('app.color.yourtube_bg_page'))

@@ -375,7 +375,11 @@ export class PiPManager {
   }
 
   private applyPlayPauseStatus(isPlaying: boolean): void {
-    if (!this.pipController) return;
+    // PiPController can exist while the app is still on the player page, but
+    // the system pipWindow is created only after STARTED. Updating controls
+    // before that point produces WMSPiP "pipWindow not exist" and can race
+    // with back-to-PiP startup. The cached state is replayed in STARTED.
+    if (!this.pipController || !PlayerSession.getInstance().isPiPActive) return;
     try {
       const status: PiPWindow.PiPControlStatus =
         isPlaying ? PiPWindow.PiPControlStatus.PLAY : PiPWindow.PiPControlStatus.PAUSE;

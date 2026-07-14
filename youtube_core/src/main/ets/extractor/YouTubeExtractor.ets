@@ -695,6 +695,7 @@ export class YouTubeExtractor {
   private cachedVideoOnlyStreams: StreamInfo[] = [];
   private streamsCachedVideoId: string = '';
   private cachedManifestNResult: ManifestNDecodeResult | null = null;
+  private decoderPlayerId: string | null = null;
 
   // Selected stream client streaming data (PipePipe configuredStreamingData)
   private configuredStreamingData: StreamingData | undefined;
@@ -1432,6 +1433,7 @@ export class YouTubeExtractor {
     this.cachedVideoStreams = [];
     this.cachedVideoOnlyStreams = [];
     this.cachedManifestNResult = null;
+    this.decoderPlayerId = null;
     this.cachedInnertubePlayers = undefined;
     this.configuredStreamingData = undefined;
     this.configuredCpn = undefined;
@@ -1561,6 +1563,9 @@ export class YouTubeExtractor {
         signatureTimestamp: localSts ?? 0,
       };
       PipePipeApiDecoder.setLocalMetadata(meta);
+      if (meta.playerId && meta.signatureTimestamp > 0) {
+        this.decoderPlayerId = meta.playerId;
+      }
       logger.info(`[METADATA] local extraction OK: playerId=${meta.playerId || '(missing)'} sts=${meta.signatureTimestamp || '(missing)'}`);
     } else {
       logger.warn('[METADATA] ytcfg did not contain STS or PLAYER_JS_URL — decode will use API fallback');
@@ -2522,7 +2527,7 @@ export class YouTubeExtractor {
 
     try {
       const result = await YoutubeJavaScriptPlayerManager.deobfuscateBatch(
-        Array.from(uniqueSigs), Array.from(uniqueNs)
+        Array.from(uniqueSigs), Array.from(uniqueNs), this.decoderPlayerId ?? undefined
       );
 
       logger.info(`[DEOBF] API returned sig=${Object.keys(result.sig).length} n=${Object.keys(result.n).length}`);
@@ -2573,6 +2578,7 @@ export class YouTubeExtractor {
       }
     } catch (e) {
       logger.warn('batchDeobfuscateItagUrls failed:', e);
+      throw new Error('Stream URL deobfuscation failed');
     }
   }
 
@@ -2589,7 +2595,12 @@ export class YouTubeExtractor {
 
   private getThrottlingParamFromUrl(url: string): string | undefined {
     const match = url.match(/[&?]n=([^&]+)/);
-    return match ? match[1] : undefined;
+    if (!match) return undefined;
+    try {
+      return decodeURIComponent(match[1]);
+    } catch (_) {
+      return match[1];
+    }
   }
 
   private buildAudioStreamInfo(itagInfo: ItagInfo, sourceClient: string = 'android_vr'): StreamInfo {
@@ -2754,7 +2765,8 @@ export class YouTubeExtractor {
       return this.cachedManifestNResult.decoded;
     }
     try {
-      const result = await YoutubeJavaScriptPlayerManager.deobfuscateBatch([], [encryptedN]);
+      const result = await YoutubeJavaScriptPlayerManager.deobfuscateBatch(
+        [], [encryptedN], this.decoderPlayerId ?? undefined);
       const decryptedN = result.n[encryptedN];
       if (decryptedN) {
         this.cachedManifestNResult = { original: encryptedN, decoded: decryptedN } as ManifestNDecodeResult;

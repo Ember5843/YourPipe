@@ -5,6 +5,7 @@ import { parseInputJson } from './InputParser';
 import { serveRange } from './RangeProxy';
 import { serveSabrRange } from '../sabr/SabrProxyServe';
 import { buildSabrDashManifest, serveSabrDashSegment } from '../sabr/SabrDashProxy';
+import { buildYoutubeDashManifest } from './YoutubeDashManifest';
 import { sabrSessionStore } from '../sabr/SabrSessionStore';
 import Logger from '../utils/Logger';
 
@@ -113,10 +114,12 @@ async function routeRequest(
 ): Promise<void> {
   const segment = parts[2];
 
-  if (session.type === 'sabr-dual' && segment === 'manifest.mpd') {
-    const manifest = buildSabrDashManifest(session);
+  if ((session.type === 'sabr-dual' || session.type === 'youtube-dual') && segment === 'manifest.mpd') {
+    const manifest = session.type === 'sabr-dual'
+      ? buildSabrDashManifest(session)
+      : buildYoutubeDashManifest(session);
     if (!manifest) {
-      await sendText(conn, 500, 'Internal Server Error', 'text/plain', 'SABR manifest unavailable');
+      await sendText(conn, 500, 'Internal Server Error', 'text/plain', 'DASH manifest unavailable');
       return;
     }
     await sendText(conn, 200, 'OK', 'application/dash+xml', method === 'HEAD' ? '' : manifest);
@@ -304,6 +307,13 @@ export class LocalProxyServer {
     if (session.type === 'single') return `${base}/resource/main`;
     if (session.type === 'sabr-dual') return `${base}/manifest.mpd`;
     return base;
+  }
+
+  dashManifestUrl(sessionId: string): string {
+    if (!this.running || !sessionId) return '';
+    const session = sessionStore.get(sessionId);
+    if (!session || (session.type !== 'youtube-dual' && session.type !== 'sabr-dual')) return '';
+    return `http://127.0.0.1:${this.port}/session/${sessionId}/manifest.mpd`;
   }
 }
 

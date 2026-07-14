@@ -1475,6 +1475,8 @@ struct Index {
             pip.startPiP().catch((e: Error) => {
               logger.warn(`startPiP on back failed: ${e.message}`);
             });
+            // Keep the 0.5.2 navigation timing: the system completes XComponent
+            // takeover while the destination is being popped.
             this.navPathStack.pop();
             return true;
           }

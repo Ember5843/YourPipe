@@ -224,6 +224,10 @@ export class LocalMediaProxy {
     return localProxyServer.playbackUrl(sessionId);
   }
 
+  static getDashManifestUrl(sessionId: string): string {
+    return localProxyServer.dashManifestUrl(sessionId);
+  }
+
   static destroySession(sessionId: string): void {
     if (!sessionId) return;
     Logger.debug(TAG, `destroySession: ${sessionId}`);

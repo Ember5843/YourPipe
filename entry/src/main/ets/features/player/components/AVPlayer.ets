@@ -18,6 +18,7 @@ import { ConfigurationConstant } from '@kit.AbilityKit';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
+import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
 import {
   AvPlayerController,
   VideoData,
@@ -80,6 +81,7 @@ export struct VideoPlayer {
   private lastController?: AvPlayerController;
   @State hasStreams: boolean = false;
   @State hasError: boolean = false;
+  @State playbackStarted: boolean = false;
   @State isWaitingForDualBuffer: boolean = false;
   // currentTime/durationTime 通过节流后的 ProgressSubscriber 更新（避免高频 @Track 触发 UI 重渲染）
   @State currentTime: number = 0;
@@ -114,6 +116,10 @@ export struct VideoPlayer {
   private progressListener = (currentTime: number, durationTime: number) => {
     this.currentTime = currentTime;
     this.durationTime = durationTime;
+    if (!this.playbackStarted && (currentTime > 0
+      || (this.vm.isReady && this.vm.isPlaying && !this.vm.isBuffering))) {
+      this.playbackStarted = true;
+    }
   };
 
   private syncPlaybackStateFromController(): void {
@@ -309,6 +315,7 @@ export struct VideoPlayer {
   async onSourceChange(): Promise<void> {
     // 切换源时更新本地流状态标记
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
+    this.playbackStarted = false;
 
     Logger.info(TAG, `Source changed to: ${this.curSource.name}. hasStreams: ${this.hasStreams}. Triggering updateVideoSource.`);
     await this.controller.updateVideoSource(this.curSource);
@@ -343,7 +350,7 @@ export struct VideoPlayer {
       // 3. 立即同步 UI 状态
       this.currentTime = this.vm.currentTime;
       this.durationTime = this.vm.durationTime;
-      this.hasError = this.vm.errorMsg.length > 0;
+      this.hasError = this.controller.getUserVisibleError().length > 0;
       const pm = this.vm.playerModel;
       this.hasStreams = pm ? (pm.categorizedStreams.audio.length + pm.categorizedStreams.video.length +
                               pm.categorizedStreams.dashManifest.length + pm.categorizedStreams.hlsManifest.length +
@@ -600,9 +607,14 @@ export struct VideoPlayer {
   SpeedMenu() {
     Menu() {
       ForEach([0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0], (speed: number) => {
-        MenuItem({ content: speed + 'x' })
+        MenuItem({
+          content: speed + 'x',
+          endIcon: this.vm.playbackSpeed === speed ? $r('sys.symbol.checkmark') : ''
+        })
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
+          .backgroundColor(this.vm.playbackSpeed === speed
+            ? this.getSelectedMenuBackground() : Color.Transparent)
           .onClick(() => {
             this.controller.setPlaybackSpeed(speed);
           })
@@ -624,7 +636,7 @@ export struct VideoPlayer {
         .contentFontColor($r('sys.color.font_primary'))
         .contentFont({ size: 14 })
         .backgroundColor(this.vm.currentSubtitleUrl === ''
-          ? $r('app.color.yourtube_bg_surface_muted') : Color.Transparent)
+          ? this.getSelectedMenuBackground() : Color.Transparent)
         .onClick(() => {
           this.controller.switchSubtitle('');
         })
@@ -636,7 +648,7 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
           .backgroundColor(this.vm.currentSubtitleUrl === track.url
-            ? $r('app.color.yourtube_bg_surface_muted') : Color.Transparent)
+            ? this.getSelectedMenuBackground() : Color.Transparent)
           .onClick(() => {
             this.controller.switchSubtitle(track.url);
           })
@@ -659,7 +671,7 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
           .backgroundColor(this.getSelectedAudioIndex() === index
-            ? $r('app.color.yourtube_bg_surface_muted') : Color.Transparent)
+            ? this.getSelectedMenuBackground() : Color.Transparent)
           .onClick(() => {
             this.controller.switchToAudioIndex(index);
           })
@@ -683,7 +695,7 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
           .backgroundColor(this.getSelectedVideoIndex() === index
-            ? $r('app.color.yourtube_bg_surface_muted') : Color.Transparent)
+            ? this.getSelectedMenuBackground() : Color.Transparent)
           .onClick(() => {
             this.controller.switchToVideoEntry(entry);
           })
@@ -720,9 +732,12 @@ export struct VideoPlayer {
   private getVideoLabel(stream: StreamInfo): string {
     const values: string[] = [];
     if (stream.quality?.trim()) values.push(stream.quality);
-    if (stream.itag !== undefined) values.push(`itag ${stream.itag}`);
     if (stream.codecs?.trim()) values.push(stream.codecs);
     return values.join(' · ');
+  }
+
+  private getSelectedMenuBackground(): string {
+    return ThemeColorUtil.selectedBackground(this.themePrimary);
   }
 
   private getSelectedAudioIndex(): number {
@@ -810,13 +825,38 @@ export struct VideoPlayer {
         })
         .zIndex(CommonConstants.Z_INDEX_BASE)
 
+      // One stable startup cover spans extraction, MPV probing, startup seek
+      // and automatic recovery. Stream URLs alone are not proof of a frame.
+      if (!this.playbackStarted && !this.hasError) {
+        Stack({ alignContent: Alignment.Center }) {
+          MediaThumb({
+            imageUrl: this.curSource.thumbnailUrl || this.selectedVideo?.thumbnailUrl || '',
+            placeholderColor: this.selectedVideo?.thumbnailColor || '#000000',
+            fillParent: true,
+            useAspectRatio: false,
+            borderRadiusVp: 0
+          })
+            .brightness(0.4)
+
+          LoadingProgress()
+            .width(48)
+            .height(48)
+            .color(Color.White)
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor(Color.Black)
+        .hitTestBehavior(HitTestMode.None)
+        .zIndex(CommonConstants.Z_INDEX_BASE + 1)
+      }
+
       // 仅音频封面：叠在 surface 上、播控下；None 穿透保证进度条/双击可点
       if (this.isAudioOnlyMode) {
         this.AudioOnlyCoverLayer()
       }
 
       // 加载中/缓冲提示层
-      if (this.vm.isBuffering) {
+      if (this.vm.isBuffering && this.playbackStarted) {
         Column() {
           LoadingProgress()
             .width(48)
@@ -843,7 +883,7 @@ export struct VideoPlayer {
             .fontWeight(FontWeight.Bold)
             .textAlign(TextAlign.Center)
 
-          Text(this.getErrorDisplay(this.curSource.error || this.vm.errorMsg))
+          Text(this.getErrorDisplay(this.curSource.error || this.controller.getUserVisibleError()))
             .fontColor('#CCFFFFFF')
             .fontSize(13)
             .textAlign(TextAlign.Center)

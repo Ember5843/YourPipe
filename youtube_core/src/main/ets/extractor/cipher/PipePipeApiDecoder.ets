@@ -63,6 +63,10 @@ export class PipePipeApiDecoder {
    * Subsequent getLatestPlayer() calls will hit this cache instead of the API.
    */
   static setLocalMetadata(meta: PlayerMetadata): void {
+    if (!meta.playerId || meta.signatureTimestamp <= 0) {
+      logger.warn(`Ignoring incomplete local player metadata: id=${meta.playerId || '(missing)'} sts=${meta.signatureTimestamp || '(missing)'}`);
+      return;
+    }
     PipePipeApiDecoder.cachedMetadata = meta;
     PipePipeApiDecoder.cacheExpiry = Date.now() + PipePipeApiDecoder.TTL_MS;
     logger.info(`Player metadata set from local extraction: id=${meta.playerId} sts=${meta.signatureTimestamp}`);
@@ -118,13 +122,17 @@ export class PipePipeApiDecoder {
   ): Promise<SolveResult> {
     const result: SolveResult = { sig: {}, n: {} };
 
+    if (!playerId.trim()) {
+      throw new Error('Cannot decode without a valid playerId');
+    }
+
     if (sigs.length === 0 && nParams.length === 0) {
       return result;
     }
 
     const uncachedSigs: string[] = [];
     for (const s of sigs) {
-      const cached = PipePipeApiDecoder.sigCache.get(s);
+      const cached = PipePipeApiDecoder.sigCache.get(`${playerId}:sig:${s}`);
       if (cached !== undefined) {
         result.sig[s] = cached;
       } else {
@@ -133,7 +141,7 @@ export class PipePipeApiDecoder {
     }
     const uncachedNs: string[] = [];
     for (const n of nParams) {
-      const cached = PipePipeApiDecoder.nCache.get(n);
+      const cached = PipePipeApiDecoder.nCache.get(`${playerId}:n:${n}`);
       if (cached !== undefined) {
         result.n[n] = cached;
       } else {
@@ -194,27 +202,31 @@ export class PipePipeApiDecoder {
         sigResponse = parsed.responses[0];
       }
 
-      if (nResponse?.type === 'result' && nResponse.data) {
+      if (uncachedNs.length > 0 && (nResponse?.type !== 'result' || !nResponse.data)) {
+        throw new Error('Decode response is missing the n result');
+      }
+      if (nResponse?.data) {
         for (const orig of uncachedNs) {
           const decoded = nResponse.data[orig];
-          if (decoded !== undefined) {
-            PipePipeApiDecoder.nCache.set(orig, decoded);
-            result.n[orig] = decoded;
-          } else {
-            result.n[orig] = null;
+          if (!decoded || decoded === orig) {
+            throw new Error(`Decode response returned an invalid n result for ${orig}`);
           }
+          PipePipeApiDecoder.nCache.set(`${playerId}:n:${orig}`, decoded);
+          result.n[orig] = decoded;
         }
       }
 
-      if (sigResponse?.type === 'result' && sigResponse.data) {
+      if (uncachedSigs.length > 0 && (sigResponse?.type !== 'result' || !sigResponse.data)) {
+        throw new Error('Decode response is missing the signature result');
+      }
+      if (sigResponse?.data) {
         for (const orig of uncachedSigs) {
           const decoded = sigResponse.data[orig];
-          if (decoded !== undefined) {
-            PipePipeApiDecoder.sigCache.set(orig, decoded);
-            result.sig[orig] = decoded;
-          } else {
-            result.sig[orig] = null;
+          if (!decoded) {
+            throw new Error('Decode response returned an empty signature result');
           }
+          PipePipeApiDecoder.sigCache.set(`${playerId}:sig:${orig}`, decoded);
+          result.sig[orig] = decoded;
         }
       }
 

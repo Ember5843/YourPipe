@@ -78,6 +78,8 @@ export class AvPlayerController {
   private isRecovering: boolean = false;
   private readonly MAX_ERROR_RETRIES = 2;
   private lastKnownGoodPosition: number = 0;
+  /** Terminal error exposed to UI. Transient engine errors stay diagnostic-only during recovery. */
+  private userVisibleErrorMsg: string = '';
 
   // Audio focus state (player-side handler for system hints — scheme A)
   /** Temporary focus loss (PAUSE): auto-resume on RESUME. */
@@ -155,6 +157,7 @@ export class AvPlayerController {
 
   public addErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners.push(listener); }
   public removeErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners = this.errorListeners.filter(l => l !== listener); }
+  public getUserVisibleError(): string { return this.userVisibleErrorMsg; }
   public addWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners.push(listener); }
   public removeWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners = this.waitingForBufferListeners.filter(l => l !== listener); }
   public addSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners.push(listener); }
@@ -990,7 +993,27 @@ export class AvPlayerController {
       }
     });
 
+    if (this.hasSegmentBase(video) && this.hasSegmentBase(audio)) {
+      const manifestUrl = LocalMediaProxy.getDashManifestUrl(sessionId);
+      if (manifestUrl.startsWith('http://127.0.0.1:')) {
+        Logger.info(TAG, `buildDualEdlUrl: using DASH SegmentBase manifest=${manifestUrl}`);
+        return manifestUrl;
+      }
+      Logger.warn(TAG, `buildDualEdlUrl: DASH manifest unavailable, falling back to EDL`);
+    } else {
+      Logger.warn(TAG, `buildDualEdlUrl: missing init/index range, falling back to EDL`);
+    }
     return this.composeDualEdl(playbackUrl, video, audio, durationMs);
+  }
+
+  private hasSegmentBase(stream: StreamInfo): boolean {
+    const initStart = stream.initRangeStart;
+    const initEnd = stream.initRangeEnd;
+    const indexStart = stream.indexRangeStart;
+    const indexEnd = stream.indexRangeEnd;
+    return !stream.isOtf
+      && initStart !== undefined && initEnd !== undefined && initStart >= 0 && initEnd >= initStart
+      && indexStart !== undefined && indexEnd !== undefined && indexStart >= 0 && indexEnd >= indexStart;
   }
 
   private composeDualEdl(
@@ -1365,11 +1388,13 @@ export class AvPlayerController {
 
     // 错误监听（手动，需要特殊处理）
     const errorChanged = prevErrorMsg !== state.errorMsg;
-    if (errorChanged && state.errorMsg) {
-      this.errorListeners.forEach(l => l(this.vm.errorMsg));
-      if (!this.isRecovering) {
-        this.handlePlaybackError(state);
-      }
+    if (errorChanged && state.errorMsg && !this.isRecovering) {
+      // MPV/FFmpeg may emit several Invalid states while probing or while an
+      // automatic retry is in progress. Do not turn those diagnostics into UI.
+      this.handlePlaybackError(state);
+    }
+    if (!state.errorMsg && (state.isReady || state.isPlaying)) {
+      this.publishUserVisibleError('');
     }
   }
 
@@ -1378,7 +1403,7 @@ export class AvPlayerController {
     // Keep videoOutputEnabled: session audio-only must survive source switch.
     this.lastKnownGoodPosition = 0;
     this.waitingForBufferListeners.forEach(l => l(false));
-    this.errorListeners.forEach(l => l(''));
+    this.publishUserVisibleError('');
   }
 
   private async handlePlaybackError(state: PlaybackState): Promise<void> {
@@ -1410,6 +1435,7 @@ export class AvPlayerController {
     }
 
     this.errorRetryCount = 0;
+    this.publishUserVisibleError(this.vm.errorMsg || '[PLAYER] PLAYBACK_FAILED');
     this.onErrorNeedsUserAction?.(this.vm.errorMsg);
   }
 
@@ -1490,8 +1516,14 @@ export class AvPlayerController {
 
   private setError(error: string): void {
     this.vm.errorMsg = error;
-    this.errorListeners.forEach(l => l(error));
+    this.publishUserVisibleError(error);
     Logger.error(TAG, error);
+  }
+
+  private publishUserVisibleError(error: string): void {
+    if (this.userVisibleErrorMsg === error) return;
+    this.userVisibleErrorMsg = error;
+    this.errorListeners.forEach(l => l(error));
   }
 
   private updateAvSessionMetadata(): void {

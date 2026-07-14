@@ -135,6 +135,21 @@ export class PlayerStateRelay {
     const playingChanged = this.prevIsPlaying !== state.isPlaying;
     const errorChanged = this.prevErrorMsg !== state.errorMsg && !!state.errorMsg;
 
+    // Automatic recovery must leave ERROR through LOADING before normal state
+    // transitions resume. Otherwise PiP/AVSession keep seeing a stale ERROR
+    // even after MPV has cleared the error and is already playing.
+    if (sm.isOneOf(PlayerState.ERROR) && !state.errorMsg) {
+      sm.transition(PlayerState.LOADING);
+      if (state.isReady) {
+        sm.transition(PlayerState.READY);
+        if (state.isBuffering) {
+          sm.forceTransition(PlayerState.BUFFERING);
+        } else if (state.isPlaying) {
+          sm.transition(PlayerState.PLAYING);
+        }
+      }
+    }
+
     // ── 进入 BUFFERING ──
     if (bufferingChanged && state.isBuffering &&
       sm.isOneOf(PlayerState.PLAYING, PlayerState.READY, PlayerState.PAUSED)) {

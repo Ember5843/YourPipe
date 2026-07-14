@@ -11,7 +11,7 @@
 
 export class ApiConfig {
   /** 是否使用本地解密服务（false = 使用远程 PipePipe API） */
-  static readonly USE_LOCAL_API: boolean = false;
+  static readonly USE_LOCAL_API: boolean = true;
 
   /** 本地解密服务地址（USB hdc reverse 模式） */
   static readonly LOCAL_DECODE_URL: string = 'http://127.0.0.1:8899';
