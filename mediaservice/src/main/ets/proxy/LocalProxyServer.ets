@@ -3,6 +3,9 @@ import { util } from '@kit.ArkTS';
 import { sessionStore, DashSession } from './SessionStore';
 import { parseInputJson } from './InputParser';
 import { serveRange } from './RangeProxy';
+import { serveSabrRange } from '../sabr/SabrProxyServe';
+import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
+import { sabrSessionStore } from '../sabr/SabrSessionStore';
 import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][Server]';
@@ -110,6 +113,20 @@ async function routeRequest(
 ): Promise<void> {
   const segment = parts[2];
 
+  if (session.type === 'sabr-dual' && parts.length >= 4) {
+    const idx = parseInt(parts[3], 10) || 0;
+    if (segment === 'video' && session.sabrVideoBuffer) {
+      const mime = session.videos[idx]?.mimeType || session.video.mimeType || 'video/mp4';
+      await serveSabrRange(conn, session.sabrVideoBuffer as SabrTrackBuffer, rangeHeader, mime);
+      return;
+    }
+    if (segment === 'audio' && session.sabrAudioBuffer) {
+      const mime = session.audios[idx]?.mimeType || session.audio.mimeType || 'audio/mp4';
+      await serveSabrRange(conn, session.sabrAudioBuffer as SabrTrackBuffer, rangeHeader, mime);
+      return;
+    }
+  }
+
   if (parts.length >= 4) {
     const idx = parseInt(parts[3], 10) || 0;
     if (segment === 'video' && idx < session.videos.length) {
@@ -183,13 +200,22 @@ export class LocalProxyServer {
     const session = parseInputJson(inputJson);
     const valid = session.type === 'single'
       ? !!session.single.url
-      : (session.videos.length > 0 && session.audios.length > 0);
+      : (session.type === 'sabr-dual'
+        ? !!(session.sabrVideoBuffer && session.sabrAudioBuffer)
+        : (session.videos.length > 0 && session.audios.length > 0));
     if (!valid) {
       Logger.warn(TAG, `createSession: invalid input type=${session.type}`);
       return '';
     }
     const id = sessionStore.add(session);
     Logger.info(TAG, `createSession: id=${id} type=${session.type} videos=${session.videos.length} audios=${session.audios.length}`);
+    return id;
+  }
+
+  /** Register a pre-built session (used for SABR where buffers are attached in TS). */
+  addPreparedSession(session: DashSession): string {
+    const id = sessionStore.add(session);
+    Logger.info(TAG, `addPreparedSession: id=${id} type=${session.type}`);
     return id;
   }
 
@@ -226,6 +252,9 @@ export class LocalProxyServer {
     const session = sessionStore.get(sessionId);
     if (session) {
       session.cancel?.();
+      if (session.sabrLeaseKey) {
+        sabrSessionStore.release(session.sabrLeaseKey);
+      }
       sessionStore.remove(sessionId);
     }
   }

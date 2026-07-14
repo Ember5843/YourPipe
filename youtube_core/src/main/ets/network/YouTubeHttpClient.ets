@@ -120,6 +120,21 @@ export class YouTubeHttpClient {
   }
 
   /**
+   * Binary POST for SABR (protobuf body, UMP ARRAY_BUFFER response).
+   */
+  async postBinary(
+    url: string,
+    data: Uint8Array,
+    customHeaders?: Record<string, string | string[]>,
+    withAuth: boolean = false
+  ): Promise<http.HttpResponse> {
+    const headers = await this.prepareHeaders(customHeaders, url, withAuth);
+    const response = await this.downloader.postBinary(url, data, headers, this.localization);
+    this.saveCookiesFromResponse(response, url);
+    return response;
+  }
+
+  /**
    * 准备请求头（合并默认头、Cookie、自定义头）
    *
    * 对齐 PipePipe DownloaderImpl + addLoggedInHeaders 行为：

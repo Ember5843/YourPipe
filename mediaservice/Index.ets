@@ -4,6 +4,7 @@ export { AVPlayerState, CommonConstants } from './src/main/ets/common/CommonCons
 export { secondToTime } from './src/main/ets/utils/CommUtils';
 export { AvPlayerController, NativeLogBridgeFns } from './src/main/ets/controller/AvPlayerController';
 export { LocalMediaProxy } from './src/main/ets/controller/LocalMediaProxy';
+export { sabrSessionStore } from './src/main/ets/sabr/SabrSessionStore';
 export { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './src/main/ets/engine/PlaybackEngine';
 export { VideoHwCaps } from './src/main/ets/engine/VideoHwCaps';
 export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from './src/main/ets/model/PlayerModel';

@@ -21,7 +21,16 @@ export interface StreamResource {
   sourceClient: string;
 }
 
-export type SessionType = 'single' | 'youtube-dual';
+export type SessionType = 'single' | 'youtube-dual' | 'sabr-dual';
+
+/** Opaque SABR track readers attached by LocalMediaProxy (avoid circular import type). */
+export interface SabrTrackReader {
+  ensureReady: () => Promise<void>;
+  readRange: (start: number, end: number) => Promise<Uint8Array>;
+  getContentLength: () => number;
+  getItag: () => number;
+  resetForSeek: (targetMs: number) => void;
+}
 
 export interface DashSession {
   id: string;
@@ -36,6 +45,10 @@ export interface DashSession {
   stale: boolean;
   cancel?: () => void;
   refreshUrls?: () => Promise<boolean>;
+  /** SABR lease key for session store release. */
+  sabrLeaseKey?: string;
+  sabrVideoBuffer?: SabrTrackReader;
+  sabrAudioBuffer?: SabrTrackReader;
 }
 
 function emptyResource(): StreamResource {

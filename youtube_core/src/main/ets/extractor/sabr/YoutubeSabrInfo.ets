@@ -1,6 +1,6 @@
 /**
  * SABR session bootstrap (PipePipe YoutubeSabrInfo).
- * Reserved entry — full UMP session not implemented yet.
+ * Session/UMP playback lives in YoutubeSabrSession.
  */
 export type SabrClientProfileKey = 'mweb' | 'web';
 
@@ -19,6 +19,13 @@ export interface YoutubeSabrFormatMeta {
   audioTrackId?: string;
   audioTrackName?: string;
   isOriginalAudio?: boolean;
+  /** Optional progressive init URL (rare on pure SABR). */
+  initializationUrl?: string;
+  initRangeStart?: number;
+  initRangeEnd?: number;
+  contentLength?: number;
+  approxDurationMs?: number;
+  drc?: boolean;
 }
 
 export class YoutubeSabrInfo {
@@ -81,5 +88,14 @@ export class YoutubeSabrInfo {
       }
     }
     return best;
+  }
+
+  findFormatByItag(itag: number): YoutubeSabrFormatMeta | undefined {
+    for (const format of this.formats) {
+      if (format.itag === itag) {
+        return format;
+      }
+    }
+    return undefined;
   }
 }

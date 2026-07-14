@@ -901,7 +901,7 @@ export class YouTubeExtractor {
           qualityLabel: undefined,
           audioQuality: undefined,
           bitrate: fmt.bitrate,
-          contentLength: undefined,
+          contentLength: fmt.contentLength,
           hasVideo: false,
           hasAudio: true,
           deliveryMethod: DeliveryMethod.SABR,
@@ -911,8 +911,8 @@ export class YouTubeExtractor {
           codecs: fmt.codecs,
           initRange: undefined,
           indexRange: undefined,
-          approxDurationMs: undefined,
-          durationMs: undefined,
+          approxDurationMs: fmt.approxDurationMs,
+          durationMs: fmt.approxDurationMs,
           isLive: false,
           isOtf: false,
           audioLanguage: undefined,
@@ -939,7 +939,7 @@ export class YouTubeExtractor {
           qualityLabel: fmt.qualityLabel,
           audioQuality: undefined,
           bitrate: fmt.bitrate,
-          contentLength: undefined,
+          contentLength: fmt.contentLength,
           hasVideo: true,
           hasAudio: false,
           deliveryMethod: DeliveryMethod.SABR,
@@ -949,8 +949,8 @@ export class YouTubeExtractor {
           codecs: fmt.codecs,
           initRange: undefined,
           indexRange: undefined,
-          approxDurationMs: undefined,
-          durationMs: undefined,
+          approxDurationMs: fmt.approxDurationMs,
+          durationMs: fmt.approxDurationMs,
           isLive: false,
           isOtf: false,
           audioLanguage: undefined,
@@ -998,6 +998,26 @@ export class YouTubeExtractor {
       const displayName = track?.displayName;
       const isOriginal = !!displayName
         && (displayName.toLowerCase().includes('original') || displayName.includes('yokuqala'));
+      let initStart: number | undefined = undefined;
+      let initEnd: number | undefined = undefined;
+      if (fmt.initRange?.start !== undefined) {
+        initStart = this.parseIntSafe(fmt.initRange.start);
+      }
+      if (fmt.initRange?.end !== undefined) {
+        initEnd = this.parseIntSafe(fmt.initRange.end);
+      }
+      if (fmt.indexRange?.end !== undefined) {
+        const indexEnd = this.parseIntSafe(fmt.indexRange.end);
+        if (indexEnd !== undefined && (initEnd === undefined || indexEnd > initEnd)) {
+          initEnd = indexEnd;
+        }
+      }
+      const contentLength = fmt.contentLength
+        ? this.parseIntSafe(fmt.contentLength)
+        : undefined;
+      const approxDurationMs = fmt.approxDurationMs
+        ? this.parseIntSafe(fmt.approxDurationMs)
+        : undefined;
       const meta: YoutubeSabrFormatMeta = {
         itag: fmt.itag,
         mimeType: mime,
@@ -1005,13 +1025,19 @@ export class YouTubeExtractor {
         width: fmt.width,
         height: fmt.height,
         lastModified: fmt.lastModified,
+        xtags: fmt.xtags,
         isAudio: isAudio,
         isVideo: isVideo && !isAudio,
         qualityLabel: fmt.qualityLabel,
         codecs: codecs,
         audioTrackId: track?.id,
         audioTrackName: displayName,
-        isOriginalAudio: isOriginal
+        isOriginalAudio: isOriginal || track?.audioIsDefault === true,
+        initializationUrl: fmt.url,
+        initRangeStart: initStart,
+        initRangeEnd: initEnd,
+        contentLength: contentLength,
+        approxDurationMs: approxDurationMs
       };
       out.push(meta);
     }

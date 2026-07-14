@@ -14,10 +14,12 @@
  */
 
 import { media } from '@kit.MediaKit';
-import { SubtitleTrack } from 'youtube_core';
+import { SubtitleTrack, YoutubeSabrInfo } from 'youtube_core';
 
 export interface StreamInfo {
   url: string;
+  /** When false, url is a session reference (SABR), not progressive media. */
+  isUrl?: boolean;
   kind: string;
   sourceClient?: string;
   itag?: number;
@@ -46,6 +48,8 @@ export interface StreamInfo {
   contentLength?: number;
   approxDurationMs?: number;
   isOtf?: boolean;
+  /** SABR bootstrap shared across audio/video streams of the same extract. */
+  sabrInfo?: YoutubeSabrInfo;
 }
 
 export interface SelectOption {

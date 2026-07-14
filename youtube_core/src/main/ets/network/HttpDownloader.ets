@@ -420,6 +420,84 @@ export class HttpDownloader {
     return this.request('POST', url, postHeaders, data, localization)
   }
 
+  /**
+   * Binary POST (SABR protobuf body + UMP response).
+   * Uses ARRAY_BUFFER for both request extraData and response result.
+   */
+  async postBinary(
+    url: string,
+    data: Uint8Array,
+    headers?: Record<string, string[] | string>,
+    localization?: Localization,
+    enableRetry: boolean = true
+  ): Promise<http.HttpResponse> {
+    let lastError: HttpError | null = null;
+    let attempt = 0;
+    while (attempt < (enableRetry ? HttpDownloader.MAX_RETRIES : 1)) {
+      attempt++;
+      try {
+        logger.debug(`POST-BIN ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
+        const requestHeaders = this.processHeaders(headers, localization);
+        requestHeaders['Accept-Encoding'] = 'identity';
+        // Avoid default application/json from processHeaders when Content-Type already set.
+        const httpRequest = http.createHttp();
+        const bodyBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+        const httpOptions: http.HttpRequestOptions = {
+          'method': http.RequestMethod.POST,
+          'header': requestHeaders,
+          'extraData': bodyBuffer,
+          'expectDataType': http.HttpDataType.ARRAY_BUFFER,
+          'connectTimeout': 30000,
+          'readTimeout': 60000,
+          'usingCache': false
+        };
+        const response = await new Promise<http.HttpResponse>((resolve, reject) => {
+          httpRequest.request(url, httpOptions, (err: BusinessError, resp: http.HttpResponse) => {
+            if (!err) {
+              resolve(resp);
+            } else {
+              reject(err);
+            }
+          });
+        });
+        httpRequest.destroy();
+        if (response.responseCode && response.responseCode >= 400) {
+          const httpError = new HttpError(
+            `HTTP ${response.responseCode}`,
+            url,
+            'POST',
+            response.responseCode,
+            `HTTP ${response.responseCode}`,
+            undefined
+          );
+          if (httpError.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
+            await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
+            continue;
+          }
+          throw httpError;
+        }
+        return response;
+      } catch (err) {
+        if (err instanceof HttpError) {
+          lastError = err;
+          if (err.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
+            await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
+            continue;
+          }
+          throw err;
+        }
+        const businessError = err as BusinessError;
+        lastError = new HttpError(businessError.message || 'Network error', url, 'POST');
+        if (lastError.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
+          await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
+          continue;
+        }
+        throw lastError;
+      }
+    }
+    throw lastError || new HttpError('Unknown error', url, 'POST');
+  }
+
   // 便捷方法：HEAD 请求
   head(
     url: string,

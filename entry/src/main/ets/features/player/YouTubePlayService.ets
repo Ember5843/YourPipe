@@ -20,7 +20,7 @@ import {
   ContentNotSupportedException,
   ExtractionException
 } from 'youtube_core';
-import { StreamInfo, SubtitleTrack } from 'mediaservice';
+import { StreamInfo, SubtitleTrack, sabrSessionStore } from 'mediaservice';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
 
@@ -91,6 +91,7 @@ export class YouTubePlayService {
     try {
       this.extractor = new YouTubeExtractor(this.context);
       await this.extractor.initialize();
+      sabrSessionStore.setHttpClient(this.extractor.getHttpClient());
       logger.info(`${TAG} YouTubePlayService initialized`);
     } catch (e) {
       this.extractor = undefined;
@@ -138,6 +139,7 @@ export class YouTubePlayService {
 
       const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
         url: stream.url,
+        isUrl: stream.isUrl,
         itag: stream.itag,
         hasVideo: stream.hasVideo,
         hasAudio: stream.hasAudio,
@@ -165,6 +167,7 @@ export class YouTubePlayService {
         approxDurationMs: stream.approxDurationMs,
         isOtf: stream.isOtf,
         sourceClient: stream.sourceClient,
+        sabrInfo: stream.sabrInfo,
       }));
 
       return {
@@ -254,6 +257,7 @@ export class YouTubePlayService {
 
       const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
         url: stream.url,
+        isUrl: stream.isUrl,
         itag: stream.itag,
         hasVideo: stream.hasVideo,
         hasAudio: stream.hasAudio,
@@ -282,9 +286,10 @@ export class YouTubePlayService {
         approxDurationMs: stream.approxDurationMs,
         isOtf: stream.isOtf,
         sourceClient: stream.sourceClient,
+        sabrInfo: stream.sabrInfo,
       }));
 
-      logger.info(`${TAG} 流摘要: video_only=${playerStreams.filter(s => s.kind === 'video_only').length} audio_only=${playerStreams.filter(s => s.kind === 'audio_only').length} progressive=${playerStreams.filter(s => s.kind === 'progressive' || s.kind === '').length} subtitles=${videoInfo.subtitleTracks.length}`);
+      logger.info(`${TAG} 流摘要: video_only=${playerStreams.filter(s => s.kind === 'video_only').length} audio_only=${playerStreams.filter(s => s.kind === 'audio_only').length} progressive=${playerStreams.filter(s => s.kind === 'progressive' || s.kind === '').length} sabr=${playerStreams.filter(s => s.kind === 'sabr' || s.deliveryMethod === 'SABR').length} subtitles=${videoInfo.subtitleTracks.length}`);
       return {
         success: true,
         videoInfo: videoInfo,

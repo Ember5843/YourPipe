@@ -1,6 +1,10 @@
 import { StreamInfo } from '../model/VideoData';
 import Logger from '../utils/Logger';
 import { localProxyServer } from '../proxy/LocalProxyServer';
+import { makeEmptySession, StreamResource } from '../proxy/SessionStore';
+import { sabrSessionStore } from '../sabr/SabrSessionStore';
+import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
+import { YoutubeSabrFormatMeta, YoutubeSabrInfo } from 'youtube_core';
 
 const TAG: string = '[PlayerLog][LocalMediaProxy]';
 const DEFAULT_USER_AGENT: string = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36';
@@ -91,6 +95,84 @@ export class LocalMediaProxy {
     return LocalMediaProxy.createSession(JSON.stringify(input));
   }
 
+  /**
+   * SABR dual session: attach UMP session buffers to local proxy paths
+   * /session/{id}/video/0 and /audio/0 for EDL playback.
+   */
+  static async createSabrDualSession(
+    video: StreamInfo,
+    audio: StreamInfo,
+    durationMs?: number,
+    useAuth: boolean = false
+  ): Promise<string> {
+    if (!await LocalMediaProxy.ensureServer()) return '';
+    const info: YoutubeSabrInfo | undefined = video.sabrInfo || audio.sabrInfo;
+    if (!info || !info.serverAbrStreamingUrl) {
+      Logger.error(TAG, 'createSabrDualSession: missing sabrInfo/serverAbrStreamingUrl');
+      return '';
+    }
+    const videoItag = video.itag;
+    const audioItag = audio.itag;
+    if (videoItag === undefined || audioItag === undefined) {
+      Logger.error(TAG, 'createSabrDualSession: missing itags');
+      return '';
+    }
+    let videoFmt: YoutubeSabrFormatMeta | undefined = info.findFormatByItag(videoItag);
+    let audioFmt: YoutubeSabrFormatMeta | undefined = info.findFormatByItag(audioItag);
+    if (!videoFmt) {
+      videoFmt = {
+        itag: videoItag,
+        mimeType: video.mimeType,
+        bitrate: video.bitrate,
+        width: video.width,
+        height: video.height,
+        isAudio: false,
+        isVideo: true,
+        qualityLabel: video.quality,
+        codecs: video.codecs,
+        approxDurationMs: video.approxDurationMs
+      };
+    }
+    if (!audioFmt) {
+      audioFmt = {
+        itag: audioItag,
+        mimeType: audio.mimeType,
+        bitrate: audio.bitrate,
+        isAudio: true,
+        isVideo: false,
+        codecs: audio.codecs,
+        audioTrackId: audio.audioTrackId,
+        audioTrackName: audio.audioTrackName,
+        approxDurationMs: audio.approxDurationMs
+      };
+    }
+    Logger.info(TAG, `createSabrDualSession: video=${videoItag} audio=${audioItag} durationMs=${durationMs}`);
+    try {
+      const lease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth);
+      const videoBuf = new SabrTrackBuffer(lease, false);
+      const audioBuf = new SabrTrackBuffer(lease, true);
+      // Prefetch inits so first MPV open is less likely to stall cold.
+      await Promise.all([videoBuf.ensureReady(), audioBuf.ensureReady()]);
+
+      const session = makeEmptySession('');
+      session.type = 'sabr-dual';
+      session.durationMs = durationMs || video.approxDurationMs || audio.approxDurationMs || 0;
+      session.hasAudio = true;
+      session.videos = [LocalMediaProxy.toStreamResource(video, false)];
+      session.audios = [LocalMediaProxy.toStreamResource(audio, true)];
+      session.video = session.videos[0];
+      session.audio = session.audios[0];
+      session.sabrLeaseKey = lease.key;
+      session.sabrVideoBuffer = videoBuf;
+      session.sabrAudioBuffer = audioBuf;
+      // release is handled in LocalProxyServer.destroySession via sabrLeaseKey
+      return localProxyServer.addPreparedSession(session);
+    } catch (e) {
+      Logger.error(TAG, `createSabrDualSession failed: ${e}`);
+      return '';
+    }
+  }
+
   static async refreshYoutubeDualUrlSession(sessionId: string, video: StreamInfo, audio: StreamInfo, durationMs?: number): Promise<string> {
     if (!await LocalMediaProxy.ensureServer()) return '';
     const input: LocalMediaSessionInput = {
@@ -161,6 +243,32 @@ export class LocalMediaProxy {
       userAgent: ua,
       referer: 'https://www.youtube.com',
       sourceClient: s.sourceClient,
+    };
+  }
+
+  private static toStreamResource(s: StreamInfo, isAudio: boolean): StreamResource {
+    const r = LocalMediaProxy.fromStream(s, isAudio);
+    return {
+      id: r.id || (isAudio ? 'audio' : 'video'),
+      url: r.url || '',
+      mimeType: r.mimeType || '',
+      codecs: r.codecs || '',
+      initRangeStart: r.initRangeStart !== undefined ? String(r.initRangeStart) : '',
+      initRangeEnd: r.initRangeEnd !== undefined ? String(r.initRangeEnd) : '',
+      indexRangeStart: r.indexRangeStart !== undefined ? String(r.indexRangeStart) : '',
+      indexRangeEnd: r.indexRangeEnd !== undefined ? String(r.indexRangeEnd) : '',
+      userAgent: r.userAgent || DEFAULT_USER_AGENT,
+      referer: r.referer || 'https://www.youtube.com',
+      contentLength: r.contentLength || 0,
+      bitrate: r.bitrate || 0,
+      width: r.width || 0,
+      height: r.height || 0,
+      fps: r.fps || 0,
+      approxDurationMs: r.approxDurationMs || 0,
+      isAudio: isAudio,
+      isYoutubePlayback: true,
+      isOtf: !!r.isOtf,
+      sourceClient: r.sourceClient || '',
     };
   }
 

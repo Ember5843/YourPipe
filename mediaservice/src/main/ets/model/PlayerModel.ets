@@ -192,8 +192,16 @@ export class PlayerModel {
       const kind = stream.kind?.toLowerCase() || '';
       const delivery = stream.deliveryMethod?.toUpperCase() || '';
 
-      // SABR reserved until session feeder lands — never select as progressive/DASH.
+      // SABR: classify as separated A/V when bootstrap present; skip bare stubs.
       if (kind === 'sabr' || delivery === 'SABR') {
+        if (!stream.sabrInfo || !stream.sabrInfo.serverAbrStreamingUrl) {
+          return;
+        }
+        if (stream.hasVideo && !stream.hasAudio) {
+          this.categorizedStreams.video.push(stream);
+        } else if (stream.hasAudio && !stream.hasVideo) {
+          this.categorizedStreams.audio.push(stream);
+        }
         return;
       }
 
@@ -346,7 +354,9 @@ export class PlayerModel {
       }
     }
 
-    const getDeliveryFromBucket = (stream: StreamInfo): 'DASH' | 'HLS' | 'PROGRESSIVE_HTTP' => {
+    const getDeliveryFromBucket = (stream: StreamInfo): string => {
+      const d = (stream.deliveryMethod || '').toUpperCase();
+      if (d === 'SABR' || stream.kind?.toLowerCase() === 'sabr') return 'SABR';
       if (this.categorizedStreams.video.includes(stream)) return 'DASH';
       if (this.categorizedStreams.hlsManifest.includes(stream)) return 'HLS';
       return 'PROGRESSIVE_HTTP';
@@ -370,7 +380,7 @@ export class PlayerModel {
           resolutionLabel: stream.quality || '',
           codecLabel: codec || 'Unknown',
           deliveryMethod: delivery,
-          requiresSeparateAudio: delivery !== 'PROGRESSIVE_HTTP',
+          requiresSeparateAudio: delivery !== 'PROGRESSIVE_HTTP' && delivery !== 'HLS',
         } as VideoEntry;
       })
       .sort((a, b) => {

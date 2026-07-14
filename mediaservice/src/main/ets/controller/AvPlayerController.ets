@@ -645,7 +645,9 @@ export class AvPlayerController {
     this.vm.playerModel.updateAudioStream(audio);
 
     const label = `${video.resolutionLabel} [${video.stream.itag}]`;
-    if (video.deliveryMethod === 'DASH') {
+    if (video.deliveryMethod === 'SABR') {
+      Logger.info(TAG, `Selected SABR: video=${label}${audio ? ` audio=${audio.quality || audio.codecs} [${audio.itag}]` : ' (no audio)'}`);
+    } else if (video.deliveryMethod === 'DASH') {
       Logger.info(TAG, `Selected DASH separated: video=${label}${audio ? ` audio=${audio.quality} [${audio.itag}]` : ' (no audio)'}`);
     } else if (video.deliveryMethod === 'HLS') {
       Logger.info(TAG, `Selected HLS variant: ${label}`);
@@ -774,17 +776,29 @@ export class AvPlayerController {
   }
 
   private async createPlaybackUrl(video?: StreamInfo, audio?: StreamInfo): Promise<string> {
-    if (!video || !video.url) return '';
+    if (!video) return '';
 
     // Defer old session destroy: mark stale, save for cleanup after new source is READY
     this.deferCurrentSessionDestroy();
+
+    const delivery = (video.deliveryMethod || '').toUpperCase();
+    const kind = (video.kind || '').toLowerCase();
+    if (delivery === 'SABR' || kind === 'sabr') {
+      if (audio) {
+        return await this.buildSabrDualEdlUrl(video, audio);
+      }
+      Logger.error(TAG, 'createPlaybackUrl: SABR requires paired audio stream');
+      return '';
+    }
+
+    if (!video.url) return '';
 
     if (this.isRemoteManifestUrl(video.url)) {
       Logger.debug(TAG, `createPlaybackUrl: using remote manifest directly`);
       return video.url;
     }
 
-    switch ((video.deliveryMethod || '').toUpperCase()) {
+    switch (delivery) {
       case 'HLS':
         Logger.info(TAG, `createPlaybackUrl: HLS variant direct url=${this.describePlaybackUrl(video.url)}`);
         return video.url;
@@ -812,6 +826,34 @@ export class AvPlayerController {
     this.currentLocalMediaSessionId = sessionId;
     Logger.debug(TAG, `buildSingleProxyUrl: itag=${video.itag} url=${playbackUrl}`);
     return playbackUrl;
+  }
+
+  private async buildSabrDualEdlUrl(video: StreamInfo, audio: StreamInfo): Promise<string> {
+    let resolvedDuration = this.resolveDurationMs(video, audio);
+    if (resolvedDuration <= 0) {
+      const vMeta = video.sabrInfo?.findFormatByItag(video.itag ?? -1)?.approxDurationMs ?? 0;
+      const aMeta = audio.sabrInfo?.findFormatByItag(audio.itag ?? -1)?.approxDurationMs ?? 0;
+      resolvedDuration = vMeta > 0 ? vMeta : aMeta;
+    }
+    if (resolvedDuration <= 0) {
+      Logger.error(TAG, 'buildSabrDualEdlUrl: unknown duration, refusing EDL');
+      return '';
+    }
+    Logger.info(TAG, `buildSabrDualEdlUrl: video=[itag=${video.itag}] audio=[itag=${audio.itag}] durationMs=${resolvedDuration}`);
+    try {
+      const sessionId = await LocalMediaProxy.createSabrDualSession(video, audio, resolvedDuration, false);
+      const playbackUrl = LocalMediaProxy.getPlaybackUrl(sessionId);
+      if (!playbackUrl.startsWith('http://127.0.0.1:')) {
+        Logger.error(TAG, `buildSabrDualEdlUrl: invalid playbackUrl sessionId=${sessionId}`);
+        LocalMediaProxy.destroySession(sessionId);
+        return '';
+      }
+      this.currentLocalMediaSessionId = sessionId;
+      return this.composeDualEdl(playbackUrl, video, audio, resolvedDuration);
+    } catch (e) {
+      Logger.error(TAG, `buildSabrDualEdlUrl failed: ${e}`);
+      return '';
+    }
   }
 
   private async buildDualEdlUrl(video: StreamInfo, audio: StreamInfo): Promise<string> {
@@ -864,6 +906,15 @@ export class AvPlayerController {
       }
     });
 
+    return this.composeDualEdl(playbackUrl, video, audio, durationMs);
+  }
+
+  private composeDualEdl(
+    playbackUrl: string,
+    video: StreamInfo,
+    audio: StreamInfo,
+    durationMs: number
+  ): string {
     const baseUrl = playbackUrl;
     const vUrl = `${baseUrl}/video/0`;
     const aUrl = `${baseUrl}/audio/0`;
@@ -892,7 +943,7 @@ export class AvPlayerController {
     parts.push(`${aUrl},length=${durationSec}`);
 
     const edlUrl = 'edl://' + parts.join(';') + ';';
-    Logger.info(TAG, `buildDualEdlUrl: edl=${edlUrl.substring(0, 300)}`);
+    Logger.info(TAG, `composeDualEdl: edl=${edlUrl.substring(0, 300)}`);
     return edlUrl;
   }
 
@@ -1044,11 +1095,15 @@ export class AvPlayerController {
   }
 
   private isSeparatedDash(videoStream: StreamInfo, audioStream?: StreamInfo): boolean {
-    if (!audioStream || !audioStream.url) return false;
+    if (!audioStream) return false;
+    const delivery = videoStream.deliveryMethod?.toUpperCase() || '';
+    if (delivery === 'SABR' || (videoStream.kind?.toLowerCase() === 'sabr')) {
+      return !!audioStream.sabrInfo || !!videoStream.sabrInfo;
+    }
+    if (!audioStream.url) return false;
     const categories = this.vm.playerModel.categorizedStreams;
     if (categories.video.length === 0 || categories.audio.length === 0) return false;
     const kind = videoStream.kind?.toLowerCase() || '';
-    const delivery = videoStream.deliveryMethod?.toUpperCase() || '';
     return kind === 'video_only' || delivery === 'DASH' || videoStream.initRangeStart !== undefined;
   }
 

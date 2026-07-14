@@ -178,6 +178,8 @@ export interface Format {
   isOtf?: boolean;
   type?: string;
   audioTrack?: AudioTrackInfo;
+  /** SABR / adaptiveFormat opaque tags (e.g. audio track type). */
+  xtags?: string;
 }
 
 export interface AudioTrackInfo {
