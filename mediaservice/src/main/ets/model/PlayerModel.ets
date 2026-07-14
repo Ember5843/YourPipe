@@ -192,6 +192,11 @@ export class PlayerModel {
       const kind = stream.kind?.toLowerCase() || '';
       const delivery = stream.deliveryMethod?.toUpperCase() || '';
 
+      // SABR reserved until session feeder lands — never select as progressive/DASH.
+      if (kind === 'sabr' || delivery === 'SABR') {
+        return;
+      }
+
       // 1. 优先根据 ITAG 元数据分类
       if (itagMeta) {
         if (itagMeta.type === 'muxed') {

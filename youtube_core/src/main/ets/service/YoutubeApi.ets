@@ -5,6 +5,7 @@ import { Localization } from "../model/Localization";
 import { YoutubeSearchQueryHandlerFactory } from "../common/YoutubeSearchQueryHanderFactory";
 import { SearchContentFilter } from "../model/SearchContentFilter";
 import { Utils } from "../common/Utils";
+import { WebClientVersionResolver } from "../common/WebClientVersionResolver";
 import { HttpDownloader } from "../network/HttpDownloader";
 import { AuthSessionManager } from "../auth/AuthSessionManager";
 import { http } from "@kit.NetworkKit";
@@ -44,11 +45,11 @@ function getStringResultFromRegexArray(input: string, regexArray: string[], grou
   return '';
 }
 
-let cachedClientVersion: string | null = null;
-
 async function getClientVersion(localization: Localization): Promise<string> {
-  if (cachedClientVersion && cachedClientVersion.length > 0) {
-    return cachedClientVersion;
+  // Prefer shared process cache (stream path may already have resolved via sw.js).
+  const cached = WebClientVersionResolver.peekCached();
+  if (cached.length > 0) {
+    return cached;
   }
   const url: string = "https://www.youtube.com/sw.js";
   const urlList = ["https://www.youtube.com"];
@@ -63,8 +64,11 @@ async function getClientVersion(localization: Localization): Promise<string> {
     REGEX_PATTERNS['INNERTUBE_CONTEXT_CLIENT_VERSION_REGEXES'],
     1
   );
-  cachedClientVersion = clientVersion === '' ? "2.20251212.01.00" : clientVersion;
-  return cachedClientVersion;
+  const resolved = clientVersion === ''
+    ? ClientsConstants.WEB_HARDCODED_CLIENT_VERSION
+    : clientVersion;
+  WebClientVersionResolver.setCached(resolved);
+  return resolved;
 }
 
 async function getClientInfoHeaders(localization: Localization): Promise<Record<string, string[]>> {

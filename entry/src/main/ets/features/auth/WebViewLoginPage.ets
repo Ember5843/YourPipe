@@ -1,5 +1,5 @@
 import web_webview from '@ohos.web.webview';
-import { AuthSessionManager, CookieAuthCredential } from 'youtube_core';
+import { AuthSessionManager, CookieAuthCredential, YoutubePlayerClientConfig } from 'youtube_core';
 import { AppLog } from '../../common/AppLog';
 
 const logger = AppLog.getInstance('WebViewLoginPage');
@@ -105,6 +105,7 @@ export struct WebViewLoginPage {
     if (this.authSession) {
       this.authSession.saveCookieCredential(credential);
     }
+    YoutubePlayerClientConfig.resetToAuthDefault(true);
     logger.info('Login complete');
     this.state = LoginState.SUCCESS;
     if (this.onSuccess) {
@@ -162,6 +163,7 @@ export struct WebViewLoginPage {
     if (this.authSession) {
       this.authSession.saveCookieCredential(credential);
     }
+    YoutubePlayerClientConfig.resetToAuthDefault(true);
     logger.info('Login complete (without pot)');
     this.state = LoginState.SUCCESS;
     if (this.onSuccess) {

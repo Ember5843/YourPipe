@@ -6,7 +6,13 @@ import { OptionItem } from '../../common/components/OptionItem';
 import { BackupItemPickerDialog } from '../../common/components/BackupItemPickerDialog';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
-import { AuthAccountStatus, AuthSessionManager, AuthStage, CookieAuthCredential } from 'youtube_core';
+import {
+  AuthAccountStatus,
+  AuthSessionManager,
+  AuthStage,
+  CookieAuthCredential,
+  YoutubePlayerClientConfig
+} from 'youtube_core';
 import { DataBackupManager, BackupError } from '../../common/DataBackupManager';
 import { BackupItemKey, AppBackupData, ALL_BACKUP_ITEM_KEYS } from '../../common/model/BackupModels';
 import { AuthStateHelper } from '../../common/AuthStateHelper';
@@ -255,6 +261,7 @@ export struct OptionsDataAccountPage {
 
     session.saveCookieCredential(credential);
     AuthStateHelper.refresh();
+    YoutubePlayerClientConfig.resetToAuthDefault(true);
 
     this.isVerifyingCookie = true;
     this.cookieImportMessage = '本地格式通过，正在向 YouTube 校验…';
@@ -281,12 +288,15 @@ export struct OptionsDataAccountPage {
     }
     AuthSessionManager.getInstance()?.setAuthEnabled(enabled);
     AuthStateHelper.refresh();
+    const signedIn = enabled && this.hasCredential();
+    YoutubePlayerClientConfig.resetToAuthDefault(signedIn);
     this.params.onAuthChanged();
   }
 
   private signOut(): void {
     AuthSessionManager.getInstance()?.signOut();
     AuthStateHelper.refresh();
+    YoutubePlayerClientConfig.resetToAuthDefault(false);
     this.params.onAuthChanged();
   }
 

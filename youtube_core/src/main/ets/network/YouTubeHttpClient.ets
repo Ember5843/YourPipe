@@ -125,7 +125,7 @@ export class YouTubeHttpClient {
    * 对齐 PipePipe DownloaderImpl + addLoggedInHeaders 行为：
    *   - 默认匿名：仅 SOCS（同意）+ 受限模式 cookie + cookieJar 已有的非鉴权 cookie
    *   - withAuth=true 时才注入 SAPISIDHASH Authorization + 完整 Cookie + X-Origin + DNT
-   *   - 调用方需要在 stream 提取链（SafariPlayerClient 等）显式传 withAuth=true
+   *   - 调用方显式 opt-in：stream Safari、WEB metadata /player、WEB /next 等
    */
   private async prepareHeaders(
     customHeaders?: Record<string, string | string[]>,
@@ -174,7 +174,7 @@ export class YouTubeHttpClient {
         headers['Referer'] = 'https://www.youtube.com/';
       }
 
-      // 登录头：仅 stream 提取链显式 opt-in 时注入（对齐 PipePipe addLoggedInHeaders）
+      // 登录头：显式 withAuth 时注入（对齐 PipePipe addLoggedInHeaders）
       if (withAuth) {
         const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
         if (activeAuthSession && activeAuthSession.isSignedIn()) {

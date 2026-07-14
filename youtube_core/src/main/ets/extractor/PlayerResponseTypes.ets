@@ -149,6 +149,8 @@ export interface StreamingData {
   adaptiveFormats?: Format[];
   dashManifestUrl?: string;
   hlsManifestUrl?: string;
+  /** SABR session URL (PipePipe serverAbrStreamingUrl). */
+  serverAbrStreamingUrl?: string;
 }
 
 export interface Format {
@@ -301,6 +303,11 @@ export interface StreamSelectionConfig {
 
 export interface MediaCommonConfig {
   dynamicReadaheadConfig?: DynamicReadaheadConfig;
+  mediaUstreamerRequestConfig?: MediaUstreamerRequestConfig;
+}
+
+export interface MediaUstreamerRequestConfig {
+  videoPlaybackUstreamerConfig?: string;
 }
 
 export interface DynamicReadaheadConfig {
@@ -412,6 +419,10 @@ export interface WebResponseContextExtensionData {
 
 export interface PlayabilityStatus {
   status?: string;
+  /** Direct reason string (WEB metadata /player often returns this instead of errorScreen runs). */
+  reason?: string;
+  /** Age-gate flag on desktop WEB player responses (PipePipe getWebPlayerResponse). */
+  desktopLegacyAgeGateReason?: number | string | boolean;
   playableInEmbed?: boolean;
   miniplayer?: Miniplayer;
   contextParams?: string;

@@ -1,4 +1,5 @@
 import { DeliveryMethod } from '../model/DeliveryType';
+import { YoutubeSabrInfo } from './sabr/YoutubeSabrInfo';
 
 /**
  * 流信息
@@ -6,6 +7,8 @@ import { DeliveryMethod } from '../model/DeliveryType';
  */
 export interface StreamInfo {
   url: string;
+  /** When false, url is a session reference (SABR), not a progressive media URL. */
+  isUrl?: boolean;
   itag: number | undefined;
   mimeType: string | undefined;
   qualityLabel: string | undefined;
@@ -35,6 +38,8 @@ export interface StreamInfo {
   codec: string | undefined;
   width: number | undefined;
   height: number | undefined;
+  /** SABR bootstrap attached to SABR streams (PipePipe deliveryMethodInfo). */
+  sabrInfo?: YoutubeSabrInfo;
 }
 
 /**
@@ -53,7 +58,8 @@ export type StreamKind =
   | 'video_only'
   | 'audio_only'
   | 'manifest_hls'
-  | 'manifest_dash';
+  | 'manifest_dash'
+  | 'sabr';
 
 /**
  * Check if two streams have equal stats (itag, codec, resolution).

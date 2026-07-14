@@ -74,7 +74,41 @@ export class PipePipeApiDecoder {
       logger.debug('Using cached player metadata (local)');
       return PipePipeApiDecoder.cachedMetadata;
     }
-    throw new Error('Player metadata not available — setLocalMetadata() must be called first');
+
+    // PipePipe remote fallback when watch-page STS is unavailable.
+    const latestUrl = ApiConfig.getLatestPlayerUrl();
+    try {
+      const httpRequest = http.createHttp();
+      const response = await httpRequest.request(latestUrl, {
+        method: http.RequestMethod.GET,
+        header: PipePipeApiDecoder.REQUEST_HEADERS,
+        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        connectTimeout: 15000,
+        readTimeout: 15000
+      });
+      httpRequest.destroy();
+      if (response.responseCode !== 200 || !response.result) {
+        throw new Error(`latest-player HTTP ${response.responseCode}`);
+      }
+      const body = arrayBufferToString(response.result as ArrayBuffer);
+      const parsed = JSON.parse(body) as Record<string, Object>;
+      const playerId = String(parsed['player'] ?? parsed['playerId'] ?? '');
+      const signatureTimestamp = Number(parsed['signatureTimestamp'] ?? 0);
+      if (!playerId || !signatureTimestamp) {
+        throw new Error('latest-player response missing player/signatureTimestamp');
+      }
+      const meta: PlayerMetadata = {
+        playerId: playerId,
+        signatureTimestamp: signatureTimestamp
+      };
+      PipePipeApiDecoder.cachedMetadata = meta;
+      PipePipeApiDecoder.cacheExpiry = Date.now() + PipePipeApiDecoder.TTL_MS;
+      logger.info(`Player metadata from remote latest-player: id=${meta.playerId} sts=${meta.signatureTimestamp}`);
+      return meta;
+    } catch (e) {
+      logger.warn('getLatestPlayer remote failed:', e);
+      throw new Error('Player metadata not available — setLocalMetadata() or latest-player failed');
+    }
   }
 
   static async decodeBatch(

@@ -11,10 +11,14 @@ export * from './src/main/ets/extractor/PlayerResponseTypes';
 export * from './src/main/ets/extractor/CommentItem';
 export * from './src/main/ets/extractor/HlsManifestParser';
 export * from './src/main/ets/extractor/clients/ClientTypes';
+export * from './src/main/ets/extractor/clients/ConfiguredPlayerClient';
+export * from './src/main/ets/extractor/sabr/YoutubeSabrInfo';
 export * from './src/main/ets/extractor/cipher/PipePipeApiDecoder';
 export * from './src/main/ets/extractor/cipher/YoutubeJavaScriptPlayerManager';
 export * from './src/main/ets/extractor/cipher/ApiConfig';
 export * from './src/main/ets/common/YoutubeParsingHelper';
+export * from './src/main/ets/common/WebClientVersionResolver';
+export * from './src/main/ets/model/YoutubePlayerClientConfig';
 
 // Export network logic
 export * from './src/main/ets/network/YouTubeHttpClient';

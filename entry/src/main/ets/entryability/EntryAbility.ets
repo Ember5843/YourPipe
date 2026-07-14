@@ -11,7 +11,7 @@ import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
 import { BackgroundTaskManager, AvPlayerController } from 'mediaservice';
 import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
-import { AuthSessionManager, YTCoreLogger } from 'youtube_core';
+import { AuthSessionManager, YTCoreLogger, YoutubePlayerClientConfig } from 'youtube_core';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -66,6 +66,10 @@ export default class EntryAbility extends UIAbility {
       AppLogStore.init(logEnabled, this.context.filesDir);
       AuthSessionManager.init(this.context);
       AuthStateHelper.refresh();
+      // PipePipe client defaults: signed-in → tv_downgraded, guest → mweb
+      const signedIn = AuthSessionManager.getInstance()?.isSignedIn() === true
+        && !!(AuthSessionManager.getInstance()?.getCookieString());
+      YoutubePlayerClientConfig.resetToAuthDefault(signedIn);
       // 注入 EnhancedLogger sink，覆盖所有 mediaservice 调用
       EnhancedLogger.setSink((level, tag, message) => {
         AppLogStore.push(level, tag, message);

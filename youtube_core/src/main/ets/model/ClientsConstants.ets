@@ -23,9 +23,16 @@ export class ClientsConstants {
   static readonly WEB_CLIENT_NAME: string = "WEB";
 
   /**
-   * The fallback hardcoded version for web client
+   * Fallback when sw.js / results extraction fails (PipePipe WEB_HARDCODED_CLIENT_VERSION).
+   * Dynamic version lives in WebClientVersionResolver.
    */
   static readonly WEB_HARDCODED_CLIENT_VERSION: string = "2.20250122.04.00";
+
+  /**
+   * Static calendar hint only. Prefer WebClientVersionResolver.getClientVersion()
+   * for mweb / WEB meta / next at runtime.
+   */
+  static readonly WEB_CLIENT_VERSION: string = "2.20260114.08.00";
 
   // =====================
   // WEB_REMIX (YouTube Music)
@@ -48,6 +55,33 @@ export class ClientsConstants {
     "Mozilla/5.0 (PlayStation; PlayStation 4/12.00) " +
       "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
       "Version/15.4 Safari/605.1.15";
+
+  // =====================
+  // TVHTML5 downgraded (PipePipe login default stream client)
+  // =====================
+  static readonly TVHTML5_DOWNGRADED_CLIENT_ID: string = "7";
+  static readonly TVHTML5_DOWNGRADED_CLIENT_NAME: string = "TVHTML5";
+  static readonly TVHTML5_DOWNGRADED_CLIENT_VERSION: string = "5.20260114";
+  static readonly TVHTML5_DOWNGRADED_USER_AGENT: string =
+    "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version";
+
+  // =====================
+  // MWEB (PipePipe guest default stream client)
+  // =====================
+  static readonly MWEB_CLIENT_ID: string = "2";
+  static readonly MWEB_CLIENT_NAME: string = "MWEB";
+  /**
+   * @deprecated Prefer WebClientVersionResolver — mweb uses dynamic getClientVersion().
+   * Kept as static hint equal to WEB_CLIENT_VERSION.
+   */
+  static readonly MWEB_CLIENT_VERSION: string = "2.20260114.08.00";
+  static readonly MWEB_USER_AGENT: string =
+    "Mozilla/5.0 (iPad; CPU OS 16_7_10 like Mac OS X) AppleWebKit/605.1.15 " +
+    "(KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1,gzip(gfe)";
+
+  static readonly WEB_USER_AGENT: string =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+    "Chrome/134.0.0.0 Safari/537.36,gzip(gfe)";
 
   // =====================
   // WEB_EMBEDDED_PLAYER (YouTube embeds)
@@ -125,6 +159,5 @@ export class ClientsConstants {
   // YouTube API URLs
   // =====================
   static readonly YOUTUBEI_V1_URL: string = "https://www.youtube.com/youtubei/v1/";
-  static readonly YOUTUBEI_GAPIS_URL: string = "https://youtubei.googleapis.com/youtubei/v1/player";
   static readonly INNERTUBE_API_KEY: string = "AIzaSyBw-K-P3oV_O6m13v7C-C0p8n5v9m6o7p4";
 }
