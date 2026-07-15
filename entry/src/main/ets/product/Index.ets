@@ -70,7 +70,7 @@ import {
   HdsNavigationTitleMode,
   SystemMaterialParams
 } from '@kit.UIDesignKit';
-import { curves } from '@kit.ArkUI';
+import { TipsDialog, curves } from '@kit.ArkUI';
 import { UIConfig, YourtubeDarkMode } from '../common/AppState';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LogPage } from '../common/components/LogPage';
@@ -92,6 +92,8 @@ import {
 const logger = AppLog.getInstance('Index');
 const APP_VERSION = '0.5.4';
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
+/** Preferences: user chose not to show Secure Shield (坚盾) JIT warning again. */
+const PREF_SECURE_SHIELD_DONT_SHOW: string = 'cfg_secureShieldDontShow';
 
 
 @Entry
@@ -161,6 +163,9 @@ struct Index {
   private appLangDialogCtrl: CustomDialogController | null = null;
   private contentLangDialogCtrl: CustomDialogController | null = null;
   private contentCountryDialogCtrl: CustomDialogController | null = null;
+  // 坚盾守护模式提示（JIT 禁用 → 本地 JSVM 不可用，走远端解密）
+  private secureShieldDialogCtrl: CustomDialogController | null = null;
+  private secureShieldDontShowAgain: boolean = false;
 
   private buildPickerItems(): void {
     const followSystem = getContext().resourceManager.getStringSync($r('app.string.yt_lang_follow_system').id);
@@ -476,6 +481,57 @@ struct Index {
     if (this.uiConfig.syncUserLibraryOnLaunch !== false) {
       this.syncUserLibraryAfterLogin();
     }
+    // 首帧后再弹：CustomDialog 依赖 UI 就绪
+    setTimeout(() => {
+      this.maybeShowSecureShieldDialog();
+    }, 400);
+  }
+
+  /**
+   * 系统「坚盾守护」开启时全局禁 JIT，本地 JSVM 签名解密不可用，
+   * 会回退到 PipePipe 远端解密，起播可能更慢。启动时提示一次。
+   */
+  private maybeShowSecureShieldDialog(): void {
+    if (PreferencesStore.getString(PREF_SECURE_SHIELD_DONT_SHOW, 'false') === 'true') {
+      return;
+    }
+    let shieldOn = false;
+    try {
+      shieldOn = YoutubeJavaScriptPlayerManager.isSecureShieldMode();
+    } catch (e) {
+      logger.warn(`Secure Shield probe failed: ${JSON.stringify(e)}`);
+      return;
+    }
+    if (!shieldOn) {
+      logger.info('Secure Shield mode: off');
+      return;
+    }
+    logger.warn('Secure Shield mode: on — local JSVM cipher unavailable, remote decrypt expected');
+    this.secureShieldDontShowAgain = false;
+    this.secureShieldDialogCtrl = new CustomDialogController({
+      builder: TipsDialog({
+        imageRes: $r('sys.media.ohos_ic_public_voice'),
+        title: $r('app.string.yt_secure_shield_title'),
+        content: $r('app.string.yt_secure_shield_content'),
+        checkTips: $r('app.string.yt_secure_shield_dont_show'),
+        isChecked: false,
+        onCheckedChange: (checked: boolean) => {
+          this.secureShieldDontShowAgain = checked;
+        },
+        primaryButton: {
+          value: $r('app.string.yt_action_got_it'),
+          action: () => {
+            if (this.secureShieldDontShowAgain) {
+              PreferencesStore.setString(PREF_SECURE_SHIELD_DONT_SHOW, 'true');
+            }
+            this.secureShieldDialogCtrl?.close();
+          },
+        },
+      }),
+      autoCancel: true,
+      alignment: DialogAlignment.Center,
+    });
+    this.secureShieldDialogCtrl.open();
   }
 
   private refreshHomeAfterAuthChange(): void {

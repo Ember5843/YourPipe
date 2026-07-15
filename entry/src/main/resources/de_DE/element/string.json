@@ -2439,6 +2439,22 @@
         {
             "name": "yt_changelog_0_5_4_8",
             "value": "Mitgelieferte MPV-Runtime aktualisiert und mehrere Stabilitätsprobleme bei Wiedergabe und UI behoben"
+        },
+        {
+            "name": "yt_secure_shield_title",
+            "value": "Secure-Shield-Modus ist aktiv"
+        },
+        {
+            "name": "yt_secure_shield_content",
+            "value": "Das System hat den Secure-Shield-Modus aktiviert und JIT deaktiviert. Lokale Signaturentschlüsselung ist nicht verfügbar; es wird die Remote-Entschlüsselung genutzt und der Videostart kann langsamer sein."
+        },
+        {
+            "name": "yt_secure_shield_dont_show",
+            "value": "Nicht mehr anzeigen"
+        },
+        {
+            "name": "yt_action_got_it",
+            "value": "Verstanden"
         }
     ]
 }

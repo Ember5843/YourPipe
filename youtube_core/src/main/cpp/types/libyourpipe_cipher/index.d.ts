@@ -17,4 +17,6 @@ export function preparePlayer(playerId: string, preprocessedPlayer: string): Pro
 export function decodeBatch(playerId: string, sigs: string[], nParams: string[]): Promise<string>;
 export function evictPlayer(playerId: string): Promise<void>;
 export function getRuntimeInfo(): NativeRuntimeInfo;
+/** True when system Secure Shield (坚盾守护) mode is on — JIT disabled globally. */
+export function isSecureShieldMode(): boolean;
 export function shutdown(): Promise<void>;

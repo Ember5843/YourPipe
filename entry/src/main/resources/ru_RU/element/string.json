@@ -2439,6 +2439,22 @@
         {
             "name": "yt_changelog_0_5_4_8",
             "value": "Обновлена встроенная runtime MPV и исправлены несколько проблем стабильности воспроизведения и интерфейса"
+        },
+        {
+            "name": "yt_secure_shield_title",
+            "value": "Включён режим Secure Shield"
+        },
+        {
+            "name": "yt_secure_shield_content",
+            "value": "Система включила Secure Shield и отключила JIT. Локальная расшифровка подписей недоступна; будет использоваться удалённая расшифровка, запуск видео может быть медленнее."
+        },
+        {
+            "name": "yt_secure_shield_dont_show",
+            "value": "Больше не показывать"
+        },
+        {
+            "name": "yt_action_got_it",
+            "value": "Понятно"
         }
     ]
 }

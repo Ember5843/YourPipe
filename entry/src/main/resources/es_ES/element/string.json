@@ -2439,6 +2439,22 @@
         {
             "name": "yt_changelog_0_5_4_8",
             "value": "Runtime MPV incluido actualizado y varios problemas de estabilidad de reproducción e interfaz corregidos"
+        },
+        {
+            "name": "yt_secure_shield_title",
+            "value": "El modo Secure Shield está activado"
+        },
+        {
+            "name": "yt_secure_shield_content",
+            "value": "El sistema ha activado Secure Shield y ha desactivado JIT. El descifrado local de firmas no está disponible; se usará el descifrado remoto y el inicio del vídeo puede ser más lento."
+        },
+        {
+            "name": "yt_secure_shield_dont_show",
+            "value": "No volver a mostrar"
+        },
+        {
+            "name": "yt_action_got_it",
+            "value": "Entendido"
         }
     ]
 }

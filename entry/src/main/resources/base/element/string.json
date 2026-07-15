@@ -2439,6 +2439,22 @@
         {
             "name": "yt_changelog_0_5_4_8",
             "value": "同步更新 MPV 运行库，并修复播放与界面相关的多处稳定性问题"
+        },
+        {
+            "name": "yt_secure_shield_title",
+            "value": "坚盾守护模式已开启"
+        },
+        {
+            "name": "yt_secure_shield_content",
+            "value": "系统已开启坚盾守护模式并禁用 JIT。本地签名解密不可用，将改用远端解密服务，视频起播可能更慢。"
+        },
+        {
+            "name": "yt_secure_shield_dont_show",
+            "value": "不再提示"
+        },
+        {
+            "name": "yt_action_got_it",
+            "value": "知道了"
         }
     ]
 }

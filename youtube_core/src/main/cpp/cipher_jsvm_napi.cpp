@@ -6,6 +6,10 @@
 #define LOG_TAG "YourPipeCipher"
 #include <hilog/log.h>
 
+#ifndef YOURPIPE_NO_DEVICE_SECURITY_MODE
+#include <DeviceSecurityKit/device_security_mode.h>
+#endif
+
 #include <map>
 #include <mutex>
 #include <condition_variable>
@@ -488,6 +492,26 @@ napi_value RuntimeInfo(napi_env env, napi_callback_info)
     return result;
 }
 
+/**
+ * Device Security Kit: Secure Shield (坚盾守护) disables JIT globally.
+ * Docs: HMS_DSM_GetDeviceSecurityMode / DSM_SECURE_SHIELD_MODE (API 5.0.1+).
+ */
+napi_value IsSecureShieldMode(napi_env env, napi_callback_info)
+{
+    bool shieldOn = false;
+#ifndef YOURPIPE_NO_DEVICE_SECURITY_MODE
+    const DSM_DeviceSecurityMode mode = HMS_DSM_GetDeviceSecurityMode();
+    shieldOn = (static_cast<int32_t>(mode) & static_cast<int32_t>(DSM_SECURE_SHIELD_MODE)) != 0;
+    OH_LOG_INFO(LOG_APP, "DeviceSecurityMode=%{public}d shield=%{public}d",
+        static_cast<int>(mode), shieldOn ? 1 : 0);
+#else
+    OH_LOG_WARN(LOG_APP, "Device Security Mode library not linked");
+#endif
+    napi_value result = nullptr;
+    napi_get_boolean(env, shieldOn, &result);
+    return result;
+}
+
 napi_value Shutdown(napi_env env, napi_callback_info)
 {
     { std::lock_guard lock(gMutex); gPlayers.clear(); }
@@ -505,6 +529,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"decodeBatch", nullptr, DecodeBatch, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"evictPlayer", nullptr, EvictPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getRuntimeInfo", nullptr, RuntimeInfo, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"isSecureShieldMode", nullptr, IsSecureShieldMode, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"shutdown", nullptr, Shutdown, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
     napi_define_properties(env, exports, sizeof(props) / sizeof(props[0]), props);

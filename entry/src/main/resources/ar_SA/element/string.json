@@ -2439,6 +2439,22 @@
         {
             "name": "yt_changelog_0_5_4_8",
             "value": "تحديث مكتبة MPV المضمّنة وإصلاح عدة مشاكل في استقرار التشغيل والواجهة"
+        },
+        {
+            "name": "yt_secure_shield_title",
+            "value": "وضع Secure Shield مفعّل"
+        },
+        {
+            "name": "yt_secure_shield_content",
+            "value": "فعّل النظام وضع Secure Shield وعطّل JIT. فك تشفير التوقيع المحلي غير متاح، وسيُستخدم فك التشفير عن بُعد وقد يكون بدء الفيديو أبطأ."
+        },
+        {
+            "name": "yt_secure_shield_dont_show",
+            "value": "عدم الإظهار مجددًا"
+        },
+        {
+            "name": "yt_action_got_it",
+            "value": "حسنًا"
         }
     ]
 }

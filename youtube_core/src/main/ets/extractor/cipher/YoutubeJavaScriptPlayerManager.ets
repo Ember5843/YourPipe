@@ -55,6 +55,19 @@ export class YoutubeJavaScriptPlayerManager {
   private static cachePath: string = '';
   private static prewarmPromise: Promise<boolean> | undefined = undefined;
 
+  /**
+   * Query system Secure Shield (坚盾守护) via Device Security Kit.
+   * When on, JIT is disabled globally and local JSVM cipher is slow/unavailable.
+   */
+  static isSecureShieldMode(): boolean {
+    try {
+      return cipher.isSecureShieldMode() === true;
+    } catch (e) {
+      logger.warn(`[CipherRoute] isSecureShieldMode failed: ${String(e)}`);
+      return false;
+    }
+  }
+
   static async startAppPrewarm(context: common.UIAbilityContext): Promise<boolean> {
     const client = new YouTubeHttpClient(context);
     await client.initialize();
