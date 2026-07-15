@@ -41,33 +41,40 @@ export type GpuApi = 'auto' | 'opengl' | 'vulkan';
 export type BackgroundVideoOffDelay = '0' | '5' | '15' | '30' | '60';
 
 export const BACKGROUND_VIDEO_OFF_DELAY_LABELS: BackgroundVideoOffDelay[] = ['0', '5', '15', '30', '60'];
-export const BACKGROUND_VIDEO_OFF_DELAY_DISPLAY: Record<BackgroundVideoOffDelay, string> = {
-  '0': '立即',
-  '5': '5 秒',
-  '15': '15 秒',
-  '30': '30 秒',
-  '60': '60 秒',
-};
 
 export const CACHE_SECS_LABELS: CacheSecs[] = ['5', '10', '20', '30', '60'];
-export const CACHE_SECS_DISPLAY: Record<CacheSecs, string> = {
-  '5': '5 秒', '10': '10 秒', '20': '20 秒', '30': '30 秒', '60': '60 秒'
-};
 
 export const DEMUXER_READAHEAD_LABELS: DemuxerReadahead[] = ['5', '8', '15', '30', '60'];
-export const DEMUXER_READAHEAD_DISPLAY: Record<DemuxerReadahead, string> = {
-  '5': '5 秒', '8': '8 秒', '15': '15 秒', '30': '30 秒', '60': '60 秒'
-};
 
 export const DEMUXER_MAX_BYTES_LABELS: DemuxerMaxBytes[] = ['10', '20', '50', '100'];
-export const DEMUXER_MAX_BYTES_DISPLAY: Record<DemuxerMaxBytes, string> = {
-  '10': '10 MB', '20': '20 MB', '50': '50 MB', '100': '100 MB'
-};
 
 export const GPU_API_LABELS: GpuApi[] = ['auto', 'opengl', 'vulkan'];
-export const GPU_API_DISPLAY: Record<GpuApi, string> = {
-  'auto': '自动', 'opengl': 'OpenGL', 'vulkan': 'Vulkan'
-};
+
+export function getBackgroundVideoOffDelayDisplay(value: BackgroundVideoOffDelay): Resource {
+  if (value === '0') {
+    return $r('app.string.yt_setting_delay_immediate');
+  }
+  return $r('app.string.yt_unit_seconds_full', Number(value));
+}
+
+export function getCacheSecsDisplay(value: CacheSecs): Resource {
+  return $r('app.string.yt_unit_seconds_full', Number(value));
+}
+
+export function getDemuxerReadaheadDisplay(value: DemuxerReadahead): Resource {
+  return $r('app.string.yt_unit_seconds_full', Number(value));
+}
+
+export function getDemuxerMaxBytesDisplay(value: DemuxerMaxBytes): Resource {
+  return $r('app.string.yt_setting_mb_value', Number(value));
+}
+
+export function getGpuApiDisplay(value: GpuApi): Resource {
+  if (value === 'auto') {
+    return $r('app.string.yt_setting_gpu_auto');
+  }
+  return $r(`app.string.yt_label_${value}`);
+}
 
 export class PlaybackConfig {
   defaultQuality: VideoQualityCap = '480p';

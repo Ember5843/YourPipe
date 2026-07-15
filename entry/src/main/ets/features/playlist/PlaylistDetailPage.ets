@@ -90,6 +90,16 @@ export struct PlaylistDetailPage {
     return 1;
   }
 
+  private formatVideoCount(res: Resource, count: number): string {
+    try {
+      const value = this.getUIContext().getHostContext()?.resourceManager.getStringSync(res) ?? '';
+      return value.replace(/%([sd])/g, () => String(count));
+    } catch (e) {
+      logger.warn('formatVideoCount failed', JSON.stringify(e));
+      return '';
+    }
+  }
+
   private async loadPlaylistVideos(): Promise<void> {
     this.isLoading = true;
     this.errorMessage = '';
@@ -107,7 +117,7 @@ export struct PlaylistDetailPage {
         this.videoList = queue ? queue.videos.slice() : [];
         this.nextPageToken = null;
         this.visitorData = '';
-        this.totalCountText = `${this.videoList.length} 个视频`;
+        this.totalCountText = this.formatVideoCount($r('app.string.yt_playlist_count'), this.videoList.length);
         return;
       }
       this.nextPageToken = null;
@@ -139,7 +149,7 @@ export struct PlaylistDetailPage {
       if (!this.totalCountText || this.totalCountText.length === 0) {
         this.totalCountText = this.playlist.videoCountText
           ? this.playlist.videoCountText
-          : (this.videoList.length > 0 ? `${this.videoList.length} 条视频` : '');
+          : (this.videoList.length > 0 ? this.formatVideoCount($r('app.string.yt_playlist_count_alt'), this.videoList.length) : '');
       }
     } catch (err) {
       logger.error('loadPlaylistVideos failed:', JSON.stringify(err));
@@ -213,7 +223,7 @@ export struct PlaylistDetailPage {
         })
 
         Column() {
-          Text(this.playlist.name || 'Untitled')
+          Text(this.playlist.name || $r('app.string.yt_label_untitled'))
             .fontSize(16)
             .fontColor($r('app.color.yourtube_text_primary'))
             .fontWeight(FontWeight.Medium)

@@ -40,11 +40,11 @@ function formatRelativeTime(ts: number): ResourceStr {
   const diff = Date.now() - ts;
   const min = Math.floor(diff / 60000);
   if (min < 1) return $r('app.string.yt_time_just_now');
-  if (min < 60) return `${min} 分钟前`;
+  if (min < 60) return $r('app.string.yt_time_minutes_ago', min);
   const h = Math.floor(min / 60);
-  if (h < 24) return `${h} 小时前`;
+  if (h < 24) return $r('app.string.yt_time_hours_ago', h);
   const d = Math.floor(h / 24);
-  return `${d} 天前`;
+  return $r('app.string.yt_date_days_ago', d);
 }
 
 const SYMBOL_FONT_SIZE: number = 16;
@@ -256,7 +256,7 @@ export struct LocalPage {
   private downloadManager: DownloadManager = DownloadManager.getInstance();
   private panOptionRight: PanGestureOptions = new PanGestureOptions({ direction: PanDirection.Right });
 
-  private readonly tabTitles: string[] = ['观看记录', '下载'];
+  private readonly tabTitles: ResourceStr[] = [$r('app.string.yt_local_history'), $r('app.string.yt_download_title')];
 
   private isSignedIn(): boolean {
     return this.authStatus.stage === AuthStage.SIGNED_IN
@@ -267,7 +267,7 @@ export struct LocalPage {
   private async syncCloudHistory(): Promise<void> {
     this.historySyncMessage = '';
     if (!this.isSignedIn()) {
-      this.historySyncMessage = '请先登录后再同步云端历史';
+      this.historySyncMessage = getContext().resourceManager.getStringSync($r('app.string.yt_history_sync_sign_in').id);
       this.isSyncingHistory = false;
       return;
     }
@@ -276,13 +276,14 @@ export struct LocalPage {
       const page = await service.fetchWatchHistory(1);
       if (page.items.length > 0) {
         WatchHistoryStore.mergeRemoteHistory(service.toWatchHistoryItems(page.items));
-        this.historySyncMessage = `已同步云端历史 ${page.items.length} 条（保留本地进度与时间）`;
+        this.historySyncMessage = getContext().resourceManager.getStringSync(
+          $r('app.string.yt_history_sync_success').id, page.items.length);
       } else {
-        this.historySyncMessage = '云端历史为空';
+        this.historySyncMessage = getContext().resourceManager.getStringSync($r('app.string.yt_history_sync_empty').id);
       }
     } catch (err) {
       logger.error('syncCloudHistory failed:', JSON.stringify(err));
-      this.historySyncMessage = '同步云端历史失败';
+      this.historySyncMessage = getContext().resourceManager.getStringSync($r('app.string.yt_history_sync_failed').id);
     } finally {
       this.isSyncingHistory = false;
     }
@@ -352,7 +353,7 @@ export struct LocalPage {
             ListItem() {
               Text(this.historySyncMessage.length > 0
                 ? this.historySyncMessage
-                : (this.isSignedIn() ? '下拉同步 YouTube 观看历史' : '登录后可下拉同步云端历史'))
+                : (this.isSignedIn() ? $r('app.string.yt_history_sync_pull_hint') : $r('app.string.yt_history_sync_sign_in_hint')))
                 .fontSize(12)
                 .fontColor($r('app.color.yourtube_text_hint'))
                 .padding({ left: 4, right: 4, bottom: 8 });
@@ -369,7 +370,7 @@ export struct LocalPage {
                     .fontSize(14)
                     .fontColor($r('app.color.yourtube_text_secondary'));
                   Text(this.isSignedIn()
-                    ? '已登录，下拉可同步云端历史'
+                    ? $r('app.string.yt_history_sync_signed_in_hint')
                     : $r('app.string.yt_empty_history_hint'))
                     .fontSize(12)
                     .fontColor($r('app.color.yourtube_text_hint'))

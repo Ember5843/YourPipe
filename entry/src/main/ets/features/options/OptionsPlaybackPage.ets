@@ -4,10 +4,12 @@ import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { UIConfig } from '../../common/AppState';
 import {
-  PlaybackConfig, VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, GPU_API_LABELS, GPU_API_DISPLAY,
-  CACHE_SECS_LABELS, CACHE_SECS_DISPLAY, DEMUXER_READAHEAD_LABELS, DEMUXER_READAHEAD_DISPLAY,
-  DEMUXER_MAX_BYTES_LABELS, DEMUXER_MAX_BYTES_DISPLAY,
-  BACKGROUND_VIDEO_OFF_DELAY_LABELS, BACKGROUND_VIDEO_OFF_DELAY_DISPLAY, BackgroundVideoOffDelay,
+  PlaybackConfig, VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, GPU_API_LABELS,
+  CACHE_SECS_LABELS, DEMUXER_READAHEAD_LABELS,
+  DEMUXER_MAX_BYTES_LABELS,
+  BACKGROUND_VIDEO_OFF_DELAY_LABELS, BackgroundVideoOffDelay,
+  getGpuApiDisplay, getCacheSecsDisplay, getDemuxerReadaheadDisplay,
+  getDemuxerMaxBytesDisplay, getBackgroundVideoOffDelayDisplay,
 } from '../../common/PlaybackConfig';
 import { PiPManager } from '../player/pip/PiPManager';
 
@@ -38,19 +40,19 @@ export struct OptionsPlaybackPage {
   }
 
   private getGpuApiOptions(): SelectOption[] {
-    return GPU_API_LABELS.map(s => ({ value: GPU_API_DISPLAY[s] } as SelectOption));
+    return GPU_API_LABELS.map(s => ({ value: getGpuApiDisplay(s) } as SelectOption));
   }
 
   private getCacheSecsOptions(): SelectOption[] {
-    return CACHE_SECS_LABELS.map(s => ({ value: CACHE_SECS_DISPLAY[s] } as SelectOption));
+    return CACHE_SECS_LABELS.map(s => ({ value: getCacheSecsDisplay(s) } as SelectOption));
   }
 
   private getReadaheadOptions(): SelectOption[] {
-    return DEMUXER_READAHEAD_LABELS.map(s => ({ value: DEMUXER_READAHEAD_DISPLAY[s] } as SelectOption));
+    return DEMUXER_READAHEAD_LABELS.map(s => ({ value: getDemuxerReadaheadDisplay(s) } as SelectOption));
   }
 
   private getMaxBytesOptions(): SelectOption[] {
-    return DEMUXER_MAX_BYTES_LABELS.map(s => ({ value: DEMUXER_MAX_BYTES_DISPLAY[s] } as SelectOption));
+    return DEMUXER_MAX_BYTES_LABELS.map(s => ({ value: getDemuxerMaxBytesDisplay(s) } as SelectOption));
   }
 
   private getConcurrencyOptions(): SelectOption[] {
@@ -59,7 +61,7 @@ export struct OptionsPlaybackPage {
 
   private getBgVideoOffDelayOptions(): SelectOption[] {
     return BACKGROUND_VIDEO_OFF_DELAY_LABELS.map(
-      s => ({ value: BACKGROUND_VIDEO_OFF_DELAY_DISPLAY[s] } as SelectOption));
+      s => ({ value: getBackgroundVideoOffDelayDisplay(s) } as SelectOption));
   }
 
   build() {
@@ -91,15 +93,15 @@ export struct OptionsPlaybackPage {
 
         if (PiPManager.getInstance().isPiPSupported()) {
           ListItem() {
-            PlaybackSectionTitle({ title: '画中画' })
+            PlaybackSectionTitle({ title: $r('app.string.yt_playback_pip') })
           }
           .padding({ left: 0, right: 0 })
 
           ListItemGroup() {
             ListItem() {
               PlaybackToggleRow({
-                title: '返回时进入画中画',
-                subtitle: '按返回键或 home 键时自动弹出画中画窗口',
+                title: $r('app.string.yt_playback_pip_on_return'),
+                subtitle: $r('app.string.yt_playback_pip_on_return_subtitle'),
                 isOn: this.playbackConfig.pipOnReturn,
                 themeColor: this.params.themeColor,
                 transparentBackground: true,
@@ -115,15 +117,15 @@ export struct OptionsPlaybackPage {
         }
 
         ListItem() {
-          PlaybackSectionTitle({ title: '播放器' })
+          PlaybackSectionTitle({ title: $r('app.string.yt_playback_player') })
         }
         .padding({ left: 0, right: 0 })
 
         ListItemGroup() {
           ListItem() {
             PlaybackToggleRow({
-              title: '后台仅音频',
-              subtitle: '真后台时延迟关闭视频解码，只保留声音以省电；分享/投屏/PiP 不受影响',
+              title: $r('app.string.yt_playback_background_audio_only'),
+              subtitle: $r('app.string.yt_playback_background_audio_only_subtitle'),
               isOn: this.playbackConfig.backgroundAudioOnly,
               themeColor: this.params.themeColor,
               transparentBackground: true,
@@ -136,7 +138,7 @@ export struct OptionsPlaybackPage {
           if (this.playbackConfig.backgroundAudioOnly) {
             ListItem() {
               PlaybackSelectRow({
-                title: '关视频延迟',
+                title: $r('app.string.yt_playback_video_off_delay'),
                 options: this.getBgVideoOffDelayOptions(),
                 selectedIndex: BACKGROUND_VIDEO_OFF_DELAY_LABELS.indexOf(
                   this.playbackConfig.backgroundVideoOffDelaySec),
@@ -152,8 +154,8 @@ export struct OptionsPlaybackPage {
 
           ListItem() {
             PlaybackToggleRow({
-              title: '硬件解码',
-              subtitle: '启用硬件加速解码，降低功耗并提升性能',
+              title: $r('app.string.yt_playback_hwdec'),
+              subtitle: $r('app.string.yt_playback_hwdec_subtitle'),
               isOn: this.playbackConfig.hwdecEnabled,
               themeColor: this.params.themeColor,
               transparentBackground: true,
@@ -165,7 +167,7 @@ export struct OptionsPlaybackPage {
 
           ListItem() {
             PlaybackSelectRow({
-              title: 'GPU 渲染',
+              title: $r('app.string.yt_playback_gpu_rendering'),
               options: this.getGpuApiOptions(),
               selectedIndex: GPU_API_LABELS.indexOf(this.playbackConfig.gpuApi),
               fontColor: this.params.themeColor,
@@ -183,14 +185,14 @@ export struct OptionsPlaybackPage {
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
         ListItem() {
-          PlaybackSectionTitle({ title: '缓冲与网络' })
+          PlaybackSectionTitle({ title: $r('app.string.yt_playback_buffer_network') })
         }
         .padding({ left: 0, right: 0 })
 
         ListItemGroup() {
           ListItem() {
             PlaybackSelectRow({
-              title: '内存缓存',
+              title: $r('app.string.yt_playback_memory_cache'),
               options: this.getCacheSecsOptions(),
               selectedIndex: CACHE_SECS_LABELS.indexOf(this.playbackConfig.cacheSecs),
               fontColor: this.params.themeColor,
@@ -204,7 +206,7 @@ export struct OptionsPlaybackPage {
 
           ListItem() {
             PlaybackSelectRow({
-              title: '预读缓冲',
+              title: $r('app.string.yt_playback_readahead'),
               options: this.getReadaheadOptions(),
               selectedIndex: DEMUXER_READAHEAD_LABELS.indexOf(this.playbackConfig.demuxerReadaheadSecs),
               fontColor: this.params.themeColor,
@@ -218,7 +220,7 @@ export struct OptionsPlaybackPage {
 
           ListItem() {
             PlaybackSelectRow({
-              title: '缓冲区大小',
+              title: $r('app.string.yt_playback_buffer_size'),
               options: this.getMaxBytesOptions(),
               selectedIndex: DEMUXER_MAX_BYTES_LABELS.indexOf(this.playbackConfig.demuxerMaxBytes),
               fontColor: this.params.themeColor,
@@ -236,14 +238,14 @@ export struct OptionsPlaybackPage {
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
         ListItem() {
-          PlaybackSectionTitle({ title: '下载' })
+          PlaybackSectionTitle({ title: $r('app.string.yt_download_title') })
         }
         .padding({ left: 0, right: 0 })
 
         ListItemGroup() {
           ListItem() {
             PlaybackSelectRow({
-              title: '并发下载任务',
+              title: $r('app.string.yt_download_concurrent_tasks'),
               options: this.getConcurrencyOptions(),
               selectedIndex: DOWNLOAD_CONCURRENCY_VALUES.indexOf(this.uiConfig.maxConcurrentDownloads || 1),
               fontColor: this.params.themeColor,

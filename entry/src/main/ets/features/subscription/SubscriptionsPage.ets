@@ -109,7 +109,7 @@ export struct SubscriptionsPage {
           const page = await library.fetchSubscriptionsFeed(1);
           if (page.items.length > 0) {
             this.videoList = page.items;
-            this.feedSourceLabel = 'YouTube 订阅动态';
+            this.feedSourceLabel = getContext().resourceManager.getStringSync($r('app.string.yt_sub_feed_youtube').id);
             return;
           }
         } catch (feedErr) {
@@ -123,7 +123,7 @@ export struct SubscriptionsPage {
         return;
       }
       this.videoList = await this.feedService.fetchSubscriptionsFeed(this.subscriptions);
-      this.feedSourceLabel = this.isSignedIn() ? '本地订阅 RSS' : '';
+      this.feedSourceLabel = this.isSignedIn() ? $r('app.string.yt_subscriptions_feed_local') : '';
     } catch (err) {
       logger.error('loadFeed failed:', JSON.stringify(err));
       this.errorMessage = $r('app.string.yt_error_load_subs');
@@ -160,7 +160,7 @@ export struct SubscriptionsPage {
                 .fontColor($r('app.color.yourtube_text_secondary'))
                 .margin({ top: 80 })
               Text(this.isSignedIn()
-                ? '已登录，下拉可同步 YouTube 订阅'
+                ? $r('app.string.yt_subs_sync_signed_in_hint')
                 : $r('app.string.yt_empty_subs_hint'))
                 .fontSize(12)
                 .fontColor($r('app.color.yourtube_text_hint'))

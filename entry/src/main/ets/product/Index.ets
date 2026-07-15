@@ -78,10 +78,6 @@ import { MaterialUtil } from '../common/utils/MaterialUtil';
 import {
   PlaybackConfig,
   VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, VIDEO_QUALITY_CAP_DISPLAY,
-  CacheSecs, CACHE_SECS_LABELS, CACHE_SECS_DISPLAY,
-  DemuxerReadahead, DEMUXER_READAHEAD_LABELS, DEMUXER_READAHEAD_DISPLAY,
-  DemuxerMaxBytes, DEMUXER_MAX_BYTES_LABELS, DEMUXER_MAX_BYTES_DISPLAY,
-  GpuApi, GPU_API_LABELS, GPU_API_DISPLAY,
 } from '../common/PlaybackConfig';
 import { PlayerSession } from '../common/PlayerSession';
 import { PiPManager } from '../features/player/pip/PiPManager';
@@ -1015,10 +1011,18 @@ struct Index {
     // 冷启动：从列表/作者页点视频进入播放页时，彻底重置上一次的播放状态，等价于"应用首次播放"，
     // 杜绝关闭 PiP 等残留影响本次。队列内切换走 session.play()、PiP 恢复走 onPipRestore，
     // 均不经此路径，故不受影响。preserveQueue=true 为跨设备续播恢复，保留其会话快照，不冷重置。
-    if (!preserveQueue) {
+    // Keep one media session across pages and source changes. Rebuilding the
+    // controller here breaks AVSession/background ownership. An active PiP is
+    // the exception: its controller is bound to the old page's XComponent.
+    const session = PlayerSession.getInstance();
+    if (session.isPiPActive) {
       PiPManager.getInstance().destroy();
-      PlayerSession.getInstance().forceReset();
     }
+    // Every navigation initiated outside the player is a fresh media session,
+    // including reopening the same video. Never reuse an old extracted URL,
+    // active extraction Promise, proxy session, MPV source, or cached VideoData.
+    // Queue-internal next/previous and PiP restore do not enter this method.
+    session.forceReset();
 
     // If a source hint is provided, pre-load the queue from that source.
     // Fire-and-forget: do NOT await — the player page must open immediately.
@@ -1061,12 +1065,11 @@ struct Index {
       }
     }
 
-    const session = PlayerSession.getInstance();
     // forceReset 会清仅音频；长按「仅音频播放」需在重置后再打开会话开关。
-    if (audioOnly) {
-      session.setAudioOnlyMode(true);
-      PlayerPresentation.onAudioOnlyModeChanged(true);
-    }
+    // External opens always carry an explicit presentation intent, so a normal
+    // open also clears audio-only mode left by a previous media item.
+    session.setAudioOnlyMode(audioOnly);
+    PlayerPresentation.onAudioOnlyModeChanged(audioOnly);
 
     this.selectedVideo = video;
     this.showOptions = false;
@@ -1752,7 +1755,7 @@ struct Index {
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
-        title: 'YouTube 登录',
+        title: $r('app.string.yt_google_web_sign_in_title'),
         onBack: () => {
           if (this.webViewLoginBackHandler && this.webViewLoginBackHandler()) {
             return;

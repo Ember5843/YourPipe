@@ -23,10 +23,25 @@ const BACKUP_APP_ID: string = 'net.yourpipe';
 const BACKUP_VERSION: number = 1;
 const APP_VERSION: string = '0.5.3';
 
+export type BackupErrorCode =
+  | 'no_context'
+  | 'no_save_path'
+  | 'no_file'
+  | 'format_error'
+  | 'wrong_app'
+  | 'version_unsupported'
+  | 'empty'
+  | 'export_failed'
+  | 'restore_failed';
+
 export class BackupError extends Error {
-  constructor(message: string) {
+  code: BackupErrorCode;
+  resourceKey: string;
+  constructor(code: BackupErrorCode, message: string, resourceKey: string) {
     super(message);
     this.name = 'BackupError';
+    this.code = code;
+    this.resourceKey = resourceKey;
   }
 }
 
@@ -97,7 +112,7 @@ export class DataBackupManager {
   static async saveBackupToFile(backup: AppBackupData): Promise<string> {
     const context = AppStorage.get<common.UIAbilityContext>('context');
     if (!context) {
-      throw new BackupError('无法获取应用上下文');
+      throw new BackupError('no_context', 'Unable to get app context', 'yt_backup_error_no_context');
     }
 
     const filePicker = new picker.DocumentViewPicker(context);
@@ -108,7 +123,7 @@ export class DataBackupManager {
 
     const result = await filePicker.save(options);
     if (!result || result.length === 0) {
-      throw new BackupError('未选择保存路径');
+      throw new BackupError('no_save_path', 'No save path selected', 'yt_backup_error_no_save_path');
     }
 
     const dirUri = result[0];
@@ -131,7 +146,7 @@ export class DataBackupManager {
   static async loadBackupFromFile(): Promise<AppBackupData> {
     const context = AppStorage.get<common.UIAbilityContext>('context');
     if (!context) {
-      throw new BackupError('无法获取应用上下文');
+      throw new BackupError('no_context', 'Unable to get app context', 'yt_backup_error_no_context');
     }
 
     const filePicker = new picker.DocumentViewPicker(context);
@@ -141,7 +156,7 @@ export class DataBackupManager {
 
     const result = await filePicker.select(options);
     if (!result || result.length === 0) {
-      throw new BackupError('未选择文件');
+      throw new BackupError('no_file', 'No file selected', 'yt_backup_error_no_file');
     }
 
     const path = new fileUri.FileUri(result[0]).path;
@@ -151,17 +166,17 @@ export class DataBackupManager {
     try {
       backup = JSON.parse(content) as AppBackupData;
     } catch (e) {
-      throw new BackupError('备份文件格式错误');
+      throw new BackupError('format_error', 'Backup file format error', 'yt_backup_error_format');
     }
 
     if (backup.appId !== BACKUP_APP_ID) {
-      throw new BackupError('备份文件不属于本应用');
+      throw new BackupError('wrong_app', 'Backup file does not belong to this app', 'yt_backup_error_wrong_app');
     }
     if (backup.backupVersion !== BACKUP_VERSION) {
-      throw new BackupError('备份文件版本不受支持');
+      throw new BackupError('version_unsupported', 'Backup file version not supported', 'yt_backup_error_version');
     }
     if (!backup.items) {
-      throw new BackupError('备份文件内容为空');
+      throw new BackupError('empty', 'Backup file is empty', 'yt_backup_error_empty');
     }
 
     logger.info(`Backup loaded from ${path}`);

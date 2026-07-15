@@ -51,6 +51,7 @@ export struct OptionsDataAccountPage {
   @State private showCookieImport: boolean = false;
   @State private cookieInput: string = '';
   @State private cookieImportMessage: string = '';
+  @State private cookieImportSuccess: boolean = false;
   @State private isVerifyingCookie: boolean = false;
   private backupPickerController: CustomDialogController | null = null;
   private restorePickerController: CustomDialogController | null = null;
@@ -61,6 +62,10 @@ export struct OptionsDataAccountPage {
       || this.authStatus.hasCookieCredential
       || this.authStatus.hasRefreshToken
       || this.authStatus.stage === AuthStage.SIGNED_IN;
+  }
+
+  private tr(resource: Resource): string {
+    return getContext().resourceManager.getStringSync(resource.id);
   }
 
   private isAuthActive(): boolean {
@@ -74,35 +79,35 @@ export struct OptionsDataAccountPage {
     return $r('app.string.yt_option_auth_session');
   }
 
-  private getAccountSubtitle(): string {
+  private getAccountSubtitle(): ResourceStr {
     if (!this.hasCredential()) {
-      return '登录以获取个性化推荐';
+      return $r('app.string.yt_auth_subtitle_sign_in');
     }
     if (this.isAuthActive()) {
       if (this.authStatus.authMode === 'cookie') {
-        return '已登录 (Cookie) · 登录态浏览中';
+        return $r('app.string.yt_auth_subtitle_cookie_active');
       }
-      return '已登录 · 登录态浏览中';
+      return $r('app.string.yt_auth_subtitle_active');
     }
-    return '已保存登录 · 无痕浏览中';
+    return $r('app.string.yt_auth_subtitle_incognito');
   }
 
   private startLogin(): void {
     const uiContext = this.getUIContext();
     uiContext.showAlertDialog({
-      title: '登录须知',
-      message: '登录后可尝试加载个性化首页推荐，并用于解锁会员内容或绕过机器人拦截。可用开关临时关闭登录态（无痕浏览），不会清除已保存的登录。登录状态下分辨率最高限制为 1080P。',
+      title: $r('app.string.yt_auth_notice_title'),
+      message: $r('app.string.yt_auth_notice_message'),
       autoCancel: true,
       alignment: DialogAlignment.Center,
       offset: { dx: 0, dy: -20 },
       buttonDirection: DialogButtonDirection.HORIZONTAL,
       buttons: [
         {
-          value: '取消',
+          value: $r('app.string.yt_action_cancel'),
           action: () => {}
         },
         {
-          value: '继续登录',
+          value: $r('app.string.yt_auth_continue_sign_in'),
           fontColor: this.themePrimary,
           action: () => {
             this.params.onLoginClick();
@@ -168,7 +173,8 @@ export struct OptionsDataAccountPage {
         pairs.push(`${name}=${value}`);
       }
       return pairs.join('; ');
-    } catch (_e) {
+    } catch (e) {
+      logger.debug(`cookie JSON parse ignored: ${e}`);
       return '';
     }
   }
@@ -205,8 +211,8 @@ export struct OptionsDataAccountPage {
       const success: CookieVerifyResult = {
         ok: true,
         detail: page.items.length > 0
-          ? `在线校验通过（历史 ${page.items.length} 条）`
-          : '在线校验通过（账号历史为空，但鉴权成功）'
+          ? getContext().resourceManager.getStringSync($r('app.string.yt_cookie_verify_history').id, page.items.length)
+          : this.tr($r('app.string.yt_cookie_verify_empty_history'))
       };
       return success;
     } catch (err) {
@@ -215,13 +221,13 @@ export struct OptionsDataAccountPage {
       if (msg.indexOf('Sign-in required') >= 0) {
         const failedSession: CookieVerifyResult = {
           ok: false,
-          detail: '会话未生效，请重新导入'
+          detail: this.tr($r('app.string.yt_cookie_session_inactive'))
         };
         return failedSession;
       }
       const failed: CookieVerifyResult = {
         ok: false,
-        detail: `在线校验失败：${msg}`
+        detail: getContext().resourceManager.getStringSync($r('app.string.yt_cookie_verify_failed').id, msg)
       };
       return failed;
     }
@@ -233,29 +239,30 @@ export struct OptionsDataAccountPage {
     }
     const raw = (this.cookieInput || '').trim();
     this.cookieImportMessage = '';
+    this.cookieImportSuccess = false;
     if (raw.length === 0) {
-      this.cookieImportMessage = '请粘贴 Cookie 字符串';
+      this.cookieImportMessage = this.tr($r('app.string.yt_cookie_input_required'));
       return;
     }
 
     const cookies = this.parseCookieInput(raw);
     if (cookies.length === 0) {
-      this.cookieImportMessage = '无法解析 Cookie（支持 header 或 EditThisCookie JSON）';
+      this.cookieImportMessage = this.tr($r('app.string.yt_cookie_parse_failed'));
       return;
     }
     if (!CookieAuthCredential.hasSid(cookies) && CookieAuthCredential.parseSapiSid(cookies).length === 0) {
-      this.cookieImportMessage = '本地校验失败：未找到 SID / SAPISID';
+      this.cookieImportMessage = this.tr($r('app.string.yt_cookie_sid_missing'));
       return;
     }
     const credential = CookieAuthCredential.fromCookies(cookies, '');
     if (credential.sapiSid.length === 0) {
-      this.cookieImportMessage = '本地校验失败：缺少 SAPISID（或 __Secure-3PAPISID）';
+      this.cookieImportMessage = this.tr($r('app.string.yt_cookie_sapisid_missing'));
       return;
     }
 
     const session = AuthSessionManager.getInstance();
     if (!session) {
-      this.cookieImportMessage = '认证模块未初始化';
+      this.cookieImportMessage = this.tr($r('app.string.yt_auth_module_unavailable'));
       return;
     }
 
@@ -264,18 +271,20 @@ export struct OptionsDataAccountPage {
     YoutubePlayerClientConfig.resetToAuthDefault(true);
 
     this.isVerifyingCookie = true;
-    this.cookieImportMessage = '本地格式通过，正在向 YouTube 校验…';
+    this.cookieImportMessage = this.tr($r('app.string.yt_cookie_local_validating'));
     try {
       const result = await this.verifyCookieOnline();
       if (result.ok) {
         this.cookieInput = '';
         this.showCookieImport = false;
         this.cookieImportMessage = result.detail;
+        this.cookieImportSuccess = true;
         this.params.onAuthChanged();
       } else {
         session.signOut();
         AuthStateHelper.refresh();
         this.cookieImportMessage = result.detail;
+        this.cookieImportSuccess = false;
       }
     } finally {
       this.isVerifyingCookie = false;
@@ -390,7 +399,7 @@ export struct OptionsDataAccountPage {
       await DataBackupManager.saveBackupToFile(backup);
       this.showToast($r('app.string.yt_backup_export_success'));
     } catch (e) {
-      const message = e instanceof BackupError ? e.message : '导出失败';
+      const message = e instanceof BackupError ? $r(`app.string.${e.resourceKey}`) : $r('app.string.yt_backup_error_export');
       this.showToast(message);
     } finally {
       this.isBusy = false;
@@ -422,7 +431,7 @@ export struct OptionsDataAccountPage {
       });
       this.restorePickerController.open();
     } catch (e) {
-      const message = e instanceof BackupError ? e.message : '恢复失败';
+      const message = e instanceof BackupError ? $r(`app.string.${e.resourceKey}`) : $r('app.string.yt_backup_error_restore');
       this.showToast(message);
     } finally {
       this.isBusy = false;
@@ -467,7 +476,7 @@ export struct OptionsDataAccountPage {
       AuthStateHelper.refresh();
       this.showToast($r('app.string.yt_backup_restore_success'));
     } catch (e) {
-      const message = e instanceof BackupError ? e.message : '恢复失败';
+      const message = e instanceof BackupError ? $r(`app.string.${e.resourceKey}`) : $r('app.string.yt_backup_error_restore');
       this.showToast(message);
     } finally {
       this.pendingRestoreBackup = null;
@@ -488,8 +497,8 @@ export struct OptionsDataAccountPage {
             ListItem() {
               OptionItem({
                 icon: $r('sys.symbol.person_crop_circle_fill'),
-                title: 'Google 账号登录',
-                subtitle: '通过网页登录 YouTube / Google',
+                title: $r('app.string.yt_google_web_sign_in'),
+                subtitle: $r('app.string.yt_google_web_sign_in_subtitle'),
                 iconColor: this.themePrimary,
                 showChevron: true,
                 transparentBackground: true,
@@ -503,8 +512,8 @@ export struct OptionsDataAccountPage {
             ListItem() {
               OptionItem({
                 icon: $r('sys.symbol.doc_plaintext'),
-                title: this.showCookieImport ? '收起 Cookie 登录' : 'Cookie 登录',
-                subtitle: '粘贴浏览器 Cookie / EditThisCookie JSON',
+                title: this.showCookieImport ? $r('app.string.yt_cookie_collapse') : $r('app.string.yt_cookie_sign_in'),
+                subtitle: $r('app.string.yt_cookie_import_subtitle'),
                 iconColor: this.themePrimary,
                 showChevron: !this.showCookieImport,
                 transparentBackground: true,
@@ -512,6 +521,7 @@ export struct OptionsDataAccountPage {
                 onClickAction: () => {
                   this.showCookieImport = !this.showCookieImport;
                   this.cookieImportMessage = '';
+                  this.cookieImportSuccess = false;
                 }
               })
             }
@@ -519,14 +529,14 @@ export struct OptionsDataAccountPage {
             if (this.showCookieImport) {
               ListItem() {
                 Column({ space: 10 }) {
-                  Text('支持 header 形式（SID=...; SAPISID=...）或 EditThisCookie / Cookie-Editor 导出的 JSON。需含 SID 与 SAPISID / __Secure-3PAPISID。')
+                  Text($r('app.string.yt_cookie_import_help'))
                     .fontSize(12)
                     .fontColor($r('app.color.yourtube_text_hint'))
                     .width('100%')
 
                   TextArea({
                     text: this.cookieInput,
-                    placeholder: 'SID=...; SAPISID=...  或  [{"name":"SID","value":"..."}, ...]'
+                    placeholder: $r('app.string.yt_cookie_import_placeholder')
                   })
                     .height(140)
                     .width('100%')
@@ -542,8 +552,7 @@ export struct OptionsDataAccountPage {
                   if (this.cookieImportMessage.length > 0) {
                     Text(this.cookieImportMessage)
                       .fontSize(12)
-                      .fontColor((this.cookieImportMessage.indexOf('通过') >= 0
-                        || this.cookieImportMessage.indexOf('成功') >= 0)
+                      .fontColor(this.cookieImportSuccess
                         ? this.themePrimary
                         : $r('app.color.yourtube_text_secondary'))
                       .width('100%')
@@ -555,7 +564,7 @@ export struct OptionsDataAccountPage {
                         .width(18)
                         .height(18)
                         .color(this.themePrimary)
-                      Text('正在校验 Cookie…')
+                      Text($r('app.string.yt_cookie_verifying'))
                         .fontSize(13)
                         .fontColor($r('app.color.yourtube_text_secondary'))
                     }
@@ -563,7 +572,7 @@ export struct OptionsDataAccountPage {
                     .justifyContent(FlexAlign.Center)
                     .height(44)
                   } else {
-                    Button('确认导入并校验')
+                    Button($r('app.string.yt_cookie_import_confirm'))
                       .height(44)
                       .width('100%')
                       .fontSize(15)
