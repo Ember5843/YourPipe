@@ -352,7 +352,9 @@ export struct VideoPlayerPage {
     this.cacheThumbnail(this.video.videoId, this.video.thumbnailUrl);
 
     // 同视频已就绪：直接同步，使用缓存数据
-    if (session.currentVideo?.videoId === this.video?.videoId && session.controller.vm.isReady) {
+    if (session.currentVideo?.videoId === this.video?.videoId
+      && (session.controller.vm.isReady
+        || session.cachedVideoSource?.videoId === this.video.videoId)) {
       this.controller = session.controller;
       this.vm = session.controller.vm;
       if (session.cachedVideoSource) {

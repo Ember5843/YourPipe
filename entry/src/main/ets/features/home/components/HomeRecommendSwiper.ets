@@ -53,6 +53,7 @@ struct HomeRecommendBannerPage {
         placeholderColor: this.video.thumbnailColor || '',
         fillParent: true,
         useAspectRatio: false,
+        useCoverBackdrop: true,
         borderRadiusVp: 12
       })
 

@@ -1214,33 +1214,51 @@ export class YouTubeExtractor {
       videoId, sts, selectedClient, hasCookieAuth);
     logger.info(`[TIMING] video=${videoId} stage=streamPlayer client=${selectedClient} auth=${hasCookieAuth} elapsed=${Date.now() - streamStartedAt}ms`);
 
-    // Stream-player metadata is sufficient for startup. Rich metadata and /next
-    // stay in the per-video background task consumed by fetchPlaybackExtras.
-    const metaBase: PlayerResponse = innertubePlayers.player
+    // Stream-player metadata is sufficient for ordinary startup. TV downgraded
+    // responses can expose only videoDetails.isLiveContent, while the definitive
+    // isLiveNow flag remains in the WEB metadata response. Resolve that ambiguity
+    // here so a current live is not accidentally sent through the DASH/SIDX path.
+    let metaBase: PlayerResponse = innertubePlayers.player
       ?? ({ videoDetails: { videoId: videoId } } as PlayerResponse);
+    const streamPr = innertubePlayers.player;
+    let isLive = this.resolveIsLive(metaBase, streamPr);
+    const isPossibleTvLive = selectedClient === 'tv_downgraded'
+      && streamPr?.videoDetails?.isLiveContent === true;
+    const hlsRecoveryPromise = (isLive || isPossibleTvLive)
+      ? ConfiguredPlayerClient.fetchMwebHlsOnly({
+        videoId: videoId,
+        hl: this.hl,
+        gl: this.gl,
+        visitorData: undefined,
+        signatureTimestamp: sts
+      }, this.client, false).catch((e: Error) => {
+        logger.warn(`[STREAM] MWEB HLS helper failed: ${e.message || e}`);
+        return undefined;
+      })
+      : Promise.resolve(undefined);
+
+    if (!isLive && isPossibleTvLive) {
+      const liveMetaStartedAt = Date.now();
+      const webMeta = await webMetaPromise;
+      if (webMeta) {
+        metaBase = webMeta;
+        isLive = this.resolveIsLive(webMeta, streamPr);
+      }
+      logger.info(`[TIMING] video=${videoId} stage=liveClassification isLive=${isLive} `
+        + `elapsed=${Date.now() - liveMetaStartedAt}ms`);
+    }
+
     const videoInfo = this.extractMetadata(videoId, metaBase);
     this.fillMissingIdentityFromPlayer(videoInfo, innertubePlayers.player);
     videoInfo.playerResponse = metaBase;
 
-    const streamPr = innertubePlayers.player;
-    const isLive = this.resolveIsLive(metaBase, streamPr);
     const hasConfiguredHls = !!(streamPr?.streamingData?.hlsManifestUrl);
-    if (isLive && (selectedClient === 'tv_downgraded'
-      || (selectedClient === 'web_safari' && !hasConfiguredHls))) {
-      try {
-        const hls = await ConfiguredPlayerClient.fetchMwebHlsOnly({
-          videoId: videoId,
-          hl: this.hl,
-          gl: this.gl,
-          visitorData: undefined,
-          signatureTimestamp: sts
-        }, this.client, hasCookieAuth);
-        if (hls) {
-          this.mwebHlsManifestUrl = hls;
-          logger.info(`[STREAM] recovered MWEB hlsManifestUrl len=${hls.length}`);
-        }
-      } catch (e) {
-        logger.warn('[STREAM] MWEB HLS helper failed:', e);
+    if ((isLive && (selectedClient === 'tv_downgraded'
+      || (selectedClient === 'web_safari' && !hasConfiguredHls))) || isPossibleTvLive) {
+      const hls = await hlsRecoveryPromise;
+      if (hls) {
+        this.mwebHlsManifestUrl = hls;
+        logger.info(`[STREAM] recovered anonymous MWEB hlsManifestUrl len=${hls.length}`);
       }
     }
     const streamBuildStartedAt = Date.now();

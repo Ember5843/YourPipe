@@ -156,11 +156,19 @@ export class LocalMediaProxy {
       Logger.error(TAG, `prepareDashSegments: missing indexRange itag=${resource.id}`);
       return false;
     }
-    const maxAttempts = 4;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Fresh authenticated TVHTML5 URLs can return 403 while the googlevideo
+    // edge authorization propagates. Keep increasing rn until the URL becomes
+    // readable, bounded by elapsed time so a genuinely invalid URL cannot hang.
+    // Every other client retains the existing four-attempt policy.
+    const isTvDowngraded = resource.sourceClient === 'tv_downgraded';
+    const retryStartedAt = Date.now();
+    const tvRetryBudgetMs = 10000;
+    let attempt = 0;
+    while (isTvDowngraded ? Date.now() - retryStartedAt < tvRetryBudgetMs : attempt < 4) {
       try {
         if (attempt > 0) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 250 * attempt));
+          const retryDelayMs = isTvDowngraded ? 250 : 250 * attempt;
+          await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
         }
         const bytes = await fetchYoutubeRangeBytes(resource, start, end);
         resource.dashSegments = parseYoutubeDashIndex(bytes, start);
@@ -169,7 +177,9 @@ export class LocalMediaProxy {
         return true;
       } catch (e) {
         resource.dashSegments = undefined;
-        Logger.warn(TAG, `DASH SIDX attempt=${attempt + 1}/${maxAttempts} itag=${resource.id}: ${e}`);
+        Logger.warn(TAG, `DASH SIDX attempt=${attempt + 1} elapsed=${Date.now() - retryStartedAt}ms `
+          + `itag=${resource.id}: ${e}`);
+        attempt++;
       }
     }
     return false;

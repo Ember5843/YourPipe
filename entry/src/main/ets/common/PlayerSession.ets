@@ -36,6 +36,8 @@ export class PlayerSession {
   private _watchVideoId: string = '';
   private _activePlayPromise: Promise<VideoData | null> | null = null;
   private _activePlayVideoId: string = '';
+  /** Source already accepted by the controller; MPV may still be opening/decoding it. */
+  private _submittedVideoId: string = '';
 
   private _cachedVideoSource: VideoData | null = null;
   private _lastPlayError: ErrorInfo | null = null;
@@ -277,8 +279,9 @@ export class PlayerSession {
 
     const videoId = video.videoId || YOUTUBE_VIDEO_ID;
 
-    if (this._currentVideo?.videoId === video.videoId && this._controller.vm.isReady) {
-      logger.info(`${TAG} play() skipped: same video ${videoId} already ready`);
+    if (this._currentVideo?.videoId === video.videoId
+      && (this._controller.vm.isReady || this._submittedVideoId === videoId)) {
+      logger.info(`${TAG} play() skipped: same video ${videoId} already submitted/ready`);
       return this._defaultSource;
     }
 
@@ -403,6 +406,7 @@ export class PlayerSession {
         videoSource.auto = shouldPlay;
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
         await this._controller.updateVideoSource(videoSource);
+        this._submittedVideoId = videoId;
         logger.info(`${TAG} [TIMING] video=${videoId} source submitted elapsed=${Date.now() - startedAt}ms`);
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
         this.startWatchSaveTimer();
@@ -591,6 +595,7 @@ export class PlayerSession {
     this._watchVideoId = '';
     this._activePlayPromise = null;
     this._activePlayVideoId = '';
+    this._submittedVideoId = '';
     this._cachedVideoSource = null;
     this._cachedChannelProfiles.clear();
     // 清 PiP 激活状态：避免会话在 PiP 激活时被 reset 后，_isPiPActive / AppStorage.isPiPActive

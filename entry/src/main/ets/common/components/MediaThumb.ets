@@ -14,6 +14,8 @@ export struct MediaThumb {
   /** Fill parent box (grid / banner). Pair with useAspectRatio for 16:9. */
   @Prop fillParent: boolean = false;
   @Prop useAspectRatio: boolean = false;
+  /** Fill contain letterbox areas with a darkened cover copy of the thumbnail. */
+  @Prop useCoverBackdrop: boolean = false;
   @Prop borderRadiusVp: number = 6;
   @Prop showLive: boolean = false;
   @Prop isLive: boolean = false;
@@ -86,6 +88,20 @@ export struct MediaThumb {
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       if (this.displayUrl && this.displayUrl.length > 0) {
+        if (this.useCoverBackdrop) {
+          Image(this.displayUrl)
+            .width(this.fillParent ? '100%' : this.widthVp)
+            .height(this.fillParent ? '100%' : this.heightVp)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(this.borderRadiusVp)
+
+          Rect()
+            .width(this.fillParent ? '100%' : this.widthVp)
+            .height(this.fillParent ? '100%' : this.heightVp)
+            .fill('#73000000')
+            .radius(this.borderRadiusVp)
+        }
+
         if (this.thumbId.length > 0) {
           Image(this.displayUrl)
             .id(this.thumbId)

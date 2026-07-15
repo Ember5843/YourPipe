@@ -218,7 +218,11 @@ function responseBodyToBytes(result: string | Object | ArrayBuffer): Uint8Array 
  * Uses @ohos.net.http (same stack as youtube_core extractor) — RCP streaming
  * has produced consistent 403 on TVHTML5 indexRange probes.
  */
-export async function fetchYoutubeRangeBytes(resource: StreamResource, start: number, end: number): Promise<Uint8Array> {
+export async function fetchYoutubeRangeBytes(
+  resource: StreamResource,
+  start: number,
+  end: number
+): Promise<Uint8Array> {
   const rangeSpec = `${start}-${end}`;
   const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
   const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
