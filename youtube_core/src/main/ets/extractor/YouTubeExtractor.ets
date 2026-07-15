@@ -88,6 +88,12 @@ interface ManifestNDecodeResult {
   decoded: string;
 }
 
+interface PlaybackEnrichmentTask {
+  webMetaPromise: Promise<PlayerResponse | undefined>;
+  nextPromise: Promise<NextResponse | null>;
+  startedAt: number;
+}
+
 /**
  * Android visitor ID request context
  */
@@ -222,8 +228,7 @@ export class YouTubeExtractor {
   private mwebHlsManifestUrl: string = '';
 
   // Cached /next from extractVideoStreams (PipePipe onFetchPage await); reused by extras.
-  private cachedNextResponse: NextResponse | null = null;
-  private cachedNextVideoId: string = '';
+  private playbackEnrichmentTasks: Map<string, PlaybackEnrichmentTask> = new Map();
 
   // Localization settings (playback path overwrites via YouTubePlayService)
   public hl: string = 'en-GB';
@@ -242,8 +247,9 @@ export class YouTubeExtractor {
    * Initialize extractor
    */
   async initialize(): Promise<void> {
+    const startedAt = Date.now();
     await this.client.initialize();
-    logger.info('Initialized');
+    logger.info(`[TIMING] http init elapsed=${Date.now() - startedAt}ms`);
   }
 
   /**
@@ -1133,13 +1139,10 @@ export class YouTubeExtractor {
    * No watch HTML on critical path; no stream-player pre-fire/retry.
    */
   async extractVideoStreams(videoId: string): Promise<VideoInfo> {
+    const criticalStartedAt = Date.now();
     logger.info(`Extracting video streams for: ${videoId}`);
     this.errors = [];
     this.mwebHlsManifestUrl = '';
-    if (this.cachedNextVideoId !== videoId) {
-      this.cachedNextResponse = null;
-      this.cachedNextVideoId = '';
-    }
 
     const hasCookieAuth = this.hasCookieAuthForRequests();
     YoutubePlayerClientConfig.applyAuthDefault(hasCookieAuth);
@@ -1153,76 +1156,67 @@ export class YouTubeExtractor {
     this.cachedVideoOnlyStreams = [];
 
     // STS (latest-player) + WEB clientVersion (sw.js) before parallel trio — independent.
-    const stsAndVersion = await Promise.all([
-      this.resolveSignatureTimestamp(videoId),
-      this.ensureWebClientVersion()
-    ]);
-    const sts = stsAndVersion[0];
+    const stsStartedAt = Date.now();
+    const stsPromise = this.resolveSignatureTimestamp(videoId).then((value: number | undefined) => {
+      logger.info(`[TIMING] video=${videoId} stage=STS elapsed=${Date.now() - stsStartedAt}ms`);
+      return value;
+    });
+    const versionStartedAt = Date.now();
+    const versionPromise = this.ensureWebClientVersion().then((value: string) => {
+      logger.info(`[TIMING] video=${videoId} stage=clientVersion elapsed=${Date.now() - versionStartedAt}ms`);
+      return value;
+    });
+    const enrichmentStartedAt = Date.now();
+    const webMetaPromise = versionPromise.then(() => {
+      const startedAt = Date.now();
+      return this.fetchWebMetadataPlayerResponse(videoId).then((value: PlayerResponse | undefined) => {
+        logger.info(`[TIMING] video=${videoId} stage=metadata elapsed=${Date.now() - startedAt}ms`);
+        return value;
+      });
+    }).catch((e: Error) => {
+      logger.warn(`[META] background fetch failed video=${videoId}: ${e.message || e}`);
+      return undefined;
+    });
+    const nextPromise = versionPromise.then(() => {
+      const startedAt = Date.now();
+      return this.fetchNextResponse(videoId).then((value: NextResponse | null) => {
+        logger.info(`[TIMING] video=${videoId} stage=next elapsed=${Date.now() - startedAt}ms`);
+        return value;
+      });
+    }).catch((e: Error) => {
+      logger.warn(`[NEXT] background fetch failed video=${videoId}: ${e.message || e}`);
+      return null;
+    });
+    const enrichmentTask: PlaybackEnrichmentTask = {
+      webMetaPromise: webMetaPromise,
+      nextPromise: nextPromise,
+      startedAt: enrichmentStartedAt
+    };
+    this.playbackEnrichmentTasks.set(videoId, enrichmentTask);
+    setTimeout(() => {
+      if (this.playbackEnrichmentTasks.get(videoId) === enrichmentTask) {
+        this.playbackEnrichmentTasks.delete(videoId);
+      }
+    }, 120000);
+
+    const sts = await stsPromise;
     if (sts === undefined || sts <= 0) {
       throw new ExtractionException('signatureTimestamp unavailable (latest-player / cache failed)');
     }
 
+    if (selectedClient === 'mweb') {
+      await versionPromise;
+    }
+
     // PipePipe onFetchPage parallel trio: WEB meta + next + selected stream player
-    const webMetaPromise = this.fetchWebMetadataPlayerResponse(videoId);
-    const nextPromise = this.fetchNextResponse(videoId);
-    const streamPromise = this.fetchSelectedStreamPlayer(
+    const streamStartedAt = Date.now();
+    const innertubePlayers = await this.fetchSelectedStreamPlayer(
       videoId, sts, selectedClient, hasCookieAuth);
+    logger.info(`[TIMING] video=${videoId} stage=streamPlayer client=${selectedClient} auth=${hasCookieAuth} elapsed=${Date.now() - streamStartedAt}ms`);
 
-    const settled = await Promise.allSettled([webMetaPromise, nextPromise, streamPromise]);
-
-    let webMetaPr: PlayerResponse | undefined = undefined;
-    if (settled[0].status === 'fulfilled') {
-      webMetaPr = settled[0].value as PlayerResponse | undefined;
-    } else {
-      const e = settled[0].reason as Error;
-      if (e instanceof AgeRestrictedContentException) {
-        throw e as AgeRestrictedContentException;
-      }
-      if (e instanceof SignInConfirmNotBotException) {
-        throw e as SignInConfirmNotBotException;
-      }
-      if (e instanceof PrivateContentException) {
-        throw e as PrivateContentException;
-      }
-      if (e instanceof ContentNotAvailableException) {
-        throw e as ContentNotAvailableException;
-      }
-      if (e instanceof ExtractionException) {
-        throw e as ExtractionException;
-      }
-      logger.warn('[META] WEB metadata player failed:', e);
-      this.errors.push(new ExtractorStageError('web-meta', e));
-    }
-
-    let nextResponse: NextResponse | null = null;
-    if (settled[1].status === 'fulfilled') {
-      nextResponse = settled[1].value as NextResponse | null;
-    } else {
-      logger.warn('[NEXT] fetch failed:', settled[1].reason);
-      this.errors.push(new ExtractorStageError('next', settled[1].reason as Error));
-    }
-    if (!nextResponse) {
-      throw new ExtractionException('YouTube next response is missing');
-    }
-    this.cachedNextResponse = nextResponse;
-    this.cachedNextVideoId = videoId;
-
-    let innertubePlayers: InnertubePlayerResult = this.emptyInnertubeResult(selectedClient);
-    if (settled[2].status === 'fulfilled') {
-      innertubePlayers = settled[2].value as InnertubePlayerResult;
-    } else {
-      this.errors.push(new ExtractorStageError(selectedClient, settled[2].reason as Error));
-      logger.warn(`[STREAM] ${selectedClient} failed:`, settled[2].reason);
-    }
-
-    if (webMetaPr) {
-      this.checkWebMetadataPlayability(webMetaPr.playabilityStatus);
-      this.assertPlayerResponseVideoId(webMetaPr, videoId);
-    }
-
-    // Prefer WEB $fields for title/desc; fill missing ids from stream player (meta may be UNPLAYABLE).
-    const metaBase: PlayerResponse = webMetaPr
-      ?? innertubePlayers.player
+    // Stream-player metadata is sufficient for startup. Rich metadata and /next
+    // stay in the per-video background task consumed by fetchPlaybackExtras.
+    const metaBase: PlayerResponse = innertubePlayers.player
       ?? ({ videoDetails: { videoId: videoId } } as PlayerResponse);
     const videoInfo = this.extractMetadata(videoId, metaBase);
     this.fillMissingIdentityFromPlayer(videoInfo, innertubePlayers.player);
@@ -1249,7 +1243,9 @@ export class YouTubeExtractor {
         logger.warn('[STREAM] MWEB HLS helper failed:', e);
       }
     }
+    const streamBuildStartedAt = Date.now();
     await this.buildAndCacheStreams(videoId, innertubePlayers, metaBase);
+    logger.info(`[TIMING] video=${videoId} stage=urlDecodeBuild elapsed=${Date.now() - streamBuildStartedAt}ms`);
 
     videoInfo.streams = [
       ...this.cachedAudioStreams,
@@ -1278,6 +1274,8 @@ export class YouTubeExtractor {
       videoInfo.hlsUrl = await this.deobfuscateManifestUrl(hlsRaw);
     }
     videoInfo.dashMpdUrl = undefined;
+
+    logger.info(`[TIMING] video=${videoId} stage=criticalExtractComplete client=${selectedClient} auth=${hasCookieAuth} elapsed=${Date.now() - criticalStartedAt}ms streams=${videoInfo.streams.length}`);
 
     return videoInfo;
   }
@@ -1328,33 +1326,36 @@ export class YouTubeExtractor {
 
   async fetchPlaybackExtras(videoId: string, playerResponse?: PlayerResponse): Promise<VideoInfo> {
     logger.info(`Fetching playback extras for: ${videoId}`);
-    const baseInfo = new VideoInfo(videoId);
+    const startedAt = Date.now();
+    const task = this.playbackEnrichmentTasks.get(videoId);
+    const webMetaPromise = task?.webMetaPromise
+      ?? this.fetchWebMetadataPlayerResponse(videoId).catch(() => undefined);
+    const nextPromise = task?.nextPromise
+      ?? this.fetchNextResponse(videoId).catch(() => null);
+    const settled = await Promise.allSettled([
+      webMetaPromise,
+      nextPromise,
+      this.fetchDislikeCount(videoId)
+    ]);
+    this.playbackEnrichmentTasks.delete(videoId);
 
-    // Prefer /next already awaited in extractVideoStreams (avoid second next POST).
-    let nextResponse: NextResponse | null = null;
-    if (this.cachedNextVideoId === videoId && this.cachedNextResponse) {
-      nextResponse = this.cachedNextResponse;
-    } else {
-      nextResponse = await this.fetchNextResponse(videoId);
-      if (nextResponse) {
-        this.cachedNextResponse = nextResponse;
-        this.cachedNextVideoId = videoId;
-      }
-    }
-
-    let dislikeCount = -1;
-    try {
-      dislikeCount = await this.fetchDislikeCount(videoId);
-    } catch (e) {
-      logger.warn('Failed to fetch dislike count:', e);
-    }
+    const webMeta = settled[0].status === 'fulfilled'
+      ? settled[0].value as PlayerResponse | undefined : undefined;
+    const nextResponse = settled[1].status === 'fulfilled'
+      ? settled[1].value as NextResponse | null : null;
+    const dislikeCount = settled[2].status === 'fulfilled'
+      ? settled[2].value as number : -1;
+    const baseInfo = webMeta ? this.extractMetadata(videoId, webMeta) : new VideoInfo(videoId);
+    baseInfo.playerResponse = webMeta ?? playerResponse;
     if (dislikeCount >= 0) {
       baseInfo.dislikeCount = dislikeCount;
     }
 
     if (nextResponse) {
-      this.enrichFromNextResponse(baseInfo, nextResponse, playerResponse);
+      this.enrichFromNextResponse(baseInfo, nextResponse, webMeta ?? playerResponse);
     }
+
+    logger.info(`[TIMING] video=${videoId} stage=backgroundEnrichment elapsed=${Date.now() - startedAt}ms totalSinceStart=${task ? Date.now() - task.startedAt : -1}ms`);
 
     return baseInfo;
   }
@@ -1443,8 +1444,7 @@ export class YouTubeExtractor {
     this.safariCpn = undefined;
     this.androidCpn = undefined;
     this.mwebHlsManifestUrl = '';
-    this.cachedNextResponse = null;
-    this.cachedNextVideoId = '';
+    this.playbackEnrichmentTasks.clear();
     // 注意：cachedSignatureTimestamp 是进程级 STS 缓存，不在此清空，复用提速
     logger.debug('Cache cleared');
   }
@@ -2562,12 +2562,20 @@ export class YouTubeExtractor {
         if (info.throttlingParam && result.n[info.throttlingParam]) {
           const deobfuscatedParam = result.n[info.throttlingParam];
           if (deobfuscatedParam) {
-            updatedUrl = updatedUrl.replace(info.throttlingParam, deobfuscatedParam);
-            nApplied = true;
+            // Replace the n query value even when the URL form is percent-encoded.
+            // Plain string replace(decoded) fails if the URL still has %XX sequences.
+            const nRe = /([?&]n=)([^&]*)/;
+            if (nRe.test(updatedUrl)) {
+              updatedUrl = updatedUrl.replace(nRe, `$1${encodeURIComponent(deobfuscatedParam)}`);
+              nApplied = true;
+            } else if (updatedUrl.includes(info.throttlingParam)) {
+              updatedUrl = updatedUrl.replace(info.throttlingParam, deobfuscatedParam);
+              nApplied = true;
+            }
           }
         }
 
-        logger.debug(`[DEOBF] #${info.streamIndex} sigApplied=${sigApplied} nApplied=${nApplied} finalUrl=${updatedUrl.substring(0, 120)}`);
+        logger.info(`[DEOBF] #${info.streamIndex} itag=${itagInfo.getItagItem().id} sigApplied=${sigApplied} nApplied=${nApplied} nLen=${info.throttlingParam?.length ?? 0}`);
         itagInfo.setContent(updatedUrl);
       }
 

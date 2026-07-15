@@ -5,13 +5,29 @@ import { makeEmptySession, StreamResource } from '../proxy/SessionStore';
 import { sabrSessionStore } from '../sabr/SabrSessionStore';
 import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
 import { YoutubeSabrFormatMeta, YoutubeSabrInfo } from 'youtube_core';
+import { fetchYoutubeRangeBytes } from '../proxy/RangeProxy';
+import { parseYoutubeDashIndex } from '../proxy/YoutubeDashIndex';
 
 const TAG: string = '[PlayerLog][LocalMediaProxy]';
-const DEFAULT_USER_AGENT: string = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36';
+// PipePipe-aligned UAs (must match extractor ClientsConstants / YoutubeParsingHelper).
+const DEFAULT_USER_AGENT: string =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+  + 'Chrome/134.0.0.0 Safari/537.36,gzip(gfe)';
 const ANDROID_USER_AGENT: string = 'com.google.android.youtube/21.03.36 (Linux; U; Android 16; GB) gzip';
-const IOS_USER_AGENT: string = 'com.google.ios.youtube/21.03.2(iPhone16,2; U; CPU iOS 18_7_2 like Mac OS X; GB)';
-const SAFARI_USER_AGENT: string = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15,gzip(gfe)';
-const TV_USER_AGENT: string = 'Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Safari/605.1.15';
+const ANDROID_VR_USER_AGENT: string =
+  'com.google.android.apps.youtube.vr.oculus/1.65.10 '
+  + '(Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
+const IOS_USER_AGENT: string = 'com.google.ios.youtube/20.03.02(iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X; GB)';
+const SAFARI_USER_AGENT: string =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) '
+  + 'Version/15.5 Safari/605.1.15,gzip(gfe)';
+const MWEB_USER_AGENT: string =
+  'Mozilla/5.0 (iPad; CPU OS 16_7_10 like Mac OS X) AppleWebKit/605.1.15 '
+  + '(KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1,gzip(gfe)';
+const TV_DOWNGRADED_USER_AGENT: string = 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version';
+const TV_USER_AGENT: string =
+  'Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) '
+  + 'Version/15.4 Safari/605.1.15';
 
 interface LocalMediaResource {
   id?: string;
@@ -47,12 +63,36 @@ interface LocalMediaSessionInput {
 
 export class LocalMediaProxy {
   private static serverReady: boolean = false;
+  private static serverStartPromise: Promise<boolean> | undefined = undefined;
+
+  static async warmup(): Promise<boolean> {
+    if (LocalMediaProxy.serverReady || localProxyServer.isRunning()) {
+      LocalMediaProxy.serverReady = true;
+      return true;
+    }
+    if (LocalMediaProxy.serverStartPromise) {
+      return LocalMediaProxy.serverStartPromise;
+    }
+    const startedAt = Date.now();
+    LocalMediaProxy.serverStartPromise = localProxyServer.start().then((ok: boolean) => {
+      LocalMediaProxy.serverReady = ok;
+      Logger.info(TAG, `proxy warmup elapsed=${Date.now() - startedAt}ms ok=${ok}`);
+      return ok;
+    }).catch((e: Error) => {
+      LocalMediaProxy.serverReady = false;
+      Logger.warn(TAG, `proxy warmup failed elapsed=${Date.now() - startedAt}ms: ${e.message || e}`);
+      return false;
+    }).finally(() => {
+      LocalMediaProxy.serverStartPromise = undefined;
+    });
+    return LocalMediaProxy.serverStartPromise;
+  }
 
   private static async ensureServer(): Promise<boolean> {
-    if (LocalMediaProxy.serverReady) return true;
-    const ok = await localProxyServer.start();
-    LocalMediaProxy.serverReady = ok;
-    return ok;
+    const first = await LocalMediaProxy.warmup();
+    if (first) return true;
+    Logger.warn(TAG, 'proxy startup retry after warmup failure');
+    return LocalMediaProxy.warmup();
   }
 
   static async createSingleUrlSession(url: string, metadata?: StreamInfo): Promise<string> {
@@ -84,20 +124,60 @@ export class LocalMediaProxy {
 
   static async createYoutubeDualUrlSession(video: StreamInfo, audio: StreamInfo, durationMs?: number): Promise<string> {
     if (!await LocalMediaProxy.ensureServer()) return '';
+    const sidxStartedAt = Date.now();
     Logger.info(TAG, `createYoutubeDualUrlSession: video=[itag=${video.itag} ${video.quality} ${video.codecs}] audio=[itag=${audio.itag} ${audio.codecs}] durationMs=${durationMs}`);
-    const input: LocalMediaSessionInput = {
-      type: 'youtube-dual',
-      userAgent: DEFAULT_USER_AGENT,
-      durationMs: durationMs || video.approxDurationMs || audio.approxDurationMs || 0,
-      videos: [LocalMediaProxy.fromStream(video, false)],
-      audios: [LocalMediaProxy.fromStream(audio, true)],
-    };
-    return LocalMediaProxy.createSession(JSON.stringify(input));
+    const session = makeEmptySession('');
+    session.type = 'youtube-dual';
+    session.durationMs = durationMs || video.approxDurationMs || audio.approxDurationMs || 0;
+    session.hasAudio = true;
+    session.videos = [LocalMediaProxy.toStreamResource(video, false)];
+    session.audios = [LocalMediaProxy.toStreamResource(audio, true)];
+    session.video = session.videos[0];
+    session.audio = session.audios[0];
+    // MPV/FFmpeg seek needs SegmentTemplate timeline from SIDX. SegmentBase is rejected
+    // (whole-file range → 403). Retry SIDX briefly — first probe often 403 then succeeds.
+    const prepared = await Promise.all([
+      LocalMediaProxy.prepareDashSegmentsRequired(session.video),
+      LocalMediaProxy.prepareDashSegmentsRequired(session.audio),
+    ]);
+    if (!prepared[0] || !prepared[1]) {
+      Logger.error(TAG, `createYoutubeDualUrlSession: SIDX required for both tracks, abort`);
+      return '';
+    }
+    Logger.info(TAG, `SIDX prepared elapsed=${Date.now() - sidxStartedAt}ms video=${video.itag} audio=${audio.itag}`);
+    return localProxyServer.addPreparedSession(session);
+  }
+
+  /** Required SIDX → SegmentTemplate timeline. Retries transient 403. */
+  private static async prepareDashSegmentsRequired(resource: StreamResource): Promise<boolean> {
+    const start = Number(resource.indexRangeStart);
+    const end = Number(resource.indexRangeEnd);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) {
+      Logger.error(TAG, `prepareDashSegments: missing indexRange itag=${resource.id}`);
+      return false;
+    }
+    const maxAttempts = 4;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        if (attempt > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 250 * attempt));
+        }
+        const bytes = await fetchYoutubeRangeBytes(resource, start, end);
+        resource.dashSegments = parseYoutubeDashIndex(bytes, start);
+        Logger.info(TAG, `prepared DASH SIDX itag=${resource.id} segments=${resource.dashSegments.length} `
+          + `range=${start}-${end} attempt=${attempt + 1}`);
+        return true;
+      } catch (e) {
+        resource.dashSegments = undefined;
+        Logger.warn(TAG, `DASH SIDX attempt=${attempt + 1}/${maxAttempts} itag=${resource.id}: ${e}`);
+      }
+    }
+    return false;
   }
 
   /**
    * SABR dual session: attach UMP session buffers to local proxy paths
-   * /session/{id}/video/0 and /audio/0 for EDL playback.
+   * /session/{id}/sabr/{video|audio}/… for static DASH segment playback.
    */
   static async createSabrDualSession(
     video: StreamInfo,
@@ -206,20 +286,6 @@ export class LocalMediaProxy {
     }
   }
 
-  static async refreshYoutubeDualUrlSession(sessionId: string, video: StreamInfo, audio: StreamInfo, durationMs?: number): Promise<string> {
-    if (!await LocalMediaProxy.ensureServer()) return '';
-    const input: LocalMediaSessionInput = {
-      type: 'youtube-dual',
-      userAgent: DEFAULT_USER_AGENT,
-      durationMs: durationMs || video.approxDurationMs || audio.approxDurationMs || 0,
-      videos: [LocalMediaProxy.fromStream(video, false)],
-      audios: [LocalMediaProxy.fromStream(audio, true)],
-    };
-    const ok = localProxyServer.refreshSession(sessionId, JSON.stringify(input));
-    if (!ok) return '';
-    return localProxyServer.playbackUrl(sessionId);
-  }
-
   static getPlaybackUrl(sessionId: string): string {
     return localProxyServer.playbackUrl(sessionId);
   }
@@ -242,10 +308,6 @@ export class LocalMediaProxy {
 
   static stopAll(): void {
     localProxyServer.destroyAll();
-  }
-
-  static setSessionRefreshCallback(sessionId: string, callback: () => Promise<boolean>): void {
-    localProxyServer.setSessionRefreshCallback(sessionId, callback);
   }
 
   private static async createSession(inputJson: string): Promise<string> {
@@ -310,12 +372,33 @@ export class LocalMediaProxy {
   }
 
   private static userAgentForClient(sourceClient?: string): string {
+    // Keys match youtube_core YoutubePlayerClientKey / StreamInfo.sourceClient.
     switch (sourceClient) {
-      case 'android': return ANDROID_USER_AGENT;
-      case 'ios': return IOS_USER_AGENT;
-      case 'safari': return SAFARI_USER_AGENT;
-      case 'tv': return TV_USER_AGENT;
-      default: return DEFAULT_USER_AGENT;
+      case 'android':
+      case 'ANDROID':
+        return ANDROID_USER_AGENT;
+      case 'android_vr':
+      case 'ANDROID_VR':
+        // RangeProxy overrides ANDROID_VR to getAndroidUserAgent for videoplayback;
+        // keep extraction UA for non-range uses / logging.
+        return ANDROID_VR_USER_AGENT;
+      case 'ios':
+      case 'IOS':
+        return IOS_USER_AGENT;
+      case 'web_safari':
+      case 'safari':
+        return SAFARI_USER_AGENT;
+      case 'mweb':
+      case 'MWEB':
+        return MWEB_USER_AGENT;
+      case 'tv_downgraded':
+      case 'TVHTML5':
+        return TV_DOWNGRADED_USER_AGENT;
+      case 'tv':
+      case 'TVHTML5_SIMPLY_EMBEDDED_PLAYER':
+        return TV_USER_AGENT;
+      default:
+        return DEFAULT_USER_AGENT;
     }
   }
 

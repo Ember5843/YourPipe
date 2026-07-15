@@ -1,5 +1,10 @@
 import { AppLog } from './AppLog';
-import { StreamInfo, muxAudioVideo } from 'mediaservice';
+import {
+  StreamInfo,
+  muxAudioVideo,
+  SabrOfflineDownloader,
+  SabrOfflineProgress
+} from 'mediaservice';
 import common from '@ohos.app.ability.common';
 import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
@@ -7,6 +12,7 @@ import { notificationManager } from '@kit.NotificationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { taskpool } from '@kit.ArkTS';
 import { UIConfig } from './AppState';
+import { AuthSessionManager } from 'youtube_core';
 
 const logger = AppLog.getInstance('DownloadManager');
 const DOWNLOAD_ROOT: string = 'downloads';
@@ -549,6 +555,163 @@ export class DownloadManager {
     return kind === 'manifest_hls' || delivery === 'HLS';
   }
 
+  private isSabrStream(stream: StreamInfo): boolean {
+    return SabrOfflineDownloader.isSabrStream(stream);
+  }
+
+  /**
+   * SABR offline: reuse playback SabrOfflineDownloader (UMP session + SabrTrackBuffer).
+   * Requires sabrSessionStore HTTP/PO wiring from YouTubePlayService.initialize().
+   */
+  private async downloadSabrStreams(task: DownloadTask): Promise<void> {
+    if (!task.audioStream) {
+      task.status = DownloadStatus.FAILED;
+      task.errorMessage = 'SABR download requires paired audio track';
+      this.publishDownloadNotification(task, true);
+      return;
+    }
+    if (!SabrOfflineDownloader.isSabrStream(task.videoStream)
+      || !SabrOfflineDownloader.isSabrStream(task.audioStream)) {
+      task.status = DownloadStatus.FAILED;
+      task.errorMessage = 'SABR bootstrap missing (sabrInfo)';
+      this.publishDownloadNotification(task, true);
+      return;
+    }
+
+    task.taskDir = this.ensureTaskDir(task);
+    const videoExt = this.getFileExtension(task.videoStream);
+    const audioExt = this.getFileExtension(task.audioStream);
+    task._videoFilePath = `${task.taskDir}/video.${videoExt}`;
+    task._audioFilePath = `${task.taskDir}/audio.${audioExt}`;
+    logger.info(`Task ${task.id} SABR download start: video=${this.getStreamLogLabel(task.videoStream)} `
+      + `audio=${this.getStreamLogLabel(task.audioStream)}`);
+    this.showToast(`开始下载：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+
+    const videoFile = fs.openSync(task._videoFilePath,
+      fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+    const audioFile = fs.openSync(task._audioFilePath,
+      fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+    let videoFileOpen = true;
+    let audioFileOpen = true;
+
+    const writeTo = (file: fs.File, data: Uint8Array): void => {
+      // Copy to a tight ArrayBuffer — writeSync expects ArrayBuffer, not a view offset.
+      const copy = new ArrayBuffer(data.byteLength);
+      new Uint8Array(copy).set(data);
+      fs.writeSync(file.fd, copy);
+    };
+
+    try {
+      task.status = DownloadStatus.DOWNLOADING_VIDEO;
+      this.publishDownloadNotification(task, true);
+
+      const durationMs = Math.max(
+        task.videoStream.approxDurationMs || 0,
+        task.audioStream.approxDurationMs || 0
+      );
+      const useAuth = AuthSessionManager.getInstance()?.isSignedIn() === true;
+
+      await SabrOfflineDownloader.downloadTracks({
+        video: task.videoStream,
+        audio: task.audioStream,
+        durationMs: durationMs > 0 ? durationMs : undefined,
+        useAuth: useAuth,
+        isCancelled: (): boolean => task._cancelled,
+        writeVideo: (data: Uint8Array): void => {
+          writeTo(videoFile, data);
+        },
+        writeAudio: (data: Uint8Array): void => {
+          writeTo(audioFile, data);
+        },
+        onProgress: (p: SabrOfflineProgress): void => {
+          if (task._cancelled) {
+            return;
+          }
+          const videoAdvanced = p.videoBytes > task.videoDownloadedSize;
+          const audioAdvanced = p.audioBytes > task.audioDownloadedSize;
+          if (videoAdvanced) {
+            task.status = DownloadStatus.DOWNLOADING_VIDEO;
+            const totalHint = task.videoStream.contentLength || 0;
+            if (totalHint > 0) {
+              task.updateProgress(p.videoBytes, totalHint, 'video');
+            } else {
+              task.videoProgress = p.percent;
+              task.videoDownloadedSize = p.videoBytes;
+            }
+          }
+          if (audioAdvanced) {
+            task.status = DownloadStatus.DOWNLOADING_AUDIO;
+            const totalHint = task.audioStream?.contentLength || 0;
+            if (totalHint > 0) {
+              task.updateProgress(p.audioBytes, totalHint, 'audio');
+            } else {
+              task.audioProgress = p.percent;
+              task.audioDownloadedSize = p.audioBytes;
+            }
+          }
+          task.downloadedSize = task.videoDownloadedSize + task.audioDownloadedSize;
+          task.progress = Math.min(95, Math.round(
+            task.videoProgress * 0.7 + task.audioProgress * 0.25));
+          this.publishDownloadNotification(task);
+        }
+      });
+
+      if (task._cancelled) {
+        return;
+      }
+
+      // Match the DASH path: finish and close both independent track files
+      // before FFmpeg opens them for muxing.
+      fs.closeSync(videoFile);
+      videoFileOpen = false;
+      fs.closeSync(audioFile);
+      audioFileOpen = false;
+
+      task.status = DownloadStatus.MERGING;
+      task.updateMergeProgress(5);
+      logger.info(`Task ${task.id} SABR merging`);
+      this.publishDownloadNotification(task, true);
+
+      task.outputPath = await this.mergeOrCopy(task);
+      task.status = DownloadStatus.COMPLETED;
+      task.progress = 100;
+      task.videoProgress = 100;
+      task.audioProgress = 100;
+      task.mergeProgress = 100;
+      this.cleanupTaskFiles(task, false);
+      logger.info(`Task ${task.id} SABR completed: output=${task.outputPath}`);
+      this.publishDownloadNotification(task, true);
+      const exportedPath = await this.runAutoExportAtTaskEnd(task);
+      if (exportedPath) {
+        this.showToast(`已保存到下载：${this.truncateNotificationText(this.getFileName(exportedPath), 36)}`);
+      } else {
+        this.showToast(`下载完成：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+      }
+    } catch (error) {
+      if (task._cancelled || this.getErrorMessage(error) === 'cancelled') {
+        task.status = DownloadStatus.CANCELLED;
+        return;
+      }
+      task.status = DownloadStatus.FAILED;
+      task.errorMessage = this.getErrorMessage(error);
+      logger.error(`Task ${task.id} SABR failed: ${task.errorMessage}`);
+      this.publishDownloadNotification(task, true);
+    } finally {
+      if (videoFileOpen) {
+        try {
+          fs.closeSync(videoFile);
+        } catch (_e) {
+        }
+      }
+      if (audioFileOpen) {
+        try {
+          fs.closeSync(audioFile);
+        } catch (_e) {
+        }
+      }
+    }
+  }
+
   private async downloadHlsStream(task: DownloadTask): Promise<void> {
     logger.info(`Task ${task.id} HLS download start: stream=${this.getStreamLogLabel(task.videoStream)}`);
     task.status = DownloadStatus.DOWNLOADING_VIDEO;
@@ -678,6 +841,11 @@ export class DownloadManager {
 
     if (this.isHlsStream(task.videoStream)) {
       await this.downloadHlsStream(task);
+      return;
+    }
+
+    if (this.isSabrStream(task.videoStream)) {
+      await this.downloadSabrStreams(task);
       return;
     }
 

@@ -78,8 +78,6 @@ export class AvPlayerController {
   private isRecovering: boolean = false;
   private readonly MAX_ERROR_RETRIES = 2;
   private lastKnownGoodPosition: number = 0;
-  /** Terminal error exposed to UI. Transient engine errors stay diagnostic-only during recovery. */
-  private userVisibleErrorMsg: string = '';
 
   // Audio focus state (player-side handler for system hints — scheme A)
   /** Temporary focus loss (PAUSE): auto-resume on RESUME. */
@@ -89,7 +87,6 @@ export class AvPlayerController {
   private duckActive: boolean = false;
   /** Snapshot for diagnostics / future UI; system owns duck gain on AudioSession path. */
   private savedVolume: number = 100;
-  public onRequestRefreshStreams?: (videoId: string, resumePos: number) => Promise<VideoData | null>;
   public onErrorNeedsUserAction?: (errorMsg: string) => void;
 
   get playerState(): PlayerState {
@@ -157,7 +154,7 @@ export class AvPlayerController {
 
   public addErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners.push(listener); }
   public removeErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners = this.errorListeners.filter(l => l !== listener); }
-  public getUserVisibleError(): string { return this.userVisibleErrorMsg; }
+  public getUserVisibleError(): string { return this.vm.userVisibleErrorMsg; }
   public addWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners.push(listener); }
   public removeWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners = this.waitingForBufferListeners.filter(l => l !== listener); }
   public addSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners.push(listener); }
@@ -266,10 +263,6 @@ export class AvPlayerController {
       + `${audio.audioTrackName || audio.audioLanguage || '-'} itag=${audio.itag} `
       + `track=${audio.audioTrackId || '-'}`);
     await this.switchQuality(video, audio);
-  }
-
-  public setRefreshHandler(handler: (videoId: string, resumePos: number) => Promise<VideoData | null>): void {
-    this.onRequestRefreshStreams = handler;
   }
 
   public setPendingStartFromSec(sec: number): void {
@@ -890,7 +883,7 @@ export class AvPlayerController {
 
       case 'DASH':
         if (audio && this.isSeparatedDash(video, audio)) {
-          return await this.buildDualEdlUrl(video, audio);
+          return await this.buildDualDashUrl(video, audio);
         }
         return await this.buildSingleProxyUrl(video);
 
@@ -943,67 +936,29 @@ export class AvPlayerController {
     }
   }
 
-  private async buildDualEdlUrl(video: StreamInfo, audio: StreamInfo): Promise<string> {
+  /** Dual adaptive VOD: static local DASH only. No EDL fallback. */
+  private async buildDualDashUrl(video: StreamInfo, audio: StreamInfo): Promise<string> {
     const durationMs = this.resolveDurationMs(video, audio);
     if (durationMs <= 0) {
-      Logger.error(TAG, `buildDualEdlUrl: dual stream with unknown duration, refusing to build EDL`);
+      Logger.error(TAG, `buildDualDashUrl: dual stream with unknown duration, refusing`);
       return '';
     }
-    Logger.info(TAG, `buildDualEdlUrl: video=[itag=${video.itag} ${video.quality} ${video.codecs}] audio=[itag=${audio.itag} ${audio.codecs}] durationMs=${durationMs}`);
+    if (!this.hasSegmentBase(video) || !this.hasSegmentBase(audio)) {
+      Logger.error(TAG, `buildDualDashUrl: missing init/index range video=${video.itag} audio=${audio.itag}, DASH-only mode`);
+      return '';
+    }
+    Logger.info(TAG, `buildDualDashUrl: video=[itag=${video.itag} ${video.quality} ${video.codecs}] audio=[itag=${audio.itag} ${audio.codecs}] durationMs=${durationMs}`);
 
     const sessionId = await LocalMediaProxy.createYoutubeDualUrlSession(video, audio, durationMs);
-    const playbackUrl = LocalMediaProxy.getPlaybackUrl(sessionId);
-    if (!playbackUrl.startsWith('http://127.0.0.1:')) {
-      Logger.error(TAG, `buildDualEdlUrl: invalid playbackUrl="${playbackUrl}" sessionId=${sessionId}`);
+    const manifestUrl = LocalMediaProxy.getDashManifestUrl(sessionId);
+    if (!manifestUrl.startsWith('http://127.0.0.1:')) {
+      Logger.error(TAG, `buildDualDashUrl: static DASH unavailable sessionId=${sessionId}`);
       LocalMediaProxy.destroySession(sessionId);
       return '';
     }
     this.currentLocalMediaSessionId = sessionId;
-
-    // 设置 URL 刷新回调：当 proxy 检测到 411 时，重新提取流 URL 并更新 session
-    LocalMediaProxy.setSessionRefreshCallback(sessionId, async (): Promise<boolean> => {
-      try {
-        Logger.info(TAG, `URL refresh triggered for session=${sessionId}`);
-        const videoId: string | undefined = this.curSource.videoId;
-        if (!videoId || !this.onRequestRefreshStreams) {
-          Logger.warn(TAG, `URL refresh: missing videoId or refresh callback`);
-          return false;
-        }
-        const refreshed: VideoData | null = await this.onRequestRefreshStreams(videoId, this.playbackEngine.getState().currentTime);
-        if (!refreshed?.streams) {
-          Logger.warn(TAG, `URL refresh: failed to get new streams`);
-          return false;
-        }
-        const newVideo: StreamInfo | undefined = refreshed.streams.find((s: StreamInfo) => s.itag === video.itag);
-        const newAudio: StreamInfo | undefined = refreshed.streams.find((s: StreamInfo) => s.itag === audio.itag);
-        if (!newVideo || !newAudio) {
-          Logger.warn(TAG, `URL refresh: failed to find matching itags video=${video.itag} audio=${audio.itag}`);
-          return false;
-        }
-        const ok: string = await LocalMediaProxy.refreshYoutubeDualUrlSession(sessionId, newVideo, newAudio, durationMs);
-        if (!ok) {
-          Logger.warn(TAG, `URL refresh: refreshYoutubeDualUrlSession failed`);
-          return false;
-        }
-        Logger.info(TAG, `URL refresh succeeded for session=${sessionId}`);
-        return true;
-      } catch (e) {
-        Logger.error(TAG, `URL refresh error: ${e}`);
-        return false;
-      }
-    });
-
-    if (this.hasSegmentBase(video) && this.hasSegmentBase(audio)) {
-      const manifestUrl = LocalMediaProxy.getDashManifestUrl(sessionId);
-      if (manifestUrl.startsWith('http://127.0.0.1:')) {
-        Logger.info(TAG, `buildDualEdlUrl: using DASH SegmentBase manifest=${manifestUrl}`);
-        return manifestUrl;
-      }
-      Logger.warn(TAG, `buildDualEdlUrl: DASH manifest unavailable, falling back to EDL`);
-    } else {
-      Logger.warn(TAG, `buildDualEdlUrl: missing init/index range, falling back to EDL`);
-    }
-    return this.composeDualEdl(playbackUrl, video, audio, durationMs);
+    Logger.info(TAG, `buildDualDashUrl: using static DASH manifest=${manifestUrl}`);
+    return manifestUrl;
   }
 
   private hasSegmentBase(stream: StreamInfo): boolean {
@@ -1014,44 +969,6 @@ export class AvPlayerController {
     return !stream.isOtf
       && initStart !== undefined && initEnd !== undefined && initStart >= 0 && initEnd >= initStart
       && indexStart !== undefined && indexEnd !== undefined && indexStart >= 0 && indexEnd >= indexStart;
-  }
-
-  private composeDualEdl(
-    playbackUrl: string,
-    video: StreamInfo,
-    audio: StreamInfo,
-    durationMs: number
-  ): string {
-    const baseUrl = playbackUrl;
-    const vUrl = `${baseUrl}/video/0`;
-    const aUrl = `${baseUrl}/audio/0`;
-    const durationSec = (durationMs / 1000).toFixed(3);
-
-    const vCodec = this.codecToMpv(video.codecs || '');
-    const vw = video.width || 0;
-    const vh = video.height || 0;
-    const vfps = video.fps || 0;
-    const vbr = video.bitrate || 0;
-    const aCodec = this.codecToMpv(audio.codecs || '');
-    const abr = audio.bitrate || 0;
-
-    const parts: string[] = [];
-    parts.push('!new_stream', '!no_clip', '!no_chapters');
-    let vDelay = `!delay_open,media_type=video,codec=${vCodec}`;
-    if (vw > 0) vDelay += `,w=${vw}`;
-    if (vh > 0) vDelay += `,h=${vh}`;
-    if (vfps > 0) vDelay += `,fps=${vfps}`;
-    parts.push(vDelay);
-    if (vbr > 0) parts.push(`!track_meta,title=${video.quality || 'video'},byterate=${Math.floor(vbr / 8)}`);
-    parts.push(`${vUrl},length=${durationSec}`);
-    parts.push('!new_stream', '!no_clip', '!no_chapters');
-    parts.push(`!delay_open,media_type=audio,codec=${aCodec}`);
-    if (abr > 0) parts.push(`!track_meta,title=${audio.quality || 'audio'},byterate=${Math.floor(abr / 8)}`);
-    parts.push(`${aUrl},length=${durationSec}`);
-
-    const edlUrl = 'edl://' + parts.join(';') + ';';
-    Logger.info(TAG, `composeDualEdl: edl=${edlUrl.substring(0, 300)}`);
-    return edlUrl;
   }
 
   /**
@@ -1421,13 +1338,7 @@ export class AvPlayerController {
       try {
         await this.sleep(800);
         if (!this.isActive()) return;
-        if (category === 'url_expired') {
-          await this.refreshAndReplay(resumePos);
-        } else if (this.errorRetryCount > 1) {
-          await this.refreshAndReplay(resumePos);
-        } else {
-          this.retryPlayback(resumePos);
-        }
+        this.retryPlayback(resumePos);
       } finally {
         this.isRecovering = false;
       }
@@ -1450,43 +1361,6 @@ export class AvPlayerController {
     this.playbackEngine.load(playbackUrl, resumePos);
     if (this.vm.isPlaying) {
       this.playbackEngine.play();
-    }
-  }
-
-  private async refreshAndReplay(resumePos: number): Promise<void> {
-    const videoId = this.curSource.videoId;
-    if (!videoId || !this.onRequestRefreshStreams) {
-      Logger.warn(TAG, 'Cannot refresh: no videoId or no refresh handler');
-      this.retryPlayback(resumePos);
-      return;
-    }
-    try {
-      const refreshed = await this.onRequestRefreshStreams(videoId, resumePos);
-      if (!refreshed || !refreshed.streams || refreshed.streams.length === 0) {
-        Logger.warn(TAG, 'Refresh returned no streams, falling back to retry');
-        this.retryPlayback(resumePos);
-        return;
-      }
-      Logger.info(TAG, `Streams refreshed, ${refreshed.streams.length} streams available`);
-      this.curSource = refreshed;
-      this.vm.playerModel.classifyStreams(refreshed.streams);
-      if (!this.selectInitialStreams(refreshed.isLive === true)) {
-        this.setError('[PLAYER] REFRESH_NO_STREAM');
-        return;
-      }
-      const current = this.vm.playerModel.getCurrentStreams();
-      const playbackUrl = await this.createPlaybackUrl(current.video, current.audio);
-      if (!playbackUrl) {
-        this.setError('[PLAYER] REFRESH_PROXY_FAILED');
-        return;
-      }
-      this.playbackEngine.load(playbackUrl, resumePos);
-      if (this.vm.isPlaying) {
-        this.playbackEngine.play();
-      }
-    } catch (e) {
-      Logger.error(TAG, `refreshAndReplay failed: ${e}`);
-      this.retryPlayback(resumePos);
     }
   }
 
@@ -1521,8 +1395,8 @@ export class AvPlayerController {
   }
 
   private publishUserVisibleError(error: string): void {
-    if (this.userVisibleErrorMsg === error) return;
-    this.userVisibleErrorMsg = error;
+    if (this.vm.userVisibleErrorMsg === error) return;
+    this.vm.userVisibleErrorMsg = error;
     this.errorListeners.forEach(l => l(error));
   }
 

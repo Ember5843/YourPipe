@@ -157,6 +157,39 @@ async function routeRequest(
     }
   }
 
+  // Preprocessed YouTube DASH SegmentTemplate: /session/{id}/video|audio/0/{init|N}
+  // Only exact SIDX byte ranges — never open whole-file Range (403 / seek storms).
+  if (session.type === 'youtube-dual' && parts.length >= 5
+    && (segment === 'video' || segment === 'audio')) {
+    const idx = parseInt(parts[3], 10) || 0;
+    const resources = segment === 'video' ? session.videos : session.audios;
+    if (idx < resources.length) {
+      const resource = resources[idx];
+      const name = parts[4];
+      let exactRange = '';
+      if (name === 'init') {
+        exactRange = `bytes=${resource.initRangeStart}-${resource.initRangeEnd}`;
+      } else {
+        const sequence = parseInt(name, 10);
+        const dashSegment = resource.dashSegments?.find((item) => item.sequence === sequence);
+        if (dashSegment) exactRange = `bytes=${dashSegment.start}-${dashSegment.end}`;
+      }
+      if (exactRange) {
+        await serveRange(conn, resource, exactRange, method === 'HEAD', true);
+        return;
+      }
+      Logger.warn(TAG, `youtube-dual unknown segment ${segment}/${idx}/${name}`);
+      await sendText(conn, 404, 'Not Found', 'text/plain', 'segment not found');
+      return;
+    }
+  }
+
+  // youtube-dual must not fall through to open byte-range progressive endpoints.
+  if (session.type === 'youtube-dual') {
+    await sendText(conn, 404, 'Not Found', 'text/plain', 'youtube-dual exact segments only');
+    return;
+  }
+
   if (parts.length >= 4) {
     const idx = parseInt(parts[3], 10) || 0;
     if (segment === 'video' && idx < session.videos.length) {
@@ -164,7 +197,7 @@ async function routeRequest(
       if (resource.isOtf) {
         Logger.warn(TAG, `OTF resource requested through byte-range endpoint: video/${idx}`);
       }
-      await serveRange(conn, resource, rangeHeader, method === 'HEAD', session);
+      await serveRange(conn, resource, rangeHeader, method === 'HEAD');
       return;
     }
     if (segment === 'audio' && session.hasAudio && idx < session.audios.length) {
@@ -172,11 +205,11 @@ async function routeRequest(
       if (resource.isOtf) {
         Logger.warn(TAG, `OTF resource requested through byte-range endpoint: audio/${idx}`);
       }
-      await serveRange(conn, resource, rangeHeader, method === 'HEAD', session);
+      await serveRange(conn, resource, rangeHeader, method === 'HEAD');
       return;
     }
     if (segment === 'resource' && parts[3] === 'main') {
-      await serveRange(conn, session.single, rangeHeader, method === 'HEAD', session);
+      await serveRange(conn, session.single, rangeHeader, method === 'HEAD');
       return;
     }
   }
@@ -249,34 +282,6 @@ export class LocalProxyServer {
     return id;
   }
 
-  refreshSession(sessionId: string, inputJson: string): boolean {
-    if (!sessionId) return false;
-    const session = parseInputJson(inputJson);
-    const valid = session.type === 'single'
-      ? !!session.single.url
-      : (session.videos.length > 0 && session.audios.length > 0);
-    if (!valid) {
-      Logger.warn(TAG, `refreshSession: invalid input sessionId=${sessionId}`);
-      return false;
-    }
-    session.id = sessionId;
-    // 保留已有的 refreshUrls 回调
-    const existing = sessionStore.get(sessionId);
-    if (existing?.refreshUrls) {
-      session.refreshUrls = existing.refreshUrls;
-    }
-    sessionStore.add(session);
-    Logger.info(TAG, `refreshSession: id=${sessionId} type=${session.type}`);
-    return true;
-  }
-
-  setSessionRefreshCallback(sessionId: string, callback: () => Promise<boolean>): void {
-    const session = sessionStore.get(sessionId);
-    if (session) {
-      session.refreshUrls = callback;
-    }
-  }
-
   destroySession(sessionId: string): void {
     Logger.debug(TAG, `destroySession: id=${sessionId}`);
     const session = sessionStore.get(sessionId);
@@ -313,6 +318,15 @@ export class LocalProxyServer {
     if (!this.running || !sessionId) return '';
     const session = sessionStore.get(sessionId);
     if (!session || (session.type !== 'youtube-dual' && session.type !== 'sabr-dual')) return '';
+    if (session.type === 'youtube-dual') {
+      // Only SIDX-backed SegmentTemplate (exact media segments). No SegmentBase.
+      if (!session.video.dashSegments?.length || !session.audio.dashSegments?.length) {
+        Logger.info(TAG, `dashManifestUrl: SIDX SegmentTemplate unavailable, reject id=${sessionId}`);
+        return '';
+      }
+      Logger.info(TAG, `dashManifestUrl: mode=SegmentTemplate id=${sessionId} `
+        + `vSeg=${session.video.dashSegments.length} aSeg=${session.audio.dashSegments.length}`);
+    }
     return `http://127.0.0.1:${this.port}/session/${sessionId}/manifest.mpd`;
   }
 }

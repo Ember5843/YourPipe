@@ -1020,18 +1020,26 @@
                        "name":  "yt_download_mode_dash",
                        "value":  "Separate Tracks (DASH)"
                    },
-                   {
-                       "name":  "yt_download_mode_hls",
-                       "value":  "HLS Stream"
-                   },
-                   {
-                       "name":  "yt_download_progressive_hint",
-                       "value":  "Recommended: video and audio already merged"
-                   },
-                   {
-                       "name":  "yt_download_dash_hint",
-                       "value":  "Video and audio downloaded separately, then merged"
-                   },
+                    {
+                        "name":  "yt_download_mode_hls",
+                        "value":  "HLS Stream"
+                    },
+                    {
+                        "name":  "yt_download_mode_sabr",
+                        "value":  "SABR Tracks"
+                    },
+                    {
+                        "name":  "yt_download_progressive_hint",
+                        "value":  "Recommended: video and audio already merged"
+                    },
+                    {
+                        "name":  "yt_download_dash_hint",
+                        "value":  "Video and audio downloaded separately, then merged"
+                    },
+                    {
+                        "name":  "yt_download_sabr_hint",
+                        "value":  "Fetch A/V via SABR/UMP session segments, then merge (same stack as playback)"
+                    },
                    {
                        "name":  "yt_download_estimated_size",
                        "value":  "Estimated size"

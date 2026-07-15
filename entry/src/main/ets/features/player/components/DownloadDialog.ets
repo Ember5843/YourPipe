@@ -7,11 +7,14 @@ export interface DownloadSelection {
   audio?: StreamInfo;
   progressive?: StreamInfo;
   hls?: StreamInfo;
+  /** True when selected video/audio are SABR (UMP session download). */
+  sabr?: boolean;
 }
 
 enum DownloadMode {
   PROGRESSIVE = 'PROGRESSIVE',
   DASH_TRACKS = 'DASH_TRACKS',
+  SABR_TRACKS = 'SABR_TRACKS',
   HLS = 'HLS'
 }
 
@@ -44,21 +47,37 @@ export struct DownloadDialog {
   onCancel: () => void = () => {};
 
   aboutToAppear() {
-    this.videoStreams = this.streamCategories?.video || [];
+    const allVideo = this.streamCategories?.video || [];
+    this.videoStreams = this.isSabrModePreferred(allVideo)
+      ? allVideo.filter((s: StreamInfo) => this.isSabrStream(s))
+      : allVideo.filter((s: StreamInfo) => !this.isSabrStream(s));
+    // If only SABR or only DASH available, fall back to all video streams of that family.
+    if (this.videoStreams.length === 0) {
+      this.videoStreams = allVideo;
+    }
 
     if (this.streamCategories?.progressive && this.streamCategories.progressive.length > 0) {
       this.selectedMode = DownloadMode.PROGRESSIVE;
       this.selectedProgressive = this.getStreamLabel(this.streamCategories.progressive[0]);
-    } else if (this.videoStreams.length > 0) {
+    } else if (this.hasSabrTracks()) {
+      this.selectedMode = DownloadMode.SABR_TRACKS;
+      this.videoStreams = allVideo.filter((s: StreamInfo) => this.isSabrStream(s));
+      if (this.videoStreams.length > 0) {
+        this.selectedDashVideo = this.getStreamLabel(this.videoStreams[0]);
+      }
+    } else if (this.hasDashTracks()) {
       this.selectedMode = DownloadMode.DASH_TRACKS;
-      this.selectedDashVideo = this.getStreamLabel(this.videoStreams[0]);
+      this.videoStreams = allVideo.filter((s: StreamInfo) => !this.isSabrStream(s));
+      if (this.videoStreams.length > 0) {
+        this.selectedDashVideo = this.getStreamLabel(this.videoStreams[0]);
+      }
     } else if (this.streamCategories?.hlsManifest && this.streamCategories.hlsManifest.length > 0) {
       this.selectedMode = DownloadMode.HLS;
       this.selectedHls = this.getStreamLabel(this.streamCategories.hlsManifest[0]);
     }
 
     if (this.streamCategories?.audio && this.streamCategories.audio.length > 0) {
-      const tracks = this.getAudioTrackLabels(this.streamCategories.audio);
+      const tracks = this.getAudioTrackLabels(this.getModeAudioPool());
       this.audioTrackOptions = tracks.map((track: ResourceStr) => ({ value: track } as SelectOption));
       if (tracks.length > 0) {
         this.selectedAudioTrack = tracks[0];
@@ -100,29 +119,30 @@ export struct DownloadDialog {
                 let pos = 0;
                 if (this.streamCategories?.progressive?.length) {
                   if (index === pos) {
-                    this.selectedMode = DownloadMode.PROGRESSIVE;
-                    this.selectedProgressive = this.getStreamLabel(this.streamCategories.progressive[0]);
-                    this.updateEstimatedSize();
+                    this.applyMode(DownloadMode.PROGRESSIVE);
                     return;
                   }
                   pos++;
                 }
-                if (this.videoStreams.length > 0) {
+                if (this.hasDashTracks()) {
                   if (index === pos) {
-                    this.selectedMode = DownloadMode.DASH_TRACKS;
-                    this.selectedDashVideo = this.getStreamLabel(this.videoStreams[0]);
-                    this.updateEstimatedSize();
+                    this.applyMode(DownloadMode.DASH_TRACKS);
+                    return;
+                  }
+                  pos++;
+                }
+                if (this.hasSabrTracks()) {
+                  if (index === pos) {
+                    this.applyMode(DownloadMode.SABR_TRACKS);
                     return;
                   }
                   pos++;
                 }
                 if (this.streamCategories?.hlsManifest?.length) {
                   if (index === pos) {
-                    this.selectedMode = DownloadMode.HLS;
-                    this.selectedHls = this.getStreamLabel(this.streamCategories.hlsManifest[0]);
+                    this.applyMode(DownloadMode.HLS);
                   }
                 }
-                this.updateEstimatedSize();
               })
           }
           .width('100%')
@@ -171,7 +191,8 @@ export struct DownloadDialog {
             .width('100%')
           }
 
-          if (this.selectedMode === DownloadMode.DASH_TRACKS) {
+          if (this.selectedMode === DownloadMode.DASH_TRACKS
+            || this.selectedMode === DownloadMode.SABR_TRACKS) {
             this.SectionHeader($r('app.string.yt_download_step2_tracks'))
 
             if (this.videoStreams.length > 0) {
@@ -199,7 +220,7 @@ export struct DownloadDialog {
               .width('100%')
             }
 
-            if (this.streamCategories?.audio && this.streamCategories.audio.length > 0) {
+            if (this.getModeAudioPool().length > 0) {
               if (this.audioTrackOptions.length > 1) {
                 Column() {
                   Text($r('app.string.yt_player_audio_language_type'))
@@ -219,7 +240,8 @@ export struct DownloadDialog {
                     .borderRadius(8)
                     .onSelect((_index: number, value: string) => {
                       this.selectedAudioTrack = value;
-                      this.filteredAudioStreams = this.getFilteredAudioStreams(this.streamCategories!.audio, value);
+                      this.filteredAudioStreams =
+                        this.getFilteredAudioStreams(this.getModeAudioPool(), value);
                       if (this.filteredAudioStreams.length > 0) {
                         this.selectedDashAudio = this.getStreamLabel(this.filteredAudioStreams[0]);
                       }
@@ -253,7 +275,9 @@ export struct DownloadDialog {
               .width('100%')
             }
 
-            Text($r('app.string.yt_download_dash_hint'))
+            Text(this.selectedMode === DownloadMode.SABR_TRACKS
+              ? $r('app.string.yt_download_sabr_hint')
+              : $r('app.string.yt_download_dash_hint'))
               .fontSize(11)
               .fontColor($r('app.color.yourtube_text_hint'))
               .width('100%')
@@ -355,13 +379,94 @@ export struct DownloadDialog {
     .width('100%')
   }
 
+  private isSabrStream(stream: StreamInfo): boolean {
+    const delivery = (stream.deliveryMethod || '').toUpperCase();
+    const kind = (stream.kind || '').toLowerCase();
+    return delivery === 'SABR' || kind === 'sabr' || !!stream.sabrInfo?.serverAbrStreamingUrl;
+  }
+
+  private hasSabrTracks(): boolean {
+    const videos = this.streamCategories?.video || [];
+    const audios = this.streamCategories?.audio || [];
+    return videos.some((s: StreamInfo) => this.isSabrStream(s))
+      && audios.some((s: StreamInfo) => this.isSabrStream(s));
+  }
+
+  private hasDashTracks(): boolean {
+    const videos = this.streamCategories?.video || [];
+    const audios = this.streamCategories?.audio || [];
+    return videos.some((s: StreamInfo) => !this.isSabrStream(s) && !!s.url)
+      && audios.some((s: StreamInfo) => !this.isSabrStream(s) && !!s.url);
+  }
+
+  private isSabrModePreferred(videos: StreamInfo[]): boolean {
+    const sabrCount = videos.filter((s: StreamInfo) => this.isSabrStream(s)).length;
+    return sabrCount > 0 && sabrCount >= videos.length / 2;
+  }
+
+  private getModeAudioPool(): StreamInfo[] {
+    const all = this.streamCategories?.audio || [];
+    if (this.selectedMode === DownloadMode.SABR_TRACKS) {
+      return all.filter((s: StreamInfo) => this.isSabrStream(s));
+    }
+    if (this.selectedMode === DownloadMode.DASH_TRACKS) {
+      return all.filter((s: StreamInfo) => !this.isSabrStream(s));
+    }
+    return all;
+  }
+
+  private applyMode(mode: DownloadMode): void {
+    this.selectedMode = mode;
+    const allVideo = this.streamCategories?.video || [];
+    if (mode === DownloadMode.PROGRESSIVE && this.streamCategories?.progressive?.length) {
+      this.selectedProgressive = this.getStreamLabel(this.streamCategories.progressive[0]);
+    } else if (mode === DownloadMode.HLS && this.streamCategories?.hlsManifest?.length) {
+      this.selectedHls = this.getStreamLabel(this.streamCategories.hlsManifest[0]);
+    } else if (mode === DownloadMode.SABR_TRACKS) {
+      this.videoStreams = allVideo.filter((s: StreamInfo) => this.isSabrStream(s));
+      if (this.videoStreams.length > 0) {
+        this.selectedDashVideo = this.getStreamLabel(this.videoStreams[0]);
+      }
+      const tracks = this.getAudioTrackLabels(this.getModeAudioPool());
+      this.audioTrackOptions = tracks.map((track: ResourceStr) => ({ value: track } as SelectOption));
+      if (tracks.length > 0) {
+        this.selectedAudioTrack = tracks[0];
+      }
+      this.updateFilteredAudioStreams();
+      if (this.filteredAudioStreams.length > 0) {
+        this.selectedDashAudio = this.getStreamLabel(this.filteredAudioStreams[0]);
+      }
+    } else if (mode === DownloadMode.DASH_TRACKS) {
+      this.videoStreams = allVideo.filter((s: StreamInfo) => !this.isSabrStream(s));
+      if (this.videoStreams.length === 0) {
+        this.videoStreams = allVideo;
+      }
+      if (this.videoStreams.length > 0) {
+        this.selectedDashVideo = this.getStreamLabel(this.videoStreams[0]);
+      }
+      const tracks = this.getAudioTrackLabels(this.getModeAudioPool());
+      this.audioTrackOptions = tracks.map((track: ResourceStr) => ({ value: track } as SelectOption));
+      if (tracks.length > 0) {
+        this.selectedAudioTrack = tracks[0];
+      }
+      this.updateFilteredAudioStreams();
+      if (this.filteredAudioStreams.length > 0) {
+        this.selectedDashAudio = this.getStreamLabel(this.filteredAudioStreams[0]);
+      }
+    }
+    this.updateEstimatedSize();
+  }
+
   private getModeOptions(): SelectOption[] {
     const options: SelectOption[] = [];
     if (this.streamCategories?.progressive?.length) {
       options.push({ value: $r('app.string.yt_download_mode_progressive') } as SelectOption);
     }
-    if (this.videoStreams.length > 0) {
+    if (this.hasDashTracks()) {
       options.push({ value: $r('app.string.yt_download_mode_dash') } as SelectOption);
+    }
+    if (this.hasSabrTracks()) {
+      options.push({ value: $r('app.string.yt_download_mode_sabr') } as SelectOption);
     }
     if (this.streamCategories?.hlsManifest?.length) {
       options.push({ value: $r('app.string.yt_download_mode_hls') } as SelectOption);
@@ -375,6 +480,9 @@ export struct DownloadDialog {
     }
     if (mode === DownloadMode.HLS) {
       return $r('app.string.yt_download_mode_hls');
+    }
+    if (mode === DownloadMode.SABR_TRACKS) {
+      return $r('app.string.yt_download_mode_sabr');
     }
     return $r('app.string.yt_download_mode_dash');
   }
@@ -444,9 +552,7 @@ export struct DownloadDialog {
   }
 
   private updateFilteredAudioStreams(): void {
-    if (this.streamCategories?.audio) {
-      this.filteredAudioStreams = this.getFilteredAudioStreams(this.streamCategories.audio);
-    }
+    this.filteredAudioStreams = this.getFilteredAudioStreams(this.getModeAudioPool());
   }
 
   private resourceToString(res: ResourceStr | null | undefined): string {
@@ -496,7 +602,13 @@ export struct DownloadDialog {
 
     selection.video = this.getStreamByLabel(this.videoStreams, this.selectedDashVideo);
     selection.audio = this.getStreamByLabel(this.filteredAudioStreams, this.selectedDashAudio)
-      || (this.streamCategories?.audio ? this.getStreamByLabel(this.streamCategories.audio, this.selectedDashAudio) : undefined);
+      || this.getStreamByLabel(this.getModeAudioPool(), this.selectedDashAudio);
+    if (this.selectedMode === DownloadMode.SABR_TRACKS) {
+      selection.sabr = true;
+      if (!selection.video || !selection.audio) {
+        return null;
+      }
+    }
     return selection.video ? selection : null;
   }
 }

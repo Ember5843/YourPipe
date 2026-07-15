@@ -1196,18 +1196,26 @@
                        "name":  "yt_download_mode_dash",
                        "value":  "分离轨道 (DASH)"
                    },
-                   {
-                       "name":  "yt_download_mode_hls",
-                       "value":  "HLS 流"
-                   },
-                   {
-                       "name":  "yt_download_progressive_hint",
-                       "value":  "推荐：视频和音频已合并，无需额外处理"
-                   },
-                   {
-                       "name":  "yt_download_dash_hint",
-                       "value":  "视频和音频分别下载后自动合并"
-                   },
+                    {
+                        "name":  "yt_download_mode_hls",
+                        "value":  "HLS 流"
+                    },
+                    {
+                        "name":  "yt_download_mode_sabr",
+                        "value":  "SABR 分轨"
+                    },
+                    {
+                        "name":  "yt_download_progressive_hint",
+                        "value":  "推荐：视频和音频已合并，无需额外处理"
+                    },
+                    {
+                        "name":  "yt_download_dash_hint",
+                        "value":  "视频和音频分别下载后自动合并"
+                    },
+                    {
+                        "name":  "yt_download_sabr_hint",
+                        "value":  "通过 SABR/UMP 会话按分片拉取音视频后自动合并（与播放同源）"
+                    },
                    {
                        "name":  "yt_download_estimated_size",
                        "value":  "预计大小"

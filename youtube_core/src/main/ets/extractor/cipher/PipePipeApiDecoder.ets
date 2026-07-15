@@ -164,7 +164,7 @@ export class PipePipeApiDecoder {
     }
 
     const apiMode: string = ApiConfig.isUsingLocalApi() ? 'LOCAL' : 'REMOTE';
-    logger.info('decodeBatch [' + apiMode + ']: sigs=' + uncachedSigs.length + '/' + sigs.length + ' n=' + uncachedNs.length + '/' + nParams.length);
+    logger.info(`[CipherRoute] route=HTTP mode=${apiMode} endpoint=${decodeUrl} player=${playerId} sig=${uncachedSigs.length} n=${uncachedNs.length}`);
 
     const httpRequest = http.createHttp();
     try {

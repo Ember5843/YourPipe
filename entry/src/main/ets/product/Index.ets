@@ -92,7 +92,7 @@ import {
 } from '../features/player/PlaybackContinuationService';
 
 const logger = AppLog.getInstance('Index');
-const APP_VERSION = '0.5.2';
+const APP_VERSION = '0.5.3';
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 
 

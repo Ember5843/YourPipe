@@ -1,4 +1,5 @@
 import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
+import { YoutubeDashSegment } from './YoutubeDashIndex';
 
 export interface StreamResource {
   id: string;
@@ -21,6 +22,7 @@ export interface StreamResource {
   isYoutubePlayback: boolean;
   isOtf: boolean;
   sourceClient: string;
+  dashSegments?: YoutubeDashSegment[];
 }
 
 export type SessionType = 'single' | 'youtube-dual' | 'sabr-dual';
@@ -37,7 +39,6 @@ export interface DashSession {
   hasAudio: boolean;
   stale: boolean;
   cancel?: () => void;
-  refreshUrls?: () => Promise<boolean>;
   /** SABR lease key for session store release. */
   sabrLeaseKey?: string;
   sabrVideoBuffer?: SabrTrackBuffer;

@@ -23,6 +23,8 @@ export class PlayerUiViewModel {
   @Track duration: number = 0;
   @Track durationTime: number = 0;
   @Track errorMsg: string = '';
+  /** Terminal error shown in player UI (transient recovery errors stay off this field). */
+  @Track userVisibleErrorMsg: string = '';
   @Track cachedPercent: number = 0;
   @Track seekableRanges: number[][] = [];
   @Track playbackSpeed: number = 1.0;
@@ -59,6 +61,7 @@ export class PlayerUiViewModel {
     this.duration = 0;
     this.durationTime = 0;
     this.errorMsg = '';
+    this.userVisibleErrorMsg = '';
     this.cachedPercent = 0;
     this.seekableRanges = [];
     this.playbackSpeed = 1.0;

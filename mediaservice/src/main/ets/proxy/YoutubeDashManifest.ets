@@ -26,6 +26,21 @@ export function hasYoutubeSegmentBase(resource: StreamResource): boolean {
     && validRange(resource.indexRangeStart, resource.indexRangeEnd);
 }
 
+/**
+ * SABR-proven template shape: SegmentTemplate + SegmentTimeline.
+ * FFmpeg dash demuxer seeks this far more reliably than SegmentList/SegmentBase.
+ */
+function segmentTemplate(resource: StreamResource): string {
+  const segments = resource.dashSegments || [];
+  if (segments.length === 0) return '';
+  let timeline = '<SegmentTemplate timescale="1000" startNumber="1" '
+    + 'initialization="init" media="$Number$"><SegmentTimeline>';
+  for (const segment of segments) {
+    timeline += `<S t="${segment.startMs}" d="${Math.max(1, segment.durationMs)}"/>`;
+  }
+  return timeline + '</SegmentTimeline></SegmentTemplate>';
+}
+
 function adaptation(kind: string, resource: StreamResource): string {
   const isAudio = kind === 'audio';
   const mime = resource.mimeType || (isAudio ? 'audio/mp4' : 'video/mp4');
@@ -40,19 +55,22 @@ function adaptation(kind: string, resource: StreamResource): string {
     if (resource.height > 0) representation += ` height="${resource.height}"`;
     if (resource.fps > 0) representation += ` frameRate="${resource.fps}"`;
   }
-  representation += `><BaseURL>${kind}/0</BaseURL>`
-    + `<SegmentBase indexRange="${resource.indexRangeStart}-${resource.indexRangeEnd}" indexRangeExact="true">`
-    + `<Initialization range="${resource.initRangeStart}-${resource.initRangeEnd}"/>`
-    + '</SegmentBase></Representation></AdaptationSet>';
+  const template = segmentTemplate(resource);
+  if (!template) return '';
+  // BaseURL ends with / so media="$Number$" resolves to video/0/1, matching LocalProxyServer route.
+  representation += `><BaseURL>${kind}/0/</BaseURL>${template}</Representation></AdaptationSet>`;
   return representation;
 }
 
-/** Build a static on-demand MPD over the stable local range-proxy URLs. */
+/** Static on-demand MPD: requires preprocessed SIDX segments (exact byte ranges only). */
 export function buildYoutubeDashManifest(session: DashSession): string {
   if (session.type !== 'youtube-dual' || !session.hasAudio
-    || !hasYoutubeSegmentBase(session.video) || !hasYoutubeSegmentBase(session.audio)) {
+    || !session.video.dashSegments?.length || !session.audio.dashSegments?.length) {
     return '';
   }
+  const videoPart = adaptation('video', session.video);
+  const audioPart = adaptation('audio', session.audio);
+  if (!videoPart || !audioPart) return '';
   const durationMs = Math.max(1, session.durationMs
     || session.video.approxDurationMs || session.audio.approxDurationMs);
   return '<?xml version="1.0" encoding="UTF-8"?>'
@@ -60,7 +78,7 @@ export function buildYoutubeDashManifest(session: DashSession): string {
     + 'profiles="urn:mpeg:dash:profile:isoff-on-demand:2011" minBufferTime="PT1.5S" '
     + `mediaPresentationDuration="${durationIso(durationMs)}">`
     + '<Period id="0" start="PT0S">'
-    + adaptation('video', session.video)
-    + adaptation('audio', session.audio)
+    + videoPart
+    + audioPart
     + '</Period></MPD>';
 }

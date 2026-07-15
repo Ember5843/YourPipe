@@ -5,8 +5,8 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 
-const APP_VERSION = '0.5.2';
-const APP_BUILD = '1000011';
+const APP_VERSION = '0.5.3';
+const APP_BUILD = '1000012';
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
 
@@ -39,6 +39,19 @@ const AI_MODELS: string[] = [
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.5.3', date: '2026-07-14',
+    changes: [
+      '新增 YouTube SABR/UMP 流媒体播放支持，提升新格式视频、高画质视频及受限播放场景的兼容性',
+      '重构视频解析与客户端选择流程，对齐 PipePipe 请求行为并恢复远程签名解密服务，减少重复提取和启动等待',
+      '完善本地 DASH 媒体代理，支持音视频分轨、分段缓存、精确拖动、断流恢复与播放结束处理',
+      '加入 SABR PoToken 支持，优化签名参数、请求头与二进制响应处理，减少 403、无法播放和加载失败',
+      '优化播放器状态同步、清晰度与音轨切换，修复画面已播放仍持续转圈、拖动错位及音轨菜单异常',
+      '升级播放列表解析与翻页机制，兼容新版列表结构、锁定内容和 continuation，改善列表加载与连续播放',
+      '整理账号与数据管理入口，改进登录状态、观看记录、本地页面、下载选项及播放偏好之间的联动',
+      '优化首页推荐、视频卡片、主题色、画中画和系统媒体会话体验，并修复多处界面与播放稳定性问题',
+    ],
+  },
   {
     version: '0.5.2', date: '2026-07-13',
     changes: [

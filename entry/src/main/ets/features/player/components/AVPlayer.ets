@@ -24,6 +24,7 @@ import {
   VideoData,
   StreamInfo,
   PlayerState,
+  PlaybackState,
   StateChangeListener,
   VideoEntry,
   SubtitleTrack
@@ -119,6 +120,13 @@ export struct VideoPlayer {
     if (!this.playbackStarted && (currentTime > 0
       || (this.vm.isReady && this.vm.isPlaying && !this.vm.isBuffering))) {
       this.playbackStarted = true;
+    }
+  };
+
+  private playbackStateListener = (state: PlaybackState) => {
+    if (!this.playbackStarted && state.isReady && state.isPlaying && !state.isBuffering) {
+      this.playbackStarted = true;
+      Logger.info(TAG, 'Playback started; startup cover dismissed');
     }
   };
 
@@ -333,6 +341,7 @@ export struct VideoPlayer {
     // 1. 从旧 controller 移除监听器
     if (this.lastController && this.lastController !== this.controller) {
       this.lastController.unsubscribeProgress(this.progressListener);
+      this.lastController.unsubscribePlaybackState(this.playbackStateListener);
       this.lastController.unsubscribeEnded(this.onEnded);
       this.lastController.removeErrorListener(this.errorListener);
       this.lastController.removeWaitingForBufferListener(this.waitingForBufferListener);
@@ -342,6 +351,7 @@ export struct VideoPlayer {
     // 2. 向新 controller 注册监听器
     if (this.controller) {
       this.controller.subscribeProgress(this.progressListener);
+      this.controller.subscribePlaybackState(this.playbackStateListener);
       this.controller.subscribeEnded(this.onEnded);
       this.controller.addErrorListener(this.errorListener);
       this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
@@ -350,7 +360,7 @@ export struct VideoPlayer {
       // 3. 立即同步 UI 状态
       this.currentTime = this.vm.currentTime;
       this.durationTime = this.vm.durationTime;
-      this.hasError = this.controller.getUserVisibleError().length > 0;
+      this.hasError = this.vm.userVisibleErrorMsg.length > 0;
       const pm = this.vm.playerModel;
       this.hasStreams = pm ? (pm.categorizedStreams.audio.length + pm.categorizedStreams.video.length +
                               pm.categorizedStreams.dashManifest.length + pm.categorizedStreams.hlsManifest.length +
@@ -358,6 +368,7 @@ export struct VideoPlayer {
       this.isCasting = this.vm.isCasting;
       this.castDeviceName = this.vm.castDeviceName;
       this.syncPlaybackStateFromController();
+      this.playbackStateListener(this.controller.getPlaybackState());
 
       // Re-inject the surface only when the new controller does not have one yet.
       try {
@@ -428,6 +439,7 @@ export struct VideoPlayer {
 
     // 注册进度监听（节流后的 currentTime/durationTime）
     this.controller.subscribeProgress(this.progressListener);
+    this.controller.subscribePlaybackState(this.playbackStateListener);
     this.controller.subscribeEnded(this.onEnded);
     // 错误与特殊状态监听
     this.controller.addErrorListener(this.errorListener);
@@ -883,7 +895,7 @@ export struct VideoPlayer {
             .fontWeight(FontWeight.Bold)
             .textAlign(TextAlign.Center)
 
-          Text(this.getErrorDisplay(this.curSource.error || this.controller.getUserVisibleError()))
+          Text(this.getErrorDisplay(this.curSource.error || this.vm.userVisibleErrorMsg))
             .fontColor('#CCFFFFFF')
             .fontSize(13)
             .textAlign(TextAlign.Center)
@@ -1327,6 +1339,7 @@ export struct VideoPlayer {
     this.controller.removeStateListener(this.keepScreenListener);
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
+    this.controller.unsubscribePlaybackState(this.playbackStateListener);
     this.controller.unsubscribeEnded(this.onEnded);
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);

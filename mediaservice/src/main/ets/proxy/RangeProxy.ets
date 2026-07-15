@@ -1,6 +1,6 @@
-import { StreamResource, DashSession } from './SessionStore';
+import { StreamResource } from './SessionStore';
 import { rcp } from '@kit.RemoteCommunicationKit';
-import { socket } from '@kit.NetworkKit';
+import { http, socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import Logger from '../utils/Logger';
 
@@ -9,16 +9,46 @@ const MAX_RETRIES = 2;
 const TIMEOUT_MS = 30000;
 const requestNumberMap: Map<string, number> = new Map<string, number>();
 
-function buildYoutubeRangeUrl(url: string, rangeSpec: string): string {
-  const sep = url.includes('?') ? '&' : '?';
-  return url + sep + 'range=' + rangeSpec;
+class BufferWriter implements rcp.WriteStream {
+  private chunks: Uint8Array[] = [];
+  private length: number = 0;
+
+  async write(buffer: ArrayBuffer): Promise<number> {
+    const chunk = new Uint8Array(buffer.slice(0));
+    this.chunks.push(chunk);
+    this.length += chunk.length;
+    return chunk.length;
+  }
+
+  bytes(): Uint8Array {
+    const result = new Uint8Array(this.length);
+    let offset = 0;
+    for (const chunk of this.chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
 }
 
-function appendYoutubeRn(url: string, urlKey: string): string {
-  let result = url.replace(/([?&])rn=[^&]*&?/, (_match: string, sep: string): string => sep === '?' ? '?' : '');
+function stripQueryParam(url: string, name: string): string {
+  const re = new RegExp(`([?&])${name}=[^&]*&?`);
+  let result = url.replace(re, (_match: string, sep: string): string => sep === '?' ? '?' : '');
   if (result.endsWith('?') || result.endsWith('&')) {
     result = result.substring(0, result.length - 1);
   }
+  return result;
+}
+
+function buildYoutubeRangeUrl(url: string, rangeSpec: string): string {
+  // Drop any pre-existing range= so MPV/SIDX never send duplicate range params.
+  const cleaned = stripQueryParam(url, 'range');
+  const sep = cleaned.includes('?') ? '&' : '?';
+  return cleaned + sep + 'range=' + rangeSpec;
+}
+
+function appendYoutubeRn(url: string, urlKey: string): string {
+  let result = stripQueryParam(url, 'rn');
   const rn = requestNumberMap.get(urlKey) || 0;
   requestNumberMap.set(urlKey, rn + 1);
   const sep = result.includes('?') ? '&' : '?';
@@ -37,19 +67,61 @@ function getYoutubeClient(url: string): string {
   }
 }
 
+function getQueryFlag(url: string, name: string): boolean {
+  return new RegExp(`[?&]${name}=`).test(url);
+}
+
+function getQueryValue(url: string, name: string): string {
+  const match = url.match(new RegExp(`[?&]${name}=([^&]*)`));
+  if (!match || match[1] === undefined) {
+    return '';
+  }
+  try {
+    return decodeURIComponent(match[1]);
+  } catch (_error) {
+    return match[1];
+  }
+}
+
+/** Safe fingerprint for comparing 403 vs success URLs without leaking sig/n/pot. */
+function youtubeUrlFingerprint(url: string): string {
+  let host = '';
+  try {
+    const m = url.match(/^https?:\/\/([^/?#]+)/i);
+    host = m?.[1] || '';
+  } catch (_e) {
+    host = '';
+  }
+  // Short non-crypto digest of path+stable query shape (not secrets themselves).
+  let hash = 2166136261;
+  const sample = url.replace(/([?&])(n|sig|lsig|signature|pot|s)=[^&]*/gi, '$1$2=*');
+  for (let i = 0; i < sample.length; i++) {
+    hash ^= sample.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const fp = (hash >>> 0).toString(16).padStart(8, '0');
+  return `host=${host} c=${getYoutubeClient(url) || '-'} expire=${getQueryValue(url, 'expire') || '-'} `
+    + `rn=${getQueryValue(url, 'rn') || '-'} hasN=${getQueryFlag(url, 'n')} hasPot=${getQueryFlag(url, 'pot')} `
+    + `hasSig=${getQueryFlag(url, 'sig') || getQueryFlag(url, 'signature') || getQueryFlag(url, 'lsig')} fp=${fp}`;
+}
+
+// PipePipe YoutubeParsingHelper: ANDROID|ANDROID_VR → POST + Android app UA
 function isAndroidUrl(url: string): boolean {
-  return getYoutubeClient(url).startsWith('ANDROID');
+  const c = getYoutubeClient(url);
+  return c === 'ANDROID' || c === 'ANDROID_VR' || c.startsWith('ANDROID_');
 }
 
 function isIosUrl(url: string): boolean {
-  return getYoutubeClient(url).startsWith('IOS');
+  return getYoutubeClient(url) === 'IOS';
 }
 
+// PipePipe: exact c=WEB only (not MWEB / WEB_EMBEDDED / …)
 function isWebUrl(url: string): boolean {
-  return getYoutubeClient(url).startsWith('WEB');
+  return getYoutubeClient(url) === 'WEB';
 }
 
-function isTvUrl(url: string): boolean {
+// PipePipe only special-cases TVHTML5_SIMPLY_EMBEDDED_PLAYER for Origin/Referer/Sec-Fetch
+function isTvSimplyEmbeddedUrl(url: string): boolean {
   return getYoutubeClient(url) === 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
 }
 
@@ -61,13 +133,20 @@ function makeHeaders(resource: StreamResource): rcp.RequestHeaders {
 }
 
 function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
-  const h: rcp.RequestHeaders = { 'Accept-Encoding': 'identity' };
+  // Align with PipePipe YoutubeHttpDataSource.makeConnection:
+  // - TE: trailers on all videoplayback requests
+  // - Origin/Referer/Sec-Fetch ONLY for c=WEB or c=TVHTML5_SIMPLY_EMBEDDED_PLAYER
+  // - regular TVHTML5 / MWEB / ANDROID_VR: no Origin/Referer (extra Referer → 403)
+  const h: rcp.RequestHeaders = {
+    'Accept-Encoding': 'identity',
+    'TE': 'trailers'
+  };
   const isAndroid = isAndroidUrl(resource.url);
   const isIos = isIosUrl(resource.url);
   const isWeb = isWebUrl(resource.url);
-  const isTv = isTvUrl(resource.url);
+  const isTvEmbed = isTvSimplyEmbeddedUrl(resource.url);
 
-  if (isWeb || isTv) {
+  if (isWeb || isTvEmbed) {
     h['Origin'] = 'https://www.youtube.com';
     h['Referer'] = 'https://www.youtube.com';
     h['Sec-Fetch-Dest'] = 'empty';
@@ -76,6 +155,7 @@ function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
   }
 
   if (isAndroid) {
+    // PipePipe getAndroidUserAgent — also used for ANDROID_VR streaming URLs
     h['User-Agent'] = 'com.google.android.youtube/21.03.36 (Linux; U; Android 16; GB) gzip';
   } else if (isIos) {
     h['User-Agent'] = 'com.google.ios.youtube/20.03.02(iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X; GB)';
@@ -83,10 +163,97 @@ function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
     h['User-Agent'] = resource.userAgent;
   }
 
-  if (resource.referer && !h['Referer']) {
-    h['Referer'] = resource.referer;
-  }
+  // Do NOT fall back to resource.referer for TVHTML5/MWEB — PipePipe omits it.
   return h;
+}
+
+function uaKind(resource: StreamResource): string {
+  const ua = resource.userAgent || '';
+  if (ua.includes('Cobalt')) return 'tv-cobalt';
+  if (ua.includes('iPad') && ua.includes('Safari')) return 'mweb-ipad';
+  if (ua.includes('Macintosh') && ua.includes('Safari')) return 'safari';
+  if (ua.startsWith('com.google.android.youtube/')) return 'android-app';
+  if (ua.startsWith('com.google.android.apps.youtube.vr')) return 'android-vr';
+  if (ua.startsWith('com.google.ios.youtube/')) return 'ios-app';
+  if (ua.includes('Chrome/')) return 'web-chrome';
+  return resource.userAgent ? 'custom' : 'default';
+}
+
+function describeYoutubeRequest(resource: StreamResource, method: string, fetchUrl: string, rangeSpec: string): string {
+  const client = getYoutubeClient(resource.url) || resource.sourceClient || '-';
+  const html5Headers = isWebUrl(resource.url) || isTvSimplyEmbeddedUrl(resource.url);
+  return `itag=${resource.id} sourceClient=${resource.sourceClient || '-'} c=${client} method=${method} `
+    + `range=${rangeSpec} uaKind=${uaKind(resource)} html5Hdr=${html5Headers} `
+    + `${youtubeUrlFingerprint(fetchUrl)}`;
+}
+
+function headersToHttpRecord(headers: rcp.RequestHeaders): Record<string, string> {
+  const out: Record<string, string> = {};
+  const keys = Object.keys(headers);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const value = headers[key];
+    if (typeof value === 'string') {
+      out[key] = value;
+    } else if (Array.isArray(value) && value.length > 0) {
+      out[key] = String(value[0]);
+    }
+  }
+  return out;
+}
+
+function responseBodyToBytes(result: string | Object | ArrayBuffer): Uint8Array {
+  if (typeof result === 'string') {
+    return new util.TextEncoder().encode(result);
+  }
+  try {
+    return new Uint8Array(result as ArrayBuffer);
+  } catch (_e) {
+    return new Uint8Array(0);
+  }
+}
+
+/**
+ * Fetch a small exact YouTube byte range for DASH SIDX preprocessing.
+ * Uses @ohos.net.http (same stack as youtube_core extractor) — RCP streaming
+ * has produced consistent 403 on TVHTML5 indexRange probes.
+ */
+export async function fetchYoutubeRangeBytes(resource: StreamResource, start: number, end: number): Promise<Uint8Array> {
+  const rangeSpec = `${start}-${end}`;
+  const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
+  const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
+  const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
+  const method = usePost ? 'POST' : 'GET';
+  Logger.info(TAG, `SIDX fetch: transport=http ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+  const req = http.createHttp();
+  try {
+    const options: http.HttpRequestOptions = {
+      method: usePost ? http.RequestMethod.POST : http.RequestMethod.GET,
+      header: headers,
+      expectDataType: http.HttpDataType.ARRAY_BUFFER,
+      connectTimeout: TIMEOUT_MS,
+      readTimeout: TIMEOUT_MS,
+      usingCache: false,
+    };
+    // Android/iOS: empty-body POST (PipePipe). Do not set Content-Type.
+    if (usePost) {
+      options.extraData = '';
+    }
+    const response = await req.request(fetchUrl, options);
+    if (response.responseCode !== 200 && response.responseCode !== 206) {
+      const bodyPreview = typeof response.result === 'string'
+        ? response.result.substring(0, 160)
+        : `bytes=${responseBodyToBytes(response.result).length}`;
+      Logger.warn(TAG, `SIDX upstream ${response.responseCode}: transport=http body=${bodyPreview} `
+        + `${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+      throw new Error(`SIDX upstream status ${response.responseCode}`);
+    }
+    const bytes = responseBodyToBytes(response.result);
+    Logger.info(TAG, `SIDX ok itag=${resource.id} bytes=${bytes.length} range=${rangeSpec} transport=http`);
+    return bytes;
+  } finally {
+    req.destroy();
+  }
 }
 
 export interface ParsedRange {
@@ -135,14 +302,17 @@ class TcpWriter implements rcp.WriteStream {
   private end: number;
   private total: number;
   private contentType: string;
+  private standalone: boolean;
   bytesEmitted: number = 0;
 
-  constructor(conn: socket.TCPSocketConnection, start: number, end: number, total: number, contentType: string) {
+  constructor(conn: socket.TCPSocketConnection, start: number, end: number, total: number,
+    contentType: string, standalone: boolean = false) {
     this.conn = conn;
     this.start = start;
     this.end = end;
     this.total = total;
     this.contentType = contentType;
+    this.standalone = standalone;
   }
 
   hasEmittedAny(): boolean {
@@ -155,12 +325,9 @@ class TcpWriter implements rcp.WriteStream {
       if (!this.headerSent) {
         const contentLength = (this.end >= this.start) ? (this.end - this.start + 1) : buffer.byteLength;
         const totalStr = this.total > 0 ? String(this.total) : '*';
-        const hdr = `HTTP/1.1 206 Partial Content\r\n` +
-          `Content-Type: ${this.contentType}\r\n` +
-          `Content-Range: bytes ${this.start}-${this.end}/${totalStr}\r\n` +
-          `Content-Length: ${contentLength}\r\n` +
-          `Accept-Ranges: bytes\r\n` +
-          `Connection: close\r\n\r\n`;
+        const hdr = this.standalone
+          ? `HTTP/1.1 200 OK\r\nContent-Type: ${this.contentType}\r\nContent-Length: ${contentLength}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n`
+          : `HTTP/1.1 206 Partial Content\r\nContent-Type: ${this.contentType}\r\nContent-Range: bytes ${this.start}-${this.end}/${totalStr}\r\nContent-Length: ${contentLength}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n`;
         await this.conn.send({ data: encodeStr(hdr) });
         this.headerSent = true;
       }
@@ -180,21 +347,12 @@ export async function serveRange(
   resource: StreamResource,
   rangeHeader: string,
   headOnly: boolean,
-  session?: DashSession
+  standaloneResponse: boolean = false
 ): Promise<void> {
   const total = resource.contentLength;
   const parsed = parseRangeHeader(rangeHeader, total);
   const start = parsed.start;
-  let end = parsed.end >= 0 ? parsed.end : (total > 0 ? total - 1 : start + 2 * 1024 * 1024 - 1);
-
-  // 限制单次请求的最大大小，避免触发YouTube的SABR限速
-  // YouTube对大范围请求会限速到~80KB/s，导致超时
-  // 将最大chunk限制为10MB，这是一个在性能和稳定性之间的平衡点
-  const MAX_CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
-  if (end - start + 1 > MAX_CHUNK_SIZE) {
-    end = start + MAX_CHUNK_SIZE - 1;
-    Logger.info(TAG, `serveRange: limiting range from ${parsed.end - start + 1} to ${MAX_CHUNK_SIZE} bytes to avoid throttling, resource=${resource.id}`);
-  }
+  const end = parsed.end >= 0 ? parsed.end : (total > 0 ? total - 1 : start + 2 * 1024 * 1024 - 1);
 
   const contentType = contentTypeFor(resource);
 
@@ -210,75 +368,104 @@ export async function serveRange(
 
   if (headOnly) {
     const totalStr = total > 0 ? String(total) : '*';
-    const hdr = `HTTP/1.1 206 Partial Content\r\nContent-Type: ${contentType}\r\nContent-Range: bytes ${start}-${end}/${totalStr}\r\nContent-Length: ${end - start + 1}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n`;
+    const hdr = standaloneResponse
+      ? `HTTP/1.1 200 OK\r\nContent-Type: ${contentType}\r\nContent-Length: ${end - start + 1}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n`
+      : `HTTP/1.1 206 Partial Content\r\nContent-Type: ${contentType}\r\nContent-Range: bytes ${start}-${end}/${totalStr}\r\nContent-Length: ${end - start + 1}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n`;
     await sendRaw(conn, encodeStr(hdr));
     return;
   }
 
   const rangeSpec = `${start}-${end}`;
   let lastError = '';
-  const writer = new TcpWriter(conn, start, end, total, contentType);
+  const writer = new TcpWriter(conn, start, end, total, contentType, standaloneResponse);
+
+  // YouTube videoplayback: buffer via @ohos.net.http (same stack as extractor).
+  // RCP streaming has been 403-prone for TVHTML5 range probes.
+  if (resource.isYoutubePlayback) {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
+      const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
+      const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
+      const method = usePost ? 'POST' : 'GET';
+      if (attempt === 0) {
+        Logger.info(TAG, `serveRange yt: transport=http ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+      }
+      const req = http.createHttp();
+      try {
+        const options: http.HttpRequestOptions = {
+          method: usePost ? http.RequestMethod.POST : http.RequestMethod.GET,
+          header: headers,
+          expectDataType: http.HttpDataType.ARRAY_BUFFER,
+          connectTimeout: TIMEOUT_MS,
+          readTimeout: TIMEOUT_MS,
+          usingCache: false,
+        };
+        if (usePost) {
+          options.extraData = '';
+        }
+        const response = await req.request(fetchUrl, options);
+        if (response.responseCode === 200 || response.responseCode === 206) {
+          const bytes = responseBodyToBytes(response.result);
+          if (bytes.length === 0) {
+            lastError = `empty body status=${response.responseCode}`;
+          } else {
+            await writer.write(bytes.buffer as ArrayBuffer);
+            return;
+          }
+        } else {
+          lastError = `status=${response.responseCode}`;
+          const bodyPreview = typeof response.result === 'string'
+            ? response.result.substring(0, 120)
+            : `bytes=${responseBodyToBytes(response.result).length}`;
+          Logger.warn(TAG, `serveRange: upstream ${response.responseCode} resource=${resource.id} `
+            + `body=${bodyPreview} ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+          if (response.responseCode >= 400 && response.responseCode < 500) {
+            if (!writer.hasEmittedAny()) {
+              await sendError(conn, 502, `upstream ${response.responseCode}`);
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        lastError = String(e);
+        Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resource.id}`);
+      } finally {
+        req.destroy();
+      }
+      if (writer.hasEmittedAny()) {
+        Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resource.id} range=${rangeSpec} err=${lastError}`);
+        return;
+      }
+      if (attempt < MAX_RETRIES) {
+        await new Promise<void>(r => setTimeout(r, 300 * (attempt + 1)));
+      }
+    }
+    Logger.error(TAG, `serveRange failed: ${lastError} resource=${resource.id}`);
+    if (!writer.hasEmittedAny()) {
+      await sendError(conn, 502, `upstream failed: ${lastError}`);
+    }
+    return;
+  }
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const sessionHeaders = resource.isYoutubePlayback ? makeYoutubeHeaders(resource) : makeHeaders(resource);
+    const sessionHeaders = makeHeaders(resource);
     const rcpSession = rcp.createSession({
       headers: sessionHeaders,
       requestConfiguration: { transfer: { timeout: { connectMs: TIMEOUT_MS, transferMs: TIMEOUT_MS } } }
     });
     try {
       const dest: rcp.DownloadToStream = { kind: 'stream', stream: writer };
-
-      let resp: rcp.Response;
-      if (resource.isYoutubePlayback) {
-        const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
-        const headers = makeYoutubeHeaders(resource);
-        const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
-        if (usePost) {
-          // PipePipe: Android/Android VR/iOS use POST with empty body and range= URL parameter.
-          const req = new rcp.Request(fetchUrl, 'POST', headers, '');
-          req.destination = dest;
-          resp = await rcpSession.fetch(req);
-        } else {
-          const req = new rcp.Request(fetchUrl, 'GET', headers);
-          req.destination = dest;
-          resp = await rcpSession.fetch(req);
-          if (resp.statusCode === 411) {
-            if (writer.hasEmittedAny()) {
-              Logger.error(TAG, `serveRange: 411 after bytes emitted, cannot retry resource=${resource.id} range=${rangeSpec}`);
-              return;
-            }
-            Logger.warn(TAG, `serveRange: upstream 411, retry with empty POST resource=${resource.id} range=${rangeSpec}`);
-            const retryReq = new rcp.Request(appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url), 'POST', headers, '');
-            retryReq.destination = dest;
-            resp = await rcpSession.fetch(retryReq);
-          }
-        }
-      } else {
-        const rangeHeaders: rcp.RequestHeaders = { 'Accept-Encoding': 'identity' };
-        if (resource.userAgent) rangeHeaders['User-Agent'] = resource.userAgent;
-        if (resource.referer) rangeHeaders['Referer'] = resource.referer;
-        rangeHeaders['Range'] = `bytes=${rangeSpec}`;
-        const req = new rcp.Request(resource.url, 'GET', rangeHeaders);
-        req.destination = dest;
-        resp = await rcpSession.fetch(req);
-      }
+      const rangeHeaders: rcp.RequestHeaders = { 'Accept-Encoding': 'identity' };
+      if (resource.userAgent) rangeHeaders['User-Agent'] = resource.userAgent;
+      if (resource.referer) rangeHeaders['Referer'] = resource.referer;
+      rangeHeaders['Range'] = `bytes=${rangeSpec}`;
+      const req = new rcp.Request(resource.url, 'GET', rangeHeaders);
+      req.destination = dest;
+      const resp = await rcpSession.fetch(req);
 
       if (resp.statusCode === 200 || resp.statusCode === 206) {
         return;
       }
-      // 411 Length Required: YouTube URL 可能已过期，尝试刷新
-      if (resp.statusCode === 411 && resource.isYoutubePlayback && session?.refreshUrls && !writer.hasEmittedAny()) {
-        Logger.info(TAG, `serveRange: 411 detected, attempting URL refresh for resource=${resource.id}`);
-        const refreshed = await session.refreshUrls();
-        if (refreshed) {
-          Logger.info(TAG, `serveRange: URL refreshed successfully, retrying resource=${resource.id}`);
-          // 刷新成功，跳过延迟直接重试（resource.url 已被更新）
-          continue;
-        } else {
-          Logger.warn(TAG, `serveRange: URL refresh failed for resource=${resource.id}`);
-        }
-      }
-      // Non-retryable errors: 4xx client errors
       if (resp.statusCode >= 400 && resp.statusCode < 500) {
         Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} (non-retryable) resource=${resource.id} range=${rangeSpec}`);
         if (!writer.hasEmittedAny()) {
@@ -293,9 +480,6 @@ export async function serveRange(
     } finally {
       rcpSession.close();
     }
-    // Cannot retry safely once any bytes have been written to the client connection:
-    // the next attempt would re-send the HTTP header and a fresh upstream body, producing
-    // [partial_body_1][header_2][body_2] on the wire and corrupting the bitstream.
     if (writer.hasEmittedAny()) {
       Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resource.id} range=${rangeSpec} err=${lastError}`);
       return;

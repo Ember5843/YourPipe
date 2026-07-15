@@ -5,7 +5,7 @@ import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
 import { AuthAccountStatus, AuthStage } from 'youtube_core';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 
-const APP_VERSION: string = '0.5.2';
+const APP_VERSION: string = '0.5.3';
 
 interface OptionsMainPageParams {
   clickEffectEnabled: ClickEffect | null;

@@ -311,49 +311,6 @@ export struct VideoPlayerPage {
       }
     };
 
-    // Set up stream refresh handler for automatic URL refresh on expiry
-    this.controller.setRefreshHandler(async (videoId: string, _resumePos: number) => {
-      try {
-        const playService = YouTubePlayService.getInstance(context as common.UIAbilityContext);
-        const result = await playService.refreshStreams(videoId);
-        if (!result.success || !result.videoInfo) {
-          return null;
-        }
-        const refreshVideoStream = result.videoInfo.streams?.find((s) => s.hasVideo && s.width && s.height);
-        const refreshed: VideoData = {
-          name: this.videoSource.name,
-          description: result.videoInfo.title || '',
-          time: this.videoSource.time,
-          auto: this.videoSource.auto,
-          head: this.videoSource.head,
-          likeCount: this.videoSource.likeCount,
-          dislikeCount: this.videoSource.dislikeCount || this.detailDislikeCount || '0',
-          commentCount: this.videoSource.commentCount,
-          shareCount: this.videoSource.shareCount,
-          author: result.videoInfo.author || this.videoSource.author || '',
-          channelId: result.videoInfo.channelId || this.videoSource.channelId || '',
-          videoDescription: result.videoInfo.description || '',
-          play: true,
-          videoId: videoId,
-          index: this.videoSource.index,
-          width: refreshVideoStream?.width || 0,
-          height: refreshVideoStream?.height || 0,
-          error: undefined,
-          streams: result.playerStreams ?? [],
-          subtitleTracks: result.subtitleTracks ?? [],
-          isLive: result.videoInfo.isLive || false,
-          thumbnailUrl: this.video?.thumbnailUrl || '',
-          viewCount: result.videoInfo.viewCount || this.videoSource.viewCount || 0,
-          publishDate: result.videoInfo.publishDate || this.videoSource.publishDate || '',
-          tags: result.videoInfo.tags || this.videoSource.tags || []
-        };
-        return refreshed;
-      } catch (e) {
-        logger.error(`${TAG} refreshHandler error: ${e}`);
-        return null;
-      }
-    });
-
     harmonyShare.on('knockShare', this.knockShareCallback);
   }
 

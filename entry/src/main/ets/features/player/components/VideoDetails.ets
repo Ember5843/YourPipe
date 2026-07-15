@@ -211,12 +211,17 @@ export struct VideoDetails {
     }
 
     this.streams.forEach((stream: StreamInfo) => {
-      if (!stream.url) {
+      const kind = (stream.kind || '').toLowerCase();
+      const delivery = (stream.deliveryMethod || '').toUpperCase();
+      const isSabr = delivery === 'SABR' || kind === 'sabr' || !!stream.sabrInfo?.serverAbrStreamingUrl;
+      // Progressive/HLS need a media URL; SABR uses sabrInfo bootstrap (isUrl=false).
+      if (!isSabr && !stream.url) {
+        return;
+      }
+      if (isSabr && (!stream.sabrInfo || !stream.sabrInfo.serverAbrStreamingUrl)) {
         return;
       }
 
-      const kind = (stream.kind || '').toLowerCase();
-      const delivery = (stream.deliveryMethod || '').toUpperCase();
       const mimeType = (stream.mimeType || '').toLowerCase();
       const codecs = (stream.codecs || '').toLowerCase();
       const hasVideo = stream.hasVideo === true
@@ -236,7 +241,7 @@ export struct VideoDetails {
         categories.hlsManifest.push(stream);
       } else if (kind === 'manifest_dash') {
         categories.dashManifest.push(stream);
-      } else if (kind === 'progressive' || delivery === 'PROGRESSIVE_HTTP' || (hasVideo && hasAudio)) {
+      } else if (!isSabr && (kind === 'progressive' || delivery === 'PROGRESSIVE_HTTP' || (hasVideo && hasAudio))) {
         categories.progressive.push(stream);
       } else if (kind === 'video_only' || hasVideo) {
         categories.video.push(stream);
@@ -282,6 +287,9 @@ export struct VideoDetails {
             videoStream = selection.progressive;
           } else if (selection.hls) {
             videoStream = selection.hls;
+          } else if (selection.sabr && selection.video && selection.audio) {
+            videoStream = selection.video;
+            audioStream = selection.audio;
           } else if (selection.video) {
             videoStream = selection.video;
             audioStream = selection.audio || null;

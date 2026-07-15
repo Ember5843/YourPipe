@@ -1,6 +1,6 @@
 import { AppLog } from './AppLog';
 import { AbilityConstant, common } from '@kit.AbilityKit';
-import { AvPlayerController, VideoData, PlayerState, StateChangeListener } from 'mediaservice';
+import { AvPlayerController, VideoData, PlayerState, StateChangeListener, LocalMediaProxy } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { PlayQueueManager } from '../features/player/PlayQueueManager';
@@ -306,7 +306,18 @@ export class PlayerSession {
   private async doPlay(video: VideoItem, videoId: string): Promise<VideoData | null> {
     try {
       const playService = YouTubePlayService.getInstance(this._context);
-      const result = await playService.play(videoId);
+      const startedAt = Date.now();
+      LocalMediaProxy.warmup().then((ok: boolean) => {
+        logger.info(`${TAG} [TIMING] video=${videoId} proxy warmup elapsed=${Date.now() - startedAt}ms ok=${ok}`);
+      }).catch((e: Error) => {
+        logger.warn(`${TAG} proxy warmup failed video=${videoId}: ${e.message || e}`);
+      });
+      const parallel = await Promise.all([
+        playService.play(videoId),
+        this.ensureInitialized()
+      ]);
+      const result = parallel[0];
+      logger.info(`${TAG} [TIMING] video=${videoId} extract+MPV init elapsed=${Date.now() - startedAt}ms`);
 
       if (this._currentVideo?.videoId !== videoId) {
         logger.info(`${TAG} doPlay() result discarded: video changed during extraction`);
@@ -392,6 +403,7 @@ export class PlayerSession {
         videoSource.auto = shouldPlay;
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
         await this._controller.updateVideoSource(videoSource);
+        logger.info(`${TAG} [TIMING] video=${videoId} source submitted elapsed=${Date.now() - startedAt}ms`);
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
         this.startWatchSaveTimer();
         return videoSource;
@@ -448,16 +460,20 @@ export class PlayerSession {
       const dislikeText = (extras.dislikeCount !== undefined && extras.dislikeCount >= 0)
         ? this.formatStatCount(extras.dislikeCount)
         : '';
-      if (likeText.length > 0 || dislikeText.length > 0) {
-        this._defaultSource.likeCount = likeText.length > 0 ? likeText : this._defaultSource.likeCount;
-        this._defaultSource.dislikeCount = dislikeText.length > 0 ? dislikeText : (this._defaultSource.dislikeCount || '0');
-        if (this._cachedVideoSource && this._cachedVideoSource.videoId === videoId) {
-          this._cachedVideoSource.likeCount = this._defaultSource.likeCount;
-          this._cachedVideoSource.dislikeCount = this._defaultSource.dislikeCount;
-        }
-        if (this.onPlaybackExtrasUpdated) {
-          this.onPlaybackExtrasUpdated(this._cachedVideoSource || this._defaultSource);
-        }
+      this._defaultSource.likeCount = likeText.length > 0 ? likeText : this._defaultSource.likeCount;
+      this._defaultSource.dislikeCount = dislikeText.length > 0 ? dislikeText : (this._defaultSource.dislikeCount || '0');
+      if (extras.title) this._defaultSource.description = extras.title;
+      if (extras.author) this._defaultSource.author = extras.author;
+      if (extras.description) this._defaultSource.videoDescription = extras.description;
+      if (extras.channelId) this._defaultSource.channelId = extras.channelId;
+      if (extras.viewCount !== undefined && extras.viewCount >= 0) this._defaultSource.viewCount = extras.viewCount;
+      if (extras.publishDate) this._defaultSource.publishDate = extras.publishDate;
+      if (extras.tags && extras.tags.length > 0) this._defaultSource.tags = extras.tags;
+
+      if (this._currentVideo?.videoId === videoId) {
+        if (extras.title) this._currentVideo.title = extras.title;
+        if (extras.author) this._currentVideo.author = extras.author;
+        if (extras.channelId) this._currentVideo.channelId = extras.channelId;
       }
 
       if (extras.uploaderAvatarUrl && this._currentVideo) {
@@ -465,6 +481,13 @@ export class PlayerSession {
         if (avatarUrl.length > 0) {
           this._currentVideo.channelAvatarUrl = avatarUrl;
         }
+      }
+
+      if (this._cachedVideoSource && this._cachedVideoSource.videoId === videoId) {
+        this._cachedVideoSource = this._defaultSource;
+      }
+      if (this.onPlaybackExtrasUpdated) {
+        this.onPlaybackExtrasUpdated(this._cachedVideoSource || this._defaultSource);
       }
 
       const relatedItems = extras.relatedItems;
