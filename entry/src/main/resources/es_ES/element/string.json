@@ -2410,35 +2410,35 @@
         },
         {
             "name": "yt_changelog_0_5_4_1",
-            "value": "Improved local JS signature decryption with disk cache, cold-start prewarm, and failure fallback, reducing waits and failures when remote decryption is needed"
+            "value": "Mejora del descifrado local de firmas JS con caché en disco, precalentamiento en arranque en frío y reintento ante fallos, reduciendo esperas y errores cuando hace falta el descifrado remoto"
         },
         {
             "name": "yt_changelog_0_5_4_2",
-            "value": "Filled DASH audio-track metadata (xtags/acont) and auto-select default tracks by content language / original preference, reducing wrong-dub picks on multi-language videos"
+            "value": "Completados los metadatos de pistas de audio DASH (xtags/acont) y selección automática de la pista predeterminada por idioma de contenido / preferencia de original, reduciendo doblajes incorrectos en vídeos multilingües"
         },
         {
             "name": "yt_changelog_0_5_4_3",
-            "value": "Added a sleep timer on the player page that stops playback and exits when due; localized like/view counts by language and refined info-area colors"
+            "value": "Temporizador de sueño en la página del reproductor que detiene la reproducción y sale al cumplirse; recuentos de me gusta/vistas localizados por idioma y colores del área de información refinados"
         },
         {
             "name": "yt_changelog_0_5_4_4",
-            "value": "Aligned UI string keys across all locales, fixed [object Object] labels in settings and About, and completed Simplified Chinese resources"
+            "value": "Claves de cadenas de UI alineadas en todos los idiomas, corregidas las etiquetas [object Object] en ajustes y Acerca de, y completados los recursos de chino simplificado"
         },
         {
             "name": "yt_changelog_0_5_4_5",
-            "value": "Changed the default theme accent to red and added player control/info background colors for better contrast"
+            "value": "El acento de tema predeterminado pasa a rojo y se añaden colores de fondo del control/info del reproductor para mejor contraste"
         },
         {
             "name": "yt_changelog_0_5_4_6",
-            "value": "Added pull-to-refresh on Home; clearing all app data also clears auth preferences, thumbnail cache, and cipher cache while preserving downloads"
+            "value": "Actualización por deslizamiento en Inicio; al borrar todos los datos de la app también se limpian preferencias de auth, caché de miniaturas y caché de cifrado, conservando las descargas"
         },
         {
             "name": "yt_changelog_0_5_4_7",
-            "value": "Improved network request logging and extraction diagnostics to help locate load failures and auth-related issues"
+            "value": "Mejor registro de peticiones de red y diagnósticos de extracción para localizar fallos de carga y problemas de autenticación"
         },
         {
             "name": "yt_changelog_0_5_4_8",
-            "value": "Updated the vendored MPV runtime and fixed multiple playback and UI stability issues"
+            "value": "Runtime MPV incluido actualizado y varios problemas de estabilidad de reproducción e interfaz corregidos"
         }
     ]
 }

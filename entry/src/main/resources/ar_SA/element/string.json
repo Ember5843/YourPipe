@@ -2410,35 +2410,35 @@
         },
         {
             "name": "yt_changelog_0_5_4_1",
-            "value": "Improved local JS signature decryption with disk cache, cold-start prewarm, and failure fallback, reducing waits and failures when remote decryption is needed"
+            "value": "تحسين فك تشفير توقيعات JS محليًا مع ذاكرة تخزين على القرص وتسخين عند التشغيل البارد والرجوع عند الفشل، مما يقلل الانتظار والأعطال عند الحاجة إلى فك التشفير عن بُعد"
         },
         {
             "name": "yt_changelog_0_5_4_2",
-            "value": "Filled DASH audio-track metadata (xtags/acont) and auto-select default tracks by content language / original preference, reducing wrong-dub picks on multi-language videos"
+            "value": "استكمال بيانات مسارات الصوت في DASH (xtags/acont) واختيار المسار الافتراضي حسب لغة المحتوى / تفضيل الأصلي، لتقليل اختيار الدبلجة الخاطئة في الفيديوهات متعددة اللغات"
         },
         {
             "name": "yt_changelog_0_5_4_3",
-            "value": "Added a sleep timer on the player page that stops playback and exits when due; localized like/view counts by language and refined info-area colors"
+            "value": "مؤقّت نوم في صفحة المشغّل يوقف التشغيل ويخرج عند الانتهاء؛ تنسيق عدد الإعجابات/المشاهدات حسب اللغة وتحسين ألوان منطقة المعلومات"
         },
         {
             "name": "yt_changelog_0_5_4_4",
-            "value": "Aligned UI string keys across all locales, fixed [object Object] labels in settings and About, and completed Simplified Chinese resources"
+            "value": "مواءمة مفاتيح نصوص الواجهة في كل اللغات، وإصلاح تسميات [object Object] في الإعدادات وحول التطبيق، وإكمال موارد الصينية المبسّطة"
         },
         {
             "name": "yt_changelog_0_5_4_5",
-            "value": "Changed the default theme accent to red and added player control/info background colors for better contrast"
+            "value": "تغيير لون التمييز الافتراضي للسمة إلى الأحمر وإضافة خلفيات منطقة التحكم/المعلومات في المشغّل لتحسين التباين"
         },
         {
             "name": "yt_changelog_0_5_4_6",
-            "value": "Added pull-to-refresh on Home; clearing all app data also clears auth preferences, thumbnail cache, and cipher cache while preserving downloads"
+            "value": "السحب للتحديث في الصفحة الرئيسية؛ عند مسح كل بيانات التطبيق تُمسح أيضًا تفضيلات المصادقة وذاكرة الصور المصغّرة وذاكرة التشفير (مع الإبقاء على التنزيلات)"
         },
         {
             "name": "yt_changelog_0_5_4_7",
-            "value": "Improved network request logging and extraction diagnostics to help locate load failures and auth-related issues"
+            "value": "تحسين سجلات طلبات الشبكة وتشخيصات الاستخراج لتسهيل تحديد أعطال التحميل ومشاكل المصادقة"
         },
         {
             "name": "yt_changelog_0_5_4_8",
-            "value": "Updated the vendored MPV runtime and fixed multiple playback and UI stability issues"
+            "value": "تحديث مكتبة MPV المضمّنة وإصلاح عدة مشاكل في استقرار التشغيل والواجهة"
         }
     ]
 }

@@ -2410,35 +2410,35 @@
         },
         {
             "name": "yt_changelog_0_5_4_1",
-            "value": "Improved local JS signature decryption with disk cache, cold-start prewarm, and failure fallback, reducing waits and failures when remote decryption is needed"
+            "value": "Lokale JS-Signaturentschlüsselung mit Festplatten-Cache, Kaltstart-Vorwärmung und Fehler-Fallback verbessert – weniger Wartezeiten und Ausfälle bei Bedarf an Remote-Entschlüsselung"
         },
         {
             "name": "yt_changelog_0_5_4_2",
-            "value": "Filled DASH audio-track metadata (xtags/acont) and auto-select default tracks by content language / original preference, reducing wrong-dub picks on multi-language videos"
+            "value": "DASH-Audio-Track-Metadaten (xtags/acont) ergänzt und Standardspuren nach Inhaltssprache / Original-Präferenz gewählt – weniger falsche Synchronisation bei mehrsprachigen Videos"
         },
         {
             "name": "yt_changelog_0_5_4_3",
-            "value": "Added a sleep timer on the player page that stops playback and exits when due; localized like/view counts by language and refined info-area colors"
+            "value": "Schlaf-Timer auf der Player-Seite: stoppt die Wiedergabe und beendet bei Ablauf; Like-/Aufrufzahlen sprachabhängig formatiert und Info-Bereichsfarben verfeinert"
         },
         {
             "name": "yt_changelog_0_5_4_4",
-            "value": "Aligned UI string keys across all locales, fixed [object Object] labels in settings and About, and completed Simplified Chinese resources"
+            "value": "UI-String-Keys in allen Sprachen angeglichen, [object Object]-Beschriftungen in Einstellungen und Über-Seite behoben, Ressourcen für vereinfachtes Chinesisch vervollständigt"
         },
         {
             "name": "yt_changelog_0_5_4_5",
-            "value": "Changed the default theme accent to red and added player control/info background colors for better contrast"
+            "value": "Standard-Akzentfarbe auf Rot geändert und Hintergrundfarben für Player-Steuerung/Info für besseren Kontrast hinzugefügt"
         },
         {
             "name": "yt_changelog_0_5_4_6",
-            "value": "Added pull-to-refresh on Home; clearing all app data also clears auth preferences, thumbnail cache, and cipher cache while preserving downloads"
+            "value": "Pull-to-Refresh auf der Startseite; beim Löschen aller App-Daten werden Auth-Einstellungen, Thumbnail-Cache und Cipher-Cache mitgelöscht (Downloads bleiben erhalten)"
         },
         {
             "name": "yt_changelog_0_5_4_7",
-            "value": "Improved network request logging and extraction diagnostics to help locate load failures and auth-related issues"
+            "value": "Netzwerkanfrage-Protokollierung und Extraktionsdiagnosen verbessert, um Ladefehler und Auth-Probleme leichter zu finden"
         },
         {
             "name": "yt_changelog_0_5_4_8",
-            "value": "Updated the vendored MPV runtime and fixed multiple playback and UI stability issues"
+            "value": "Mitgelieferte MPV-Runtime aktualisiert und mehrere Stabilitätsprobleme bei Wiedergabe und UI behoben"
         }
     ]
 }
