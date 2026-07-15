@@ -204,20 +204,24 @@ struct DownloadTaskRow {
     .height(52)
   }
 
-  private getSubtitle(): string {
+  private getSubtitle(): ResourceStr {
     if (this.task.status === DownloadStatus.FAILED) {
-      return this.task.errorMessage || 'Download failed';
+      return this.task.errorMessage || $r('app.string.yt_download_status_failed');
     }
     if (this.task.status === DownloadStatus.COMPLETED) {
-      return 'Completed';
+      return $r('app.string.yt_download_status_completed');
     }
     if (this.task.status === DownloadStatus.PENDING) {
-      return 'Waiting';
+      return $r('app.string.yt_download_status_waiting');
     }
     if (this.task.status === DownloadStatus.CANCELLED) {
-      return 'Cancelled';
+      return $r('app.string.yt_download_status_cancelled');
     }
-    const label = this.task.getStatusLabel();
+    const label = this.task.status === DownloadStatus.DOWNLOADING_VIDEO
+      ? getContext().resourceManager.getStringSync($r('app.string.yt_download_status_video').id)
+      : this.task.status === DownloadStatus.DOWNLOADING_AUDIO
+        ? getContext().resourceManager.getStringSync($r('app.string.yt_download_status_audio').id)
+        : getContext().resourceManager.getStringSync($r('app.string.yt_download_status_merging').id);
     const progressText = this.task.getProgressText();
     return progressText ? `${label} · ${progressText}` : label;
   }
@@ -239,12 +243,12 @@ struct DownloadTaskRow {
       const destinationDir = new fileUri.FileUri(result[0]).path;
       await this.downloadManager.exportCompletedTask(this.task.id, destinationDir);
       this.getUIContext().getPromptAction().showToast({
-        message: 'Saved to Downloads',
+        message: $r('app.string.yt_download_saved_to_downloads'),
         duration: 2000
       });
     } catch (error) {
       this.getUIContext().getPromptAction().showToast({
-        message: (error as Error).message || 'Save failed',
+        message: (error as Error).message || $r('app.string.yt_download_save_failed'),
         duration: 2000
       });
     } finally {

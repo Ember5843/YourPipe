@@ -1,4 +1,7 @@
 import { DashSession, StreamResource, makeEmptySession } from './SessionStore';
+import Logger from '../utils/Logger';
+
+const TAG: string = '[PlayerLog][InputParser]';
 
 interface RawResource {
   id?: string;
@@ -66,6 +69,7 @@ export function parseInputJson(inputJson: string): DashSession {
   try {
     raw = JSON.parse(inputJson) as RawInput;
   } catch (e) {
+    Logger.error(TAG, `parseInputJson failed: ${e}`);
     return makeEmptySession('');
   }
 

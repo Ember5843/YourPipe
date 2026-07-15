@@ -1457,24 +1457,8 @@
             "value": "Не удалось скопировать"
         },
         {
-            "name": "yt_about_version_format",
-            "value": "Версия %s"
-        },
-        {
             "name": "yt_about_package_name",
             "value": "Имя пакета"
-        },
-        {
-            "name": "yt_about_project_count",
-            "value": "%d проектов"
-        },
-        {
-            "name": "yt_about_model_count",
-            "value": "%d моделей"
-        },
-        {
-            "name": "yt_about_latest_version",
-            "value": "Последняя v%s"
         },
         {
             "name": "yt_follow_system",
@@ -1957,28 +1941,8 @@
             "value": "Вход выполнен; потяните вниз для синхронизации подписок YouTube"
         },
         {
-            "name": "yt_playlist_count",
-            "value": "%d видео"
-        },
-        {
-            "name": "yt_playlist_count_alt",
-            "value": "%d видео"
-        },
-        {
-            "name": "yt_favorites_count",
-            "value": "%d видео"
-        },
-        {
             "name": "yt_setting_delay_immediate",
             "value": "Сразу"
-        },
-        {
-            "name": "yt_unit_seconds_full",
-            "value": "%d сек"
-        },
-        {
-            "name": "yt_setting_mb_value",
-            "value": "%d МБ"
         },
         {
             "name": "yt_setting_gpu_auto",
@@ -2335,6 +2299,114 @@
         {
             "name": "yt_changelog_0_1_0_5",
             "value": "Comment list and channel page"
+        },
+        {
+            "name": "yt_label_version_format",
+            "value": "Версия"
+        },
+        {
+            "name": "yt_label_projects",
+            "value": "проектов"
+        },
+        {
+            "name": "yt_label_models",
+            "value": "моделей"
+        },
+        {
+            "name": "yt_label_latest_version",
+            "value": "Последняя v"
+        },
+        {
+            "name": "yt_label_videos",
+            "value": "видео"
+        },
+        {
+            "name": "yt_label_videos_alt",
+            "value": "видео"
+        },
+        {
+            "name": "yt_label_favorites_videos",
+            "value": "видео"
+        },
+        {
+            "name": "yt_label_seconds_short",
+            "value": "сек"
+        },
+        {
+            "name": "yt_label_mb_short",
+            "value": "МБ"
+        },
+        {
+            "name": "yt_setting_delay_5",
+            "value": "5 с"
+        },
+        {
+            "name": "yt_setting_delay_15",
+            "value": "15 с"
+        },
+        {
+            "name": "yt_setting_delay_30",
+            "value": "30 с"
+        },
+        {
+            "name": "yt_setting_delay_60",
+            "value": "60 с"
+        },
+        {
+            "name": "yt_setting_cache_secs_5",
+            "value": "5 с"
+        },
+        {
+            "name": "yt_setting_cache_secs_10",
+            "value": "10 с"
+        },
+        {
+            "name": "yt_setting_cache_secs_20",
+            "value": "20 с"
+        },
+        {
+            "name": "yt_setting_cache_secs_30",
+            "value": "30 с"
+        },
+        {
+            "name": "yt_setting_cache_secs_60",
+            "value": "60 с"
+        },
+        {
+            "name": "yt_setting_readahead_5",
+            "value": "5 с"
+        },
+        {
+            "name": "yt_setting_readahead_8",
+            "value": "8 с"
+        },
+        {
+            "name": "yt_setting_readahead_15",
+            "value": "15 с"
+        },
+        {
+            "name": "yt_setting_readahead_30",
+            "value": "30 с"
+        },
+        {
+            "name": "yt_setting_readahead_60",
+            "value": "60 с"
+        },
+        {
+            "name": "yt_setting_max_bytes_10",
+            "value": "10 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_20",
+            "value": "20 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_50",
+            "value": "50 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_100",
+            "value": "100 MB"
         }
     ]
 }

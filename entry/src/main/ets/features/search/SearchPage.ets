@@ -345,7 +345,7 @@ export struct SearchPage {
     const uiContext: UIContext = this.getUIContext();
     uiContext.showAlertDialog({
       title: $r('app.string.yt_dialog_delete_search_record'),
-      message: `确定要删除"${query}"吗？`,
+      message: getContext().resourceManager.getStringSync($r('app.string.yt_confirm_delete_search_item').id, query),
       autoCancel: true,
       alignment: DialogAlignment.Center,
       offset: { dx: 0, dy: -20 },

@@ -181,7 +181,7 @@ export struct UIPickerLanguageDialog {
     Column() {
       // 标题栏
       Row() {
-        Button('取消')
+        Button($r('app.string.yt_action_cancel'))
           .fontSize(16)
           .backgroundColor(Color.Transparent)
           .fontColor($r('app.color.yourtube_text_secondary'))
@@ -195,7 +195,7 @@ export struct UIPickerLanguageDialog {
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
 
-        Button('确认')
+        Button($r('app.string.yt_action_confirm'))
           .fontSize(16)
           .backgroundColor(Color.Transparent)
           .fontColor(this.themePrimary)

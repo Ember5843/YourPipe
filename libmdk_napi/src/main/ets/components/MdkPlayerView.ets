@@ -1,5 +1,4 @@
 import { MdkPlayerController } from '../controller/MdkPlayerController';
-import { hilog } from '@kit.PerformanceAnalysisKit';
 
 // How the video frame is fitted into the display area.
 export enum VideoFit {
@@ -78,7 +77,6 @@ export struct MdkPlayerView {
       this.videoW = w;
       this.videoH = h;
       this.sized = true;
-      hilog.info(0xFF00, 'mpv', `locked component to native video size ${w}x${h}`);
       if (this.sizeTimer !== -1) {
         clearInterval(this.sizeTimer);
         this.sizeTimer = -1;

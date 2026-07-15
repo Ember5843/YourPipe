@@ -60,9 +60,9 @@ export class AvPlayerController {
   private backgroundTaskListener: StateChangeListener | null = null;
   private backgroundTaskActive: boolean = false;
 
-  private errorListeners: ((errorMsg: string) => void)[] = [];
-  private waitingForBufferListeners: ((isWaiting: boolean) => void)[] = [];
-  private seekableRangesListeners: (() => void)[] = [];
+  private errorListeners: Set<(errorMsg: string) => void> = new Set();
+  private waitingForBufferListeners: Set<(isWaiting: boolean) => void> = new Set();
+  private seekableRangesListeners: Set<() => void> = new Set();
 
   private currentLocalMediaSessionId: string = '';
   private pendingDestroySessionId: string = '';
@@ -152,13 +152,13 @@ export class AvPlayerController {
     this.stateRelay.unsubscribeEnded(listener);
   }
 
-  public addErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners.push(listener); }
-  public removeErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners = this.errorListeners.filter(l => l !== listener); }
+  public addErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners.add(listener); }
+  public removeErrorListener(listener: (errorMsg: string) => void): void { this.errorListeners.delete(listener); }
   public getUserVisibleError(): string { return this.vm.userVisibleErrorMsg; }
-  public addWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners.push(listener); }
-  public removeWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners = this.waitingForBufferListeners.filter(l => l !== listener); }
-  public addSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners.push(listener); }
-  public removeSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners = this.seekableRangesListeners.filter(l => l !== listener); }
+  public addWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners.add(listener); }
+  public removeWaitingForBufferListener(listener: (isWaiting: boolean) => void): void { this.waitingForBufferListeners.delete(listener); }
+  public addSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners.add(listener); }
+  public removeSeekableRangesListener(listener: () => void): void { this.seekableRangesListeners.delete(listener); }
 
   public getStreamCategories(): StreamCategories { return this.vm.playerModel.getStreamCategories(); }
   public getCurrentStreams(): CurrentStreams { return this.vm.playerModel.getCurrentStreams(); }
@@ -667,9 +667,9 @@ export class AvPlayerController {
     this.videoOutputEnabled = true;
     this.lastUpdatedSourceRef = null;
     this.lastUpdatedVideoId = '';
-    this.errorListeners = [];
-    this.waitingForBufferListeners = [];
-    this.seekableRangesListeners = [];
+    this.errorListeners.clear();
+    this.waitingForBufferListeners.clear();
+    this.seekableRangesListeners.clear();
     this.vm.playerModel = new PlayerModel();
   }
 

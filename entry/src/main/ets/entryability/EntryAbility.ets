@@ -14,7 +14,6 @@ import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
 import { AuthSessionManager, YTCoreLogger, YoutubePlayerClientConfig } from 'youtube_core';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
 import { PlayerSession } from '../common/PlayerSession';
 import { PlayerPresentation } from '../common/PlayerPresentation';
@@ -83,7 +82,6 @@ export default class EntryAbility extends UIAbility {
       // 注入 YTCoreLogger sink，覆盖所有 youtube_core 调用
       YTCoreLogger.setSink((level, tag, message) => {
         AppLogStore.push(level, tag, message);
-        hilog.info(0xFF00, 'YTC-' + tag, '%{public}s', message);
       });
       LanguageManager.applyPersistedLanguage();
       ColorModeManager.applyPersistedMode(this.context);

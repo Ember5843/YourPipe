@@ -155,7 +155,7 @@ export struct ChannelCard {
       .margin({ right: 12, top: 2 });
 
       Column() {
-        Text(this.channel.name || 'Unknown')
+        Text(this.channel.name || $r('app.string.yt_label_unknown'))
           .fontSize(14)
           .fontColor($r('app.color.yourtube_text_primary'))
           .maxLines(1)

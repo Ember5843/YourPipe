@@ -124,6 +124,12 @@ export struct VideoPlayer {
   };
 
   private playbackStateListener = (state: PlaybackState) => {
+    // PlaybackState is emitted continuously by the engine and closes the
+    // timing gap where the state-machine transition happened before this page
+    // registered its listener. Buffering must keep the display awake even when
+    // the native player temporarily reports isPlaying=false.
+    this.envService.setKeepScreenOn(state.isPlaying || state.isBuffering
+      || state.engineState === 'buffering');
     if (!this.playbackStarted && state.isReady && state.isPlaying && !state.isBuffering) {
       this.playbackStarted = true;
       Logger.info(TAG, 'Playback started; startup cover dismissed');
@@ -477,10 +483,9 @@ export struct VideoPlayer {
     this.envService.subscribeScreenEvents(
       () => { /* screen off — globally disabled */ },
       () => {
-        Logger.info(TAG, 'Screen on → restore playback');
-        if (this.vm.isReady && !this.vm.isPlaying) {
-          this.controller.syncPlay();
-        }
+        // Screen-on is not a user play command. Keep the explicit pause/play
+        // intent instead of unexpectedly starting audio from the lock screen.
+        Logger.info(TAG, 'Screen on → keep current playback intent');
       }
     );
   }
@@ -1240,7 +1245,7 @@ export struct VideoPlayer {
       if (this.curSource.isLive) {
         Row({ space: 6 }) {
           Circle({ width: 8, height: 8 }).fill('#FF3B30')
-          Text('LIVE')
+          Text($r('app.string.yt_label_live'))
             .fontColor(Color.White).fontSize(13).fontWeight(FontWeight.Medium)
         }
         .layoutWeight(1)

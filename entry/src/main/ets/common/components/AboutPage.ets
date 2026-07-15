@@ -458,7 +458,7 @@ export struct AboutPage {
               Text('YourPipe')
                 .fontSize(26).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.yourtube_text_primary'))
-              Text($r('app.string.yt_about_version_format', APP_VERSION))
+              Text(`${getContext().resourceManager.getStringSync($r('app.string.yt_label_version_format').id)} ${APP_VERSION}`)
                 .fontSize(13).fontColor($r('app.color.yourtube_text_hint'))
             }
             .alignItems(HorizontalAlign.Center)
@@ -576,7 +576,7 @@ export struct AboutPage {
             OptionItem({
               icon: $r('sys.symbol.translate'),
               title: $r('app.string.yt_about_open_source'),
-              subtitle: $r('app.string.yt_about_project_count', OPEN_SOURCE_ITEMS.length),
+              subtitle: `${OPEN_SOURCE_ITEMS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_projects').id)}`,
               iconColor: $r('app.color.yourtube_option_icon_language'),
               onClickAction: () => { this.aboutNavStack.pushPathByName('open_source', null); }
             })
@@ -584,7 +584,7 @@ export struct AboutPage {
             OptionItem({
               icon: $r('sys.symbol.star_fill'),
               title: $r('app.string.yt_about_ai_models'),
-              subtitle: $r('app.string.yt_about_model_count', AI_MODELS.length),
+              subtitle: `${AI_MODELS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_models').id)}`,
               iconColor: '#8B5CF6',
               onClickAction: () => { this.aboutNavStack.pushPathByName('ai_models', null); }
             })
@@ -592,7 +592,7 @@ export struct AboutPage {
             OptionItem({
               icon: $r('sys.symbol.clock'),
               title: $r('app.string.yt_about_changelog'),
-              subtitle: $r('app.string.yt_about_latest_version', CHANGELOG[0].version),
+              subtitle: `${getContext().resourceManager.getStringSync($r('app.string.yt_label_latest_version').id)}${CHANGELOG[0].version}`,
               iconColor: $r('app.color.yourtube_option_icon_palette'),
               onClickAction: () => { this.aboutNavStack.pushPathByName('changelog', null); }
             })

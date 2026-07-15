@@ -32,6 +32,10 @@ export class PlayerPresentation {
   static onAbilityForeground(): void {
     AppStorage.setOrCreate('isAppBackground', false);
     PlayerPresentation.overlayHold = 0;
+    if (AppStorage.get<boolean>('isPiPActive') === true) {
+      PlayerPresentation.enter(PresentationMode.PIP, 'ability-fg-pip');
+      return;
+    }
     PlayerPresentation.enter(PresentationMode.PAGE, 'ability-fg');
   }
 

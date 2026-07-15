@@ -397,6 +397,13 @@ export class DownloadManager {
   private context: common.UIAbilityContext | null = null;
   private notificationDispatcher: DownloadNotificationDispatcher;
 
+  private tr(resource: Resource, ...args: Array<string | number>): string {
+    if (!this.context) {
+      return '';
+    }
+    return this.context.resourceManager.getStringSync(resource.id, ...args);
+  }
+
   private constructor() {
     this.notificationDispatcher = new DownloadNotificationDispatcher(
       (task: DownloadTask): string => this.getNotificationStatusText(task),
@@ -585,7 +592,7 @@ export class DownloadManager {
     task._audioFilePath = `${task.taskDir}/audio.${audioExt}`;
     logger.info(`Task ${task.id} SABR download start: video=${this.getStreamLogLabel(task.videoStream)} `
       + `audio=${this.getStreamLogLabel(task.audioStream)}`);
-    this.showToast(`开始下载：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+    this.showToast(this.tr($r('app.string.yt_download_started_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
 
     const videoFile = fs.openSync(task._videoFilePath,
       fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
@@ -683,9 +690,9 @@ export class DownloadManager {
       this.publishDownloadNotification(task, true);
       const exportedPath = await this.runAutoExportAtTaskEnd(task);
       if (exportedPath) {
-        this.showToast(`已保存到下载：${this.truncateNotificationText(this.getFileName(exportedPath), 36)}`);
+        this.showToast(this.tr($r('app.string.yt_download_saved_format'), this.truncateNotificationText(this.getFileName(exportedPath), 36)));
       } else {
-        this.showToast(`下载完成：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+        this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
       }
     } catch (error) {
       if (task._cancelled || this.getErrorMessage(error) === 'cancelled') {
@@ -716,7 +723,7 @@ export class DownloadManager {
     logger.info(`Task ${task.id} HLS download start: stream=${this.getStreamLogLabel(task.videoStream)}`);
     task.status = DownloadStatus.DOWNLOADING_VIDEO;
     this.publishDownloadNotification(task, true);
-    this.showToast(`开始下载：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+    this.showToast(this.tr($r('app.string.yt_download_started_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
 
     try {
       const manifestUrl = task.videoStream.url;
@@ -759,7 +766,7 @@ export class DownloadManager {
       task.videoProgress = 100;
       logger.info(`Task ${task.id} HLS completed: output=${outputPath}`);
       this.publishDownloadNotification(task, true);
-      this.showToast(`下载完成：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+      this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
     } catch (error) {
       task.status = DownloadStatus.FAILED;
       task.errorMessage = this.getErrorMessage(error);
@@ -855,7 +862,7 @@ export class DownloadManager {
     task._videoFilePath = `${task.taskDir}/video.${videoExt}`;
     task._audioFilePath = task.audioStream ? `${task.taskDir}/audio.${audioExt}` : '';
     logger.info(`Task ${task.id} start: dir=${task.taskDir} totalSize=${task.totalSize || 'unknown'} video=${this.getStreamLogLabel(task.videoStream)} audio=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'}`);
-    this.showToast(`开始下载：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+    this.showToast(this.tr($r('app.string.yt_download_started_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
 
     task.status = DownloadStatus.DOWNLOADING_VIDEO;
     this.publishDownloadNotification(task, true);
@@ -889,9 +896,9 @@ export class DownloadManager {
     this.publishDownloadNotification(task, true);
     const exportedPath = await this.runAutoExportAtTaskEnd(task);
     if (exportedPath) {
-      this.showToast(`已保存到下载：${this.truncateNotificationText(this.getFileName(exportedPath), 36)}`);
+      this.showToast(this.tr($r('app.string.yt_download_saved_format'), this.truncateNotificationText(this.getFileName(exportedPath), 36)));
     } else {
-      this.showToast(`下载完成：${this.truncateNotificationText(task.title || task.videoId, 36)}`);
+      this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
     }
   }
 
@@ -1203,7 +1210,7 @@ export class DownloadManager {
 
   private getNotificationStatusText(task: DownloadTask): string {
     if (task.status === DownloadStatus.FAILED) {
-      return task.errorMessage || 'Download failed';
+      return task.errorMessage || this.tr($r('app.string.yt_download_status_failed'));
     }
     const progressText = task.getProgressText();
     return progressText ? `${task.getStatusLabel()} · ${progressText}` : task.getStatusLabel();

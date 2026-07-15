@@ -12,6 +12,7 @@
  */
 
 import { PlayerState, isValidTransition, describeState } from './PlayerState';
+import Logger from '../utils/Logger';
 
 export interface StateChangeListener {
   onStateChange(from: PlayerState, to: PlayerState): void;
@@ -61,14 +62,14 @@ export class PlayerStateMachine {
     }
     if (!isValidTransition(from, to)) {
       const allowed = this.getAllowedTransitions(from);
-      console.error(
+      Logger.error(
         `${this.debugTag} Illegal transition: ${describeState(from)} → ${describeState(to)}. ` +
         `Allowed: [${allowed.map(s => describeState(s)).join(', ')}]`
       );
       return false;
     }
     this._currentState = to;
-    console.info(`${this.debugTag} ${describeState(from)} → ${describeState(to)}`);
+    Logger.info(`${this.debugTag} ${describeState(from)} → ${describeState(to)}`);
     this.notifyListeners(from, to);
     return true;
   }
@@ -80,7 +81,7 @@ export class PlayerStateMachine {
     const from = this._currentState;
     if (from === to) return;
     this._currentState = to;
-    console.warn(`${this.debugTag} [FORCE] ${describeState(from)} → ${describeState(to)}`);
+    Logger.warn(`${this.debugTag} [FORCE] ${describeState(from)} → ${describeState(to)}`);
     this.notifyListeners(from, to);
   }
 
@@ -119,7 +120,7 @@ export class PlayerStateMachine {
       try {
         listener.onStateChange(from, to);
       } catch (e) {
-        console.error(`${this.debugTag} Listener error: ${e}`);
+        Logger.error(`${this.debugTag} Listener error: ${e}`);
       }
     }
   }

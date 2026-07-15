@@ -1,3 +1,7 @@
+import { hilog } from '@kit.PerformanceAnalysisKit';
+
+const DOMAIN: number = 0xFF00;
+
 export type YTCoreLogSinkFn = (level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR', tag: string, message: string) => void;
 
 export class YTCoreLogger {
@@ -24,6 +28,7 @@ export class YTCoreLogger {
   // Instance methods
   debug(message: string, ...args: Object[]): void {
     const logArgs = [message, ...args].join(' ');
+    hilog.debug(DOMAIN, `YTC-${this.tag}`, '%{public}s', logArgs);
     if (YTCoreLogger.sink) {
       YTCoreLogger.sink('DEBUG', this.tag, logArgs);
     }
@@ -31,6 +36,7 @@ export class YTCoreLogger {
 
   info(message: string, ...args: Object[]): void {
     const logArgs = [message, ...args].join(' ');
+    hilog.info(DOMAIN, `YTC-${this.tag}`, '%{public}s', logArgs);
     if (YTCoreLogger.sink) {
       YTCoreLogger.sink('INFO', this.tag, logArgs);
     }
@@ -38,6 +44,7 @@ export class YTCoreLogger {
 
   log(message: string, ...args: Object[]): void {
     const logArgs = [message, ...args].join(' ');
+    hilog.info(DOMAIN, `YTC-${this.tag}`, '%{public}s', logArgs);
     if (YTCoreLogger.sink) {
       YTCoreLogger.sink('INFO', this.tag, logArgs);
     }
@@ -45,6 +52,7 @@ export class YTCoreLogger {
 
   warn(message: string, ...args: Object[]): void {
     const logArgs = [message, ...args].join(' ');
+    hilog.warn(DOMAIN, `YTC-${this.tag}`, '%{public}s', logArgs);
     if (YTCoreLogger.sink) {
       YTCoreLogger.sink('WARN', this.tag, logArgs);
     }
@@ -52,6 +60,7 @@ export class YTCoreLogger {
 
   error(message: string, ...args: Object[]): void {
     const logArgs = [message, ...args].join(' ');
+    hilog.error(DOMAIN, `YTC-${this.tag}`, '%{public}s', logArgs);
     if (YTCoreLogger.sink) {
       YTCoreLogger.sink('ERROR', this.tag, logArgs);
     }

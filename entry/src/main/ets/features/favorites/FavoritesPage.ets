@@ -52,27 +52,6 @@ export struct FavoritesPage {
     return 1;
   }
 
-  private getString(res: Resource, ...args: (string | number)[]): string {
-    try {
-      const ctx = this.getUIContext().getHostContext();
-      if (!ctx) {
-        return '';
-      }
-      const rm = ctx.resourceManager;
-      const value = rm.getStringSync(res);
-      if (args.length === 0) {
-        return value;
-      }
-      return value.replace(/%([sd])/g, () => {
-        const v = args.shift();
-        return v === undefined ? '' : String(v);
-      });
-    } catch (e) {
-      logger.warn('getString failed', JSON.stringify(e));
-      return '';
-    }
-  }
-
   private buildPlaceholder(item: PlaylistItem, index: number): SearchPlaylistItem {
     return new SearchPlaylistItem(
       index,
@@ -89,12 +68,14 @@ export struct FavoritesPage {
   /** 把本地播放列表快照转成 PlaylistCard 可渲染的 SearchPlaylistItem，封面取首个视频缩略图。 */
   private buildLocalPlaylistItem(queue: StoredLocalQueue, index: number): SearchPlaylistItem {
     const cover = queue.videos.length > 0 ? (queue.videos[0].thumbnailUrl || '') : '';
-    const untitled = this.getString($r('app.string.yt_label_untitled'));
-    const countText = this.getString($r('app.string.yt_favorites_count'), queue.videos.length);
+    const ctx = this.getUIContext().getHostContext();
+    const countText = ctx
+      ? `${queue.videos.length} ${ctx.resourceManager.getStringSync($r('app.string.yt_label_favorites_videos'))}`
+      : '';
     return new SearchPlaylistItem(
       index,
       queue.id,
-      queue.name || untitled,
+      queue.name || '',
       '',
       countText,
       cover,

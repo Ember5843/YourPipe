@@ -90,16 +90,6 @@ export struct PlaylistDetailPage {
     return 1;
   }
 
-  private formatVideoCount(res: Resource, count: number): string {
-    try {
-      const value = this.getUIContext().getHostContext()?.resourceManager.getStringSync(res) ?? '';
-      return value.replace(/%([sd])/g, () => String(count));
-    } catch (e) {
-      logger.warn('formatVideoCount failed', JSON.stringify(e));
-      return '';
-    }
-  }
-
   private async loadPlaylistVideos(): Promise<void> {
     this.isLoading = true;
     this.errorMessage = '';
@@ -117,7 +107,9 @@ export struct PlaylistDetailPage {
         this.videoList = queue ? queue.videos.slice() : [];
         this.nextPageToken = null;
         this.visitorData = '';
-        this.totalCountText = this.formatVideoCount($r('app.string.yt_playlist_count'), this.videoList.length);
+        const ctx = this.getUIContext().getHostContext();
+        const suffix = ctx ? ctx.resourceManager.getStringSync($r('app.string.yt_label_videos')) : '';
+        this.totalCountText = `${this.videoList.length} ${suffix}`;
         return;
       }
       this.nextPageToken = null;
@@ -147,9 +139,15 @@ export struct PlaylistDetailPage {
         this.visitorData = '';
       }
       if (!this.totalCountText || this.totalCountText.length === 0) {
-        this.totalCountText = this.playlist.videoCountText
-          ? this.playlist.videoCountText
-          : (this.videoList.length > 0 ? this.formatVideoCount($r('app.string.yt_playlist_count_alt'), this.videoList.length) : '');
+        if (this.playlist.videoCountText) {
+          this.totalCountText = this.playlist.videoCountText;
+        } else if (this.videoList.length > 0) {
+          const ctx = this.getUIContext().getHostContext();
+          const suffix = ctx ? ctx.resourceManager.getStringSync($r('app.string.yt_label_videos_alt')) : '';
+          this.totalCountText = `${this.videoList.length} ${suffix}`;
+        } else {
+          this.totalCountText = '';
+        }
       }
     } catch (err) {
       logger.error('loadPlaylistVideos failed:', JSON.stringify(err));

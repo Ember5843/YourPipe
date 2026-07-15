@@ -137,7 +137,7 @@ export struct PlayQueueList {
       }
 
       Row() {
-        Text('自动播放')
+        Text($r('app.string.yt_label_autoplay'))
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_secondary'))
         Toggle({ type: ToggleType.Switch, isOn: this.autoPlayEnabled })

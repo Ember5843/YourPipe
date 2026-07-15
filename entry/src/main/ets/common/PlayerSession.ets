@@ -3,7 +3,7 @@ import { AbilityConstant, common } from '@kit.AbilityKit';
 import { AvPlayerController, VideoData, PlayerState, StateChangeListener, LocalMediaProxy } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
-import { PlayQueueManager } from '../features/player/PlayQueueManager';
+import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
 import { YOUTUBE_VIDEO_ID } from './Constants';
@@ -36,6 +36,8 @@ export class PlayerSession {
   private _watchVideoId: string = '';
   private _activePlayPromise: Promise<VideoData | null> | null = null;
   private _activePlayVideoId: string = '';
+  /** Invalidates async extraction/source submission across a fresh external open. */
+  private _playGeneration: number = 0;
   /** Source already accepted by the controller; MPV may still be opening/decoding it. */
   private _submittedVideoId: string = '';
 
@@ -57,8 +59,15 @@ export class PlayerSession {
 
   /** PlayerSession 被 release 销毁时由外部（Index.ets）设置的回调，用于清理 NavStack */
   onSessionReleased?: () => void;
-  /** nextResponse / RYD 点赞点踩等到齐后回调，供播放页刷新 UI */
-  onPlaybackExtrasUpdated?: (source: VideoData) => void;
+  private playbackExtrasListeners: Set<(source: VideoData) => void> = new Set();
+
+  subscribePlaybackExtras(listener: (source: VideoData) => void): void {
+    this.playbackExtrasListeners.add(listener);
+  }
+
+  unsubscribePlaybackExtras(listener: (source: VideoData) => void): void {
+    this.playbackExtrasListeners.delete(listener);
+  }
 
   static getInstance(): PlayerSession {
     if (!PlayerSession.instance) {
@@ -279,6 +288,18 @@ export class PlayerSession {
 
     const videoId = video.videoId || YOUTUBE_VIDEO_ID;
 
+    // Finish accounting for the old media before publishing the new current
+    // video. Otherwise the history timer can write new metadata to the old ID
+    // while extraction of the replacement source is still in flight.
+    if (this._currentVideo?.videoId && this._currentVideo.videoId !== videoId) {
+      this.saveWatchHistory();
+      this.stopWatchSaveTimer();
+      this._watchVideoId = '';
+      this._activeExtrasVideoId = '';
+      this._cachedVideoSource = null;
+      logger.info(`${TAG} media switch ${this._currentVideo.videoId} -> ${videoId}`);
+    }
+
     if (this._currentVideo?.videoId === video.videoId
       && (this._controller.vm.isReady || this._submittedVideoId === videoId)) {
       logger.info(`${TAG} play() skipped: same video ${videoId} already submitted/ready`);
@@ -294,7 +315,8 @@ export class PlayerSession {
     this._activePlayVideoId = videoId;
     logger.info(`${TAG} play() called for ${videoId}`);
 
-    const promise = this.doPlay(video, videoId);
+    const generation = this._playGeneration;
+    const promise = this.doPlay(video, videoId, generation);
     this._activePlayPromise = promise;
     try {
       return await promise;
@@ -306,7 +328,7 @@ export class PlayerSession {
     }
   }
 
-  private async doPlay(video: VideoItem, videoId: string): Promise<VideoData | null> {
+  private async doPlay(video: VideoItem, videoId: string, generation: number): Promise<VideoData | null> {
     try {
       const playService = YouTubePlayService.getInstance(this._context);
       const startedAt = Date.now();
@@ -322,8 +344,8 @@ export class PlayerSession {
       const result = parallel[0];
       logger.info(`${TAG} [TIMING] video=${videoId} extract+MPV init elapsed=${Date.now() - startedAt}ms`);
 
-      if (this._currentVideo?.videoId !== videoId) {
-        logger.info(`${TAG} doPlay() result discarded: video changed during extraction`);
+      if (generation !== this._playGeneration || this._currentVideo?.videoId !== videoId) {
+        logger.info(`${TAG} doPlay() result discarded: session changed during extraction`);
         return null;
       }
 
@@ -406,6 +428,10 @@ export class PlayerSession {
         videoSource.auto = shouldPlay;
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
         await this._controller.updateVideoSource(videoSource);
+        if (generation !== this._playGeneration || this._currentVideo?.videoId !== videoId) {
+          logger.info(`${TAG} source completion discarded: session changed during submission`);
+          return null;
+        }
         this._submittedVideoId = videoId;
         logger.info(`${TAG} [TIMING] video=${videoId} source submitted elapsed=${Date.now() - startedAt}ms`);
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
@@ -435,16 +461,7 @@ export class PlayerSession {
     if (count === undefined || count === null || count < 0) {
       return '0';
     }
-    if (count >= 100000000) {
-      return `${(count / 100000000).toFixed(1)}亿`;
-    }
-    if (count >= 10000) {
-      return `${(count / 10000).toFixed(1)}万`;
-    }
-    if (count >= 1000) {
-      return `${(count / 1000).toFixed(1)}K`;
-    }
-    return `${count}`;
+    return count.toLocaleString();
   }
 
   private fetchPlaybackExtrasInBackground(playService: YouTubePlayService, videoInfo: VideoInfo): void {
@@ -490,8 +507,12 @@ export class PlayerSession {
       if (this._cachedVideoSource && this._cachedVideoSource.videoId === videoId) {
         this._cachedVideoSource = this._defaultSource;
       }
-      if (this.onPlaybackExtrasUpdated) {
-        this.onPlaybackExtrasUpdated(this._cachedVideoSource || this._defaultSource);
+      for (const listener of this.playbackExtrasListeners) {
+        try {
+          listener(this._cachedVideoSource || this._defaultSource);
+        } catch (e) {
+          logger.warn(`${TAG} playback extras listener failed: ${e}`);
+        }
       }
 
       const relatedItems = extras.relatedItems;
@@ -569,6 +590,10 @@ export class PlayerSession {
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
     this._controller.releaseVideo(0);
+    const queue = PlayQueueManager.getInstance();
+    if (queue.sourceType === QueueSourceType.ADHOC) {
+      queue.clear();
+    }
   }
 
   /**
@@ -589,6 +614,7 @@ export class PlayerSession {
    *   forceReset/release always pass false.
    */
   private resetSession(preserveAudioOnly: boolean = false): void {
+    this._playGeneration++;
     const keepAudioOnly = preserveAudioOnly && this._isAudioOnlyMode;
     this._controller.releaseVideo(0);
     this._currentVideo = null;

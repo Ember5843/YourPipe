@@ -153,7 +153,7 @@ export class AppLogStore {
         AppLogStore.ensureLogsDir();
         AppLogStore.loadHistorySessions();
       } catch (e) {
-        // 文件系统初始化失败不影响日志内存记录
+        hilog.error(0xFF00, 'AppLogStore', 'init filesystem failed: %{public}s', JSON.stringify(e));
       }
     }
 
@@ -161,6 +161,8 @@ export class AppLogStore {
     if (enableLogger) {
       AppLogStore.createNewSession();
     }
+    hilog.info(0xFF00, 'AppLogStore', 'initialized enabled=%{public}s dir=%{public}s',
+      String(enableLogger), AppLogStore.logsDir || '(memory-only)');
   }
 
   /**
@@ -174,6 +176,7 @@ export class AppLogStore {
     if (AppLogStore.nativeStartFn) {
       AppLogStore.nativeStartFn();
     }
+    hilog.info(0xFF00, 'AppLogStore', 'listening started session=%{public}s', AppLogStore.currentSessionId);
   }
 
   /**
@@ -186,6 +189,7 @@ export class AppLogStore {
     if (AppLogStore.nativeStopFn) {
       AppLogStore.nativeStopFn();
     }
+    hilog.info(0xFF00, 'AppLogStore', 'listening stopped');
   }
 
   /** 是否正在记录 */

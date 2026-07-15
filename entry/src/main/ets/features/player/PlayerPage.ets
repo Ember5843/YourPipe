@@ -35,7 +35,6 @@ import { CommentNavWrapper } from './components/CommentNavWrapper';
 import { AvPlayerController, PlayerUiViewModel } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
 import { PlayQueueList } from './components/PlayQueueList';
-import { PlayQueueManager, QueueSourceType } from './PlayQueueManager';
 import { PiPManager } from './pip/PiPManager';
 import { PlaybackConfig } from '../../common/PlaybackConfig';
 import { MediaThumb } from '../../common/components/MediaThumb';
@@ -112,6 +111,8 @@ export struct VideoPlayerPage {
    * so we never flash landscape-wide mid-rotate (0.5.1 gap).
    */
   private pendingOrientationSettle: boolean = false;
+  /** Whether local playback was active before a cast session took ownership. */
+  private resumeAfterCast: boolean = false;
 
   private async cacheThumbnail(videoId: string, thumbnailUrl: string): Promise<void> {
     if (!videoId || !thumbnailUrl) {
@@ -125,7 +126,8 @@ export struct VideoPlayerPage {
         this.cachedThumbnailUri = fileUri.getUriFromPath(localPath);
         return;
       }
-    } catch (_e) {
+    } catch (e) {
+      logger.debug(`${TAG} thumbnail cache skipped: ${e}`);
     }
     try {
       const downloader = http.createHttp();
@@ -232,38 +234,21 @@ export struct VideoPlayerPage {
     this.detailChannelAvatarUrl = this.video?.channelAvatarUrl || '';
   }
 
+  private playbackExtrasListener = (source: VideoData): void => {
+    if (!source || (this.video && source.videoId && source.videoId !== this.video.videoId)) {
+      return;
+    }
+    this.videoSource = source;
+    this.syncDetailStateFromSource(source);
+  };
+
   async aboutToAppear(): Promise<void> {
     const session = PlayerSession.getInstance();
     this.controller = session.controller;
     this.vm = session.controller.vm;
-    session.onPlaybackExtrasUpdated = (source: VideoData) => {
-      if (!source || (this.video && source.videoId && source.videoId !== this.video.videoId)) {
-        return;
-      }
-      this.videoSource = source;
-      this.syncDetailStateFromSource(source);
-    };
+    session.subscribePlaybackExtras(this.playbackExtrasListener);
 
     let context: Context = this.getUIContext().getHostContext() as Context;
-
-    // XComponent 方式 PiP：surface 由 AVPlayer 的内联 XComponent.onLoad 直接绑定，
-    // 这里无需注册 surface 监听。仅注入 release 时停 PiP 的回调（避免 PlayerSession 循环 import）。
-    PlayerSession.getInstance().onStopPiP = () => PiPManager.getInstance().stopPiP();
-
-    // 移植 0.4.0 退出语义：PiP 被关闭时，后台仅暂停（保活后台播放），前台释放会话。
-    PiPManager.getInstance().onPipStop = () => {
-      const session = PlayerSession.getInstance();
-      const isAppBackground = AppStorage.get<boolean>('isAppBackground') ?? false;
-      if (isAppBackground) {
-        logger.info(`${TAG} onPipStop while background → pause only`);
-        session.controller.syncPause();
-      } else {
-        // 前台关闭 PiP：仅释放会话。不调用 closePage()——进入 PiP 时（返回键路径）
-        // 播放页已被 navPathStack.pop() 弹出，此处再 pop 会多触发一次返回动作。
-        logger.info(`${TAG} onPipStop while foreground → release session`);
-        session.release();
-      }
-    };
 
     // 进入播放页：重置沉浸全屏标志，由 WindowUtil 全局策略按当前方向决定系统栏
     this.windowUtil.setPlayerFullscreenImmersive(false);
@@ -290,24 +275,18 @@ export struct VideoPlayerPage {
     this.controller = session.controller;
     this.vm = session.controller.vm;
 
-    // Register queue switch callback: when user clicks another video in the play queue,
-    // PlayerPage reloads without going through AppStorage/Index.openVideoDetail.
-    PlayQueueManager.getInstance().onSwitchVideo = async (v: VideoItem) => {
-      logger.info(`${TAG} queue switch → ${v.videoId}`);
-      // Set StorageProp to trigger @Watch('onVideoChange') — do NOT call onVideoChange()
-      // explicitly to avoid double-trigger race condition.
-      AppStorage.setOrCreate('selectedVideo', v);
-      await PlayerSession.getInstance().play(v);
-    };
-
     this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
 
     this.controller.onCastStateChange = (isCasting: boolean, deviceName: string) => {
       logger.info(`${TAG} Cast state changed: isCasting=${isCasting}, device=${deviceName}`);
       if (isCasting) {
+        this.resumeAfterCast = this.vm.isPlaying;
         this.controller.syncPause();
-      } else if (this.isPageShow && !this.vm.isCasting) {
+      } else if (this.resumeAfterCast && this.isPageShow && !this.vm.isCasting) {
+        this.resumeAfterCast = false;
         this.controller.syncPlay();
+      } else {
+        this.resumeAfterCast = false;
       }
     };
 
@@ -315,7 +294,7 @@ export struct VideoPlayerPage {
   }
 
   aboutToDisappear(): void {
-    PlayerSession.getInstance().onPlaybackExtrasUpdated = undefined;
+    PlayerSession.getInstance().unsubscribePlaybackExtras(this.playbackExtrasListener);
     harmonyShare.off('knockShare', this.knockShareCallback);
     // 离开播放页：清除沉浸全屏标志，恢复主题状态栏颜色
     this.windowUtil.setPlayerFullscreenImmersive(false);
@@ -324,26 +303,25 @@ export struct VideoPlayerPage {
     this.windowUtil.registerOffWindowSizeChange();
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
     this.controller.onCastStateChange = undefined;
+    this.resumeAfterCast = false;
 
     // 退出播放页：关闭 PiP 自动启动（避免非播放页 home 键误启），注销生命周期回调
     PiPManager.getInstance().setAutoStart(false);
     PiPManager.getInstance().unregisterPipStateChangeListener();
 
-    // 退出时清理 adhoc 队列
-    const qm = PlayQueueManager.getInstance();
-    if (qm.sourceType === QueueSourceType.ADHOC) {
-      qm.clear();
-      logger.info(`${TAG} cleared adhoc queue on exit`);
-    }
+    // Queue lifetime belongs to PlayerSession. A page can disappear while PiP
+    // or background playback is still active, so it must not clear the queue.
   }
 
   // Guard against concurrent onVideoChange invocations (e.g. @Watch + explicit call)
   private isVideoChanging: boolean = false;
+  private pendingVideoChange: boolean = false;
 
   private async onVideoChange(): Promise<void> {
     if (!this.video) return;
     if (this.isVideoChanging) {
-      logger.info(`${TAG} onVideoChange skipped: already in progress`);
+      this.pendingVideoChange = true;
+      logger.info(`${TAG} onVideoChange queued: already in progress`);
       return;
     }
     const session = PlayerSession.getInstance();
@@ -411,7 +389,8 @@ export struct VideoPlayerPage {
       } else {
         const err = session.lastPlayError;
         if (err === null) {
-          this.videoDescriptionError = '加载视频失败';
+          this.videoDescriptionError = getContext().resourceManager.getStringSync(
+            $r('app.string.yt_error_playback_failed').id);
           this.errorInfo = null;
         } else {
           this.errorInfo = err;
@@ -420,17 +399,23 @@ export struct VideoPlayerPage {
       }
     } catch (e) {
       logger.error(`${TAG} onVideoChange exception: ${e}`);
-      this.videoDescriptionError = '加载视频失败';
+      this.videoDescriptionError = getContext().resourceManager.getStringSync(
+        $r('app.string.yt_error_playback_failed').id);
     } finally {
       this.isLoading = false;
       this.isVideoChanging = false;
+      if (this.pendingVideoChange) {
+        this.pendingVideoChange = false;
+        setTimeout(() => this.onVideoChange(), 0);
+      }
     }
   }
 
   onPageHide(): void {
     this.isPageShow = false;
-    // 页面隐藏时关闭 PiP 自动启动（避免非播放页 home 键误启）
-    PiPManager.getInstance().setAutoStart(false);
+    // onPageHide also fires when the ability goes to background. Do not disable
+    // auto-start here or the Home gesture races against its own PiP request.
+    // aboutToDisappear handles real navigation away from the player page.
   }
 
   onPageShow(): void {
@@ -777,11 +762,11 @@ export struct VideoPlayerPage {
         SymbolGlyph($r('sys.symbol.play_circle'))
           .fontSize(40)
           .fontColor([Color.White])
-        Text('画中画播放中')
+        Text($r('app.string.yt_pip_playing'))
           .fontColor(Color.White)
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
-        Text('点击画中画窗口恢复')
+        Text($r('app.string.yt_pip_restore_hint'))
           .fontColor('#99FFFFFF')
           .fontSize(13)
       }

@@ -34,7 +34,8 @@ export struct OptionsLanguageAndRegionPage {
 
   private getItemDisplay(items: LanguagePickerItem[], code: string): string {
     const found = items.find((it: LanguagePickerItem): boolean => it.code === code);
-    return found ? found.localizedName : '跟随系统';
+    return found ? found.localizedName
+      : getContext().resourceManager.getStringSync($r('app.string.yt_follow_system').id);
   }
 
   private getAppLanguageSubtitle(): string {

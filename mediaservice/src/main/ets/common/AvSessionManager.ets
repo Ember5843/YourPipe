@@ -25,8 +25,11 @@ export class AvSessionManager {
   private currentMetadata: avSession.AVMetadata | undefined = undefined;
   private audioSessionManager: audio.AudioSessionManager | undefined = undefined;
   private audioSessionActivated: boolean = false;
+  private audioActivationGeneration: number = 0;
   private pendingPlaybackState: avSession.AVPlaybackState | null = null;
   private playbackStateWriteInFlight: boolean = false;
+  /** Serializes singleton AVSession destroy/init across controller replacement. */
+  private lifecycleChain: Promise<void> = Promise.resolve();
 
   // Callbacks wired up by AvPlayerController
   public onPlayCommand: (() => void) | undefined = undefined;
@@ -69,6 +72,14 @@ export class AvSessionManager {
    * is first initialized (e.g. in AvPlayerController.initAVPlayer).
    */
   public async init(): Promise<void> {
+    const task = this.lifecycleChain.then(() => this.initInternal());
+    this.lifecycleChain = task.catch((e: Error) => {
+      Logger.error(TAG, `lifecycle init failed: ${e.message}`);
+    });
+    await task;
+  }
+
+  private async initInternal(): Promise<void> {
     this.context = AppStorage.get<common.UIAbilityContext>('context');
     if (!this.context) {
       Logger.error(TAG, 'init failed: context is undefined');
@@ -114,6 +125,14 @@ export class AvSessionManager {
    * Call when the player is fully stopped/released.
    */
   public async destroy(): Promise<void> {
+    const task = this.lifecycleChain.then(() => this.destroyInternal());
+    this.lifecycleChain = task.catch((e: Error) => {
+      Logger.error(TAG, `lifecycle destroy failed: ${e.message}`);
+    });
+    await task;
+  }
+
+  private async destroyInternal(): Promise<void> {
     this.deactivateForPause();
     if (!this.session) {
       return;
@@ -421,6 +440,7 @@ export class AvSessionManager {
   // ─────────────────────────────────────────────────────────────────────────
 
   public activateForPlayback(): void {
+    const activationGeneration = ++this.audioActivationGeneration;
     try {
       if (!this.audioSessionManager) {
         const audioManager: audio.AudioManager = audio.getAudioManager();
@@ -456,6 +476,11 @@ export class AvSessionManager {
       }
 
       this.audioSessionManager.activateAudioSession(strategy).then(() => {
+        if (activationGeneration !== this.audioActivationGeneration) {
+          Logger.info(TAG, '[AudioFocus] stale activation completed; deactivating');
+          this.audioSessionManager?.deactivateAudioSession().catch(() => {});
+          return;
+        }
         this.audioSessionActivated = true;
         Logger.info(TAG, '[AudioFocus] sessionActivated strategy=DEFAULT scene=MEDIA');
       }).catch((e: BusinessError) => {
@@ -467,6 +492,7 @@ export class AvSessionManager {
   }
 
   public deactivateForPause(): void {
+    this.audioActivationGeneration++;
     if (!this.audioSessionManager) {
       return;
     }

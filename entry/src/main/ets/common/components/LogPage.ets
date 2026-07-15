@@ -97,7 +97,7 @@ struct SessionCard {
         .width('100%')
 
         // 次行：日志条数（直接读 @Track logs.length，不用 getter）
-        Text(`${this.session.logs.length} 条日志`)
+        Text($r('app.string.yt_log_count_format', this.session.logs.length))
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_quaternary'))
       }
@@ -310,7 +310,7 @@ export struct LogPage {
         })
 
         Column() {
-          TextInput({ placeholder: 'Regex filter, e.g. DownloadManager|Task .*failed', text: this.logFilterPattern })
+          TextInput({ placeholder: $r('app.string.yt_log_regex_placeholder'), text: this.logFilterPattern })
             .width('100%')
             .height(42)
             .fontSize(14)

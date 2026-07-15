@@ -106,10 +106,7 @@ export struct VideoDetails {
 
   private formatViewCount(count: number): string {
     if (!count) return '';
-    if (count >= 100000000) return (count / 100000000).toFixed(1) + '亿';
-    if (count >= 10000) return (count / 10000).toFixed(1) + '万';
-    if (count >= 1000) return (count / 1000).toFixed(1) + 'K';
-    return count.toString();
+    return count.toLocaleString();
   }
 
   private formatRelativeDate(dateStr: string): string {
@@ -118,11 +115,12 @@ export struct VideoDetails {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays < 1) return '今天';
-    if (diffDays < 7) return `${diffDays}天前`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}周前`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)}个月前`;
-    return `${Math.floor(diffDays / 365)}年前`;
+    const rm = getContext().resourceManager;
+    if (diffDays < 1) return rm.getStringSync($r('app.string.yt_date_today').id);
+    if (diffDays < 7) return rm.getStringSync($r('app.string.yt_date_days_ago').id, diffDays);
+    if (diffDays < 30) return rm.getStringSync($r('app.string.yt_date_weeks_ago').id, Math.floor(diffDays / 7));
+    if (diffDays < 365) return rm.getStringSync($r('app.string.yt_date_months_ago').id, Math.floor(diffDays / 30));
+    return rm.getStringSync($r('app.string.yt_date_years_ago').id, Math.floor(diffDays / 365));
   }
 
   aboutToAppear() {
@@ -262,7 +260,7 @@ export struct VideoDetails {
       (this.streamCategories.video.length === 0 &&
         this.streamCategories.progressive.length === 0 &&
         this.streamCategories.hlsManifest.length === 0)) {
-      this.getUIContext().getPromptAction().showToast({ message: 'No downloadable streams available' });
+      this.getUIContext().getPromptAction().showToast({ message: $r('app.string.yt_error_no_downloadable_stream') });
       return;
     }
 
@@ -411,7 +409,8 @@ export struct VideoDetails {
     // Title-adjacent stats: views / date / like / dislike as one compact strip.
     Row({ space: 0 }) {
       if (this.viewCount > 0) {
-        this.StatItem($r('sys.symbol.play_round_rectangle'), `${this.formatViewCount(this.viewCount)}次观看`, false)
+        this.StatItem($r('sys.symbol.play_round_rectangle'),
+          $r('app.string.yt_views_count_format', this.formatViewCount(this.viewCount)), false)
       }
       if (this.publishDate && this.publishDate.length > 0) {
         this.StatItem($r('sys.symbol.calendar'), this.formatRelativeDate(this.publishDate), this.viewCount > 0)
@@ -442,7 +441,7 @@ export struct VideoDetails {
   }
 
   @Builder
-  StatItem(icon: Resource, label: string, showDivider: boolean) {
+  StatItem(icon: Resource, label: ResourceStr, showDivider: boolean) {
     if (showDivider) {
       Text('·')
         .fontSize(12)
@@ -469,16 +468,16 @@ export struct VideoDetails {
     Scroll() {
       Row({ space: 10 }) {
         this.ActionButton($r('sys.symbol.TV_tv'),
-          '投屏', () => { this.openCastPicker(); })
+          $r('app.string.yt_action_cast'), () => { this.openCastPicker(); })
         this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
           $r('app.string.yt_action_download'), () => { this.openDownloadDialog(); })
         this.ActionButton($r('sys.symbol.info_circle'),
-          '流媒体信息', () => { this.showStreamInfoSheet = true; })
+          $r('app.string.yt_stream_info_title'), () => { this.showStreamInfoSheet = true; })
         this.ActionButton($r('sys.symbol.bookmark'),
-          '保存到播放列表', () => { this.showSavePlaylistSheet = true; })
+          $r('app.string.yt_action_save_to_playlist'), () => { this.showSavePlaylistSheet = true; })
         this.AudioOnlyActionButton()
         this.ActionButton($r('sys.symbol.share'),
-          '分享', () => { this.shareVideo(); })
+          $r('app.string.yt_action_share'), () => { this.shareVideo(); })
       }
     }
     .scrollable(ScrollDirection.Horizontal)
@@ -642,7 +641,7 @@ export struct VideoDetails {
         SymbolGlyph($r('sys.symbol.info_circle'))
           .fontSize(16)
           .fontColor([$r('app.color.yourtube_text_secondary')])
-        Text('流媒体信息')
+        Text($r('app.string.yt_stream_info_title'))
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.yourtube_text_primary'))
@@ -653,63 +652,63 @@ export struct VideoDetails {
 
       // ── 容器信息 ──
       if (this.mpvContainerFormat.length > 0) {
-        this.StreamInfoRow('容器格式', this.mpvContainerFormat.toUpperCase())
+        this.StreamInfoRow($r('app.string.yt_stream_container'), this.mpvContainerFormat.toUpperCase())
       }
       if (this.mpvMediaTitle.length > 0) {
-        this.StreamInfoRow('媒体标题', this.mpvMediaTitle)
+        this.StreamInfoRow($r('app.string.yt_stream_media_title'), this.mpvMediaTitle)
       }
       if (this.mpvDuration > 0) {
-        this.StreamInfoRow('时长', this.formatDuration(this.mpvDuration))
+        this.StreamInfoRow($r('app.string.yt_stream_duration'), this.formatDuration(this.mpvDuration))
       }
       if (this.mpvFileSize > 0) {
-        this.StreamInfoRow('文件大小', this.formatFileSize(this.mpvFileSize))
+        this.StreamInfoRow($r('app.string.yt_stream_file_size'), this.formatFileSize(this.mpvFileSize))
       }
 
       // ── 视频流 ──
       if (this.mpvVideoWidth > 0) {
         Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
-        Text('视频')
+        Text($r('app.string.yt_stream_video'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.yourtube_text_secondary'))
           .margin({ bottom: 6 })
-        this.StreamInfoRow('分辨率', `${this.mpvVideoWidth} × ${this.mpvVideoHeight}`)
+        this.StreamInfoRow($r('app.string.yt_stream_resolution'), `${this.mpvVideoWidth} × ${this.mpvVideoHeight}`)
         if (this.mpvVideoCodec.length > 0) {
-          this.StreamInfoRow('编码', this.mpvVideoCodec)
+          this.StreamInfoRow($r('app.string.yt_stream_codec'), this.mpvVideoCodec)
         }
         if (this.mpvVideoBitRate > 0) {
-          this.StreamInfoRow('码率', this.formatBitrate(this.mpvVideoBitRate))
+          this.StreamInfoRow($r('app.string.yt_stream_bitrate'), this.formatBitrate(this.mpvVideoBitRate))
         }
         if (this.mpvFrameRate > 0) {
-          this.StreamInfoRow('帧率', `${this.mpvFrameRate.toFixed(2)} fps`)
+          this.StreamInfoRow($r('app.string.yt_stream_frame_rate'), `${this.mpvFrameRate.toFixed(2)} fps`)
         }
       }
 
       // ── 音频流 ──
       if (this.mpvAudioCodec.length > 0 || this.mpvAudioSampleRate > 0) {
         Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
-        Text('音频')
+        Text($r('app.string.yt_stream_audio'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.yourtube_text_secondary'))
           .margin({ bottom: 6 })
         if (this.mpvAudioCodec.length > 0) {
-          this.StreamInfoRow('编码', this.mpvAudioCodec)
+          this.StreamInfoRow($r('app.string.yt_stream_codec'), this.mpvAudioCodec)
         }
         if (this.mpvAudioBitRate > 0) {
-          this.StreamInfoRow('码率', this.formatBitrate(this.mpvAudioBitRate))
+          this.StreamInfoRow($r('app.string.yt_stream_bitrate'), this.formatBitrate(this.mpvAudioBitRate))
         }
         if (this.mpvAudioChannels > 0) {
-          this.StreamInfoRow('声道', this.formatChannels(this.mpvAudioChannels))
+          this.StreamInfoRow($r('app.string.yt_stream_channels'), this.formatChannels(this.mpvAudioChannels))
         }
         if (this.mpvAudioSampleRate > 0) {
-          this.StreamInfoRow('采样率', `${(this.mpvAudioSampleRate / 1000).toFixed(1)} kHz`)
+          this.StreamInfoRow($r('app.string.yt_stream_sample_rate'), `${(this.mpvAudioSampleRate / 1000).toFixed(1)} kHz`)
         }
       }
 
       // ── 无数据占位 ──
       if (this.mpvVideoWidth === 0 && this.mpvAudioCodec.length === 0 && this.mpvContainerFormat.length === 0) {
-        Text('正在获取流信息...')
+        Text($r('app.string.yt_stream_loading'))
           .fontSize(13)
           .fontColor($r('app.color.yourtube_text_hint'))
           .margin({ top: 8 })
@@ -720,7 +719,7 @@ export struct VideoDetails {
   }
 
   @Builder
-  StreamInfoRow(label: string, value: string) {
+  StreamInfoRow(label: ResourceStr, value: string) {
     Row() {
       Text(label)
         .fontSize(13)

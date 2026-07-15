@@ -23,6 +23,9 @@ export class PlayerEnvironmentService {
   private onScreenOff?: () => void;
   private onScreenOn?: () => void;
   private lastKeepScreenOn?: boolean;
+  private appliedKeepScreenOn?: boolean;
+  private keepScreenRequestInFlight: boolean = false;
+  private lastKeepScreenAttemptMs: number = 0;
 
   /** 初始化窗口和音量 */
   async init(context: Context): Promise<void> {
@@ -116,20 +119,30 @@ export class PlayerEnvironmentService {
 
   /** 设置 KeepScreenOn（窗口未就绪时只记意图，init 后再真正下发） */
   setKeepScreenOn(keepOn: boolean): void {
-    if (keepOn === this.lastKeepScreenOn && this.mainWin) return;
     this.lastKeepScreenOn = keepOn;
-    if (this.mainWin) {
-      this.mainWin.setWindowKeepScreenOn(keepOn).catch((e: Error) => {
-        Logger.warn(TAG, `setWindowKeepScreenOn failed: ${e.message}`);
-      });
-    }
+    this.applyPendingKeepScreenOn();
   }
 
   /** init 完成后按缓存意图补发一次 KeepScreenOn */
   private applyPendingKeepScreenOn(): void {
-    if (this.lastKeepScreenOn === undefined || !this.mainWin) return;
-    this.mainWin.setWindowKeepScreenOn(this.lastKeepScreenOn).catch((e: Error) => {
-      Logger.warn(TAG, `setWindowKeepScreenOn(pending) failed: ${e.message}`);
+    if (this.lastKeepScreenOn === undefined || !this.mainWin
+      || this.keepScreenRequestInFlight || this.appliedKeepScreenOn === this.lastKeepScreenOn) return;
+    const now = Date.now();
+    if (this.appliedKeepScreenOn === undefined && now - this.lastKeepScreenAttemptMs < 1000) return;
+    this.lastKeepScreenAttemptMs = now;
+    const keepOn = this.lastKeepScreenOn;
+    this.keepScreenRequestInFlight = true;
+    this.mainWin.setWindowKeepScreenOn(keepOn).then(() => {
+      this.appliedKeepScreenOn = keepOn;
+      Logger.info(TAG, `keepScreenOn applied=${keepOn}`);
+    }).catch((e: Error) => {
+      this.appliedKeepScreenOn = undefined;
+      Logger.warn(TAG, `setWindowKeepScreenOn failed: ${e.message}`);
+    }).finally(() => {
+      this.keepScreenRequestInFlight = false;
+      if (this.lastKeepScreenOn !== keepOn) {
+        this.applyPendingKeepScreenOn();
+      }
     });
   }
 
@@ -180,7 +193,16 @@ export class PlayerEnvironmentService {
   /** 释放资源 */
   release(): void {
     this.unsubscribeScreenEvents();
-    this.setKeepScreenOn(false);
+    // A pending `true` call must not suppress release when the component is
+    // disappearing. Submit false directly against the captured window.
+    const win = this.mainWin;
+    this.lastKeepScreenOn = false;
+    if (win) {
+      win.setWindowKeepScreenOn(false).catch((e: Error) => {
+        Logger.warn(TAG, `setWindowKeepScreenOn(release) failed: ${e.message}`);
+      });
+    }
     this.mainWin = undefined;
+    this.appliedKeepScreenOn = undefined;
   }
 }

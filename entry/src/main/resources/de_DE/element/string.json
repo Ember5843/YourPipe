@@ -1805,24 +1805,8 @@
             "value": "Kopieren fehlgeschlagen"
         },
         {
-            "name": "yt_about_version_format",
-            "value": "Version %s"
-        },
-        {
             "name": "yt_about_package_name",
             "value": "Paketname"
-        },
-        {
-            "name": "yt_about_project_count",
-            "value": "%d Projekte"
-        },
-        {
-            "name": "yt_about_model_count",
-            "value": "%d Modelle"
-        },
-        {
-            "name": "yt_about_latest_version",
-            "value": "Aktuellste v%s"
         },
         {
             "name": "yt_follow_system",
@@ -1957,28 +1941,8 @@
             "value": "Angemeldet; zum Synchronisieren der YouTube-Abos nach unten ziehen"
         },
         {
-            "name": "yt_playlist_count",
-            "value": "%d Videos"
-        },
-        {
-            "name": "yt_playlist_count_alt",
-            "value": "%d Videos"
-        },
-        {
-            "name": "yt_favorites_count",
-            "value": "%d Videos"
-        },
-        {
             "name": "yt_setting_delay_immediate",
             "value": "Sofort"
-        },
-        {
-            "name": "yt_unit_seconds_full",
-            "value": "%d Sek."
-        },
-        {
-            "name": "yt_setting_mb_value",
-            "value": "%d MB"
         },
         {
             "name": "yt_setting_gpu_auto",
@@ -2335,6 +2299,114 @@
         {
             "name": "yt_changelog_0_1_0_5",
             "value": "Comment list and channel page"
+        },
+        {
+            "name": "yt_label_version_format",
+            "value": "Version"
+        },
+        {
+            "name": "yt_label_projects",
+            "value": "Projekte"
+        },
+        {
+            "name": "yt_label_models",
+            "value": "Modelle"
+        },
+        {
+            "name": "yt_label_latest_version",
+            "value": "Aktuellste v"
+        },
+        {
+            "name": "yt_label_videos",
+            "value": "Videos"
+        },
+        {
+            "name": "yt_label_videos_alt",
+            "value": "Videos"
+        },
+        {
+            "name": "yt_label_favorites_videos",
+            "value": "Videos"
+        },
+        {
+            "name": "yt_label_seconds_short",
+            "value": "Sek."
+        },
+        {
+            "name": "yt_label_mb_short",
+            "value": "MB"
+        },
+        {
+            "name": "yt_setting_delay_5",
+            "value": "5 s"
+        },
+        {
+            "name": "yt_setting_delay_15",
+            "value": "15 s"
+        },
+        {
+            "name": "yt_setting_delay_30",
+            "value": "30 s"
+        },
+        {
+            "name": "yt_setting_delay_60",
+            "value": "60 s"
+        },
+        {
+            "name": "yt_setting_cache_secs_5",
+            "value": "5 s"
+        },
+        {
+            "name": "yt_setting_cache_secs_10",
+            "value": "10 s"
+        },
+        {
+            "name": "yt_setting_cache_secs_20",
+            "value": "20 s"
+        },
+        {
+            "name": "yt_setting_cache_secs_30",
+            "value": "30 s"
+        },
+        {
+            "name": "yt_setting_cache_secs_60",
+            "value": "60 s"
+        },
+        {
+            "name": "yt_setting_readahead_5",
+            "value": "5 s"
+        },
+        {
+            "name": "yt_setting_readahead_8",
+            "value": "8 s"
+        },
+        {
+            "name": "yt_setting_readahead_15",
+            "value": "15 s"
+        },
+        {
+            "name": "yt_setting_readahead_30",
+            "value": "30 s"
+        },
+        {
+            "name": "yt_setting_readahead_60",
+            "value": "60 s"
+        },
+        {
+            "name": "yt_setting_max_bytes_10",
+            "value": "10 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_20",
+            "value": "20 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_50",
+            "value": "50 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_100",
+            "value": "100 MB"
         }
     ]
 }

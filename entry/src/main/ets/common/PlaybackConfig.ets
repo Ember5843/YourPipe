@@ -50,23 +50,23 @@ export const DEMUXER_MAX_BYTES_LABELS: DemuxerMaxBytes[] = ['10', '20', '50', '1
 
 export const GPU_API_LABELS: GpuApi[] = ['auto', 'opengl', 'vulkan'];
 
-export function getBackgroundVideoOffDelayDisplay(value: BackgroundVideoOffDelay): Resource {
+export function getBackgroundVideoOffDelayDisplay(value: BackgroundVideoOffDelay): ResourceStr {
   if (value === '0') {
     return $r('app.string.yt_setting_delay_immediate');
   }
-  return $r('app.string.yt_unit_seconds_full', Number(value));
+  return $r(`app.string.yt_setting_delay_${value}`);
 }
 
-export function getCacheSecsDisplay(value: CacheSecs): Resource {
-  return $r('app.string.yt_unit_seconds_full', Number(value));
+export function getCacheSecsDisplay(value: CacheSecs): ResourceStr {
+  return $r(`app.string.yt_setting_cache_secs_${value}`);
 }
 
-export function getDemuxerReadaheadDisplay(value: DemuxerReadahead): Resource {
-  return $r('app.string.yt_unit_seconds_full', Number(value));
+export function getDemuxerReadaheadDisplay(value: DemuxerReadahead): ResourceStr {
+  return $r(`app.string.yt_setting_readahead_${value}`);
 }
 
-export function getDemuxerMaxBytesDisplay(value: DemuxerMaxBytes): Resource {
-  return $r('app.string.yt_setting_mb_value', Number(value));
+export function getDemuxerMaxBytesDisplay(value: DemuxerMaxBytes): ResourceStr {
+  return $r(`app.string.yt_setting_max_bytes_${value}`);
 }
 
 export function getGpuApiDisplay(value: GpuApi): Resource {

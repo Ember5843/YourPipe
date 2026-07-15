@@ -21,6 +21,10 @@ export struct SubscriptionManagePage {
   @State syncMessage: string = '';
   private channelInfoService: ChannelInfoService = new ChannelInfoService();
 
+  private tr(res: Resource): string {
+    return getContext().resourceManager.getStringSync(res.id);
+  }
+
   aboutToAppear(): void {
     this.loadProfiles();
   }
@@ -133,23 +137,23 @@ export struct SubscriptionManagePage {
 
   private async syncCloudSubscriptions(): Promise<void> {
     if (!this.isSignedIn()) {
-      this.syncMessage = '请先登录后再同步关注列表';
+      this.syncMessage = this.tr($r('app.string.yt_sub_sync_sign_in_first'));
       return;
     }
     try {
       const library = FeedServiceProvider.getInstance().getUserLibraryService();
       const channels = await library.fetchSubscribedChannels();
       if (channels.length === 0) {
-        this.syncMessage = '云端关注列表为空';
+        this.syncMessage = this.tr($r('app.string.yt_sub_sync_cloud_empty'));
         return;
       }
       const added = this.mergeRemoteChannels(channels);
       this.syncMessage = added > 0
-        ? `已同步 ${channels.length} 个关注，新增 ${added}`
-        : `已同步 ${channels.length} 个关注`;
+        ? getContext().resourceManager.getStringSync($r('app.string.yt_sub_sync_result_added').id, channels.length, added)
+        : getContext().resourceManager.getStringSync($r('app.string.yt_sub_sync_result').id, channels.length);
     } catch (err) {
       logger.error('syncCloudSubscriptions failed:', JSON.stringify(err));
-      this.syncMessage = '同步关注列表失败';
+      this.syncMessage = this.tr($r('app.string.yt_sub_sync_failed'));
     }
   }
 
@@ -182,7 +186,7 @@ export struct SubscriptionManagePage {
     } catch (err) {
       logger.error('onPullRefresh failed:', JSON.stringify(err));
       if (this.syncMessage.length === 0) {
-        this.syncMessage = '刷新失败';
+        this.syncMessage = this.tr($r('app.string.yt_refresh_failed'));
       }
     } finally {
       this.isRefreshing = false;
@@ -232,7 +236,7 @@ export struct SubscriptionManagePage {
                   .margin({ top: 6 })
                   .width('100%')
               } else if (this.isSignedIn()) {
-                Text('下拉同步 YouTube 关注列表')
+                Text($r('app.string.yt_sub_pull_to_sync'))
                   .fontSize(12)
                   .fontColor($r('app.color.yourtube_text_hint'))
                   .margin({ top: 6 })
@@ -253,7 +257,7 @@ export struct SubscriptionManagePage {
                   .fontColor($r('app.color.yourtube_text_secondary'))
                   .margin({ top: 40 })
                 Text(this.isSignedIn()
-                  ? '已登录，下拉可同步 YouTube 关注'
+                  ? $r('app.string.yt_sub_signed_in_pull_hint')
                   : $r('app.string.yt_empty_subs_hint_alt'))
                   .fontSize(12)
                   .fontColor($r('app.color.yourtube_text_hint'))

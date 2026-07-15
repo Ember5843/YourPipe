@@ -106,7 +106,7 @@ export struct CommentList {
     Column() {
       if (this.commentCount > 0) {
         Row() {
-          Text(`评论 (${this.commentCount})`)
+          Text($r('app.string.yt_comments_count_format', this.commentCount))
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.yourtube_text_primary'))
@@ -260,7 +260,7 @@ export struct CommentList {
         }
 
         if (item.replyCount > 0) {
-          Text(`${item.replyCount} 条回复`)
+          Text($r('app.string.yt_replies_count_format', item.replyCount))
             .fontSize(12)
             .fontColor(this.themePrimary)
             .fontWeight(FontWeight.Medium)

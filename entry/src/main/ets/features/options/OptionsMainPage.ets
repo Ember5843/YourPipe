@@ -42,26 +42,26 @@ export struct OptionsMainPage {
     onAboutClick: () => {}
   };
 
-  private getItemDisplay(items: LanguagePickerItem[], code: string): string {
+  private getItemDisplay(items: LanguagePickerItem[], code: string): ResourceStr {
     const found = items.find((it: LanguagePickerItem): boolean => it.code === code);
-    return found ? found.localizedName : '跟随系统';
+    return found ? found.localizedName : $r('app.string.yt_follow_system');
   }
 
-  private getDataAccountSubtitle(): string {
+  private getDataAccountSubtitle(): ResourceStr {
     const hasCred = this.authStatus.hasCredential
       || this.authStatus.hasCookieCredential
       || this.authStatus.hasRefreshToken
       || this.authStatus.stage === AuthStage.SIGNED_IN;
     if (!hasCred) {
-      return '管理数据与登录状态';
+      return $r('app.string.yt_data_account_manage_sign_in');
     }
     if (this.authStatus.authEnabled === false) {
-      return '已保存登录 · 无痕浏览中';
+      return $r('app.string.yt_data_account_incognito');
     }
     if (this.authStatus.authMode === 'cookie') {
-      return '已登录 (Cookie) · 管理数据与账号';
+      return $r('app.string.yt_data_account_cookie');
     }
-    return '已登录 · 管理数据与账号';
+    return $r('app.string.yt_data_account_signed_in');
   }
 
   private getLanguageAndRegionSubtitle(): string {
@@ -91,7 +91,7 @@ export struct OptionsMainPage {
     Column() {
       List({ space: 6 }) {
         ListItem() {
-          PlaybackSectionTitle({ title: '首选项' })
+          PlaybackSectionTitle({ title: $r('app.string.yt_option_preferences') })
         }
         .padding({ left: 0, right: 0 })
 

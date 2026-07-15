@@ -182,7 +182,7 @@ export struct DownloadDialog {
                   this.updateEstimatedSize();
                 }
               )
-              Text('HLS 流将以原始分片格式下载并拼接为完整文件')
+              Text($r('app.string.yt_download_hls_hint'))
                 .fontSize(11)
                 .fontColor($r('app.color.yourtube_text_hint'))
                 .width('100%')
@@ -289,7 +289,7 @@ export struct DownloadDialog {
               SymbolGlyph($r('sys.symbol.doc'))
                 .fontSize(14)
                 .fontColor([$r('app.color.yourtube_text_secondary')])
-              Text(`${$r('app.string.yt_download_estimated_size')}: ${this.estimatedSize}`)
+              Text(`${getContext().resourceManager.getStringSync($r('app.string.yt_download_estimated_size').id)}: ${this.estimatedSize}`)
                 .fontSize(13)
                 .fontColor($r('app.color.yourtube_text_secondary'))
             }

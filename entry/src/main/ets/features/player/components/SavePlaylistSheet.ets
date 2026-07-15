@@ -64,7 +64,7 @@ export struct SavePlaylistSheet {
           .fontWeight(FontWeight.Medium)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(`${queue.videos.length} 个视频`)
+        Text($r('app.string.yt_video_count_format', queue.videos.length))
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_quaternary'))
           .margin({ top: 2 })
@@ -83,7 +83,7 @@ export struct SavePlaylistSheet {
   CreateRow() {
     if (this.isCreating) {
       Row() {
-        TextInput({ placeholder: '播放列表名称', text: this.newName })
+        TextInput({ placeholder: $r('app.string.yt_playlist_name_placeholder'), text: this.newName })
           .layoutWeight(1)
           .height(40)
           .borderRadius(10)
@@ -92,7 +92,7 @@ export struct SavePlaylistSheet {
           .onChange((val: string) => { this.newName = val; })
           .onSubmit(() => { this.confirmCreate(); })
 
-        Button('创建')
+        Button($r('app.string.yt_action_create'))
           .fontSize(14)
           .fontColor($r('app.color.yourtube_text_inverse'))
           .backgroundColor(this.newName.trim().length > 0
@@ -112,7 +112,7 @@ export struct SavePlaylistSheet {
           .fontSize(22)
           .fontColor([this.themePrimary])
           .margin({ right: 12 })
-        Text('新建播放列表')
+        Text($r('app.string.yt_action_new_playlist'))
           .fontSize(15)
           .fontColor(this.themePrimary)
           .fontWeight(FontWeight.Medium)
@@ -129,7 +129,7 @@ export struct SavePlaylistSheet {
   build() {
     Column() {
       Row() {
-        Text('保存到播放列表')
+        Text($r('app.string.yt_action_save_to_playlist'))
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.yourtube_text_primary'))

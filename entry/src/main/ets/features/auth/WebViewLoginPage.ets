@@ -98,7 +98,7 @@ export struct WebViewLoginPage {
 
     if (credential.sapiSid.length === 0) {
       this.state = LoginState.FAILED;
-      this.errorMessage = '未能获取 SAPISID，请重试';
+      this.errorMessage = getContext().resourceManager.getStringSync($r('app.string.yt_login_sapisid_failed').id);
       return;
     }
 
@@ -122,6 +122,7 @@ export struct WebViewLoginPage {
       }
       return ytCookies || musicCookies || this.extractedCookies;
     } catch (e) {
+      logger.warn(`fetch cookies failed: ${e}`);
       return this.extractedCookies;
     }
   }
@@ -157,7 +158,7 @@ export struct WebViewLoginPage {
     const credential = CookieAuthCredential.fromCookies(allCookies, '');
     if (credential.sapiSid.length === 0) {
       this.state = LoginState.FAILED;
-      this.errorMessage = '未能获取 SAPISID，请重试';
+      this.errorMessage = getContext().resourceManager.getStringSync($r('app.string.yt_login_sapisid_failed').id);
       return;
     }
     if (this.authSession) {
@@ -209,14 +210,14 @@ export struct WebViewLoginPage {
 
           if (this.state === LoginState.EXTRACTING_POT) {
             Column() {
-              Text('登录成功，正在提取认证信息...')
+              Text($r('app.string.yt_login_extracting_auth'))
                 .fontSize(14)
                 .fontColor(Color.White)
                 .padding(12)
                 .borderRadius(8)
                 .backgroundColor('rgba(0,0,0,0.7)')
 
-              Button('跳过 (不提取 pot)')
+              Button($r('app.string.yt_login_skip_pot'))
                 .fontSize(13)
                 .fontColor(Color.White)
                 .backgroundColor('rgba(0,0,0,0.5)')
@@ -242,7 +243,7 @@ export struct WebViewLoginPage {
             .fontColor($r('app.color.yourtube_text_primary'))
             .textAlign(TextAlign.Center)
 
-          Button('重试')
+          Button($r('app.string.yt_action_retry'))
             .height(44)
             .width('80%')
             .fontSize(15)
@@ -255,7 +256,7 @@ export struct WebViewLoginPage {
               this.webController.loadUrl(WebViewLoginPage.LOGIN_URL);
             })
 
-          Button('取消')
+          Button($r('app.string.yt_action_cancel'))
             .height(42)
             .width('80%')
             .fontSize(15)

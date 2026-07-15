@@ -496,7 +496,7 @@ export struct UserPage {
         }
 
         Column() {
-          Text(this.displayChannel.name || 'Unknown')
+          Text(this.displayChannel.name || $r('app.string.yt_label_unknown'))
             .fontSize(18)
             .fontColor($r('app.color.yourtube_text_primary'))
             .fontWeight(FontWeight.Medium)

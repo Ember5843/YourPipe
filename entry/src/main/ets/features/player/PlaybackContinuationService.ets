@@ -4,10 +4,12 @@ import {
   PlayQueueManager,
   QueueSourceType
 } from './PlayQueueManager';
+import { AppLog } from '../../common/AppLog';
 
 const PAYLOAD_KEY = 'yourpipePlaybackContinuation';
 const SCHEMA_VERSION = 1;
 const MAX_QUEUE_ITEMS = 50;
+const logger = AppLog.getInstance('PlaybackContinuation');
 
 export interface ContinuationVideoSnapshot {
   id: number;
@@ -76,11 +78,13 @@ export class PlaybackContinuationService {
     const session = PlayerSession.getInstance();
     const currentVideo = session.currentVideo || PlayQueueManager.getInstance().getCurrent();
     if (!currentVideo || !currentVideo.videoId || session.isReleased) {
+      logger.debug('build skipped reason=no-active-video');
       return null;
     }
 
     const controller = session.controller;
     if (!controller.vm.isReady || controller.vm.errorMsg) {
+      logger.debug(`build skipped reason=player-not-ready ready=${controller.vm.isReady}`);
       return null;
     }
 
@@ -105,19 +109,23 @@ export class PlaybackContinuationService {
       wasPlaying: controller.vm.isPlaying,
       queue: queue
     };
+    logger.info(`payload built videoId=${video.videoId} queueItems=${queue.items.length} progressSec=${payload.progressSec}`);
     return payload;
   }
 
   static writeWantParam(wantParam: Record<string, Object>): boolean {
     const payload = PlaybackContinuationService.buildPayload();
     if (!payload) {
+      logger.warn('want write skipped reason=no-payload');
       return false;
     }
     const json = JSON.stringify(payload);
     if (!PlaybackContinuationService.isPayloadSafe(json)) {
+      logger.warn(`want write rejected reason=payload-size bytes=${json.length}`);
       return false;
     }
     wantParam[PAYLOAD_KEY] = json;
+    logger.info(`want written videoId=${payload.videoId} bytes=${json.length}`);
     return true;
   }
 
@@ -139,10 +147,13 @@ export class PlaybackContinuationService {
     try {
       const parsed = JSON.parse(raw) as PlaybackContinuationPayload;
       if (parsed.schemaVersion !== SCHEMA_VERSION || !parsed.videoId || !parsed.video?.videoId) {
+        logger.warn(`payload rejected schema=${parsed.schemaVersion} hasVideoId=${!!parsed.videoId}`);
         return null;
       }
+      logger.info(`payload parsed videoId=${parsed.videoId} queueItems=${parsed.queue?.items?.length || 0}`);
       return parsed;
-    } catch (_e) {
+    } catch (e) {
+      logger.warn(`payload parse failed: ${e}`);
       return null;
     }
   }

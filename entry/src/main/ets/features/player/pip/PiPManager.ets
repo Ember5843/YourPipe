@@ -36,6 +36,8 @@ export class PiPManager {
 
   /** 由播放页 AVPlayer 通过 onSurfaceReady 注入的渲染用 XComponentController */
   private componentController: XComponentController | null = null;
+  /** Controller captured by the currently-created system PiPController. */
+  private boundComponentController: XComponentController | null = null;
   private pipController: PiPWindow.PiPController | null = null;
   private isInitialized: boolean = false;
   private isCreatingController: boolean = false;
@@ -45,14 +47,14 @@ export class PiPManager {
   private playbackStateController: AvPlayerController | null = null;
   private hasPlaybackState: boolean = false;
   private lastIsPlaying: boolean = false;
+  private desiredAutoStart: boolean = false;
+  private suppressNextStopAction: boolean = false;
   private playbackStateListener = (state: PlaybackState): void => {
     this.hasPlaybackState = true;
     this.lastIsPlaying = state.isPlaying;
     this.applyPlaybackStateToPiP();
   };
 
-  /** PiP 关闭时回调（移植 0.4.0）：由 PlayerSession 注入，区分后台暂停/前台释放 */
-  onPipStop: (() => void) | null = null;
   /** PiP 恢复时回调（移植 0.4.0）：由 Index 注入，确保 PlayerPage 在栈顶以重建 */
   onPipRestore: (() => void) | null = null;
   /** 正在从 PiP 恢复，避免 STOPPED 误触发 onPipStop 的释放 */
@@ -64,7 +66,9 @@ export class PiPManager {
   private pendingInitW: number = 0;
   private pendingInitH: number = 0;
 
-  private constructor() {}
+  private constructor() {
+    PlayerSession.getInstance().onStopPiP = () => this.stopPiP();
+  }
 
   static getInstance(): PiPManager {
     if (!PiPManager.instance) {
@@ -90,6 +94,13 @@ export class PiPManager {
    * 这是 XComponent 方式 PiP 的 componentController 来源。
    */
   setComponentController(controller: XComponentController): void {
+    // PiPWindow.create captures componentController; changing our field does
+    // not update an existing PiPController. A newly-created PlayerPage must
+    // therefore invalidate a controller bound to the previous page surface.
+    if (this.pipController && this.boundComponentController !== controller) {
+      logger.info(`${TAG} setComponentController: page controller changed, recreate PiPController`);
+      this.destroy();
+    }
     this.componentController = controller;
     // 若此前 init 因 controller 未就绪而挂起，现在补做（消除冷启动后的到达顺序竞争）。
     if (!this.isInitialized && this.pendingInitCtx) {
@@ -142,8 +153,9 @@ export class PiPManager {
         contentHeight: safeH,
       };
       this.pipController = await PiPWindow.create(config);
+      this.boundComponentController = this.componentController;
       this.registerCallbacks();
-      this.pipController.setAutoStartEnabled(false);
+      this.pipController.setAutoStartEnabled(this.desiredAutoStart);
       this.isInitialized = true;
       this.applyPlaybackStateToPiP();
       logger.info(`${TAG} init success, pipController created`);
@@ -207,6 +219,24 @@ export class PiPManager {
         // 还回主页。提前 unmount 占位层让主页 XComponent 露出，与系统缩放动画
         // 同步过渡；否则要等到 STOPPED 才 unmount，悬浮窗已消失而占位层还在，
         // 会出现"先黑屏闪一下再露画面"。
+        // Closing the PiP panel is equivalent to destroying the playback page.
+        // Stop MPV before WMS destroys the PiP surface; waiting until STOPPED
+        // leaves gpu-next rendering into a dead swapchain and produces
+        // VK_ERROR_SURFACE_LOST_KHR. Restore keeps rendering for hand-back.
+        if (this.isDeleteReason(reason)) {
+          logger.info(`${TAG} ABOUT_TO_STOP via ${reason}, release session before surface teardown`);
+          // This controller belongs to the playback page that is being closed.
+          // Invalidate it immediately: a subsequent page can call init() before
+          // STOPPED arrives, and must wait for its own XComponent.onLoad rather
+          // than create a PiPController with this dead surface controller.
+          this.componentController = null;
+          // Closing the PiP window means closing playback altogether.  Release
+          // MPV while the PiP surface is still valid so its Vulkan swapchain is
+          // destroyed before WindowManager removes the surface.
+          session.setPiPActive(false);
+          session.release();
+          PlayerPresentation.onPipStopped(false);
+        }
         session.setPiPActive(false);
         break;
       case PiPWindow.PiPState.ABOUT_TO_RESTORE:
@@ -227,11 +257,15 @@ export class PiPManager {
         //   否则后台分支只 pause 不 release，PiP surface 已销毁而 MPV 渲染管线仍指向它，
         //   触发 VK_ERROR_SURFACE_LOST_KHR 并残留状态导致下次切视频/退出报错。
         // 其它原因：走 onPipStop 按前后台处理。
-        if (reason === 'panelActionRestore') {
+        if (this.suppressNextStopAction) {
+          this.suppressNextStopAction = false;
+          PlayerPresentation.onPipStopped(false);
+          logger.info(`${TAG} STOPPED ignored: old PiP was intentionally replaced`);
+        } else if (reason === 'panelActionRestore') {
           logger.info(`${TAG} STOPPED via panelActionRestore, skip (will restore)`);
           PlayerPresentation.onPipStopped(true);
-        } else if (reason === 'requestDelete') {
-          logger.info(`${TAG} STOPPED via requestDelete, release session + destroy pipController`);
+        } else if (this.isDeleteReason(reason)) {
+          logger.info(`${TAG} STOPPED via ${reason}, release session + destroy pipController`);
           PlayerPresentation.onPipStopped(false);
           session.release();
           // 销毁 PiPController 本身：它持有已销毁播放页的旧 XComponentController，
@@ -239,11 +273,9 @@ export class PiPManager {
           // (SetXComponentController: swap xComponent failed / OnInitXComponentController failed)。
           // destroy 后 isInitialized=false，下次 init 重建绑定新 XComponentController 的干净控制器。
           this.destroy();
-        } else if (this.onPipStop) {
-          PlayerPresentation.onPipStopped(false);
-          this.onPipStop();
         } else {
           PlayerPresentation.onPipStopped(false);
+          this.handleDefaultPipStop();
         }
         this.isRestoring = false;
         break;
@@ -332,7 +364,9 @@ export class PiPManager {
    * 设置是否在应用返回桌面时自动启动画中画（home 键场景）。
    */
   setAutoStart(enabled: boolean): void {
+    this.desiredAutoStart = enabled;
     if (!this.pipController) {
+      logger.info(`${TAG} setAutoStart deferred=${enabled}`);
       return;
     }
     try {
@@ -437,20 +471,38 @@ export class PiPManager {
     // app 侧控制器没了但系统悬浮窗还在，成为孤儿窗口导致状态错乱。
     const ctrl = this.pipController;
     if (ctrl) {
+      this.suppressNextStopAction = PlayerSession.getInstance().isPiPActive;
       ctrl.stopPiP().catch((e: Error) => {
+        this.suppressNextStopAction = false;
         logger.warn(`${TAG} stopPiP during destroy failed: ${e.message}`);
       });
     }
     this.unregisterCallbacks();
     this.pipController = null;
+    this.boundComponentController = null;
     this.isInitialized = false;
-    // 注意：不清 componentController。它由 AVPlayer 的 XComponentController 提供，
-    // 该 controller 随 AVPlayer 实例存活。页面复用(moveToTop)时 aboutToAppear/onLoad 都不重跑，
-    // 若在此清空则无人重新注入 → 下次 init 永远 deferred、PiP 不可用（连续进出第 N 次失效的根因）。
-    // 新建页面时 aboutToAppear 会用新 controller 覆盖，无悬空风险。
+    // requestDelete 在 ABOUT_TO_STOP 中已经清除了旧页面 controller。其他 destroy
+    // 场景可能仍会复用同一个页面，因此这里不做无条件清理。
     // 同步清 PiP 激活标志，避免占位层/返回键误判残留。
     PlayerSession.getInstance().setPiPActive(false);
     // 清待初始化缓存，避免冷重置后残留旧参数误触发 init。
     this.pendingInitCtx = null;
+  }
+
+  private handleDefaultPipStop(): void {
+    const session = PlayerSession.getInstance();
+    const isAppBackground = AppStorage.get<boolean>('isAppBackground') ?? false;
+    if (isAppBackground) {
+      logger.info(`${TAG} default stop while background -> pause`);
+      session.controller.syncPause();
+    } else {
+      logger.info(`${TAG} default stop while foreground -> release`);
+      session.release();
+    }
+  }
+
+  /** HarmonyOS versions report panel close as either value. */
+  private isDeleteReason(reason: string): boolean {
+    return reason === 'requestDelete' || reason === 'panelActionDelete';
   }
 }

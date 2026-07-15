@@ -13,6 +13,22 @@ export class AppLog {
     this.tag = tag;
   }
 
+  private format(message: string, args: Object[]): string {
+    const values: string[] = [message];
+    for (const arg of args) {
+      if (typeof arg === 'string') {
+        values.push(arg);
+      } else {
+        try {
+          values.push(JSON.stringify(arg));
+        } catch (_) {
+          values.push(String(arg));
+        }
+      }
+    }
+    return values.join(' ');
+  }
+
   static getInstance(tag: string): AppLog {
     if (!AppLog.instances.has(tag)) {
       AppLog.instances.set(tag, new AppLog(tag));
@@ -22,31 +38,31 @@ export class AppLog {
 
   // Instance methods
   debug(message: string, ...args: Object[]): void {
-    const logArgs = [message, ...args].join(' ');
+    const logArgs = this.format(message, args);
     hilog.debug(DOMAIN, this.tag, '%{public}s', logArgs);
     AppLogStore.push('DEBUG', this.tag, logArgs);
   }
 
   info(message: string, ...args: Object[]): void {
-    const logArgs = [message, ...args].join(' ');
+    const logArgs = this.format(message, args);
     hilog.info(DOMAIN, this.tag, '%{public}s', logArgs);
     AppLogStore.push('INFO', this.tag, logArgs);
   }
 
   log(message: string, ...args: Object[]): void {
-    const logArgs = [message, ...args].join(' ');
+    const logArgs = this.format(message, args);
     hilog.info(DOMAIN, this.tag, '%{public}s', logArgs);
     AppLogStore.push('INFO', this.tag, logArgs);
   }
 
   warn(message: string, ...args: Object[]): void {
-    const logArgs = [message, ...args].join(' ');
+    const logArgs = this.format(message, args);
     hilog.warn(DOMAIN, this.tag, '%{public}s', logArgs);
     AppLogStore.push('WARN', this.tag, logArgs);
   }
 
   error(message: string, ...args: Object[]): void {
-    const logArgs = [message, ...args].join(' ');
+    const logArgs = this.format(message, args);
     hilog.error(DOMAIN, this.tag, '%{public}s', logArgs);
     AppLogStore.push('ERROR', this.tag, logArgs);
   }

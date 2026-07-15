@@ -92,7 +92,7 @@ export struct OptionsAppearancePage {
         .clip(true)
 
         ListItem() {
-          PlaybackSectionTitle({ title: '主题色' })
+          PlaybackSectionTitle({ title: $r('app.string.yt_appearance_theme_color') })
         }
         .padding({ left: 0, right: 0 })
 
@@ -100,7 +100,7 @@ export struct OptionsAppearancePage {
           ListItem() {
             Column({ space: 12 }) {
               Row() {
-                Text('当前')
+                Text($r('app.string.yt_label_current'))
                   .fontSize(13)
                   .fontColor($r('app.color.yourtube_text_secondary'))
                   .layoutWeight(1)
@@ -136,7 +136,8 @@ export struct OptionsAppearancePage {
           ListItem() {
             PlaybackToggleRow({
               title: $r('app.string.yt_layout_grid'),
-              subtitle: this.uiConfig.homeLayoutMode === 'grid' ? '卡片模式' : '列表模式',
+              subtitle: this.uiConfig.homeLayoutMode === 'grid'
+                ? $r('app.string.yt_layout_card_mode') : $r('app.string.yt_layout_list_mode'),
               isOn: this.uiConfig.homeLayoutMode === 'grid',
               themeColor: this.params.themeColor,
               transparentBackground: true,

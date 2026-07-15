@@ -39,6 +39,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private currentSubtitleUrl: string = '';
   private lastKnownPositionMs: number = 0;
   private lastTimeEmitMs: number = 0;
+  /** Reconciles native pause changes made directly by the OHAudio bridge. */
+  private nativeStatePollTimerId: number = -1;
+  private lastReportedIsPlaying: boolean = false;
 
   // 保存配置供 load() 方法使用
   private engineConfig: EngineConfig = {};
@@ -112,6 +115,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
       this.controller = ctrl;
       this.initialized = true;
+      this.startNativeStateReconciliation();
       if (this.surfaceId.length > 0) {
         this.bindSurface(ctrl, this.surfaceId);
       }
@@ -125,6 +129,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   }
 
   destroy(): void {
+    this.stopNativeStateReconciliation();
     this.destroyed = true;
     this.initialized = false;
     this.loadGeneration++;
@@ -274,6 +279,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
     ctrl.pause();
+    this.emitCurrentState();
   }
 
   stop(): void {
@@ -283,6 +289,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
     ctrl.stop();
+    this.emitCurrentState();
   }
 
   seek(positionSec: number, keyframe: boolean): void {
@@ -558,6 +565,26 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.stateCallback?.(this.buildState());
   }
 
+  private startNativeStateReconciliation(): void {
+    this.stopNativeStateReconciliation();
+    this.nativeStatePollTimerId = setInterval(() => {
+      const ctrl = this.controller;
+      if (!this.destroyed && this.sourceUrl.length > 0 && ctrl !== null) {
+        const nativeIsPlaying = ctrl.getState() === NativePlaybackState.Playing;
+        if (nativeIsPlaying === this.lastReportedIsPlaying) return;
+        Logger.info(TAG, `native state reconciled playing=${nativeIsPlaying}`);
+        this.emitCurrentState();
+      }
+    }, 500) as number;
+  }
+
+  private stopNativeStateReconciliation(): void {
+    if (this.nativeStatePollTimerId >= 0) {
+      clearInterval(this.nativeStatePollTimerId);
+      this.nativeStatePollTimerId = -1;
+    }
+  }
+
   private buildState(): PlaybackState {
     const ctrl: MpvPlayerController | null = this.controller;
 
@@ -586,6 +613,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       // 无源时 native 返回 Stopped，避免误判为"正在播放"
       isPlaying = this.sourceUrl.length > 0 && ctrl.getState() === NativePlaybackState.Playing;
     }
+    this.lastReportedIsPlaying = isPlaying;
 
     // pendingSeekMs >= 0 时优先使用跳转目标位置（直到位置事件确认追上了目标，见 onMpvEvent type=1）
     const currentMs: number = (this.pendingSeekMs >= 0) ? this.pendingSeekMs : posMs;
