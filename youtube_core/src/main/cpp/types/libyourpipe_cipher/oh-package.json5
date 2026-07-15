@@ -1,0 +1,6 @@
+{
+  "name": "libyourpipe_cipher.so",
+  "types": "./index.d.ts",
+  "version": "1.0.0",
+  "description": "YourPipe local JSVM cipher bridge"
+}

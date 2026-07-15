@@ -14,12 +14,23 @@ const logger = YTCoreLogger.getInstance('YouTubeHttpClient');
  * 封装 HttpDownloader 和 CookieJar，提供自动 Cookie 管理和 YouTube 专用请求头
  */
 export class YouTubeHttpClient {
+  private static requestSequence: number = 0;
   private downloader: HttpDownloader = new HttpDownloader();
   private cookieJar: CookieJar;
   private localization: Localization;
   private contentCountry: ContentCountry;
   private context: Context;
   private authSession?: AuthSessionManager;
+
+  private static safeRequestTarget(url: string): string {
+    const match = /^(https?:\/\/[^/?#]+)([^?#]*)/.exec(url);
+    return match ? `${match[1]}${match[2] || '/'}` : '(invalid-url)';
+  }
+
+  private static nextRequestId(): number {
+    YouTubeHttpClient.requestSequence++;
+    return YouTubeHttpClient.requestSequence;
+  }
 
   // 默认 YouTube 请求头
   private static readonly DEFAULT_USER_AGENT: string =
@@ -69,10 +80,20 @@ export class YouTubeHttpClient {
     customHeaders?: Record<string, string | string[]>,
     withAuth: boolean = false
   ): Promise<http.HttpResponse> {
+    const requestId = YouTubeHttpClient.nextRequestId();
+    const target = YouTubeHttpClient.safeRequestTarget(url);
+    const startedAt = Date.now();
+    logger.info(`[NET] id=${requestId} phase=start method=GET target=${target} auth=${withAuth}`);
     const headers = await this.prepareHeaders(customHeaders, url, withAuth);
-    const response: http.HttpResponse = await this.downloader.request('GET', url, headers, undefined, this.localization);
-    this.saveCookiesFromResponse(response, url);
-    return response;
+    try {
+      const response: http.HttpResponse = await this.downloader.request('GET', url, headers, undefined, this.localization);
+      this.saveCookiesFromResponse(response, url);
+      logger.info(`[NET] id=${requestId} phase=complete method=GET target=${target} status=${response.responseCode} elapsed=${Date.now() - startedAt}ms`);
+      return response;
+    } catch (e) {
+      logger.error(`[NET] id=${requestId} phase=failed method=GET target=${target} elapsed=${Date.now() - startedAt}ms error=${String(e)}`);
+      throw new Error(String(e));
+    }
   }
 
   /**
@@ -86,6 +107,10 @@ export class YouTubeHttpClient {
     contentType?: string,
     withAuth: boolean = false
   ): Promise<http.HttpResponse> {
+    const requestId = YouTubeHttpClient.nextRequestId();
+    const target = YouTubeHttpClient.safeRequestTarget(url);
+    const startedAt = Date.now();
+    logger.info(`[NET] id=${requestId} phase=start method=POST target=${target} auth=${withAuth} bytes=${data?.length ?? 0}`);
     const headers = await this.prepareHeaders(customHeaders, url, withAuth);
 
     const postHeaders: Record<string, string[]> = {};
@@ -100,9 +125,15 @@ export class YouTubeHttpClient {
       }
     }
 
-    const response: http.HttpResponse = await this.downloader.post(url, data, postHeaders, this.localization, contentType);
-    this.saveCookiesFromResponse(response, url);
-    return response;
+    try {
+      const response: http.HttpResponse = await this.downloader.post(url, data, postHeaders, this.localization, contentType);
+      this.saveCookiesFromResponse(response, url);
+      logger.info(`[NET] id=${requestId} phase=complete method=POST target=${target} status=${response.responseCode} elapsed=${Date.now() - startedAt}ms`);
+      return response;
+    } catch (e) {
+      logger.error(`[NET] id=${requestId} phase=failed method=POST target=${target} elapsed=${Date.now() - startedAt}ms error=${String(e)}`);
+      throw new Error(String(e));
+    }
   }
 
   /**
@@ -129,6 +160,10 @@ export class YouTubeHttpClient {
     customHeaders?: Record<string, string | string[]>,
     withAuth: boolean = false
   ): Promise<http.HttpResponse> {
+    const requestId = YouTubeHttpClient.nextRequestId();
+    const target = YouTubeHttpClient.safeRequestTarget(url);
+    const startedAt = Date.now();
+    logger.info(`[NET] id=${requestId} phase=start method=POST_BINARY target=${target} auth=${withAuth} bytes=${data.length}`);
     // Minimal cookie/auth only — SABR googlevideo rejects wrong browser/API defaults.
     const headers: Record<string, string | string[]> = {};
     if (customHeaders) {
@@ -150,9 +185,15 @@ export class YouTubeHttpClient {
         }
       }
     }
-    const response = await this.downloader.postBinary(url, data, headers, this.localization);
-    this.saveCookiesFromResponse(response, url);
-    return response;
+    try {
+      const response = await this.downloader.postBinary(url, data, headers, this.localization);
+      this.saveCookiesFromResponse(response, url);
+      logger.info(`[NET] id=${requestId} phase=complete method=POST_BINARY target=${target} status=${response.responseCode} elapsed=${Date.now() - startedAt}ms`);
+      return response;
+    } catch (e) {
+      logger.error(`[NET] id=${requestId} phase=failed method=POST_BINARY target=${target} elapsed=${Date.now() - startedAt}ms error=${String(e)}`);
+      throw new Error(String(e));
+    }
   }
 
   /**

@@ -231,7 +231,10 @@ export class PlayerModel {
       }
     });
 
-    // UI lists intentionally preserve response order.
+// UI lists intentionally preserve response order.
+    // The user's preferred audio language is honoured in
+    // AvPlayerController.filterAudioStreamsByLanguage at selection time so
+    // manual track picks keep this response order intact.
     void preferredLanguage;
     void audioMaxBitrate;
     Logger.info(TAG, `audio streams listed: ${this.categorizedStreams.audio.length} `

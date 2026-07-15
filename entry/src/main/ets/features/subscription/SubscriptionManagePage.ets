@@ -1,5 +1,6 @@
 import { AppLog } from '../../common/AppLog';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
+import { SubscriptionScrollCoordinator } from './SubscriptionScrollCoordinator';
 import { AuthAccountStatus, AuthSessionManager, AuthStage, SearchChannelItem } from 'youtube_core';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
 import { ChannelCard } from '../../features/user/components/ChannelCard';
@@ -221,7 +222,7 @@ export struct SubscriptionManagePage {
     // 顶栏避让放在 Refresh 外侧，加载圈从标题栏下方出现（与内容区对齐）。
     Column() {
       Refresh({ refreshing: $$this.isRefreshing }) {
-        List({ space: 4 }) {
+        List({ scroller: SubscriptionScrollCoordinator.scroller, space: 4 }) {
           ListItem() {
             Column() {
               Text($r('app.string.yt_sub_manage_title'))

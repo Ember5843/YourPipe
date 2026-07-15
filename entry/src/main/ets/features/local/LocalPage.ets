@@ -394,7 +394,7 @@ export struct LocalPage {
           }
           .width('100%')
           .height('100%')
-          .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
+          .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 88 })
           .edgeEffect(EdgeEffect.Spring)
         }
         .width('100%')
@@ -432,7 +432,7 @@ export struct LocalPage {
         }
         .width('100%')
         .height('100%')
-        .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
+        .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 88 })
       }
       .tabBar(this.TabBarBuilder(1))
     }

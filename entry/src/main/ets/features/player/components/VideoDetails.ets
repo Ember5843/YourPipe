@@ -26,12 +26,11 @@ import { SavePlaylistSheet } from './SavePlaylistSheet';
 import { DownloadManager, DownloadTask } from '../../../common/DownloadManager';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
+import { LanguageManager } from '../../../common/LanguageManager';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerPresentation } from '../../../common/PlayerPresentation';
 import common from '@ohos.app.ability.common';
 import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSession';
-import { AVCastPickerStyle, avSession } from '@kit.AVSessionKit';
-import type { BusinessError } from '@kit.BasicServicesKit';
 import { systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 
@@ -72,9 +71,14 @@ export struct VideoDetails {
   private streamCategories: StreamCategories | null = null;
   private downloadDialogController: CustomDialogController | null = null;
   private descSkeletonTimer: number = -1;
+  private sleepTimerUiInterval: number = -1;
   @State descSkeletonOpacity: number = 0.3;
+  @State sleepTimerRemainingMinutes: number = 0;
   @State showSavePlaylistSheet: boolean = false;
   @State showStreamInfoSheet: boolean = false;
+  @State showSleepTimerSheet: boolean = false;
+  // TimePicker 选择的时间（时/分），仅作为「多久后停止」的时长输入，无系统当前时刻展示。
+  @State sleepPickerDate: Date = new Date(0, 0, 0, 0, 30, 0, 0);
   /** 会话级仅音频（封面层 + 关视频轨） */
   @StorageLink('isAudioOnlyMode') isAudioOnlyMode: boolean = false;
 
@@ -106,7 +110,38 @@ export struct VideoDetails {
 
   private formatViewCount(count: number): string {
     if (!count) return '';
+    const language = LanguageManager.normalizeLanguageCode(
+      LanguageManager.resolveAppliedLanguage(this.uiConfig));
+    if (language === LanguageManager.LANGUAGE_ZH_HANS) {
+      if (count >= 100000000) return `${(count / 100000000).toFixed(1)}亿`;
+      if (count >= 10000) return `${(count / 10000).toFixed(1)}万`;
+      if (count >= 1000) return `${(count / 1000).toFixed(1)}千`;
+      return count.toLocaleString();
+    }
+    if (language === LanguageManager.LANGUAGE_ZH_HK
+      || language === LanguageManager.LANGUAGE_ZH_TW) {
+      if (count >= 100000000) return `${(count / 100000000).toFixed(1)}億`;
+      if (count >= 10000) return `${(count / 10000).toFixed(1)}萬`;
+      if (count >= 1000) return `${(count / 1000).toFixed(1)}千`;
+      return count.toLocaleString();
+    }
+    if (count >= 1000000000) return `${(count / 1000000000).toFixed(1)}B`;
+    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
     return count.toLocaleString();
+  }
+
+  private formatStatCount(value: string): string {
+    const normalized = (value || '').trim();
+    // Preserve already-localized values such as "1.2K" or text returned by YouTube.
+    if (!/^[0-9,.\s]+$/.test(normalized)) {
+      return normalized;
+    }
+    const parsed = Number(normalized.replace(/[,\s]/g, ''));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return normalized;
+    }
+    return this.formatViewCount(parsed);
   }
 
   private formatRelativeDate(dateStr: string): string {
@@ -127,6 +162,7 @@ export struct VideoDetails {
     this.channelInfoService = new ChannelInfoService();
     this.resetForCurrentItem();
     this.classifyStreamsForDownload();
+    this.startSleepTimerUiUpdates();
 
     if (this.getEffectiveDesc().length === 0) {
       this.descSkeletonTimer = setInterval(() => {
@@ -139,6 +175,28 @@ export struct VideoDetails {
     if (this.descSkeletonTimer >= 0) {
       clearInterval(this.descSkeletonTimer);
     }
+    if (this.sleepTimerUiInterval >= 0) {
+      clearInterval(this.sleepTimerUiInterval);
+      this.sleepTimerUiInterval = -1;
+    }
+  }
+
+  private startSleepTimerUiUpdates(): void {
+    if (this.sleepTimerUiInterval >= 0) {
+      clearInterval(this.sleepTimerUiInterval);
+    }
+    this.syncSleepTimerUi();
+    this.sleepTimerUiInterval = setInterval(() => this.syncSleepTimerUi(), 1000);
+  }
+
+  private syncSleepTimerUi(): void {
+    this.sleepTimerRemainingMinutes = PlayerSession.getInstance().sleepTimerRemainingMinutes;
+  }
+
+  private formatSleepTimerRemaining(): string {
+    const hours = Math.floor(this.sleepTimerRemainingMinutes / 60);
+    const minutes = this.sleepTimerRemainingMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   }
 
   private onItemChanged(): void {
@@ -418,14 +476,14 @@ export struct VideoDetails {
       if (this.hasLikeCount()) {
         this.StatItem(
           $r('sys.symbol.hand_thumbsup'),
-          this.likeCount,
+          this.formatStatCount(this.likeCount),
           this.viewCount > 0 || !!(this.publishDate && this.publishDate.length > 0)
         )
       }
       if (this.hasDislikeCount()) {
         this.StatItem(
           $r('sys.symbol.hand_thumbsdown'),
-          this.dislikeCount,
+          this.formatStatCount(this.dislikeCount),
           this.viewCount > 0
             || !!(this.publishDate && this.publishDate.length > 0)
             || this.hasLikeCount()
@@ -436,7 +494,7 @@ export struct VideoDetails {
     .alignItems(VerticalAlign.Center)
     .padding({ left: 10, right: 10, top: 8, bottom: 8 })
     .borderRadius(12)
-    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+    .backgroundColor($r('app.color.yourtube_player_info_bg'))
     .margin({ top: 8, bottom: 12 })
   }
 
@@ -467,8 +525,7 @@ export struct VideoDetails {
   ActionButtonRow() {
     Scroll() {
       Row({ space: 10 }) {
-        this.ActionButton($r('sys.symbol.TV_tv'),
-          $r('app.string.yt_action_cast'), () => { this.openCastPicker(); })
+        this.SleepTimerActionButton()
         this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
           $r('app.string.yt_action_download'), () => { this.openDownloadDialog(); })
         this.ActionButton($r('sys.symbol.info_circle'),
@@ -507,12 +564,42 @@ export struct VideoDetails {
     }
     .height(36)
     .backgroundColor(this.isAudioOnlyMode
-      ? $r('app.color.yourtube_bg_surface_muted')
-      : $r('app.color.yourtube_bg_surface'))
+      ? $r('app.color.yourtube_player_info_bg')
+      : $r('app.color.yourtube_player_control_bg'))
     .borderRadius(18)
     .padding({ left: 14, right: 14 })
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .onClick(() => { this.toggleAudioOnlyMode(); })
+  }
+
+  @Builder
+  SleepTimerActionButton() {
+    Button() {
+      Row({ space: 6 }) {
+        SymbolGlyph($r('sys.symbol.timer'))
+          .fontSize(14)
+          .fontColor([this.sleepTimerRemainingMinutes > 0
+            ? this.themePrimary
+            : $r('app.color.yourtube_text_primary')])
+          .fontWeight(this.sleepTimerRemainingMinutes > 0 ? FontWeight.Bold : FontWeight.Normal)
+        Text(this.sleepTimerRemainingMinutes > 0
+          ? this.formatSleepTimerRemaining()
+          : $r('app.string.yt_action_sleep_timer'))
+          .fontSize(13)
+          .fontColor(this.sleepTimerRemainingMinutes > 0
+            ? this.themePrimary
+            : $r('app.color.yourtube_text_primary'))
+          .fontWeight(FontWeight.Medium)
+      }
+    }
+    .height(36)
+    .backgroundColor(this.sleepTimerRemainingMinutes > 0
+      ? $r('app.color.yourtube_player_info_bg')
+      : $r('app.color.yourtube_player_control_bg'))
+    .borderRadius(18)
+    .padding({ left: 14, right: 14 })
+    .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+    .onClick(() => { this.openSleepTimerPicker(); })
   }
 
   @Builder
@@ -529,7 +616,7 @@ export struct VideoDetails {
       }
     }
     .height(36)
-    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .backgroundColor($r('app.color.yourtube_player_control_bg'))
     .borderRadius(18)
     .padding({ left: 14, right: 14 })
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
@@ -616,6 +703,67 @@ export struct VideoDetails {
       backgroundColor: $r('app.color.yourtube_bg_page'),
       preferType: SheetType.BOTTOM,
       showClose: false,
+    })
+    .bindSheet($$this.showSleepTimerSheet, this.SleepTimerSheetBuilder(), {
+      detents: [SheetSize.MEDIUM],
+      dragBar: true,
+      backgroundColor: $r('app.color.yourtube_bg_page'),
+      preferType: SheetType.BOTTOM,
+      showClose: false,
+    })
+  }
+
+  @Builder
+  SleepTimerSheetBuilder() {
+    Column({ space: 0 }) {
+      Row() {
+        Text($r('app.string.yt_action_sleep_timer'))
+          .fontSize(18)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.yourtube_text_primary'))
+      }
+      .width('100%')
+      .padding({ top: 8, bottom: 4 })
+
+      TimePicker({
+        selected: this.sleepPickerDate,
+        format: TimePickerFormat.HOUR_MINUTE
+      })
+        .useMilitaryTime(true)
+        .loop(false)
+        .dateTimeOptions({ hour: '2-digit', minute: '2-digit' })
+        .selectedTextStyle({
+          color: this.themePrimary,
+          font: { size: '20fp', weight: FontWeight.Medium }
+        })
+        .onChange((value: TimePickerResult) => {
+          this.sleepPickerDate = new Date(0, 0, 0, value.hour, value.minute, 0, 0);
+        })
+
+      Row({ space: 12 }) {
+        Button($r('app.string.yt_action_cancel'))
+          .layoutWeight(1)
+          .backgroundColor($r('app.color.yourtube_player_control_bg'))
+          .fontColor($r('app.color.yourtube_text_primary'))
+          .onClick(() => {
+            this.showSleepTimerSheet = false;
+            Logger.debug(TAG, 'Sleep timer sheet cancelled');
+          })
+        Button($r('app.string.yt_action_confirm'))
+          .layoutWeight(1)
+          .backgroundColor(this.themePrimary)
+          .fontColor(Color.White)
+          .onClick(() => { this.confirmSleepTimerPicker(); })
+      }
+      .width('100%')
+      .margin({ top: 16, bottom: 8 })
+    }
+    .width('100%')
+    .padding({
+      top: $r('app.float.padding_12'),
+      bottom: 24,
+      left: $r('app.float.padding_16'),
+      right: $r('app.float.padding_16'),
     })
   }
 
@@ -753,18 +901,18 @@ export struct VideoDetails {
         .lineHeight(22)
         .width('100%')
         .margin({ bottom: 14 })
-    } else {
+    } else if (!this.streams || this.streams.length === 0) {
       Column({ space: 8 }) {
         Row().width('100%').height(14).borderRadius(2)
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('app.color.yourtube_player_info_bg'))
           .opacity(this.descSkeletonOpacity)
           .animation({ duration: 400, curve: Curve.EaseInOut })
         Row().width('92%').height(14).borderRadius(2)
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('app.color.yourtube_player_info_bg'))
           .opacity(this.descSkeletonOpacity)
           .animation({ duration: 400, curve: Curve.EaseInOut })
         Row().width('60%').height(14).borderRadius(2)
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('app.color.yourtube_player_info_bg'))
           .opacity(this.descSkeletonOpacity)
           .animation({ duration: 400, curve: Curve.EaseInOut })
       }.width('100%').margin({ top: 8, bottom: 14 })
@@ -778,7 +926,7 @@ export struct VideoDetails {
         Text(`#${tag}`)
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_secondary'))
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('app.color.yourtube_player_info_bg'))
           .borderRadius(12)
           .padding({ left: 10, right: 10, top: 4, bottom: 4 })
       }, (tag: string, index: number) => `${tag}_${index}`)
@@ -794,19 +942,22 @@ export struct VideoDetails {
     PlayerPresentation.onAudioOnlyModeChanged(next);
   }
 
-  private openCastPicker(): void {
-    // OVERLAY: cast panel must not arm BACKGROUND video-off.
-    // Cleared by onAbilityForeground when panel closes.
-    PlayerPresentation.beginOverlay('cast');
-    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    const pickerHelper = new avSession.AVCastPickerHelper(context);
-    pickerHelper.select({
-      sessionType: 'video',
-      pickerStyle: AVCastPickerStyle.STYLE_PANEL
-    }).catch((error: BusinessError) => {
-      PlayerPresentation.endOverlay('cast-error');
-      Logger.error(TAG, `Failed to open cast picker: ${JSON.stringify(error)}`);
-    });
+  private openSleepTimerPicker(): void {
+    const session = PlayerSession.getInstance();
+    const remaining = session.sleepTimerRemainingMinutes;
+    const initialMinutes = remaining > 0 ? remaining : 30;
+    this.sleepPickerDate = new Date(0, 0, 0,
+      Math.floor(initialMinutes / 60), initialMinutes % 60, 0, 0);
+    this.showSleepTimerSheet = true;
+  }
+
+  private confirmSleepTimerPicker(): void {
+    const d = this.sleepPickerDate;
+    const minutes = d.getHours() * 60 + d.getMinutes();
+    PlayerSession.getInstance().setSleepTimer(minutes);
+    this.syncSleepTimerUi();
+    this.showSleepTimerSheet = false;
+    Logger.info(TAG, `Sleep timer sheet accepted minutes=${minutes}`);
   }
 
   private shareVideo(): void {

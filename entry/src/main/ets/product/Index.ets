@@ -8,7 +8,8 @@ import { uniformTypeDescriptor as utd, preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import type { BusinessError } from '@kit.BasicServicesKit';
 import { ActionHub, ActionHubEvent } from '../common/ActionHub';
-import { AuthSessionManager, SearchChannelItem, SearchPlaylistItem } from 'youtube_core';
+import { AuthSessionManager, SearchChannelItem, SearchPlaylistItem,
+  YoutubeJavaScriptPlayerManager } from 'youtube_core';
 import { VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../common/SubscriptionModel';
 import { LocalStore } from '../common/LocalStore';
@@ -28,6 +29,7 @@ import { HomeRecommendSwiper } from '../features/home/components/HomeRecommendSw
 import { ErrorPage } from '../common/components/ErrorPage';
 import { SearchPage } from '../features/search/SearchPage';
 import { SubscriptionManagePage } from '../features/subscription/SubscriptionManagePage';
+import { SubscriptionScrollCoordinator } from '../features/subscription/SubscriptionScrollCoordinator';
 import { FavoritesPage } from '../features/favorites/FavoritesPage';
 import { LocalPage } from '../features/local/LocalPage';
 import { UserPage } from '../features/user/UserPage';
@@ -88,7 +90,7 @@ import {
 } from '../features/player/PlaybackContinuationService';
 
 const logger = AppLog.getInstance('Index');
-const APP_VERSION = '0.5.3';
+const APP_VERSION = '0.5.4';
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 
 
@@ -123,6 +125,7 @@ struct Index {
   @State showOptions: boolean = false;
   @State isLoadingMore: boolean = false;
   @State isInitialLoading: boolean = false;
+  @State isHomeRefreshing: boolean = false;
   @State homeErrorMessage: string = '';
   @State homeModeNoticeMessage: string = '';
   @State nextPageToken: string | null = null;
@@ -267,6 +270,7 @@ struct Index {
     const defaultPlaybackConfig = new PlaybackConfig();
     this.playbackConfig = defaultPlaybackConfig;
     PlaybackConfig.saveToPreferences(defaultPlaybackConfig);
+    DownloadManager.getInstance().refreshTaskPool();
 
     // 3. 应用深色模式
     Promise.resolve().then(() => {
@@ -308,6 +312,13 @@ struct Index {
       } catch (e) {
         logger.warn('Failed to clear cookie preferences:', JSON.stringify(e));
       }
+      try {
+        const authPrefs = preferences.getPreferencesSync(hostContext, { name: 'yourpipe_auth_poc' });
+        authPrefs.clearSync();
+        authPrefs.flush();
+      } catch (e) {
+        logger.warn('Failed to clear auth preferences:', JSON.stringify(e));
+      }
     }
 
     // 4. 清理下载临时文件
@@ -330,6 +341,24 @@ struct Index {
       } catch (e) {
         logger.warn('Failed to clean temp dir:', JSON.stringify(e));
       }
+
+      // Cache data is disposable. Preserve filesDir/downloads: downloaded media
+      // belongs to the user and intentionally survives "clear all app data".
+      try {
+        const cacheDir = hostContext.cacheDir;
+        if (cacheDir && fs.accessSync(cacheDir)) {
+          const files = fs.listFileSync(cacheDir);
+          for (const f of files) {
+            if (/^thumb_.*\.jpg$/.test(f)) {
+              try { fs.unlinkSync(cacheDir + '/' + f); } catch (_e) {}
+            }
+          }
+        }
+      } catch (e) {
+        logger.warn('Failed to clean thumbnail cache:', JSON.stringify(e));
+      }
+      YoutubeJavaScriptPlayerManager.clearPersistentCache()
+        .catch((e: Error) => logger.warn(`Failed to clear cipher cache: ${e.message || e}`));
     }
 
     // 5. 重置内存中的状态为默认值
@@ -974,6 +1003,25 @@ struct Index {
     }
   }
 
+  private async refreshHomeFeed(): Promise<void> {
+    // Refresh sets the two-way bound value before invoking onRefreshing.
+    // Always perform the work and clear it in finally.
+    logger.info(`[HomeRefresh] stage=start mode=${this.homeMode} source=${this.homeFeedSource}`);
+    const startedAt = Date.now();
+    try {
+      this.kioskNextPageToken = null;
+      this.kioskVisitorData = '';
+      this.nextPageToken = null;
+      this.lastLoadedQuery = '';
+      await this.loadLiveVideos(true);
+      logger.info(`[HomeRefresh] stage=complete mode=${this.homeMode} elapsed=${Date.now() - startedAt}ms items=${this.videoList.length}`);
+    } catch (e) {
+      logger.error(`[HomeRefresh] stage=failed elapsed=${Date.now() - startedAt}ms error=${JSON.stringify(e)}`);
+    } finally {
+      this.isHomeRefreshing = false;
+    }
+  }
+
   private formatHomeRequestError(err: Object, fallback: string): string {
     let code = '';
     let message = '';
@@ -1403,7 +1451,8 @@ struct Index {
         })
       ]
     }))
-    .bindToScrollable([this.homeGridScroller, this.homeListScroller])
+    .bindToScrollable([this.homeGridScroller, this.homeListScroller,
+      SubscriptionScrollCoordinator.scroller])
     .bindSheet($$this.showOptions, this.OptionsPanel(this.optionsDepth), {
       detents: [SheetSize.LARGE],
       dragBar: false,
@@ -1511,7 +1560,8 @@ struct Index {
             }
           })
         } else {
-          Column() {
+          Refresh({ refreshing: $$this.isHomeRefreshing }) {
+            Column() {
             if (this.homeModeNoticeMessage.length > 0) {
               Text(this.homeModeNoticeMessage)
                 .fontSize(12)
@@ -1522,7 +1572,6 @@ struct Index {
             if (this.uiConfig.homeLayoutMode === 'grid') {
               Scroll(this.homeGridScroller) {
                 Column({ space: 12 }) {
-                  Column().width('100%').height(this.topSafeHeight + 56)
                   if (this.shouldShowHomeRecommendBanner()) {
                     // Banner manages its own side inset so wide peek can use more of the row.
                     HomeRecommendSwiper({
@@ -1598,16 +1647,24 @@ struct Index {
               .layoutWeight(1)
               .clip(false)
               .backgroundColor($r('app.color.yourtube_bg_page'))
-              .contentStartOffset(this.topSafeHeight + 56)
               .contentEndOffset(this.bottomSafeHeight + 72)
               .edgeEffect(EdgeEffect.Spring)
               .onReachEnd(() => {
                 this.loadLiveVideos(false);
               })
             }
+            }
+            .width('100%')
+            .height('100%')
           }
           .width('100%')
           .layoutWeight(1)
+          .padding({ top: this.topSafeHeight + 56 })
+          .pullToRefresh(true)
+          .refreshOffset(64)
+          .onRefreshing(() => {
+            this.refreshHomeFeed();
+          })
         }
 
         if (this.isInitialLoading) {

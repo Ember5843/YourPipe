@@ -10,8 +10,8 @@ export interface ColorPresetItem {
 }
 
 export const COLOR_PRESETS: ColorPresetItem[] = [
-  { id: 'default', displayName: 'Orange',   primary: '#F1680D', primaryDeep: '#D15C00' },
-  { id: 'red',     displayName: 'Red',      primary: '#E53935', primaryDeep: '#B71C1C' },
+  { id: 'default', displayName: 'Red',      primary: '#E53935', primaryDeep: '#B71C1C' },
+  { id: 'orange',  displayName: 'Orange',   primary: '#F1680D', primaryDeep: '#D15C00' },
   { id: 'pink',    displayName: 'Pink',     primary: '#EC4899', primaryDeep: '#BE185D' },
   { id: 'purple',  displayName: 'Purple',   primary: '#8B5CF6', primaryDeep: '#6D28D9' },
   { id: 'blue',    displayName: 'Blue',     primary: '#2563EB', primaryDeep: '#1E40AF' },

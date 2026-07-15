@@ -1441,8 +1441,8 @@
             "value": "沒有可下載的媒體串流"
         },
         {
-            "name": "yt_action_cast",
-            "value": "投放"
+            "name": "yt_action_sleep_timer",
+            "value": "定時停止"
         },
         {
             "name": "yt_stream_info_title",
@@ -2407,6 +2407,38 @@
         {
             "name": "yt_setting_max_bytes_100",
             "value": "100 MB"
+        },
+        {
+            "name": "yt_changelog_0_5_4_1",
+            "value": "完善本地 JS 簽名解密與磁碟快取，冷啟動預熱並支援失敗回退，減少依賴遠端解密時的等待與失敗"
+        },
+        {
+            "name": "yt_changelog_0_5_4_2",
+            "value": "補齊 DASH 音軌中繼資料（xtags/acont），依內容語言與原聲軌偏好自動選擇預設音軌，減少多語言片誤選配音"
+        },
+        {
+            "name": "yt_changelog_0_5_4_3",
+            "value": "播放頁新增睡眠定時器，到時停止播放並退出；按讚/播放量依語言在地化顯示，並優化資訊區配色"
+        },
+        {
+            "name": "yt_changelog_0_5_4_4",
+            "value": "對齊全部介面語言文案鍵，修復設定項與關於頁出現 [object Object] 的問題，補全簡體中文資源"
+        },
+        {
+            "name": "yt_changelog_0_5_4_5",
+            "value": "預設主題色改為紅色，並新增播放頁控制區/資訊區背景色以提升對比度"
+        },
+        {
+            "name": "yt_changelog_0_5_4_6",
+            "value": "首頁支援下拉重新整理；清除全部資料時同步清理鑑權偏好、縮圖快取與解密快取（保留已下載媒體）"
+        },
+        {
+            "name": "yt_changelog_0_5_4_7",
+            "value": "完善網路請求日誌與擷取鏈路診斷資訊，便於定位載入失敗與鑑權相關問題"
+        },
+        {
+            "name": "yt_changelog_0_5_4_8",
+            "value": "同步更新 MPV 執行庫，並修復播放與介面相關的多處穩定性問題"
         }
     ]
 }

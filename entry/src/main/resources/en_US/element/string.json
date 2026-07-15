@@ -1165,8 +1165,8 @@
             "value": "No downloadable streams available"
         },
         {
-            "name": "yt_action_cast",
-            "value": "Cast"
+            "name": "yt_action_sleep_timer",
+            "value": "Sleep timer"
         },
         {
             "name": "yt_stream_info_title",
@@ -2407,6 +2407,38 @@
         {
             "name": "yt_setting_max_bytes_100",
             "value": "100 MB"
+        },
+        {
+            "name": "yt_changelog_0_5_4_1",
+            "value": "Improved local JS signature decryption with disk cache, cold-start prewarm, and failure fallback, reducing waits and failures when remote decryption is needed"
+        },
+        {
+            "name": "yt_changelog_0_5_4_2",
+            "value": "Filled DASH audio-track metadata (xtags/acont) and auto-select default tracks by content language / original preference, reducing wrong-dub picks on multi-language videos"
+        },
+        {
+            "name": "yt_changelog_0_5_4_3",
+            "value": "Added a sleep timer on the player page that stops playback and exits when due; localized like/view counts by language and refined info-area colors"
+        },
+        {
+            "name": "yt_changelog_0_5_4_4",
+            "value": "Aligned UI string keys across all locales, fixed [object Object] labels in settings and About, and completed Simplified Chinese resources"
+        },
+        {
+            "name": "yt_changelog_0_5_4_5",
+            "value": "Changed the default theme accent to red and added player control/info background colors for better contrast"
+        },
+        {
+            "name": "yt_changelog_0_5_4_6",
+            "value": "Added pull-to-refresh on Home; clearing all app data also clears auth preferences, thumbnail cache, and cipher cache while preserving downloads"
+        },
+        {
+            "name": "yt_changelog_0_5_4_7",
+            "value": "Improved network request logging and extraction diagnostics to help locate load failures and auth-related issues"
+        },
+        {
+            "name": "yt_changelog_0_5_4_8",
+            "value": "Updated the vendored MPV runtime and fixed multiple playback and UI stability issues"
         }
     ]
 }

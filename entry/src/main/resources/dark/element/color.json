@@ -25,6 +25,14 @@
       "value": "#242830"
     },
     {
+      "name": "yourtube_player_control_bg",
+      "value": "#242830"
+    },
+    {
+      "name": "yourtube_player_info_bg",
+      "value": "#2D333D"
+    },
+    {
       "name": "yourtube_bg_tag",
       "value": "#4C5563"
     },

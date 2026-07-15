@@ -113,6 +113,14 @@
       "value": "#F7F7F7"
     },
     {
+      "name": "yourtube_player_control_bg",
+      "value": "#E5EAF0"
+    },
+    {
+      "name": "yourtube_player_info_bg",
+      "value": "#DCE3EA"
+    },
+    {
       "name": "yourtube_bg_tag",
       "value": "#6A6A6A"
     },

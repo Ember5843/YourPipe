@@ -18,6 +18,8 @@ export interface YoutubeSabrFormatMeta {
   codecs?: string;
   audioTrackId?: string;
   audioTrackName?: string;
+  /** acont from xtags when present: original | dubbed | descriptive | … */
+  audioTrackType?: string;
   isOriginalAudio?: boolean;
   /** Optional progressive init URL (rare on pure SABR). */
   initializationUrl?: string;

@@ -1,6 +1,18 @@
 {
   "apiType": "stageMode",
-  "buildOption": {},
+  "buildOption": {
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      "arguments": "",
+      "abiFilters": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "targets": [
+        "yourpipe_cipher"
+      ]
+    }
+  },
   "buildOptionSet": [
     {
       "name": "release",

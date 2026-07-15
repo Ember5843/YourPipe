@@ -55,6 +55,26 @@ import { CommentItem, CommentResponse } from './CommentItem';
 
 const logger = YTCoreLogger.getInstance('YouTubeExtractor');
 
+class XtagsKeyValue {
+  key: string = '';
+  value: string = '';
+
+  constructor(key: string, value: string) {
+    this.key = key;
+    this.value = value;
+  }
+}
+
+class ProtoVarintResult {
+  value: number = 0;
+  next: number = 0;
+
+  constructor(value: number, next: number) {
+    this.value = value;
+    this.next = next;
+  }
+}
+
 /**
  * Selected stream player result (PipePipe configuredStreamingData).
  */
@@ -220,6 +240,7 @@ export class YouTubeExtractor {
 
   // Process-level STS cache (watch HTML or remote latest-player).
   private static cachedSignatureTimestamp: number | undefined = undefined;
+  private static cachedPlayerId: string | undefined = undefined;
 
   // WEB desktop client version for metadata / next (PipePipe getClientVersion fallback).
   private static cachedWebClientVersion: string | undefined = undefined;
@@ -250,6 +271,10 @@ export class YouTubeExtractor {
     const startedAt = Date.now();
     await this.client.initialize();
     logger.info(`[TIMING] http init elapsed=${Date.now() - startedAt}ms`);
+    // Fire-and-forget: validate the current YouTube Player and warm the persistent
+    // JSVM without extending application or player-service initialization.
+    YoutubeJavaScriptPlayerManager.startPrewarm(this.client, this.context.cacheDir)
+      .catch((e: Error) => logger.warn('[CipherWarmup] unhandled prewarm failure', e));
   }
 
   /**
@@ -702,6 +727,8 @@ export class YouTubeExtractor {
   private streamsCachedVideoId: string = '';
   private cachedManifestNResult: ManifestNDecodeResult | null = null;
   private decoderPlayerId: string | null = null;
+  private decoderPlayerJsUrl: string | null = null;
+  private localCipherPreparePromise: Promise<boolean> | null = null;
 
   // Selected stream client streaming data (PipePipe configuredStreamingData)
   private configuredStreamingData: StreamingData | undefined;
@@ -946,7 +973,8 @@ export class YouTubeExtractor {
           })(),
           audioTrackId: fmt.audioTrackId,
           audioTrackName: fmt.audioTrackName,
-          audioTrackType: fmt.isOriginalAudio ? 'original' : undefined,
+          audioTrackType: fmt.audioTrackType
+            || (fmt.isOriginalAudio ? 'original' : undefined),
           audioChannels: undefined,
           audioSampleRate: undefined,
           videoFps: undefined,
@@ -1027,10 +1055,13 @@ export class YouTubeExtractor {
       const trackId = track?.id || '';
       const langPart = trackId.length > 0 ? trackId.split('.')[0] : '';
       const audioLocale = langPart.length > 0 ? langPart.split('-')[0] : undefined;
-      const isOriginal = (!!displayName
-        && (displayName.toLowerCase().includes('original')
-          || displayName.toLowerCase().includes('default')
-          || displayName.includes('yokuqala')))
+      // Prefer xtags acont (NewPipe), then displayName / audioIsDefault.
+      const acont = this.resolveAudioTrackType(fmt, fmt.url || '');
+      const isOriginal = acont === 'original'
+        || (!!displayName
+          && (displayName.toLowerCase().includes('original')
+            || displayName.toLowerCase().includes('default')
+            || displayName.includes('yokuqala')))
         || track?.audioIsDefault === true;
       let initStart: number | undefined = undefined;
       let initEnd: number | undefined = undefined;
@@ -1067,6 +1098,7 @@ export class YouTubeExtractor {
         audioTrackId: trackId || undefined,
         // Prefer raw YouTube displayName; else raw track id — no synthesized labels.
         audioTrackName: displayName.length > 0 ? displayName : (trackId || undefined),
+        audioTrackType: acont,
         isOriginalAudio: isOriginal,
         initializationUrl: fmt.url,
         initRangeStart: initStart,
@@ -1155,9 +1187,22 @@ export class YouTubeExtractor {
     this.cachedVideoStreams = [];
     this.cachedVideoOnlyStreams = [];
 
+    // One watch request owns STS/player metadata and local-cipher validation for this extraction.
+    // Keep it off the ordinary playback critical path; if the current player is already READY,
+    // decode uses it immediately, otherwise this playback falls back remotely while preparation
+    // continues for subsequent videos.
+    const watchPagePromise = this.fetchWatchPage(videoId);
+    const localCipherPromise = watchPagePromise.then((html: string) => {
+      this.extractPlayerMetadata(html);
+      return this.localCipherPreparePromise ?? Promise.resolve(false);
+    }).then((prepared: boolean) => prepared).catch((e: Error) => {
+      logger.warn(`[CipherRoute] route=LOCAL_JSVM stage=watch_prepare_failed video=${videoId}`, e);
+      return false;
+    });
+
     // STS (latest-player) + WEB clientVersion (sw.js) before parallel trio — independent.
     const stsStartedAt = Date.now();
-    const stsPromise = this.resolveSignatureTimestamp(videoId).then((value: number | undefined) => {
+    const stsPromise = this.resolveSignatureTimestamp(videoId, watchPagePromise).then((value: number | undefined) => {
       logger.info(`[TIMING] video=${videoId} stage=STS elapsed=${Date.now() - stsStartedAt}ms`);
       return value;
     });
@@ -1261,6 +1306,13 @@ export class YouTubeExtractor {
         logger.info(`[STREAM] recovered anonymous MWEB hlsManifestUrl len=${hls.length}`);
       }
     }
+    // Deliberately do not await Player JS preparation here. deobfuscateBatch only invokes
+    // JSVM in READY state and otherwise routes this batch through PipePipe.
+    localCipherPromise.then((ready: boolean) => {
+      logger.info(`[CipherRoute] stage=background_validation video=${videoId} ready=${ready}`);
+    }).catch((e: Error) => {
+      logger.warn(`[CipherRoute] stage=background_validation_failed video=${videoId}`, e);
+    });
     const streamBuildStartedAt = Date.now();
     await this.buildAndCacheStreams(videoId, innertubePlayers, metaBase);
     logger.info(`[TIMING] video=${videoId} stage=urlDecodeBuild elapsed=${Date.now() - streamBuildStartedAt}ms`);
@@ -1301,15 +1353,23 @@ export class YouTubeExtractor {
   /**
    * STS for stream player: process cache → remote latest-player → optional watch HTML fallback.
    */
-  private async resolveSignatureTimestamp(videoId: string): Promise<number | undefined> {
+  private async resolveSignatureTimestamp(
+    videoId: string,
+    watchPagePromise?: Promise<string>
+  ): Promise<number | undefined> {
     if (YouTubeExtractor.cachedSignatureTimestamp
       && YouTubeExtractor.cachedSignatureTimestamp > 0) {
+      if (YouTubeExtractor.cachedPlayerId) {
+        this.decoderPlayerId = YouTubeExtractor.cachedPlayerId;
+      }
       return YouTubeExtractor.cachedSignatureTimestamp;
     }
     try {
       const remote = await PipePipeApiDecoder.getLatestPlayer();
       if (remote.signatureTimestamp > 0) {
         YouTubeExtractor.cachedSignatureTimestamp = remote.signatureTimestamp;
+        YouTubeExtractor.cachedPlayerId = remote.playerId;
+        this.decoderPlayerId = remote.playerId;
         logger.info(`[STREAM] STS from latest-player: ${remote.signatureTimestamp} player=${remote.playerId}`);
         return remote.signatureTimestamp;
       }
@@ -1318,7 +1378,7 @@ export class YouTubeExtractor {
     }
     // Optional fallback only — not on the happy path.
     try {
-      const html = await this.fetchWatchPage(videoId);
+      const html = await (watchPagePromise ?? this.fetchWatchPage(videoId));
       const sts = this.extractPlayerMetadata(html);
       if (sts !== undefined && sts > 0) {
         logger.info(`[STREAM] STS from watch HTML fallback: ${sts}`);
@@ -1411,9 +1471,247 @@ export class YouTubeExtractor {
     return undefined;
   }
 
+  /**
+   * Resolve audio track type (acont) for DASH adaptive formats.
+   * Priority matches NewPipeExtractor: format.xtags protobuf → URL xtags →
+   * audioTrack.displayName / audioIsDefault heuristics.
+   * Values: original | dubbed | dubbed-auto | descriptive | secondary.
+   */
+  private resolveAudioTrackType(formatData: Format, streamUrl: string): string | undefined {
+    const fromXtags = this.extractAudioTrackTypeFromXtags(formatData.xtags);
+    if (fromXtags) {
+      return fromXtags;
+    }
+    const fromUrl = this.extractAudioTrackTypeFromUrl(streamUrl);
+    if (fromUrl) {
+      return fromUrl;
+    }
+    const track = formatData.audioTrack;
+    if (!track) {
+      return undefined;
+    }
+    if (track.audioIsDefault === true) {
+      return 'original';
+    }
+    const displayName = (track.displayName || '').toLowerCase();
+    if (displayName.indexOf('original') >= 0
+      || displayName.indexOf('default') >= 0
+      || displayName.indexOf('yokuqala') >= 0) {
+      return 'original';
+    }
+    return undefined;
+  }
+
+  /**
+   * NewPipe-compatible xtags parse: base64url protobuf XTags { repeated { key, value } }.
+   * Example payload: acont=original, lang=en-US.
+   */
+  private extractAudioTrackTypeFromXtags(xtags: string | undefined): string | undefined {
+    if (!xtags || xtags.length === 0) {
+      return undefined;
+    }
+    try {
+      const bytes = this.decodeBase64UrlToBytes(xtags);
+      if (!bytes || bytes.length === 0) {
+        return undefined;
+      }
+      const acont = this.readXtagsAcont(bytes);
+      return this.normalizeAudioTrackType(acont);
+    } catch (_e) {
+      return undefined;
+    }
+  }
+
   private extractAudioTrackTypeFromUrl(url: string): string | undefined {
-    const match = url.match(/[?&]xtags=[^&]*audio_track_type%3D([^%&]+)/);
-    return match ? decodeURIComponent(match[1]) : undefined;
+    if (!url || url.length === 0) {
+      return undefined;
+    }
+    // Query form used by some clients: xtags=...audio_track_type%3Doriginal...
+    const encoded = url.match(/[?&]xtags=[^&]*audio_track_type%3D([^%&]+)/i);
+    if (encoded) {
+      try {
+        return this.normalizeAudioTrackType(decodeURIComponent(encoded[1]));
+      } catch (_e) {
+        return this.normalizeAudioTrackType(encoded[1]);
+      }
+    }
+    // Path/query form similar to HLS: xtags=acont=original:lang=en
+    try {
+      const decoded = decodeURIComponent(url);
+      const matcher = /[?&/]xtags=([^&]+)/i.exec(decoded);
+      if (matcher) {
+        const payload = matcher[1];
+        // Base64 protobuf blob in the URL.
+        if (payload.indexOf('=') < 0 || payload.indexOf('acont') < 0) {
+          const fromB64 = this.extractAudioTrackTypeFromXtags(payload.split('/')[0]);
+          if (fromB64) {
+            return fromB64;
+          }
+        }
+        for (const part of payload.split(/[:&,]/)) {
+          const eq = part.indexOf('=');
+          if (eq <= 0) {
+            continue;
+          }
+          const key = part.substring(0, eq).toLowerCase();
+          const value = part.substring(eq + 1);
+          if (key === 'acont' || key === 'audio_track_type') {
+            return this.normalizeAudioTrackType(value);
+          }
+        }
+      }
+    } catch (_e) {
+      // ignore malformed URLs
+    }
+    return undefined;
+  }
+
+  private normalizeAudioTrackType(raw: string | undefined): string | undefined {
+    if (!raw) {
+      return undefined;
+    }
+    const value = raw.trim().toLowerCase();
+    if (value.length === 0) {
+      return undefined;
+    }
+    if (value === 'original' || value === 'dubbed' || value === 'dubbed-auto'
+      || value === 'descriptive' || value === 'secondary') {
+      return value;
+    }
+    return value;
+  }
+
+  /** Base64 / base64url decode (same approach as SabrProto.decodeBase64ToBytes). */
+  private decodeBase64UrlToBytes(input: string): Uint8Array | undefined {
+    const raw = (input || '').trim();
+    if (raw.length === 0) {
+      return undefined;
+    }
+    const padLen = (4 - (raw.length % 4)) % 4;
+    const normalized = (raw + '='.repeat(padLen)).replace(/-/g, '+').replace(/_/g, '/');
+    const table = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const bytes: number[] = [];
+    let buffer = 0;
+    let bits = 0;
+    for (let i = 0; i < normalized.length; i++) {
+      const ch = normalized.charAt(i);
+      if (ch === '=') {
+        break;
+      }
+      const val = table.indexOf(ch);
+      if (val < 0) {
+        continue;
+      }
+      buffer = (buffer << 6) | val;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        bytes.push((buffer >> bits) & 0xff);
+      }
+    }
+    if (bytes.length === 0) {
+      return undefined;
+    }
+    return new Uint8Array(bytes);
+  }
+
+  /** Walk XTags protobuf bytes and return value for key "acont". */
+  private readXtagsAcont(bytes: Uint8Array): string | undefined {
+    let offset = 0;
+    while (offset < bytes.length) {
+      const tag = bytes[offset++];
+      const fieldNumber = tag >> 3;
+      const wireType = tag & 0x7;
+      if (wireType === 2) {
+        const lenResult = this.readProtoVarint(bytes, offset);
+        if (!lenResult) {
+          return undefined;
+        }
+        offset = lenResult.next;
+        const len = lenResult.value;
+        if (offset + len > bytes.length) {
+          return undefined;
+        }
+        if (fieldNumber === 1) {
+          // Nested KeyValuePair
+          const pair = this.readXtagsKeyValuePair(bytes.subarray(offset, offset + len));
+          if (pair && pair.key === 'acont' && pair.value) {
+            return pair.value;
+          }
+        }
+        offset += len;
+      } else if (wireType === 0) {
+        const skip = this.readProtoVarint(bytes, offset);
+        if (!skip) {
+          return undefined;
+        }
+        offset = skip.next;
+      } else {
+        return undefined;
+      }
+    }
+    return undefined;
+  }
+
+  private readXtagsKeyValuePair(bytes: Uint8Array): XtagsKeyValue | undefined {
+    let key = '';
+    let value = '';
+    let offset = 0;
+    while (offset < bytes.length) {
+      const tag = bytes[offset++];
+      const fieldNumber = tag >> 3;
+      const wireType = tag & 0x7;
+      if (wireType !== 2) {
+        // Only string fields expected.
+        if (wireType === 0) {
+          const skip = this.readProtoVarint(bytes, offset);
+          if (!skip) {
+            return undefined;
+          }
+          offset = skip.next;
+          continue;
+        }
+        return undefined;
+      }
+      const lenResult = this.readProtoVarint(bytes, offset);
+      if (!lenResult) {
+        return undefined;
+      }
+      offset = lenResult.next;
+      const len = lenResult.value;
+      if (offset + len > bytes.length) {
+        return undefined;
+      }
+      let text = '';
+      for (let i = 0; i < len; i++) {
+        text += String.fromCharCode(bytes[offset + i]);
+      }
+      offset += len;
+      if (fieldNumber === 1) {
+        key = text;
+      } else if (fieldNumber === 2) {
+        value = text;
+      }
+    }
+    if (key.length === 0) {
+      return undefined;
+    }
+    return new XtagsKeyValue(key, value);
+  }
+
+  private readProtoVarint(bytes: Uint8Array, offset: number): ProtoVarintResult | undefined {
+    let result = 0;
+    let shift = 0;
+    let pos = offset;
+    while (pos < bytes.length && shift < 35) {
+      const b = bytes[pos++];
+      result |= (b & 0x7f) << shift;
+      if ((b & 0x80) === 0) {
+        return new ProtoVarintResult(result >>> 0, pos);
+      }
+      shift += 7;
+    }
+    return undefined;
   }
 
   private appendQueryParam(url: string, key: string, value: string): string {
@@ -1453,6 +1751,8 @@ export class YouTubeExtractor {
     this.cachedVideoOnlyStreams = [];
     this.cachedManifestNResult = null;
     this.decoderPlayerId = null;
+    this.decoderPlayerJsUrl = null;
+    this.localCipherPreparePromise = null;
     this.cachedInnertubePlayers = undefined;
     this.configuredStreamingData = undefined;
     this.configuredCpn = undefined;
@@ -1539,6 +1839,14 @@ export class YouTubeExtractor {
     return match ? match[1] : null;
   }
 
+  private normalizePlayerJsUrl(playerJsUrl: string): string | null {
+    let normalized = playerJsUrl.replace(/\\\//g, '/');
+    if (normalized.startsWith('//')) normalized = 'https:' + normalized;
+    else if (normalized.startsWith('/')) normalized = 'https://www.youtube.com' + normalized;
+    if (!normalized.startsWith('https://www.youtube.com/s/player/')) return null;
+    return normalized;
+  }
+
   private randomCpn(): string {
     return generateContentPlaybackNonce();
   }
@@ -1566,7 +1874,11 @@ export class YouTubeExtractor {
       }
       const playerJsUrl = ytcfg['PLAYER_JS_URL'];
       if (typeof playerJsUrl === 'string') {
-        playerId = this.extractPlayerIdFromUrl(playerJsUrl);
+        const normalizedUrl = this.normalizePlayerJsUrl(playerJsUrl);
+        if (normalizedUrl) {
+          playerId = this.extractPlayerIdFromUrl(normalizedUrl);
+          this.decoderPlayerJsUrl = normalizedUrl;
+        }
       }
     }
 
@@ -1583,6 +1895,11 @@ export class YouTubeExtractor {
       PipePipeApiDecoder.setLocalMetadata(meta);
       if (meta.playerId && meta.signatureTimestamp > 0) {
         this.decoderPlayerId = meta.playerId;
+        YouTubeExtractor.cachedPlayerId = meta.playerId;
+      }
+      if (meta.playerId && this.decoderPlayerJsUrl) {
+        this.localCipherPreparePromise = YoutubeJavaScriptPlayerManager.prepareLocalPlayer(
+          meta.playerId, this.decoderPlayerJsUrl, this.client);
       }
       logger.info(`[METADATA] local extraction OK: playerId=${meta.playerId || '(missing)'} sts=${meta.signatureTimestamp || '(missing)'}`);
     } else {
@@ -2485,7 +2802,14 @@ export class YouTubeExtractor {
   }
 
   private extractAndSetAudioTrackInfo(formatData: Format, itagInfo: ItagInfo): void {
-    if (!formatData.audioTrack) return;
+    const streamUrl = itagInfo.getContent() || '';
+    const audioTrackType = this.resolveAudioTrackType(formatData, streamUrl);
+    if (audioTrackType) {
+      itagInfo.setAudioTrackType(audioTrackType);
+    }
+    if (!formatData.audioTrack) {
+      return;
+    }
     const audioTrack = formatData.audioTrack;
     if (audioTrack.id) {
       const audioTrackId = audioTrack.id;
@@ -2494,7 +2818,7 @@ export class YouTubeExtractor {
       const audioLocale = langPart.split('-')[0];
       // Raw API text only: displayName, else track id (no synthesized "(original)").
       const audioTrackName = displayName.length > 0 ? displayName : audioTrackId;
-      itagInfo.setAudioTrackInfo(audioTrackId, audioTrackName, audioLocale);
+      itagInfo.setAudioTrackInfo(audioTrackId, audioTrackName, audioLocale, audioTrackType);
     }
   }
 
@@ -2658,7 +2982,7 @@ export class YouTubeExtractor {
       audioLanguage: itagInfo.getAudioLocale(),
       audioTrackId: itagInfo.getAudioTrackId(),
       audioTrackName: itagInfo.getAudioTrackName(),
-      audioTrackType: undefined,
+      audioTrackType: itagInfo.getAudioTrackType(),
       audioChannels: itagItem.getAudioChannels() > 0 ? itagItem.getAudioChannels() : undefined,
       audioSampleRate: itagItem.getSampleRate() > 0 ? itagItem.getSampleRate() : undefined,
       videoFps: undefined,

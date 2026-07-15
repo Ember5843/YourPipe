@@ -1132,14 +1132,20 @@ export class AvPlayerController {
   }
 
   /**
-   * Auto-pick audio for video: prefer original track, then higher bitrate,
-   * among container-compatible candidates. UI lists every stream; this is default only.
+   * Auto-pick audio for video: filter compatible candidates by the user's
+   * preferred audio language (PlaybackPreferences.searchLanguage), then
+   * prefer the original track and higher bitrate within that group; fall
+   * back to all candidates when the preferred language is unavailable.
+   * UI lists every stream; this only chooses the default.
    */
   private selectBestCompatibleAudio(videoStream: StreamInfo, audioStreams: StreamInfo[]): StreamInfo | undefined {
     const candidates = this.compatibleAudioCandidates(videoStream, audioStreams);
     if (candidates.length === 0) {
       return undefined;
     }
+    const prefs = PlaybackPreferences.snapshot();
+    const langMatched = this.filterAudioStreamsByLanguage(candidates, prefs.searchLanguage);
+    const pool = langMatched.length > 0 ? langMatched : candidates;
     const isOriginal = (s: StreamInfo): boolean => {
       const type = (s.audioTrackType || '').toUpperCase();
       const name = (s.audioTrackName || '').toLowerCase();
@@ -1147,7 +1153,7 @@ export class AvPlayerController {
         || name.indexOf('original') >= 0
         || name.indexOf('default') >= 0;
     };
-    return candidates.slice().sort((a: StreamInfo, b: StreamInfo): number => {
+    return pool.slice().sort((a: StreamInfo, b: StreamInfo): number => {
       const oa = isOriginal(a) ? 1 : 0;
       const ob = isOriginal(b) ? 1 : 0;
       if (oa !== ob) {
@@ -1155,6 +1161,53 @@ export class AvPlayerController {
       }
       return this.audioFormatPriority(b) - this.audioFormatPriority(a);
     })[0];
+  }
+
+  /**
+   * Filter audio streams by the preferred audio language, aligned with the
+   * PipePipe `ListHelper.filterAudioStreamsByLanguage` semantics:
+   *  - "original" (or empty): prefer tracks explicitly flagged original /
+   *    default, then tracks that carry no track-id / language metadata.
+   *  - explicit code (e.g. "zh", "en"): match StreamInfo.audioLanguage first,
+   *    then the language prefix of audioTrackId, then the track name.
+   * Returns an empty array when nothing matches so callers can fall back to
+   * the full candidate set.
+   */
+  private filterAudioStreamsByLanguage(audioStreams: StreamInfo[], preferredLanguage: string): StreamInfo[] {
+    if (!audioStreams || audioStreams.length === 0) {
+      return [];
+    }
+    const pref = (preferredLanguage || '').trim().toLowerCase();
+    if (pref === '' || pref === 'original') {
+      const originalStreams = audioStreams.filter((s: StreamInfo) => {
+        const name = (s.audioTrackName || '').toLowerCase();
+        const type = (s.audioTrackType || '').toLowerCase();
+        return name.indexOf('original') >= 0
+          || name.indexOf('default') >= 0
+          || type === 'original';
+      });
+      if (originalStreams.length > 0) {
+        return originalStreams;
+      }
+      const noTrackInfo = audioStreams.filter((s: StreamInfo) =>
+        (s.audioTrackId || '') === '' && (s.audioLanguage || '') === '');
+      return noTrackInfo;
+    }
+    const matched = audioStreams.filter((s: StreamInfo) => {
+      const lang = (s.audioLanguage || '').toLowerCase();
+      if (lang === pref) {
+        return true;
+      }
+      const trackId = s.audioTrackId || '';
+      if (trackId) {
+        const code = trackId.split('.')[0].split('-')[0].toLowerCase();
+        if (code === pref) {
+          return true;
+        }
+      }
+      return (s.audioTrackName || '').toLowerCase() === pref;
+    });
+    return matched;
   }
 
   private audioFormatPriority(stream: StreamInfo): number {

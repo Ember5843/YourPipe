@@ -33,6 +33,8 @@ export class PlayerSession {
   private _defaultSource: VideoData;
   private _context: common.UIAbilityContext;
   private _watchSaveTimerId: number = -1;
+  private _sleepTimerId: number = -1;
+  private _sleepTimerEndsAt: number = 0;
   private _watchVideoId: string = '';
   private _activePlayPromise: Promise<VideoData | null> | null = null;
   private _activePlayVideoId: string = '';
@@ -145,6 +147,44 @@ export class PlayerSession {
 
   get isAudioOnlyMode(): boolean {
     return this._isAudioOnlyMode;
+  }
+
+  get sleepTimerRemainingMinutes(): number {
+    if (this._sleepTimerEndsAt <= Date.now()) {
+      return 0;
+    }
+    return Math.ceil((this._sleepTimerEndsAt - Date.now()) / 60000);
+  }
+
+  setSleepTimer(durationMinutes: number): void {
+    this.cancelSleepTimer();
+    const minutes = Math.max(0, Math.min(1439, Math.floor(durationMinutes)));
+    if (minutes === 0) {
+      logger.info(`${TAG} sleep timer cancelled by user`);
+      return;
+    }
+    const durationMs = minutes * 60000;
+    this._sleepTimerEndsAt = Date.now() + durationMs;
+    this._sleepTimerId = setTimeout(() => {
+      this._sleepTimerId = -1;
+      this._sleepTimerEndsAt = 0;
+      logger.info(`${TAG} sleep timer fired minutes=${minutes}`);
+      this.release();
+      this._context.terminateSelf().then(() => {
+        logger.info(`${TAG} sleep timer terminated ability`);
+      }).catch((e: Error) => {
+        logger.error(`${TAG} sleep timer terminateSelf failed: ${e.message || e}`);
+      });
+    }, durationMs);
+    logger.info(`${TAG} sleep timer scheduled minutes=${minutes} endsAt=${this._sleepTimerEndsAt}`);
+  }
+
+  cancelSleepTimer(): void {
+    if (this._sleepTimerId >= 0) {
+      clearTimeout(this._sleepTimerId);
+      this._sleepTimerId = -1;
+    }
+    this._sleepTimerEndsAt = 0;
   }
 
   /**
@@ -587,6 +627,7 @@ export class PlayerSession {
       this.setPiPActive(false);
     }
     this.clearAudioOnlyMode();
+    this.cancelSleepTimer();
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
     this._controller.releaseVideo(0);

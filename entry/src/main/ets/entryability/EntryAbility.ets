@@ -11,7 +11,8 @@ import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
 import { BackgroundTaskManager, AvPlayerController } from 'mediaservice';
 import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
-import { AuthSessionManager, YTCoreLogger, YoutubePlayerClientConfig } from 'youtube_core';
+import { AuthSessionManager, YTCoreLogger, YoutubeJavaScriptPlayerManager,
+  YoutubePlayerClientConfig } from 'youtube_core';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
@@ -83,6 +84,8 @@ export default class EntryAbility extends UIAbility {
       YTCoreLogger.setSink((level, tag, message) => {
         AppLogStore.push(level, tag, message);
       });
+      YoutubeJavaScriptPlayerManager.startAppPrewarm(this.context)
+        .catch((e: Error) => logger.warn(`Cipher prewarm failed: ${e.message || e}`));
       LanguageManager.applyPersistedLanguage();
       ColorModeManager.applyPersistedMode(this.context);
     } catch (err) {

@@ -18,6 +18,7 @@ export class ItagInfo {
   private audioTrackIdVal: string | undefined;
   private audioTrackNameVal: string | undefined;
   private audioLocaleVal: string | undefined;
+  private audioTrackTypeVal: string | undefined;
 
   constructor(content: string, itagItem: ItagItem) {
     this.contentVal = content;
@@ -52,10 +53,22 @@ export class ItagInfo {
     return this.isUrlVal;
   }
 
-  setAudioTrackInfo(audioTrackId: string | undefined, audioTrackName: string | undefined, audioLocale: string | undefined): void {
+  setAudioTrackInfo(
+    audioTrackId: string | undefined,
+    audioTrackName: string | undefined,
+    audioLocale: string | undefined,
+    audioTrackType?: string | undefined
+  ): void {
     this.audioTrackIdVal = audioTrackId;
     this.audioTrackNameVal = audioTrackName;
     this.audioLocaleVal = audioLocale;
+    if (audioTrackType !== undefined) {
+      this.audioTrackTypeVal = audioTrackType;
+    }
+  }
+
+  setAudioTrackType(audioTrackType: string | undefined): void {
+    this.audioTrackTypeVal = audioTrackType;
   }
 
   getAudioTrackId(): string | undefined {
@@ -68,5 +81,9 @@ export class ItagInfo {
 
   getAudioLocale(): string | undefined {
     return this.audioLocaleVal;
+  }
+
+  getAudioTrackType(): string | undefined {
+    return this.audioTrackTypeVal;
   }
 }
