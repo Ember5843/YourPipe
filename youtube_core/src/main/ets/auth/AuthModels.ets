@@ -38,6 +38,10 @@ export class AuthAccountStatus {
   hasCredential: boolean = false;
   /** When false, requests stay anonymous (private browsing) while credentials are kept. */
   authEnabled: boolean = true;
+  /** Fine-grained: attach auth to user-data requests (feed / subscriptions / history / search). */
+  useAuthForUserData: boolean = true;
+  /** Fine-grained: attach auth to playback extraction (player API + stream URL cookies). */
+  useAuthForPlayback: boolean = true;
   lastError: string = '';
   lastErrorCode: string = '';
   pollIntervalMs: number = 3000;

@@ -302,6 +302,26 @@ export struct OptionsDataAccountPage {
     this.params.onAuthChanged();
   }
 
+  private isUseAuthForUserDataActive(): boolean {
+    return this.authStatus.useAuthForUserData !== false;
+  }
+
+  private onUseAuthForUserDataToggle(enabled: boolean): void {
+    AuthSessionManager.getInstance()?.setUseAuthForUserData(enabled);
+    AuthStateHelper.refresh();
+    this.params.onAuthChanged();
+  }
+
+  private isUseAuthForPlaybackActive(): boolean {
+    return this.authStatus.useAuthForPlayback !== false;
+  }
+
+  private onUseAuthForPlaybackToggle(enabled: boolean): void {
+    AuthSessionManager.getInstance()?.setUseAuthForPlayback(enabled);
+    AuthStateHelper.refresh();
+    this.params.onAuthChanged();
+  }
+
   private signOut(): void {
     AuthSessionManager.getInstance()?.signOut();
     AuthStateHelper.refresh();
@@ -608,10 +628,39 @@ export struct OptionsDataAccountPage {
                 }
               })
             }
+
+            if (this.isAuthActive()) {
+              ListItem() {
+                PlaybackToggleRow({
+                  title: $r('app.string.yt_option_auth_use_for_user_data'),
+                  subtitle: $r('app.string.yt_option_auth_use_for_user_data_subtitle'),
+                  isOn: this.isUseAuthForUserDataActive(),
+                  themeColor: this.themePrimary,
+                  transparentBackground: true,
+                  onChange: (val: boolean) => {
+                    this.onUseAuthForUserDataToggle(val);
+                  }
+                })
+              }
+
+              ListItem() {
+                PlaybackToggleRow({
+                  title: $r('app.string.yt_option_auth_use_for_playback'),
+                  subtitle: $r('app.string.yt_option_auth_use_for_playback_subtitle'),
+                  isOn: this.isUseAuthForPlaybackActive(),
+                  themeColor: this.themePrimary,
+                  transparentBackground: true,
+                  onChange: (val: boolean) => {
+                    this.onUseAuthForPlaybackToggle(val);
+                  }
+                })
+              }
+            }
           }
           .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
           .borderRadius(16)
           .clip(true)
+          .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
           ListItem() {
             Button($r('app.string.yt_option_sign_out'))

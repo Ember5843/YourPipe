@@ -72,6 +72,14 @@ export class PipePipeApiDecoder {
     logger.info(`Player metadata set from local extraction: id=${meta.playerId} sts=${meta.signatureTimestamp}`);
   }
 
+  /** Sync read of process cache — no network. */
+  static peekCachedMetadata(): PlayerMetadata | null {
+    if (PipePipeApiDecoder.cachedMetadata && Date.now() < PipePipeApiDecoder.cacheExpiry) {
+      return PipePipeApiDecoder.cachedMetadata;
+    }
+    return null;
+  }
+
   static async getLatestPlayer(): Promise<PlayerMetadata> {
     const now = Date.now();
     if (PipePipeApiDecoder.cachedMetadata && now < PipePipeApiDecoder.cacheExpiry) {
@@ -82,13 +90,15 @@ export class PipePipeApiDecoder {
     // PipePipe remote fallback when watch-page STS is unavailable.
     const latestUrl = ApiConfig.getLatestPlayerUrl();
     try {
+      // Remote is fallback only; keep a tight budget so the happy path
+      // (watch HTML STS) is not blocked when the API is slow/unreachable.
       const httpRequest = http.createHttp();
       const response = await httpRequest.request(latestUrl, {
         method: http.RequestMethod.GET,
         header: PipePipeApiDecoder.REQUEST_HEADERS,
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
-        connectTimeout: 15000,
-        readTimeout: 15000
+        connectTimeout: 4000,
+        readTimeout: 4000
       });
       httpRequest.destroy();
       if (response.responseCode !== 200 || !response.result) {

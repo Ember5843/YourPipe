@@ -174,8 +174,8 @@ export class YouTubeHttpClient {
     }
     if (withAuth) {
       const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
-      if (activeAuthSession && activeAuthSession.isSignedIn()) {
-        const cookieStr = activeAuthSession.getCookieString();
+      if (activeAuthSession && activeAuthSession.isAuthEnabledForPlayback()) {
+        const cookieStr = activeAuthSession.getCookieStringForPlayback();
         if (cookieStr) {
           headers['Cookie'] = cookieStr;
         }
@@ -252,10 +252,11 @@ export class YouTubeHttpClient {
       }
 
       // 登录头：显式 withAuth 时注入（对齐 PipePipe addLoggedInHeaders）
+      // 使用 useAuthForPlayback 开关（播放路径），不影响到用户数据路径
       if (withAuth) {
         const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
-        if (activeAuthSession && activeAuthSession.isSignedIn()) {
-          const cookieStr = activeAuthSession.getCookieString();
+        if (activeAuthSession && activeAuthSession.isAuthEnabledForPlayback()) {
+          const cookieStr = activeAuthSession.getCookieStringForPlayback();
           if (cookieStr) {
             headers['Cookie'] = cookieStr;
             headers['X-Origin'] = 'https://www.youtube.com';

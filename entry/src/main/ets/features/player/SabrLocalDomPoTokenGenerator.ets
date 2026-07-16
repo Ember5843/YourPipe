@@ -1,3 +1,4 @@
+import { WebClientVersionResolver } from 'youtube_core';
 import web_webview from '@ohos.web.webview';
 import { http } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
@@ -7,7 +8,6 @@ import { AppLog } from '../../common/AppLog';
 const logger = AppLog.getInstance('SabrLocalDomPoToken');
 const API_KEY = 'AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw';
 const REQUEST_KEY = 'O43z0dpjhgX20SCx4KAo';
-const CLIENT_VERSION = '2.20260227.01.00';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
   + '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.3';
 
@@ -27,7 +27,7 @@ interface WrappedUrl {
 
 class AttClient {
   clientName: string = 'WEB';
-  clientVersion: string = CLIENT_VERSION;
+  clientVersion: string = WebClientVersionResolver.getCachedOrHardcoded();
 }
 
 class AttContext {
@@ -216,6 +216,33 @@ function bytesToCsv(bytes: Uint8Array): string {
     result += bytes[i].toString();
   }
   return result;
+}
+
+const BASE64URL_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  // Standard base64 from platform API, then make it URL-safe (RFC 4648 §5):
+  //   '+' -> '-', '/' -> '_', strip '=' padding.
+  const helper = new util.Base64Helper();
+  const standard = helper.encodeToStringSync(bytes);
+  let out = '';
+  for (let i = 0; i < standard.length; i++) {
+    const c = standard.charAt(i);
+    if (c === '+') {
+      out += '-';
+    } else if (c === '/') {
+      out += '_';
+    } else if (c === '=') {
+      break;
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
+
+export function poTokenBytesToString(token: Uint8Array): string {
+  return bytesToBase64Url(token);
 }
 
 function sleep(ms: number): Promise<void> {

@@ -20,6 +20,8 @@ export class AuthSessionManager {
   private static readonly REFRESH_TOKEN_KEY: string = 'refresh_token';
   private static readonly COOKIE_CREDENTIAL_KEY: string = 'cookie_auth_credential';
   private static readonly AUTH_ENABLED_KEY: string = 'auth_enabled';
+  private static readonly USE_AUTH_FOR_USER_DATA_KEY: string = 'use_auth_for_user_data';
+  private static readonly USE_AUTH_FOR_PLAYBACK_KEY: string = 'use_auth_for_playback';
   private static readonly REFRESH_MARGIN_MS: number = 60000;
 
   private context: Context;
@@ -28,8 +30,12 @@ export class AuthSessionManager {
   private accessToken: string = '';
   private accessTokenExpiresAt: number = 0;
   private cookieCredential: CookieAuthCredential | null = null;
-  /** When false, keep credentials but do not attach auth to requests (private browsing). */
+  /** Master switch. When false, keep credentials but do not attach auth to any request. */
   private authEnabled: boolean = true;
+  /** Fine-grained: attach auth to user-data requests (feed / subscriptions / history / search). */
+  private useAuthForUserData: boolean = true;
+  /** Fine-grained: attach auth to playback extraction (player API + stream URL cookies). */
+  private useAuthForPlayback: boolean = true;
 
   private constructor(context: Context) {
     this.context = context;
@@ -51,6 +57,8 @@ export class AuthSessionManager {
   getStatus(): AuthAccountStatus {
     const status = new AuthAccountStatus();
     status.authEnabled = this.authEnabled;
+    status.useAuthForUserData = this.useAuthForUserData;
+    status.useAuthForPlayback = this.useAuthForPlayback;
     status.hasCredential = this.hasCredential();
     if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
       status.stage = AuthStage.SIGNED_IN;
@@ -85,9 +93,42 @@ export class AuthSessionManager {
     return this.getStatus();
   }
 
+  isUseAuthForUserData(): boolean {
+    return this.useAuthForUserData;
+  }
+
+  setUseAuthForUserData(enabled: boolean): AuthAccountStatus {
+    this.useAuthForUserData = enabled;
+    this.persistUseAuthForUserData();
+    logger.info(`Use auth for user data set to ${enabled}`);
+    return this.getStatus();
+  }
+
+  isUseAuthForPlayback(): boolean {
+    return this.useAuthForPlayback;
+  }
+
+  setUseAuthForPlayback(enabled: boolean): AuthAccountStatus {
+    this.useAuthForPlayback = enabled;
+    this.persistUseAuthForPlayback();
+    logger.info(`Use auth for playback set to ${enabled}`);
+    return this.getStatus();
+  }
+
+  /** Effective: user-data requests should attach auth. */
+  isAuthEnabledForUserData(): boolean {
+    return this.authEnabled && this.useAuthForUserData && this.hasCredential();
+  }
+
+  /** Effective: playback extraction should attach auth. */
+  isAuthEnabledForPlayback(): boolean {
+    return this.authEnabled && this.useAuthForPlayback && this.hasCredential();
+  }
+
   /**
-   * Whether requests should attach login credentials.
+   * Whether requests should attach login credentials (legacy coarse signal).
    * False when private browsing is on, even if a credential is stored.
+   * Prefer isAuthEnabledForUserData / isAuthEnabledForPlayback at call sites.
    */
   isSignedIn(): boolean {
     if (!this.authEnabled) {
@@ -152,9 +193,13 @@ export class AuthSessionManager {
     this.accessTokenExpiresAt = 0;
     this.cookieCredential = null;
     this.authEnabled = true;
+    this.useAuthForUserData = true;
+    this.useAuthForPlayback = true;
     this.persistRefreshToken();
     this.persistCookieCredential();
     this.persistAuthEnabled();
+    this.persistUseAuthForUserData();
+    this.persistUseAuthForPlayback();
     logger.info('Signed out');
     return this.getStatus();
   }
@@ -169,8 +214,41 @@ export class AuthSessionManager {
     return undefined;
   }
 
+  /** Cookie string for user-data requests; respects fine-grained toggle. */
+  getCookieStringForUserData(): string | undefined {
+    if (!this.isAuthEnabledForUserData()) {
+      return undefined;
+    }
+    if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
+      return this.cookieCredential.cookies;
+    }
+    return undefined;
+  }
+
+  /** Cookie string for playback extraction; respects fine-grained toggle. */
+  getCookieStringForPlayback(): string | undefined {
+    if (!this.isAuthEnabledForPlayback()) {
+      return undefined;
+    }
+    if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
+      return this.cookieCredential.cookies;
+    }
+    return undefined;
+  }
+
   getPotToken(): string | undefined {
     if (!this.authEnabled) {
+      return undefined;
+    }
+    if (this.cookieCredential && this.cookieCredential.potToken.length > 0) {
+      return this.cookieCredential.potToken;
+    }
+    return undefined;
+  }
+
+  /** PoToken for playback extraction; respects fine-grained toggle. */
+  getPotTokenForPlayback(): string | undefined {
+    if (!this.isAuthEnabledForPlayback()) {
       return undefined;
     }
     if (this.cookieCredential && this.cookieCredential.potToken.length > 0) {
@@ -215,6 +293,10 @@ export class AuthSessionManager {
       }
       const enabledRaw = storage.getSync(AuthSessionManager.AUTH_ENABLED_KEY, 'true') as string;
       this.authEnabled = enabledRaw !== 'false';
+      const userDataRaw = storage.getSync(AuthSessionManager.USE_AUTH_FOR_USER_DATA_KEY, 'true') as string;
+      this.useAuthForUserData = userDataRaw !== 'false';
+      const playbackRaw = storage.getSync(AuthSessionManager.USE_AUTH_FOR_PLAYBACK_KEY, 'true') as string;
+      this.useAuthForPlayback = playbackRaw !== 'false';
     } catch (e) {
       logger.error('Failed to load auth state');
     }
@@ -248,6 +330,26 @@ export class AuthSessionManager {
       storage.flush();
     } catch (e) {
       logger.error('Failed to persist auth enabled');
+    }
+  }
+
+  private persistUseAuthForUserData(): void {
+    try {
+      const storage = preferences.getPreferencesSync(this.context, { name: AuthSessionManager.STORAGE_NAME });
+      storage.putSync(AuthSessionManager.USE_AUTH_FOR_USER_DATA_KEY, this.useAuthForUserData ? 'true' : 'false');
+      storage.flush();
+    } catch (e) {
+      logger.error('Failed to persist useAuthForUserData');
+    }
+  }
+
+  private persistUseAuthForPlayback(): void {
+    try {
+      const storage = preferences.getPreferencesSync(this.context, { name: AuthSessionManager.STORAGE_NAME });
+      storage.putSync(AuthSessionManager.USE_AUTH_FOR_PLAYBACK_KEY, this.useAuthForPlayback ? 'true' : 'false');
+      storage.flush();
+    } catch (e) {
+      logger.error('Failed to persist useAuthForPlayback');
     }
   }
 

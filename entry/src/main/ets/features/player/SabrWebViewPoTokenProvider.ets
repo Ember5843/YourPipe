@@ -1,10 +1,17 @@
 import type { SabrPoTokenProvider, YoutubeSabrInfo, YoutubeSabrStreamState } from 'youtube_core';
 import { AppLog } from '../../common/AppLog';
+import { poTokenBytesToString } from './SabrLocalDomPoTokenGenerator';
 
 const logger = AppLog.getInstance('SabrLocalDomProvider');
 
 interface CachedPoToken {
   token: Uint8Array;
+  mintedAtMs: number;
+}
+
+interface CachedDashPoToken {
+  /** base64url-encoded string for pot= URL param */
+  tokenStr: string;
   mintedAtMs: number;
 }
 
@@ -17,6 +24,7 @@ export type LocalDomMintFn = (
 export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider {
   private static instance: SabrWebViewPoTokenProvider = new SabrWebViewPoTokenProvider();
   private cache: Map<string, CachedPoToken> = new Map();
+  private dashCache: Map<string, CachedDashPoToken> = new Map();
   private mint?: LocalDomMintFn;
   private mintPromise?: Promise<Uint8Array | undefined>;
 
@@ -66,5 +74,34 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider {
     } finally {
       this.mintPromise = undefined;
     }
+  }
+
+  /**
+   * Get a base64url-encoded PoToken for DASH segment URL injection (pot=).
+   * DASH URLs are short-lived so keep TTL at 5 min.
+   */
+  async getDashPoToken(visitorData: string, videoId: string): Promise<string | undefined> {
+    if (!visitorData) {
+      logger.warn(`getDashPoToken: missing visitorData video=${videoId}`);
+      return undefined;
+    }
+    const cached = this.dashCache.get(videoId);
+    if (cached && Date.now() - cached.mintedAtMs < 5 * 60 * 1000) {
+      return cached.tokenStr;
+    }
+    if (!this.mint) {
+      logger.warn('getDashPoToken: Local DOM ArkWeb is not attached');
+      return undefined;
+    }
+    logger.info(`getDashPoToken: mint start video=${videoId}`);
+    const raw = await this.mint(visitorData, videoId, false);
+    if (!raw || raw.length === 0) {
+      logger.warn(`getDashPoToken: mint returned empty video=${videoId}`);
+      return undefined;
+    }
+    const tokenStr = poTokenBytesToString(raw);
+    this.dashCache.set(videoId, { tokenStr, mintedAtMs: Date.now() });
+    logger.info(`getDashPoToken: success video=${videoId} len=${tokenStr.length}`);
+    return tokenStr;
   }
 }

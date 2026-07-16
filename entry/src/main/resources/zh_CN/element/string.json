@@ -2455,6 +2455,22 @@
         {
             "name": "yt_action_got_it",
             "value": "知道了"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data",
+            "value": "登录态用于用户数据"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data_subtitle",
+            "value": "首页推荐、订阅、观看历史、搜索"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback",
+            "value": "登录态用于播放"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback_subtitle",
+            "value": "播放器 API 及流地址鉴权"
         }
     ]
 }

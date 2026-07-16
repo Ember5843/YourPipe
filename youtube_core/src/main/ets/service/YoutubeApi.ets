@@ -124,10 +124,10 @@ async function getYoutubeHeaders(
 
 async function applyAuthHeaders(headers: Record<string, string[]>): Promise<void> {
   const authSession = AuthSessionManager.getInstance();
-  if (!authSession || !authSession.isSignedIn()) {
+  if (!authSession || !authSession.isAuthEnabledForUserData()) {
     return;
   }
-  const cookieStr = authSession.getCookieString();
+  const cookieStr = authSession.getCookieStringForUserData();
   if (cookieStr && cookieStr.length > 0) {
     headers['Cookie'] = [cookieStr];
     headers['X-Origin'] = ['https://www.youtube.com'];

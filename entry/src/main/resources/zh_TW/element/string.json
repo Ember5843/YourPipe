@@ -2455,6 +2455,22 @@
         {
             "name": "yt_action_got_it",
             "value": "知道了"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data",
+            "value": "登入態用作用戶數據"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data_subtitle",
+            "value": "首頁推薦、訂閱、觀看歷史、搜尋"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback",
+            "value": "登入態用於播放"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback_subtitle",
+            "value": "播放器 API 及串流地址鑑權"
         }
     ]
 }

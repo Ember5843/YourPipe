@@ -2455,6 +2455,22 @@
         {
             "name": "yt_action_got_it",
             "value": "Compris"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data",
+            "value": "Utiliser la connexion pour les données utilisateur"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data_subtitle",
+            "value": "Fil d actualité, abonnements, historique, recherche"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback",
+            "value": "Utiliser la connexion pour la lecture"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback_subtitle",
+            "value": "API du lecteur et authentification des URL de flux"
         }
     ]
 }

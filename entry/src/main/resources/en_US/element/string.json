@@ -2455,6 +2455,22 @@
         {
             "name": "yt_action_got_it",
             "value": "Got it"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data",
+            "value": "Use login state for user data"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data_subtitle",
+            "value": "Feed, subscriptions, history, search"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback",
+            "value": "Use login state for playback"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback_subtitle",
+            "value": "Player API and stream URL authentication"
         }
     ]
 }

@@ -174,7 +174,24 @@ export class YoutubeJavaScriptPlayerManager {
     }
   }
 
-  static async ensurePlayer(_html: string, _client: YouTubeHttpClient): Promise<PlayerMetadata> {
+  static async ensurePlayer(html: string, _client: YouTubeHttpClient): Promise<PlayerMetadata> {
+    // Local HTML extraction is the fast path; remote PipePipe is fallback.
+    const match = /"STS"\s*:\s*(\d+)/.exec(html);
+    if (match?.[1]) {
+      const sts = parseInt(match[1], 10);
+      if (sts > 0) {
+        const urlMatch = /"PLAYER_JS_URL"\s*:\s*"([^"]+)"/.exec(html);
+        const playerId = urlMatch?.[1]
+          ? /\/s\/player\/([^/]+)\//.exec(urlMatch[1].replace(/\\\//g, '/'))?.[1]
+          : undefined;
+        const meta: PlayerMetadata = {
+          playerId: playerId || '',
+          signatureTimestamp: sts,
+        };
+        if (playerId) PipePipeApiDecoder.setLocalMetadata(meta);
+        return meta;
+      }
+    }
     return PipePipeApiDecoder.getLatestPlayer();
   }
 
@@ -261,7 +278,9 @@ export class YoutubeJavaScriptPlayerManager {
   }
 
   static async deobfuscateBatch(sigs: string[], nParams: string[], playerId?: string): Promise<SolveResult> {
-    const resolvedPlayerId = playerId || (await PipePipeApiDecoder.getLatestPlayer()).playerId;
+    const resolvedPlayerId = playerId
+      || (PipePipeApiDecoder.peekCachedMetadata()?.playerId)
+      || (await PipePipeApiDecoder.getLatestPlayer()).playerId;
     const localState = YoutubeJavaScriptPlayerManager.getLocalState(resolvedPlayerId);
     if (localState === LocalCipherState.READY
       && YoutubeJavaScriptPlayerManager.prepared.has(resolvedPlayerId)) {
@@ -307,6 +326,8 @@ export class YoutubeJavaScriptPlayerManager {
   }
 
   static async getLatestPlayer(): Promise<PlayerMetadata> {
+    const cached = PipePipeApiDecoder.peekCachedMetadata();
+    if (cached) return cached;
     return PipePipeApiDecoder.getLatestPlayer();
   }
 }

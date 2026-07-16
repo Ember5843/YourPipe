@@ -77,6 +77,10 @@ export struct VideoDetails {
   @State showSavePlaylistSheet: boolean = false;
   @State showStreamInfoSheet: boolean = false;
   @State showSleepTimerSheet: boolean = false;
+  /** 0=none, 1=save, 2=streaminfo, 3=sleep. Drives single bindSheet content. */
+  @State activeSheet: number = 0;
+  /** Single bindSheet visibility. Replaces the 3 separate bindSheet bindings. */
+  @State sheetVisible: boolean = false;
   // TimePicker 选择的时间（时/分），仅作为「多久后停止」的时长输入，无系统当前时刻展示。
   @State sleepPickerDate: Date = new Date(0, 0, 0, 0, 30, 0, 0);
   /** 会话级仅音频（封面层 + 关视频轨） */
@@ -529,9 +533,9 @@ export struct VideoDetails {
         this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
           $r('app.string.yt_action_download'), () => { this.openDownloadDialog(); })
         this.ActionButton($r('sys.symbol.info_circle'),
-          $r('app.string.yt_stream_info_title'), () => { this.showStreamInfoSheet = true; })
+          $r('app.string.yt_stream_info_title'), () => { this.openSheet(2); })
         this.ActionButton($r('sys.symbol.bookmark'),
-          $r('app.string.yt_action_save_to_playlist'), () => { this.showSavePlaylistSheet = true; })
+          $r('app.string.yt_action_save_to_playlist'), () => { this.openSheet(1); })
         this.AudioOnlyActionButton()
         this.ActionButton($r('sys.symbol.share'),
           $r('app.string.yt_action_share'), () => { this.shareVideo(); })
@@ -690,27 +694,32 @@ export struct VideoDetails {
       left: $r('app.float.padding_16'),
       right: $r('app.float.padding_16'),
     })
-    .bindSheet($$this.showSavePlaylistSheet, this.SavePlaylistSheetBuilder(), {
+    .bindSheet($$this.sheetVisible, this.ActiveSheetBuilder(), {
       detents: [SheetSize.MEDIUM, SheetSize.LARGE],
       dragBar: true,
       backgroundColor: $r('app.color.yourtube_bg_page'),
       preferType: SheetType.BOTTOM,
       showClose: false,
+      onWillDisappear: () => {
+        this.activeSheet = 0;
+        this.showSavePlaylistSheet = false;
+        this.showStreamInfoSheet = false;
+        this.showSleepTimerSheet = false;
+      }
     })
-    .bindSheet($$this.showStreamInfoSheet, this.StreamInfoSheetBuilder(), {
-      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
-      dragBar: true,
-      backgroundColor: $r('app.color.yourtube_bg_page'),
-      preferType: SheetType.BOTTOM,
-      showClose: false,
-    })
-    .bindSheet($$this.showSleepTimerSheet, this.SleepTimerSheetBuilder(), {
-      detents: [SheetSize.MEDIUM],
-      dragBar: true,
-      backgroundColor: $r('app.color.yourtube_bg_page'),
-      preferType: SheetType.BOTTOM,
-      showClose: false,
-    })
+  }
+
+  @Builder
+  ActiveSheetBuilder() {
+    if (this.activeSheet === 1) {
+      this.SavePlaylistSheetBuilder()
+    } else if (this.activeSheet === 2) {
+      this.StreamInfoSheetBuilder()
+    } else if (this.activeSheet === 3) {
+      this.SleepTimerSheetBuilder()
+    } else {
+      Column().width('100%').height('100%')
+    }
   }
 
   @Builder
@@ -746,7 +755,7 @@ export struct VideoDetails {
           .backgroundColor($r('app.color.yourtube_player_control_bg'))
           .fontColor($r('app.color.yourtube_text_primary'))
           .onClick(() => {
-            this.showSleepTimerSheet = false;
+            this.closeSheet();
             Logger.debug(TAG, 'Sleep timer sheet cancelled');
           })
         Button($r('app.string.yt_action_confirm'))
@@ -942,13 +951,23 @@ export struct VideoDetails {
     PlayerPresentation.onAudioOnlyModeChanged(next);
   }
 
+  private openSheet(id: number): void {
+    this.activeSheet = id;
+    this.sheetVisible = true;
+  }
+
+  private closeSheet(): void {
+    this.sheetVisible = false;
+    this.activeSheet = 0;
+  }
+
   private openSleepTimerPicker(): void {
     const session = PlayerSession.getInstance();
     const remaining = session.sleepTimerRemainingMinutes;
     const initialMinutes = remaining > 0 ? remaining : 30;
     this.sleepPickerDate = new Date(0, 0, 0,
       Math.floor(initialMinutes / 60), initialMinutes % 60, 0, 0);
-    this.showSleepTimerSheet = true;
+    this.openSheet(3);
   }
 
   private confirmSleepTimerPicker(): void {
@@ -956,7 +975,7 @@ export struct VideoDetails {
     const minutes = d.getHours() * 60 + d.getMinutes();
     PlayerSession.getInstance().setSleepTimer(minutes);
     this.syncSleepTimerUi();
-    this.showSleepTimerSheet = false;
+    this.closeSheet();
     Logger.info(TAG, `Sleep timer sheet accepted minutes=${minutes}`);
   }
 

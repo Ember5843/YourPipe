@@ -160,9 +160,11 @@ export class LocalMediaProxy {
     // edge authorization propagates. Keep increasing rn until the URL becomes
     // readable, bounded by elapsed time so a genuinely invalid URL cannot hang.
     // Every other client retains the existing four-attempt policy.
+    // With pot= now injected by YouTubePlayService, 403s are rare; keep a short
+    // budget so genuinely invalid URLs fail fast instead of hanging 10s.
     const isTvDowngraded = resource.sourceClient === 'tv_downgraded';
     const retryStartedAt = Date.now();
-    const tvRetryBudgetMs = 10000;
+    const tvRetryBudgetMs = 4000;
     let attempt = 0;
     while (isTvDowngraded ? Date.now() - retryStartedAt < tvRetryBudgetMs : attempt < 4) {
       try {

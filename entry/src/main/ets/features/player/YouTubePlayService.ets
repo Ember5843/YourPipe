@@ -194,6 +194,12 @@ export class YouTubePlayService {
         return result;
       }
 
+      // Inject pot= into DASH stream URLs to prevent googlevideo 403
+      try {
+        await this.injectDashPoToken(videoInfo);
+      } catch (e) {
+        logger.warn(`${TAG} Dash PoToken injection failed, continuing without pot: ${String(e)}`);
+      }
       const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
         url: stream.url,
         isUrl: stream.isUrl,
@@ -253,6 +259,33 @@ export class YouTubePlayService {
     const result = textEncoder.encodeInto(str, buffer);
     // 只转换实际写入的部分
     return helper.encodeToStringSync(buffer.subarray(0, result.written));
+  }
+
+  /** Inject pot= into DASH/progressive stream URLs (not SABR). */
+  private async injectDashPoToken(videoInfo: VideoInfo): Promise<void> {
+    const visitorData = videoInfo.playerResponse?.responseContext?.visitorData
+      || videoInfo.streams.find(s => s.sabrInfo?.visitorData)?.sabrInfo?.visitorData;
+    if (!visitorData || visitorData.length === 0) {
+      logger.info(`${TAG} no visitorData, skipping Dash PoToken injection`);
+      return;
+    }
+    const startMs = Date.now();
+    const potStr = await SabrWebViewPoTokenProvider.getInstance()
+      .getDashPoToken(visitorData, videoInfo.videoId);
+    if (!potStr) {
+      logger.info(`${TAG} Dash PoToken not available video=${videoInfo.videoId}`);
+      return;
+    }
+    let injected = 0;
+    for (const stream of videoInfo.streams) {
+      if (!stream.url || stream.url.includes('pot=')) continue;
+      if (stream.deliveryMethod === 'SABR' || stream.kind === 'sabr') continue;
+      const sep = stream.url.includes('?') ? '&' : '?';
+      stream.url = `${stream.url}${sep}pot=${potStr}`;
+      injected++;
+    }
+    const elapsed = Date.now() - startMs;
+    logger.info(`${TAG} Dash PoToken injected for ${injected} streams video=${videoInfo.videoId} elapsed=${elapsed}ms`);
   }
 
   private determineNoStreamsErrorCode(videoInfo: VideoInfo): YouTubeErrorCode {

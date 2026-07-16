@@ -2455,6 +2455,22 @@
         {
             "name": "yt_action_got_it",
             "value": "Entendido"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data",
+            "value": "Usar inicio de sesión para datos de usuario"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data_subtitle",
+            "value": "Feed, suscripciones, historial, búsqueda"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback",
+            "value": "Usar inicio de sesión para reproducción"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback_subtitle",
+            "value": "API del reproductor y autenticación de URL de transmisión"
         }
     ]
 }

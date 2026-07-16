@@ -309,7 +309,7 @@ export class YouTubeExtractor {
     if (!metaPr) {
       // Watch HTML path: same login skip as stream extract when anonymous page says LOGIN_REQUIRED.
       const authManager = AuthSessionManager.getInstance();
-      const hasCookieAuth = authManager?.isSignedIn() === true && !!(authManager?.getCookieString());
+      const hasCookieAuth = authManager?.isAuthEnabledForPlayback() === true && !!(authManager?.getCookieStringForPlayback());
       const watchStatus = watchPr.playabilityStatus?.status?.toUpperCase();
       if (!hasCookieAuth || watchStatus !== 'LOGIN_REQUIRED') {
         this.checkPlayabilityStatus(watchPr.playabilityStatus);
@@ -1351,7 +1351,7 @@ export class YouTubeExtractor {
   }
 
   /**
-   * STS for stream player: process cache → remote latest-player → optional watch HTML fallback.
+   * STS: process cache → watch HTML (fast, ~700ms) → remote latest-player (15s timeout fallback).
    */
   private async resolveSignatureTimestamp(
     videoId: string,
@@ -1364,6 +1364,19 @@ export class YouTubeExtractor {
       }
       return YouTubeExtractor.cachedSignatureTimestamp;
     }
+    // 1. Local watch HTML is the fast happy-path (already fetched in parallel).
+    try {
+      const html = await (watchPagePromise ?? this.fetchWatchPage(videoId));
+      const localMeta = this.extractPlayerMetadata(html);
+      if (localMeta !== undefined && localMeta > 0) {
+        YouTubeExtractor.cachedSignatureTimestamp = localMeta;
+        logger.info(`[STREAM] STS from watch HTML: ${localMeta}`);
+        return localMeta;
+      }
+    } catch (e) {
+      logger.warn('[STREAM] watch HTML STS failed:', e);
+    }
+    // 2. Remote latest-player fallback (slow / flaky API).
     try {
       const remote = await PipePipeApiDecoder.getLatestPlayer();
       if (remote.signatureTimestamp > 0) {
@@ -1374,18 +1387,7 @@ export class YouTubeExtractor {
         return remote.signatureTimestamp;
       }
     } catch (e) {
-      logger.warn('[STREAM] latest-player STS failed, trying watch HTML fallback:', e);
-    }
-    // Optional fallback only — not on the happy path.
-    try {
-      const html = await (watchPagePromise ?? this.fetchWatchPage(videoId));
-      const sts = this.extractPlayerMetadata(html);
-      if (sts !== undefined && sts > 0) {
-        logger.info(`[STREAM] STS from watch HTML fallback: ${sts}`);
-        return sts;
-      }
-    } catch (e) {
-      logger.warn('[STREAM] watch HTML STS fallback failed:', e);
+      logger.warn('[STREAM] latest-player STS failed:', e);
     }
     return YouTubeExtractor.cachedSignatureTimestamp;
   }
@@ -2030,7 +2032,7 @@ export class YouTubeExtractor {
 
   private hasCookieAuthForRequests(): boolean {
     const authManager = AuthSessionManager.getInstance();
-    return authManager?.isSignedIn() === true && !!(authManager?.getCookieString());
+    return authManager?.isAuthEnabledForPlayback() === true && !!(authManager?.getCookieStringForPlayback());
   }
 
   /**

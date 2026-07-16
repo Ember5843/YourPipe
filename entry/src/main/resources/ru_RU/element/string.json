@@ -2455,6 +2455,22 @@
         {
             "name": "yt_action_got_it",
             "value": "Понятно"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data",
+            "value": "Использовать вход для данных пользователя"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data_subtitle",
+            "value": "Лента, подписки, история, поиск"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback",
+            "value": "Использовать вход для воспроизведения"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback_subtitle",
+            "value": "API плеера и аутентификация URL потока"
         }
     ]
 }
