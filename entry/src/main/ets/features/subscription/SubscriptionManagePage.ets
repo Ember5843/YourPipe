@@ -1,4 +1,6 @@
 import { AppLog } from '../../common/AppLog';
+import { customAnimationUtil } from '../../common/AnimationUtil';
+import { UIConfig } from '../../common/AppState';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { SubscriptionScrollCoordinator } from './SubscriptionScrollCoordinator';
 import { AuthAccountStatus, AuthSessionManager, AuthStage, SearchChannelItem } from 'youtube_core';
@@ -15,11 +17,14 @@ const logger = AppLog.getInstance('SubscriptionManagePage');
 export struct SubscriptionManagePage {
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
   @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State channelMap: Record<string, SearchChannelItem> = {};
   @State isRefreshing: boolean = false;
   @State syncMessage: string = '';
+  /** Bumps after profile load so ChannelCard ForEach keys change and cards rebuild. */
+  @State profileEpoch: number = 0;
   private channelInfoService: ChannelInfoService = new ChannelInfoService();
 
   private tr(res: Resource): string {
@@ -176,14 +181,18 @@ export struct SubscriptionManagePage {
     });
     await Promise.all(tasks);
     this.channelMap = nextMap;
+    this.profileEpoch += 1;
   }
 
   private async onPullRefresh(): Promise<void> {
     // Refresh($$isRefreshing) 已把 isRefreshing 置 true，这里只干活并在 finally 复位。
     this.syncMessage = '';
+    const startedAt = Date.now();
+    const prevCount = this.subscriptions.length;
     try {
       await this.syncCloudSubscriptions();
       await this.loadProfiles();
+      logger.info(`[SubRefresh] stage=complete elapsed=${Date.now() - startedAt}ms channels=${this.subscriptions.length} prev=${prevCount}`);
     } catch (err) {
       logger.error('onPullRefresh failed:', JSON.stringify(err));
       if (this.syncMessage.length === 0) {
@@ -280,7 +289,8 @@ export struct SubscriptionManagePage {
                   forceActionLabel: $r('app.string.yt_action_unsubscribe')
                 })
               }
-            }, (item: SubscriptionUser) => item.channelId)
+              .transition(customAnimationUtil.isScaleTran(`${this.profileEpoch}_${item.channelId}`, this.uiConfig))
+            }, (item: SubscriptionUser) => `${this.profileEpoch}_${item.channelId}`)
           }
         }
         .width('100%')

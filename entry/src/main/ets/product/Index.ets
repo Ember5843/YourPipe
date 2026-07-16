@@ -130,6 +130,8 @@ struct Index {
   @State isHomeRefreshing: boolean = false;
   @State homeErrorMessage: string = '';
   @State homeModeNoticeMessage: string = '';
+  /** Bumps on each successful home reset so ForEach rebuilds cards (ids alone are positional). */
+  @State homeFeedEpoch: number = 0;
   @State nextPageToken: string | null = null;
   @State kioskNextPageToken: string | null = null;
   @State kioskVisitorData: string = '';
@@ -510,7 +512,9 @@ struct Index {
     this.secureShieldDontShowAgain = false;
     this.secureShieldDialogCtrl = new CustomDialogController({
       builder: TipsDialog({
-        imageRes: $r('sys.media.ohos_ic_public_voice'),
+        // System SymbolGlyph resource (not media); enlarge past default 64vp.
+        imageRes: $r('sys.symbol.key_shield_fill'),
+        imageSize: { width: 96, height: 96 },
         title: $r('app.string.yt_secure_shield_title'),
         content: $r('app.string.yt_secure_shield_content'),
         checkTips: $r('app.string.yt_secure_shield_dont_show'),
@@ -988,6 +992,8 @@ struct Index {
         if (reset) {
           this.videoList = kioskResult.items;
           this.homeFeedSource = kioskResult.source || 'kiosk';
+          this.homeFeedEpoch += 1;
+          this.scrollHomeFeedToTop();
         } else {
           this.videoList = this.videoList.concat(kioskResult.items);
         }
@@ -1022,6 +1028,8 @@ struct Index {
       }
       if (reset) {
         this.videoList = pageResult.items;
+        this.homeFeedEpoch += 1;
+        this.scrollHomeFeedToTop();
       } else {
         this.videoList = this.videoList.concat(pageResult.items);
       }
@@ -1064,18 +1072,42 @@ struct Index {
     // Always perform the work and clear it in finally.
     logger.info(`[HomeRefresh] stage=start mode=${this.homeMode} source=${this.homeFeedSource}`);
     const startedAt = Date.now();
+    const prevHead = this.videoList.length > 0
+      ? (this.videoList[0].videoId || this.videoList[0].id.toString())
+      : '';
     try {
       this.kioskNextPageToken = null;
       this.kioskVisitorData = '';
       this.nextPageToken = null;
       this.lastLoadedQuery = '';
       await this.loadLiveVideos(true);
-      logger.info(`[HomeRefresh] stage=complete mode=${this.homeMode} elapsed=${Date.now() - startedAt}ms items=${this.videoList.length}`);
+      const nextHead = this.videoList.length > 0
+        ? (this.videoList[0].videoId || this.videoList[0].id.toString())
+        : '';
+      logger.info(`[HomeRefresh] stage=complete mode=${this.homeMode} source=${this.homeFeedSource} elapsed=${Date.now() - startedAt}ms items=${this.videoList.length} head=${nextHead} changed=${prevHead !== nextHead}`);
     } catch (e) {
       logger.error(`[HomeRefresh] stage=failed elapsed=${Date.now() - startedAt}ms error=${JSON.stringify(e)}`);
     } finally {
       this.isHomeRefreshing = false;
     }
+  }
+
+  private scrollHomeFeedToTop(): void {
+    try {
+      if (this.uiConfig.homeLayoutMode === 'grid') {
+        this.homeGridScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
+      } else {
+        this.homeListScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
+      }
+    } catch (e) {
+      logger.warn(`[HomeRefresh] scrollToTop failed: ${JSON.stringify(e)}`);
+    }
+  }
+
+  private homeListItemKey(item: VideoItem): string {
+    const videoId = (item.videoId || '').trim();
+    // Epoch forces full card rebuild after pull-to-refresh; videoId is stable identity.
+    return `${this.homeFeedEpoch}_${videoId.length > 0 ? videoId : item.id.toString()}`;
   }
 
   private formatHomeRequestError(err: Object, fallback: string): string {
@@ -1631,9 +1663,10 @@ struct Index {
                   if (this.shouldShowHomeRecommendBanner()) {
                     // Banner manages its own side inset so wide peek can use more of the row.
                     HomeRecommendSwiper({
-                      videos: this.getHomeBannerVideos()
+                      videos: this.getHomeBannerVideos(),
+                      feedEpoch: this.homeFeedEpoch
                     })
-                      .transition(customAnimationUtil.isScaleTran('home_recommend_banner', this.uiConfig))
+                      .transition(customAnimationUtil.isScaleTran(`home_recommend_banner_${this.homeFeedEpoch}`, this.uiConfig))
                   }
                   GridRow({
                     columns: this.getVideoGridColumnCount(),
@@ -1648,8 +1681,8 @@ struct Index {
                           useFavoriteToggle: true
                         })
                       }
-                      .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                    }, (item: VideoItem) => item.id.toString())
+                      .transition(customAnimationUtil.isScaleTran(this.homeListItemKey(item), this.uiConfig))
+                    }, (item: VideoItem) => this.homeListItemKey(item))
                   }
                   .width('100%')
                   .padding({ left: 12, right: 12 })
@@ -1670,12 +1703,13 @@ struct Index {
                 if (this.shouldShowHomeRecommendBanner()) {
                   ListItem() {
                     HomeRecommendSwiper({
-                      videos: this.getHomeBannerVideos()
+                      videos: this.getHomeBannerVideos(),
+                      feedEpoch: this.homeFeedEpoch
                     })
                   }
                   // Side inset owned by HomeRecommendSwiper (wide: smaller pad + larger peeks).
                   .padding({ bottom: 8 })
-                  .transition(customAnimationUtil.isScaleTran('home_recommend_banner', this.uiConfig))
+                  .transition(customAnimationUtil.isScaleTran(`home_recommend_banner_${this.homeFeedEpoch}`, this.uiConfig))
                 }
                 ForEach(this.getHomeListVideos(), (item: VideoItem) => {
                   ListItem() {
@@ -1687,8 +1721,8 @@ struct Index {
                     })
                   }
                   .padding({ left: 12, right: 12 })
-                  .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                }, (item: VideoItem) => item.id.toString())
+                  .transition(customAnimationUtil.isScaleTran(this.homeListItemKey(item), this.uiConfig))
+                }, (item: VideoItem) => this.homeListItemKey(item))
                 if (this.isLoadingMore) {
                   ListItem() {
                     Row() {

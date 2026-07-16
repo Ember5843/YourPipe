@@ -90,7 +90,14 @@ export struct HomeRecommendSwiper {
   @StorageProp('deviceWidth') deviceWidthPx: number = 0;
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm';
   @Prop videos: VideoItem[] = [];
+  /** Parent feed epoch so banner cards rebuild after pull-to-refresh. */
+  @Prop feedEpoch: number = 0;
   onOpenVideo?: (video: VideoItem) => void;
+
+  private bannerItemKey(video: VideoItem, index: number): string {
+    const videoId = (video.videoId || '').trim();
+    return `banner_${this.feedEpoch}_${index}_${videoId.length > 0 ? videoId : video.id}`;
+  }
 
   private getDeviceWidthVp(): number {
     const ui = this.getUIContext();
@@ -163,13 +170,13 @@ export struct HomeRecommendSwiper {
   build() {
     Row() {
       Swiper() {
-        ForEach(this.videos, (video: VideoItem) => {
+        ForEach(this.videos, (video: VideoItem, index: number) => {
           HomeRecommendBannerPage({
             video: video,
             bannerHeightVp: this.getBannerHeightVp(),
             onOpenVideo: this.onOpenVideo
           })
-        }, (video: VideoItem) => `banner_${video.videoId || video.id}`)
+        }, (video: VideoItem, index: number) => this.bannerItemKey(video, index))
       }
       .width('100%')
       .height(this.getBannerHeightVp())
