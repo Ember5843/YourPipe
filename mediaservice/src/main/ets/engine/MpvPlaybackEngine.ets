@@ -24,6 +24,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private isSeeking: boolean = false;
   private isEnded: boolean = false;
   private isReady: boolean = false;
+  private isBuffered: boolean = false;
   private hasError: boolean = false;
   private errorMsg: string = '';
   private lastErrorCategory: PlaybackErrorCategory = 'unknown';
@@ -521,12 +522,14 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ended: boolean = (status & MediaStatus.End) !== 0;
     const prepared: boolean = (status & MediaStatus.Prepared) !== 0;
     const loaded: boolean = (status & MediaStatus.Loaded) !== 0;
+    const buffered: boolean = (status & MediaStatus.Buffered) !== 0;
     const invalid: boolean = (status & MediaStatus.Invalid) !== 0;
     const loading: boolean = (status & MediaStatus.Loading) !== 0;
 
     this.loaded = loaded || prepared;
     this.preparing = this.preparing && !prepared && !invalid;
     this.isReady = prepared;
+    this.isBuffered = buffered;
     this.isBuffering = buffering || loading || this.preparing;
     this.isEnded = ended;
 
@@ -680,6 +683,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       engineState: engineState,
       isPlaying: isPlaying,
       isReady: this.isReady,
+      isBuffered: this.isBuffered,
       isBuffering: this.isBuffering,
       isSeeking: this.isSeeking,
       isEnded: this.isEnded,

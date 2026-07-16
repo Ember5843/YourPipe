@@ -27,8 +27,8 @@ export class HomeFeedService {
    *              recommended failure does NOT fall back to kiosk.
    */
   async fetchHomeKioskInitial(startId: number, style: string = 'recommended'): Promise<KioskPageResult> {
-    const signedIn = AuthSessionManager.getInstance()?.isSignedIn() === true;
-    const useRecommended = signedIn && style !== 'kiosk';
+    const useUserData = AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
+    const useRecommended = useUserData && style !== 'kiosk';
 
     if (useRecommended) {
       const recommended = await this.fetchBrowseSource(
@@ -59,7 +59,7 @@ export class HomeFeedService {
     startId: number,
     withAuth: boolean = false
   ): Promise<KioskPageResult> {
-    const useAuth = withAuth && AuthSessionManager.getInstance()?.isSignedIn() === true;
+    const useAuth = withAuth && AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
     const response = await fetchBrowseContinuation(
       this.localization,
       this.contentCountry,

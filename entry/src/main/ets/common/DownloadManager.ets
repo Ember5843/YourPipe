@@ -616,7 +616,7 @@ export class DownloadManager {
         task.videoStream.approxDurationMs || 0,
         task.audioStream.approxDurationMs || 0
       );
-      const useAuth = AuthSessionManager.getInstance()?.isSignedIn() === true;
+      const useAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
 
       await SabrOfflineDownloader.downloadTracks({
         video: task.videoStream,

@@ -90,7 +90,7 @@ import {
 } from '../features/player/PlaybackContinuationService';
 
 const logger = AppLog.getInstance('Index');
-const APP_VERSION = '0.5.4';
+const APP_VERSION = '0.5.5';
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 /** Preferences: user chose not to show Secure Shield (坚盾) JIT warning again. */
 const PREF_SECURE_SHIELD_DONT_SHOW: string = 'cfg_secureShieldDontShow';
@@ -592,7 +592,7 @@ struct Index {
 
   /** 登录后用 cookie 同步云端历史 + 订阅频道列表（不阻塞首页）。 */
   private async syncUserLibraryAfterLogin(): Promise<void> {
-    if (AuthSessionManager.getInstance()?.isSignedIn() !== true) {
+    if (AuthSessionManager.getInstance()?.isAuthEnabledForUserData() !== true) {
       return;
     }
     try {
@@ -1044,7 +1044,7 @@ struct Index {
       logger.error('fetchSearchPage failed:', JSON.stringify(err));
       if (reset && this.homeMode === 'kiosk') {
         const wantedRecommended = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle) === 'recommended'
-          && AuthSessionManager.getInstance()?.isSignedIn() === true;
+          && AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
         const fallbackRes = wantedRecommended
           ? $r('app.string.yt_home_recommended_error')
           : $r('app.string.yt_home_kiosk_error');
@@ -1210,6 +1210,10 @@ struct Index {
     this.selectedVideo = video;
     this.showOptions = false;
     AppStorage.setOrCreate('selectedVideo', video);
+
+    // Start extraction/engine/proxy work immediately after the click reset. The
+    // player page consumes this exact task and remains the only owner of source submission.
+    session.beginPrepare(video);
 
     const movedIndex = this.navPathStack.moveToTop('PlayerPage');
     if (movedIndex === -1) {

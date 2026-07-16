@@ -6,6 +6,8 @@ export interface PlaybackState {
   engineState: PlaybackEngineState;
   isPlaying: boolean;
   isReady: boolean;
+  /** True for the native MPV buffered/playback-restart status event. */
+  isBuffered: boolean;
   isBuffering: boolean;
   isSeeking: boolean;
   isEnded: boolean;

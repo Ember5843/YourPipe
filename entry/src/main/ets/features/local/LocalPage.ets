@@ -1,7 +1,7 @@
 import { WatchHistoryStore, WatchHistoryItem } from '../../common/WatchHistoryStore';
 import { DownloadManager, DownloadTask } from '../../common/DownloadManager';
 import { ActionHub } from '../../common/ActionHub';
-import { AuthAccountStatus, AuthStage, AuthSessionManager, VideoItem } from 'youtube_core';
+import { AuthAccountStatus, AuthSessionManager, VideoItem } from 'youtube_core';
 import { customVibrator } from '../../common/VibratorUtil';
 import { UIConfig } from '../../common/AppState';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
@@ -259,8 +259,7 @@ export struct LocalPage {
   private readonly tabTitles: ResourceStr[] = [$r('app.string.yt_local_history'), $r('app.string.yt_download_title')];
 
   private isSignedIn(): boolean {
-    return this.authStatus.stage === AuthStage.SIGNED_IN
-      || AuthSessionManager.getInstance()?.isSignedIn() === true;
+    return AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
   }
 
   /** Refresh($$isRefreshing) 已把 isSyncingHistory 置 true；此处只干活并 finally 复位。 */

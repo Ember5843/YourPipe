@@ -2,7 +2,7 @@ import { AppLog } from './AppLog';
 import { AbilityConstant, common } from '@kit.AbilityKit';
 import { AvPlayerController, VideoData, PlayerState, StateChangeListener, LocalMediaProxy } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
-import { YouTubePlayService } from '../features/player/YouTubePlayService';
+import { YouTubePlayResult, YouTubePlayService } from '../features/player/YouTubePlayService';
 import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
@@ -19,6 +19,13 @@ export interface CachedChannelProfile {
 
 const logger = AppLog.getInstance('PlayerSession');
 const TAG = '[PlayerSession]';
+
+interface PreparedPlayback {
+  result: YouTubePlayResult;
+  generation: number;
+  attemptId: string;
+  startedAt: number;
+}
 
 function getFallbackThumbnailUrl(videoId: string): string {
   // Prefer maxres (highest). Client may 404 on some videos; UI has placeholder.
@@ -38,6 +45,11 @@ export class PlayerSession {
   private _watchVideoId: string = '';
   private _activePlayPromise: Promise<VideoData | null> | null = null;
   private _activePlayVideoId: string = '';
+  private _preparePromise: Promise<PreparedPlayback> | null = null;
+  private _prepareVideoId: string = '';
+  private _prepareGeneration: number = -1;
+  private _prepareAttemptId: string = '';
+  private _attemptSequence: number = 0;
   /** Invalidates async extraction/source submission across a fresh external open. */
   private _playGeneration: number = 0;
   /** Source already accepted by the controller; MPV may still be opening/decoding it. */
@@ -274,6 +286,56 @@ export class PlayerSession {
     await this._controller.initAVPlayer();
   }
 
+  /**
+   * Start click-to-play work before PlayerPage lifecycle runs. This deliberately
+   * stops before controller.updateVideoSource(), so MPV cannot load before the
+   * player surface exists. play() consumes the same in-flight result.
+   */
+  beginPrepare(video: VideoItem): void {
+    const videoId = video.videoId || YOUTUBE_VIDEO_ID;
+    if (!videoId) return;
+    const generation = this._playGeneration;
+    if (this._preparePromise
+      && this._prepareVideoId === videoId
+      && this._prepareGeneration === generation) {
+      return;
+    }
+    const attemptId = `${videoId}-${Date.now()}-${++this._attemptSequence}`;
+    const startedAt = Date.now();
+    this._prepareVideoId = videoId;
+    this._prepareGeneration = generation;
+    this._prepareAttemptId = attemptId;
+    this._controller.setStartupAttempt(attemptId, startedAt);
+    logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=card_click`);
+    logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=prepare_start generation=${generation}`);
+    const playService = YouTubePlayService.getInstance(this._context);
+    const proxyTask = LocalMediaProxy.warmup().then((ok: boolean) => {
+      logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=proxy_ready elapsed=${Date.now() - startedAt}ms ok=${ok}`);
+      return ok;
+    }).catch((e: Error) => {
+      logger.warn(`${TAG} [STARTUP] attempt=${attemptId} stage=proxy_failed error=${e.message || e}`);
+      return false;
+    });
+    const initTask = this.ensureInitialized().then(() => {
+      logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=engine_ready elapsed=${Date.now() - startedAt}ms`);
+    }).catch((e: Error) => {
+      // Preparation is speculative with respect to page lifetime. Keep the
+      // shared task settled even if the page is closed before it consumes it;
+      // updateVideoSource retains its normal initialization/error path.
+      logger.warn(`${TAG} [STARTUP] attempt=${attemptId} stage=engine_prepare_failed error=${e.message || e}`);
+    });
+    this._preparePromise = Promise.all([
+      playService.play(videoId, attemptId),
+      initTask,
+      proxyTask
+    ]).then((values) => ({
+      result: values[0],
+      generation: generation,
+      attemptId: attemptId,
+      startedAt: startedAt
+    } as PreparedPlayback));
+  }
+
   // ──── 播放控制 ────
 
   private bindControllerQueueControls(): void {
@@ -372,19 +434,21 @@ export class PlayerSession {
     try {
       const playService = YouTubePlayService.getInstance(this._context);
       const startedAt = Date.now();
-      LocalMediaProxy.warmup().then((ok: boolean) => {
-        logger.info(`${TAG} [TIMING] video=${videoId} proxy warmup elapsed=${Date.now() - startedAt}ms ok=${ok}`);
-      }).catch((e: Error) => {
-        logger.warn(`${TAG} proxy warmup failed video=${videoId}: ${e.message || e}`);
-      });
-      const parallel = await Promise.all([
-        playService.play(videoId),
-        this.ensureInitialized()
-      ]);
-      const result = parallel[0];
+      let prepared: PreparedPlayback;
+      if (this._preparePromise
+        && this._prepareVideoId === videoId
+        && this._prepareGeneration === generation) {
+        prepared = await this._preparePromise;
+      } else {
+        this.beginPrepare(video);
+        prepared = await this._preparePromise!;
+      }
+      const result = prepared.result;
+      const attemptId = prepared.attemptId;
       logger.info(`${TAG} [TIMING] video=${videoId} extract+MPV init elapsed=${Date.now() - startedAt}ms`);
 
-      if (generation !== this._playGeneration || this._currentVideo?.videoId !== videoId) {
+      if (prepared.generation !== this._playGeneration
+        || generation !== this._playGeneration || this._currentVideo?.videoId !== videoId) {
         logger.info(`${TAG} doPlay() result discarded: session changed during extraction`);
         return null;
       }
@@ -467,13 +531,14 @@ export class PlayerSession {
         videoSource.play = shouldPlay;
         videoSource.auto = shouldPlay;
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
+        logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=source_submit elapsed=${Date.now() - prepared.startedAt}ms`);
         await this._controller.updateVideoSource(videoSource);
         if (generation !== this._playGeneration || this._currentVideo?.videoId !== videoId) {
           logger.info(`${TAG} source completion discarded: session changed during submission`);
           return null;
         }
         this._submittedVideoId = videoId;
-        logger.info(`${TAG} [TIMING] video=${videoId} source submitted elapsed=${Date.now() - startedAt}ms`);
+        logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=source_submitted elapsed=${Date.now() - prepared.startedAt}ms`);
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
         this.startWatchSaveTimer();
         return videoSource;
@@ -662,6 +727,10 @@ export class PlayerSession {
     this._watchVideoId = '';
     this._activePlayPromise = null;
     this._activePlayVideoId = '';
+    this._preparePromise = null;
+    this._prepareVideoId = '';
+    this._prepareGeneration = -1;
+    this._prepareAttemptId = '';
     this._submittedVideoId = '';
     this._cachedVideoSource = null;
     this._cachedChannelProfiles.clear();

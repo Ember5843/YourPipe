@@ -297,8 +297,9 @@ export struct OptionsDataAccountPage {
     }
     AuthSessionManager.getInstance()?.setAuthEnabled(enabled);
     AuthStateHelper.refresh();
-    const signedIn = enabled && this.hasCredential();
-    YoutubePlayerClientConfig.resetToAuthDefault(signedIn);
+    const usePlaybackAuth = enabled
+      && AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
+    YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);
     this.params.onAuthChanged();
   }
 
@@ -319,6 +320,8 @@ export struct OptionsDataAccountPage {
   private onUseAuthForPlaybackToggle(enabled: boolean): void {
     AuthSessionManager.getInstance()?.setUseAuthForPlayback(enabled);
     AuthStateHelper.refresh();
+    const usePlaybackAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
+    YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);
     this.params.onAuthChanged();
   }
 

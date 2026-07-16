@@ -114,6 +114,19 @@ interface PlaybackEnrichmentTask {
   startedAt: number;
 }
 
+export interface PlaybackStreamingContext {
+  videoId: string;
+  visitorData: string;
+  hasDirectDash: boolean;
+  deliveryMethod: string;
+  attemptId: string;
+}
+
+export interface PlaybackExtractionHooks {
+  attemptId?: string;
+  onStreamingContext?: (context: PlaybackStreamingContext) => void;
+}
+
 /**
  * Android visitor ID request context
  */
@@ -1170,8 +1183,17 @@ export class YouTubeExtractor {
    * STS (latest-player primary) → parallel meta + next + stream player → ensureStreams.
    * No watch HTML on critical path; no stream-player pre-fire/retry.
    */
-  async extractVideoStreams(videoId: string): Promise<VideoInfo> {
+  async extractVideoStreams(videoId: string, hooks?: PlaybackExtractionHooks): Promise<VideoInfo> {
+    return this.extractVideoStreamsAttempt(videoId, hooks, false);
+  }
+
+  private async extractVideoStreamsAttempt(
+    videoId: string,
+    hooks: PlaybackExtractionHooks | undefined,
+    forceFreshPlayerMetadata: boolean
+  ): Promise<VideoInfo> {
     const criticalStartedAt = Date.now();
+    const attemptId = hooks?.attemptId || videoId;
     logger.info(`Extracting video streams for: ${videoId}`);
     this.errors = [];
     this.mwebHlsManifestUrl = '';
@@ -1187,22 +1209,36 @@ export class YouTubeExtractor {
     this.cachedVideoStreams = [];
     this.cachedVideoOnlyStreams = [];
 
-    // One watch request owns STS/player metadata and local-cipher validation for this extraction.
-    // Keep it off the ordinary playback critical path; if the current player is already READY,
-    // decode uses it immediately, otherwise this playback falls back remotely while preparation
-    // continues for subsequent videos.
-    const watchPagePromise = this.fetchWatchPage(videoId);
-    const localCipherPromise = watchPagePromise.then((html: string) => {
-      this.extractPlayerMetadata(html);
-      return this.localCipherPreparePromise ?? Promise.resolve(false);
-    }).then((prepared: boolean) => prepared).catch((e: Error) => {
-      logger.warn(`[CipherRoute] route=LOCAL_JSVM stage=watch_prepare_failed video=${videoId}`, e);
-      return false;
-    });
+    if (forceFreshPlayerMetadata) {
+      YouTubeExtractor.cachedSignatureTimestamp = undefined;
+      YouTubeExtractor.cachedPlayerId = undefined;
+      this.decoderPlayerId = null;
+      this.decoderPlayerJsUrl = null;
+      PipePipeApiDecoder.invalidatePlayerMetadata();
+      logger.warn(`[STARTUP] attempt=${attemptId} stage=player_metadata_refresh mode=forced_watch`);
+    }
+
+    // The app-level cipher prewarm populates PipePipeApiDecoder. Do not compete
+    // with the stream request using another watch HTML fetch when that cache is usable.
+    const prewarmedMetadata = PipePipeApiDecoder.peekCachedMetadata();
+    const hasCachedSts = !forceFreshPlayerMetadata && (
+      !!(YouTubeExtractor.cachedSignatureTimestamp
+        && YouTubeExtractor.cachedSignatureTimestamp > 0) || !!prewarmedMetadata);
+    const watchPagePromise: Promise<string> | undefined = hasCachedSts
+      ? undefined : this.fetchWatchPage(videoId);
+    const localCipherPromise: Promise<boolean> = watchPagePromise
+      ? watchPagePromise.then((html: string) => {
+        this.extractPlayerMetadata(html);
+        return this.localCipherPreparePromise ?? Promise.resolve(false);
+      }).then((prepared: boolean) => prepared).catch((e: Error) => {
+        logger.warn(`[CipherRoute] route=LOCAL_JSVM stage=watch_prepare_failed video=${videoId}`, e);
+        return false;
+      })
+      : Promise.resolve(true);
 
     // STS (latest-player) + WEB clientVersion (sw.js) before parallel trio — independent.
     const stsStartedAt = Date.now();
-    const stsPromise = this.resolveSignatureTimestamp(videoId, watchPagePromise).then((value: number | undefined) => {
+    const stsPromise = this.resolveSignatureTimestamp(videoId, watchPagePromise, attemptId).then((value: number | undefined) => {
       logger.info(`[TIMING] video=${videoId} stage=STS elapsed=${Date.now() - stsStartedAt}ms`);
       return value;
     });
@@ -1249,15 +1285,33 @@ export class YouTubeExtractor {
       throw new ExtractionException('signatureTimestamp unavailable (latest-player / cache failed)');
     }
 
-    if (selectedClient === 'mweb') {
-      await versionPromise;
-    }
-
-    // PipePipe onFetchPage parallel trio: WEB meta + next + selected stream player
+    // Start mweb immediately with the cached/hardcoded version. Dynamic version
+    // resolution continues beside it and is used only for a bounded recovery retry.
+    const initialMwebVersion = WebClientVersionResolver.getCachedOrHardcoded();
+    logger.info(`[STARTUP] attempt=${attemptId} stage=client_version source=`
+      + `${WebClientVersionResolver.getCachedOrHardcodedSource()} version=${initialMwebVersion}`);
     const streamStartedAt = Date.now();
-    const innertubePlayers = await this.fetchSelectedStreamPlayer(
+    let innertubePlayers = await this.fetchSelectedStreamPlayer(
       videoId, sts, selectedClient, hasCookieAuth);
+    if (selectedClient === 'mweb' && !innertubePlayers.player?.streamingData) {
+      const resolvedVersion = await versionPromise;
+      if (resolvedVersion !== initialMwebVersion) {
+        logger.warn(`[STREAM] retry mweb with resolved clientVersion=${resolvedVersion}`);
+        innertubePlayers = await this.fetchSelectedStreamPlayer(
+          videoId, sts, selectedClient, hasCookieAuth);
+      }
+    }
+    if (!innertubePlayers.player) {
+      if (!forceFreshPlayerMetadata) {
+        logger.warn(`[STARTUP] attempt=${attemptId} stage=stream_player_retry reason=empty_response`);
+        this.playbackEnrichmentTasks.delete(videoId);
+        return this.extractVideoStreamsAttempt(videoId, hooks, true);
+      }
+      throw new ExtractionException('stream player returned no playerResponse after metadata refresh');
+    }
     logger.info(`[TIMING] video=${videoId} stage=streamPlayer client=${selectedClient} auth=${hasCookieAuth} elapsed=${Date.now() - streamStartedAt}ms`);
+    logger.info(`[STARTUP] attempt=${attemptId} stage=stream_player client=${selectedClient} `
+      + `elapsed=${Date.now() - streamStartedAt}ms`);
 
     // Stream-player metadata is sufficient for ordinary startup. TV downgraded
     // responses can expose only videoDetails.isLiveContent, while the definitive
@@ -1293,6 +1347,22 @@ export class YouTubeExtractor {
         + `elapsed=${Date.now() - liveMetaStartedAt}ms`);
     }
 
+    const streamingData = streamPr?.streamingData;
+    const isPostLive = this.resolveIsPostLive(metaBase, streamPr);
+    const willUseSabr = selectedClient === 'mweb' && !isLive && !isPostLive
+      && !!streamingData?.serverAbrStreamingUrl;
+    const hasDirectDash = !willUseSabr && !!streamingData?.adaptiveFormats?.some(
+      (format: Format) => !!(format.url || format.signatureCipher || format.cipher));
+    if (hooks?.onStreamingContext) {
+      hooks.onStreamingContext({
+        videoId: videoId,
+        visitorData: streamPr?.responseContext?.visitorData || '',
+        hasDirectDash: hasDirectDash,
+        deliveryMethod: willUseSabr ? 'SABR' : (isLive ? 'HLS' : 'DASH'),
+        attemptId: hooks.attemptId || ''
+      });
+    }
+
     const videoInfo = this.extractMetadata(videoId, metaBase);
     this.fillMissingIdentityFromPlayer(videoInfo, innertubePlayers.player);
     videoInfo.playerResponse = metaBase;
@@ -1314,8 +1384,19 @@ export class YouTubeExtractor {
       logger.warn(`[CipherRoute] stage=background_validation_failed video=${videoId}`, e);
     });
     const streamBuildStartedAt = Date.now();
-    await this.buildAndCacheStreams(videoId, innertubePlayers, metaBase);
+    try {
+      await this.buildAndCacheStreams(videoId, innertubePlayers, metaBase);
+    } catch (e) {
+      if (!forceFreshPlayerMetadata && this.shouldRetryWithFreshPlayerMetadata(e as Error)) {
+        logger.warn(`[STARTUP] attempt=${attemptId} stage=url_decode_retry reason=stale_player_metadata`);
+        this.playbackEnrichmentTasks.delete(videoId);
+        return this.extractVideoStreamsAttempt(videoId, hooks, true);
+      }
+      throw e as Error;
+    }
     logger.info(`[TIMING] video=${videoId} stage=urlDecodeBuild elapsed=${Date.now() - streamBuildStartedAt}ms`);
+    logger.info(`[STARTUP] attempt=${attemptId} stage=url_decode `
+      + `elapsed=${Date.now() - streamBuildStartedAt}ms`);
 
     videoInfo.streams = [
       ...this.cachedAudioStreams,
@@ -1355,14 +1436,25 @@ export class YouTubeExtractor {
    */
   private async resolveSignatureTimestamp(
     videoId: string,
-    watchPagePromise?: Promise<string>
+    watchPagePromise?: Promise<string>,
+    attemptId: string = videoId
   ): Promise<number | undefined> {
     if (YouTubeExtractor.cachedSignatureTimestamp
       && YouTubeExtractor.cachedSignatureTimestamp > 0) {
       if (YouTubeExtractor.cachedPlayerId) {
         this.decoderPlayerId = YouTubeExtractor.cachedPlayerId;
       }
+      logger.info(`[STARTUP] attempt=${attemptId} stage=sts source=extractor_cache`);
       return YouTubeExtractor.cachedSignatureTimestamp;
+    }
+    const prewarmed = PipePipeApiDecoder.peekCachedMetadata();
+    if (prewarmed && prewarmed.signatureTimestamp > 0) {
+      YouTubeExtractor.cachedSignatureTimestamp = prewarmed.signatureTimestamp;
+      YouTubeExtractor.cachedPlayerId = prewarmed.playerId;
+      this.decoderPlayerId = prewarmed.playerId;
+      logger.info(`[STREAM] STS from prewarm cache: ${prewarmed.signatureTimestamp}`);
+      logger.info(`[STARTUP] attempt=${attemptId} stage=sts source=decoder_cache`);
+      return prewarmed.signatureTimestamp;
     }
     // 1. Local watch HTML is the fast happy-path (already fetched in parallel).
     try {
@@ -1371,6 +1463,7 @@ export class YouTubeExtractor {
       if (localMeta !== undefined && localMeta > 0) {
         YouTubeExtractor.cachedSignatureTimestamp = localMeta;
         logger.info(`[STREAM] STS from watch HTML: ${localMeta}`);
+        logger.info(`[STARTUP] attempt=${attemptId} stage=sts source=watch_html`);
         return localMeta;
       }
     } catch (e) {
@@ -1384,12 +1477,21 @@ export class YouTubeExtractor {
         YouTubeExtractor.cachedPlayerId = remote.playerId;
         this.decoderPlayerId = remote.playerId;
         logger.info(`[STREAM] STS from latest-player: ${remote.signatureTimestamp} player=${remote.playerId}`);
+        logger.info(`[STARTUP] attempt=${attemptId} stage=sts source=latest_player`);
         return remote.signatureTimestamp;
       }
     } catch (e) {
       logger.warn('[STREAM] latest-player STS failed:', e);
     }
     return YouTubeExtractor.cachedSignatureTimestamp;
+  }
+
+  private shouldRetryWithFreshPlayerMetadata(error: Error): boolean {
+    const message = (error?.message || String(error)).toLowerCase();
+    return message.indexOf('deobfuscation failed') >= 0
+      || message.indexOf('no playable streams') >= 0
+      || message.indexOf('client version') >= 0
+      || message.indexOf('player version') >= 0;
   }
 
   private emptyInnertubeResult(selectedClient: YoutubePlayerClientKey): InnertubePlayerResult {
@@ -2080,17 +2182,20 @@ export class YouTubeExtractor {
     }
   }
 
-  /** 获取 next 端点响应（对标 PipePipe nextDataCall / prepareDesktopJsonBuilder） */
+  /**
+   * 获取 next 端点响应（对标 PipePipe nextDataCall / prepareDesktopJsonBuilder）。
+   * Keep this request anonymous: PipePipe uses the non-logged JSON helper here, and the
+   * related-items parser targets that stable anonymous response shape.
+   */
   private async fetchNextResponse(videoId: string): Promise<NextResponse | null> {
     const url = `${ClientsConstants.YOUTUBEI_V1_URL}next?prettyPrint=false`;
     const payload = this.buildDesktopWebPayload(videoId);
-    const withAuth = this.hasCookieAuthForRequests();
     try {
       const resp = await this.client.postJson(
         url,
         payload,
         this.webDesktopApiHeaders(),
-        withAuth
+        false
       );
       if (resp.responseCode === 200 && resp.result) {
         return JSON.parse(resp.result as string) as NextResponse;

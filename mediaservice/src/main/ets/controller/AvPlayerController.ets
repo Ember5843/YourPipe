@@ -67,6 +67,10 @@ export class AvPlayerController {
   private currentLocalMediaSessionId: string = '';
   private pendingDestroySessionId: string = '';
   private pendingStartFromSec: number = 0;
+  private startupAttemptId: string = '';
+  private startupStartedAt: number = 0;
+  private startupFileLoadedLogged: boolean = false;
+  private startupPlaybackRestartLogged: boolean = false;
 
   /** 上一次 updateVideoSource 处理过的 source 引用，用于幂等去重。 */
   private lastUpdatedSourceRef: VideoData | null = null;
@@ -166,6 +170,13 @@ export class AvPlayerController {
   public updateAudioStream(stream: StreamInfo | undefined): void { this.vm.playerModel.updateAudioStream(stream); }
   public setCurIndex(curIndex: number): void { this.curIndex = curIndex; }
   public setIsPlaying(isPlaying: boolean): void { this.vm.isPlaying = isPlaying; }
+
+  public setStartupAttempt(attemptId: string, startedAt: number): void {
+    this.startupAttemptId = attemptId;
+    this.startupStartedAt = startedAt;
+    this.startupFileLoadedLogged = false;
+    this.startupPlaybackRestartLogged = false;
+  }
 
   public getMergedVideoList(): VideoEntry[] {
     // Full quality list — manual switch is always allowed (including 4K VP9/AV1).
@@ -949,7 +960,8 @@ export class AvPlayerController {
     }
     Logger.info(TAG, `buildDualDashUrl: video=[itag=${video.itag} ${video.quality} ${video.codecs}] audio=[itag=${audio.itag} ${audio.codecs}] durationMs=${durationMs}`);
 
-    const sessionId = await LocalMediaProxy.createYoutubeDualUrlSession(video, audio, durationMs);
+    const sessionId = await LocalMediaProxy.createYoutubeDualUrlSession(
+      video, audio, durationMs, this.startupAttemptId);
     const manifestUrl = LocalMediaProxy.getDashManifestUrl(sessionId);
     if (!manifestUrl.startsWith('http://127.0.0.1:')) {
       Logger.error(TAG, `buildDualDashUrl: static DASH unavailable sessionId=${sessionId}`);
@@ -1296,6 +1308,17 @@ export class AvPlayerController {
 
   private onPlaybackStateChange(state: PlaybackState): void {
     if (!this.isActive()) return;
+
+    if (this.startupAttemptId.length > 0 && state.isReady && !this.startupFileLoadedLogged) {
+      this.startupFileLoadedLogged = true;
+      Logger.info(TAG, `[STARTUP] attempt=${this.startupAttemptId} stage=file_loaded ` +
+        `elapsed=${Date.now() - this.startupStartedAt}ms`);
+    }
+    if (this.startupAttemptId.length > 0 && state.isBuffered && !this.startupPlaybackRestartLogged) {
+      this.startupPlaybackRestartLogged = true;
+      Logger.info(TAG, `[STARTUP] attempt=${this.startupAttemptId} stage=playback_restart ` +
+        `elapsed=${Date.now() - this.startupStartedAt}ms`);
+    }
 
     if (state.isPlaying && !this.vm.isPlaying) {
       this.errorRetryCount = 0;

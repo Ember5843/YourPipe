@@ -156,8 +156,8 @@ export class YouTubePlayService {
     }
   }
 
-  async play(videoIdOrUrl: string): Promise<YouTubePlayResult> {
-    logger.info(`${TAG} play() called for ${videoIdOrUrl}`);
+  async play(videoIdOrUrl: string, attemptId: string = ''): Promise<YouTubePlayResult> {
+    logger.info(`${TAG} play() called for ${videoIdOrUrl} attempt=${attemptId || '-'}`);
     if (!this.extractor) await this.initialize();
 
     this.syncExtractorLocale();
@@ -179,7 +179,9 @@ export class YouTubePlayService {
     try {
       logger.info(`${TAG} 开始提取视频流及元数据 (包含 Player JS 和解密)...`);
       const extractStartMs = Date.now();
-      const videoInfo = await this.extractor!.extractVideoStreams(videoId);
+      const videoInfo = await this.extractor!.extractVideoStreams(videoId, {
+        attemptId: attemptId
+      });
       const extractElapsed = Date.now() - extractStartMs;
       logger.info(`${TAG} 提取完成 elapsed=${extractElapsed}ms streams=${videoInfo.streams.length} subtitles=${videoInfo.subtitleTracks.length} isLive=${videoInfo.isLive}`);
       if (videoInfo.streams.length === 0) {

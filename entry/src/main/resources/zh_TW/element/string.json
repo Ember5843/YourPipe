@@ -1982,323 +1982,323 @@
         },
         {
             "name": "yt_changelog_0_5_3_1",
-            "value": "Added YouTube SABR/UMP streaming support, improving compatibility for new-format, high-resolution, and restricted videos"
+            "value": "新增 YouTube SABR/UMP 流支持，提升新格式、高分辨率和受限视頻兼容性"
         },
         {
             "name": "yt_changelog_0_5_3_2",
-            "value": "Refactored video extraction and client selection, aligned with PipePipe request behavior, restored remote signature decryption, reduced duplicate extraction and startup wait"
+            "value": "重構视頻解析與客户端選择，对齊 PipePipe 请求行为並恢複远程签名解密"
         },
         {
             "name": "yt_changelog_0_5_3_3",
-            "value": "Improved local DASH media proxy: separated A/V tracks, segmented cache, precise seeking, stream break recovery, and playback end handling"
+            "value": "改進本地 DASH 媒體代理：分离音视頻轨道、分段緩存和精确跳轉"
         },
         {
             "name": "yt_changelog_0_5_3_4",
-            "value": "Added SABR PoToken support; optimized signature parameters, request headers, and binary response handling, reducing 403 / unable to play / loading failures"
+            "value": "新增 SABR PoToken 支持，優化签名参数、请求頭和二進制响應處理"
         },
         {
             "name": "yt_changelog_0_5_3_5",
-            "value": "Improved player state sync, quality and audio track switching, fixed endless loading after playback, seek offset and audio track menu issues"
+            "value": "改進播放器状态同步、清晰度和音轨切換，修複播放後的无限加載"
         },
         {
             "name": "yt_changelog_0_5_3_6",
-            "value": "Upgraded playlist parsing and pagination, compatible with new list structures, locked content, and continuation; improved list loading and continuous playback"
+            "value": "升级播放列表解析與分頁，兼容新列表结構、锁定内容和续頁"
         },
         {
             "name": "yt_changelog_0_5_3_7",
-            "value": "Reorganized account and data management entry, improved linkage between sign-in state, watch history, local page, download options, and playback preferences"
+            "value": "重组账号與数据管理入口，改善登錄、歷史记錄、下載和播放設置联動"
         },
         {
             "name": "yt_changelog_0_5_3_8",
-            "value": "Improved home recommendations, video cards, theme color, picture-in-picture, and system media session; fixed multiple UI and playback stability issues"
+            "value": "優化首頁推荐、视頻卡片、主题色、畫中畫和系統媒體會話穩定性"
         },
         {
             "name": "yt_changelog_0_5_2_1",
-            "value": "Player page adds Audio-only: turn off video and listen to sound, cover replaces picture, progress and controls still available"
+            "value": "播放器新增纯音頻模式：關閉视頻後繼续收聽聲音，封面替代畫面"
         },
         {
             "name": "yt_changelog_0_5_2_2",
-            "value": "In audio-only mode, no picture-in-picture; returning to foreground keeps audio-only, manual resume required"
+            "value": "纯音頻模式不進入畫中畫；回到前臺仍保持纯音頻，需手動恢複视頻"
         },
         {
             "name": "yt_changelog_0_5_2_3",
-            "value": "Background can delay turning off video to save power (adjustable in playback settings)"
+            "value": "支持在後臺延迟關閉视頻以節省电量，可在播放設置中調整"
         },
         {
             "name": "yt_changelog_0_5_2_4",
-            "value": "Fixed system broadcast interruption: correct duck volume reduction, avoid secondary compression causing silence"
+            "value": "修複系統广播中斷时的音量衰減，避免二次壓缩導致静音"
         },
         {
             "name": "yt_changelog_0_5_2_5",
-            "value": "Smoother landscape/portrait, fullscreen, and windowed playback, reduced screen black and blur"
+            "value": "優化橫豎螢、全螢和窗口播放切換，減少黑螢與模糊"
         },
         {
             "name": "yt_changelog_0_5_2_6",
-            "value": "Home page after login better matches account state, can sync cloud watch history and subscriptions"
+            "value": "登錄後首頁更贴合账号状态，可同步雲端觀看歷史和訂阅"
         },
         {
             "name": "yt_changelog_0_5_2_7",
-            "value": "Clearer video cards, live badges, and page safe area display"
+            "value": "優化视頻卡片、直播標識和頁面安全區域顯示"
         },
         {
             "name": "yt_changelog_0_5_2_8",
-            "value": "Support app handoff and tap-to-share video links"
+            "value": "支持應用接续與點击分享视頻鏈接"
         },
         {
             "name": "yt_changelog_0_5_1_1",
-            "value": "Fixed some known bugs"
+            "value": "修複部分已知问题"
         },
         {
             "name": "yt_changelog_0_5_1_2",
-            "value": "Aligned with PipePipe issues"
+            "value": "对齊 PipePipe 的相關问题修複"
         },
         {
             "name": "yt_changelog_0_5_1_3",
-            "value": "Fixed inability to watch after login"
+            "value": "修複登錄後无法觀看的问题"
         },
         {
             "name": "yt_changelog_0_5_1_4",
-            "value": "Fixed information bar popping up incorrectly in landscape mode"
+            "value": "修複橫螢时信息栏錯誤弹出的问题"
         },
         {
             "name": "yt_changelog_0_5_1_5",
-            "value": "Optimized settings page UI"
+            "value": "優化設置頁面介面"
         },
         {
             "name": "yt_changelog_0_5_1_6",
-            "value": "Completed local decryption logic verification, ready for deployment"
+            "value": "完成本地解密逻辑驗證，为部署做好准備"
         },
         {
             "name": "yt_changelog_0_5_0_1",
-            "value": "Replaced system playback engine and third-party FFMpeg with MPVPlayer"
+            "value": "以 MPVPlayer 替換系統播放引擎和第三方 FFMpeg"
         },
         {
             "name": "yt_changelog_0_5_0_2",
-            "value": "Restored high-resolution playback and subtitle features"
+            "value": "恢複高分辨率播放和字幕功能"
         },
         {
             "name": "yt_changelog_0_5_0_3",
-            "value": "Support HEVC/H.264 hardware decoding; on API 23+ try VP9/AV1 hardware decoding"
+            "value": "支持 HEVC/H.264 硬件解碼；API 23 以上嘗試 VP9/AV1 硬件解碼"
         },
         {
             "name": "yt_changelog_0_5_0_4",
-            "value": "Added true HDR display"
+            "value": "新增真正的 HDR 顯示"
         },
         {
             "name": "yt_changelog_0_5_0_5",
-            "value": "Optimized network transport library capabilities in non-login state"
+            "value": "優化非登錄状态下的網絡传输能力"
         },
         {
             "name": "yt_changelog_0_5_0_6",
-            "value": "Optimized error display"
+            "value": "優化錯誤提示顯示"
         },
         {
             "name": "yt_changelog_0_5_0_7",
-            "value": "Optimized UI and settings options"
+            "value": "優化介面和設置選項"
         },
         {
             "name": "yt_changelog_0_5_0_8",
-            "value": "Applied PipePipe latest version patches"
+            "value": "合入 PipePipe 最新版本補丁"
         },
         {
             "name": "yt_changelog_0_4_1_1",
-            "value": "Optimized video loading speed"
+            "value": "優化视頻加載速度"
         },
         {
             "name": "yt_changelog_0_4_1_2",
-            "value": "Applied pipepipe 5.1.1 patches"
+            "value": "合入 PipePipe 5.1.1 補丁"
         },
         {
             "name": "yt_changelog_0_4_1_3",
-            "value": "Allowed Google sign-in, basically eliminated bot protection issues"
+            "value": "允許 Google 登錄，基本消除机器人驗證问题"
         },
         {
             "name": "yt_changelog_0_4_1_4",
-            "value": "Optimized fullscreen interaction for various devices"
+            "value": "優化多設備全螢交互"
         },
         {
             "name": "yt_changelog_0_4_1_5",
-            "value": "Developed multiple modules of the player page"
+            "value": "開發播放器頁面多個模块"
         },
         {
             "name": "yt_changelog_0_4_1_6",
-            "value": "Initial download feature completed"
+            "value": "完成下載功能初版"
         },
         {
             "name": "yt_changelog_0_4_1_7",
-            "value": "Complete playlist feature"
+            "value": "完善播放列表功能"
         },
         {
             "name": "yt_changelog_0_4_1_8",
-            "value": "Integrated system and cast entry, experimental initial app handoff"
+            "value": "集成系統與投螢入口，初步實驗應用接续"
         },
         {
             "name": "yt_changelog_0_4_0_1",
-            "value": "Basically completed yt-dlp ecosystem analysis and integration interface"
+            "value": "基本完成 yt-dlp 生态分析和集成接口"
         },
         {
             "name": "yt_changelog_0_4_0_2",
-            "value": "Allowed Google sign-in, basically eliminated bot protection issues"
+            "value": "允許 Google 登錄，基本消除机器人驗證问题"
         },
         {
             "name": "yt_changelog_0_4_0_3",
-            "value": "Optimized playback mechanism"
+            "value": "優化播放机制"
         },
         {
             "name": "yt_changelog_0_4_0_4",
-            "value": "Used cloud decoding instead of local decoding, more stable"
+            "value": "使用雲端解密替代本地解密，提升穩定性"
         },
         {
             "name": "yt_changelog_0_3_1_1",
-            "value": "Improved page stack and mini-window playback"
+            "value": "改進頁面栈和小窗播放"
         },
         {
             "name": "yt_changelog_0_3_1_2",
-            "value": "Added server cache for smoother playback"
+            "value": "新增服务器緩存以提升播放流畅度"
         },
         {
             "name": "yt_changelog_0_3_1_3",
-            "value": "Optimized UI and interaction"
+            "value": "優化介面和交互"
         },
         {
             "name": "yt_changelog_0_3_1_4",
-            "value": "More page and size adaptation"
+            "value": "增加頁面與尺寸适配"
         },
         {
             "name": "yt_changelog_0_3_1_5",
-            "value": "Continued to simplify previous code to prevent bugs"
+            "value": "繼续精簡舊代碼以減少问题"
         },
         {
             "name": "yt_changelog_0_3_1_6",
-            "value": "Initial Google sign-in development, verified pipepipe sign-in feasibility"
+            "value": "初步開發 Google 登錄，驗證 PipePipe 登錄可行性"
         },
         {
             "name": "yt_changelog_0_3_1_7",
-            "value": "Optimized background playback stability"
+            "value": "優化後臺播放穩定性"
         },
         {
             "name": "yt_changelog_0_3_0_1",
-            "value": "Final experimental selection of relay HTTP server solution"
+            "value": "最终試驗性确定中繼 HTTP 服务器方案"
         },
         {
             "name": "yt_changelog_0_3_0_2",
-            "value": "Reverted to system-level player to improve lifecycle"
+            "value": "回退到系統级播放器以改善生命周期"
         },
         {
             "name": "yt_changelog_0_3_0_3",
-            "value": "Optimized UI and interaction"
+            "value": "優化介面和交互"
         },
         {
             "name": "yt_changelog_0_3_0_4",
-            "value": "More page and size adaptation"
+            "value": "增加頁面與尺寸适配"
         },
         {
             "name": "yt_changelog_0_3_0_5",
-            "value": "Removed many previous libraries and headers, simplified to prevent bugs"
+            "value": "移除大量舊庫和頭文件，精簡以減少问题"
         },
         {
             "name": "yt_changelog_0_3_0_6",
-            "value": "Initial Google sign-in development, verified smarttube feasibility"
+            "value": "初步開發 Google 登錄，驗證 SmartTube 可行性"
         },
         {
             "name": "yt_changelog_0_3_0_7",
-            "value": "Optimized background playback stability"
+            "value": "優化後臺播放穩定性"
         },
         {
             "name": "yt_changelog_0_2_0_1",
-            "value": "Refactored project code, optimized lifecycle management and development speed, fresh start"
+            "value": "重構項目代碼，優化生命周期管理和開發效率，重新起步"
         },
         {
             "name": "yt_changelog_0_2_0_2",
-            "value": "Optimized playback and live streaming, smoother live, less heating"
+            "value": "優化播放與直播，直播更流畅並減少發熱"
         },
         {
             "name": "yt_changelog_0_2_0_3",
-            "value": "More options, customizable playback options"
+            "value": "增加更多可自定义的播放選項"
         },
         {
             "name": "yt_changelog_0_2_0_4",
-            "value": "Richer error messages and log management"
+            "value": "豐富錯誤信息和日志管理"
         },
         {
             "name": "yt_changelog_0_2_0_5",
-            "value": "Added multilingual optimization"
+            "value": "新增多語言優化"
         },
         {
             "name": "yt_changelog_0_2_0_6",
-            "value": "Updated NewPipe core code, optimized network connection and decoding, more stable"
+            "value": "更新 NewPipe 核心代碼，優化網絡连接與解碼穩定性"
         },
         {
             "name": "yt_changelog_0_2_0_7",
-            "value": "Optimized background playback stability"
+            "value": "優化後臺播放穩定性"
         },
         {
             "name": "yt_changelog_0_2_0_8",
-            "value": "System-level AVPlayer playback, stability and power optimization"
+            "value": "使用系統级 AVPlayer 播放，優化穩定性和功耗"
         },
         {
             "name": "yt_changelog_0_1_2_1",
-            "value": "Fixed UI freeze when switching app UI language"
+            "value": "修複切換應用介面語言时的卡顿"
         },
         {
             "name": "yt_changelog_0_1_2_2",
-            "value": "Optimized content language list Chinese variant display (Simplified / Traditional HK / Traditional TW)"
+            "value": "優化内容語言列表中的中文变體顯示（簡體／繁體香港／繁體臺湾）"
         },
         {
             "name": "yt_changelog_0_1_2_3",
-            "value": "Show save path hint after log download completes"
+            "value": "日志下載完成後顯示保存路径提示"
         },
         {
             "name": "yt_changelog_0_1_2_4",
-            "value": "Added About page"
+            "value": "新增關于頁面"
         },
         {
             "name": "yt_changelog_0_1_2_5",
-            "value": "Fixed high resolution disable option not working"
+            "value": "修複高分辨率禁用選項无效的问题"
         },
         {
             "name": "yt_changelog_0_1_2_6",
-            "value": "Unified visual style across settings page modules"
+            "value": "統一設置頁各模块的视觉風格"
         },
         {
             "name": "yt_changelog_0_1_1_1",
-            "value": "Integrated MPV playback core, supports hardware decoding and high-resolution video"
+            "value": "集成 MPV 播放核心，支持硬件解碼和高分辨率视頻"
         },
         {
             "name": "yt_changelog_0_1_1_2",
-            "value": "Implemented background playback and system media controls integration"
+            "value": "實現後臺播放和系統媒體控制集成"
         },
         {
             "name": "yt_changelog_0_1_1_3",
-            "value": "Completed language and region settings, supports content language / region switching"
+            "value": "完成語言和地區設置，支持内容語言和地區切換"
         },
         {
             "name": "yt_changelog_0_1_1_4",
-            "value": "Added runtime log system, supports session export"
+            "value": "新增运行时日志系統，支持會話導出"
         },
         {
             "name": "yt_changelog_0_1_1_5",
-            "value": "Optimized tablet landscape player layout"
+            "value": "優化平板橫螢播放器布局"
         },
         {
             "name": "yt_changelog_0_1_0_1",
-            "value": "Initial release: basic YouTube video browsing and search"
+            "value": "初始發布：支持 YouTube 视頻浏覽和搜索"
         },
         {
             "name": "yt_changelog_0_1_0_2",
-            "value": "Integrated NewPipe Extractor engine"
+            "value": "集成 NewPipe Extractor 引擎"
         },
         {
             "name": "yt_changelog_0_1_0_3",
-            "value": "Support channel subscriptions, favorites, and playlist management"
+            "value": "支持頻道訂阅、收藏和播放列表管理"
         },
         {
             "name": "yt_changelog_0_1_0_4",
-            "value": "Support live stream playback"
+            "value": "支持直播播放"
         },
         {
             "name": "yt_changelog_0_1_0_5",
-            "value": "Comment list and channel page"
+            "value": "新增评论列表和頻道頁面"
         },
         {
             "name": "yt_label_version_format",
@@ -2410,35 +2410,35 @@
         },
         {
             "name": "yt_changelog_0_5_4_1",
-            "value": "完善本地 JS 簽名解密與磁碟快取，冷啟動預熱並支援失敗回退，減少依賴遠端解密時的等待與失敗"
+            "value": "完善本地 JS 签名解密與磁盘緩存，冷启動预熱並支持失败回退，減少依赖远程解密时的等待與失败"
         },
         {
             "name": "yt_changelog_0_5_4_2",
-            "value": "補齊 DASH 音軌中繼資料（xtags/acont），依內容語言與原聲軌偏好自動選擇預設音軌，減少多語言片誤選配音"
+            "value": "補齊 DASH 音轨元数据（xtags/acont），按内容語言與原聲轨偏好自動選择默認音轨，減少多語言片誤選配音"
         },
         {
             "name": "yt_changelog_0_5_4_3",
-            "value": "播放頁新增睡眠定時器，到時停止播放並退出；按讚/播放量依語言在地化顯示，並優化資訊區配色"
+            "value": "播放頁新增睡眠定时器，到时停止播放並退出；點赞/播放量按語言本地化顯示，並優化信息區配色"
         },
         {
             "name": "yt_changelog_0_5_4_4",
-            "value": "對齊全部介面語言文案鍵，修復設定項與關於頁出現 [object Object] 的問題，補全簡體中文資源"
+            "value": "对齊全部介面語言文案键，修複設置項與關于頁出現 [object Object] 的问题，補全簡體中文資源"
         },
         {
             "name": "yt_changelog_0_5_4_5",
-            "value": "預設主題色改為紅色，並新增播放頁控制區/資訊區背景色以提升對比度"
+            "value": "默認主题色改为红色，並新增播放頁控制區/信息區背景色以提升对比度"
         },
         {
             "name": "yt_changelog_0_5_4_6",
-            "value": "首頁支援下拉重新整理；清除全部資料時同步清理鑑權偏好、縮圖快取與解密快取（保留已下載媒體）"
+            "value": "首頁支持下拉刷新；清理全部数据时同步清理鉴权偏好、缩略图緩存與解密緩存（保留已下載媒體）"
         },
         {
             "name": "yt_changelog_0_5_4_7",
-            "value": "完善網路請求日誌與擷取鏈路診斷資訊，便於定位載入失敗與鑑權相關問題"
+            "value": "完善網絡请求日志與提取鏈路诊斷信息，便于定位加載失败與鉴权相關问题"
         },
         {
             "name": "yt_changelog_0_5_4_8",
-            "value": "同步更新 MPV 執行庫，並修復播放與介面相關的多處穩定性問題"
+            "value": "同步更新 MPV 运行庫，並修複播放與介面相關的多處穩定性问题"
         },
         {
             "name": "yt_secure_shield_title",
@@ -2467,6 +2467,86 @@
         {
             "name": "yt_option_auth_use_for_playback",
             "value": "登入態用於播放"
+        },
+        {
+            "name": "yt_changelog_0_5_5_1",
+            "value": "启動时检測坚盾守护/JIT 限制，並明确提示何时會改用远程签名解密"
+        },
+        {
+            "name": "yt_changelog_0_5_5_2",
+            "value": "修複首頁和訂阅卡片下拉刷新後的重建逻辑，即使条目 ID 不变也能正确更新内容"
+        },
+        {
+            "name": "yt_changelog_0_5_5_3",
+            "value": "新增可持久化的登錄总開關、用户数据開關和播放開關，可分别控制账号使用范围"
+        },
+        {
+            "name": "yt_changelog_0_5_5_4",
+            "value": "關閉用户数据登錄态後，首頁和信息流會自動使用匿名/本地模式，不再顯示空的登錄响應"
+        },
+        {
+            "name": "yt_changelog_0_5_5_5",
+            "value": "關閉播放登錄态後自動選择匿名播放器客户端，SABR 下載也不會携带账号凭据"
+        },
+        {
+            "name": "yt_changelog_0_5_5_6",
+            "value": "播放頁推荐固定使用穩定的匿名 YouTube next 响應，修複登錄状态下推荐队列为空的问题"
+        },
+        {
+            "name": "yt_changelog_0_5_5_7",
+            "value": "改進登錄播放客户端選择及受限视頻的 LOGIN_REQUIRED 處理，提升账号播放穩定性"
+        },
+        {
+            "name": "yt_changelog_0_5_5_8",
+            "value": "優先从觀看頁面取得签名时间戳，仅在失败时使用远程播放器服务，缩短起播等待"
+        },
+        {
+            "name": "yt_changelog_0_5_5_9",
+            "value": "增加播放器元数据緩存並收紧远程解密超时，避免緩慢服务長时间阻塞播放"
+        },
+        {
+            "name": "yt_changelog_0_5_5_10",
+            "value": "为 DASH 地址加入可緩存的 base64url PoToken，減少 googlevideo 403，令牌失败时仍可繼续播放"
+        },
+        {
+            "name": "yt_changelog_0_5_5_11",
+            "value": "合並衝突的底部面板绑定，修複保存到播放列表、流信息和睡眠定时器按钮无响應"
+        },
+        {
+            "name": "yt_changelog_0_5_5_12",
+            "value": "完善登錄播放列表和用户資料庫访问，同时在账号使用關閉时保留匿名與本地回退"
+        },
+        {
+            "name": "yt_changelog_0_5_5_13",
+            "value": "无痕模式可同时隐藏两类账号访问而不刪除已保存凭据，随时可以恢複登錄模式"
+        },
+        {
+            "name": "yt_changelog_0_5_5_14",
+            "value": "切換登錄总開關或播放開關後立即重新選择正确的匿名或登錄播放器客户端"
+        },
+        {
+            "name": "yt_changelog_0_5_5_15",
+            "value": "歷史和訂阅雲同步現在遵循用户数据開關，同时保留已有本地歷史與訂阅内容"
+        },
+        {
+            "name": "yt_changelog_0_5_5_16",
+            "value": "播放列表浏覽请求可在需要时使用账号访问，改善账号专属及受限播放列表加載"
+        },
+        {
+            "name": "yt_changelog_0_5_5_17",
+            "value": "PoToken 生成改用当前解析到的 YouTube Web 客户端版本，不再依赖过期的固定版本"
+        },
+        {
+            "name": "yt_changelog_0_5_5_18",
+            "value": "PoToken 字節會轉換为 URL 安全的 base64，並按视頻緩存五分钟，避免重複生成"
+        },
+        {
+            "name": "yt_changelog_0_5_5_19",
+            "value": "用户数据和播放请求只會在各自启用范围内附加凭据，減少账号 Cookie 的意外暴露"
+        },
+        {
+            "name": "yt_changelog_0_5_5_20",
+            "value": "扩充播放、鉴权、令牌、刷新及回退诊斷，同时确保日志不记錄敏感 Cookie 和签名地址"
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",

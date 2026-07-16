@@ -38,7 +38,7 @@ export class UserLibraryService {
   }
 
   private requireSignedIn(): void {
-    if (AuthSessionManager.getInstance()?.isSignedIn() !== true) {
+    if (AuthSessionManager.getInstance()?.isAuthEnabledForUserData() !== true) {
       throw new Error('Sign-in required');
     }
   }

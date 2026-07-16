@@ -3,7 +3,7 @@ import { customAnimationUtil } from '../../common/AnimationUtil';
 import { UIConfig } from '../../common/AppState';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { SubscriptionScrollCoordinator } from './SubscriptionScrollCoordinator';
-import { AuthAccountStatus, AuthSessionManager, AuthStage, SearchChannelItem } from 'youtube_core';
+import { AuthAccountStatus, AuthSessionManager, SearchChannelItem } from 'youtube_core';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
 import { ChannelCard } from '../../features/user/components/ChannelCard';
 import { ChannelInfoService, ChannelProfile } from '../../features/user/ChannelInfoService';
@@ -36,8 +36,7 @@ export struct SubscriptionManagePage {
   }
 
   private isSignedIn(): boolean {
-    return this.authStatus.stage === AuthStage.SIGNED_IN
-      || AuthSessionManager.getInstance()?.isSignedIn() === true;
+    return AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
   }
 
   private buildPlaceholder(item: SubscriptionUser, index: number): SearchChannelItem {

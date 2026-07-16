@@ -1982,323 +1982,323 @@
         },
         {
             "name": "yt_changelog_0_5_3_1",
-            "value": "Added YouTube SABR/UMP streaming support, improving compatibility for new-format, high-resolution, and restricted videos"
+            "value": "Se agregó soporte de transmisión de YouTube SABR/UMP, mejorando la compatibilidad para videos restringidos, de alta resolución y de nuevo formato."
         },
         {
             "name": "yt_changelog_0_5_3_2",
-            "value": "Refactored video extraction and client selection, aligned with PipePipe request behavior, restored remote signature decryption, reduced duplicate extraction and startup wait"
+            "value": "Extracción de video y selección de cliente refactorizadas, alineadas con el comportamiento de solicitud de PipePipe, descifrado de firma remota restaurado, reducción de extracción de duplicados y espera de inicio."
         },
         {
             "name": "yt_changelog_0_5_3_3",
-            "value": "Improved local DASH media proxy: separated A/V tracks, segmented cache, precise seeking, stream break recovery, and playback end handling"
+            "value": "Proxy de medios DASH local mejorado: pistas A/V separadas, caché segmentada, búsqueda precisa, recuperación de interrupciones de transmisión y manejo de fin de reproducción"
         },
         {
             "name": "yt_changelog_0_5_3_4",
-            "value": "Added SABR PoToken support; optimized signature parameters, request headers, and binary response handling, reducing 403 / unable to play / loading failures"
+            "value": "Se agregó soporte para SABR PoToken; parámetros de firma optimizados, encabezados de solicitud y manejo de respuestas binarias, lo que reduce los errores 403/no se puede reproducir/carga"
         },
         {
             "name": "yt_changelog_0_5_3_5",
-            "value": "Improved player state sync, quality and audio track switching, fixed endless loading after playback, seek offset and audio track menu issues"
+            "value": "Se mejoró la sincronización del estado del reproductor, la calidad y el cambio de pista de audio, se corrigió la carga interminable después de la reproducción, se corrigieron problemas en el menú de búsqueda de desplazamiento y pista de audio."
         },
         {
             "name": "yt_changelog_0_5_3_6",
-            "value": "Upgraded playlist parsing and pagination, compatible with new list structures, locked content, and continuation; improved list loading and continuous playback"
+            "value": "Análisis y paginación de listas de reproducción mejorados, compatibles con nuevas estructuras de listas, contenido bloqueado y continuación; carga de listas mejorada y reproducción continua"
         },
         {
             "name": "yt_changelog_0_5_3_7",
-            "value": "Reorganized account and data management entry, improved linkage between sign-in state, watch history, local page, download options, and playback preferences"
+            "value": "Entrada reorganizada de administración de datos y cuenta, vínculo mejorado entre el estado de inicio de sesión, historial de visualización, página local, opciones de descarga y preferencias de reproducción."
         },
         {
             "name": "yt_changelog_0_5_3_8",
-            "value": "Improved home recommendations, video cards, theme color, picture-in-picture, and system media session; fixed multiple UI and playback stability issues"
+            "value": "Recomendaciones de inicio mejoradas, tarjetas de video, color de tema, imagen en imagen y sesión multimedia del sistema; Se corrigieron múltiples problemas de estabilidad de reproducción y de interfaz de usuario."
         },
         {
             "name": "yt_changelog_0_5_2_1",
-            "value": "Player page adds Audio-only: turn off video and listen to sound, cover replaces picture, progress and controls still available"
+            "value": "La página del reproductor agrega solo audio: apaga el video y escucha el sonido, la portada reemplaza la imagen, el progreso y los controles aún están disponibles"
         },
         {
             "name": "yt_changelog_0_5_2_2",
-            "value": "In audio-only mode, no picture-in-picture; returning to foreground keeps audio-only, manual resume required"
+            "value": "En modo de solo audio, no hay imagen dentro de imagen; volver al primer plano mantiene solo audio, se requiere reanudación manual"
         },
         {
             "name": "yt_changelog_0_5_2_3",
-            "value": "Background can delay turning off video to save power (adjustable in playback settings)"
+            "value": "El fondo puede retrasar el apagado del video para ahorrar energía (ajustable en la configuración de reproducción)"
         },
         {
             "name": "yt_changelog_0_5_2_4",
-            "value": "Fixed system broadcast interruption: correct duck volume reduction, avoid secondary compression causing silence"
+            "value": "Se corrigió la interrupción de la transmisión del sistema: reducción correcta del volumen del pato, evita la compresión secundaria que causa silencio"
         },
         {
             "name": "yt_changelog_0_5_2_5",
-            "value": "Smoother landscape/portrait, fullscreen, and windowed playback, reduced screen black and blur"
+            "value": "Reproducción de paisaje/retrato, pantalla completa y ventana más fluida, pantalla reducida en negro y desenfoque"
         },
         {
             "name": "yt_changelog_0_5_2_6",
-            "value": "Home page after login better matches account state, can sync cloud watch history and subscriptions"
+            "value": "La página de inicio después de iniciar sesión coincide mejor con el estado de la cuenta, puede sincronizar el historial de visualización en la nube y las suscripciones"
         },
         {
             "name": "yt_changelog_0_5_2_7",
-            "value": "Clearer video cards, live badges, and page safe area display"
+            "value": "Tarjetas de video más claras, insignias en vivo y visualización del área segura de la página"
         },
         {
             "name": "yt_changelog_0_5_2_8",
-            "value": "Support app handoff and tap-to-share video links"
+            "value": "Admite transferencia de aplicaciones y enlaces de vídeo de tocar para compartir"
         },
         {
             "name": "yt_changelog_0_5_1_1",
-            "value": "Fixed some known bugs"
+            "value": "Se corrigieron algunos errores conocidos."
         },
         {
             "name": "yt_changelog_0_5_1_2",
-            "value": "Aligned with PipePipe issues"
+            "value": "Alineado con los problemas de PipePipe"
         },
         {
             "name": "yt_changelog_0_5_1_3",
-            "value": "Fixed inability to watch after login"
+            "value": "Se corrigió la imposibilidad de mirar después de iniciar sesión."
         },
         {
             "name": "yt_changelog_0_5_1_4",
-            "value": "Fixed information bar popping up incorrectly in landscape mode"
+            "value": "Se corrigió que la barra de información apareciera incorrectamente en modo horizontal."
         },
         {
             "name": "yt_changelog_0_5_1_5",
-            "value": "Optimized settings page UI"
+            "value": "UI de la página de configuración optimizada"
         },
         {
             "name": "yt_changelog_0_5_1_6",
-            "value": "Completed local decryption logic verification, ready for deployment"
+            "value": "Verificación de la lógica de descifrado local completada, lista para su implementación"
         },
         {
             "name": "yt_changelog_0_5_0_1",
-            "value": "Replaced system playback engine and third-party FFMpeg with MPVPlayer"
+            "value": "Se reemplazó el motor de reproducción del sistema y FFMpeg de terceros con MPVPlayer"
         },
         {
             "name": "yt_changelog_0_5_0_2",
-            "value": "Restored high-resolution playback and subtitle features"
+            "value": "Funciones restauradas de reproducción y subtítulos de alta resolución."
         },
         {
             "name": "yt_changelog_0_5_0_3",
-            "value": "Support HEVC/H.264 hardware decoding; on API 23+ try VP9/AV1 hardware decoding"
+            "value": "Admite decodificación de hardware HEVC/H.264; en API 23+ pruebe la decodificación de hardware VP9/AV1"
         },
         {
             "name": "yt_changelog_0_5_0_4",
-            "value": "Added true HDR display"
+            "value": "Se agregó una pantalla HDR real"
         },
         {
             "name": "yt_changelog_0_5_0_5",
-            "value": "Optimized network transport library capabilities in non-login state"
+            "value": "Capacidades optimizadas de la biblioteca de transporte de red en estado sin inicio de sesión"
         },
         {
             "name": "yt_changelog_0_5_0_6",
-            "value": "Optimized error display"
+            "value": "Visualización de errores optimizada"
         },
         {
             "name": "yt_changelog_0_5_0_7",
-            "value": "Optimized UI and settings options"
+            "value": "Opciones de configuración y UI optimizadas"
         },
         {
             "name": "yt_changelog_0_5_0_8",
-            "value": "Applied PipePipe latest version patches"
+            "value": "Parches aplicados de la última versión de PipePipe"
         },
         {
             "name": "yt_changelog_0_4_1_1",
-            "value": "Optimized video loading speed"
+            "value": "Velocidad de carga de vídeo optimizada"
         },
         {
             "name": "yt_changelog_0_4_1_2",
-            "value": "Applied pipepipe 5.1.1 patches"
+            "value": "Parches de pipepipe 5.1.1 aplicados"
         },
         {
             "name": "yt_changelog_0_4_1_3",
-            "value": "Allowed Google sign-in, basically eliminated bot protection issues"
+            "value": "Se permitió el inicio de sesión de Google, básicamente se eliminaron los problemas de protección contra bots."
         },
         {
             "name": "yt_changelog_0_4_1_4",
-            "value": "Optimized fullscreen interaction for various devices"
+            "value": "Interacción optimizada en pantalla completa para varios dispositivos"
         },
         {
             "name": "yt_changelog_0_4_1_5",
-            "value": "Developed multiple modules of the player page"
+            "value": "Desarrollé múltiples módulos de la página del jugador."
         },
         {
             "name": "yt_changelog_0_4_1_6",
-            "value": "Initial download feature completed"
+            "value": "Función de descarga inicial completada"
         },
         {
             "name": "yt_changelog_0_4_1_7",
-            "value": "Complete playlist feature"
+            "value": "Función de lista de reproducción completa"
         },
         {
             "name": "yt_changelog_0_4_1_8",
-            "value": "Integrated system and cast entry, experimental initial app handoff"
+            "value": "Sistema integrado y entrada de elenco, transferencia de aplicación inicial experimental"
         },
         {
             "name": "yt_changelog_0_4_0_1",
-            "value": "Basically completed yt-dlp ecosystem analysis and integration interface"
+            "value": "Interfaz de integración y análisis del ecosistema yt-dlp básicamente completada"
         },
         {
             "name": "yt_changelog_0_4_0_2",
-            "value": "Allowed Google sign-in, basically eliminated bot protection issues"
+            "value": "Se permitió el inicio de sesión de Google, básicamente se eliminaron los problemas de protección contra bots."
         },
         {
             "name": "yt_changelog_0_4_0_3",
-            "value": "Optimized playback mechanism"
+            "value": "Mecanismo de reproducción optimizado"
         },
         {
             "name": "yt_changelog_0_4_0_4",
-            "value": "Used cloud decoding instead of local decoding, more stable"
+            "value": "Se utilizó decodificación en la nube en lugar de decodificación local, más estable"
         },
         {
             "name": "yt_changelog_0_3_1_1",
-            "value": "Improved page stack and mini-window playback"
+            "value": "Pila de páginas mejorada y reproducción en miniventana"
         },
         {
             "name": "yt_changelog_0_3_1_2",
-            "value": "Added server cache for smoother playback"
+            "value": "Caché de servidor agregado para una reproducción más fluida"
         },
         {
             "name": "yt_changelog_0_3_1_3",
-            "value": "Optimized UI and interaction"
+            "value": "Interfaz de usuario e interacción optimizadas"
         },
         {
             "name": "yt_changelog_0_3_1_4",
-            "value": "More page and size adaptation"
+            "value": "Más adaptación de página y tamaño"
         },
         {
             "name": "yt_changelog_0_3_1_5",
-            "value": "Continued to simplify previous code to prevent bugs"
+            "value": "Se continuó simplificando el código anterior para evitar errores."
         },
         {
             "name": "yt_changelog_0_3_1_6",
-            "value": "Initial Google sign-in development, verified pipepipe sign-in feasibility"
+            "value": "Desarrollo inicial de inicio de sesión de Google, viabilidad de inicio de sesión verificada en Pipepipe"
         },
         {
             "name": "yt_changelog_0_3_1_7",
-            "value": "Optimized background playback stability"
+            "value": "Estabilidad de reproducción en segundo plano optimizada"
         },
         {
             "name": "yt_changelog_0_3_0_1",
-            "value": "Final experimental selection of relay HTTP server solution"
+            "value": "Selección experimental final de la solución de servidor HTTP de retransmisión"
         },
         {
             "name": "yt_changelog_0_3_0_2",
-            "value": "Reverted to system-level player to improve lifecycle"
+            "value": "Se volvió al reproductor a nivel de sistema para mejorar el ciclo de vida."
         },
         {
             "name": "yt_changelog_0_3_0_3",
-            "value": "Optimized UI and interaction"
+            "value": "Interfaz de usuario e interacción optimizadas"
         },
         {
             "name": "yt_changelog_0_3_0_4",
-            "value": "More page and size adaptation"
+            "value": "Más adaptación de página y tamaño"
         },
         {
             "name": "yt_changelog_0_3_0_5",
-            "value": "Removed many previous libraries and headers, simplified to prevent bugs"
+            "value": "Se eliminaron muchas bibliotecas y encabezados anteriores y se simplificaron para evitar errores."
         },
         {
             "name": "yt_changelog_0_3_0_6",
-            "value": "Initial Google sign-in development, verified smarttube feasibility"
+            "value": "Desarrollo inicial de inicio de sesión de Google, viabilidad verificada de smarttube"
         },
         {
             "name": "yt_changelog_0_3_0_7",
-            "value": "Optimized background playback stability"
+            "value": "Estabilidad de reproducción en segundo plano optimizada"
         },
         {
             "name": "yt_changelog_0_2_0_1",
-            "value": "Refactored project code, optimized lifecycle management and development speed, fresh start"
+            "value": "Código de proyecto refactorizado, gestión del ciclo de vida optimizada y velocidad de desarrollo, nuevo comienzo"
         },
         {
             "name": "yt_changelog_0_2_0_2",
-            "value": "Optimized playback and live streaming, smoother live, less heating"
+            "value": "Reproducción optimizada y transmisión en vivo, vivo más fluido, menos calentamiento"
         },
         {
             "name": "yt_changelog_0_2_0_3",
-            "value": "More options, customizable playback options"
+            "value": "Más opciones, opciones de reproducción personalizables"
         },
         {
             "name": "yt_changelog_0_2_0_4",
-            "value": "Richer error messages and log management"
+            "value": "Mensajes de error más completos y gestión de registros"
         },
         {
             "name": "yt_changelog_0_2_0_5",
-            "value": "Added multilingual optimization"
+            "value": "Optimización multilingüe agregada"
         },
         {
             "name": "yt_changelog_0_2_0_6",
-            "value": "Updated NewPipe core code, optimized network connection and decoding, more stable"
+            "value": "Código central NewPipe actualizado, conexión de red optimizada y decodificación, más estable"
         },
         {
             "name": "yt_changelog_0_2_0_7",
-            "value": "Optimized background playback stability"
+            "value": "Estabilidad de reproducción en segundo plano optimizada"
         },
         {
             "name": "yt_changelog_0_2_0_8",
-            "value": "System-level AVPlayer playback, stability and power optimization"
+            "value": "Reproducción, estabilidad y optimización de energía de AVPlayer a nivel de sistema"
         },
         {
             "name": "yt_changelog_0_1_2_1",
-            "value": "Fixed UI freeze when switching app UI language"
+            "value": "Se corrigió la congelación de la interfaz de usuario al cambiar el idioma de la interfaz de usuario de la aplicación."
         },
         {
             "name": "yt_changelog_0_1_2_2",
-            "value": "Optimized content language list Chinese variant display (Simplified / Traditional HK / Traditional TW)"
+            "value": "Lista de idiomas de contenido optimizada Visualización de variantes en chino (simplificado/tradicional HK/tradicional TW)"
         },
         {
             "name": "yt_changelog_0_1_2_3",
-            "value": "Show save path hint after log download completes"
+            "value": "Mostrar sugerencia de ruta para guardar después de que se complete la descarga del registro"
         },
         {
             "name": "yt_changelog_0_1_2_4",
-            "value": "Added About page"
+            "value": "Se agregó la página Acerca de"
         },
         {
             "name": "yt_changelog_0_1_2_5",
-            "value": "Fixed high resolution disable option not working"
+            "value": "Se corrigió la opción de desactivación de alta resolución que no funciona."
         },
         {
             "name": "yt_changelog_0_1_2_6",
-            "value": "Unified visual style across settings page modules"
+            "value": "Estilo visual unificado en todos los módulos de la página de configuración"
         },
         {
             "name": "yt_changelog_0_1_1_1",
-            "value": "Integrated MPV playback core, supports hardware decoding and high-resolution video"
+            "value": "Núcleo de reproducción MPV integrado, admite decodificación de hardware y vídeo de alta resolución"
         },
         {
             "name": "yt_changelog_0_1_1_2",
-            "value": "Implemented background playback and system media controls integration"
+            "value": "Se implementó la reproducción en segundo plano y la integración de controles multimedia del sistema."
         },
         {
             "name": "yt_changelog_0_1_1_3",
-            "value": "Completed language and region settings, supports content language / region switching"
+            "value": "Configuración completa de idioma y región, admite cambio de idioma/región del contenido"
         },
         {
             "name": "yt_changelog_0_1_1_4",
-            "value": "Added runtime log system, supports session export"
+            "value": "Se agregó un sistema de registro de tiempo de ejecución que admite la exportación de sesiones."
         },
         {
             "name": "yt_changelog_0_1_1_5",
-            "value": "Optimized tablet landscape player layout"
+            "value": "Diseño optimizado del reproductor horizontal para tableta"
         },
         {
             "name": "yt_changelog_0_1_0_1",
-            "value": "Initial release: basic YouTube video browsing and search"
+            "value": "Lanzamiento inicial: navegación y búsqueda básica de vídeos de YouTube"
         },
         {
             "name": "yt_changelog_0_1_0_2",
-            "value": "Integrated NewPipe Extractor engine"
+            "value": "Motor extractor NewPipe integrado"
         },
         {
             "name": "yt_changelog_0_1_0_3",
-            "value": "Support channel subscriptions, favorites, and playlist management"
+            "value": "Admite suscripciones a canales, favoritos y administración de listas de reproducción"
         },
         {
             "name": "yt_changelog_0_1_0_4",
-            "value": "Support live stream playback"
+            "value": "Admite reproducción de transmisión en vivo"
         },
         {
             "name": "yt_changelog_0_1_0_5",
-            "value": "Comment list and channel page"
+            "value": "Lista de comentarios y página del canal."
         },
         {
             "name": "yt_label_version_format",
@@ -2467,6 +2467,86 @@
         {
             "name": "yt_option_auth_use_for_playback",
             "value": "Usar inicio de sesión para reproducción"
+        },
+        {
+            "name": "yt_changelog_0_5_5_1",
+            "value": "Detecta al iniciar las restricciones de Secure Shield/JIT y explica cuándo se usará el descifrado remoto de firmas"
+        },
+        {
+            "name": "yt_changelog_0_5_5_2",
+            "value": "Las tarjetas de Inicio y suscripciones se reconstruyen correctamente tras actualizar, incluso si sus ID no cambian"
+        },
+        {
+            "name": "yt_changelog_0_5_5_3",
+            "value": "Nuevos controles persistentes para el inicio de sesión general, los datos de usuario y la reproducción"
+        },
+        {
+            "name": "yt_changelog_0_5_5_4",
+            "value": "Al desactivar el acceso a datos de usuario, Inicio y los feeds pasan al modo anónimo/local en vez de quedar vacíos"
+        },
+        {
+            "name": "yt_changelog_0_5_5_5",
+            "value": "Al desactivar el acceso para reproducción se usan clientes anónimos y las descargas SABR no envían credenciales"
+        },
+        {
+            "name": "yt_changelog_0_5_5_6",
+            "value": "Las recomendaciones usan la respuesta anónima estable de YouTube next y corrigen las colas vacías con sesión iniciada"
+        },
+        {
+            "name": "yt_changelog_0_5_5_7",
+            "value": "Se estabilizó la selección del cliente autenticado y el tratamiento de LOGIN_REQUIRED en vídeos restringidos"
+        },
+        {
+            "name": "yt_changelog_0_5_5_8",
+            "value": "Se obtiene primero la marca temporal de firma de la página del vídeo y solo se recurre al servicio remoto si falla"
+        },
+        {
+            "name": "yt_changelog_0_5_5_9",
+            "value": "La caché de metadatos y los tiempos de espera remotos más cortos evitan bloqueos largos al reproducir"
+        },
+        {
+            "name": "yt_changelog_0_5_5_10",
+            "value": "Los PoToken base64url en caché para URL DASH reducen errores 403 de googlevideo sin hacer fatal un fallo del token"
+        },
+        {
+            "name": "yt_changelog_0_5_5_11",
+            "value": "Se corrigieron los paneles Guardar en lista, Información del flujo y Temporizador al unificar sus hojas inferiores"
+        },
+        {
+            "name": "yt_changelog_0_5_5_12",
+            "value": "Mejor acceso autenticado a listas y biblioteca, conservando alternativas anónimas/locales al desactivar la cuenta"
+        },
+        {
+            "name": "yt_changelog_0_5_5_13",
+            "value": "La navegación privada oculta ambos usos de la cuenta sin borrar credenciales guardadas y permite volver fácilmente al modo conectado"
+        },
+        {
+            "name": "yt_changelog_0_5_5_14",
+            "value": "Cambiar el control general o de reproducción selecciona al instante el cliente anónimo o autenticado correcto"
+        },
+        {
+            "name": "yt_changelog_0_5_5_15",
+            "value": "La sincronización de historial y suscripciones respeta el control de datos, manteniendo disponibles los datos locales"
+        },
+        {
+            "name": "yt_changelog_0_5_5_16",
+            "value": "La exploración de listas puede usar la cuenta cuando hace falta, mejorando listas específicas o restringidas"
+        },
+        {
+            "name": "yt_changelog_0_5_5_17",
+            "value": "La generación de PoToken usa la versión web actual de YouTube resuelta, no una versión fija obsoleta"
+        },
+        {
+            "name": "yt_changelog_0_5_5_18",
+            "value": "Los bytes PoToken se convierten a base64 seguro para URL y se guardan cinco minutos por vídeo"
+        },
+        {
+            "name": "yt_changelog_0_5_5_19",
+            "value": "Las solicitudes de datos y reproducción solo adjuntan credenciales en su ámbito elegido, reduciendo la exposición de cookies"
+        },
+        {
+            "name": "yt_changelog_0_5_5_20",
+            "value": "Más diagnósticos de reproducción, autenticación, tokens, actualización y alternativas sin registrar cookies ni URL firmadas"
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",

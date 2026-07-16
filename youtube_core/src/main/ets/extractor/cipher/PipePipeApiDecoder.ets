@@ -80,6 +80,13 @@ export class PipePipeApiDecoder {
     return null;
   }
 
+  /** Drop only player metadata so a failed/stale extraction can force refresh once. */
+  static invalidatePlayerMetadata(): void {
+    PipePipeApiDecoder.cachedMetadata = null;
+    PipePipeApiDecoder.cacheExpiry = 0;
+    logger.info('Player metadata cache invalidated');
+  }
+
   static async getLatestPlayer(): Promise<PlayerMetadata> {
     const now = Date.now();
     if (PipePipeApiDecoder.cachedMetadata && now < PipePipeApiDecoder.cacheExpiry) {

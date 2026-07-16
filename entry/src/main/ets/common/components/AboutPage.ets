@@ -6,8 +6,8 @@ import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNaviga
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 import { AppLog } from '../AppLog';
 
-const APP_VERSION = '0.5.4';
-const APP_BUILD = '1000013';
+const APP_VERSION = '0.5.5';
+const APP_BUILD = '1000014';
 const logger = AppLog.getInstance('AboutPage');
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
@@ -41,6 +41,19 @@ const AI_MODELS: string[] = [
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.5.5', date: '2026-07-16',
+    changes: [
+      $r('app.string.yt_changelog_0_5_5_1'),
+      $r('app.string.yt_changelog_0_5_5_2'),
+      $r('app.string.yt_changelog_0_5_5_3'),
+      $r('app.string.yt_changelog_0_5_5_4'),
+      $r('app.string.yt_changelog_0_5_5_5'),
+      $r('app.string.yt_changelog_0_5_5_6'),
+      $r('app.string.yt_changelog_0_5_5_7'),
+      $r('app.string.yt_changelog_0_5_5_8'),
+    ],
+  },
   {
     version: '0.5.4', date: '2026-07-15',
     changes: [
@@ -356,7 +369,7 @@ struct ChangelogPage {
               }
               .width('100%').alignItems(VerticalAlign.Center).margin({ bottom: 10 })
 
-              ForEach(item.changes, (change: string) => {
+              ForEach(item.changes, (change: Resource) => {
                 Row({ space: 8 }) {
                   Text('·').fontSize(16).fontColor(this.themePrimary).width(12)
                   Text(change)
@@ -364,7 +377,7 @@ struct ChangelogPage {
                     .layoutWeight(1).lineHeight(20)
                 }
                 .width('100%').alignItems(VerticalAlign.Top).padding({ bottom: 5 })
-              }, (c: string) => c)
+              }, (_change: Resource, changeIndex: number) => `${item.version}-${changeIndex}`)
             }
             .width('100%')
             .padding({ left: 16, right: 16, top: 14, bottom: 14 })

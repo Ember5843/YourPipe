@@ -29,6 +29,10 @@ export class WebClientVersionResolver {
     return ClientsConstants.WEB_HARDCODED_CLIENT_VERSION;
   }
 
+  static getCachedOrHardcodedSource(): string {
+    return WebClientVersionResolver.cachedVersion.length > 0 ? 'cache' : 'builtin';
+  }
+
   static peekCached(): string {
     return WebClientVersionResolver.cachedVersion;
   }

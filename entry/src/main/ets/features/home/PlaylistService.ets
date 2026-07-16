@@ -47,7 +47,7 @@ export class PlaylistService {
     }
     // Align with PipePipe YoutubePlaylistExtractor: browseId VL+id + params wgYCCAA%3D
     const response = await fetchBrowsePage(this.localization, this.contentCountry,
-      this.toPlaylistBrowseId(trimmed), PLAYLIST_BROWSE_PARAMS);
+      this.toPlaylistBrowseId(trimmed), PLAYLIST_BROWSE_PARAMS, undefined, true);
     if (!response) {
       throw new Error('Empty browse response');
     }
@@ -79,7 +79,7 @@ export class PlaylistService {
       return null;
     }
     const response = await fetchBrowsePage(this.localization, this.contentCountry,
-      this.toPlaylistBrowseId(trimmed), PLAYLIST_BROWSE_PARAMS);
+      this.toPlaylistBrowseId(trimmed), PLAYLIST_BROWSE_PARAMS, undefined, true);
     if (!response) {
       return null;
     }

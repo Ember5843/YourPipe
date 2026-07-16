@@ -122,7 +122,12 @@ export class LocalMediaProxy {
     return LocalMediaProxy.createSession(JSON.stringify(input));
   }
 
-  static async createYoutubeDualUrlSession(video: StreamInfo, audio: StreamInfo, durationMs?: number): Promise<string> {
+  static async createYoutubeDualUrlSession(
+    video: StreamInfo,
+    audio: StreamInfo,
+    durationMs?: number,
+    attemptId: string = ''
+  ): Promise<string> {
     if (!await LocalMediaProxy.ensureServer()) return '';
     const sidxStartedAt = Date.now();
     Logger.info(TAG, `createYoutubeDualUrlSession: video=[itag=${video.itag} ${video.quality} ${video.codecs}] audio=[itag=${audio.itag} ${audio.codecs}] durationMs=${durationMs}`);
@@ -145,6 +150,8 @@ export class LocalMediaProxy {
       return '';
     }
     Logger.info(TAG, `SIDX prepared elapsed=${Date.now() - sidxStartedAt}ms video=${video.itag} audio=${audio.itag}`);
+    Logger.info(TAG, `[STARTUP] attempt=${attemptId || '-'} stage=sidx_init `
+      + `elapsed=${Date.now() - sidxStartedAt}ms video=${video.itag} audio=${audio.itag}`);
     return localProxyServer.addPreparedSession(session);
   }
 

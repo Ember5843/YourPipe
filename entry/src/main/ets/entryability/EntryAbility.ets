@@ -73,9 +73,9 @@ export default class EntryAbility extends UIAbility {
       AuthSessionManager.init(this.context);
       AuthStateHelper.refresh();
       // PipePipe client defaults: signed-in → tv_downgraded, guest → mweb
-      const signedIn = AuthSessionManager.getInstance()?.isSignedIn() === true
-        && !!(AuthSessionManager.getInstance()?.getCookieString());
-      YoutubePlayerClientConfig.resetToAuthDefault(signedIn);
+      const usePlaybackAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true
+        && !!(AuthSessionManager.getInstance()?.getCookieStringForPlayback());
+      YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);
       // 注入 EnhancedLogger sink，覆盖所有 mediaservice 调用
       EnhancedLogger.setSink((level, tag, message) => {
         AppLogStore.push(level, tag, message);

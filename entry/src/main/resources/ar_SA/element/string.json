@@ -1982,323 +1982,323 @@
         },
         {
             "name": "yt_changelog_0_5_3_1",
-            "value": "Added YouTube SABR/UMP streaming support, improving compatibility for new-format, high-resolution, and restricted videos"
+            "value": "تمت إضافة دعم دفق YouTube SABR/UMP، مما أدى إلى تحسين التوافق مع مقاطع الفيديو ذات التنسيق الجديد وعالية الدقة والمقيدة"
         },
         {
             "name": "yt_changelog_0_5_3_2",
-            "value": "Refactored video extraction and client selection, aligned with PipePipe request behavior, restored remote signature decryption, reduced duplicate extraction and startup wait"
+            "value": "إعادة هيكلة استخراج الفيديو واختيار العميل، بما يتماشى مع سلوك طلب PipePipe، واستعادة فك تشفير التوقيع عن بعد، وتقليل استخراج التكرارات وانتظار بدء التشغيل"
         },
         {
             "name": "yt_changelog_0_5_3_3",
-            "value": "Improved local DASH media proxy: separated A/V tracks, segmented cache, precise seeking, stream break recovery, and playback end handling"
+            "value": "وكيل وسائط DASH المحلي المحسّن: مسارات الصوت/الفيديو المنفصلة، وذاكرة التخزين المؤقت المجزأة، والبحث الدقيق، واستعادة انقطاع الدفق، ومعالجة نهاية التشغيل"
         },
         {
             "name": "yt_changelog_0_5_3_4",
-            "value": "Added SABR PoToken support; optimized signature parameters, request headers, and binary response handling, reducing 403 / unable to play / loading failures"
+            "value": "تمت إضافة دعم SABR PoToken؛ معلمات التوقيع المحسنة، ورؤوس الطلب، ومعالجة الاستجابة الثنائية، مما يقلل من فشل 403 / غير قادر على التشغيل / التحميل"
         },
         {
             "name": "yt_changelog_0_5_3_5",
-            "value": "Improved player state sync, quality and audio track switching, fixed endless loading after playback, seek offset and audio track menu issues"
+            "value": "تحسين مزامنة حالة المشغل والجودة وتبديل المسار الصوتي وإصلاح التحميل الذي لا نهاية له بعد التشغيل والبحث عن مشكلات قائمة الإزاحة والمسار الصوتي"
         },
         {
             "name": "yt_changelog_0_5_3_6",
-            "value": "Upgraded playlist parsing and pagination, compatible with new list structures, locked content, and continuation; improved list loading and continuous playback"
+            "value": "ترقية تحليل قائمة التشغيل وترقيم الصفحات، المتوافقة مع هياكل القائمة الجديدة والمحتوى المقفل والاستمرار؛ تحسين تحميل القائمة والتشغيل المستمر"
         },
         {
             "name": "yt_changelog_0_5_3_7",
-            "value": "Reorganized account and data management entry, improved linkage between sign-in state, watch history, local page, download options, and playback preferences"
+            "value": "إعادة تنظيم إدخال إدارة الحساب والبيانات، وتحسين الارتباط بين حالة تسجيل الدخول، وسجل المشاهدة، والصفحة المحلية، وخيارات التنزيل، وتفضيلات التشغيل"
         },
         {
             "name": "yt_changelog_0_5_3_8",
-            "value": "Improved home recommendations, video cards, theme color, picture-in-picture, and system media session; fixed multiple UI and playback stability issues"
+            "value": "تحسين التوصيات المنزلية وبطاقات الفيديو ولون السمة والصورة داخل الصورة وجلسة وسائط النظام؛ تم إصلاح العديد من مشكلات واجهة المستخدم واستقرار التشغيل"
         },
         {
             "name": "yt_changelog_0_5_2_1",
-            "value": "Player page adds Audio-only: turn off video and listen to sound, cover replaces picture, progress and controls still available"
+            "value": "تضيف صفحة المشغل الصوت فقط: قم بإيقاف تشغيل الفيديو واستمع إلى الصوت، ويحل الغلاف محل الصورة، ولا يزال التقدم وعناصر التحكم متاحة"
         },
         {
             "name": "yt_changelog_0_5_2_2",
-            "value": "In audio-only mode, no picture-in-picture; returning to foreground keeps audio-only, manual resume required"
+            "value": "في وضع الصوت فقط، لا توجد صورة داخل صورة؛ العودة إلى المقدمة تحافظ على الصوت فقط، ويلزم استئناف يدوي"
         },
         {
             "name": "yt_changelog_0_5_2_3",
-            "value": "Background can delay turning off video to save power (adjustable in playback settings)"
+            "value": "يمكن للخلفية تأخير إيقاف تشغيل الفيديو لتوفير الطاقة (قابل للتعديل في إعدادات التشغيل)"
         },
         {
             "name": "yt_changelog_0_5_2_4",
-            "value": "Fixed system broadcast interruption: correct duck volume reduction, avoid secondary compression causing silence"
+            "value": "انقطاع بث النظام الثابت: تقليل حجم البطة بشكل صحيح، وتجنب الضغط الثانوي الذي يسبب الصمت"
         },
         {
             "name": "yt_changelog_0_5_2_5",
-            "value": "Smoother landscape/portrait, fullscreen, and windowed playback, reduced screen black and blur"
+            "value": "تشغيل أفقي/عمودي أكثر سلاسة، وملء الشاشة، والنوافذ، وتقليل الشاشة السوداء والتعتيم"
         },
         {
             "name": "yt_changelog_0_5_2_6",
-            "value": "Home page after login better matches account state, can sync cloud watch history and subscriptions"
+            "value": "الصفحة الرئيسية بعد تسجيل الدخول تتطابق بشكل أفضل مع حالة الحساب، ويمكنها مزامنة سجل المشاهدة السحابية والاشتراكات"
         },
         {
             "name": "yt_changelog_0_5_2_7",
-            "value": "Clearer video cards, live badges, and page safe area display"
+            "value": "بطاقات فيديو أكثر وضوحًا وشارات حية وعرض المنطقة الآمنة للصفحة"
         },
         {
             "name": "yt_changelog_0_5_2_8",
-            "value": "Support app handoff and tap-to-share video links"
+            "value": "دعم تسليم التطبيق وروابط الفيديو انقر لمشاركة"
         },
         {
             "name": "yt_changelog_0_5_1_1",
-            "value": "Fixed some known bugs"
+            "value": "إصلاح بعض الخلل المعروفة"
         },
         {
             "name": "yt_changelog_0_5_1_2",
-            "value": "Aligned with PipePipe issues"
+            "value": "تتماشى مع مشاكل PipePipe"
         },
         {
             "name": "yt_changelog_0_5_1_3",
-            "value": "Fixed inability to watch after login"
+            "value": "تم إصلاح عدم القدرة على المشاهدة بعد تسجيل الدخول"
         },
         {
             "name": "yt_changelog_0_5_1_4",
-            "value": "Fixed information bar popping up incorrectly in landscape mode"
+            "value": "تم إصلاح ظهور شريط المعلومات بشكل غير صحيح في الوضع الأفقي"
         },
         {
             "name": "yt_changelog_0_5_1_5",
-            "value": "Optimized settings page UI"
+            "value": "واجهة مستخدم صفحة الإعدادات المحسنة"
         },
         {
             "name": "yt_changelog_0_5_1_6",
-            "value": "Completed local decryption logic verification, ready for deployment"
+            "value": "تم الانتهاء من التحقق من منطق فك التشفير المحلي، وهو جاهز للنشر"
         },
         {
             "name": "yt_changelog_0_5_0_1",
-            "value": "Replaced system playback engine and third-party FFMpeg with MPVPlayer"
+            "value": "تم استبدال محرك تشغيل النظام وFFMpeg التابع لجهة خارجية بـ MPVPlayer"
         },
         {
             "name": "yt_changelog_0_5_0_2",
-            "value": "Restored high-resolution playback and subtitle features"
+            "value": "تمت استعادة ميزات التشغيل والترجمة عالية الدقة"
         },
         {
             "name": "yt_changelog_0_5_0_3",
-            "value": "Support HEVC/H.264 hardware decoding; on API 23+ try VP9/AV1 hardware decoding"
+            "value": "دعم فك تشفير الأجهزة HEVC/H.264؛ على API 23+، حاول فك تشفير الأجهزة VP9/AV1"
         },
         {
             "name": "yt_changelog_0_5_0_4",
-            "value": "Added true HDR display"
+            "value": "تمت إضافة شاشة HDR حقيقية"
         },
         {
             "name": "yt_changelog_0_5_0_5",
-            "value": "Optimized network transport library capabilities in non-login state"
+            "value": "تحسين إمكانات مكتبة نقل الشبكة في حالة عدم تسجيل الدخول"
         },
         {
             "name": "yt_changelog_0_5_0_6",
-            "value": "Optimized error display"
+            "value": "عرض الخطأ الأمثل"
         },
         {
             "name": "yt_changelog_0_5_0_7",
-            "value": "Optimized UI and settings options"
+            "value": "تحسين واجهة المستخدم وخيارات الإعدادات"
         },
         {
             "name": "yt_changelog_0_5_0_8",
-            "value": "Applied PipePipe latest version patches"
+            "value": "تم تطبيق تصحيحات الإصدار الأحدث من PipePipe"
         },
         {
             "name": "yt_changelog_0_4_1_1",
-            "value": "Optimized video loading speed"
+            "value": "تحسين سرعة تحميل الفيديو"
         },
         {
             "name": "yt_changelog_0_4_1_2",
-            "value": "Applied pipepipe 5.1.1 patches"
+            "value": "تطبيق Pipepipe 5.1.1 بقع"
         },
         {
             "name": "yt_changelog_0_4_1_3",
-            "value": "Allowed Google sign-in, basically eliminated bot protection issues"
+            "value": "تم السماح بتسجيل الدخول إلى Google، مما أدى بشكل أساسي إلى التخلص من مشكلات حماية الروبوتات"
         },
         {
             "name": "yt_changelog_0_4_1_4",
-            "value": "Optimized fullscreen interaction for various devices"
+            "value": "التفاعل الأمثل بملء الشاشة لمختلف الأجهزة"
         },
         {
             "name": "yt_changelog_0_4_1_5",
-            "value": "Developed multiple modules of the player page"
+            "value": "تم تطوير وحدات متعددة لصفحة اللاعب"
         },
         {
             "name": "yt_changelog_0_4_1_6",
-            "value": "Initial download feature completed"
+            "value": "اكتملت ميزة التنزيل الأولية"
         },
         {
             "name": "yt_changelog_0_4_1_7",
-            "value": "Complete playlist feature"
+            "value": "ميزة قائمة التشغيل كاملة"
         },
         {
             "name": "yt_changelog_0_4_1_8",
-            "value": "Integrated system and cast entry, experimental initial app handoff"
+            "value": "النظام المتكامل وإدخال فريق التمثيل، والتسليم التجريبي للتطبيق الأولي"
         },
         {
             "name": "yt_changelog_0_4_0_1",
-            "value": "Basically completed yt-dlp ecosystem analysis and integration interface"
+            "value": "تم الانتهاء بشكل أساسي من تحليل النظام البيئي yt-dlp وواجهة التكامل"
         },
         {
             "name": "yt_changelog_0_4_0_2",
-            "value": "Allowed Google sign-in, basically eliminated bot protection issues"
+            "value": "تم السماح بتسجيل الدخول إلى Google، مما أدى بشكل أساسي إلى التخلص من مشكلات حماية الروبوتات"
         },
         {
             "name": "yt_changelog_0_4_0_3",
-            "value": "Optimized playback mechanism"
+            "value": "آلية التشغيل الأمثل"
         },
         {
             "name": "yt_changelog_0_4_0_4",
-            "value": "Used cloud decoding instead of local decoding, more stable"
+            "value": "يستخدم فك التشفير السحابي بدلاً من فك التشفير المحلي، وهو أكثر استقرارًا"
         },
         {
             "name": "yt_changelog_0_3_1_1",
-            "value": "Improved page stack and mini-window playback"
+            "value": "تحسين مكدس الصفحات وتشغيل النافذة المصغرة"
         },
         {
             "name": "yt_changelog_0_3_1_2",
-            "value": "Added server cache for smoother playback"
+            "value": "تمت إضافة ذاكرة التخزين المؤقت للخادم لتشغيل أكثر سلاسة"
         },
         {
             "name": "yt_changelog_0_3_1_3",
-            "value": "Optimized UI and interaction"
+            "value": "تحسين واجهة المستخدم والتفاعل"
         },
         {
             "name": "yt_changelog_0_3_1_4",
-            "value": "More page and size adaptation"
+            "value": "المزيد من التكيف مع الصفحة والحجم"
         },
         {
             "name": "yt_changelog_0_3_1_5",
-            "value": "Continued to simplify previous code to prevent bugs"
+            "value": "استمر في تبسيط التعليمات البرمجية السابقة لمنع الأخطاء"
         },
         {
             "name": "yt_changelog_0_3_1_6",
-            "value": "Initial Google sign-in development, verified pipepipe sign-in feasibility"
+            "value": "التطوير الأولي لتسجيل الدخول إلى Google، والتحقق من إمكانية تسجيل الدخول عبر الأنابيب"
         },
         {
             "name": "yt_changelog_0_3_1_7",
-            "value": "Optimized background playback stability"
+            "value": "تحسين استقرار تشغيل الخلفية"
         },
         {
             "name": "yt_changelog_0_3_0_1",
-            "value": "Final experimental selection of relay HTTP server solution"
+            "value": "الاختيار التجريبي النهائي لحل خادم HTTP للترحيل"
         },
         {
             "name": "yt_changelog_0_3_0_2",
-            "value": "Reverted to system-level player to improve lifecycle"
+            "value": "تمت العودة إلى المشغل على مستوى النظام لتحسين دورة الحياة"
         },
         {
             "name": "yt_changelog_0_3_0_3",
-            "value": "Optimized UI and interaction"
+            "value": "تحسين واجهة المستخدم والتفاعل"
         },
         {
             "name": "yt_changelog_0_3_0_4",
-            "value": "More page and size adaptation"
+            "value": "المزيد من التكيف مع الصفحة والحجم"
         },
         {
             "name": "yt_changelog_0_3_0_5",
-            "value": "Removed many previous libraries and headers, simplified to prevent bugs"
+            "value": "تمت إزالة العديد من المكتبات والرؤوس السابقة، وتم تبسيطها لمنع الأخطاء"
         },
         {
             "name": "yt_changelog_0_3_0_6",
-            "value": "Initial Google sign-in development, verified smarttube feasibility"
+            "value": "التطوير الأولي لتسجيل الدخول إلى Google، والتحقق من جدوى Smarttube"
         },
         {
             "name": "yt_changelog_0_3_0_7",
-            "value": "Optimized background playback stability"
+            "value": "تحسين استقرار تشغيل الخلفية"
         },
         {
             "name": "yt_changelog_0_2_0_1",
-            "value": "Refactored project code, optimized lifecycle management and development speed, fresh start"
+            "value": "كود المشروع المعاد تشكيله، وإدارة دورة الحياة المحسنة وسرعة التطوير، وبداية جديدة"
         },
         {
             "name": "yt_changelog_0_2_0_2",
-            "value": "Optimized playback and live streaming, smoother live, less heating"
+            "value": "التشغيل الأمثل والبث المباشر، وبث مباشر أكثر سلاسة، وتدفئة أقل"
         },
         {
             "name": "yt_changelog_0_2_0_3",
-            "value": "More options, customizable playback options"
+            "value": "المزيد من الخيارات، خيارات التشغيل القابلة للتخصيص"
         },
         {
             "name": "yt_changelog_0_2_0_4",
-            "value": "Richer error messages and log management"
+            "value": "رسائل خطأ وإدارة سجل أكثر ثراءً"
         },
         {
             "name": "yt_changelog_0_2_0_5",
-            "value": "Added multilingual optimization"
+            "value": "وأضاف التحسين متعدد اللغات"
         },
         {
             "name": "yt_changelog_0_2_0_6",
-            "value": "Updated NewPipe core code, optimized network connection and decoding, more stable"
+            "value": "تم تحديث الكود الأساسي لـ NewPipe، واتصال الشبكة وفك التشفير الأمثل، وأكثر استقرارًا"
         },
         {
             "name": "yt_changelog_0_2_0_7",
-            "value": "Optimized background playback stability"
+            "value": "تحسين استقرار تشغيل الخلفية"
         },
         {
             "name": "yt_changelog_0_2_0_8",
-            "value": "System-level AVPlayer playback, stability and power optimization"
+            "value": "تشغيل AVPlayer على مستوى النظام، وتحسين الاستقرار والطاقة"
         },
         {
             "name": "yt_changelog_0_1_2_1",
-            "value": "Fixed UI freeze when switching app UI language"
+            "value": "تم إصلاح تجميد واجهة المستخدم عند تبديل لغة واجهة المستخدم الخاصة بالتطبيق"
         },
         {
             "name": "yt_changelog_0_1_2_2",
-            "value": "Optimized content language list Chinese variant display (Simplified / Traditional HK / Traditional TW)"
+            "value": "عرض محسّن لقائمة لغات المحتوى باللغة الصينية (المبسطة / التقليدية في هونج كونج / TW التقليدية)"
         },
         {
             "name": "yt_changelog_0_1_2_3",
-            "value": "Show save path hint after log download completes"
+            "value": "إظهار تلميح مسار الحفظ بعد اكتمال تنزيل السجل"
         },
         {
             "name": "yt_changelog_0_1_2_4",
-            "value": "Added About page"
+            "value": "تمت إضافة صفحة حول"
         },
         {
             "name": "yt_changelog_0_1_2_5",
-            "value": "Fixed high resolution disable option not working"
+            "value": "تم إصلاح خيار تعطيل الدقة العالية الذي لا يعمل"
         },
         {
             "name": "yt_changelog_0_1_2_6",
-            "value": "Unified visual style across settings page modules"
+            "value": "نمط مرئي موحد عبر وحدات صفحة الإعدادات"
         },
         {
             "name": "yt_changelog_0_1_1_1",
-            "value": "Integrated MPV playback core, supports hardware decoding and high-resolution video"
+            "value": "قلب تشغيل MPV مدمج، يدعم فك تشفير الأجهزة والفيديو عالي الدقة"
         },
         {
             "name": "yt_changelog_0_1_1_2",
-            "value": "Implemented background playback and system media controls integration"
+            "value": "تم تنفيذ تشغيل الخلفية وتكامل عناصر التحكم في وسائط النظام"
         },
         {
             "name": "yt_changelog_0_1_1_3",
-            "value": "Completed language and region settings, supports content language / region switching"
+            "value": "إعدادات اللغة والمنطقة المكتملة، تدعم تبديل لغة المحتوى/المنطقة"
         },
         {
             "name": "yt_changelog_0_1_1_4",
-            "value": "Added runtime log system, supports session export"
+            "value": "تمت إضافة نظام سجل وقت التشغيل، ويدعم تصدير الجلسة"
         },
         {
             "name": "yt_changelog_0_1_1_5",
-            "value": "Optimized tablet landscape player layout"
+            "value": "تحسين تخطيط مشغل المناظر الطبيعية للكمبيوتر اللوحي"
         },
         {
             "name": "yt_changelog_0_1_0_1",
-            "value": "Initial release: basic YouTube video browsing and search"
+            "value": "الإصدار الأولي: تصفح الفيديو الأساسي والبحث فيه على YouTube"
         },
         {
             "name": "yt_changelog_0_1_0_2",
-            "value": "Integrated NewPipe Extractor engine"
+            "value": "محرك NewPipe Extractor المتكامل"
         },
         {
             "name": "yt_changelog_0_1_0_3",
-            "value": "Support channel subscriptions, favorites, and playlist management"
+            "value": "دعم اشتراكات القنوات والمفضلة وإدارة قوائم التشغيل"
         },
         {
             "name": "yt_changelog_0_1_0_4",
-            "value": "Support live stream playback"
+            "value": "دعم تشغيل البث المباشر"
         },
         {
             "name": "yt_changelog_0_1_0_5",
-            "value": "Comment list and channel page"
+            "value": "قائمة التعليقات وصفحة القناة"
         },
         {
             "name": "yt_label_version_format",
@@ -2467,6 +2467,86 @@
         {
             "name": "yt_option_auth_use_for_playback",
             "value": "استخدام تسجيل الدخول للتشغيل"
+        },
+        {
+            "name": "yt_changelog_0_5_5_1",
+            "value": "اكتشاف قيود Secure Shield وJIT عند التشغيل وتوضيح وقت استخدام فك توقيع الفيديو عن بُعد"
+        },
+        {
+            "name": "yt_changelog_0_5_5_2",
+            "value": "إعادة بناء بطاقات الصفحة الرئيسية والاشتراكات بعد السحب للتحديث حتى عند بقاء معرّفات العناصر دون تغيير"
+        },
+        {
+            "name": "yt_changelog_0_5_5_3",
+            "value": "إضافة مفاتيح دائمة ومنفصلة لتسجيل الدخول وبيانات المستخدم والتشغيل للتحكم المستقل في الحساب"
+        },
+        {
+            "name": "yt_changelog_0_5_5_4",
+            "value": "عند تعطيل الحساب لبيانات المستخدم تنتقل الصفحة الرئيسية والخلاصات إلى الوضع المجهول أو المحلي بدل الظهور فارغة"
+        },
+        {
+            "name": "yt_changelog_0_5_5_5",
+            "value": "عند تعطيل الحساب للتشغيل تُستخدم عملاء مجهولة ولا ترسل تنزيلات SABR بيانات اعتماد الحساب"
+        },
+        {
+            "name": "yt_changelog_0_5_5_6",
+            "value": "تستخدم توصيات المشغل استجابة YouTube next المجهولة والثابتة لإصلاح قائمة الانتظار الفارغة بعد تسجيل الدخول"
+        },
+        {
+            "name": "yt_changelog_0_5_5_7",
+            "value": "تحسين اختيار عميل التشغيل المسجل ومعالجة LOGIN_REQUIRED لمقاطع الفيديو المقيّدة"
+        },
+        {
+            "name": "yt_changelog_0_5_5_8",
+            "value": "استخدام طابع التوقيع من صفحة المشاهدة أولاً والرجوع إلى خدمة المشغل البعيدة عند الفشل فقط"
+        },
+        {
+            "name": "yt_changelog_0_5_5_9",
+            "value": "تخزين بيانات المشغل وتقليل مهلة فك التشفير البعيد لمنع الخدمات البطيئة من حجب التشغيل طويلاً"
+        },
+        {
+            "name": "yt_changelog_0_5_5_10",
+            "value": "إضافة PoToken بصيغة base64url قابل للتخزين إلى روابط DASH لتقليل أخطاء googlevideo 403 دون إيقاف التشغيل عند فشله"
+        },
+        {
+            "name": "yt_changelog_0_5_5_11",
+            "value": "إصلاح لوحات الحفظ في قائمة والتدفق ومؤقت النوم عبر توحيد روابط الأوراق السفلية المتعارضة"
+        },
+        {
+            "name": "yt_changelog_0_5_5_12",
+            "value": "تحسين تصفح قوائم التشغيل ومكتبة المستخدم بالحساب مع إبقاء البديل المجهول أو المحلي عند تعطيله"
+        },
+        {
+            "name": "yt_changelog_0_5_5_13",
+            "value": "يخفي التصفح الخاص استخدام الحساب للبيانات والتشغيل دون حذف بيانات الاعتماد المحفوظة مع سهولة العودة إلى وضع الدخول"
+        },
+        {
+            "name": "yt_changelog_0_5_5_14",
+            "value": "يؤدي تغيير مفتاح الدخول العام أو التشغيل إلى اختيار العميل المجهول أو المسجل الصحيح فوراً"
+        },
+        {
+            "name": "yt_changelog_0_5_5_15",
+            "value": "تتبع مزامنة السجل والاشتراكات مفتاح بيانات المستخدم مع إبقاء السجل والاشتراكات المحلية متاحة"
+        },
+        {
+            "name": "yt_changelog_0_5_5_16",
+            "value": "يمكن لتصفح قوائم التشغيل استخدام الحساب عند الحاجة لتحسين تحميل القوائم الخاصة أو المقيّدة"
+        },
+        {
+            "name": "yt_changelog_0_5_5_17",
+            "value": "يستخدم إنشاء PoToken إصدار عميل YouTube Web الحالي بدلاً من إصدار ثابت قديم"
+        },
+        {
+            "name": "yt_changelog_0_5_5_18",
+            "value": "تحويل بايتات PoToken إلى base64 آمن للروابط وتخزينها لكل فيديو لمدة خمس دقائق"
+        },
+        {
+            "name": "yt_changelog_0_5_5_19",
+            "value": "تضيف طلبات البيانات والتشغيل بيانات الاعتماد ضمن النطاق المحدد فقط لتقليل كشف ملفات Cookie"
+        },
+        {
+            "name": "yt_changelog_0_5_5_20",
+            "value": "توسيع تشخيص التشغيل والدخول والرموز والتحديث والبدائل دون تسجيل Cookie الحساسة أو الروابط الموقعة"
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",

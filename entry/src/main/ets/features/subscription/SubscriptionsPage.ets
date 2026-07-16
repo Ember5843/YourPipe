@@ -1,5 +1,5 @@
 import { AppLog } from '../../common/AppLog';
-import { AuthAccountStatus, AuthSessionManager, AuthStage, VideoItem } from 'youtube_core';
+import { AuthAccountStatus, AuthSessionManager, VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { SubscriptionFeedService } from '../../features/subscription/SubscriptionFeedService';
 import { VideoCard } from '../../common/components/VideoCard';
@@ -30,8 +30,7 @@ export struct SubscriptionsPage {
   }
 
   private isSignedIn(): boolean {
-    return this.authStatus.stage === AuthStage.SIGNED_IN
-      || AuthSessionManager.getInstance()?.isSignedIn() === true;
+    return AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
   }
 
   private syncSubscriptionsToStorage(list: SubscriptionUser[]): void {
