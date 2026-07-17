@@ -551,6 +551,7 @@ export interface BadgeItem {
 
 export interface WatchEndpoint {
   videoId?: string;
+  startTimeSeconds?: number;
 }
 
 export interface InnertubeCommand {
@@ -559,6 +560,7 @@ export interface InnertubeCommand {
 
 export interface OnTap {
   innertubeCommand?: InnertubeCommand;
+  watchEndpoint?: WatchEndpoint;
 }
 
 export interface CommandContext {
@@ -723,6 +725,32 @@ export interface Contents {
   twoColumnWatchNextResults?: TwoColumnWatchNextResults;
 }
 
+export interface MacroMarkersListItemRenderer {
+  title?: NextResponseText;
+  onTap?: OnTap;
+}
+
+export interface MacroMarkersListContent {
+  macroMarkersListItemRenderer?: MacroMarkersListItemRenderer;
+}
+
+export interface MacroMarkersListRenderer {
+  contents?: MacroMarkersListContent[];
+}
+
+export interface EngagementPanelContent {
+  macroMarkersListRenderer?: MacroMarkersListRenderer;
+}
+
+export interface EngagementPanelSectionListRenderer {
+  panelIdentifier?: string;
+  content?: EngagementPanelContent;
+}
+
+export interface EngagementPanel {
+  engagementPanelSectionListRenderer?: EngagementPanelSectionListRenderer;
+}
+
 /** compactVideoRenderer (추천 동영상 항목) */
 export interface CompactVideoRenderer {
   videoId?: string;
@@ -778,4 +806,5 @@ export interface VideoPrimaryInfoRenderer {
 /** nextResponse 최상위 구조 */
 export interface NextResponse {
   contents?: Contents;
+  engagementPanels?: EngagementPanel[];
 }

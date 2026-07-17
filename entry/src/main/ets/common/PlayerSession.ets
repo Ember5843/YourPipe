@@ -505,6 +505,7 @@ export class PlayerSession {
           error: undefined,
           streams: result.playerStreams ?? [],
           subtitleTracks: result.subtitleTracks ?? [],
+          chapters: result.videoInfo.chapters || [],
           isLive: result.videoInfo.isLive || false,
           hlsUrl: result.videoInfo.hlsUrl,
           dashMpdUrl: result.videoInfo.dashMpdUrl,
@@ -578,7 +579,7 @@ export class PlayerSession {
       if (!extras || this._currentVideo?.videoId !== videoId || this._activeExtrasVideoId !== videoId) {
         return;
       }
-      logger.info(`${TAG} playback extras done video=${videoId} elapsed=${Date.now() - startedAt}ms like=${extras.likeCount ?? -1} dislike=${extras.dislikeCount ?? -1} related=${extras.relatedItems?.length || 0}`);
+      logger.info(`${TAG} playback extras done video=${videoId} elapsed=${Date.now() - startedAt}ms like=${extras.likeCount ?? -1} dislike=${extras.dislikeCount ?? -1} related=${extras.relatedItems?.length || 0} chapters=${extras.chapters?.length || 0}`);
 
       const likeText = (extras.likeCount !== undefined && extras.likeCount >= 0)
         ? this.formatStatCount(extras.likeCount)
@@ -595,6 +596,9 @@ export class PlayerSession {
       if (extras.viewCount !== undefined && extras.viewCount >= 0) this._defaultSource.viewCount = extras.viewCount;
       if (extras.publishDate) this._defaultSource.publishDate = extras.publishDate;
       if (extras.tags && extras.tags.length > 0) this._defaultSource.tags = extras.tags;
+      if (extras.chapters && extras.chapters.length > 0) {
+        this._defaultSource.chapters = extras.chapters.slice();
+      }
 
       if (this._currentVideo?.videoId === videoId) {
         if (extras.title) this._currentVideo.title = extras.title;

@@ -1113,6 +1113,10 @@
             "value": "Subtitles off"
         },
         {
+            "name": "yt_player_chapters",
+            "value": "Chapters"
+        },
+        {
             "name": "yt_log_count_format",
             "value": "%d logs"
         },

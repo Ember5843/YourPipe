@@ -1041,6 +1041,10 @@
             "value": "إيقاف الترجمة"
         },
         {
+            "name": "yt_player_chapters",
+            "value": "الفصول"
+        },
+        {
             "name": "yt_log_count_format",
             "value": "%d سجلات"
         },

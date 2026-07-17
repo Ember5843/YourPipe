@@ -1041,6 +1041,10 @@
             "value": "Субтитры выключены"
         },
         {
+            "name": "yt_player_chapters",
+            "value": "Главы"
+        },
+        {
             "name": "yt_log_count_format",
             "value": "Журналов: %d"
         },

@@ -1041,6 +1041,10 @@
             "value": "Subtítulos desactivados"
         },
         {
+            "name": "yt_player_chapters",
+            "value": "Capítulos"
+        },
+        {
             "name": "yt_log_count_format",
             "value": "%d registros"
         },

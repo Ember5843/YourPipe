@@ -15,7 +15,7 @@ export { VideoHwCaps } from './src/main/ets/engine/VideoHwCaps';
 export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry, AudioTrackOption } from './src/main/ets/model/PlayerModel';
 // AudioTrackOption kept for compatibility; UI now lists StreamInfo via getAudioStreamList.
 export { VideoData, StreamInfo, SelectOption } from './src/main/ets/model/VideoData';
-export { SubtitleTrack } from 'youtube_core';
+export { ChapterInfo, SubtitleTrack } from 'youtube_core';
 export { BackgroundTaskManager } from './src/main/ets/common/BackgroundTaskManager';
 export { PlayerState, isValidTransition, describeState } from './src/main/ets/state/PlayerState';
 export { PlayerStateMachine, StateChangeListener } from './src/main/ets/state/PlayerStateMachine';

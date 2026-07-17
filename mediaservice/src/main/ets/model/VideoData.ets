@@ -14,7 +14,7 @@
  */
 
 import { media } from '@kit.MediaKit';
-import { SubtitleTrack, YoutubeSabrInfo } from 'youtube_core';
+import { ChapterInfo, SubtitleTrack, YoutubeSabrInfo } from 'youtube_core';
 
 export interface StreamInfo {
   url: string;
@@ -81,6 +81,7 @@ export interface VideoData {
   error?: string;
   streams?: StreamInfo[];
   subtitleTracks?: SubtitleTrack[];
+  chapters?: ChapterInfo[];
   isLive?: boolean;
   hlsUrl?: string;
   dashMpdUrl?: string;

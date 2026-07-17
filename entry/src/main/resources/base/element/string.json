@@ -1389,6 +1389,10 @@
             "value": "关闭字幕"
         },
         {
+            "name": "yt_player_chapters",
+            "value": "章节"
+        },
+        {
             "name": "yt_log_count_format",
             "value": "%d 条日志"
         },

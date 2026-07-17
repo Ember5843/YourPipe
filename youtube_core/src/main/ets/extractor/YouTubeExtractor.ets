@@ -2232,6 +2232,13 @@ export class YouTubeExtractor {
     nextResponse: NextResponse,
     playerResponse?: PlayerResponse
   ): void {
+    const chapters = this.extractChaptersFromNextResponse(nextResponse, videoInfo.lengthSeconds);
+    if (chapters.length > 0) {
+      // /next macro markers are the canonical chapter source. Keep the
+      // player-response chapters already extracted when /next has none.
+      videoInfo.chapters = chapters;
+    }
+
     const twoCol = nextResponse.contents?.twoColumnWatchNextResults;
     const contents = twoCol?.results?.results?.contents || [];
 
@@ -2267,7 +2274,45 @@ export class YouTubeExtractor {
       }
     }
     videoInfo.relatedItems = related;
-    logger.info(`enrichFromNextResponse: likeCount=${videoInfo.likeCount}, uploaderUrl=${videoInfo.uploaderUrl}, related=${related.length}`);
+    logger.info(`enrichFromNextResponse: likeCount=${videoInfo.likeCount}, uploaderUrl=${videoInfo.uploaderUrl}, related=${related.length}, chapters=${videoInfo.chapters.length}`);
+  }
+
+  private extractChaptersFromNextResponse(
+    nextResponse: NextResponse,
+    durationSeconds?: number
+  ): ChapterInfo[] {
+    const panels = nextResponse.engagementPanels || [];
+    const chapterPanel = panels.find((panel) =>
+      panel.engagementPanelSectionListRenderer?.panelIdentifier
+        === 'engagement-panel-macro-markers-description-chapters');
+    const contents = chapterPanel?.engagementPanelSectionListRenderer
+      ?.content?.macroMarkersListRenderer?.contents || [];
+    const unique: Map<number, ChapterInfo> = new Map();
+    let invalidCount = 0;
+
+    for (const item of contents) {
+      const renderer = item.macroMarkersListItemRenderer;
+      const rawStart = renderer?.onTap?.watchEndpoint?.startTimeSeconds;
+      const title = this.extractNextText(renderer?.title).trim();
+      if (rawStart === undefined || !Number.isFinite(rawStart) || rawStart < 0 || title.length === 0) {
+        invalidCount++;
+        continue;
+      }
+      const startTimeSeconds = Math.floor(rawStart);
+      if (durationSeconds !== undefined && durationSeconds > 0
+        && startTimeSeconds > durationSeconds) {
+        invalidCount++;
+        continue;
+      }
+      if (!unique.has(startTimeSeconds)) {
+        unique.set(startTimeSeconds, new ChapterInfo(title, startTimeSeconds));
+      }
+    }
+
+    const chapters = Array.from(unique.values()).sort(
+      (a: ChapterInfo, b: ChapterInfo): number => a.startTimeSeconds - b.startTimeSeconds);
+    logger.info(`[CHAPTERS] source=next count=${chapters.length} invalid=${invalidCount}`);
+    return chapters;
   }
 
   private extractLikeCount(primary: VideoPrimaryInfoRenderer, playerResponse: PlayerResponse): number {

@@ -1041,6 +1041,10 @@
             "value": "Sous-titres désactivés"
         },
         {
+            "name": "yt_player_chapters",
+            "value": "Chapitres"
+        },
+        {
             "name": "yt_log_count_format",
             "value": "%d journaux"
         },

@@ -29,7 +29,7 @@ import { initTabData } from '../../common/model/TabViewModel';
 import { TabItem } from '../../common/model/TabItem';
 import { Constants } from '../../common/Constants';
 import { YouTubePlayService } from './YouTubePlayService';
-import { VideoItem } from 'youtube_core';
+import { ChapterInfo, VideoItem } from 'youtube_core';
 import { ActionHub, ActionHubEvent } from '../../common/ActionHub';
 import { CommentNavWrapper } from './components/CommentNavWrapper';
 import { AvPlayerController, PlayerUiViewModel } from 'mediaservice';
@@ -92,6 +92,7 @@ export struct VideoPlayerPage {
   @State detailDislikeCount: string = '0';
   @State detailChannelId: string = '';
   @State detailChannelAvatarUrl: string = '';
+  @State chapters: ChapterInfo[] = [];
   @State isRetrying: boolean = false;
   @State isLoading: boolean = false;
   /** 画中画是否激活（订阅 PlayerSession.isPiPActive → 显示占位层） */
@@ -232,6 +233,7 @@ export struct VideoPlayerPage {
     this.detailDislikeCount = source.dislikeCount || '0';
     this.detailChannelId = source.channelId || this.video?.channelId || '';
     this.detailChannelAvatarUrl = this.video?.channelAvatarUrl || '';
+    this.chapters = (source.chapters || []).slice();
   }
 
   private playbackExtrasListener = (source: VideoData): void => {
@@ -357,6 +359,7 @@ export struct VideoPlayerPage {
       this.detailDislikeCount = '0';
       this.detailChannelId = this.video.channelId || '';
       this.detailChannelAvatarUrl = this.video.channelAvatarUrl || '';
+      this.chapters = [];
       const newVideoSource = await session.play(this.video);
 
       this.controller = session.controller;
@@ -740,6 +743,7 @@ export struct VideoPlayerPage {
           PiPManager.getInstance().setComponentController(xc);
         },
         curSource: $videoSource,
+        chapters: this.chapters,
         curIndex: 0,
         index: 0,
       })

@@ -27,6 +27,7 @@ import {
   PlaybackState,
   StateChangeListener,
   VideoEntry,
+  ChapterInfo,
   SubtitleTrack
 } from 'mediaservice';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
@@ -65,6 +66,7 @@ export struct VideoPlayer {
   @StorageProp('selectedVideo') selectedVideo: VideoItem | null = null;
   @Prop index: number = 0;
   @Link @Watch('onSourceChange') curSource: VideoData;
+  @Prop chapters: ChapterInfo[] = [];
   @Prop @Watch('onIndexChange') curIndex: number = CommonConstants.CURINDEX_DEFAULT_NUM;
   @State surfaceWidth: number = CommonConstants.SURFACE_WIDTH;
   @State surfaceHeight: number = CommonConstants.SURFACE_HEIGHT;
@@ -678,6 +680,30 @@ export struct VideoPlayer {
   }
 
   @Builder
+  ChapterMenu() {
+    Menu() {
+      ForEach(this.chapters, (chapter: ChapterInfo, index: number) => {
+        MenuItem({
+          content: `${secondToTime(Math.floor(chapter.startTimeSeconds))} · ${chapter.title}`,
+          endIcon: this.getCurrentChapterIndex() === index ? $r('sys.symbol.checkmark') : ''
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .backgroundColor(this.getCurrentChapterIndex() === index
+            ? this.getSelectedMenuBackground() : Color.Transparent)
+          .onClick(() => {
+            Logger.info(TAG, `Chapter seek: index=${index} start=${chapter.startTimeSeconds}s`);
+            this.controller.syncSeek(chapter.startTimeSeconds * 1000);
+          })
+      }, (chapter: ChapterInfo, index: number) => `${chapter.startTimeSeconds}_${index}`)
+    }
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .borderRadius(12)
+    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+    .width(280)
+  }
+
+  @Builder
   AudioMenu() {
     Menu() {
       ForEach(this.controller.getAudioStreamList(), (stream: StreamInfo, index: number) => {
@@ -759,6 +785,17 @@ export struct VideoPlayer {
 
   private getSelectedAudioIndex(): number {
     return this.controller.getCurrentAudioIndex();
+  }
+
+  private getCurrentChapterIndex(): number {
+    let selected = -1;
+    for (let i = 0; i < this.chapters.length; i++) {
+      if (this.chapters[i].startTimeSeconds > this.currentTime) {
+        break;
+      }
+      selected = i;
+    }
+    return selected;
   }
 
   /**
@@ -1165,6 +1202,16 @@ export struct VideoPlayer {
 
       // 右侧操作栏：入口统一使用 SymbolGlyph，展开后使用 Menu。
       Row({ space: 8 }) {
+        if (this.chapters.length > 0) {
+          SymbolGlyph($r('sys.symbol.list_bullet_square'))
+            .fontSize(24)
+            .fontColor([Color.White])
+            .width(40)
+            .height(40)
+            .accessibilityText($r('app.string.yt_player_chapters'))
+            .bindMenu(this.ChapterMenu())
+        }
+
         if (this.vm.subtitleTracks.length > 0) {
           SymbolGlyph($r('sys.symbol.AI_subtitles'))
             .fontSize(24)
@@ -1174,7 +1221,7 @@ export struct VideoPlayer {
             .bindMenu(this.SubtitleMenu())
         }
 
-        if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 0) {
+        if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
           SymbolGlyph($r('sys.symbol.speaker_wave_2'))
             .fontSize(24)
             .fontColor([Color.White])

@@ -1041,6 +1041,10 @@
             "value": "關閉字幕"
         },
         {
+            "name": "yt_player_chapters",
+            "value": "章節"
+        },
+        {
             "name": "yt_log_count_format",
             "value": "%d 條日誌"
         },

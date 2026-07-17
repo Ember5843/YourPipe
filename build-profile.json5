@@ -2,29 +2,29 @@
   "app": {
     "signingConfigs": [
       {
-        "name": "emberrelease",
+        "name": "yourpiperelease",
         "type": "HarmonyOS",
         "material": {
-          "storeFile": "C:/Users/USER/.ohos/config/emberrelease.p12",
+          "storeFile": "C:/Users/USER/Desktop/npp/keys/yourpiperelease.p12",
           "storePassword": "REDACTED_SIGNING_SECRET",
-          "keyAlias": "emberrelease",
+          "keyAlias": "yourpiperelease",
           "keyPassword": "REDACTED_SIGNING_SECRET",
           "signAlg": "SHA256withECDSA",
-          "profile": "C:/Users/USER/.ohos/config/emberreleaseRelease.p7b",
-          "certpath": "C:/Users/USER/.ohos/config/emberrelease.cer"
+          "profile": "C:/Users/USER/Desktop/npp/keys/yourpipereleaseRelease.p7b",
+          "certpath": "C:/Users/USER/Desktop/npp/keys/yourpiperelease.cer"
         }
       },
       {
         "name": "pc",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\dyzxp\\.ohos\\config\\pc_YourPipe_VaTYoZfZfLxNpiC6KGxT6OJOW-8GeuTJHs9kGJZSpzg=.cer",
-          "keyAlias": "debugKey",
+          "storeFile": "C:/Users/USER/Desktop/npp/keys/yourpipedebug.p12",
+          "storePassword": "REDACTED_SIGNING_SECRET",
+          "keyAlias": "yourpipedebug",
           "keyPassword": "REDACTED_SIGNING_SECRET",
-          "profile": "C:\\Users\\dyzxp\\.ohos\\config\\pc_YourPipe_VaTYoZfZfLxNpiC6KGxT6OJOW-8GeuTJHs9kGJZSpzg=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\dyzxp\\.ohos\\config\\pc_YourPipe_VaTYoZfZfLxNpiC6KGxT6OJOW-8GeuTJHs9kGJZSpzg=.p12",
-          "storePassword": "REDACTED_SIGNING_SECRET"
+          "profile": "C:/Users/USER/Desktop/npp/keys/yourpipedebugDebug.p7b",
+          "certpath": "C:/Users/USER/Desktop/npp/keys/yourpipedebug.cer"
         }
       },
       {
@@ -44,7 +44,7 @@
     "products": [
       {
         "name": "default",
-        "signingConfig": "pc",
+        "signingConfig": "yourpiperelease",
         "targetSdkVersion": "6.1.0(23)",
         "compatibleSdkVersion": "6.1.0(23)",
         "runtimeOS": "HarmonyOS",
