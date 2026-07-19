@@ -33,8 +33,30 @@ import common from '@ohos.app.ability.common';
 import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSession';
 import { systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
+import { AppLog } from '../../../common/AppLog';
 
 const TAG: string = '[VideoDetails]';
+const logger = AppLog.getInstance('VideoDetails');
+
+enum DescriptionSegmentKind {
+  TEXT = 0,
+  LINK = 1,
+  TIMESTAMP = 2
+}
+
+class DescriptionSegment {
+  text: string;
+  kind: DescriptionSegmentKind;
+  target: string;
+  seconds: number;
+
+  constructor(text: string, kind: DescriptionSegmentKind, target: string = '', seconds: number = 0) {
+    this.text = text;
+    this.kind = kind;
+    this.target = target;
+    this.seconds = seconds;
+  }
+}
 
 @Component
 export struct VideoDetails {
@@ -110,6 +132,78 @@ export struct VideoDetails {
       return this.videoDescriptionError;
     }
     return this.item?.videoDescriptionError || undefined;
+  }
+
+  private parseTimestamp(value: string): number {
+    const parts = value.split(':').map((part: string): number => Number(part));
+    if ((parts.length !== 2 && parts.length !== 3)
+      || parts.some((part: number): boolean => !Number.isInteger(part) || part < 0)) {
+      return -1;
+    }
+    const seconds = parts[parts.length - 1];
+    const minutes = parts[parts.length - 2];
+    if (seconds >= 60 || minutes >= 60) {
+      return -1;
+    }
+    return parts.length === 3
+      ? parts[0] * 3600 + minutes * 60 + seconds
+      : minutes * 60 + seconds;
+  }
+
+  private buildDescriptionSegments(description: string): DescriptionSegment[] {
+    const segments: DescriptionSegment[] = [];
+    const matcher = /https?:\/\/[^\s]+|www\.[^\s]+|\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b/gi;
+    let cursor = 0;
+    let match: RegExpExecArray | null = matcher.exec(description);
+    while (match) {
+      const start = match.index;
+      const value = match[0];
+      if (start > cursor) {
+        segments.push(new DescriptionSegment(description.substring(cursor, start), DescriptionSegmentKind.TEXT));
+      }
+
+      if (/^(?:https?:\/\/|www\.)/i.test(value)) {
+        const link = value.replace(/[\]\)}>.,!?;:，。！？；：、》】）]+$/g, '');
+        if (link.length > 0) {
+          segments.push(new DescriptionSegment(link, DescriptionSegmentKind.LINK, link));
+        }
+        if (link.length < value.length) {
+          segments.push(new DescriptionSegment(value.substring(link.length), DescriptionSegmentKind.TEXT));
+        }
+      } else {
+        const seconds = this.parseTimestamp(value);
+        segments.push(new DescriptionSegment(value,
+          seconds >= 0 ? DescriptionSegmentKind.TIMESTAMP : DescriptionSegmentKind.TEXT,
+          '', Math.max(0, seconds)));
+      }
+
+      cursor = matcher.lastIndex;
+      match = matcher.exec(description);
+    }
+    if (cursor < description.length) {
+      segments.push(new DescriptionSegment(description.substring(cursor), DescriptionSegmentKind.TEXT));
+    }
+    return segments;
+  }
+
+  private openDescriptionLink(target: string): void {
+    const url = target.toLowerCase().startsWith('www.') ? `https://${target}` : target;
+    try {
+      logger.info(`description link requested videoId=${this.item.videoId}`);
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      context.openLink(url, { appLinkingOnly: false }).catch((error: Object) => {
+        logger.error(`description link failed videoId=${this.item.videoId}`, error);
+      });
+    } catch (error) {
+      logger.error(`description link failed videoId=${this.item.videoId}`, error as Object);
+    }
+  }
+
+  private seekToDescriptionTimestamp(seconds: number): void {
+    const duration = PlayerSession.getInstance().controller.vm.durationTime;
+    const targetSeconds = duration > 0 ? Math.min(seconds, duration) : seconds;
+    logger.info(`description timestamp seek videoId=${this.item.videoId} targetSec=${targetSeconds}`);
+    PlayerSession.getInstance().controller.syncSeekExact(targetSeconds * 1000);
   }
 
   private formatViewCount(count: number): string {
@@ -685,9 +779,12 @@ export struct VideoDetails {
         }
       }
       .width('100%')
+      .alignItems(HorizontalAlign.Start)
     }
     .edgeEffect(EdgeEffect.Spring)
     .width(Const.WIDTH_FULL_PERCENT)
+    .height(Const.HEIGHT_FULL_PERCENT)
+    .align(Alignment.Top)
     .padding({
       top: $r('app.float.padding_12'),
       bottom: 24,
@@ -904,7 +1001,26 @@ export struct VideoDetails {
         }
       })
     } else if (this.getEffectiveDesc().length > 0) {
-      Text(this.getEffectiveDesc())
+      Text() {
+        ForEach(this.buildDescriptionSegments(this.getEffectiveDesc()),
+          (segment: DescriptionSegment) => {
+            if (segment.kind === DescriptionSegmentKind.LINK) {
+              Span(segment.text)
+                .fontColor(this.themePrimary)
+                .decoration({ type: TextDecorationType.Underline, color: this.themePrimary })
+                .onClick(() => { this.openDescriptionLink(segment.target); })
+            } else if (segment.kind === DescriptionSegmentKind.TIMESTAMP) {
+              Span(segment.text)
+                .fontColor(this.themePrimary)
+                .fontWeight(FontWeight.Medium)
+                .onClick(() => { this.seekToDescriptionTimestamp(segment.seconds); })
+            } else {
+              Span(segment.text)
+                .fontColor($r('app.color.yourtube_text_primary'))
+            }
+          },
+          (segment: DescriptionSegment, index: number) => `${index}_${segment.kind}_${segment.text}`)
+      }
         .fontSize($r('app.float.font_size_14'))
         .fontColor($r('app.color.yourtube_text_primary'))
         .lineHeight(22)
@@ -932,15 +1048,36 @@ export struct VideoDetails {
   TagsSection() {
     Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
       ForEach(this.tags, (tag: string) => {
-        Text(`#${tag}`)
+        Text(this.formatTagLabel(tag))
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_secondary'))
           .backgroundColor($r('app.color.yourtube_player_info_bg'))
           .borderRadius(12)
           .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+          .onClick(() => { this.openTagSearch(tag); })
       }, (tag: string, index: number) => `${tag}_${index}`)
     }
     .width('100%')
+  }
+
+  private normalizeTag(tag: string): string {
+    return tag.trim().replace(/^#+/, '').trim();
+  }
+
+  private formatTagLabel(tag: string): string {
+    const normalizedTag = this.normalizeTag(tag);
+    return normalizedTag.length > 0 ? `#${normalizedTag}` : '#';
+  }
+
+  private openTagSearch(tag: string): void {
+    const normalizedTag = this.normalizeTag(tag);
+    if (normalizedTag.length === 0) {
+      logger.warn(`tag search ignored videoId=${this.item.videoId} reason=empty`);
+      return;
+    }
+    logger.info(`tag search requested videoId=${this.item.videoId} query=${normalizedTag}`);
+    this.actionHub.openSearch(normalizedTag);
   }
 
   private toggleAudioOnlyMode(): void {

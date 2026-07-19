@@ -1672,6 +1672,13 @@
             "name": "yt_playback_player",
             "value": "播放器"
         },
+        { "name": "yt_playback_gestures", "value": "播放手勢" },
+        { "name": "yt_playback_gesture_seek", "value": "滑動調整播放進度" },
+        { "name": "yt_playback_gesture_seek_subtitle", "value": "在影片畫面上橫向滑動以預覽並跳至播放位置" },
+        { "name": "yt_playback_gesture_brightness", "value": "左側滑動調整亮度" },
+        { "name": "yt_playback_gesture_brightness_subtitle", "value": "在影片畫面左半側上下滑動以調整螢幕亮度" },
+        { "name": "yt_playback_gesture_volume", "value": "右側滑動調整音量" },
+        { "name": "yt_playback_gesture_volume_subtitle", "value": "在影片畫面右半側上下滑動以調整播放音量" },
         {
             "name": "yt_playback_background_audio_only",
             "value": "背景僅音訊"
@@ -1715,6 +1722,10 @@
         {
             "name": "yt_download_concurrent_tasks",
             "value": "並行下載任務"
+        },
+        {
+            "name": "yt_toast_login_success",
+            "value": "登入成功"
         },
         {
             "name": "yt_login_extracting_auth",

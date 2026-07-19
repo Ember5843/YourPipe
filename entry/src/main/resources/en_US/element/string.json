@@ -1396,6 +1396,13 @@
             "name": "yt_playback_player",
             "value": "Player"
         },
+        { "name": "yt_playback_gestures", "value": "Playback gestures" },
+        { "name": "yt_playback_gesture_seek", "value": "Swipe to seek" },
+        { "name": "yt_playback_gesture_seek_subtitle", "value": "Swipe horizontally on the video to preview and change the playback position" },
+        { "name": "yt_playback_gesture_brightness", "value": "Left swipe for brightness" },
+        { "name": "yt_playback_gesture_brightness_subtitle", "value": "Swipe vertically on the left half of the video to adjust screen brightness" },
+        { "name": "yt_playback_gesture_volume", "value": "Right swipe for volume" },
+        { "name": "yt_playback_gesture_volume_subtitle", "value": "Swipe vertically on the right half of the video to adjust playback volume" },
         {
             "name": "yt_playback_background_audio_only",
             "value": "Background audio only"
@@ -1439,6 +1446,10 @@
         {
             "name": "yt_download_concurrent_tasks",
             "value": "Concurrent downloads"
+        },
+        {
+            "name": "yt_toast_login_success",
+            "value": "Signed in successfully"
         },
         {
             "name": "yt_login_extracting_auth",

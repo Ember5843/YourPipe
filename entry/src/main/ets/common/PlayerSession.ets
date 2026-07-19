@@ -83,6 +83,17 @@ export class PlayerSession {
     this.playbackExtrasListeners.delete(listener);
   }
 
+  private notifyPlaybackSourceChanged(source: VideoData, stage: string): void {
+    logger.debug(`${TAG} playback source notify video=${source.videoId || ''} stage=${stage}`);
+    for (const listener of this.playbackExtrasListeners) {
+      try {
+        listener(source);
+      } catch (e) {
+        logger.warn(`${TAG} playback source listener failed stage=${stage}: ${e}`);
+      }
+    }
+  }
+
   static getInstance(): PlayerSession {
     if (!PlayerSession.instance) {
       PlayerSession.instance = new PlayerSession();
@@ -539,6 +550,8 @@ export class PlayerSession {
           return null;
         }
         this._submittedVideoId = videoId;
+        this._cachedVideoSource = videoSource;
+        this.notifyPlaybackSourceChanged(videoSource, 'source-ready');
         logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=source_submitted elapsed=${Date.now() - prepared.startedAt}ms`);
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
         this.startWatchSaveTimer();
@@ -616,13 +629,7 @@ export class PlayerSession {
       if (this._cachedVideoSource && this._cachedVideoSource.videoId === videoId) {
         this._cachedVideoSource = this._defaultSource;
       }
-      for (const listener of this.playbackExtrasListeners) {
-        try {
-          listener(this._cachedVideoSource || this._defaultSource);
-        } catch (e) {
-          logger.warn(`${TAG} playback extras listener failed: ${e}`);
-        }
-      }
+      this.notifyPlaybackSourceChanged(this._cachedVideoSource || this._defaultSource, 'extras-ready');
 
       const relatedItems = extras.relatedItems;
       if (relatedItems && relatedItems.length > 0) {

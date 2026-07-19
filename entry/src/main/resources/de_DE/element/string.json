@@ -1672,6 +1672,13 @@
             "name": "yt_playback_player",
             "value": "Abspieler"
         },
+        { "name": "yt_playback_gestures", "value": "Wiedergabegesten" },
+        { "name": "yt_playback_gesture_seek", "value": "Wischen zum Spulen" },
+        { "name": "yt_playback_gesture_seek_subtitle", "value": "Horizontal über das Video wischen, um die Wiedergabeposition anzusehen und zu ändern" },
+        { "name": "yt_playback_gesture_brightness", "value": "Links für Helligkeit wischen" },
+        { "name": "yt_playback_gesture_brightness_subtitle", "value": "Auf der linken Videohälfte vertikal wischen, um die Bildschirmhelligkeit anzupassen" },
+        { "name": "yt_playback_gesture_volume", "value": "Rechts für Lautstärke wischen" },
+        { "name": "yt_playback_gesture_volume_subtitle", "value": "Auf der rechten Videohälfte vertikal wischen, um die Lautstärke anzupassen" },
         {
             "name": "yt_playback_background_audio_only",
             "value": "Nur Audio im Hintergrund"
@@ -1715,6 +1722,10 @@
         {
             "name": "yt_download_concurrent_tasks",
             "value": "Gleichzeitige Downloads"
+        },
+        {
+            "name": "yt_toast_login_success",
+            "value": "Anmeldung erfolgreich"
         },
         {
             "name": "yt_login_extracting_auth",

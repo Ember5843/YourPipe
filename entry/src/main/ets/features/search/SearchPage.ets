@@ -20,6 +20,14 @@ import { HdsNavDestination } from '@kit.UIDesignKit';
 
 const logger = AppLog.getInstance('SearchPage');
 
+export class SearchPageLaunchParams {
+  initialQuery: string;
+
+  constructor(initialQuery: string = '') {
+    this.initialQuery = initialQuery;
+  }
+}
+
 @Preview
 @Component
 export struct SearchPage {
@@ -28,6 +36,7 @@ export struct SearchPage {
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @Prop initialQuery: string = '';
 
   @State query: string = '';
   @State results: SearchInfoItem[] = [];
@@ -41,6 +50,7 @@ export struct SearchPage {
   @State isResultMode: boolean = false;
   @State activeContentFilters: string[] = [];
   @State lastOptionBeforeDialog: string = '';
+  @State searchInputFocusable: boolean = this.initialQuery.trim().length === 0;
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   private isProgrammaticUpdate: boolean = false;
 
@@ -49,6 +59,8 @@ export struct SearchPage {
   private readonly GRID_GUTTER: number = 8;
   private readonly SEARCH_RESULT_SIDE_PADDING: number = 12;
   private suggestionTimer: number = -1;
+  private hasAppliedInitialQuery: boolean = false;
+  private isInitialSearchInFlight: boolean = false;
   @State selectedOption: string = 'yt_all';
   @State searchHistory: SearchHistoryItem[] = [];
   private dialogController: CustomDialogController | undefined = new CustomDialogController({
@@ -76,6 +88,16 @@ export struct SearchPage {
 
   aboutToAppear() {
     this.loadSearchHistory();
+    const initialQuery = this.initialQuery.trim();
+    if (!this.hasAppliedInitialQuery && initialQuery.length > 0) {
+      this.hasAppliedInitialQuery = true;
+      this.isProgrammaticUpdate = true;
+      this.query = initialQuery;
+      this.selectedOption = 'yt_all';
+      this.isInitialSearchInFlight = true;
+      logger.info(`auto search requested source=tag query=${initialQuery}`);
+      this.runInitialSearch();
+    }
   }
 
   aboutToDisappear() {
@@ -230,6 +252,15 @@ export struct SearchPage {
         return [SearchContentFilter.MUSIC_PLAYLISTS];
       default:
         return [SearchContentFilter.ALL];
+    }
+  }
+
+  private async runInitialSearch(): Promise<void> {
+    try {
+      await this.runSearch(true);
+    } finally {
+      this.isInitialSearchInFlight = false;
+      this.searchInputFocusable = true;
     }
   }
 
@@ -737,7 +768,8 @@ export struct SearchPage {
       .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
       .height(40)
       .layoutWeight(1)
-      .defaultFocus(true)
+      .defaultFocus(this.initialQuery.trim().length === 0)
+      .focusable(this.searchInputFocusable)
       .borderRadius(20)
       .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
       .searchIcon({
@@ -753,6 +785,10 @@ export struct SearchPage {
         autoDisable: false
       })
       .onFocus(() => {
+        if (this.isInitialSearchInFlight) {
+          logger.debug('initial tag search ignored automatic focus');
+          return;
+        }
         this.isResultMode = false;
         if (this.query.trim().length > 0) {
           this.scheduleSuggestions();

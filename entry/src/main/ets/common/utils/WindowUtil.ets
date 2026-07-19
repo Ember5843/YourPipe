@@ -57,10 +57,24 @@ export class WindowUtil {
         // Track system + cutout top separately; UI reads max as statusBarHeight.
         const topSystemVp = uiContext?.px2vp(area.topRect.height) ?? 0;
         const topCutoutVp = uiContext?.px2vp(cutoutArea.topRect.height + cutoutArea.topRect.top) ?? 0;
+        const bottomSystemVp = uiContext?.px2vp(area.bottomRect.height) ?? 0;
+        const leftSystemVp = uiContext?.px2vp(area.leftRect.width) ?? 0;
+        const rightSystemVp = uiContext?.px2vp(area.rightRect.width) ?? 0;
+        const bottomCutoutVp = uiContext?.px2vp(cutoutArea.bottomRect.height) ?? 0;
+        const leftCutoutVp = uiContext?.px2vp(cutoutArea.leftRect.width) ?? 0;
+        const rightCutoutVp = uiContext?.px2vp(cutoutArea.rightRect.width) ?? 0;
         AppStorage.setOrCreate('statusBarSystemHeight', topSystemVp);
         AppStorage.setOrCreate('statusBarCutoutHeight', topCutoutVp);
         AppStorage.setOrCreate('statusBarHeight', Math.max(topSystemVp, topCutoutVp));
-        AppStorage.setOrCreate('navBarHeight', uiContext?.px2vp(naviBarArea.bottomRect.height));
+        AppStorage.setOrCreate('systemAvoidBottom', bottomSystemVp);
+        AppStorage.setOrCreate('systemAvoidLeft', leftSystemVp);
+        AppStorage.setOrCreate('systemAvoidRight', rightSystemVp);
+        AppStorage.setOrCreate('cutoutAvoidBottom', bottomCutoutVp);
+        AppStorage.setOrCreate('cutoutAvoidLeft', leftCutoutVp);
+        AppStorage.setOrCreate('cutoutAvoidRight', rightCutoutVp);
+        AppStorage.setOrCreate('navBarHeight', uiContext?.px2vp(naviBarArea.bottomRect.height) ?? 0);
+        WindowUtil.publishPlayerGestureInsets();
+        WindowUtil.publishPlayerControlAvoidInsets();
 
         // 注册唯一的全局分发器，内部同时通知 BreakpointSystem、系统栏策略和播放页回调
         this.globalSizeChangeHandler = (size: window.Size) => {
@@ -96,17 +110,31 @@ export class WindowUtil {
     }
     if (type === window.AvoidAreaType.TYPE_SYSTEM) {
       const topSystemVp = uiContext.px2vp(area.topRect.height);
-      if (topSystemVp > 0) {
-        AppStorage.setOrCreate('statusBarSystemHeight', topSystemVp);
-      }
+      WindowUtil.setPositiveInset('statusBarSystemHeight', topSystemVp);
+      // Unlike the cached portrait status-bar height, edge avoid values must
+      // track zero as well so rotation/folding cannot retain stale side insets.
+      AppStorage.setOrCreate('systemAvoidBottom', uiContext.px2vp(area.bottomRect.height));
+      AppStorage.setOrCreate('systemAvoidLeft', uiContext.px2vp(area.leftRect.width));
+      AppStorage.setOrCreate('systemAvoidRight', uiContext.px2vp(area.rightRect.width));
       // topSystemVp === 0: bars hidden — leave last positive system height cached
       WindowUtil.publishStatusBarHeight();
     } else if (type === window.AvoidAreaType.TYPE_CUTOUT) {
       const topCutoutVp = uiContext.px2vp(area.topRect.height + area.topRect.top);
       AppStorage.setOrCreate('statusBarCutoutHeight', topCutoutVp);
+      AppStorage.setOrCreate('cutoutAvoidBottom', uiContext.px2vp(area.bottomRect.height));
+      AppStorage.setOrCreate('cutoutAvoidLeft', uiContext.px2vp(area.leftRect.width));
+      AppStorage.setOrCreate('cutoutAvoidRight', uiContext.px2vp(area.rightRect.width));
       WindowUtil.publishStatusBarHeight();
     } else if (type === window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
       AppStorage.setOrCreate('navBarHeight', uiContext.px2vp(area.bottomRect.height));
+    }
+    WindowUtil.publishPlayerGestureInsets();
+    WindowUtil.publishPlayerControlAvoidInsets();
+  }
+
+  private static setPositiveInset(key: string, value: number): void {
+    if (value > 0) {
+      AppStorage.setOrCreate(key, value);
     }
   }
 
@@ -114,6 +142,56 @@ export class WindowUtil {
     const systemH = AppStorage.get<number>('statusBarSystemHeight') ?? 0;
     const cutoutH = AppStorage.get<number>('statusBarCutoutHeight') ?? 0;
     AppStorage.setOrCreate('statusBarHeight', Math.max(systemH, cutoutH));
+  }
+
+  private static publishPlayerGestureInsets(): void {
+    const top = Math.max(
+      AppStorage.get<number>('statusBarSystemHeight') ?? 0,
+      AppStorage.get<number>('statusBarCutoutHeight') ?? 0
+    );
+    const bottom = Math.max(
+      AppStorage.get<number>('systemAvoidBottom') ?? 0,
+      AppStorage.get<number>('cutoutAvoidBottom') ?? 0,
+      AppStorage.get<number>('navBarHeight') ?? 0
+    );
+    const left = Math.max(
+      AppStorage.get<number>('systemAvoidLeft') ?? 0,
+      AppStorage.get<number>('cutoutAvoidLeft') ?? 0
+    );
+    const right = Math.max(
+      AppStorage.get<number>('systemAvoidRight') ?? 0,
+      AppStorage.get<number>('cutoutAvoidRight') ?? 0
+    );
+    AppStorage.setOrCreate('playerGestureSafeTop', Math.min(56, Math.max(24, top)));
+    AppStorage.setOrCreate('playerGestureSafeBottom', Math.min(48, Math.max(16, bottom)));
+    AppStorage.setOrCreate('playerGestureSafeLeft', Math.min(32, Math.max(16, left)));
+    AppStorage.setOrCreate('playerGestureSafeRight', Math.min(32, Math.max(16, right)));
+  }
+
+  /**
+   * Raw avoid-area values for visible player controls. Keep these separate from
+   * playerGestureSafe*: gesture insets are deliberately clamped, while controls
+   * must always clear the complete cutout / waterfall / navigation area.
+   */
+  private static publishPlayerControlAvoidInsets(): void {
+    const top = AppStorage.get<number>('statusBarCutoutHeight') ?? 0;
+    const bottom = Math.max(
+      AppStorage.get<number>('systemAvoidBottom') ?? 0,
+      AppStorage.get<number>('cutoutAvoidBottom') ?? 0,
+      AppStorage.get<number>('navBarHeight') ?? 0
+    );
+    const left = Math.max(
+      AppStorage.get<number>('systemAvoidLeft') ?? 0,
+      AppStorage.get<number>('cutoutAvoidLeft') ?? 0
+    );
+    const right = Math.max(
+      AppStorage.get<number>('systemAvoidRight') ?? 0,
+      AppStorage.get<number>('cutoutAvoidRight') ?? 0
+    );
+    AppStorage.setOrCreate('playerControlAvoidTop', top);
+    AppStorage.setOrCreate('playerControlAvoidBottom', bottom);
+    AppStorage.setOrCreate('playerControlAvoidLeft', left);
+    AppStorage.setOrCreate('playerControlAvoidRight', right);
   }
 
   setMainWindowOrientation(orientation: window.Orientation, callback?: Function): void {
@@ -234,4 +312,4 @@ export class WindowUtil {
   registerOffWindowSizeChange(): void {
     this.playerSizeChangeCallback = null;
   }
-}
+}

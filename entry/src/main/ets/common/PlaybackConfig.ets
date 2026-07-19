@@ -79,6 +79,10 @@ export function getGpuApiDisplay(value: GpuApi): Resource {
 export class PlaybackConfig {
   defaultQuality: VideoQualityCap = '480p';
   mobileQuality: VideoQualityCap = '480p';
+  /** Full-surface swipe shortcuts. Visible controls remain available when disabled. */
+  gestureSeekEnabled: boolean = true;
+  gestureBrightnessEnabled: boolean = true;
+  gestureVolumeEnabled: boolean = true;
   /** 返回键/home 键时是否自动进入画中画（设备不支持时强制 false） */
   pipOnReturn: boolean = true;
   /**
@@ -107,6 +111,9 @@ export class PlaybackConfig {
     const next = new PlaybackConfig();
     next.defaultQuality = this.defaultQuality;
     next.mobileQuality = this.mobileQuality;
+    next.gestureSeekEnabled = this.gestureSeekEnabled;
+    next.gestureBrightnessEnabled = this.gestureBrightnessEnabled;
+    next.gestureVolumeEnabled = this.gestureVolumeEnabled;
     next.pipOnReturn = this.pipOnReturn;
     next.backgroundAudioOnly = this.backgroundAudioOnly;
     next.backgroundVideoOffDelaySec = this.backgroundVideoOffDelaySec;
@@ -122,6 +129,9 @@ export class PlaybackConfig {
     const cfg = new PlaybackConfig();
     cfg.defaultQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_defaultQuality', '480p'), '480p');
     cfg.mobileQuality = normalizeQuality(PreferencesStore.getString('cfg_pb_mobileQuality', '480p'), '480p');
+    cfg.gestureSeekEnabled = PreferencesStore.getString('cfg_pb_gestureSeekEnabled', 'true') === 'true';
+    cfg.gestureBrightnessEnabled = PreferencesStore.getString('cfg_pb_gestureBrightnessEnabled', 'true') === 'true';
+    cfg.gestureVolumeEnabled = PreferencesStore.getString('cfg_pb_gestureVolumeEnabled', 'true') === 'true';
     cfg.pipOnReturn = PreferencesStore.getString('cfg_pb_pipOnReturn', 'true') === 'true';
     cfg.backgroundAudioOnly = PreferencesStore.getString('cfg_pb_backgroundAudioOnly', 'true') === 'true';
     const delay = PreferencesStore.getString('cfg_pb_backgroundVideoOffDelaySec', '15');
@@ -146,6 +156,9 @@ export class PlaybackConfig {
   static saveToPreferences(cfg: PlaybackConfig): void {
     PreferencesStore.setString('cfg_pb_defaultQuality', cfg.defaultQuality);
     PreferencesStore.setString('cfg_pb_mobileQuality', cfg.mobileQuality);
+    PreferencesStore.setString('cfg_pb_gestureSeekEnabled', cfg.gestureSeekEnabled ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_gestureBrightnessEnabled', cfg.gestureBrightnessEnabled ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_gestureVolumeEnabled', cfg.gestureVolumeEnabled ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_pipOnReturn', cfg.pipOnReturn ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_backgroundAudioOnly', cfg.backgroundAudioOnly ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_backgroundVideoOffDelaySec', cfg.backgroundVideoOffDelaySec);

@@ -1324,6 +1324,13 @@
             "name": "yt_playback_player",
             "value": "Проигрыватель"
         },
+        { "name": "yt_playback_gestures", "value": "Жесты воспроизведения" },
+        { "name": "yt_playback_gesture_seek", "value": "Перемотка свайпом" },
+        { "name": "yt_playback_gesture_seek_subtitle", "value": "Проведите по видео горизонтально для предпросмотра и смены позиции" },
+        { "name": "yt_playback_gesture_brightness", "value": "Яркость свайпом слева" },
+        { "name": "yt_playback_gesture_brightness_subtitle", "value": "Проведите вертикально по левой половине видео для настройки яркости" },
+        { "name": "yt_playback_gesture_volume", "value": "Громкость свайпом справа" },
+        { "name": "yt_playback_gesture_volume_subtitle", "value": "Проведите вертикально по правой половине видео для настройки громкости" },
         {
             "name": "yt_playback_background_audio_only",
             "value": "Только аудио в фоне"
@@ -1367,6 +1374,10 @@
         {
             "name": "yt_download_concurrent_tasks",
             "value": "Параллельные загрузки"
+        },
+        {
+            "name": "yt_toast_login_success",
+            "value": "Вход выполнен"
         },
         {
             "name": "yt_login_extracting_auth",

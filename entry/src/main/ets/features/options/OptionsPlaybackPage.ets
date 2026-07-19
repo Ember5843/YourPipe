@@ -185,6 +185,56 @@ export struct OptionsPlaybackPage {
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
         ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_playback_gestures') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_playback_gesture_seek'),
+              subtitle: $r('app.string.yt_playback_gesture_seek_subtitle'),
+              isOn: this.playbackConfig.gestureSeekEnabled,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig(cfg => cfg.gestureSeekEnabled = val);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_playback_gesture_brightness'),
+              subtitle: $r('app.string.yt_playback_gesture_brightness_subtitle'),
+              isOn: this.playbackConfig.gestureBrightnessEnabled,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig(cfg => cfg.gestureBrightnessEnabled = val);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_playback_gesture_volume'),
+              subtitle: $r('app.string.yt_playback_gesture_volume_subtitle'),
+              isOn: this.playbackConfig.gestureVolumeEnabled,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig(cfg => cfg.gestureVolumeEnabled = val);
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_playback_buffer_network') })
         }
         .padding({ left: 0, right: 0 })

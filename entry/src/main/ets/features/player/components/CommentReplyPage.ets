@@ -6,6 +6,10 @@ import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from '../../../common/components/HdsTitleBar';
+import { AppLog } from '../../../common/AppLog';
+
+const logger = AppLog.getInstance('CommentReplyPage');
+const TITLE_BAR_SAFE_HEIGHT: number = 56;
 
 @Component
 export struct CommentReplyPage {
@@ -40,6 +44,7 @@ export struct CommentReplyPage {
     }
 
     try {
+      logger.info(`loadReplies start reset=${reset} currentCount=${this.replies.length}`);
       const context = getContext(this) as common.UIAbilityContext;
       const service = YouTubePlayService.getInstance(context);
       const response: CommentResponse = await service.fetchCommentReplies(continuation);
@@ -52,8 +57,10 @@ export struct CommentReplyPage {
       }
       this.nextPageToken = response.nextPageToken;
       this.errorMessage = '';
+      logger.info(`loadReplies complete reset=${reset} loaded=${response.items.length} hasNext=${!!this.nextPageToken}`);
     } catch (e) {
       this.errorMessage = $r('app.string.yt_error_load_replies');
+      logger.error(`loadReplies failed reset=${reset}`, e as Object);
     } finally {
       this.isLoading = false;
     }
@@ -63,6 +70,11 @@ export struct CommentReplyPage {
     HdsNavDestination() {
       Column() {
         List({ scroller: this.scrollerForScroll }) {
+          ListItem() {
+            Row()
+              .width('100%')
+              .height(TITLE_BAR_SAFE_HEIGHT)
+          }
           // 父评论
           if (this.parentComment) {
             ListItem() {

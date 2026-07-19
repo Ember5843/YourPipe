@@ -236,11 +236,76 @@ export struct VideoPlayerPage {
     this.chapters = (source.chapters || []).slice();
   }
 
+  private snapshotVideoSource(source: VideoData): VideoData {
+    return {
+      mediaSource: source.mediaSource,
+      url: source.url,
+      headers: source.headers,
+      name: source.name,
+      description: source.description,
+      author: source.author,
+      channelId: source.channelId,
+      videoDescription: source.videoDescription,
+      time: source.time,
+      controller: source.controller,
+      auto: source.auto,
+      head: source.head,
+      likeCount: source.likeCount,
+      dislikeCount: source.dislikeCount,
+      commentCount: source.commentCount,
+      shareCount: source.shareCount,
+      play: source.play,
+      index: source.index,
+      width: source.width,
+      height: source.height,
+      error: source.error,
+      streams: source.streams ? source.streams.slice() : [],
+      subtitleTracks: source.subtitleTracks ? source.subtitleTracks.slice() : [],
+      chapters: source.chapters ? source.chapters.slice() : [],
+      isLive: source.isLive,
+      hlsUrl: source.hlsUrl,
+      dashMpdUrl: source.dashMpdUrl,
+      thumbnailUrl: source.thumbnailUrl,
+      videoId: source.videoId,
+      viewCount: source.viewCount,
+      publishDate: source.publishDate,
+      tags: source.tags ? source.tags.slice() : []
+    };
+  }
+
+  private createPendingVideoSource(video: VideoItem): VideoData {
+    return {
+      name: this.videoSource.name,
+      description: video.title || '',
+      author: video.author || '',
+      channelId: video.channelId || '',
+      videoDescription: '',
+      time: '00:00',
+      auto: true,
+      head: this.videoSource.head,
+      likeCount: '0',
+      dislikeCount: '0',
+      commentCount: '0',
+      shareCount: '0',
+      play: false,
+      index: 0,
+      streams: [],
+      chapters: [],
+      thumbnailUrl: video.thumbnailUrl || '',
+      videoId: video.videoId,
+      viewCount: 0,
+      publishDate: '',
+      tags: []
+    };
+  }
+
   private playbackExtrasListener = (source: VideoData): void => {
     if (!source || (this.video && source.videoId && source.videoId !== this.video.videoId)) {
       return;
     }
-    this.videoSource = source;
+    // PlayerSession updates extras in place. Publish a new identity so ArkUI
+    // refreshes view count/date even when the underlying source object is reused.
+    this.videoSource = this.snapshotVideoSource(source);
     this.syncDetailStateFromSource(source);
   };
 
@@ -332,15 +397,14 @@ export struct VideoPlayerPage {
     this.cacheThumbnail(this.video.videoId, this.video.thumbnailUrl);
 
     // 同视频已就绪：直接同步，使用缓存数据
+    const cachedSource = session.cachedVideoSource;
     if (session.currentVideo?.videoId === this.video?.videoId
-      && (session.controller.vm.isReady
-        || session.cachedVideoSource?.videoId === this.video.videoId)) {
+      && cachedSource?.videoId === this.video.videoId
+      && (session.controller.vm.isReady || cachedSource.streams !== undefined)) {
       this.controller = session.controller;
       this.vm = session.controller.vm;
-      if (session.cachedVideoSource) {
-        this.videoSource = session.cachedVideoSource;
-        this.syncDetailStateFromSource(session.cachedVideoSource);
-      }
+      this.videoSource = this.snapshotVideoSource(cachedSource);
+      this.syncDetailStateFromSource(cachedSource);
       this.isLoading = false;
       this.isVideoChanging = false;
       return;
@@ -360,17 +424,16 @@ export struct VideoPlayerPage {
       this.detailChannelId = this.video.channelId || '';
       this.detailChannelAvatarUrl = this.video.channelAvatarUrl || '';
       this.chapters = [];
+      this.videoSource = this.createPendingVideoSource(this.video);
       const newVideoSource = await session.play(this.video);
 
       this.controller = session.controller;
       this.vm = session.controller.vm;
 
       if (newVideoSource) {
-        if (!this.videoSource.videoId || this.videoSource.videoId !== newVideoSource.videoId) {
-          this.videoSource = newVideoSource;
-          session.cachedVideoSource = newVideoSource;
-          this.syncDetailStateFromSource(newVideoSource);
-        }
+        this.videoSource = this.snapshotVideoSource(newVideoSource);
+        session.cachedVideoSource = newVideoSource;
+        this.syncDetailStateFromSource(newVideoSource);
         // 画中画：首次播放时创建 PiPController，切视频时更新 contentSize（调整 PiP 窗口比例）
         const pip = PiPManager.getInstance();
         if (pip.isPiPSupported()) {
@@ -541,7 +604,7 @@ export struct VideoPlayerPage {
         .fontSize(16)
         .fontWeight(this.currentTabIndex === index ? FontWeight.Normal : FontWeight.Medium)
         .lineHeight(22)
-        .margin({ top: 17, bottom: 7 })
+        .margin({ top: 10, bottom: 5 })
       Divider()
         .width(48)
         .strokeWidth(Constants.STROKE_WIDTH)
@@ -710,7 +773,7 @@ export struct VideoPlayerPage {
       .borderRadius({ topLeft: 16, topRight: 16 })
       .barMode(BarMode.Fixed)
       .barWidth(Const.WIDTH_FULL_PERCENT)
-      .barHeight(52)
+      .barHeight(44)
       .onAnimationStart((index: number, targetIndex: number) => {
         this.currentTabIndex = targetIndex;
       })

@@ -27,7 +27,7 @@ import { VideoCard } from '../common/components/VideoCard';
 import { VideoCardGrid } from '../common/components/VideoCardGrid';
 import { HomeRecommendSwiper } from '../features/home/components/HomeRecommendSwiper';
 import { ErrorPage } from '../common/components/ErrorPage';
-import { SearchPage } from '../features/search/SearchPage';
+import { SearchPage, SearchPageLaunchParams } from '../features/search/SearchPage';
 import { SubscriptionManagePage } from '../features/subscription/SubscriptionManagePage';
 import { SubscriptionScrollCoordinator } from '../features/subscription/SubscriptionScrollCoordinator';
 import { FavoritesPage } from '../features/favorites/FavoritesPage';
@@ -754,8 +754,8 @@ struct Index {
   }
 
   private bindActionHub(): void {
-    this.actionHub.openSearch = () => {
-      this.openSearchPage();
+    this.actionHub.openSearch = (initialQuery?: string) => {
+      this.openSearchPage(initialQuery);
     };
     this.actionHub.openVideo = async (video: VideoItem, sourceHint?: PlayQueueSourceHint, audioOnly?: boolean) => {
       await this.openVideoDetail(video, sourceHint, false, audioOnly === true);
@@ -1130,9 +1130,14 @@ struct Index {
     return code.length > 0 ? `[${code}] ${message}` : message;
   }
 
-  private openSearchPage(): void {
+  private openSearchPage(initialQuery: string = ''): void {
     this.showOptions = false;
-    this.navPathStack.pushPath({ name: 'SearchPage' });
+    const normalizedQuery = initialQuery.trim();
+    logger.info(`openSearchPage: source=${normalizedQuery.length > 0 ? 'tag' : 'manual'} query=${normalizedQuery}`);
+    this.navPathStack.pushPath({
+      name: 'SearchPage',
+      param: new SearchPageLaunchParams(normalizedQuery)
+    });
   }
 
   private async openVideoDetail(
@@ -1561,9 +1566,11 @@ struct Index {
   }
 
   @Builder
-  PageMap(name: string) {
+  PageMap(name: string, param: Object) {
     if (name === 'SearchPage') {
-      SearchPage()
+      SearchPage({
+        initialQuery: (param as SearchPageLaunchParams)?.initialQuery ?? ''
+      })
     } else if (name === 'VideoDetailPage') {
       VideoDetailPage({
         video: this.selectedVideo
@@ -1897,6 +1904,15 @@ struct Index {
             this.refreshHomeAfterAuthChange();
             this.syncUserLibraryAfterLogin();
             this.popOptionsPath();
+            try {
+              this.getUIContext().getPromptAction().showToast({
+                message: $r('app.string.yt_toast_login_success'),
+                duration: 2000
+              });
+              logger.info('Login success toast shown');
+            } catch (error) {
+              logger.warn(`Login success toast failed: ${JSON.stringify(error)}`);
+            }
           },
           onCancel: () => { this.popOptionsPath(); },
           onRegisterBackHandler: (handler: () => boolean) => {

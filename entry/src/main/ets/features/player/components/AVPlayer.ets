@@ -38,8 +38,43 @@ import { PiPManager } from '../pip/PiPManager';
 import { PlayerUiViewModel } from 'mediaservice';
 import { MediaThumb } from '../../../common/components/MediaThumb';
 import { VideoItem } from 'youtube_core';
+import { PlaybackConfig } from '../../../common/PlaybackConfig';
 
 const TAG: string = '[PlayerLog][VideoPlayer]';
+const GESTURE_LOCK_DISTANCE: number = 12;
+const GESTURE_AXIS_DOMINANCE: number = 1.25;
+const CONTROLS_HIDE_DELAY: number = 3000;
+const SIDE_HINT_HIDE_DELAY: number = 800;
+const SEEK_HINT_HIDE_DELAY: number = 200;
+const DOUBLE_TAP_HINT_HIDE_DELAY: number = 800;
+const CONTROL_SLOT_SIZE: number = 40;
+const CONTROL_ICON_SIZE: number = 24;
+const SPEED_CONTROL_WIDTH: number = 48;
+const CONTROL_SIDE_MIN: number = 24;
+const CONTROL_SIDE_MAX: number = 36;
+const CONTROL_SAFE_GAP: number = 12;
+const CONTROL_VERTICAL_INSET: number = 16;
+const FULLSCREEN_VERTICAL_INSET: number = 20;
+const COMPACT_CONTROL_WIDTH: number = 360;
+const PROGRESS_MIN_WIDTH: number = 32;
+const TIMELINE_TEXT_MIN_WIDTH: number = 480;
+const TIMELINE_TEXT_MIN_HEIGHT: number = 240;
+
+enum PlayerGestureMode {
+  IDLE = 'idle',
+  PENDING = 'pending',
+  IGNORED = 'ignored',
+  SEEK = 'seek',
+  BRIGHTNESS = 'brightness',
+  VOLUME = 'volume'
+}
+
+enum PlayerInteractionKind {
+  NONE = 'none',
+  PAN = 'pan',
+  SLIDER = 'slider',
+  MENU = 'menu'
+}
 
 interface MySurfaceRect {
   offsetX: number;
@@ -55,14 +90,23 @@ export struct VideoPlayer {
   @Consume('actionHub') actionHub: ActionHub;
   @StorageProp('navBarHeight') navBarHeight: number = 0;
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
+  @StorageProp('playerGestureSafeTop') playerGestureSafeTop: number = 24;
+  @StorageProp('playerGestureSafeBottom') playerGestureSafeBottom: number = 16;
+  @StorageProp('playerGestureSafeLeft') playerGestureSafeLeft: number = 16;
+  @StorageProp('playerGestureSafeRight') playerGestureSafeRight: number = 16;
+  @StorageProp('playerControlAvoidTop') playerControlAvoidTop: number = 0;
+  @StorageProp('playerControlAvoidBottom') playerControlAvoidBottom: number = 0;
+  @StorageProp('playerControlAvoidLeft') playerControlAvoidLeft: number = 0;
+  @StorageProp('playerControlAvoidRight') playerControlAvoidRight: number = 0;
   // Index Provide fallback when Storage statusBarHeight is 0 (bars hidden / mid-rotate).
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @StorageProp('currentColorMode') currentColorMode: number = ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET;
-  @Prop @Watch('calculateSurfaceSize') isFullLandscapeScreen: boolean = false;
+  @Prop @Watch('onFullscreenModeChange') isFullLandscapeScreen: boolean = false;
   @StorageProp('playerPageVisible') @Watch('onPageVisibilityChange') isPageShow: boolean = false;
   @StorageProp('isAppBackground') @Watch('onPageVisibilityChange') isAppBackground: boolean = false;
   /** 会话级仅音频：封面层在播控之下，不挡进度条/手势 */
   @StorageLink('isAudioOnlyMode') isAudioOnlyMode: boolean = false;
+  @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageProp('selectedVideo') selectedVideo: VideoItem | null = null;
   @Prop index: number = 0;
   @Link @Watch('onSourceChange') curSource: VideoData;
@@ -109,10 +153,11 @@ export struct VideoPlayer {
       || to === PlayerState.BUFFERING
       || to === PlayerState.READY;
     this.envService.setKeepScreenOn(shouldKeepOn);
-    if (shouldKeepOn) {
+    if (to === PlayerState.PLAYING || to === PlayerState.BUFFERING) {
       this.scheduleHideControls();
     } else {
       this.clearHideTimer();
+      this.showControls = true;
     }
   }
 
@@ -159,6 +204,10 @@ export struct VideoPlayer {
       this.lastLoggedError = '';
     }
     this.hasError = errorMsg.length > 0;
+    if (this.hasError) {
+      this.clearHideTimer();
+      this.showControls = true;
+    }
   };
 
   private getErrorDisplay(errorMsg: string | undefined): string {
@@ -206,23 +255,24 @@ export struct VideoPlayer {
   @State sliderStyle: SliderStyle = SliderStyle.NONE;
   @State isSliderDragging: boolean = false;
   @State sliderDragValue: number = 0;   // 拖动时的本地同步值，避免依赖异步的 currentTime
-  @State isSliderGesture: boolean = false;
-  private panGestureIgnoredForSlider: boolean = false; // 在 onActionStart 时记录，避免 End 时的竞争条件
+  private sliderTouchCanceled: boolean = false;
   private sliderChangeDebounceTimer: number = -1; // Seek防抖定时器
   // UI auto-hide
   @State showControls: boolean = true;
   private controlsHideTimerId: number = -1;
   @State containerVpWidth: number = 0;
-  // 基于容器实际尺寸计算的比例間距（单位 vp）
-  // 手机(360vp宽): H≈ 16  V≈ 14
-  // 平板(1000vp+宽): H≈ 28  V≈ 20+
-  @State ctrlHPad: number = 20;  // 播控层左右 padding
-  @State ctrlVPad: number = 14;  // 播控层上下基础 padding
+  @State containerVpHeight: number = 0;
   // horizontal seek gesture
   @State isGestureSeek: boolean = false;
   @State gestureSeekTime: number = 0;
   private gestureSeekStartTime: number = 0;
   private panEndTime: number = 0;
+  private gestureMode: PlayerGestureMode = PlayerGestureMode.IDLE;
+  private activeInteraction: PlayerInteractionKind = PlayerInteractionKind.NONE;
+  private gestureStartX: number = 0;
+  private gestureStartY: number = 0;
+  private interactionEpoch: number = 0;
+  private seekHintHideTimerId: number = -1;
   // brightness/volume hints
   @State showBrightnessHint: boolean = false;
   @State showVolumeHint: boolean = false;
@@ -234,7 +284,6 @@ export struct VideoPlayer {
   private maxVolume: number = 15;
   private volHideTimerId: number = -1;
   private brightnessHideTimerId: number = -1;
-  private verticalGestureDir: string = 'none';
   // double-tap hints
   // Canvas context for multi-segment cache bar rendering.
   // HarmonyOS Canvas onReady 是 VoidCallback（无参数），context 通过构造时传入的对象引用获得。
@@ -266,12 +315,9 @@ export struct VideoPlayer {
   // XComponent 方式的 PiP 不迁移节点，进/出 PiP 时同一个 surface 直接投到悬浮窗，
   // surfaceId 不变，MPV 无需 detach/re-attach，避免黑帧与几何丢失。
   private x_componentController: XComponentController = new XComponentController();
-  private screenHeight: number = 0;
   private envService: PlayerEnvironmentService = new PlayerEnvironmentService();
 
   // 手势控制相关的私有变量
-  private panStartX: number = 0;
-  private panStartTime: number = 0;
 
   onFullScreenClick: (isLandscape?: boolean) => void = () => {};
   /** 当播放器内部发生不可恢复错误时，通知父组件重新获取流信息 */
@@ -329,6 +375,7 @@ export struct VideoPlayer {
   }
 
   async onSourceChange(): Promise<void> {
+    this.resetTransientUi('source-change');
     // 切换源时更新本地流状态标记
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
     this.playbackStarted = false;
@@ -346,6 +393,7 @@ export struct VideoPlayer {
    * 并重新绑定 Surface ID，防止切视频后出现黑屏或 UI 无响应。
    */
   private onControllerChanged(): void {
+    this.resetTransientUi('controller-change');
     // 1. 从旧 controller 移除监听器
     if (this.lastController && this.lastController !== this.controller) {
       this.lastController.unsubscribeProgress(this.progressListener);
@@ -402,6 +450,7 @@ export struct VideoPlayer {
     PlayerPresentation.onPlayerPageVisibility(isVisible);
 
     if (!isVisible) {
+      this.resetTransientUi('page-hidden');
       return;
     }
 
@@ -424,6 +473,8 @@ export struct VideoPlayer {
     }
 
     this.syncPlaybackStateFromController();
+    this.showControls = true;
+    this.scheduleHideControls();
   }
 
   async aboutToAppear(): Promise<void> {
@@ -443,7 +494,6 @@ export struct VideoPlayer {
     this.gestureBrightnessValue = brightness;
     const volInfo = this.envService.getVolume();
     this.gestureVolumeValue = volInfo.volume / volInfo.maxVolume;
-    this.screenHeight = AppStorage.get<number>('deviceHeight') || 0;
 
     // 注册进度监听（节流后的 currentTime/durationTime）
     this.controller.subscribeProgress(this.progressListener);
@@ -518,10 +568,18 @@ export struct VideoPlayer {
   // ── UI 自动隐藏 ──
   private scheduleHideControls(): void {
     this.clearHideTimer();
+    if (!this.showControls || this.activeInteraction !== PlayerInteractionKind.NONE ||
+      !this.isPageShow || this.isAppBackground || !this.canAutoHideControls()) {
+      return;
+    }
+    const epoch = this.interactionEpoch;
     this.controlsHideTimerId = setTimeout(() => {
-      this.showControls = false;
       this.controlsHideTimerId = -1;
-    }, 3000);
+      if (epoch === this.interactionEpoch && this.activeInteraction === PlayerInteractionKind.NONE &&
+        this.isPageShow && !this.isAppBackground && this.canAutoHideControls()) {
+        this.showControls = false;
+      }
+    }, CONTROLS_HIDE_DELAY);
   }
 
   private clearHideTimer(): void {
@@ -532,8 +590,282 @@ export struct VideoPlayer {
   }
 
   private onCenterTap(): void {
+    this.interactionEpoch++;
+    this.clearHideTimer();
+    if (!this.canAutoHideControls()) {
+      this.showControls = true;
+      return;
+    }
     this.showControls = !this.showControls;
     if (this.showControls) { this.scheduleHideControls(); } else { this.clearHideTimer(); }
+  }
+
+  private canAutoHideControls(): boolean {
+    if (!this.controller || this.hasError) {
+      return false;
+    }
+    const state = this.controller.getPlaybackState();
+    return state.isPlaying || state.isBuffering || state.engineState === 'buffering';
+  }
+
+  private beginInteraction(kind: PlayerInteractionKind): void {
+    this.interactionEpoch++;
+    this.clearHideTimer();
+    this.clearTransientHintTimers();
+    this.showBrightnessHint = false;
+    this.showVolumeHint = false;
+    this.isGestureSeek = false;
+    this.showForwardHint = false;
+    this.showBackwardHint = false;
+    this.activeInteraction = kind;
+    this.showControls = true;
+  }
+
+  private clearTransientHintTimers(): void {
+    if (this.seekHintHideTimerId >= 0) {
+      clearTimeout(this.seekHintHideTimerId);
+      this.seekHintHideTimerId = -1;
+    }
+    if (this.volHideTimerId >= 0) {
+      clearTimeout(this.volHideTimerId);
+      this.volHideTimerId = -1;
+    }
+    if (this.brightnessHideTimerId >= 0) {
+      clearTimeout(this.brightnessHideTimerId);
+      this.brightnessHideTimerId = -1;
+    }
+    if (this.forwardHintTimerId >= 0) {
+      clearTimeout(this.forwardHintTimerId);
+      this.forwardHintTimerId = -1;
+    }
+    if (this.backwardHintTimerId >= 0) {
+      clearTimeout(this.backwardHintTimerId);
+      this.backwardHintTimerId = -1;
+    }
+  }
+
+  private resetTransientUi(reason: string): void {
+    this.interactionEpoch++;
+    this.clearHideTimer();
+    this.clearTransientHintTimers();
+    if (this.sliderChangeDebounceTimer >= 0) {
+      clearTimeout(this.sliderChangeDebounceTimer);
+      this.sliderChangeDebounceTimer = -1;
+    }
+    this.gestureMode = PlayerGestureMode.IDLE;
+    this.activeInteraction = PlayerInteractionKind.NONE;
+    this.isGestureSeek = false;
+    this.showBrightnessHint = false;
+    this.showVolumeHint = false;
+    this.showForwardHint = false;
+    this.showBackwardHint = false;
+    this.isSliderDragging = false;
+    this.trackThicknessSize = CommonConstants.TRACK_SIZE_MIN;
+    this.sliderStyle = SliderStyle.NONE;
+    this.showControls = true;
+    Logger.debug(TAG, `Transient UI reset reason=${reason}`);
+  }
+
+  private onFullscreenModeChange(): void {
+    this.resetTransientUi('fullscreen-change');
+    this.calculateSurfaceSize();
+  }
+
+  private isInFullscreenGestureSafeEdge(x: number, y: number): boolean {
+    if (!this.isFullLandscapeScreen) {
+      return false;
+    }
+    const top = Math.max(this.playerGestureSafeTop, this.safeAreaTop);
+    return x <= this.playerGestureSafeLeft || x >= this.containerVpWidth - this.playerGestureSafeRight ||
+      y <= top || y >= this.containerVpHeight - this.playerGestureSafeBottom;
+  }
+
+  private ignorePlayerPan(reason: string): void {
+    this.gestureMode = PlayerGestureMode.IGNORED;
+    this.isGestureSeek = false;
+    this.showBrightnessHint = false;
+    this.showVolumeHint = false;
+    Logger.debug(TAG, `Player pan ignored reason=${reason}`);
+  }
+
+  private onPlayerPanStart(event: GestureEvent): void {
+    if (this.isSliderDragging) {
+      this.gestureMode = PlayerGestureMode.IGNORED;
+      Logger.debug(TAG, 'Player pan ignored reason=slider-dragging-start');
+      return;
+    }
+    this.beginInteraction(PlayerInteractionKind.PAN);
+    this.gestureMode = PlayerGestureMode.PENDING;
+    const finger = event.fingerList[0];
+    this.gestureStartX = (finger?.localX ?? 0) - event.offsetX;
+    this.gestureStartY = (finger?.localY ?? 0) - event.offsetY;
+    this.gestureSeekStartTime = this.currentTime;
+    this.gestureSeekTime = this.currentTime;
+    this.panEndTime = this.currentTime;
+    if (event.fingerList.length !== 1) {
+      this.ignorePlayerPan('finger-count');
+    } else if (this.isInFullscreenGestureSafeEdge(this.gestureStartX, this.gestureStartY)) {
+      this.ignorePlayerPan('system-safe-edge');
+    }
+  }
+
+  private lockPlayerPanMode(event: GestureEvent): void {
+    const absX = Math.abs(event.offsetX);
+    const absY = Math.abs(event.offsetY);
+    if (Math.max(absX, absY) < GESTURE_LOCK_DISTANCE) {
+      return;
+    }
+    if (absX >= absY * GESTURE_AXIS_DOMINANCE) {
+      const state = this.controller.getPlaybackState();
+      if (!this.playbackConfig.gestureSeekEnabled || this.curSource.isLive || this.durationTime <= 0 ||
+        !state.isSeekable) {
+        this.ignorePlayerPan(this.playbackConfig.gestureSeekEnabled ? 'seek-unavailable' : 'seek-disabled');
+        return;
+      }
+      this.gestureMode = PlayerGestureMode.SEEK;
+      this.isGestureSeek = true;
+      Logger.debug(TAG, 'Player pan locked mode=seek');
+      return;
+    }
+    if (absY < absX * GESTURE_AXIS_DOMINANCE) {
+      return;
+    }
+    if (this.gestureStartX < this.containerVpWidth / 2) {
+      if (!this.playbackConfig.gestureBrightnessEnabled) {
+        this.ignorePlayerPan('brightness-disabled');
+        return;
+      }
+      try {
+        const context: Context = this.getUIContext().getHostContext() as Context;
+        this.gestureBrightnessValue = this.envService.getBrightnessSync(context);
+      } catch (e) {
+        Logger.warn(TAG, `Brightness gesture baseline fallback reason=${e}`);
+      }
+      this.gestureInitValue = this.gestureBrightnessValue;
+      this.gestureMode = PlayerGestureMode.BRIGHTNESS;
+      this.showBrightnessHint = true;
+      Logger.debug(TAG, 'Player pan locked mode=brightness');
+    } else {
+      if (!this.playbackConfig.gestureVolumeEnabled) {
+        this.ignorePlayerPan('volume-disabled');
+        return;
+      }
+      try {
+        const volInfo = this.envService.getVolume();
+        this.maxVolume = volInfo.maxVolume;
+        this.gestureVolumeValue = volInfo.maxVolume > 0 ? volInfo.volume / volInfo.maxVolume : 0;
+      } catch (e) {
+        Logger.warn(TAG, `Volume gesture baseline fallback reason=${e}`);
+      }
+      this.gestureInitValue = this.gestureVolumeValue;
+      this.gestureMode = PlayerGestureMode.VOLUME;
+      this.showVolumeHint = true;
+      Logger.debug(TAG, 'Player pan locked mode=volume');
+    }
+  }
+
+  private onPlayerPanUpdate(event: GestureEvent): void {
+    if (this.isSliderDragging || this.activeInteraction === PlayerInteractionKind.SLIDER) {
+      this.ignorePlayerPan('slider-dragging-update');
+      return;
+    }
+    if (event.fingerList.length !== 1) {
+      this.ignorePlayerPan('finger-count-update');
+      return;
+    }
+    if (this.gestureMode === PlayerGestureMode.PENDING) {
+      this.lockPlayerPanMode(event);
+    }
+    if (this.gestureMode === PlayerGestureMode.SEEK) {
+      const seekWidth = Math.max(1, this.containerVpWidth);
+      const time = this.gestureSeekStartTime + (event.offsetX / seekWidth) * this.durationTime;
+      this.gestureSeekTime = Math.min(Math.max(0, time), this.durationTime);
+      this.panEndTime = this.gestureSeekTime;
+    } else if (this.gestureMode === PlayerGestureMode.BRIGHTNESS) {
+      const value = Math.min(1, Math.max(0, this.gestureInitValue + (-event.offsetY / 200)));
+      this.gestureBrightnessValue = value;
+      this.envService.setBrightness(value);
+      this.gestureBrightnessIcon = value > 0.3 ? $r('sys.symbol.sun_max_fill') : $r('sys.symbol.moon_fill');
+    } else if (this.gestureMode === PlayerGestureMode.VOLUME) {
+      const value = Math.min(1, Math.max(0, this.gestureInitValue + (-event.offsetY / 200)));
+      this.gestureVolumeValue = value;
+      this.envService.setVolume(Math.round(value * this.maxVolume));
+      this.gestureVolumeIcon = value > 0.5 ? $r('sys.symbol.speaker_wave_3_fill') :
+        (value > 0 ? $r('sys.symbol.speaker_wave_1_fill') : $r('sys.symbol.speaker_slash_fill'));
+    }
+  }
+
+  private onPlayerPanEnd(canceled: boolean): void {
+    const mode = this.gestureMode;
+    const epoch = this.interactionEpoch;
+    if (!canceled && mode === PlayerGestureMode.SEEK) {
+      this.controller.syncSeek(this.panEndTime * 1000);
+      Logger.debug(TAG, `Player pan seek committed positionMs=${Math.round(this.panEndTime * 1000)}`);
+    } else if (canceled && mode !== PlayerGestureMode.IDLE) {
+      Logger.debug(TAG, `Player pan canceled mode=${mode}`);
+    }
+    this.gestureMode = PlayerGestureMode.IDLE;
+    if (this.activeInteraction === PlayerInteractionKind.PAN) {
+      this.activeInteraction = PlayerInteractionKind.NONE;
+    }
+    if (mode === PlayerGestureMode.SEEK) {
+      if (canceled) {
+        this.isGestureSeek = false;
+      } else {
+        this.seekHintHideTimerId = setTimeout(() => {
+          this.seekHintHideTimerId = -1;
+          if (epoch === this.interactionEpoch) {
+            this.isGestureSeek = false;
+          }
+        }, SEEK_HINT_HIDE_DELAY);
+      }
+    } else if (mode === PlayerGestureMode.BRIGHTNESS) {
+      if (canceled) {
+        this.showBrightnessHint = false;
+      } else {
+        this.brightnessHideTimerId = setTimeout(() => {
+          this.brightnessHideTimerId = -1;
+          if (epoch === this.interactionEpoch) {
+            this.showBrightnessHint = false;
+          }
+        }, SIDE_HINT_HIDE_DELAY);
+      }
+    } else if (mode === PlayerGestureMode.VOLUME) {
+      if (canceled) {
+        this.showVolumeHint = false;
+      } else {
+        this.volHideTimerId = setTimeout(() => {
+          this.volHideTimerId = -1;
+          if (epoch === this.interactionEpoch) {
+            this.showVolumeHint = false;
+          }
+        }, SIDE_HINT_HIDE_DELAY);
+      }
+    }
+    this.scheduleHideControls();
+  }
+
+  private registerDoubleTapActivity(): number {
+    this.beginInteraction(PlayerInteractionKind.NONE);
+    this.scheduleHideControls();
+    return this.interactionEpoch;
+  }
+
+  private registerControlActivity(): void {
+    this.beginInteraction(PlayerInteractionKind.NONE);
+    this.scheduleHideControls();
+  }
+
+  private onControlMenuAppear(): void {
+    this.beginInteraction(PlayerInteractionKind.MENU);
+  }
+
+  private onControlMenuDisappear(): void {
+    if (this.activeInteraction === PlayerInteractionKind.MENU) {
+      this.activeInteraction = PlayerInteractionKind.NONE;
+    }
+    this.interactionEpoch++;
+    this.scheduleHideControls();
   }
 
   private calculateSurfaceSizeByArea(width: number, height: number): void {
@@ -609,6 +941,7 @@ export struct VideoPlayer {
   }
 
   private togglePlayback() {
+    this.registerControlActivity();
     if (!this.vm.isReady || !this.hasStreams) {
       Logger.warn(TAG, `togglePlayback ignored: isReady=${this.vm.isReady}, hasStreams=${this.hasStreams}`);
       return;
@@ -639,6 +972,8 @@ export struct VideoPlayer {
           })
       })
     }
+    .onAppear(() => this.onControlMenuAppear())
+    .onDisAppear(() => this.onControlMenuDisappear())
     .backgroundColor($r('app.color.yourtube_bg_surface'))
     .borderRadius(12)
     .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
@@ -673,6 +1008,8 @@ export struct VideoPlayer {
           })
       }, (track: SubtitleTrack) => track.url)
     }
+    .onAppear(() => this.onControlMenuAppear())
+    .onDisAppear(() => this.onControlMenuDisappear())
     .backgroundColor($r('app.color.yourtube_bg_surface'))
     .borderRadius(12)
     .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
@@ -697,6 +1034,8 @@ export struct VideoPlayer {
           })
       }, (chapter: ChapterInfo, index: number) => `${chapter.startTimeSeconds}_${index}`)
     }
+    .onAppear(() => this.onControlMenuAppear())
+    .onDisAppear(() => this.onControlMenuDisappear())
     .backgroundColor($r('app.color.yourtube_bg_surface'))
     .borderRadius(12)
     .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
@@ -721,6 +1060,8 @@ export struct VideoPlayer {
       }, (stream: StreamInfo, index: number) =>
         `${stream.itag ?? ''}_${stream.audioTrackId || ''}_${stream.sourceClient || ''}_${index}`)
     }
+    .onAppear(() => this.onControlMenuAppear())
+    .onDisAppear(() => this.onControlMenuDisappear())
     .backgroundColor($r('app.color.yourtube_bg_surface'))
     .borderRadius(12)
     .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
@@ -745,6 +1086,8 @@ export struct VideoPlayer {
       }, (entry: VideoEntry, index: number) =>
         `${entry.stream.itag ?? ''}_${entry.stream.audioTrackId || ''}_${entry.stream.sourceClient || ''}_${index}`)
     }
+    .onAppear(() => this.onControlMenuAppear())
+    .onDisAppear(() => this.onControlMenuDisappear())
     .backgroundColor($r('app.color.yourtube_bg_surface'))
     .borderRadius(12)
     .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
@@ -798,20 +1141,66 @@ export struct VideoPlayer {
     return selected;
   }
 
+  private getControlComfortSidePad(): number {
+    return Math.min(CONTROL_SIDE_MAX,
+      Math.max(CONTROL_SIDE_MIN, Math.round(this.containerVpWidth * 0.035)));
+  }
+
+  private getControlLeftPad(): number {
+    const comfort = this.getControlComfortSidePad();
+    return this.isFullLandscapeScreen
+      ? Math.max(comfort, this.playerControlAvoidLeft + CONTROL_SAFE_GAP)
+      : comfort;
+  }
+
+  private getControlRightPad(): number {
+    const comfort = this.getControlComfortSidePad();
+    return this.isFullLandscapeScreen
+      ? Math.max(comfort, this.playerControlAvoidRight + CONTROL_SAFE_GAP)
+      : comfort;
+  }
+
+  private getControlTopPad(): number {
+    return this.isFullLandscapeScreen
+      ? Math.max(FULLSCREEN_VERTICAL_INSET, this.playerControlAvoidTop + CONTROL_SAFE_GAP)
+      : CONTROL_VERTICAL_INSET;
+  }
+
+  private getControlBottomPad(): number {
+    return this.isFullLandscapeScreen
+      ? Math.max(FULLSCREEN_VERTICAL_INSET, this.navBarHeight + CONTROL_SAFE_GAP,
+        this.playerControlAvoidBottom + CONTROL_SAFE_GAP)
+      : CONTROL_VERTICAL_INSET;
+  }
+
+  private getControlItemGap(): number {
+    return this.containerVpWidth > 0 && this.containerVpWidth < COMPACT_CONTROL_WIDTH ? 4 : 8;
+  }
+
+  private getTimeLabelWidth(): number {
+    const durationText = secondToTime(Math.floor(Math.max(0, this.durationTime)));
+    if (durationText.length > 8) {
+      return 80;
+    }
+    if (durationText.length > 5) {
+      return 64;
+    }
+    return 48;
+  }
+
+  private getCombinedTimeLabelWidth(): number {
+    return this.getTimeLabelWidth() * 2 + 12;
+  }
+
   /**
-   * Immersive fullscreen top pad.
-   *
-   * Do NOT use AppStorage statusBarHeight here: WindowUtil keeps the last
-   * positive TYPE_SYSTEM height after bars hide (for portrait restore). That
-   * portrait cache (~40–50vp) is wrong in landscape immersive — notch moves
-   * to the side, top should only clear cutout/rounded corner.
-   *
-   * Use TYPE_CUTOUT top only + base pad (0 when no top cutout).
+   * Timeline labels are optional chrome. Base compact mode on the player
+   * surface itself, not the physical device/window, so split-screen, folding
+   * and embedded portrait players all give their limited width to the slider.
    */
-  private getFullscreenTopPad(): number {
-    const cutoutH = AppStorage.get<number>('statusBarCutoutHeight') ?? 0;
-    const topInset = cutoutH > 0 ? cutoutH : 0;
-    return topInset + this.ctrlVPad;
+  private shouldShowTimelineText(): boolean {
+    return !this.curSource.isLive
+      && this.containerVpWidth >= TIMELINE_TEXT_MIN_WIDTH
+      && this.containerVpHeight >= TIMELINE_TEXT_MIN_HEIGHT;
   }
 
   @Builder
@@ -952,6 +1341,7 @@ export struct VideoPlayer {
             .borderRadius(18)
             .margin({ top: 8 })
             .onClick(() => {
+              this.registerControlActivity();
               this.hasError = false;
               this.isWaitingForDualBuffer = false;
               if (this.onRetry) {
@@ -991,69 +1381,6 @@ export struct VideoPlayer {
         .zIndex(CommonConstants.Z_INDEX_BASE + 2.5)
         .hitTestBehavior(HitTestMode.None)
       }
-
-      // 左右垂直手势层（独立绑定，避免与 Horizontal PanGesture 竞争）
-      Row() {
-        Column()
-          .width('50%').height('100%')
-          .gesture(
-            PanGesture({ direction: PanDirection.Vertical })
-              .onActionStart((_event: GestureEvent) => {
-                this.scheduleHideControls();
-                this.verticalGestureDir = 'brightness';
-                try {
-                  const context: Context = this.getUIContext().getHostContext() as Context;
-                  this.gestureBrightnessValue = this.envService.getBrightnessSync(context);
-                } catch (_e) {
-                  // 读取失败时保留上次缓存值，不影响手势逻辑
-                }
-                this.gestureInitValue = this.gestureBrightnessValue;
-                this.showBrightnessHint = true;
-              })
-              .onActionUpdate((event: GestureEvent) => {
-                const v: number = Math.min(1, Math.max(0, this.gestureInitValue + (-event.offsetY / 200)));
-                this.gestureBrightnessValue = v;
-                this.envService.setBrightness(v);
-                this.gestureBrightnessIcon = v > 0.3 ? $r('sys.symbol.sun_max_fill') : $r('sys.symbol.moon_fill');
-              })
-              .onActionEnd((_e: GestureEvent) => {
-                clearTimeout(this.brightnessHideTimerId);
-                this.brightnessHideTimerId = setTimeout(() => { this.showBrightnessHint = false; }, 2000);
-                this.verticalGestureDir = 'none';
-              })
-          )
-        Column()
-          .width('50%').height('100%')
-          .gesture(
-            PanGesture({ direction: PanDirection.Vertical })
-              .onActionStart((_event: GestureEvent) => {
-                this.scheduleHideControls();
-                this.verticalGestureDir = 'volume';
-                try {
-                  const volInfo = this.envService.getVolume();
-                  this.gestureVolumeValue = volInfo.volume / volInfo.maxVolume;
-                } catch (_e) {
-                  // 读取失败时保留上次缓存值，不影响手势逻辑
-                }
-                this.gestureInitValue = this.gestureVolumeValue;
-                this.showVolumeHint = true;
-              })
-              .onActionUpdate((event: GestureEvent) => {
-                const v: number = Math.min(1, Math.max(0, this.gestureInitValue + (-event.offsetY / 200)));
-                this.gestureVolumeValue = v;
-                this.envService.setVolume(Math.round(v * this.envService.getVolume().maxVolume));
-                this.gestureVolumeIcon = v > 0.5 ? $r('sys.symbol.speaker_wave_3_fill') : (v > 0 ? $r('sys.symbol.speaker_wave_1_fill') : $r('sys.symbol.speaker_slash_fill'));
-              })
-              .onActionEnd((_e: GestureEvent) => {
-                clearTimeout(this.volHideTimerId);
-                this.volHideTimerId = setTimeout(() => { this.showVolumeHint = false; }, 2000);
-                this.verticalGestureDir = 'none';
-              })
-          )
-      }
-      .width('100%').height('100%')
-      .hitTestBehavior(HitTestMode.Transparent)
-      .zIndex(10)
 
       // 2. 手势提示层
       RelativeContainer() {
@@ -1121,66 +1448,58 @@ export struct VideoPlayer {
     .onSizeChange((_old: SizeOptions, newSize: SizeOptions) => {
       const w = newSize.width as number;
       const h = newSize.height as number;
+      if (this.containerVpWidth > 0 && this.containerVpHeight > 0 &&
+        (this.containerVpWidth !== w || this.containerVpHeight !== h)) {
+        this.resetTransientUi('container-size-change');
+      }
       this.containerVpWidth = w;
-      // 按容器实际尺寸计算比例間距，手机和平板自适应
-      // 横向：3% 宽度，不超过 32vp，不小于 16vp
-      this.ctrlHPad = Math.min(32, Math.max(16, Math.round(w * 0.03)));
-      // 竖向：3% 高度，不超过 16vp，不小于 8vp
-      this.ctrlVPad = Math.min(16, Math.max(8, Math.round(h * 0.03)));
+      this.containerVpHeight = h;
+      Logger.debug(TAG, `Control layout size=${Math.round(w)}x${Math.round(h)} fullscreen=${this.isFullLandscapeScreen}`);
     })
     .parallelGesture(
       GestureGroup(GestureMode.Exclusive,
         TapGesture({ count: 2, fingers: 1 })
           .onAction((event: GestureEvent) => {
-            this.scheduleHideControls();
+            const epoch = this.registerDoubleTapActivity();
             const x: number = event.fingerList[0]?.localX ?? 0;
             if (x > this.containerVpWidth / 2) {
               Logger.info(TAG, 'Double-tap forward +15s');
               this.controller.syncSeek(Math.min(this.currentTime + 15, this.durationTime) * 1000);
-              clearTimeout(this.forwardHintTimerId);
               this.showForwardHint = true;
-              this.forwardHintTimerId = setTimeout(() => { this.showForwardHint = false; }, 800);
+              this.forwardHintTimerId = setTimeout(() => {
+                this.forwardHintTimerId = -1;
+                if (epoch === this.interactionEpoch) {
+                  this.showForwardHint = false;
+                }
+              }, DOUBLE_TAP_HINT_HIDE_DELAY);
             } else {
               Logger.info(TAG, 'Double-tap backward -15s');
               this.controller.syncSeek(Math.max(this.currentTime - 15, 0) * 1000);
-              clearTimeout(this.backwardHintTimerId);
               this.showBackwardHint = true;
-              this.backwardHintTimerId = setTimeout(() => { this.showBackwardHint = false; }, 800);
+              this.backwardHintTimerId = setTimeout(() => {
+                this.backwardHintTimerId = -1;
+                if (epoch === this.interactionEpoch) {
+                  this.showBackwardHint = false;
+                }
+              }, DOUBLE_TAP_HINT_HIDE_DELAY);
             }
           }),
         TapGesture({ count: 1, fingers: 1 })
           .onAction((_event: GestureEvent) => {
             this.onCenterTap();
           }),
-        PanGesture({ direction: PanDirection.Horizontal })
+        PanGesture({ direction: PanDirection.All, fingers: 1, distance: 8 })
           .onActionStart((_e: GestureEvent) => {
-            // 在 Start 时记录是否因 Slider 拖动而忙略，该标记会持续到 End
-            if (this.isSliderDragging) {
-              this.panGestureIgnoredForSlider = true;
-              return;
-            }
-            this.panGestureIgnoredForSlider = false;
-            this.scheduleHideControls();
-            this.isGestureSeek = true;
-            this.gestureSeekStartTime = this.currentTime;
+            this.onPlayerPanStart(_e);
           })
           .onActionUpdate((event: GestureEvent) => {
-            if (this.panGestureIgnoredForSlider) { return; }
-            const seekWidth = Math.max(1, this.containerVpWidth);
-            const t = this.gestureSeekStartTime + (event.offsetX / seekWidth) * this.durationTime;
-            this.gestureSeekTime = Math.min(Math.max(0, t), this.durationTime);
-            this.panEndTime = this.gestureSeekTime;
+            this.onPlayerPanUpdate(event);
           })
           .onActionEnd((_e: GestureEvent) => {
-            if (this.panGestureIgnoredForSlider) {
-              // 本次 PanGesture 属于 Slider 拖动的伴随手势，不执行 seek
-              this.panGestureIgnoredForSlider = false;
-              this.isGestureSeek = false;
-              return;
-            }
-            // 空白区域横滑：独立调用 syncSeek
-            this.controller.syncSeek(this.panEndTime * 1000);
-            this.isGestureSeek = false;
+            this.onPlayerPanEnd(false);
+          })
+          .onActionCancel((_e: GestureEvent) => {
+            this.onPlayerPanEnd(true);
           })
       )
     )
@@ -1189,10 +1508,14 @@ export struct VideoPlayer {
   @Builder
   TopControl() {
     Row() {
-      SymbolGlyph($r('sys.symbol.xmark'))
-        .width(24)
-        .height(24)
-        .fontColor([Color.White])
+      Stack({ alignContent: Alignment.Center }) {
+        SymbolGlyph($r('sys.symbol.xmark'))
+          .fontSize(CONTROL_ICON_SIZE)
+          .fontWeight(FontWeight.Medium)
+          .fontColor([Color.White])
+      }
+        .width(CONTROL_SLOT_SIZE)
+        .height(CONTROL_SLOT_SIZE)
         .onClick(() => {
           PlayerSession.getInstance().release();
           this.actionHub.closePage();
@@ -1201,41 +1524,49 @@ export struct VideoPlayer {
       Blank()
 
       // 右侧操作栏：入口统一使用 SymbolGlyph，展开后使用 Menu。
-      Row({ space: 8 }) {
+      Row({ space: this.getControlItemGap() }) {
         if (this.chapters.length > 0) {
-          SymbolGlyph($r('sys.symbol.list_bullet_square'))
-            .fontSize(24)
-            .fontColor([Color.White])
-            .width(40)
-            .height(40)
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.list_bullet_square'))
+              .fontSize(CONTROL_ICON_SIZE)
+              .fontColor([Color.White])
+          }
+            .width(SPEED_CONTROL_WIDTH)
+            .height(CONTROL_SLOT_SIZE)
             .accessibilityText($r('app.string.yt_player_chapters'))
             .bindMenu(this.ChapterMenu())
         }
 
         if (this.vm.subtitleTracks.length > 0) {
-          SymbolGlyph($r('sys.symbol.AI_subtitles'))
-            .fontSize(24)
-            .fontColor([Color.White])
-            .width(40)
-            .height(40)
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.AI_subtitles'))
+              .fontSize(CONTROL_ICON_SIZE)
+              .fontColor([Color.White])
+          }
+            .width(SPEED_CONTROL_WIDTH)
+            .height(CONTROL_SLOT_SIZE)
             .bindMenu(this.SubtitleMenu())
         }
 
         if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
-          SymbolGlyph($r('sys.symbol.speaker_wave_2'))
-            .fontSize(24)
-            .fontColor([Color.White])
-            .width(40)
-            .height(40)
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.speaker_wave_2'))
+              .fontSize(CONTROL_ICON_SIZE)
+              .fontColor([Color.White])
+          }
+            .width(SPEED_CONTROL_WIDTH)
+            .height(CONTROL_SLOT_SIZE)
             .bindMenu(this.AudioMenu())
         }
 
         if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
-          SymbolGlyph($r('sys.symbol.resolution_video'))
-            .fontSize(24)
-            .fontColor([Color.White])
-            .width(40)
-            .height(40)
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.resolution_video'))
+              .fontSize(CONTROL_ICON_SIZE)
+              .fontColor([Color.White])
+          }
+            .width(SPEED_CONTROL_WIDTH)
+            .height(CONTROL_SLOT_SIZE)
             .bindMenu(this.VideoMenu())
         }
 
@@ -1244,22 +1575,23 @@ export struct VideoPlayer {
           .fontSize(16)
           .fontColor(Color.White)
           .fontWeight(FontWeight.Medium)
-          .height(40)
-          .padding({ left: 6, right: 6 })
+          .width(SPEED_CONTROL_WIDTH)
+          .height(CONTROL_SLOT_SIZE)
+          .maxLines(1)
+          .textAlign(TextAlign.Center)
           .bindMenu(this.SpeedMenu())
       }
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    // 顶部间距：
-    // 竖屏非沉浸——PlayerPage 已用 topSafeInset 下移视频区，这里只需 ctrlVPad
-    // 沉浸全屏——只加顶部 cutout（横屏通常为 0）+ ctrlVPad，勿用缓存的竖屏状态栏高
+    .alignItems(VerticalAlign.Center)
+    // 非沉浸模式由 PlayerPage 负责状态栏安全区，这里保留舒适边距。
+    // 沉浸全屏只使用当前挖孔避让值，不复用缓存的竖屏状态栏高度。
     .padding({
-      left: this.ctrlHPad,
-      right: this.ctrlHPad,
-      top: this.isFullLandscapeScreen
-           ? this.getFullscreenTopPad()
-           : this.ctrlVPad,
-      bottom: this.ctrlVPad
+      left: this.getControlLeftPad(),
+      right: this.getControlRightPad(),
+      top: this.getControlTopPad(),
+      bottom: CONTROL_VERTICAL_INSET
     })
     .linearGradient({
       direction: GradientDirection.Bottom,
@@ -1272,22 +1604,18 @@ export struct VideoPlayer {
 
   @Builder
   PlayControl() {
-    Row({ space: 8 }) {
+    Row({ space: this.getControlItemGap() }) {
       // 播放/暂停按鈕：正在播放或缓冲中时显示暂停图标，其他状态显示播放图标
-      SymbolGlyph(this.vm.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
-        .fontSize(24).width(24).height(24)
-        .fontColor([Color.White])
+      Stack({ alignContent: Alignment.Center }) {
+        SymbolGlyph(this.vm.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
+          .fontSize(CONTROL_ICON_SIZE)
+          .fontColor([Color.White])
+      }
+        .width(CONTROL_SLOT_SIZE)
+        .height(CONTROL_SLOT_SIZE)
         .opacity(this.vm.isReady && this.hasStreams ? 1 : 0.4)
         .enabled(this.vm.isReady && this.hasStreams && !this.vm.isBuffering)
         .onClick(() => this.togglePlayback())
-
-      Text(secondToTime(Math.floor(
-        this.isSliderDragging ? this.sliderDragValue
-          : this.isGestureSeek ? this.gestureSeekTime
-          : this.currentTime
-      )))
-        .fontColor(Color.White).fontSize(13).width(48).textAlign(TextAlign.Center)
-        .visibility(this.curSource.isLive ? Visibility.None : Visibility.Visible)
 
       if (this.curSource.isLive) {
         Row({ space: 6 }) {
@@ -1296,12 +1624,15 @@ export struct VideoPlayer {
             .fontColor(Color.White).fontSize(13).fontWeight(FontWeight.Medium)
         }
         .layoutWeight(1)
+        .height(CONTROL_SLOT_SIZE)
         .justifyContent(FlexAlign.Center)
+        .alignItems(VerticalAlign.Center)
       } else {
-        Stack({ alignContent: Alignment.Start }) {
+        Stack({ alignContent: Alignment.Center }) {
           // 轨道底层：透明 Slider 提供轨道几何（起点缩进、高度等），仅用于对齐
           Slider({ value: 0, max: 100, style: this.sliderStyle })
             .width('100%')
+            .height(CONTROL_SLOT_SIZE)
             .trackColor('#33FFFFFF')       // 未缓存区底色（20%白）
             .selectedColor(Color.Transparent)
             .blockColor(Color.Transparent)
@@ -1325,32 +1656,53 @@ export struct VideoPlayer {
               max: this.durationTime,
               style: this.sliderStyle
             })
-            .width('100%').trackColor(Color.Transparent).selectedColor(Color.White)
+            .width('100%').height(CONTROL_SLOT_SIZE)
+            .trackColor(Color.Transparent).selectedColor(Color.White)
             .trackThickness(this.trackThicknessSize).enabled(!!(this.vm.isReady && this.hasStreams))
+            .onTouch((event: TouchEvent) => this.onSliderTouch(event))
             .onChange((value: number, mode: SliderChangeMode) => this.sliderOnchange(value, mode))
-        }.layoutWeight(1)
+        }
+        .layoutWeight(1)
+        .height(CONTROL_SLOT_SIZE)
+        .constraintSize({ minWidth: PROGRESS_MIN_WIDTH })
       }
 
-      Text(secondToTime(Math.floor(this.durationTime)))
-        .fontColor('#AAFFFFFF').fontSize(13).width(48).textAlign(TextAlign.Center)
-        .visibility(this.curSource.isLive ? Visibility.None : Visibility.Visible)
+      if (this.shouldShowTimelineText()) {
+        Text(`${secondToTime(Math.floor(
+          this.isSliderDragging ? this.sliderDragValue
+            : this.isGestureSeek ? this.gestureSeekTime
+            : this.currentTime
+        ))} / ${secondToTime(Math.floor(this.durationTime))}`)
+          .fontColor('#DDFFFFFF')
+          .fontSize(13)
+          .width(this.getCombinedTimeLabelWidth())
+          .height(CONTROL_SLOT_SIZE)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Clip })
+          .textAlign(TextAlign.Center)
+          .flexShrink(0)
+      }
 
       // 全屏按鈕 — fontSize 统一用 vp，移除冲突的 height(24)限制
-      SymbolGlyph(this.isFullLandscapeScreen ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') : $r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-        .fontSize(24).width(24).height(24)
-        .fontColor([Color.White])
-        .onClick(() => { this.onFullScreenClick?.(!this.isFullLandscapeScreen); })
+      Stack({ alignContent: Alignment.Center }) {
+        SymbolGlyph(this.isFullLandscapeScreen ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') : $r('sys.symbol.arrow_up_left_and_arrow_down_right'))
+          .fontSize(CONTROL_ICON_SIZE)
+          .fontColor([Color.White])
+      }
+        .width(CONTROL_SLOT_SIZE)
+        .height(CONTROL_SLOT_SIZE)
+        .onClick(() => {
+          this.registerControlActivity();
+          this.onFullScreenClick?.(!this.isFullLandscapeScreen);
+        })
     }
     .width('100%')
-    // 底部間距策略：
-    // 竖屏——ctrlVPad 保证进度条不紧贴视频帧底边，与信息栏不重叠
-    // 横屏全屏——额外加 navBarHeight 避开导航条
+    .alignItems(VerticalAlign.Center)
+    // 非沉浸模式保留舒适边距；沉浸全屏叠加当前导航区和底部避让值。
     .padding({
-      left: this.ctrlHPad,
-      right: this.ctrlHPad,
-      bottom: this.isFullLandscapeScreen
-              ? Math.max(this.ctrlVPad, this.navBarHeight + this.ctrlVPad)
-              : this.ctrlVPad
+      left: this.getControlLeftPad(),
+      right: this.getControlRightPad(),
+      bottom: this.getControlBottomPad()
     })
     .linearGradient({ direction: GradientDirection.Bottom, colors: [['#00000000', 0.0], ['#66000000', 1.0]] })
   }
@@ -1358,11 +1710,13 @@ export struct VideoPlayer {
   private sliderOnchange(value: number, mode: SliderChangeMode) {
     switch (mode) {
       case SliderChangeMode.Begin:
+        this.sliderTouchCanceled = false;
+        this.gestureMode = PlayerGestureMode.IGNORED;
+        this.beginInteraction(PlayerInteractionKind.SLIDER);
         this.isSliderDragging = true;
         this.sliderDragValue = this.currentTime; // 初始化为当前位置
         this.trackThicknessSize = CommonConstants.TRACK_SIZE_MAX;
         this.sliderStyle = SliderStyle.InSet;
-        this.scheduleHideControls();
         break;
       case SliderChangeMode.Moving:
         this.sliderDragValue = value; // 同步更新本地值，立即反映到 UI
@@ -1378,16 +1732,42 @@ export struct VideoPlayer {
           this.sliderChangeDebounceTimer = -1;
         }
         // 使用快速seek模式（keyframe）提升响应速度
-        this.controller.syncSeekFast(value * 1000);
+        if (!this.sliderTouchCanceled) {
+          this.controller.syncSeekFast(value * 1000);
+        } else {
+          Logger.debug(TAG, 'Slider seek canceled; final value not committed');
+        }
         this.isSliderDragging = false;
         this.sliderDragValue = value;
         this.trackThicknessSize = CommonConstants.TRACK_SIZE_MIN;
         this.sliderStyle = SliderStyle.NONE;
+        this.gestureMode = PlayerGestureMode.IDLE;
+        this.activeInteraction = PlayerInteractionKind.NONE;
+        this.sliderTouchCanceled = false;
+        this.scheduleHideControls();
         break;
     }
   }
 
+  private onSliderTouch(event: TouchEvent): void {
+    if (event.type === TouchType.Down) {
+      this.sliderTouchCanceled = false;
+    } else if (event.type === TouchType.Cancel) {
+      this.sliderTouchCanceled = true;
+      this.isSliderDragging = false;
+      this.trackThicknessSize = CommonConstants.TRACK_SIZE_MIN;
+      this.sliderStyle = SliderStyle.NONE;
+      this.gestureMode = PlayerGestureMode.IDLE;
+      if (this.activeInteraction === PlayerInteractionKind.SLIDER) {
+        this.activeInteraction = PlayerInteractionKind.NONE;
+      }
+      Logger.debug(TAG, 'Slider touch canceled');
+      this.scheduleHideControls();
+    }
+  }
+
   aboutToDisappear(): void {
+    this.resetTransientUi('component-disappear');
     this.controller.removeStateListener(this.keepScreenListener);
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
@@ -1396,11 +1776,6 @@ export struct VideoPlayer {
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
-    this.clearHideTimer();
-    clearTimeout(this.volHideTimerId);
-    clearTimeout(this.brightnessHideTimerId);
-    clearTimeout(this.forwardHintTimerId);
-    clearTimeout(this.backwardHintTimerId);
   }
 }
 
