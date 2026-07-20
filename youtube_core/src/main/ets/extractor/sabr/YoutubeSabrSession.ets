@@ -40,6 +40,7 @@ export class YoutubeSabrSession {
   private cacheOrder: string[] = [];
   private cachedBytes: number = 0;
   private playHeadMs: number = 0;
+  private lastPlayHeadLogMs: number = -1;
   private closed: boolean = false;
   private useAuth: boolean = false;
   /** Serialize pumps — concurrent A/V ensureReady must not dual-fire rn=1. */
@@ -95,6 +96,14 @@ export class YoutubeSabrSession {
 
   setPlayHeadMs(ms: number): void {
     this.playHeadMs = Math.max(0, ms);
+    // PipePipe continuously feeds the real player position into SABR. Keep the request player
+    // time moving after a seek instead of leaving prepareForSeek's target override frozen for the
+    // rest of the session.
+    this.streamState.setPlayerTimeMsOverride(this.playHeadMs);
+    if (this.lastPlayHeadLogMs < 0 || Math.abs(this.playHeadMs - this.lastPlayHeadLogMs) >= 30000) {
+      logger.debug(`[SABR] player time positionMs=${Math.floor(this.playHeadMs)}`);
+      this.lastPlayHeadLogMs = this.playHeadMs;
+    }
   }
 
   close(): void {

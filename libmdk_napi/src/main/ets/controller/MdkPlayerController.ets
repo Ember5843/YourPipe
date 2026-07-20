@@ -35,8 +35,8 @@ export class MdkPlayerController {
     this.eventHandlers.get(event)?.forEach(h => h(value));
   }
 
-  setMedia(url: string): void {
-    nativeModule.setMedia(this.playerId, url);
+  setMedia(url: string, startPositionMs: number = 0): void {
+    nativeModule.setMedia(this.playerId, url, startPositionMs);
   }
 
   setMediaSource(url: string, mediaType: MediaType): void {
@@ -113,6 +113,10 @@ export class MdkPlayerController {
 
   buffered(): number {
     return nativeModule.buffered(this.playerId);
+  }
+
+  getSeekableRangesJson(): string {
+    return nativeModule.getSeekableRangesJson(this.playerId);
   }
 
   getState(): PlaybackState {

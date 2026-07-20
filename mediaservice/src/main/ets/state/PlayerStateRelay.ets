@@ -123,6 +123,27 @@ export class PlayerStateRelay {
     return this.lastPublishedCurrentTime >= 0 ? this.lastPublishedCurrentTime : 0;
   }
 
+  /** Reset per-media edge and throttle state while retaining UI subscribers. */
+  resetMediaSession(): void {
+    this.lastPublishedCurrentTime = -1;
+    this.lastPublishedDuration = -1;
+    this.hasAvSessionState = false;
+    this.lastAvSessionIsPlaying = false;
+    this.lastAvSessionIsBuffering = false;
+    this.lastAvSessionIsSeeking = false;
+    this.lastAvSessionIsEnded = false;
+    this.lastAvSessionErrorMsg = '';
+    this.lastAvSessionPlaybackSpeed = 1;
+    this.avSessionPushScheduled = false;
+    this.prevIsPlaying = false;
+    this.prevIsBuffering = false;
+    this.prevIsReady = false;
+    this.prevIsEnded = false;
+    this.prevIsSeeking = false;
+    this.prevErrorMsg = '';
+    this.prevDuration = 0;
+  }
+
   // ── private ──
 
   private syncStateMachine(state: PlaybackState): void {

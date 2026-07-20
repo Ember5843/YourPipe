@@ -319,6 +319,10 @@ export class LocalMediaProxy {
     localProxyServer.destroySession(sessionId);
   }
 
+  static updatePlaybackPosition(sessionId: string, positionMs: number): void {
+    localProxyServer.updateSabrPlayHead(sessionId, positionMs);
+  }
+
   static markSessionStale(sessionId: string): void {
     if (!sessionId) return;
     Logger.debug(TAG, `markSessionStale: ${sessionId}`);

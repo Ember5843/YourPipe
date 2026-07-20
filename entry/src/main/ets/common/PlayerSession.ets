@@ -63,6 +63,9 @@ export class PlayerSession {
   private _pendingAutoPlay: boolean | null = null;
   /** 画中画是否激活（由 PiPManager.onStateChange 设置） */
   private _isPiPActive: boolean = false;
+  private _pipHandoffPending: boolean = false;
+  private _pipRestoring: boolean = false;
+  private _explicitPageCloseHandled: boolean = false;
   /**
    * 会话级「仅音频」：关视频轨 + 页内封面层。
    * 不写 Preferences；release / forceReset 时清除。
@@ -158,6 +161,46 @@ export class PlayerSession {
 
   get isPiPActive(): boolean {
     return this._isPiPActive;
+  }
+
+  get isPipHandoffPending(): boolean {
+    return this._pipHandoffPending;
+  }
+
+  get isPipRestoring(): boolean {
+    return this._pipRestoring;
+  }
+
+  beginPipHandoff(): void {
+    this._pipHandoffPending = true;
+    logger.info(`${TAG} PiP handoff pending`);
+  }
+
+  cancelPipHandoff(): void {
+    if (this._pipHandoffPending) {
+      logger.info(`${TAG} PiP handoff cancelled`);
+    }
+    this._pipHandoffPending = false;
+  }
+
+  completePipHandoff(): void {
+    this._pipHandoffPending = false;
+    logger.info(`${TAG} PiP handoff completed`);
+  }
+
+  setPipRestoring(restoring: boolean): void {
+    this._pipRestoring = restoring;
+    logger.info(`${TAG} PiP restoring=${restoring}`);
+  }
+
+  shouldRetainMediaOnPageDisappear(): boolean {
+    return this._pipHandoffPending || this._isPiPActive || this._pipRestoring;
+  }
+
+  consumeExplicitPageCloseHandled(): boolean {
+    const handled = this._explicitPageCloseHandled;
+    this._explicitPageCloseHandled = false;
+    return handled;
   }
 
   setPiPActive(active: boolean): void {
@@ -257,11 +300,6 @@ export class PlayerSession {
     this._cachedChannelProfiles.set(channelId, profile);
   }
 
-  private isSessionActive(): boolean {
-    const s = this._controller.playerState;
-    return s !== PlayerState.RELEASED && s !== PlayerState.IDLE;
-  }
-
   private continueStateListener: ContinueStateListener | null = null;
 
   private registerContinueStateListener(): void {
@@ -291,10 +329,19 @@ export class PlayerSession {
   async ensureInitialized(): Promise<void> {
     if (this._controller.playerState === PlayerState.RELEASED) {
       logger.warn(`${TAG} ensureInitialized called after release, reinitializing`);
-      // Keep session audio-only across engine re-create (e.g. open with audio-only then play()).
-      this.resetSession(true);
+      this.recreateReleasedController(true);
     }
-    await this._controller.initAVPlayer();
+    // Page binding and click preparation may happen before a media source is
+    // ready. Keep this path MPV-only; AVSession/background ownership starts
+    // when updateVideoSource submits the first source for this media session.
+    await this._controller.prewarmPlaybackEngine();
+  }
+
+  async prewarmPlaybackEngine(): Promise<void> {
+    if (this._controller.playerState === PlayerState.RELEASED) {
+      this.recreateReleasedController(false);
+    }
+    await this._controller.prewarmPlaybackEngine();
   }
 
   /**
@@ -393,10 +440,8 @@ export class PlayerSession {
   }
 
   async play(video: VideoItem): Promise<VideoData | null> {
-    if (!this.isSessionActive()) {
-      // Critical: openVideoDetail may setAudioOnlyMode(true) before play().
-      // Rebuilding the engine must not wipe that session preference.
-      this.resetSession(true);
+    if (this._controller.playerState === PlayerState.RELEASED) {
+      this.recreateReleasedController(true);
     }
 
     const videoId = video.videoId || YOUTUBE_VIDEO_ID;
@@ -407,10 +452,8 @@ export class PlayerSession {
     if (this._currentVideo?.videoId && this._currentVideo.videoId !== videoId) {
       this.saveWatchHistory();
       this.stopWatchSaveTimer();
-      this._watchVideoId = '';
-      this._activeExtrasVideoId = '';
-      this._cachedVideoSource = null;
       logger.info(`${TAG} media switch ${this._currentVideo.videoId} -> ${videoId}`);
+      this.resetSession(true, false);
     }
 
     if (this._currentVideo?.videoId === video.videoId
@@ -694,6 +737,11 @@ export class PlayerSession {
 
   release(): void {
     if (this._controller.playerState === PlayerState.RELEASED) return;
+    if (this._controller.playerState === PlayerState.IDLE && !this._currentVideo && !this._preparePromise) {
+      this._explicitPageCloseHandled = true;
+      AppStorage.setOrCreate('playerLoading', false);
+      return;
+    }
     logger.info(`${TAG} release() called`);
     // 若画中画激活，先停止 PiP（释放播放器前关闭悬浮窗）
     if (this._isPiPActive && this.onStopPiP) {
@@ -706,11 +754,22 @@ export class PlayerSession {
     this.cancelSleepTimer();
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
-    this._controller.releaseVideo(0);
+    this.resetSession(false, true);
+    this._explicitPageCloseHandled = true;
+    AppStorage.setOrCreate('playerLoading', false);
     const queue = PlayQueueManager.getInstance();
     if (queue.sourceType === QueueSourceType.ADHOC) {
       queue.clear();
     }
+  }
+
+  /** Normal navigation away from PlayerPage: close media but retain the queue. */
+  closeForNavigation(): void {
+    logger.info(`${TAG} closeForNavigation() called`);
+    this.saveWatchHistory();
+    this.stopWatchSaveTimer();
+    this.resetSession(true, true);
+    AppStorage.setOrCreate('playerLoading', false);
   }
 
   /**
@@ -720,9 +779,10 @@ export class PlayerSession {
    */
   forceReset(): void {
     logger.info(`${TAG} forceReset() called`);
+    this._explicitPageCloseHandled = false;
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
-    this.resetSession(false);
+    this.resetSession(false, false);
   }
 
   /**
@@ -730,10 +790,10 @@ export class PlayerSession {
    *   video-off on the new controller (used by play/ensureInitialized).
    *   forceReset/release always pass false.
    */
-  private resetSession(preserveAudioOnly: boolean = false): void {
+  private resetSession(preserveAudioOnly: boolean = false, clearSurface: boolean = false): void {
     this._playGeneration++;
     const keepAudioOnly = preserveAudioOnly && this._isAudioOnlyMode;
-    this._controller.releaseVideo(0);
+    this._controller.closeMediaSession(clearSurface);
     this._currentVideo = null;
     this._watchVideoId = '';
     this._activePlayPromise = null;
@@ -744,27 +804,17 @@ export class PlayerSession {
     this._prepareAttemptId = '';
     this._submittedVideoId = '';
     this._cachedVideoSource = null;
+    this._lastPlayError = null;
+    this._activeExtrasVideoId = '';
     this._cachedChannelProfiles.clear();
     // 清 PiP 激活状态：避免会话在 PiP 激活时被 reset 后，_isPiPActive / AppStorage.isPiPActive
     // 残留为 true，导致占位层显示残留或返回键误判已在 PiP。
-    this.setPiPActive(false);
-    this.clearAudioOnlyMode();
-    this._defaultSource = {
-      name: $r('app.string.module_desc'),
-      description: '',
-      time: '00:00',
-      auto: true,
-      head: $r('app.media.foreground'),
-      likeCount: '0',
-      commentCount: '0',
-      shareCount: '0',
-      play: false,
-      index: 0
-    };
-    this._controller = new AvPlayerController(this._defaultSource);
-    this.bindControllerQueueControls();
-    this.bindQueueSwitchHandler();
-    this.registerContinueStateListener();
+    this._pipHandoffPending = false;
+    this._pipRestoring = false;
+    if (!keepAudioOnly) {
+      this.clearAudioOnlyMode();
+    }
+    this._defaultSource = this.createDefaultSource();
     if (keepAudioOnly) {
       // Re-arm after clear: AppStorage + deferred vid=no on the new controller.
       this._isAudioOnlyMode = true;
@@ -778,6 +828,37 @@ export class PlayerSession {
     } else {
       logger.debug(`${TAG} Session reset`);
     }
+  }
+
+  private createDefaultSource(): VideoData {
+    return {
+      name: $r('app.string.module_desc'),
+      description: '',
+      time: '00:00',
+      auto: true,
+      head: $r('app.media.foreground'),
+      likeCount: '0',
+      commentCount: '0',
+      shareCount: '0',
+      play: false,
+      index: 0
+    };
+  }
+
+  /** Hard-release recovery only; ordinary media changes retain the controller and MPV. */
+  private recreateReleasedController(preserveAudioOnly: boolean): void {
+    this._playGeneration++;
+    const keepAudioOnly = preserveAudioOnly && this._isAudioOnlyMode;
+    this._defaultSource = this.createDefaultSource();
+    this._controller = new AvPlayerController(this._defaultSource);
+    this.bindControllerQueueControls();
+    this.bindQueueSwitchHandler();
+    this.registerContinueStateListener();
+    if (keepAudioOnly) {
+      AppStorage.setOrCreate('isAudioOnlyMode', true);
+      this._controller.setVideoOutputEnabled(false);
+    }
+    logger.info(`${TAG} hard-released controller recreated audioOnly=${keepAudioOnly}`);
   }
 }
 

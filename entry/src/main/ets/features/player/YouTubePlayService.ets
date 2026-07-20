@@ -4,6 +4,7 @@ import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import {
   YouTubeExtractor,
+  WebClientVersionResolver,
   VideoInfo,
   StreamInfo as YouTubeStreamInfo,
   CommentResponse,
@@ -104,6 +105,13 @@ export class YouTubePlayService {
     }
   }
 
+  async prewarmClientVersion(): Promise<void> {
+    if (!this.extractor) await this.initialize();
+    if (!this.extractor) return;
+    const version = await WebClientVersionResolver.getClientVersion(this.extractor.getHttpClient());
+    logger.info(`${TAG} WEB client version prewarmed version=${version}`);
+  }
+
   /** Playback-only: sync stream extract hl/gl from content language/region settings. */
   private syncExtractorLocale(): void {
     if (!this.extractor) {
@@ -196,11 +204,16 @@ export class YouTubePlayService {
         return result;
       }
 
-      // Inject pot= into DASH stream URLs to prevent googlevideo 403
-      try {
-        await this.injectDashPoToken(videoInfo);
-      } catch (e) {
-        logger.warn(`${TAG} Dash PoToken injection failed, continuing without pot: ${String(e)}`);
+      const hasDirectUrlStream = videoInfo.streams.some((stream: YouTubeStreamInfo) =>
+        !!stream.url && stream.deliveryMethod !== 'SABR' && stream.kind !== 'sabr');
+      if (hasDirectUrlStream) {
+        try {
+          await this.injectDashPoToken(videoInfo);
+        } catch (e) {
+          logger.warn(`${TAG} Dash PoToken injection failed, continuing without pot: ${String(e)}`);
+        }
+      } else {
+        logger.info(`${TAG} all playable streams are SABR; skipping Dash PoToken`);
       }
       const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
         url: stream.url,

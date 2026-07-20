@@ -163,12 +163,15 @@ struct PlayerContext {
     void* window = nullptr;
     string surfaceId;
     string mediaUrl;
+    int64_t mediaStartPositionMs = 0;
     bool pendingLoad = false;
     atomic_int32_t state {kStateStopped};
     atomic_int32_t mediaStatus {kStatusNoMedia};
     atomic_int64_t lastPositionMs {0};
     atomic_int64_t lastDurationMs {0};
     atomic_int64_t lastBufferedMs {0};
+    mutex cacheRangesMutex;
+    string seekableRangesJson = "[]";
     int32_t loopCount = 0;
     bool initialized = false;
     atomic_bool eventLoopRunning {false};
@@ -397,9 +400,57 @@ void ResetObservedPlaybackState(PlayerContext& ctx)
     ctx.pausedForCache.store(false);
     ctx.seeking.store(false);
     ctx.eofReached.store(false);
+    {
+        const scoped_lock lock(ctx.cacheRangesMutex);
+        ctx.seekableRangesJson = "[]";
+    }
     // Do not reset ctx.paused here. "pause" is an observed MPV property and
     // START_FILE does not necessarily change it, so MPV may emit no follow-up
     // property event. Retaining the last observed value keeps MPV authoritative.
+}
+
+string SerializeSeekableRanges(const mpv_node* node)
+{
+    if (!node || node->format != MPV_FORMAT_NODE_MAP || !node->u.list) {
+        return "[]";
+    }
+    const mpv_node_list* map = node->u.list;
+    const mpv_node* rangesNode = nullptr;
+    for (int i = 0; i < map->num; i++) {
+        if (map->keys && map->keys[i] && string(map->keys[i]) == "seekable-ranges") {
+            rangesNode = &map->values[i];
+            break;
+        }
+    }
+    if (!rangesNode || rangesNode->format != MPV_FORMAT_NODE_ARRAY || !rangesNode->u.list) {
+        return "[]";
+    }
+
+    const mpv_node_list* ranges = rangesNode->u.list;
+    string result = "[";
+    bool first = true;
+    for (int i = 0; i < ranges->num; i++) {
+        const mpv_node* range = &ranges->values[i];
+        if (range->format != MPV_FORMAT_NODE_MAP || !range->u.list) continue;
+        const mpv_node_list* rangeMap = range->u.list;
+        double start = -1.0;
+        double end = -1.0;
+        for (int j = 0; j < rangeMap->num; j++) {
+            if (!rangeMap->keys || !rangeMap->keys[j]) continue;
+            const mpv_node* value = &rangeMap->values[j];
+            const double number = value->format == MPV_FORMAT_DOUBLE ? value->u.double_ : -1.0;
+            const string key = rangeMap->keys[j];
+            if (key == "start") start = number;
+            else if (key == "end") end = number;
+        }
+        if (!isfinite(start) || !isfinite(end) || start < 0.0 || end <= start) continue;
+        char buffer[80];
+        snprintf(buffer, sizeof(buffer), first ? "[%.3f,%.3f]" : ",[%.3f,%.3f]", start, end);
+        result += buffer;
+        first = false;
+    }
+    result += "]";
+    return result;
 }
 
 void UpdateStatusFromObservedProperties(PlayerContext& ctx)
@@ -508,6 +559,10 @@ void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property)
         } else if (name == "pause") {
             ctx.paused.store(value);
         }
+    } else if (property->format == MPV_FORMAT_NODE && name == "demuxer-cache-state") {
+        const string rangesJson = SerializeSeekableRanges(static_cast<mpv_node*>(property->data));
+        const scoped_lock lock(ctx.cacheRangesMutex);
+        ctx.seekableRangesJson = rangesJson;
     }
 
     UpdateStatusFromObservedProperties(ctx);
@@ -533,6 +588,7 @@ void ObservePlaybackProperties(PlayerContext& ctx)
         {"seeking", MPV_FORMAT_FLAG},
         {"eof-reached", MPV_FORMAT_FLAG},
         {"pause", MPV_FORMAT_FLAG},
+        {"demuxer-cache-state", MPV_FORMAT_NODE},
     };
 
     uint64_t replyId = 1;
@@ -593,6 +649,8 @@ void StartEventLoop(PlayerContext& ctx)
                     PushEvent(ctx, 1, ctx.lastPositionMs.load());
                 } else if (prop->name == string("duration")) {
                     PushEvent(ctx, 3, ctx.lastDurationMs.load());
+                } else if (prop->name == string("demuxer-cache-state")) {
+                    PushEvent(ctx, 4, 0);
                 } else {
                     PushEvent(ctx, 2, ctx.mediaStatus.load());
                 }
@@ -986,10 +1044,24 @@ string ResolveMediaUri(const string& url)
     return url;
 }
 
-void LoadMedia(PlayerContext& ctx, const string& rawUrl)
+vector<string> BuildLoadFileCommand(const string& url, int64_t startPositionMs)
+{
+    vector<string> command {"loadfile", url, "replace"};
+    if (startPositionMs > 0) {
+        const string seconds = to_string(static_cast<double>(startPositionMs) / 1000.0);
+        // mpv >= 0.38 reserves the third loadfile argument for a playlist index. The fourth
+        // argument is a per-file option list. A leading '+' makes start relative to media start.
+        command.push_back("-1");
+        command.push_back("start=+" + seconds);
+    }
+    return command;
+}
+
+void LoadMedia(PlayerContext& ctx, const string& rawUrl, int64_t startPositionMs = 0)
 {
     const string url = ResolveMediaUri(rawUrl);
     ctx.mediaUrl = url;
+    ctx.mediaStartPositionMs = max<int64_t>(0, startPositionMs);
     ctx.pendingLoad = false;
     ctx.lastPositionMs.store(0);
     ctx.lastDurationMs.store(0);
@@ -1013,11 +1085,12 @@ void LoadMedia(PlayerContext& ctx, const string& rawUrl)
     }
 
     SetMediaStatus(ctx, kStatusLoading | kStatusBuffering | kStatusStalled, "loadfile-start");
-    PostCommand(ctx, [url](PlayerContext& workerCtx) {
+    const int64_t requestedStartMs = ctx.mediaStartPositionMs;
+    PostCommand(ctx, [url, requestedStartMs](PlayerContext& workerCtx) {
         if (!EnsureMpv(workerCtx)) {
             return;
         }
-        RunMpvCommand(workerCtx, {"loadfile", url, "replace"}, "loadfile");
+        RunMpvCommand(workerCtx, BuildLoadFileCommand(url, requestedStartMs), "loadfile");
     });
 }
 
@@ -1193,12 +1266,13 @@ napi_value SetVideoSurfaceId(napi_env env, napi_callback_info info)
             return;
         }
         const string url = ctx.mediaUrl;
+        const int64_t requestedStartMs = ctx.mediaStartPositionMs;
         SetMediaStatus(ctx, kStatusLoading | kStatusBuffering | kStatusStalled, "load-pending-start");
         ctx.pendingLoad = false;
-        PostCommand(ctx, [url](PlayerContext& workerCtx) {
+        PostCommand(ctx, [url, requestedStartMs](PlayerContext& workerCtx) {
             if (EnsureMpv(workerCtx)) {
                 ApplyWindowOption(workerCtx);
-                RunMpvCommand(workerCtx, {"loadfile", url, "replace"}, "loadfile");
+                RunMpvCommand(workerCtx, BuildLoadFileCommand(url, requestedStartMs), "loadfile");
             }
         });
     });
@@ -1241,10 +1315,16 @@ napi_value ReleasePlayer(napi_env env, napi_callback_info info)
 
 napi_value SetMedia(napi_env env, napi_callback_info info)
 {
-    size_t argc = 2; napi_value args[2];
+    size_t argc = 3; napi_value args[3];
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     const string url = ToString(env, args[1]);
-    lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) { LoadMedia(ctx, url); });
+    int64_t startPositionMs = 0;
+    if (argc > 2) {
+        napi_get_value_int64(env, args[2], &startPositionMs);
+    }
+    lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) {
+        LoadMedia(ctx, url, startPositionMs);
+    });
     return Undefined(env);
 }
 
@@ -1566,6 +1646,19 @@ napi_value Buffered(napi_env env, napi_callback_info info)
     return result;
 }
 
+napi_value GetSeekableRangesJson(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1; napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    const auto json = lockFor(ToString(env, args[0]), [](PlayerContext& ctx) {
+        const scoped_lock lock(ctx.cacheRangesMutex);
+        return ctx.seekableRangesJson;
+    });
+    napi_value result = nullptr;
+    napi_create_string_utf8(env, json.c_str(), NAPI_AUTO_LENGTH, &result);
+    return result;
+}
+
 napi_value GetState(napi_env env, napi_callback_info info)
 {
     size_t argc = 1; napi_value args[1];
@@ -1748,6 +1841,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"setAudioBackends", nullptr, SetAudioBackends, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getPosition", nullptr, GetPosition, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"buffered", nullptr, Buffered, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"getSeekableRangesJson", nullptr, GetSeekableRangesJson, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getState", nullptr, GetState, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getMediaStatus", nullptr, GetMediaStatus, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getMediaInfo", nullptr, GetMediaInfo, nullptr, nullptr, nullptr, napi_default, nullptr},

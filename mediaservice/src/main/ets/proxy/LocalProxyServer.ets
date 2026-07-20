@@ -314,6 +314,16 @@ export class LocalProxyServer {
     return base;
   }
 
+  updateSabrPlayHead(sessionId: string, positionMs: number): void {
+    if (!sessionId || !Number.isFinite(positionMs) || positionMs < 0) {
+      return;
+    }
+    const session = sessionStore.get(sessionId);
+    if (session?.type === 'sabr-dual' && session.sabrLeaseKey) {
+      sabrSessionStore.setPlayHeadMs(session.sabrLeaseKey, positionMs);
+    }
+  }
+
   dashManifestUrl(sessionId: string): string {
     if (!this.running || !sessionId) return '';
     const session = sessionStore.get(sessionId);

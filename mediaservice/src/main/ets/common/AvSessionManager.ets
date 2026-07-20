@@ -23,6 +23,7 @@ export class AvSessionManager {
   private context: common.UIAbilityContext | undefined = undefined;
   private session: avSession.AVSession | undefined = undefined;
   private currentMetadata: avSession.AVMetadata | undefined = undefined;
+  private metadataGeneration: number = 0;
   private audioSessionManager: audio.AudioSessionManager | undefined = undefined;
   private audioSessionActivated: boolean = false;
   private audioActivationGeneration: number = 0;
@@ -133,6 +134,7 @@ export class AvSessionManager {
   }
 
   private async destroyInternal(): Promise<void> {
+    this.metadataGeneration++;
     this.deactivateForPause();
     if (!this.session) {
       return;
@@ -188,10 +190,12 @@ export class AvSessionManager {
    * @param duration    Total duration in seconds
    * @param thumbnailUrl  HTTP URL for thumbnail
    */
-  public setMetadata(title: string, artist: string, duration: number, thumbnailUrl?: string): void {
+  public setMetadata(title: string, artist: string, duration: number, thumbnailUrl?: string,
+    loadArtwork: boolean = true): void {
     if (!this.session) {
       return;
     }
+    const generation = ++this.metadataGeneration;
     const metadata: avSession.AVMetadata = {
       assetId: title || 'default',
       title: title,
@@ -203,9 +207,12 @@ export class AvSessionManager {
     };
 
     const pushMetadata = (pixelMap?: image.PixelMap) => {
+      if (generation !== this.metadataGeneration || !this.session) {
+        return;
+      }
       if (pixelMap) {
         metadata.mediaImage = pixelMap;
-      } else if (thumbnailUrl) {
+      } else if (thumbnailUrl && loadArtwork) {
         // Fallback: pass URL string if PixelMap creation failed
         metadata.mediaImage = thumbnailUrl;
       }
@@ -217,7 +224,7 @@ export class AvSessionManager {
       });
     };
 
-    if (thumbnailUrl) {
+    if (thumbnailUrl && loadArtwork) {
       // Download thumbnail and create a PixelMap without pre-scaling so the
       // system media card uses the image's own aspect ratio.
       this.downloadThumbnailPixelMap(thumbnailUrl)

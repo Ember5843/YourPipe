@@ -1156,6 +1156,7 @@ struct Index {
     // controller here breaks AVSession/background ownership. An active PiP is
     // the exception: its controller is bound to the old page's XComponent.
     const session = PlayerSession.getInstance();
+    AppStorage.setOrCreate('playerLoading', true);
     if (session.isPiPActive) {
       PiPManager.getInstance().destroy();
     }
@@ -1623,12 +1624,20 @@ struct Index {
           if (canEnterPiP) {
             // 返回 = 弹 PiP：先锁定 PIP 呈现态（视频保持 ON），再 startPiP + pop。
             PlayerPresentation.onPipStarted();
-            pip.startPiP().catch((e: Error) => {
+            session.beginPipHandoff();
+            pip.startPiP().then((started: boolean) => {
+              if (!started) {
+                session.cancelPipHandoff();
+                PlayerPresentation.onPipStopped(false);
+                logger.warn('startPiP on back failed; keeping PlayerPage visible');
+                return;
+              }
+              this.navPathStack.pop();
+            }).catch((e: Error) => {
+              session.cancelPipHandoff();
+              PlayerPresentation.onPipStopped(false);
               logger.warn(`startPiP on back failed: ${e.message}`);
             });
-            // Keep the 0.5.2 navigation timing: the system completes XComponent
-            // takeover while the destination is being popped.
-            this.navPathStack.pop();
             return true;
           }
           session.release();

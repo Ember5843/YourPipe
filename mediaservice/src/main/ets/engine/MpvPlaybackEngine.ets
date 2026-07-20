@@ -20,6 +20,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   private lastPositionMs: number = 0;
   private lastDurationMs: number = 0;
+  private seekableRanges: number[][] = [];
   private isBuffering: boolean = false;
   private isSeeking: boolean = false;
   private isEnded: boolean = false;
@@ -40,6 +41,11 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private currentSubtitleUrl: string = '';
   private lastKnownPositionMs: number = 0;
   private lastTimeEmitMs: number = 0;
+  /**
+   * Native getPosition()/getDuration() keep reporting the outgoing file for a short window after
+   * setMedia(). Do not expose that timeline as the newly loaded source until MPV reports Prepared.
+   */
+  private acceptsNativeTimeline: boolean = false;
   /** Reconciles native pause changes made directly by the OHAudio bridge. */
   private nativeStatePollTimerId: number = -1;
   private lastReportedIsPlaying: boolean = false;
@@ -133,6 +139,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.stopNativeStateReconciliation();
     this.destroyed = true;
     this.initialized = false;
+    this.acceptsNativeTimeline = false;
     this.loadGeneration++;
     const ctrl: MpvPlayerController | null = this.controller;
     this.controller = null;
@@ -160,7 +167,11 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   }
 
   detachSurface(): void {
-    // The mpv wrapper has no detach API. Keep the last surface id for rebinding.
+    // The native wrapper has no detach API. Stop the media first, then forget the
+    // old XComponent so a later page cannot accidentally bind a destroyed surface.
+    this.surfaceId = '';
+    this.surfaceWidthPx = 0;
+    this.surfaceHeightPx = 0;
   }
 
   resizeSurface(widthPx: number, heightPx: number): void {
@@ -199,7 +210,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.pendingSeekMs = -1;
     this.lastPositionMs = 0;
     this.lastDurationMs = 0;
+    this.seekableRanges = [];
     this.lastKnownPositionMs = 0;
+    this.acceptsNativeTimeline = false;
     this.emitCurrentState();
 
     Logger.info(TAG, `load: startPos=${startPos.toFixed(2)}s isLive=${this.isLive} url=${this.sourceUrl.substring(0, 120)}`);
@@ -233,7 +246,15 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     }
 
     try {
-      ctrl.setMedia(this.sourceUrl);
+      const isEdl = this.sourceUrl.startsWith('edl://');
+      const directStartMs = isEdl ? 0 : this.pendingStartMs;
+      ctrl.setMedia(this.sourceUrl, directStartMs);
+      if (!isEdl) {
+        // mpv's per-file start option performs the initial demuxer seek before the first frame.
+        // Keep pendingStartMs only for legacy EDL sources whose lazy child demuxer needs a
+        // post-Prepared seek.
+        this.pendingStartMs = -1;
+      }
       if (this.surfaceId.length > 0) {
         this.bindSurface(ctrl, this.surfaceId);
         Logger.info(TAG, `load: surface bound id=${this.surfaceId.substring(0, 24)}`);
@@ -241,11 +262,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         Logger.warn(TAG, `load: surfaceId is empty, video may not render`);
       }
       this.preparing = true;
-      // 统一策略：prepare(0) 不带 seek，交给 applyReadyActions 在 Prepared 事件后 seek。
-      // 原因：
-      //   - EDL + delay_open：prepare 的 seek 不会传播到 lazy 打开的子 demuxer
-      //   - HLS：MPV 的 HLS demuxer 在加载 master playlist / 切 variant 时会丢弃 prepare 位置
-      // 在 Ready 之后显式 seek 能保证两种 source 都从正确位置起播。
+      // The actual source is already loading with a per-file start option. prepare(0) is retained
+      // only as a compatibility signal for the legacy controller wrapper; it does not seek to 0.
       ctrl.prepare(0);
       if (generation !== this.loadGeneration || this.destroyed) {
         return false;
@@ -287,9 +305,20 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.playWhenReady = false;
     this.pendingStartMs = -1;
     this.pendingSeekMs = -1;
+    this.acceptsNativeTimeline = false;
+    this.seekableRanges = [];
+    this.loadGeneration++;
     const ctrl: MpvPlayerController | null = this.controller;
-    if (ctrl === null || this.destroyed) return;
-    ctrl.stop();
+    if (ctrl !== null && !this.destroyed) {
+      try {
+        ctrl.stop();
+      } catch (err) {
+        Logger.warn(TAG, `stop failed: ${this.describeError(err)}`);
+      }
+    }
+    // Keep the native controller initialized, but expose an empty media session
+    // to the controller/UI. This is intentionally different from destroy().
+    this.resetLocalState(false);
     this.emitCurrentState();
   }
 
@@ -464,8 +493,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         this.seekInternal(this.pendingSeekMs, false);
         this.pendingSeekMs = -1;
       }
-      // 起播/续播位置处理：load() 时 prepare(0)，这里在 Prepared 后统一显式 seek。
-      // pendingStartMs > 0 时一定 seek（无论 EDL/HLS/普通），=0 时仅 EDL 需要 seek 以激活子 demuxer。
+      // Normal sources consumed pendingStartMs in loadfile's per-file start option. Only legacy EDL
+      // sources retain it because delay_open requires a seek after the child demuxer is prepared.
       else if (this.pendingStartMs >= 0) {
         const isEdl = this.sourceUrl.startsWith('edl://');
         if (this.pendingStartMs > 0 || isEdl) {
@@ -485,6 +514,10 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (this.destroyed || ctrl !== this.controller) return;
 
     if (type === 1) {
+      if (!this.acceptsNativeTimeline) {
+        Logger.debug(TAG, `ignored outgoing position during source load value=${value}ms`);
+        return;
+      }
       // 位置更新事件：缩小容差到500ms（MPV内部seek已经较准）
       if (this.pendingSeekMs >= 0) {
         const diff = Math.abs(value - this.pendingSeekMs);
@@ -504,13 +537,71 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       if (now - this.lastTimeEmitMs < 100) return;
       this.lastTimeEmitMs = now;
     } else if (type === 2) {
+      const wasAcceptingNativeTimeline = this.acceptsNativeTimeline;
       this.handleStatusUpdate(value);
+      if (!wasAcceptingNativeTimeline && this.acceptsNativeTimeline) {
+        // Cache state can arrive before Prepared. Pull the latest snapshot once the new source
+        // owns the native timeline so a short, already-buffered item still paints its cache bar.
+        this.updateSeekableRanges(ctrl.getSeekableRangesJson());
+      }
     } else if (type === 3) {
+      if (!this.acceptsNativeTimeline) {
+        Logger.debug(TAG, `ignored outgoing duration during source load value=${value}ms`);
+        return;
+      }
       if (value > 0) {
         this.lastDurationMs = value;
       }
+    } else if (type === 4) {
+      if (!this.acceptsNativeTimeline) {
+        return;
+      }
+      if (!this.updateSeekableRanges(ctrl.getSeekableRangesJson())) {
+        return;
+      }
     }
     this.emitCurrentState();
+  }
+
+  private updateSeekableRanges(json: string): boolean {
+    try {
+      const parsed = JSON.parse(json) as number[][];
+      if (!Array.isArray(parsed)) {
+        return this.replaceSeekableRanges([]);
+      }
+      const next: number[][] = [];
+      for (const range of parsed) {
+        if (!Array.isArray(range) || range.length < 2) continue;
+        const start = Number(range[0]);
+        const end = Number(range[1]);
+        if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start) {
+          next.push([start, end]);
+        }
+      }
+      return this.replaceSeekableRanges(next);
+    } catch (err) {
+      Logger.warn(TAG, `seekable ranges parse failed: ${this.describeError(err)}`);
+      return this.replaceSeekableRanges([]);
+    }
+  }
+
+  private replaceSeekableRanges(next: number[][]): boolean {
+    if (this.areSeekableRangesEqual(this.seekableRanges, next)) {
+      return false;
+    }
+    this.seekableRanges = next;
+    return true;
+  }
+
+  private areSeekableRangesEqual(left: number[][], right: number[][]): boolean {
+    if (left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) {
+      if (left[i].length < 2 || right[i].length < 2 ||
+        left[i][0] !== right[i][0] || left[i][1] !== right[i][1]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private handleStatusUpdate(status: number): void {
@@ -558,6 +649,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (!wasReady && this.isReady) {
       this.preparing = false;
       this.isBuffering = false;
+      this.acceptsNativeTimeline = true;
       this.applyReadyActions();
     }
 
@@ -601,7 +693,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // Native 侧的 ctx.state 在每次 mpv pause 属性变化后由
     // UpdateStatusFromObservedProperties 自动镜像维护，是唯一真相。
     let isPlaying: boolean = false;
-    if (ctrl !== null && !this.destroyed) {
+    if (ctrl !== null && !this.destroyed && this.acceptsNativeTimeline) {
       const nativePos: number = ctrl.getPosition();
       const nativeDur: number = ctrl.getDuration();
       if (nativePos > 0) {
@@ -693,6 +785,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       duration: durMs > 0 ? durMs / 1000 : 0,
       playbackSpeed: this.playbackSpeed,
       bufferingPercent: 0,
+      seekableRanges: this.seekableRanges,
       uri: this.sourceUrl,
       mediaTitle: mediaTitle,
       containerFormat: containerFormat,
@@ -770,10 +863,12 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.lastLoggedHwdec = '';
     this.lastPositionMs = 0;
     this.lastDurationMs = 0;
+    this.seekableRanges = [];
     this.isBuffering = false;
     this.isSeeking = false;
     this.isEnded = false;
     this.isReady = false;
+    this.isBuffered = false;
     this.hasError = false;
     this.errorMsg = '';
     this.lastErrorCategory = 'unknown';
@@ -785,6 +880,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.pendingSubtitleUrl = '';
     this.currentSubtitleUrl = '';
     this.lastKnownPositionMs = 0;
+    this.lastTimeEmitMs = 0;
+    this.acceptsNativeTimeline = false;
+    this.isLive = false;
   }
 
   private describeError(err: Object): string {

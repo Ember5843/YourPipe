@@ -20,7 +20,7 @@ import { harmonyShare, systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { fileUri, fileIo as fs } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
-import { CommonConstants as Const, VideoData } from 'mediaservice';
+import { CommonConstants as Const, PlaybackState, PlayerState, VideoData } from 'mediaservice';
 import { WindowUtil } from '../../common/utils/WindowUtil';
 import { VideoDetails } from './components/VideoDetails';
 import { VideoPlayer } from './components/AVPlayer';
@@ -94,7 +94,7 @@ export struct VideoPlayerPage {
   @State detailChannelAvatarUrl: string = '';
   @State chapters: ChapterInfo[] = [];
   @State isRetrying: boolean = false;
-  @State isLoading: boolean = false;
+  @StorageLink('playerLoading') isLoading: boolean = false;
   /** 画中画是否激活（订阅 PlayerSession.isPiPActive → 显示占位层） */
   @StorageLink('isPiPActive') isPiPActive: boolean = false;
   /** 会话级仅音频：封面 + 耳机层，禁止 PiP */
@@ -114,6 +114,16 @@ export struct VideoPlayerPage {
   private pendingOrientationSettle: boolean = false;
   /** Whether local playback was active before a cast session took ownership. */
   private resumeAfterCast: boolean = false;
+  private pagePlaybackStateListener = (state: PlaybackState): void => {
+    if (state.errorMsg) {
+      this.isLoading = false;
+      return;
+    }
+    if (this.isLoading && (state.isBuffered || (state.isReady && !state.isBuffering))) {
+      this.isLoading = false;
+      logger.info(`${TAG} first playable frame ready; loading cover dismissed`);
+    }
+  };
 
   private async cacheThumbnail(videoId: string, thumbnailUrl: string): Promise<void> {
     if (!videoId || !thumbnailUrl) {
@@ -210,10 +220,19 @@ export struct VideoPlayerPage {
    * 重试加载视频信息（从获取视频详细信息和流开始）
    */
   private async retryLoadVideo(): Promise<void> {
-    if (this.isRetrying) return;
+    if (this.isRetrying || !this.video) return;
     this.isRetrying = true;
-    await this.onVideoChange();
-    this.isRetrying = false;
+    const session = PlayerSession.getInstance();
+    const audioOnly = session.isAudioOnlyMode;
+    session.forceReset();
+    session.setAudioOnlyMode(audioOnly);
+    this.isLoading = true;
+    session.beginPrepare(this.video);
+    try {
+      await this.onVideoChange();
+    } finally {
+      this.isRetrying = false;
+    }
   }
 
   private openInBrowser(url: string): void {
@@ -314,8 +333,10 @@ export struct VideoPlayerPage {
     this.controller = session.controller;
     this.vm = session.controller.vm;
     session.subscribePlaybackExtras(this.playbackExtrasListener);
-
-    let context: Context = this.getUIContext().getHostContext() as Context;
+    this.controller.subscribePlaybackState(this.pagePlaybackStateListener);
+    if (session.playerState === PlayerState.IDLE && this.video) {
+      this.isLoading = true;
+    }
 
     // 进入播放页：重置沉浸全屏标志，由 WindowUtil 全局策略按当前方向决定系统栏
     this.windowUtil.setPlayerFullscreenImmersive(false);
@@ -338,9 +359,10 @@ export struct VideoPlayerPage {
       this.onPlayerWindowSizeChange(size.width, size.height);
     });
 
-    await this.onVideoChange();
-    this.controller = session.controller;
-    this.vm = session.controller.vm;
+    this.onVideoChange().catch((e: Error) => {
+      logger.error(`${TAG} deferred onVideoChange failed: ${e.message || e}`);
+      this.isLoading = false;
+    });
 
     this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
 
@@ -361,7 +383,9 @@ export struct VideoPlayerPage {
   }
 
   aboutToDisappear(): void {
-    PlayerSession.getInstance().unsubscribePlaybackExtras(this.playbackExtrasListener);
+    const session = PlayerSession.getInstance();
+    session.unsubscribePlaybackExtras(this.playbackExtrasListener);
+    this.controller.unsubscribePlaybackState(this.pagePlaybackStateListener);
     harmonyShare.off('knockShare', this.knockShareCallback);
     // 离开播放页：清除沉浸全屏标志，恢复主题状态栏颜色
     this.windowUtil.setPlayerFullscreenImmersive(false);
@@ -373,11 +397,21 @@ export struct VideoPlayerPage {
     this.resumeAfterCast = false;
 
     // 退出播放页：关闭 PiP 自动启动（避免非播放页 home 键误启），注销生命周期回调
-    PiPManager.getInstance().setAutoStart(false);
-    PiPManager.getInstance().unregisterPipStateChangeListener();
+    const pip = PiPManager.getInstance();
+    pip.setAutoStart(false);
+    pip.unregisterPipStateChangeListener();
 
-    // Queue lifetime belongs to PlayerSession. A page can disappear while PiP
-    // or background playback is still active, so it must not clear the queue.
+    if (session.shouldRetainMediaOnPageDisappear()) {
+      logger.info(`${TAG} page disappeared for PiP handoff/restore; retaining media session`);
+      return;
+    }
+    if (session.consumeExplicitPageCloseHandled()) {
+      pip.destroy();
+      logger.info(`${TAG} explicit page close already handled`);
+      return;
+    }
+    session.closeForNavigation();
+    pip.destroy();
   }
 
   // Guard against concurrent onVideoChange invocations (e.g. @Watch + explicit call)
@@ -393,8 +427,8 @@ export struct VideoPlayerPage {
     }
     const session = PlayerSession.getInstance();
     this.isVideoChanging = true;
-
-    this.cacheThumbnail(this.video.videoId, this.video.thumbnailUrl);
+    this.controller = session.controller;
+    this.vm = session.controller.vm;
 
     // 同视频已就绪：直接同步，使用缓存数据
     const cachedSource = session.cachedVideoSource;
@@ -405,12 +439,15 @@ export struct VideoPlayerPage {
       this.vm = session.controller.vm;
       this.videoSource = this.snapshotVideoSource(cachedSource);
       this.syncDetailStateFromSource(cachedSource);
-      this.isLoading = false;
+      const playbackState = this.controller.getPlaybackState();
+      this.isLoading = !(playbackState.isBuffered
+        || (playbackState.isReady && !playbackState.isBuffering));
       this.isVideoChanging = false;
       return;
     }
 
     // 切换视频：清空旧流数据以显示加载占位图，清空元数据避免残留
+    let waitForFirstFrame = false;
     try {
       const isSwitchingVideo = !!this.videoSource.videoId && this.videoSource.videoId !== this.video.videoId;
       if (isSwitchingVideo) {
@@ -425,15 +462,24 @@ export struct VideoPlayerPage {
       this.detailChannelAvatarUrl = this.video.channelAvatarUrl || '';
       this.chapters = [];
       this.videoSource = this.createPendingVideoSource(this.video);
+      const existingPip = PiPManager.getInstance();
+      if (existingPip.isReady && !session.isPiPActive) {
+        existingPip.destroy();
+      }
       const newVideoSource = await session.play(this.video);
 
       this.controller = session.controller;
       this.vm = session.controller.vm;
 
       if (newVideoSource) {
+        waitForFirstFrame = true;
         this.videoSource = this.snapshotVideoSource(newVideoSource);
         session.cachedVideoSource = newVideoSource;
         this.syncDetailStateFromSource(newVideoSource);
+        this.cacheThumbnail(this.video.videoId, this.video.thumbnailUrl);
+        if (this.controller.getPlaybackState().isBuffered || (this.vm.isReady && !this.vm.isBuffering)) {
+          this.isLoading = false;
+        }
         // 画中画：首次播放时创建 PiPController，切视频时更新 contentSize（调整 PiP 窗口比例）
         const pip = PiPManager.getInstance();
         if (pip.isPiPSupported()) {
@@ -468,7 +514,9 @@ export struct VideoPlayerPage {
       this.videoDescriptionError = getContext().resourceManager.getStringSync(
         $r('app.string.yt_error_playback_failed').id);
     } finally {
-      this.isLoading = false;
+      if (!waitForFirstFrame) {
+        this.isLoading = false;
+      }
       this.isVideoChanging = false;
       if (this.pendingVideoChange) {
         this.pendingVideoChange = false;
@@ -489,8 +537,9 @@ export struct VideoPlayerPage {
     this.syncPiPAutoStart();
 
     const session = PlayerSession.getInstance();
-    if (session.isReleased && this.video) {
-      logger.info(`${TAG} Session was released while hidden, reloading video`);
+    if ((session.isReleased || session.playerState === PlayerState.IDLE) && this.video) {
+      this.isLoading = true;
+      logger.info(`${TAG} Media session is closed while hidden, reloading video`);
       this.onVideoChange();
     }
   }
@@ -604,7 +653,7 @@ export struct VideoPlayerPage {
         .fontSize(16)
         .fontWeight(this.currentTabIndex === index ? FontWeight.Normal : FontWeight.Medium)
         .lineHeight(22)
-        .margin({ top: 10, bottom: 5 })
+        .margin({ top: 17, bottom: 7 })
       Divider()
         .width(48)
         .strokeWidth(Constants.STROKE_WIDTH)
@@ -773,7 +822,7 @@ export struct VideoPlayerPage {
       .borderRadius({ topLeft: 16, topRight: 16 })
       .barMode(BarMode.Fixed)
       .barWidth(Const.WIDTH_FULL_PERCENT)
-      .barHeight(44)
+      .barHeight(52)
       .onAnimationStart((index: number, targetIndex: number) => {
         this.currentTabIndex = targetIndex;
       })

@@ -25,19 +25,47 @@ function durationIso(durationMs: number): string {
 function segmentTimeline(buffer: SabrTrackBuffer, durationMs: number,
   fallbackDurationMs: number): string {
   const end = buffer.getEndSegment();
-  if (end <= 0 || end > 10000 || durationMs <= 0) {
+  if (end <= 0 || durationMs <= 0) {
+    Logger.warn(TAG, `fallback timeline itag=${buffer.getItag()} end=${end} durationMs=${durationMs} `
+      + `segmentDurationMs=${fallbackDurationMs}`);
     return `<SegmentTemplate timescale="1000" startNumber="1" duration="${fallbackDurationMs}" `
       + 'initialization="init" media="$Number$"/>';
   }
-  let timeline = '<SegmentTemplate timescale="1000" startNumber="1" '
-    + 'initialization="init" media="$Number$"><SegmentTimeline>';
+
+  // Long videos routinely exceed 10,000 video segments. Falling back to a fixed duration here
+  // makes DASH choose a sequence from the synthetic duration instead of the real SIDX timeline;
+  // the error accumulates into hours near the end of a 24-hour video. Preserve the exact SIDX
+  // mapping and compress only truly contiguous, equal-duration runs with DASH's r attribute.
+  const entries: string[] = [];
+  let runStartMs = 0;
+  let runDurationMs = 0;
+  let runRepeat = 0;
+  let expectedNextStartMs = 0;
+  const flushRun = (): void => {
+    if (runDurationMs <= 0) return;
+    entries.push(`<S t="${runStartMs}" d="${runDurationMs}"`
+      + (runRepeat > 0 ? ` r="${runRepeat}"` : '') + '/>');
+  };
   for (let sequence = 1; sequence <= end; sequence++) {
     const startMs = Math.max(0, buffer.getSegmentStartMs(sequence));
     const endMs = buffer.getSegmentEndMs(sequence);
     const segmentDurationMs = Math.max(1, endMs - startMs);
-    timeline += `<S t="${startMs}" d="${segmentDurationMs}"/>`;
+    if (sequence > 1 && startMs === expectedNextStartMs
+      && segmentDurationMs === runDurationMs) {
+      runRepeat++;
+    } else {
+      flushRun();
+      runStartMs = startMs;
+      runDurationMs = segmentDurationMs;
+      runRepeat = 0;
+    }
+    expectedNextStartMs = startMs + segmentDurationMs;
   }
-  return timeline + '</SegmentTimeline></SegmentTemplate>';
+  flushRun();
+  Logger.info(TAG, `exact timeline itag=${buffer.getItag()} segments=${end} runs=${entries.length}`);
+  return '<SegmentTemplate timescale="1000" startNumber="1" '
+    + 'initialization="init" media="$Number$"><SegmentTimeline>'
+    + entries.join('') + '</SegmentTimeline></SegmentTemplate>';
 }
 
 function adaptation(kind: string, resource: StreamResource, buffer: SabrTrackBuffer,

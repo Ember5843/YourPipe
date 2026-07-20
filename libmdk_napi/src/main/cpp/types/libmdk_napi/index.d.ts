@@ -156,7 +156,7 @@ export interface MediaInfo {
 export interface NativeMdkPlayerModule {
   ensurePlayer: (playerId: string) => void;
   releasePlayer: (playerId: string) => void;
-  setMedia: (playerId: string, url: string) => void;
+  setMedia: (playerId: string, url: string, startPositionMs?: number) => void;
   setMediaSource: (playerId: string, url: string, mediaType: number) => void;
   play: (playerId: string) => void;
   pause: (playerId: string) => void;
@@ -176,6 +176,7 @@ export interface NativeMdkPlayerModule {
   setAudioBackends: (playerId: string, names: string[]) => void;
   getPosition: (playerId: string) => number;
   buffered: (playerId: string) => number;
+  getSeekableRangesJson: (playerId: string) => string;
   getState: (playerId: string) => number;
   getMediaStatus: (playerId: string) => number;
   getMediaInfo: (playerId: string) => MediaInfo;

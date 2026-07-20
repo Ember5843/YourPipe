@@ -101,6 +101,15 @@ export class YoutubeJavaScriptPlayerManager {
       const idMatch = /\/s\/player\/([^/]+)\//.exec(playerJsUrl);
       if (!idMatch?.[1]) throw new Error('prewarm watch has invalid Player JS URL');
       const playerId = idMatch[1];
+      const stsMatch = /"STS"\s*:\s*(\d+)/.exec(html);
+      const signatureTimestamp = stsMatch?.[1] ? parseInt(stsMatch[1], 10) : 0;
+      if (signatureTimestamp > 0) {
+        PipePipeApiDecoder.setLocalMetadata({
+          playerId: playerId,
+          signatureTimestamp: signatureTimestamp
+        });
+        logger.info(`[CipherWarmup] stage=metadata player=${playerId} sts=${signatureTimestamp}`);
+      }
 
       const cached = YoutubeJavaScriptPlayerManager.readDiskCache();
       if (cached && cached.playerId === playerId && cached.playerJsUrl === playerJsUrl) {

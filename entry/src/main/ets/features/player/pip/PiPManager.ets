@@ -49,6 +49,9 @@ export class PiPManager {
   private lastIsPlaying: boolean = false;
   private desiredAutoStart: boolean = false;
   private suppressNextStopAction: boolean = false;
+  private pendingRestoreComponentController: XComponentController | null = null;
+  private restoreWatchdogTimerId: number = -1;
+  private restoreStopped: boolean = false;
   private playbackStateListener = (state: PlaybackState): void => {
     this.hasPlaybackState = true;
     this.lastIsPlaying = state.isPlaying;
@@ -94,6 +97,20 @@ export class PiPManager {
    * 这是 XComponent 方式 PiP 的 componentController 来源。
    */
   setComponentController(controller: XComponentController): void {
+    const session = PlayerSession.getInstance();
+    if (this.isRestoring || session.isPipRestoring) {
+      // The restored page can expose its new XComponent before the old PiP
+      // controller reports STOPPED. Keep the new surface pending until the
+      // old system-owned surface is fully released.
+      this.componentController = controller;
+      this.pendingRestoreComponentController = controller;
+      if (this.restoreStopped) {
+        this.finishRestoreRebind();
+      } else {
+        logger.info(`${TAG} setComponentController: defer PiP recreation until restore STOPPED`);
+      }
+      return;
+    }
     // PiPWindow.create captures componentController; changing our field does
     // not update an existing PiPController. A newly-created PlayerPage must
     // therefore invalidate a controller bound to the previous page surface.
@@ -210,6 +227,7 @@ export class PiPManager {
         // 已进入 PiP：surface 已被悬浮窗接管，主页 XComponent 实际是空帧。
         // 此时再 mount 占位层填上空白，无闪烁。
         session.setPiPActive(true);
+        session.completePipHandoff();
         // Keep video decode ON for PiP surface (cancel any background off timer).
         PlayerPresentation.onPipStarted();
         this.applyPlaybackStateToPiP();
@@ -243,6 +261,9 @@ export class PiPManager {
         // 点 PiP 恢复按钮：通知外部（Index）确保 PlayerPage 在栈顶，准备重建。
         // 占位层已在 ABOUT_TO_STOP 提前隐藏，这里只设置 isRestoring 标记。
         this.isRestoring = true;
+        this.restoreStopped = false;
+        session.setPipRestoring(true);
+        this.startRestoreWatchdog();
         if (this.onPipRestore) {
           this.onPipRestore();
         }
@@ -264,6 +285,8 @@ export class PiPManager {
         } else if (reason === 'panelActionRestore') {
           logger.info(`${TAG} STOPPED via panelActionRestore, skip (will restore)`);
           PlayerPresentation.onPipStopped(true);
+          this.restoreStopped = true;
+          this.finishRestoreRebind();
         } else if (this.isDeleteReason(reason)) {
           logger.info(`${TAG} STOPPED via ${reason}, release session + destroy pipController`);
           PlayerPresentation.onPipStopped(false);
@@ -277,13 +300,30 @@ export class PiPManager {
           PlayerPresentation.onPipStopped(false);
           this.handleDefaultPipStop();
         }
-        this.isRestoring = false;
+        // Restore completion is finalized by finishRestoreRebind once both
+        // STOPPED and the replacement page surface are available. If either
+        // event is still missing, leave the watchdog armed.
+        if (!this.isRestoring) {
+          session.setPipRestoring(false);
+          this.clearRestoreWatchdog();
+        }
         break;
       case PiPWindow.PiPState.ERROR:
         logger.error(`${TAG} PiP error: ${reason}`);
+        const failedDuringRestore = this.isRestoring || session.isPipRestoring;
+        session.cancelPipHandoff();
         session.setPiPActive(false);
         PlayerPresentation.onPipStopped(false);
-        this.isRestoring = false;
+        if (failedDuringRestore) {
+          logger.error(`${TAG} PiP restore failed; closing media session`);
+          session.release();
+          this.destroy();
+        } else {
+          this.isRestoring = false;
+          this.restoreStopped = false;
+          session.setPipRestoring(false);
+          this.clearRestoreWatchdog();
+        }
         break;
       default:
         break;
@@ -481,24 +521,68 @@ export class PiPManager {
     this.pipController = null;
     this.boundComponentController = null;
     this.isInitialized = false;
+    this.isRestoring = false;
+    this.restoreStopped = false;
+    PlayerSession.getInstance().setPipRestoring(false);
     // requestDelete 在 ABOUT_TO_STOP 中已经清除了旧页面 controller。其他 destroy
     // 场景可能仍会复用同一个页面，因此这里不做无条件清理。
     // 同步清 PiP 激活标志，避免占位层/返回键误判残留。
     PlayerSession.getInstance().setPiPActive(false);
     // 清待初始化缓存，避免冷重置后残留旧参数误触发 init。
     this.pendingInitCtx = null;
+    this.pendingRestoreComponentController = null;
+    this.clearRestoreWatchdog();
+  }
+
+  private finishRestoreRebind(): void {
+    const restoredController = this.pendingRestoreComponentController;
+    if (!restoredController || !this.restoreStopped) {
+      return;
+    }
+    this.unregisterCallbacks();
+    this.pipController = null;
+    this.boundComponentController = null;
+    this.isInitialized = false;
+    this.componentController = restoredController;
+    this.pendingRestoreComponentController = null;
+    this.isRestoring = false;
+    this.restoreStopped = false;
+    PlayerSession.getInstance().setPipRestoring(false);
+    this.clearRestoreWatchdog();
+    const ctx = AppStorage.get<common.UIAbilityContext>('context');
+    if (!ctx) {
+      logger.warn(`${TAG} restore rebind skipped: context unavailable`);
+      return;
+    }
+    const vm = PlayerSession.getInstance().controller.vm;
+    this.init(ctx, vm.videoWidth || 16, vm.videoHeight || 9).catch((e: Error) => {
+      logger.warn(`${TAG} restore PiP recreation failed: ${e.message}`);
+    });
+  }
+
+  private startRestoreWatchdog(): void {
+    this.clearRestoreWatchdog();
+    this.restoreStopped = false;
+    this.restoreWatchdogTimerId = setTimeout(() => {
+      this.restoreWatchdogTimerId = -1;
+      if (!this.isRestoring) return;
+      logger.error(`${TAG} restore timed out; closing media session`);
+      PlayerSession.getInstance().release();
+      this.destroy();
+    }, 5000);
+  }
+
+  private clearRestoreWatchdog(): void {
+    if (this.restoreWatchdogTimerId >= 0) {
+      clearTimeout(this.restoreWatchdogTimerId);
+      this.restoreWatchdogTimerId = -1;
+    }
   }
 
   private handleDefaultPipStop(): void {
     const session = PlayerSession.getInstance();
-    const isAppBackground = AppStorage.get<boolean>('isAppBackground') ?? false;
-    if (isAppBackground) {
-      logger.info(`${TAG} default stop while background -> pause`);
-      session.controller.syncPause();
-    } else {
-      logger.info(`${TAG} default stop while foreground -> release`);
-      session.release();
-    }
+    logger.info(`${TAG} default PiP stop -> close media session`);
+    session.release();
   }
 
   /** HarmonyOS versions report panel close as either value. */

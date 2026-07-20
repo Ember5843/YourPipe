@@ -477,7 +477,7 @@ export struct VideoPlayer {
     this.scheduleHideControls();
   }
 
-  async aboutToAppear(): Promise<void> {
+  aboutToAppear(): void {
     const context: Context = this.getUIContext().getHostContext() as Context;
 
     // 清理错误状态（包括 PlayerPage 设置的 API 层错误和 Controller 设置的播放错误）
@@ -489,11 +489,7 @@ export struct VideoPlayer {
     // 先拿主窗口，再注册 keep-screen / 状态监听。
     // 旧顺序在 mainWin 未就绪时调用 setKeepScreenOn，会把 lastKeepScreenOn 置 true
     // 却不下发系统 API，后续同值又被短路 → 播放中自动息屏。
-    await this.envService.init(context);
-    const brightness = await this.envService.getBrightness(context);
-    this.gestureBrightnessValue = brightness;
-    const volInfo = this.envService.getVolume();
-    this.gestureVolumeValue = volInfo.volume / volInfo.maxVolume;
+    this.initializePlayerEnvironment(context);
 
     // 注册进度监听（节流后的 currentTime/durationTime）
     this.controller.subscribeProgress(this.progressListener);
@@ -522,7 +518,9 @@ export struct VideoPlayer {
 
     // 确保播放引擎已初始化（不再需要传递 XComponentController）
     const session = PlayerSession.getInstance();
-    await session.ensureInitialized();
+    session.ensureInitialized().catch((e: Error) => {
+      Logger.warn(TAG, `Deferred engine initialization failed: ${e.message || e}`);
+    });
 
     // 主动注入 componentController：aboutToAppear 每次组件创建必跑，比 onLoad 可靠。
     // 冷启动 destroy 清空了 PiPManager.componentController，若仅靠 onLoad 重注入，
@@ -544,6 +542,18 @@ export struct VideoPlayer {
 
   // ── 多段缓存条绘制 ──
   // 当 seekableRanges 更新时由 @Watch 触发，在 Canvas onReady 保存的 ctx 上绘制。
+  private async initializePlayerEnvironment(context: Context): Promise<void> {
+    try {
+      await this.envService.init(context);
+      const brightness = await this.envService.getBrightness(context);
+      this.gestureBrightnessValue = brightness;
+      const volInfo = this.envService.getVolume();
+      this.gestureVolumeValue = volInfo.volume / volInfo.maxVolume;
+    } catch (e) {
+      Logger.warn(TAG, `Player environment initialization failed: ${e}`);
+    }
+  }
+
   private drawCacheRanges(): void {
     const ctx = this.cacheCanvasCtx;
     const duration = this.durationTime;

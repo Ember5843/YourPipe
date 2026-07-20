@@ -9,7 +9,7 @@ import { UIConfig } from '../common/AppState';
 import { PlaybackConfig } from '../common/PlaybackConfig';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
-import { BackgroundTaskManager, AvPlayerController } from 'mediaservice';
+import { BackgroundTaskManager, AvPlayerController, LocalMediaProxy } from 'mediaservice';
 import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
 import { AuthSessionManager, YTCoreLogger, YoutubeJavaScriptPlayerManager,
   YoutubePlayerClientConfig } from 'youtube_core';
@@ -18,6 +18,7 @@ import { AppLogStore } from '../common/AppLogStore';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
 import { PlayerSession } from '../common/PlayerSession';
 import { PlayerPresentation } from '../common/PlayerPresentation';
+import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import type { EngineConfig } from 'mediaservice';
 
 const logger = AppLog.getInstance('EntryAbility');
@@ -27,6 +28,7 @@ export default class EntryAbility extends UIAbility {
   private curBp: string = '';
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate('context', this.context);
+    AppStorage.setOrCreate('playerLoading', false);
     try {
       this.context.setMissionContinueState(AbilityConstant.ContinueState.INACTIVE);
     } catch (err) {
@@ -86,12 +88,33 @@ export default class EntryAbility extends UIAbility {
       });
       YoutubeJavaScriptPlayerManager.startAppPrewarm(this.context)
         .catch((e: Error) => logger.warn(`Cipher prewarm failed: ${e.message || e}`));
+      this.startPlaybackPrewarm();
       LanguageManager.applyPersistedLanguage();
       ColorModeManager.applyPersistedMode(this.context);
     } catch (err) {
       logger.error(`onCreate failed: ${JSON.stringify(err)}`);
     }
     logger.info('Ability onCreate');
+  }
+
+  private startPlaybackPrewarm(): void {
+    const startedAt = Date.now();
+    PlayerSession.getInstance().prewarmPlaybackEngine().then(() => {
+      logger.info(`Playback prewarm MPV ready elapsed=${Date.now() - startedAt}ms`);
+    }).catch((e: Error) => {
+      logger.warn(`Playback prewarm MPV failed: ${e.message || e}`);
+    });
+    LocalMediaProxy.warmup().then((ok: boolean) => {
+      logger.info(`Playback prewarm proxy ready=${ok} elapsed=${Date.now() - startedAt}ms`);
+    }).catch((e: Error) => {
+      logger.warn(`Playback prewarm proxy failed: ${e.message || e}`);
+    });
+    const service = YouTubePlayService.getInstance(this.context);
+    service.initialize().then(() => service.prewarmClientVersion()).then(() => {
+      logger.info(`Playback prewarm extractor ready elapsed=${Date.now() - startedAt}ms`);
+    }).catch((e: Error) => {
+      logger.warn(`Playback prewarm extractor failed: ${e.message || e}`);
+    });
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -113,6 +136,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    PlayerSession.getInstance().controller.releaseVideo(0);
     logger.info('Ability onDestroy');
   }
 

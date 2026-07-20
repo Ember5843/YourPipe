@@ -17,6 +17,8 @@ export interface PlaybackState {
   duration: number;
   playbackSpeed: number;
   bufferingPercent: number;
+  /** MPV demuxer cache ranges in media seconds; ranges may be sparse after seeking. */
+  seekableRanges: number[][];
   uri: string;
   mediaTitle: string;
   containerFormat: string;

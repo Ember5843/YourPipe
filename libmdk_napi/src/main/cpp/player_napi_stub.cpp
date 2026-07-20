@@ -141,6 +141,11 @@ napi_value Buffered(napi_env env, napi_callback_info /*info*/)
     return MakeDouble(env, 0);
 }
 
+napi_value GetSeekableRangesJson(napi_env env, napi_callback_info /*info*/)
+{
+    return MakeString(env, "[]");
+}
+
 napi_value GetState(napi_env env, napi_callback_info /*info*/)
 {
     return MakeInt(env, 0); // Stopped
@@ -258,6 +263,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"setAudioBackends", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getPosition", nullptr, GetPosition, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"buffered", nullptr, Buffered, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"getSeekableRangesJson", nullptr, GetSeekableRangesJson, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getState", nullptr, GetState, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getMediaStatus", nullptr, GetMediaStatus, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getMediaInfo", nullptr, GetMediaInfo, nullptr, nullptr, nullptr, napi_default, nullptr},
