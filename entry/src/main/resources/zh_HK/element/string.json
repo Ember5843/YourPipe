@@ -2703,6 +2703,42 @@
         {
             "name": "yt_proxy_loopback_note",
             "value": "本地播放环回地址（127.0.0.1）不会走此代理。"
+        },
+        {
+            "name": "yt_device_qr_sign_in",
+            "value": "二维码 / 电视码登录"
+        },
+        {
+            "name": "yt_device_qr_sign_in_subtitle",
+            "value": "手机扫码，或打开 youtube.com/activate"
+        },
+        {
+            "name": "yt_device_login_help",
+            "value": "请在另一台设备打开下方链接或扫描二维码，输入验证码完成授权（类似 SmartTube 电视登录）。"
+        },
+        {
+            "name": "yt_device_login_requesting",
+            "value": "正在获取设备码…"
+        },
+        {
+            "name": "yt_device_login_waiting",
+            "value": "等待你在手机上完成授权…"
+        },
+        {
+            "name": "yt_device_login_polling",
+            "value": "正在检查授权状态"
+        },
+        {
+            "name": "yt_device_login_success",
+            "value": "登录成功"
+        },
+        {
+            "name": "yt_device_login_failed",
+            "value": "登录失败"
+        },
+        {
+            "name": "yt_device_login_retry",
+            "value": "重试"
         }
     ]
 }

@@ -29,6 +29,8 @@ interface CookieVerifyResult {
 interface OptionsDataAccountPageParams {
   /** Open Google WebView login (after notice dialog). */
   onLoginClick: () => void;
+  /** Open SmartTube-style device / QR OAuth login. */
+  onDeviceQrLoginClick: () => void;
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
   onHomeFeedStyleChanged: () => void;
   onAuthChanged: () => void;
@@ -42,6 +44,7 @@ export struct OptionsDataAccountPage {
 
   @Prop params: OptionsDataAccountPageParams = {
     onLoginClick: () => {},
+    onDeviceQrLoginClick: () => {},
     updateUiConfig: () => {},
     onHomeFeedStyleChanged: () => {},
     onAuthChanged: () => {}
@@ -528,6 +531,21 @@ export struct OptionsDataAccountPage {
                 clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
                 onClickAction: () => {
                   this.startLogin();
+                }
+              })
+            }
+
+            ListItem() {
+              OptionItem({
+                icon: $r('sys.symbol.wifi'),
+                title: $r('app.string.yt_device_qr_sign_in'),
+                subtitle: $r('app.string.yt_device_qr_sign_in_subtitle'),
+                iconColor: this.themePrimary,
+                showChevron: true,
+                transparentBackground: true,
+                clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+                onClickAction: () => {
+                  this.params.onDeviceQrLoginClick();
                 }
               })
             }

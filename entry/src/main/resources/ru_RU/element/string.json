@@ -2703,6 +2703,42 @@
         {
             "name": "yt_proxy_loopback_note",
             "value": "Local playback proxy (127.0.0.1) never uses this setting."
+        },
+        {
+            "name": "yt_device_qr_sign_in",
+            "value": "QR / TV code sign-in"
+        },
+        {
+            "name": "yt_device_qr_sign_in_subtitle",
+            "value": "Scan with phone or open youtube.com/activate"
+        },
+        {
+            "name": "yt_device_login_help",
+            "value": "On another device, open the link or scan the QR code, then enter the code below to authorize this app."
+        },
+        {
+            "name": "yt_device_login_requesting",
+            "value": "Requesting device code…"
+        },
+        {
+            "name": "yt_device_login_waiting",
+            "value": "Waiting for authorization…"
+        },
+        {
+            "name": "yt_device_login_polling",
+            "value": "Checking authorization status"
+        },
+        {
+            "name": "yt_device_login_success",
+            "value": "Signed in"
+        },
+        {
+            "name": "yt_device_login_failed",
+            "value": "Sign-in failed"
+        },
+        {
+            "name": "yt_device_login_retry",
+            "value": "Try again"
         }
     ]
 }

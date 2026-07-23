@@ -9,7 +9,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import type { BusinessError } from '@kit.BasicServicesKit';
 import { ActionHub, ActionHubEvent } from '../common/ActionHub';
 import { AuthSessionManager, SearchChannelItem, SearchPlaylistItem,
-  YoutubeJavaScriptPlayerManager } from 'youtube_core';
+  YoutubeJavaScriptPlayerManager, YoutubePlayerClientConfig } from 'youtube_core';
 import { VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../common/SubscriptionModel';
 import { LocalStore } from '../common/LocalStore';
@@ -38,6 +38,7 @@ import { VideoDetailPage } from '../features/player/VideoDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
 import { PlayerPresentation } from '../common/PlayerPresentation';
 import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
+import { DeviceQrLoginPage } from '../features/auth/DeviceQrLoginPage';
 import { SabrPoTokenWebRuntime } from '../features/player/SabrPoTokenWebRuntime';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { customAnimationUtil } from '../common/AnimationUtil';
@@ -1973,6 +1974,7 @@ struct Index {
         OptionsDataAccountPage({
           params: {
             onLoginClick: () => { this.pushOptionsPath('webview_login'); },
+            onDeviceQrLoginClick: () => { this.pushOptionsPath('device_qr_login'); },
             updateUiConfig: this.updateUiConfig.bind(this),
             onHomeFeedStyleChanged: () => { this.refreshHomeAfterAuthChange(); },
             onAuthChanged: () => { this.refreshHomeAfterAuthChange(); }
@@ -1982,6 +1984,43 @@ struct Index {
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
         title: $r('app.string.yt_option_data_account'),
+        onBack: () => {
+          this.popOptionsPath();
+        }
+      }))
+      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .onBackPressed(() => {
+        this.popOptionsPath();
+        return true;
+      })
+    } else if (name === 'device_qr_login') {
+      HdsNavDestination() {
+        DeviceQrLoginPage({
+          onSuccess: () => {
+            AuthStateHelper.refresh();
+            YoutubePlayerClientConfig.resetToAuthDefault(
+              AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true
+            );
+            this.refreshHomeAfterAuthChange();
+            this.webViewLoginBackHandler = null;
+            this.popOptionsPath();
+            try {
+              this.getUIContext().getPromptAction().showToast({
+                message: $r('app.string.yt_toast_login_success'),
+                duration: 2000
+              });
+            } catch (_e) {
+              // ignore
+            }
+          },
+          onCancel: () => {
+            this.popOptionsPath();
+          }
+        })
+      }
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_device_qr_sign_in'),
         onBack: () => {
           this.popOptionsPath();
         }

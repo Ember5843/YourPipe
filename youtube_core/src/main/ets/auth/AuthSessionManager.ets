@@ -37,6 +37,18 @@ export class AuthSessionManager {
   /** Fine-grained: attach auth to playback extraction (player API + stream URL cookies). */
   private useAuthForPlayback: boolean = true;
 
+  /** Device / QR OAuth (SmartTube-style) in-flight state. */
+  private deviceFlowActive: boolean = false;
+  private deviceCode: string = '';
+  private deviceUserCode: string = '';
+  private deviceVerificationUrl: string = 'https://youtube.com/activate';
+  private deviceExpiresAt: number = 0;
+  private devicePollIntervalMs: number = 5000;
+  private devicePollGeneration: number = 0;
+  private deviceLastError: string = '';
+  private deviceLastErrorCode: string = '';
+  private deviceStage: AuthStage = AuthStage.SIGNED_OUT;
+
   private constructor(context: Context) {
     this.context = context;
   }
@@ -60,6 +72,12 @@ export class AuthSessionManager {
     status.useAuthForUserData = this.useAuthForUserData;
     status.useAuthForPlayback = this.useAuthForPlayback;
     status.hasCredential = this.hasCredential();
+    status.userCode = this.deviceUserCode;
+    status.verificationUrl = this.deviceVerificationUrl;
+    status.expiresAt = this.deviceExpiresAt;
+    status.pollIntervalMs = this.devicePollIntervalMs;
+    status.lastError = this.deviceLastError;
+    status.lastErrorCode = this.deviceLastErrorCode;
     if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
       status.stage = AuthStage.SIGNED_IN;
       status.authMode = 'cookie';
@@ -69,10 +87,155 @@ export class AuthSessionManager {
       status.authMode = 'oauth';
       status.hasRefreshToken = true;
       status.accessTokenExpiresAt = this.accessTokenExpiresAt;
+    } else if (this.deviceFlowActive) {
+      status.stage = this.deviceStage;
+      status.authMode = 'oauth';
     } else {
       status.authMode = 'none';
+      status.stage = AuthStage.SIGNED_OUT;
     }
     return status;
+  }
+
+  /**
+   * SmartTube-style device OAuth: request user_code, then poll until authorized.
+   * UI shows QR(verificationUrl + user_code) and the human-readable code.
+   */
+  async startDeviceLogin(): Promise<AuthAccountStatus> {
+    this.cancelDeviceLoginInternal(false);
+    this.deviceFlowActive = true;
+    this.deviceStage = AuthStage.REQUESTING_CODE;
+    this.deviceLastError = '';
+    this.deviceLastErrorCode = '';
+    this.deviceUserCode = '';
+    this.deviceCode = '';
+    logger.info('Device login: requesting code');
+    try {
+      const code = await this.probe.requestDeviceCode();
+      if (!code.deviceCode || !code.userCode) {
+        this.deviceStage = AuthStage.FAILED;
+        this.deviceLastErrorCode = 'empty_device_code';
+        this.deviceLastError = '无法获取设备码，请稍后重试';
+        this.deviceFlowActive = false;
+        return this.getStatus();
+      }
+      this.deviceCode = code.deviceCode;
+      this.deviceUserCode = code.userCode;
+      this.deviceVerificationUrl = code.verificationUrl || 'https://youtube.com/activate';
+      this.deviceExpiresAt = Date.now() + Math.max(code.expiresIn, 60) * 1000;
+      this.devicePollIntervalMs = Math.max(3, code.interval || 5) * 1000;
+      this.deviceStage = AuthStage.WAITING_FOR_USER;
+      const gen = ++this.devicePollGeneration;
+      this.scheduleDevicePoll(gen);
+      logger.info(`Device login: waiting user_code=${code.userCode} intervalMs=${this.devicePollIntervalMs}`);
+      return this.getStatus();
+    } catch (e) {
+      this.deviceStage = AuthStage.FAILED;
+      this.deviceFlowActive = false;
+      this.deviceLastErrorCode = 'network_error';
+      this.deviceLastError = e instanceof Error ? e.message : '网络错误';
+      logger.error(`Device login request failed: ${this.deviceLastError}`);
+      return this.getStatus();
+    }
+  }
+
+  cancelDeviceLogin(): AuthAccountStatus {
+    this.cancelDeviceLoginInternal(true);
+    return this.getStatus();
+  }
+
+  private cancelDeviceLoginInternal(log: boolean): void {
+    this.devicePollGeneration++;
+    this.deviceFlowActive = false;
+    this.deviceCode = '';
+    this.deviceUserCode = '';
+    this.deviceExpiresAt = 0;
+    this.deviceStage = AuthStage.SIGNED_OUT;
+    this.deviceLastError = '';
+    this.deviceLastErrorCode = '';
+    if (log) {
+      logger.info('Device login cancelled');
+    }
+  }
+
+  private scheduleDevicePoll(generation: number): void {
+    const delay = this.devicePollIntervalMs > 0 ? this.devicePollIntervalMs : 5000;
+    setTimeout(() => {
+      this.pollDeviceOnce(generation).catch((e: Error) => {
+        logger.warn(`Device poll exception: ${e.message || e}`);
+      });
+    }, delay);
+  }
+
+  private async pollDeviceOnce(generation: number): Promise<void> {
+    if (generation !== this.devicePollGeneration || !this.deviceFlowActive) {
+      return;
+    }
+    if (Date.now() >= this.deviceExpiresAt) {
+      this.deviceStage = AuthStage.FAILED;
+      this.deviceFlowActive = false;
+      this.deviceLastErrorCode = 'expired_token';
+      this.deviceLastError = this.toUserMessage('expired_token');
+      logger.warn('Device login expired');
+      return;
+    }
+    this.deviceStage = AuthStage.POLLING_TOKEN;
+    try {
+      const token = await this.probe.pollToken(this.deviceCode);
+      if (generation !== this.devicePollGeneration || !this.deviceFlowActive) {
+        return;
+      }
+      if (token.accessToken.length > 0 || token.refreshToken.length > 0) {
+        // Prefer OAuth-only session for device login; drop cookie so mode is oauth.
+        this.cookieCredential = null;
+        this.persistCookieCredential();
+        this.authEnabled = true;
+        this.persistAuthEnabled();
+        this.saveToken(token);
+        this.deviceFlowActive = false;
+        this.deviceStage = AuthStage.SIGNED_IN;
+        this.deviceCode = '';
+        this.deviceUserCode = '';
+        this.deviceLastError = '';
+        this.deviceLastErrorCode = '';
+        logger.info('Device login succeeded');
+        return;
+      }
+      const err = token.error || '';
+      if (err === 'authorization_pending' || err === 'slow_down') {
+        if (err === 'slow_down') {
+          this.devicePollIntervalMs = Math.min(this.devicePollIntervalMs + 2000, 15000);
+        }
+        this.deviceStage = AuthStage.WAITING_FOR_USER;
+        this.scheduleDevicePoll(generation);
+        return;
+      }
+      if (err === 'expired_token' || err === 'access_denied') {
+        this.deviceStage = AuthStage.FAILED;
+        this.deviceFlowActive = false;
+        this.deviceLastErrorCode = err;
+        this.deviceLastError = this.toUserMessage(err);
+        logger.warn(`Device login terminal: ${err}`);
+        return;
+      }
+      if (err.length > 0) {
+        this.deviceStage = AuthStage.FAILED;
+        this.deviceFlowActive = false;
+        this.deviceLastErrorCode = err;
+        this.deviceLastError = this.toUserMessage(err);
+        return;
+      }
+      this.deviceStage = AuthStage.WAITING_FOR_USER;
+      this.scheduleDevicePoll(generation);
+    } catch (e) {
+      if (generation !== this.devicePollGeneration || !this.deviceFlowActive) {
+        return;
+      }
+      // Transient network: keep polling until expiry.
+      logger.warn(`Device poll network error, retrying: ${e instanceof Error ? e.message : String(e)}`);
+      this.deviceStage = AuthStage.WAITING_FOR_USER;
+      this.scheduleDevicePoll(generation);
+    }
   }
 
   hasCredential(): boolean {
@@ -380,8 +543,14 @@ export class AuthSessionManager {
         return '登录状态已失效，请重新登录';
       case 'expired_token':
         return '设备码已过期，请重新开始登录';
+      case 'access_denied':
+        return '授权被拒绝';
+      case 'authorization_pending':
+        return '等待授权中';
+      case 'slow_down':
+        return '请稍后再试';
       default:
-        return `登录失败：${code}`;
+        return code.length > 0 ? `登录失败：${code}` : '登录失败';
     }
   }
 }
