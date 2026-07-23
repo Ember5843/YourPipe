@@ -91,6 +91,13 @@ export class AvPlayerController {
   private isRecovering: boolean = false;
   private readonly MAX_ERROR_RETRIES = 2;
   private lastKnownGoodPosition: number = 0;
+  /**
+   * Quality/audio switch in flight: keep spinner on while proxy rebuilds + engine reloads.
+   * loadStarted becomes true only after createPlaybackUrl finishes and load() is called,
+   * so stale engine snapshots cannot clear the spinner early.
+   */
+  private qualitySwitchPending: boolean = false;
+  private qualitySwitchLoadStarted: boolean = false;
 
   // Audio focus state (player-side handler for system hints — scheme A)
   /** Temporary focus loss (PAUSE): auto-resume on RESUME. */
@@ -553,10 +560,21 @@ export class AvPlayerController {
 
     this.vm.playerModel.updateVideoStream(videoStream);
     this.vm.playerModel.updateAudioStream(effectiveAudio);
+    // 立刻给 UI 缓冲态：createPlaybackUrl（SIDX/SABR warm）可能数秒，期间引擎仍报旧源 isBuffering=false
+    this.qualitySwitchPending = true;
+    this.qualitySwitchLoadStarted = false;
+    this.vm.isBuffering = true;
 
     const playbackUrl = await this.createPlaybackUrl(videoStream, effectiveAudio, generation);
-    if (!this.isMediaSessionCurrent(generation)) return;
+    if (!this.isMediaSessionCurrent(generation)) {
+      this.qualitySwitchPending = false;
+      this.qualitySwitchLoadStarted = false;
+      return;
+    }
     if (!playbackUrl) {
+      this.qualitySwitchPending = false;
+      this.qualitySwitchLoadStarted = false;
+      this.vm.isBuffering = false;
       this.setError('[PLAYER] LOCAL_PROXY_FAILED');
       return;
     }
@@ -565,7 +583,15 @@ export class AvPlayerController {
       `switchQuality: ${videoStream.height}p codec=${videoStream.codecs} itag=${videoStream.itag} ` +
       `hw=${VideoHwCaps.isCodecHardwareFriendly(videoStream.codecs)} pos=${resumePos.toFixed(2)}s`);
     // Manual quality switch always allowed (including 4K VP9/AV1). Engine is mpv.
-    this.loadPlaybackSource(playbackUrl, resumePos, generation);
+    this.qualitySwitchLoadStarted = true;
+    this.vm.isBuffering = true;
+    const loaded = this.loadPlaybackSource(playbackUrl, resumePos, generation);
+    if (!loaded) {
+      this.qualitySwitchPending = false;
+      this.qualitySwitchLoadStarted = false;
+      this.vm.isBuffering = false;
+      return;
+    }
     if (wasPlaying) {
       this.playbackEngine.play();
     }
@@ -1525,7 +1551,23 @@ export class AvPlayerController {
 
     // 更新 ViewModel 字段（ArkTS 自动推送到绑定的 UI）
     this.vm.isPlaying = state.isPlaying;
-    this.vm.isBuffering = state.isBuffering;
+    // 切清晰度/音轨：代理重建 + 新 load 完成前强制缓冲指示；勿被旧源 snapshot 清掉
+    if (this.qualitySwitchPending) {
+      const hardError = !!(state.errorMsg && state.errorMsg.length > 0);
+      if (hardError) {
+        this.qualitySwitchPending = false;
+        this.qualitySwitchLoadStarted = false;
+        this.vm.isBuffering = state.isBuffering;
+      } else if (this.qualitySwitchLoadStarted && state.isReady && !state.isBuffering) {
+        this.qualitySwitchPending = false;
+        this.qualitySwitchLoadStarted = false;
+        this.vm.isBuffering = false;
+      } else {
+        this.vm.isBuffering = true;
+      }
+    } else {
+      this.vm.isBuffering = state.isBuffering;
+    }
     this.vm.isReady = state.isReady;
     this.vm.isSeeking = state.isSeeking;
     this.vm.isEnded = state.isEnded;
