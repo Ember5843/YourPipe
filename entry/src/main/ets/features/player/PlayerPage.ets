@@ -57,15 +57,16 @@ export struct VideoPlayerPage {
   // Index Provide 的 safeAreaTop 作为兜底，避免 Storage 尚未写入时 inset 为 0
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   // 三种布局状态：
-  //   isFullLandscapeScreen = true  → 沉浸全屏（视频 100%，隐藏系统栏）
-  //   isWideLayout         = true  → 平板/折叠屏宽布局（左视频 60% + 右信息 40%）
+  //   isFullLandscapeScreen = true  → 沉浸全屏（视频 100%）
+  //   isWideLayout         = true  → 宽窗口侧栏布局（左视频 60% + 右信息 40%）
   //   都为 false                 → 竖屏（上视频 + 下 Tab）
-  // isManualFullscreen 标识"用户主动点了全屏按钮"，仅它为真时才进入沉浸全屏；
-  // 否则系统横屏一律走宽布局。
+  // isManualFullscreen：用户点了全屏按钮。默认打开不强制全屏/横屏；仅分屏强制铺满。
   @State isFullLandscapeScreen: boolean = false;
   @State isWideLayout: boolean = false;
   @State isManualFullscreen: boolean = false;
   @State isImmersive: boolean = false;
+  /** 仅分屏：视频默认铺满分屏窗口 */
+  @StorageProp('isSplitScreen') @Watch('onSplitScreenChange') isSplitScreen: boolean = false;
   @Consume('actionHub') actionHub: ActionHub;
   onFullScreenChange?: (isFullScreen: boolean) => void;
 
@@ -338,18 +339,18 @@ export struct VideoPlayerPage {
       this.isLoading = true;
     }
 
-    // 进入播放页：重置沉浸全屏标志，由 WindowUtil 全局策略按当前方向决定系统栏
+    // 进入播放页：不改朝向、不声明横向多窗；仅按当前窗口尺寸 + 是否分屏算布局
+    this.isManualFullscreen = false;
     this.windowUtil.setPlayerFullscreenImmersive(false);
-    // Dark video surface: force white status-bar icons (鸿蒙沉浸式推荐：内容延伸 + 图标对比色)
     this.windowUtil.setPlayerStatusBarStyle(true);
+    this.windowUtil.disableLandscapeMultiWindow();
+    this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
 
     const initW = this.deviceWidth;
     const initH = this.deviceHeight;
-    if (initW > 0 && initH > 0 && initW > initH) {
-      this.isWideLayout = true;
-      const shortSideVp = this.getUIContext().px2vp(Math.min(initW, initH));
-      this.isImmersive = shortSideVp < 600;
-      logger.info(`${TAG} entered in landscape, wide layout, immersive=${this.isImmersive}`);
+    if (initW > 0 && initH > 0) {
+      this.applyLayoutForWindowSize(initW, initH);
+      logger.info(`${TAG} entered layout full=${this.isFullLandscapeScreen} wide=${this.isWideLayout} split=${this.isSplitScreen}`);
     }
 
     // 0.5.1 混合动画：
@@ -390,6 +391,7 @@ export struct VideoPlayerPage {
     // 离开播放页：清除沉浸全屏标志，恢复主题状态栏颜色
     this.windowUtil.setPlayerFullscreenImmersive(false);
     this.windowUtil.setPlayerStatusBarStyle(false);
+    this.windowUtil.disableLandscapeMultiWindow();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
     this.windowUtil.registerOffWindowSizeChange();
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
@@ -567,12 +569,30 @@ export struct VideoPlayerPage {
     }
   }
 
-  /** Compute layout flags from window size + manual fullscreen intent. */
+  private onSplitScreenChange(): void {
+    // 分屏进出时立刻按当前窗口尺寸重算布局（不依赖下一次 sizeChange）
+    if (this.deviceWidth > 0 && this.deviceHeight > 0) {
+      this.onPlayerWindowSizeChange(this.deviceWidth, this.deviceHeight);
+    }
+  }
+
+  /**
+   * 布局规则（默认打开不做强制全屏/横屏）：
+   *   分屏 → 视频铺满分屏窗
+   *   用户手动全屏 → 沉浸全屏
+   *   否则仅按窗口宽高：横 → 宽布局，竖 → 竖屏详情
+   */
   private applyLayoutForWindowSize(widthPx: number, heightPx: number): void {
     const isLandscape = widthPx > heightPx;
     const shortSideVp = this.getUIContext().px2vp(Math.min(widthPx, heightPx));
+    const inSplit = this.isSplitScreen || this.windowUtil.isSplitScreenMode();
 
-    if (this.isManualFullscreen) {
+    if (inSplit) {
+      // 分屏：仅布局铺满，不改系统朝向
+      this.isFullLandscapeScreen = true;
+      this.isWideLayout = false;
+      this.isImmersive = true;
+    } else if (this.isManualFullscreen) {
       this.isFullLandscapeScreen = true;
       this.isWideLayout = false;
       this.isImmersive = true;
@@ -585,7 +605,8 @@ export struct VideoPlayerPage {
       this.isWideLayout = false;
       this.isImmersive = false;
     }
-    this.windowUtil.setPlayerFullscreenImmersive(this.isManualFullscreen || this.isFullLandscapeScreen);
+    // 系统栏：手动全屏或分屏沉浸时隐藏；其余交给 WindowUtil 方向策略
+    this.windowUtil.setPlayerFullscreenImmersive(this.isManualFullscreen || inSplit);
     this.notifyFullScreenChange();
   }
 
@@ -599,7 +620,14 @@ export struct VideoPlayerPage {
   }
 
   private enterImmersiveFullscreen(): void {
-    // 0.5.1: fixed LANDSCAPE / PORTRAIT (not USER_ROTATION_*) — cleaner rotate anim.
+    // 分屏已铺满，不锁朝向
+    if (this.isSplitScreen || this.windowUtil.isSplitScreenMode()) {
+      this.isManualFullscreen = false;
+      this.applyLayoutForWindowSize(this.deviceWidth, this.deviceHeight);
+      return;
+    }
+
+    // 仅用户主动全屏：按视频比例锁朝向（默认打开路径不会走到这里）
     const isLandscapeVideo = !!(this.videoSource.width && this.videoSource.height
       && this.videoSource.width > this.videoSource.height);
     const targetOrientation = isLandscapeVideo
@@ -611,10 +639,9 @@ export struct VideoPlayerPage {
     this.isManualFullscreen = true;
     this.pendingOrientationSettle = false;
     this.windowUtil.setPlayerFullscreenImmersive(true);
+    this.windowUtil.enableLandscapeMultiWindow();
     this.windowUtil.setMainWindowOrientation(targetOrientation);
 
-    // 同向（尺寸不变）：直接改状态 → 容器 .animation(300)
-    // 跨向：只等 windowSizeChange + animateTo(0)，系统旋转独占
     if (!willRotate) {
       this.isWideLayout = false;
       this.isFullLandscapeScreen = true;
@@ -624,25 +651,11 @@ export struct VideoPlayerPage {
   }
 
   handleFullScreenExit(): void {
-    // 0.5.1 exit path: clear manual, unlock rotation, snap layout immediately.
-    // Same-orient uses .animation(300); cross-orient sizeChange uses animateTo(0).
     this.isManualFullscreen = false;
     this.pendingOrientationSettle = false;
+    this.windowUtil.disableLandscapeMultiWindow();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
-
-    const isLandscape = this.deviceWidth > this.deviceHeight;
-    if (isLandscape) {
-      const shortSideVp = this.getUIContext().px2vp(Math.min(this.deviceWidth, this.deviceHeight));
-      this.isFullLandscapeScreen = false;
-      this.isWideLayout = true;
-      this.isImmersive = shortSideVp < 600;
-    } else {
-      this.isFullLandscapeScreen = false;
-      this.isWideLayout = false;
-      this.isImmersive = false;
-    }
-    this.windowUtil.setPlayerFullscreenImmersive(false);
-    this.notifyFullScreenChange();
+    this.applyLayoutForWindowSize(this.deviceWidth, this.deviceHeight);
   }
 
   @Builder
@@ -923,7 +936,10 @@ export struct VideoPlayerPage {
           // 0.5.1：同向宽布局↔沉浸 300ms；跨向时 windowSizeChange 用 animateTo(0) 关掉本动画
           .animation({ duration: 300, curve: Curve.EaseInOut })
 
-          this.InfoPanel()
+          // 沉浸/分屏铺满时不占布局，避免详情 Tab 挤占小窗口高度
+          if (!this.isFullLandscapeScreen) {
+            this.InfoPanel()
+          }
         }
         .width(Const.WIDTH_FULL_PERCENT)
         .layoutWeight(1)

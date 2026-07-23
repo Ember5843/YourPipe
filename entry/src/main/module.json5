@@ -56,6 +56,12 @@
         "startWindowBackground": "$color:start_window_background",
         "exported": true,
         "orientation": "auto_rotation_restricted",
+        "supportWindowMode": [
+          "fullscreen",
+          "split",
+          "floating"
+        ],
+        "preferMultiWindowOrientation": "default",
         "continuable": true,
         "continueType": [
           "YourPipePlayback_ContinueQuickStart"

@@ -1324,13 +1324,34 @@
             "name": "yt_playback_player",
             "value": "Reproductor"
         },
-        { "name": "yt_playback_gestures", "value": "Gestos de reproducción" },
-        { "name": "yt_playback_gesture_seek", "value": "Deslizar para buscar" },
-        { "name": "yt_playback_gesture_seek_subtitle", "value": "Desliza horizontalmente sobre el vídeo para previsualizar y cambiar la posición" },
-        { "name": "yt_playback_gesture_brightness", "value": "Deslizar a la izquierda para el brillo" },
-        { "name": "yt_playback_gesture_brightness_subtitle", "value": "Desliza verticalmente en la mitad izquierda para ajustar el brillo de la pantalla" },
-        { "name": "yt_playback_gesture_volume", "value": "Deslizar a la derecha para el volumen" },
-        { "name": "yt_playback_gesture_volume_subtitle", "value": "Desliza verticalmente en la mitad derecha para ajustar el volumen" },
+        {
+            "name": "yt_playback_gestures",
+            "value": "Gestos de reproducción"
+        },
+        {
+            "name": "yt_playback_gesture_seek",
+            "value": "Deslizar para buscar"
+        },
+        {
+            "name": "yt_playback_gesture_seek_subtitle",
+            "value": "Desliza horizontalmente sobre el vídeo para previsualizar y cambiar la posición"
+        },
+        {
+            "name": "yt_playback_gesture_brightness",
+            "value": "Deslizar a la izquierda para el brillo"
+        },
+        {
+            "name": "yt_playback_gesture_brightness_subtitle",
+            "value": "Desliza verticalmente en la mitad izquierda para ajustar el brillo de la pantalla"
+        },
+        {
+            "name": "yt_playback_gesture_volume",
+            "value": "Deslizar a la derecha para el volumen"
+        },
+        {
+            "name": "yt_playback_gesture_volume_subtitle",
+            "value": "Desliza verticalmente en la mitad derecha para ajustar el volumen"
+        },
         {
             "name": "yt_playback_background_audio_only",
             "value": "Solo audio en segundo plano"
@@ -2566,6 +2587,22 @@
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "API del reproductor y autenticación de URL de transmisión"
+        },
+        {
+            "name": "yt_player_more_tools",
+            "value": "Más"
+        },
+        {
+            "name": "yt_player_subtitles",
+            "value": "Subtítulos"
+        },
+        {
+            "name": "yt_player_audio_track",
+            "value": "Pista de audio"
+        },
+        {
+            "name": "yt_player_playback_speed",
+            "value": "Velocidad"
         }
     ]
 }

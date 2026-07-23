@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import { componentUtils, LengthMetrics } from '@kit.ArkUI';
+import { componentUtils, LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { ConfigurationConstant } from '@kit.AbilityKit';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { commonEventManager } from '@kit.BasicServicesKit';
@@ -59,6 +59,8 @@ const COMPACT_CONTROL_WIDTH: number = 360;
 const PROGRESS_MIN_WIDTH: number = 32;
 const TIMELINE_TEXT_MIN_WIDTH: number = 480;
 const TIMELINE_TEXT_MIN_HEIGHT: number = 240;
+/** 顶部右侧工具条预估宽度超过容器一半时收成三横杠菜单 */
+const TOP_TOOLS_HALF_RATIO: number = 0.5;
 
 enum PlayerGestureMode {
   IDLE = 'idle',
@@ -866,11 +868,19 @@ export struct VideoPlayer {
     this.scheduleHideControls();
   }
 
+  private controlMenuDepth: number = 0;
+
   private onControlMenuAppear(): void {
+    this.controlMenuDepth++;
     this.beginInteraction(PlayerInteractionKind.MENU);
   }
 
   private onControlMenuDisappear(): void {
+    // 折叠菜单打开二级时父层可能先 onDisAppear；用深度计数避免控件立刻收起
+    this.controlMenuDepth = Math.max(0, this.controlMenuDepth - 1);
+    if (this.controlMenuDepth > 0) {
+      return;
+    }
     if (this.activeInteraction === PlayerInteractionKind.MENU) {
       this.activeInteraction = PlayerInteractionKind.NONE;
     }
@@ -1185,6 +1195,48 @@ export struct VideoPlayer {
 
   private getControlItemGap(): number {
     return this.containerVpWidth > 0 && this.containerVpWidth < COMPACT_CONTROL_WIDTH ? 4 : 8;
+  }
+
+  /** 章节 / 字幕 / 音轨 / 画质 / 倍速 是否作为顶部独立图标展示 */
+  private getTopToolCount(): number {
+    let count = 1; // speed always present
+    if (this.chapters.length > 0) {
+      count++;
+    }
+    if (this.vm.subtitleTracks.length > 0) {
+      count++;
+    }
+    if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
+      count++;
+    }
+    if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
+      count++;
+    }
+    return count;
+  }
+
+  private estimateTopToolsWidthVp(): number {
+    const gap = this.getControlItemGap();
+    const count = this.getTopToolCount();
+    if (count <= 0) {
+      return 0;
+    }
+    return count * SPEED_CONTROL_WIDTH + Math.max(0, count - 1) * gap;
+  }
+
+  /**
+   * 非沉浸全屏，或右侧工具预估宽度 > 播放区一半 → 收成三横杠总菜单。
+   */
+  private shouldCollapseTopTools(): boolean {
+    if (!this.isFullLandscapeScreen) {
+      return true;
+    }
+    if (this.containerVpWidth <= 0) {
+      return false;
+    }
+    const usable = Math.max(0, this.containerVpWidth - this.getControlLeftPad()
+      - this.getControlRightPad() - CONTROL_SLOT_SIZE);
+    return this.estimateTopToolsWidthVp() > usable * TOP_TOOLS_HALF_RATIO;
   }
 
   private getTimeLabelWidth(): number {
@@ -1515,6 +1567,142 @@ export struct VideoPlayer {
     )
   }
 
+  private menuSymbol(icon: Resource): SymbolGlyphModifier {
+    return new SymbolGlyphModifier(icon).fontSize('22vp');
+  }
+
+  @Builder
+  TopToolsCollapsedMenu() {
+    // 折叠总菜单：symbolStartIcon 显示与展开态相同的系统图标；倍速用 labelInfo 显示当前 Nx。
+    Menu() {
+      if (this.chapters.length > 0) {
+        MenuItem({
+          symbolStartIcon: this.menuSymbol($r('sys.symbol.list_bullet_square')),
+          content: $r('app.string.yt_player_chapters'),
+          builder: (): void => {
+            this.ChapterMenu()
+          }
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+      }
+      if (this.vm.subtitleTracks.length > 0) {
+        MenuItem({
+          symbolStartIcon: this.menuSymbol($r('sys.symbol.AI_subtitles')),
+          content: $r('app.string.yt_player_subtitles'),
+          builder: (): void => {
+            this.SubtitleMenu()
+          }
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+      }
+      if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
+        MenuItem({
+          symbolStartIcon: this.menuSymbol($r('sys.symbol.speaker_wave_2')),
+          content: $r('app.string.yt_player_audio_track'),
+          builder: (): void => {
+            this.AudioMenu()
+          }
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+      }
+      if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
+        MenuItem({
+          symbolStartIcon: this.menuSymbol($r('sys.symbol.resolution_video')),
+          content: $r('app.string.yt_player_video_quality'),
+          builder: (): void => {
+            this.VideoMenu()
+          }
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+      }
+      MenuItem({
+        symbolStartIcon: this.menuSymbol($r('sys.symbol.play_circle')),
+        content: $r('app.string.yt_player_playback_speed'),
+        labelInfo: `${this.vm.playbackSpeed}x`,
+        builder: (): void => {
+          this.SpeedMenu()
+        }
+      })
+        .contentFontColor($r('sys.color.font_primary'))
+        .contentFont({ size: 14 })
+        .labelFont({ size: 14, weight: FontWeight.Medium })
+        .labelFontColor($r('sys.color.font_primary'))
+    }
+    .onAppear(() => this.onControlMenuAppear())
+    .onDisAppear(() => this.onControlMenuDisappear())
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .borderRadius(12)
+    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+    // 嵌套展开：二级嵌在一级里，不侧滑另开层，避免立刻消失
+    .subMenuExpandingMode(SubMenuExpandingMode.EMBEDDED_EXPAND)
+    .width(260)
+  }
+
+  @Builder
+  TopToolsExpandedRow() {
+    Row({ space: this.getControlItemGap() }) {
+      if (this.chapters.length > 0) {
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph($r('sys.symbol.list_bullet_square'))
+            .fontSize(CONTROL_ICON_SIZE)
+            .fontColor([Color.White])
+        }
+          .width(SPEED_CONTROL_WIDTH)
+          .height(CONTROL_SLOT_SIZE)
+          .accessibilityText($r('app.string.yt_player_chapters'))
+          .bindMenu(this.ChapterMenu())
+      }
+
+      if (this.vm.subtitleTracks.length > 0) {
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph($r('sys.symbol.AI_subtitles'))
+            .fontSize(CONTROL_ICON_SIZE)
+            .fontColor([Color.White])
+        }
+          .width(SPEED_CONTROL_WIDTH)
+          .height(CONTROL_SLOT_SIZE)
+          .bindMenu(this.SubtitleMenu())
+      }
+
+      if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph($r('sys.symbol.speaker_wave_2'))
+            .fontSize(CONTROL_ICON_SIZE)
+            .fontColor([Color.White])
+        }
+          .width(SPEED_CONTROL_WIDTH)
+          .height(CONTROL_SLOT_SIZE)
+          .bindMenu(this.AudioMenu())
+      }
+
+      if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph($r('sys.symbol.resolution_video'))
+            .fontSize(CONTROL_ICON_SIZE)
+            .fontColor([Color.White])
+        }
+          .width(SPEED_CONTROL_WIDTH)
+          .height(CONTROL_SLOT_SIZE)
+          .bindMenu(this.VideoMenu())
+      }
+
+      Text(this.vm.playbackSpeed + 'x')
+        .fontSize(16)
+        .fontColor(Color.White)
+        .fontWeight(FontWeight.Medium)
+        .width(SPEED_CONTROL_WIDTH)
+        .height(CONTROL_SLOT_SIZE)
+        .maxLines(1)
+        .textAlign(TextAlign.Center)
+        .bindMenu(this.SpeedMenu())
+    }
+    .alignItems(VerticalAlign.Center)
+  }
+
   @Builder
   TopControl() {
     Row() {
@@ -1533,65 +1721,19 @@ export struct VideoPlayer {
 
       Blank()
 
-      // 右侧操作栏：入口统一使用 SymbolGlyph，展开后使用 Menu。
-      Row({ space: this.getControlItemGap() }) {
-        if (this.chapters.length > 0) {
-          Stack({ alignContent: Alignment.Center }) {
-            SymbolGlyph($r('sys.symbol.list_bullet_square'))
-              .fontSize(CONTROL_ICON_SIZE)
-              .fontColor([Color.White])
-          }
-            .width(SPEED_CONTROL_WIDTH)
-            .height(CONTROL_SLOT_SIZE)
-            .accessibilityText($r('app.string.yt_player_chapters'))
-            .bindMenu(this.ChapterMenu())
+      if (this.shouldCollapseTopTools()) {
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph($r('sys.symbol.line_3_horizontal'))
+            .fontSize(CONTROL_ICON_SIZE)
+            .fontColor([Color.White])
         }
-
-        if (this.vm.subtitleTracks.length > 0) {
-          Stack({ alignContent: Alignment.Center }) {
-            SymbolGlyph($r('sys.symbol.AI_subtitles'))
-              .fontSize(CONTROL_ICON_SIZE)
-              .fontColor([Color.White])
-          }
-            .width(SPEED_CONTROL_WIDTH)
-            .height(CONTROL_SLOT_SIZE)
-            .bindMenu(this.SubtitleMenu())
-        }
-
-        if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
-          Stack({ alignContent: Alignment.Center }) {
-            SymbolGlyph($r('sys.symbol.speaker_wave_2'))
-              .fontSize(CONTROL_ICON_SIZE)
-              .fontColor([Color.White])
-          }
-            .width(SPEED_CONTROL_WIDTH)
-            .height(CONTROL_SLOT_SIZE)
-            .bindMenu(this.AudioMenu())
-        }
-
-        if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
-          Stack({ alignContent: Alignment.Center }) {
-            SymbolGlyph($r('sys.symbol.resolution_video'))
-              .fontSize(CONTROL_ICON_SIZE)
-              .fontColor([Color.White])
-          }
-            .width(SPEED_CONTROL_WIDTH)
-            .height(CONTROL_SLOT_SIZE)
-            .bindMenu(this.VideoMenu())
-        }
-
-        // 播放速度
-        Text(this.vm.playbackSpeed + 'x')
-          .fontSize(16)
-          .fontColor(Color.White)
-          .fontWeight(FontWeight.Medium)
-          .width(SPEED_CONTROL_WIDTH)
+          .width(CONTROL_SLOT_SIZE)
           .height(CONTROL_SLOT_SIZE)
-          .maxLines(1)
-          .textAlign(TextAlign.Center)
-          .bindMenu(this.SpeedMenu())
+          .accessibilityText($r('app.string.yt_player_more_tools'))
+          .bindMenu(this.TopToolsCollapsedMenu())
+      } else {
+        this.TopToolsExpandedRow()
       }
-      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)

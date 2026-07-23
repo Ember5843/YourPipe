@@ -1324,13 +1324,34 @@
             "name": "yt_playback_player",
             "value": "المشغل"
         },
-        { "name": "yt_playback_gestures", "value": "إيماءات التشغيل" },
-        { "name": "yt_playback_gesture_seek", "value": "التمرير للانتقال" },
-        { "name": "yt_playback_gesture_seek_subtitle", "value": "مرر أفقياً على الفيديو لمعاينة موضع التشغيل وتغييره" },
-        { "name": "yt_playback_gesture_brightness", "value": "التمرير يساراً للسطوع" },
-        { "name": "yt_playback_gesture_brightness_subtitle", "value": "مرر عمودياً على النصف الأيسر من الفيديو لضبط سطوع الشاشة" },
-        { "name": "yt_playback_gesture_volume", "value": "التمرير يميناً للصوت" },
-        { "name": "yt_playback_gesture_volume_subtitle", "value": "مرر عمودياً على النصف الأيمن من الفيديو لضبط مستوى الصوت" },
+        {
+            "name": "yt_playback_gestures",
+            "value": "إيماءات التشغيل"
+        },
+        {
+            "name": "yt_playback_gesture_seek",
+            "value": "التمرير للانتقال"
+        },
+        {
+            "name": "yt_playback_gesture_seek_subtitle",
+            "value": "مرر أفقياً على الفيديو لمعاينة موضع التشغيل وتغييره"
+        },
+        {
+            "name": "yt_playback_gesture_brightness",
+            "value": "التمرير يساراً للسطوع"
+        },
+        {
+            "name": "yt_playback_gesture_brightness_subtitle",
+            "value": "مرر عمودياً على النصف الأيسر من الفيديو لضبط سطوع الشاشة"
+        },
+        {
+            "name": "yt_playback_gesture_volume",
+            "value": "التمرير يميناً للصوت"
+        },
+        {
+            "name": "yt_playback_gesture_volume_subtitle",
+            "value": "مرر عمودياً على النصف الأيمن من الفيديو لضبط مستوى الصوت"
+        },
         {
             "name": "yt_playback_background_audio_only",
             "value": "صوت فقط في الخلفية"
@@ -2566,6 +2587,22 @@
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "API المشغل ومصادقة عنوان URL للبث"
+        },
+        {
+            "name": "yt_player_more_tools",
+            "value": "المزيد"
+        },
+        {
+            "name": "yt_player_subtitles",
+            "value": "الترجمة"
+        },
+        {
+            "name": "yt_player_audio_track",
+            "value": "المسار الصوتي"
+        },
+        {
+            "name": "yt_player_playback_speed",
+            "value": "سرعة التشغيل"
         }
     ]
 }

@@ -29,6 +29,9 @@ export class WindowUtil {
   private playerSizeChangeCallback: ((size: window.Size) => void) | null = null;
   // 全局统一的 windowSizeChange 分发器（唯一注册，内部分发给各子监听器）
   private globalSizeChangeHandler: ((size: window.Size) => void) | null = null;
+  private windowStatusChangeHandler: ((status: window.WindowStatusType) => void) | null = null;
+  private currentWindowStatus: window.WindowStatusType = window.WindowStatusType.FULL_SCREEN;
+  private landscapeMultiWindowEnabled: boolean = false;
 
   public static getInstance(): WindowUtil {
     if (!WindowUtil.instance) {
@@ -76,6 +79,9 @@ export class WindowUtil {
         WindowUtil.publishPlayerGestureInsets();
         WindowUtil.publishPlayerControlAvoidInsets();
 
+        // 初始窗口模式（全屏 / 分屏 / 悬浮）
+        this.publishWindowStatus(windowClass.getWindowStatus());
+
         // 注册唯一的全局分发器，内部同时通知 BreakpointSystem、系统栏策略和播放页回调
         this.globalSizeChangeHandler = (size: window.Size) => {
           AppStorage.setOrCreate('deviceWidth', size.width);
@@ -86,6 +92,19 @@ export class WindowUtil {
         };
         windowClass.on('windowSizeChange', this.globalSizeChangeHandler);
 
+        this.windowStatusChangeHandler = (status: window.WindowStatusType) => {
+          this.publishWindowStatus(status);
+          this.updateSystemBar();
+          // 分屏/悬浮尺寸常伴随 size 变化；再推一次当前 rect 给播放页布局
+          try {
+            const rect = windowClass.getWindowProperties().windowRect;
+            this.playerSizeChangeCallback?.({ width: rect.width, height: rect.height });
+          } catch (statusErr) {
+            Logger.error(TAG, `windowStatusChange size push failed: ${JSON.stringify(statusErr)}`);
+          }
+        };
+        windowClass.on('windowStatusChange', this.windowStatusChangeHandler);
+
         windowClass.on('avoidAreaChange', (avoidAreaOption) => {
           WindowUtil.setAvoidArea(avoidAreaOption.type, avoidAreaOption.area);
         });
@@ -95,6 +114,60 @@ export class WindowUtil {
       } catch (error) {
         Logger.error(TAG, `setWindowStage getWindowProperties failed. Code:${err.code}, message:${err.message}`);
       }
+    });
+  }
+
+  private publishWindowStatus(status: window.WindowStatusType): void {
+    this.currentWindowStatus = status;
+    const isSplitScreen = status === window.WindowStatusType.SPLIT_SCREEN;
+    const isFloating = status === window.WindowStatusType.FLOATING;
+    AppStorage.setOrCreate('windowStatus', status);
+    AppStorage.setOrCreate('isSplitScreen', isSplitScreen);
+    AppStorage.setOrCreate('isFloatingWindow', isFloating);
+    // 兼容旧键：仅分屏视为“需强制铺满”的多窗
+    AppStorage.setOrCreate('isMultiWindow', isSplitScreen);
+    Logger.info(TAG, `windowStatus=${status}, isSplitScreen=${isSplitScreen}, isFloating=${isFloating}`);
+  }
+
+  /** 仅分屏：播放页默认铺满窗口（悬浮窗不强制）。 */
+  isSplitScreenMode(): boolean {
+    return this.currentWindowStatus === window.WindowStatusType.SPLIT_SCREEN
+      || (AppStorage.get<boolean>('isSplitScreen') ?? false);
+  }
+
+  /** @deprecated 使用 isSplitScreenMode；保留以免外部误用。 */
+  isMultiWindowMode(): boolean {
+    return this.isSplitScreenMode();
+  }
+
+  getWindowStatus(): window.WindowStatusType {
+    return this.currentWindowStatus;
+  }
+
+  /**
+   * 仅用户主动沉浸全屏时调用；默认进播放页 / 悬浮窗不要声明横向多窗，否则系统会强制横屏浮窗。
+   */
+  enableLandscapeMultiWindow(): void {
+    if (this.mainWindowClass === undefined || this.landscapeMultiWindowEnabled) {
+      return;
+    }
+    this.mainWindowClass.enableLandscapeMultiWindow().then(() => {
+      this.landscapeMultiWindowEnabled = true;
+      Logger.info(TAG, 'enableLandscapeMultiWindow ok');
+    }).catch((err: BusinessError) => {
+      Logger.error(TAG, `enableLandscapeMultiWindow failed. Code:${err.code}, message:${err.message}`);
+    });
+  }
+
+  disableLandscapeMultiWindow(): void {
+    if (this.mainWindowClass === undefined || !this.landscapeMultiWindowEnabled) {
+      return;
+    }
+    this.mainWindowClass.disableLandscapeMultiWindow().then(() => {
+      this.landscapeMultiWindowEnabled = false;
+      Logger.info(TAG, 'disableLandscapeMultiWindow ok');
+    }).catch((err: BusinessError) => {
+      Logger.error(TAG, `disableLandscapeMultiWindow failed. Code:${err.code}, message:${err.message}`);
     });
   }
 

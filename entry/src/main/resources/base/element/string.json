@@ -1672,13 +1672,34 @@
             "name": "yt_playback_player",
             "value": "播放器"
         },
-        { "name": "yt_playback_gestures", "value": "播放手势" },
-        { "name": "yt_playback_gesture_seek", "value": "滑动调节播放进度" },
-        { "name": "yt_playback_gesture_seek_subtitle", "value": "在视频画面上横向滑动以预览并跳转播放位置" },
-        { "name": "yt_playback_gesture_brightness", "value": "左侧滑动调节亮度" },
-        { "name": "yt_playback_gesture_brightness_subtitle", "value": "在视频画面左半侧上下滑动以调节屏幕亮度" },
-        { "name": "yt_playback_gesture_volume", "value": "右侧滑动调节音量" },
-        { "name": "yt_playback_gesture_volume_subtitle", "value": "在视频画面右半侧上下滑动以调节播放音量" },
+        {
+            "name": "yt_playback_gestures",
+            "value": "播放手势"
+        },
+        {
+            "name": "yt_playback_gesture_seek",
+            "value": "滑动调节播放进度"
+        },
+        {
+            "name": "yt_playback_gesture_seek_subtitle",
+            "value": "在视频画面上横向滑动以预览并跳转播放位置"
+        },
+        {
+            "name": "yt_playback_gesture_brightness",
+            "value": "左侧滑动调节亮度"
+        },
+        {
+            "name": "yt_playback_gesture_brightness_subtitle",
+            "value": "在视频画面左半侧上下滑动以调节屏幕亮度"
+        },
+        {
+            "name": "yt_playback_gesture_volume",
+            "value": "右侧滑动调节音量"
+        },
+        {
+            "name": "yt_playback_gesture_volume_subtitle",
+            "value": "在视频画面右半侧上下滑动以调节播放音量"
+        },
         {
             "name": "yt_playback_background_audio_only",
             "value": "后台仅音频"
@@ -2483,29 +2504,105 @@
             "name": "yt_option_auth_use_for_playback",
             "value": "Use login state for playback"
         },
-        { "name": "yt_changelog_0_5_5_1", "value": "Detects Secure Shield/JIT restrictions at startup and clearly explains when remote signature decryption will be used" },
-        { "name": "yt_changelog_0_5_5_2", "value": "Home and subscription cards now rebuild reliably after pull-to-refresh, including cases where item IDs stay unchanged" },
-        { "name": "yt_changelog_0_5_5_3", "value": "Added persistent master, user-data, and playback login controls so account access can be managed independently" },
-        { "name": "yt_changelog_0_5_5_4", "value": "Turning off login for user data now falls back to anonymous Home and local feeds instead of showing empty authenticated responses" },
-        { "name": "yt_changelog_0_5_5_5", "value": "Turning off login for playback now selects anonymous player clients and keeps SABR downloads free of account credentials" },
-        { "name": "yt_changelog_0_5_5_6", "value": "Player recommendations now use the stable anonymous YouTube next response, fixing empty queues while signed in" },
-        { "name": "yt_changelog_0_5_5_7", "value": "Stabilized authenticated playback client selection and LOGIN_REQUIRED handling for restricted videos" },
-        { "name": "yt_changelog_0_5_5_8", "value": "Uses signature timestamps from watch pages first, reducing startup delay before falling back to the remote player service" },
-        { "name": "yt_changelog_0_5_5_9", "value": "Added cached player metadata and tighter remote-decryption timeouts so slow services cannot block playback for long" },
-        { "name": "yt_changelog_0_5_5_10", "value": "Added cached base64url PoToken injection for DASH URLs to reduce googlevideo 403 errors without making token failure fatal" },
-        { "name": "yt_changelog_0_5_5_11", "value": "Fixed Save to Playlist, Stream Info, and Sleep Timer panels by consolidating their conflicting bottom-sheet bindings" },
-        { "name": "yt_changelog_0_5_5_12", "value": "Improved authenticated playlist and user-library browsing while preserving anonymous and local fallbacks when account use is disabled" },
-        { "name": "yt_changelog_0_5_5_13", "value": "Private browsing can now mask both account surfaces without deleting saved credentials, making it easy to return to signed-in mode" },
-        { "name": "yt_changelog_0_5_5_14", "value": "Changing the master or playback login switch immediately reselects the correct anonymous or authenticated player client" },
-        { "name": "yt_changelog_0_5_5_15", "value": "History and subscription cloud sync now follow the user-data switch while keeping existing local history and subscriptions available" },
-        { "name": "yt_changelog_0_5_5_16", "value": "Playlist browse requests can use account access when needed, improving loading of account-specific and restricted playlists" },
-        { "name": "yt_changelog_0_5_5_17", "value": "PoToken generation now shares the current resolved YouTube web-client version instead of relying on a stale fixed version" },
-        { "name": "yt_changelog_0_5_5_18", "value": "PoToken bytes are converted to URL-safe base64 and cached per video for five minutes to avoid repeated token generation" },
-        { "name": "yt_changelog_0_5_5_19", "value": "User-data and playback requests now apply credentials only within their selected scope, reducing unintended account-cookie exposure" },
-        { "name": "yt_changelog_0_5_5_20", "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs" },
+        {
+            "name": "yt_changelog_0_5_5_1",
+            "value": "Detects Secure Shield/JIT restrictions at startup and clearly explains when remote signature decryption will be used"
+        },
+        {
+            "name": "yt_changelog_0_5_5_2",
+            "value": "Home and subscription cards now rebuild reliably after pull-to-refresh, including cases where item IDs stay unchanged"
+        },
+        {
+            "name": "yt_changelog_0_5_5_3",
+            "value": "Added persistent master, user-data, and playback login controls so account access can be managed independently"
+        },
+        {
+            "name": "yt_changelog_0_5_5_4",
+            "value": "Turning off login for user data now falls back to anonymous Home and local feeds instead of showing empty authenticated responses"
+        },
+        {
+            "name": "yt_changelog_0_5_5_5",
+            "value": "Turning off login for playback now selects anonymous player clients and keeps SABR downloads free of account credentials"
+        },
+        {
+            "name": "yt_changelog_0_5_5_6",
+            "value": "Player recommendations now use the stable anonymous YouTube next response, fixing empty queues while signed in"
+        },
+        {
+            "name": "yt_changelog_0_5_5_7",
+            "value": "Stabilized authenticated playback client selection and LOGIN_REQUIRED handling for restricted videos"
+        },
+        {
+            "name": "yt_changelog_0_5_5_8",
+            "value": "Uses signature timestamps from watch pages first, reducing startup delay before falling back to the remote player service"
+        },
+        {
+            "name": "yt_changelog_0_5_5_9",
+            "value": "Added cached player metadata and tighter remote-decryption timeouts so slow services cannot block playback for long"
+        },
+        {
+            "name": "yt_changelog_0_5_5_10",
+            "value": "Added cached base64url PoToken injection for DASH URLs to reduce googlevideo 403 errors without making token failure fatal"
+        },
+        {
+            "name": "yt_changelog_0_5_5_11",
+            "value": "Fixed Save to Playlist, Stream Info, and Sleep Timer panels by consolidating their conflicting bottom-sheet bindings"
+        },
+        {
+            "name": "yt_changelog_0_5_5_12",
+            "value": "Improved authenticated playlist and user-library browsing while preserving anonymous and local fallbacks when account use is disabled"
+        },
+        {
+            "name": "yt_changelog_0_5_5_13",
+            "value": "Private browsing can now mask both account surfaces without deleting saved credentials, making it easy to return to signed-in mode"
+        },
+        {
+            "name": "yt_changelog_0_5_5_14",
+            "value": "Changing the master or playback login switch immediately reselects the correct anonymous or authenticated player client"
+        },
+        {
+            "name": "yt_changelog_0_5_5_15",
+            "value": "History and subscription cloud sync now follow the user-data switch while keeping existing local history and subscriptions available"
+        },
+        {
+            "name": "yt_changelog_0_5_5_16",
+            "value": "Playlist browse requests can use account access when needed, improving loading of account-specific and restricted playlists"
+        },
+        {
+            "name": "yt_changelog_0_5_5_17",
+            "value": "PoToken generation now shares the current resolved YouTube web-client version instead of relying on a stale fixed version"
+        },
+        {
+            "name": "yt_changelog_0_5_5_18",
+            "value": "PoToken bytes are converted to URL-safe base64 and cached per video for five minutes to avoid repeated token generation"
+        },
+        {
+            "name": "yt_changelog_0_5_5_19",
+            "value": "User-data and playback requests now apply credentials only within their selected scope, reducing unintended account-cookie exposure"
+        },
+        {
+            "name": "yt_changelog_0_5_5_20",
+            "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs"
+        },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "Player API and stream URL authentication"
+        },
+        {
+            "name": "yt_player_more_tools",
+            "value": "More"
+        },
+        {
+            "name": "yt_player_subtitles",
+            "value": "Subtitles"
+        },
+        {
+            "name": "yt_player_audio_track",
+            "value": "Audio track"
+        },
+        {
+            "name": "yt_player_playback_speed",
+            "value": "Playback speed"
         }
     ]
 }

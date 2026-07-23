@@ -1672,13 +1672,34 @@
             "name": "yt_playback_player",
             "value": "Abspieler"
         },
-        { "name": "yt_playback_gestures", "value": "Wiedergabegesten" },
-        { "name": "yt_playback_gesture_seek", "value": "Wischen zum Spulen" },
-        { "name": "yt_playback_gesture_seek_subtitle", "value": "Horizontal über das Video wischen, um die Wiedergabeposition anzusehen und zu ändern" },
-        { "name": "yt_playback_gesture_brightness", "value": "Links für Helligkeit wischen" },
-        { "name": "yt_playback_gesture_brightness_subtitle", "value": "Auf der linken Videohälfte vertikal wischen, um die Bildschirmhelligkeit anzupassen" },
-        { "name": "yt_playback_gesture_volume", "value": "Rechts für Lautstärke wischen" },
-        { "name": "yt_playback_gesture_volume_subtitle", "value": "Auf der rechten Videohälfte vertikal wischen, um die Lautstärke anzupassen" },
+        {
+            "name": "yt_playback_gestures",
+            "value": "Wiedergabegesten"
+        },
+        {
+            "name": "yt_playback_gesture_seek",
+            "value": "Wischen zum Spulen"
+        },
+        {
+            "name": "yt_playback_gesture_seek_subtitle",
+            "value": "Horizontal über das Video wischen, um die Wiedergabeposition anzusehen und zu ändern"
+        },
+        {
+            "name": "yt_playback_gesture_brightness",
+            "value": "Links für Helligkeit wischen"
+        },
+        {
+            "name": "yt_playback_gesture_brightness_subtitle",
+            "value": "Auf der linken Videohälfte vertikal wischen, um die Bildschirmhelligkeit anzupassen"
+        },
+        {
+            "name": "yt_playback_gesture_volume",
+            "value": "Rechts für Lautstärke wischen"
+        },
+        {
+            "name": "yt_playback_gesture_volume_subtitle",
+            "value": "Auf der rechten Videohälfte vertikal wischen, um die Lautstärke anzupassen"
+        },
         {
             "name": "yt_playback_background_audio_only",
             "value": "Nur Audio im Hintergrund"
@@ -2566,6 +2587,22 @@
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "Player-API und Stream-URL-Authentifizierung"
+        },
+        {
+            "name": "yt_player_more_tools",
+            "value": "Mehr"
+        },
+        {
+            "name": "yt_player_subtitles",
+            "value": "Untertitel"
+        },
+        {
+            "name": "yt_player_audio_track",
+            "value": "Tonspur"
+        },
+        {
+            "name": "yt_player_playback_speed",
+            "value": "Wiedergabegeschwindigkeit"
         }
     ]
 }

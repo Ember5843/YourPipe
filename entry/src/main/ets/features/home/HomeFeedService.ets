@@ -1,6 +1,9 @@
 import { AuthSessionManager, VideoItem } from 'youtube_core';
 import { ContentCountry, Localization, fetchBrowseContinuation, fetchBrowsePage } from 'youtube_core';
+import { AppLog } from '../../common/AppLog';
 import { buildHomeKioskVideoItems, getHomeFeedItemsFromTabContent } from './utils/HomeFeedUtils';
+
+const logger = AppLog.getInstance('HomeFeedService');
 
 export interface KioskPageResult {
   items: Array<VideoItem>;
@@ -29,28 +32,50 @@ export class HomeFeedService {
   async fetchHomeKioskInitial(startId: number, style: string = 'recommended'): Promise<KioskPageResult> {
     const useUserData = AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
     const useRecommended = useUserData && style !== 'kiosk';
+    const startedAt = Date.now();
+    logger.info(`[HomeFeed] stage=initial_start style=${style} useUserData=${useUserData} `
+      + `path=${useRecommended ? 'recommended' : 'kiosk'}`);
 
     if (useRecommended) {
-      const recommended = await this.fetchBrowseSource(
-        this.RECOMMENDED_BROWSE_ID,
-        '',
-        true,
-        startId,
-        'recommended'
-      );
-      if (recommended.items.length === 0) {
-        throw new Error('Empty recommended feed');
+      try {
+        const recommended = await this.fetchBrowseSource(
+          this.RECOMMENDED_BROWSE_ID,
+          '',
+          true,
+          startId,
+          'recommended'
+        );
+        if (recommended.items.length === 0) {
+          throw new Error('Empty recommended feed');
+        }
+        logger.info(`[HomeFeed] stage=initial_done source=recommended items=${recommended.items.length} `
+          + `elapsed=${Date.now() - startedAt}ms hasNext=${!!recommended.nextPageToken}`);
+        return recommended;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logger.error(`[HomeFeed] stage=initial_failed source=recommended `
+          + `elapsed=${Date.now() - startedAt}ms message=${msg}`);
+        throw e instanceof Error ? e : new Error(msg);
       }
-      return recommended;
     }
 
-    return this.fetchBrowseSource(
-      this.KIOSK_BROWSE_ID,
-      this.KIOSK_PARAMS,
-      false,
-      startId,
-      'kiosk'
-    );
+    try {
+      const kiosk = await this.fetchBrowseSource(
+        this.KIOSK_BROWSE_ID,
+        this.KIOSK_PARAMS,
+        false,
+        startId,
+        'kiosk'
+      );
+      logger.info(`[HomeFeed] stage=initial_done source=kiosk items=${kiosk.items.length} `
+        + `elapsed=${Date.now() - startedAt}ms hasNext=${!!kiosk.nextPageToken}`);
+      return kiosk;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.error(`[HomeFeed] stage=initial_failed source=kiosk `
+        + `elapsed=${Date.now() - startedAt}ms message=${msg}`);
+      throw e instanceof Error ? e : new Error(msg);
+    }
   }
 
   async fetchHomeKioskNext(
@@ -60,23 +85,34 @@ export class HomeFeedService {
     withAuth: boolean = false
   ): Promise<KioskPageResult> {
     const useAuth = withAuth && AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
-    const response = await fetchBrowseContinuation(
-      this.localization,
-      this.contentCountry,
-      nextPageToken,
-      visitorData,
-      useAuth
-    );
-    if (!response) {
-      throw new Error('Empty browse continuation response');
+    const startedAt = Date.now();
+    logger.info(`[HomeFeed] stage=next_start withAuth=${useAuth} tokenLen=${nextPageToken.length}`);
+    try {
+      const response = await fetchBrowseContinuation(
+        this.localization,
+        this.contentCountry,
+        nextPageToken,
+        visitorData,
+        useAuth
+      );
+      if (!response) {
+        throw new Error('Empty browse continuation response');
+      }
+      const parsed = this.parseHomeBrowseContinuationResponse(
+        response as Record<string, Object>,
+        visitorData,
+        startId
+      );
+      parsed.source = useAuth ? 'recommended' : 'kiosk';
+      logger.info(`[HomeFeed] stage=next_done source=${parsed.source} items=${parsed.items.length} `
+        + `elapsed=${Date.now() - startedAt}ms hasNext=${!!parsed.nextPageToken}`);
+      return parsed;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.error(`[HomeFeed] stage=next_failed withAuth=${useAuth} `
+        + `elapsed=${Date.now() - startedAt}ms message=${msg}`);
+      throw e instanceof Error ? e : new Error(msg);
     }
-    const parsed = this.parseHomeBrowseContinuationResponse(
-      response as Record<string, Object>,
-      visitorData,
-      startId
-    );
-    parsed.source = useAuth ? 'recommended' : 'kiosk';
-    return parsed;
   }
 
   private async fetchBrowseSource(
@@ -86,6 +122,8 @@ export class HomeFeedService {
     startId: number,
     source: string
   ): Promise<KioskPageResult> {
+    const startedAt = Date.now();
+    logger.info(`[HomeFeed] stage=browse_start source=${source} browseId=${browseId} withAuth=${withAuth}`);
     const response = await fetchBrowsePage(
       this.localization,
       this.contentCountry,
@@ -95,10 +133,12 @@ export class HomeFeedService {
       withAuth
     );
     if (!response) {
-      throw new Error('Empty browse response');
+      throw new Error(`Empty browse response source=${source} browseId=${browseId}`);
     }
     const parsed = this.parseHomeBrowseInitialResponse(response as Record<string, Object>, startId);
     parsed.source = source;
+    logger.info(`[HomeFeed] stage=browse_parsed source=${source} items=${parsed.items.length} `
+      + `elapsed=${Date.now() - startedAt}ms`);
     return parsed;
   }
 

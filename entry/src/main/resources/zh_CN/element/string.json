@@ -1672,13 +1672,34 @@
             "name": "yt_playback_player",
             "value": "播放器"
         },
-        { "name": "yt_playback_gestures", "value": "播放手势" },
-        { "name": "yt_playback_gesture_seek", "value": "滑动调节播放进度" },
-        { "name": "yt_playback_gesture_seek_subtitle", "value": "在视频画面上横向滑动以预览并跳转播放位置" },
-        { "name": "yt_playback_gesture_brightness", "value": "左侧滑动调节亮度" },
-        { "name": "yt_playback_gesture_brightness_subtitle", "value": "在视频画面左半侧上下滑动以调节屏幕亮度" },
-        { "name": "yt_playback_gesture_volume", "value": "右侧滑动调节音量" },
-        { "name": "yt_playback_gesture_volume_subtitle", "value": "在视频画面右半侧上下滑动以调节播放音量" },
+        {
+            "name": "yt_playback_gestures",
+            "value": "播放手势"
+        },
+        {
+            "name": "yt_playback_gesture_seek",
+            "value": "滑动调节播放进度"
+        },
+        {
+            "name": "yt_playback_gesture_seek_subtitle",
+            "value": "在视频画面上横向滑动以预览并跳转播放位置"
+        },
+        {
+            "name": "yt_playback_gesture_brightness",
+            "value": "左侧滑动调节亮度"
+        },
+        {
+            "name": "yt_playback_gesture_brightness_subtitle",
+            "value": "在视频画面左半侧上下滑动以调节屏幕亮度"
+        },
+        {
+            "name": "yt_playback_gesture_volume",
+            "value": "右侧滑动调节音量"
+        },
+        {
+            "name": "yt_playback_gesture_volume_subtitle",
+            "value": "在视频画面右半侧上下滑动以调节播放音量"
+        },
         {
             "name": "yt_playback_background_audio_only",
             "value": "后台仅音频"
@@ -2566,6 +2587,22 @@
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "播放器 API 及流地址鉴权"
+        },
+        {
+            "name": "yt_player_more_tools",
+            "value": "更多"
+        },
+        {
+            "name": "yt_player_subtitles",
+            "value": "字幕"
+        },
+        {
+            "name": "yt_player_audio_track",
+            "value": "音轨"
+        },
+        {
+            "name": "yt_player_playback_speed",
+            "value": "播放速度"
         }
     ]
 }

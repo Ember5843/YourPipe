@@ -970,6 +970,9 @@ struct Index {
     }
 
     const startId = reset ? 1 : (this.videoList.length + 1);
+    const loadStartedAt = Date.now();
+    logger.info(`[HomeFeed] stage=load_start reset=${reset} mode=${this.homeMode} `
+      + `source=${this.homeFeedSource} startId=${startId} listLen=${this.videoList.length}`);
     try {
       if (this.homeMode === 'kiosk') {
         if (!reset) {
@@ -1003,6 +1006,9 @@ struct Index {
         }
         this.homeErrorMessage = '';
         this.homeModeNoticeMessage = '';
+        logger.info(`[HomeFeed] stage=load_done reset=${reset} mode=kiosk source=${this.homeFeedSource} `
+          + `items=${kioskResult.items.length} listLen=${this.videoList.length} `
+          + `elapsed=${Date.now() - loadStartedAt}ms`);
         return;
       }
 
@@ -1041,7 +1047,9 @@ struct Index {
         this.homeErrorMessage = '';
       }
     } catch (err) {
-      logger.error('fetchSearchPage failed:', JSON.stringify(err));
+      // Never JSON.stringify(Error) alone — enumerable fields are empty → "{}" in user logs.
+      logger.error(`[HomeFeed] stage=failed reset=${reset} mode=${this.homeMode} `
+        + `source=${this.homeFeedSource} ${this.describeThrowable(err)}`);
       if (reset && this.homeMode === 'kiosk') {
         const wantedRecommended = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle) === 'recommended'
           && AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
@@ -1084,9 +1092,11 @@ struct Index {
       const nextHead = this.videoList.length > 0
         ? (this.videoList[0].videoId || this.videoList[0].id.toString())
         : '';
-      logger.info(`[HomeRefresh] stage=complete mode=${this.homeMode} source=${this.homeFeedSource} elapsed=${Date.now() - startedAt}ms items=${this.videoList.length} head=${nextHead} changed=${prevHead !== nextHead}`);
+      logger.info(`[HomeRefresh] stage=complete mode=${this.homeMode} source=${this.homeFeedSource} `
+        + `elapsed=${Date.now() - startedAt}ms items=${this.videoList.length} head=${nextHead} `
+        + `changed=${prevHead !== nextHead} error=${this.homeErrorMessage.length > 0 ? 'yes' : 'no'}`);
     } catch (e) {
-      logger.error(`[HomeRefresh] stage=failed elapsed=${Date.now() - startedAt}ms error=${JSON.stringify(e)}`);
+      logger.error(`[HomeRefresh] stage=failed elapsed=${Date.now() - startedAt}ms ${this.describeThrowable(e)}`);
     } finally {
       this.isHomeRefreshing = false;
     }
@@ -1110,15 +1120,81 @@ struct Index {
     return `${this.homeFeedEpoch}_${videoId.length > 0 ? videoId : item.id.toString()}`;
   }
 
+  /** Safe one-line error for hilog / exported app logs (Error → not "{}"). */
+  private describeThrowable(err: Object | Error | string | undefined | null): string {
+    if (err === undefined || err === null) {
+      return 'error=null';
+    }
+    if (typeof err === 'string') {
+      return `error=${err}`;
+    }
+    if (err instanceof Error) {
+      const name = err.name || 'Error';
+      const msg = err.message || '';
+      return `name=${name} message=${msg}`;
+    }
+    if (typeof err === 'object') {
+      const anyErr = err as Record<string, Object>;
+      const parts: string[] = [];
+      const name = anyErr['name'];
+      const message = anyErr['message'];
+      const code = anyErr['code'];
+      const errorType = anyErr['errorType'];
+      const url = anyErr['url'];
+      const method = anyErr['method'];
+      if (typeof name === 'string' && name.length > 0) {
+        parts.push(`name=${name}`);
+      }
+      if (typeof message === 'string' && message.length > 0) {
+        parts.push(`message=${message}`);
+      }
+      if (typeof code === 'number' || typeof code === 'string') {
+        parts.push(`code=${String(code)}`);
+      }
+      if (typeof errorType === 'string' && errorType.length > 0) {
+        parts.push(`errorType=${errorType}`);
+      }
+      if (typeof method === 'string' && method.length > 0) {
+        parts.push(`method=${method}`);
+      }
+      if (typeof url === 'string' && url.length > 0) {
+        // Host+path only — no query/cookies.
+        const m = /^(https?:\/\/[^/?#]+)([^?#]*)/.exec(url);
+        parts.push(`target=${m ? `${m[1]}${m[2] || '/'}` : '(url)'}`);
+      }
+      if (parts.length > 0) {
+        return parts.join(' ');
+      }
+      try {
+        const raw = JSON.stringify(err);
+        if (raw && raw !== '{}' && raw !== 'null') {
+          return `error=${raw}`;
+        }
+      } catch (_e) {
+        // ignore
+      }
+    }
+    return `error=${String(err)}`;
+  }
+
   private formatHomeRequestError(err: Object, fallback: string): string {
     let code = '';
     let message = '';
-    if (err && typeof err === 'object') {
+    if (err instanceof Error) {
+      message = err.message || '';
+      const name = err.name || '';
+      if (name.length > 0 && name !== 'Error') {
+        code = name;
+      }
+    } else if (err && typeof err === 'object') {
       const anyErr = err as Record<string, Object>;
       const errorCode = anyErr['code'];
       const errorMessage = anyErr['message'];
+      const errorType = anyErr['errorType'];
       if (typeof errorCode === 'number' || typeof errorCode === 'string') {
         code = String(errorCode);
+      } else if (typeof errorType === 'string' && errorType.length > 0) {
+        code = errorType;
       }
       if (typeof errorMessage === 'string') {
         message = errorMessage;
@@ -1603,7 +1679,8 @@ struct Index {
         if (this.isRepliesOpen) {
           this.actionHub.emit(ActionHubEvent.EXIT_COMMENT_REPLIES);
           return true;
-        } else if (this.isPlayerFullLandscapeScreen) {
+        } else if (this.isPlayerFullLandscapeScreen && !(AppStorage.get<boolean>('isSplitScreen') ?? false)) {
+          // 分屏下播放页默认即铺满，返回应离开播放页而非空转“退出全屏”
           this.actionHub.emit(ActionHubEvent.EXIT_FULLSCREEN);
           return true;
         } else {

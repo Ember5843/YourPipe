@@ -1324,13 +1324,34 @@
             "name": "yt_playback_player",
             "value": "Lecteur"
         },
-        { "name": "yt_playback_gestures", "value": "Gestes de lecture" },
-        { "name": "yt_playback_gesture_seek", "value": "Balayer pour avancer" },
-        { "name": "yt_playback_gesture_seek_subtitle", "value": "Balayez horizontalement la vidéo pour prévisualiser et modifier la position" },
-        { "name": "yt_playback_gesture_brightness", "value": "Balayer à gauche pour la luminosité" },
-        { "name": "yt_playback_gesture_brightness_subtitle", "value": "Balayez verticalement la moitié gauche pour régler la luminosité de l’écran" },
-        { "name": "yt_playback_gesture_volume", "value": "Balayer à droite pour le volume" },
-        { "name": "yt_playback_gesture_volume_subtitle", "value": "Balayez verticalement la moitié droite pour régler le volume" },
+        {
+            "name": "yt_playback_gestures",
+            "value": "Gestes de lecture"
+        },
+        {
+            "name": "yt_playback_gesture_seek",
+            "value": "Balayer pour avancer"
+        },
+        {
+            "name": "yt_playback_gesture_seek_subtitle",
+            "value": "Balayez horizontalement la vidéo pour prévisualiser et modifier la position"
+        },
+        {
+            "name": "yt_playback_gesture_brightness",
+            "value": "Balayer à gauche pour la luminosité"
+        },
+        {
+            "name": "yt_playback_gesture_brightness_subtitle",
+            "value": "Balayez verticalement la moitié gauche pour régler la luminosité de l’écran"
+        },
+        {
+            "name": "yt_playback_gesture_volume",
+            "value": "Balayer à droite pour le volume"
+        },
+        {
+            "name": "yt_playback_gesture_volume_subtitle",
+            "value": "Balayez verticalement la moitié droite pour régler le volume"
+        },
         {
             "name": "yt_playback_background_audio_only",
             "value": "Audio uniquement en arrière-plan"
@@ -2566,6 +2587,22 @@
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "API du lecteur et authentification des URL de flux"
+        },
+        {
+            "name": "yt_player_more_tools",
+            "value": "Plus"
+        },
+        {
+            "name": "yt_player_subtitles",
+            "value": "Sous-titres"
+        },
+        {
+            "name": "yt_player_audio_track",
+            "value": "Piste audio"
+        },
+        {
+            "name": "yt_player_playback_speed",
+            "value": "Vitesse"
         }
     ]
 }
