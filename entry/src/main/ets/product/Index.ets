@@ -56,6 +56,8 @@ import { OptionsPlaybackPage } from '../features/options/OptionsPlaybackPage';
 import { OptionsLanguageAndRegionPage } from '../features/options/OptionsLanguageAndRegionPage';
 import { OptionsRecoveryPage } from '../features/options/OptionsRecoveryPage';
 import { OptionsDataAccountPage } from '../features/options/OptionsDataAccountPage';
+import { OptionsNetworkPage } from '../features/options/OptionsNetworkPage';
+import { NetworkProxyConfig } from '../common/NetworkProxyConfig';
 import { LanguagePickerDialog, LanguagePickerItem } from '../common/components/LanguagePickerDialog';
 import { LanguagePickerPage } from '../common/components/LanguagePickerPage';
 import {
@@ -279,7 +281,11 @@ struct Index {
     PlaybackConfig.saveToPreferences(defaultPlaybackConfig);
     DownloadManager.getInstance().refreshTaskPool();
 
-    // 3. 应用深色模式
+    // 3. 重置网络代理
+    const defaultProxy = NetworkProxyConfig.resetToDefault();
+    AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
+
+    // 4. 应用深色模式
     Promise.resolve().then(() => {
       const colorMode = ColorModeManager.resolveMode(defaultUiConfig.darkMode);
       AppStorage.setOrCreate('currentColorMode', colorMode);
@@ -290,7 +296,7 @@ struct Index {
       }
     });
 
-    // 4. 提示用户
+    // 5. 提示用户
     this.getUIContext().getPromptAction().showToast({
       message: $r('app.string.yt_toast_reset_settings_done'),
       duration: 2000
@@ -373,6 +379,8 @@ struct Index {
     this.uiConfig = defaultUiConfig;
     const defaultPlaybackConfig = new PlaybackConfig();
     this.playbackConfig = defaultPlaybackConfig;
+    const defaultProxy = NetworkProxyConfig.resetToDefault();
+    AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
 
     // 6. 清空各业务数据
     this.subscriptions = [];
@@ -1902,6 +1910,7 @@ struct Index {
               onDataAccountClick: () => { this.pushOptionsPath('data_account'); },
               onLanguageClick: () => { this.pushOptionsPath('language'); },
               onPlaybackClick: () => { this.pushOptionsPath('playback'); },
+              onNetworkClick: () => { this.pushOptionsPath('network'); },
               onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
               onLogClick: () => { this.pushOptionsPath('log_page'); },
               onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
@@ -2039,6 +2048,29 @@ struct Index {
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .titleBar(buildSheetTitleBar({
         title: $r('app.string.yt_option_appearance'),
+        onBack: () => {
+          this.popOptionsPath();
+        }
+      }))
+      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .onBackPressed(() => {
+        this.popOptionsPath();
+        return true;
+      })
+    } else if (name === 'network') {
+      HdsNavDestination() {
+        OptionsNetworkPage({
+          params: {
+            themeColor: this.themePrimary,
+            onConfigChanged: (cfg: NetworkProxyConfig) => {
+              AppStorage.setOrCreate('networkProxyConfig', cfg);
+            }
+          }
+        })
+      }
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_network'),
         onBack: () => {
           this.popOptionsPath();
         }

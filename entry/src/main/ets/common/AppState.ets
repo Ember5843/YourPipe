@@ -1,6 +1,7 @@
 import { AppLog } from './AppLog';
 import { PreferencesStore } from './PreferencesStore';
 import { PlaybackConfig } from './PlaybackConfig';
+import { NetworkProxyConfig } from './NetworkProxyConfig';
 import { ThemeManager } from './ThemeManager';
 
 const logger = AppLog.getInstance('Persistence');
@@ -108,6 +109,9 @@ export class AppState {
     // 初始化播放设置
     const playbackConfig = PlaybackConfig.loadFromPreferences();
     AppStorage.setOrCreate('playbackConfig', playbackConfig);
+    const networkProxyConfig = NetworkProxyConfig.load();
+    AppStorage.setOrCreate('networkProxyConfig', networkProxyConfig);
+    NetworkProxyConfig.applySystemAndProviders(networkProxyConfig);
     ThemeManager.initFromConfig(config.colorPreset);
   }
 }

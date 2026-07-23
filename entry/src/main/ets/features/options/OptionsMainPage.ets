@@ -2,6 +2,7 @@ import { OptionItem } from '../../common/components/OptionItem';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
 import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
+import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
 import { AuthAccountStatus, AuthStage } from 'youtube_core';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 
@@ -15,6 +16,7 @@ interface OptionsMainPageParams {
   onDataAccountClick: () => void;
   onLanguageClick: () => void;
   onPlaybackClick: () => void;
+  onNetworkClick: () => void;
   onAppearanceClick: () => void;
   onLogClick: () => void;
   onRecoveryClick: () => void;
@@ -26,6 +28,7 @@ export struct OptionsMainPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
+  @StorageLink('networkProxyConfig') networkProxyConfig: NetworkProxyConfig = new NetworkProxyConfig();
   @StorageProp('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
 
   @Prop params: OptionsMainPageParams = {
@@ -36,6 +39,7 @@ export struct OptionsMainPage {
     onDataAccountClick: () => {},
     onLanguageClick: () => {},
     onPlaybackClick: () => {},
+    onNetworkClick: () => {},
     onAppearanceClick: () => {},
     onLogClick: () => {},
     onRecoveryClick: () => {},
@@ -132,6 +136,18 @@ export struct OptionsMainPage {
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onPlaybackClick
+          })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          OptionItem({
+            icon: $r('sys.symbol.wifi'),
+            title: $r('app.string.yt_option_network'),
+            subtitle: this.networkProxyConfig.subtitle(),
+            iconColor: this.themePrimary,
+            clickEffectEnabled: this.params.clickEffectEnabled,
+            onClickAction: this.params.onNetworkClick
           })
         }
         .padding({ left: 0, right: 0 })

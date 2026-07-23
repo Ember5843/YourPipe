@@ -1,7 +1,8 @@
 import { YTCoreLogger } from '../common/YTCoreLogger';
-import { http } from '@kit.NetworkKit';
+import { connection, http } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { Localization } from '../model/Localization';
+import { AppHttpProxySnapshot, HttpProxyOptions } from './HttpProxyOptions';
 
 const logger = YTCoreLogger.getInstance('HttpDownloader');
 
@@ -201,6 +202,32 @@ export class HttpDownloader {
   // 重试延迟（毫秒）
   private static readonly RETRY_DELAY = 1000;
 
+  /** Inject app proxy into request options. Loopback / exclusion always bypass. */
+  static applyProxyToOptions(options: http.HttpRequestOptions, url: string): void {
+    const snap: AppHttpProxySnapshot = HttpProxyOptions.getSnapshot();
+    if (!HttpProxyOptions.isActive(snap) || HttpProxyOptions.shouldBypass(url, snap)) {
+      options.usingProxy = false;
+      return;
+    }
+    if (snap.kind === 'http') {
+      const proxy: connection.HttpProxy = {
+        host: snap.host.trim(),
+        port: snap.port,
+        exclusionList: snap.exclusionList && snap.exclusionList.length > 0
+          ? snap.exclusionList
+          : HttpProxyOptions.defaultExclusions()
+      };
+      if (snap.username && snap.username.length > 0) {
+        proxy.username = snap.username;
+        proxy.password = snap.password || '';
+      }
+      options.usingProxy = proxy;
+      return;
+    }
+    // socks5 reserved — treat as direct until platform support is product-ready
+    options.usingProxy = false;
+  }
+
   /**
    * 核心请求方法，处理所有 HTTP 请求（带错误分析和重试）
    * @param method 请求方法（GET/POST/HEAD 等）
@@ -245,6 +272,7 @@ export class HttpDownloader {
           'readTimeout': 30000,
           'usingCache': false
         }
+        HttpDownloader.applyProxyToOptions(httpOptions, url);
 
         // 4. 发送请求并获取响应
         const response = await new Promise<http.HttpResponse>((resolve, reject) => {
@@ -452,6 +480,7 @@ export class HttpDownloader {
           'readTimeout': 60000,
           'usingCache': false
         };
+        HttpDownloader.applyProxyToOptions(httpOptions, url);
         const response = await new Promise<http.HttpResponse>((resolve, reject) => {
           httpRequest.request(url, httpOptions, (err: BusinessError, resp: http.HttpResponse) => {
             if (!err) {

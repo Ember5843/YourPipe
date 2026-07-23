@@ -2,6 +2,7 @@ import { StreamResource } from './SessionStore';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { http, socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
+import { HttpDownloader } from 'youtube_core';
 import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][RangeProxy]';
@@ -243,6 +244,7 @@ export async function fetchYoutubeRangeBytes(
     if (usePost) {
       options.extraData = '';
     }
+    HttpDownloader.applyProxyToOptions(options, fetchUrl);
     const response = await req.request(fetchUrl, options);
     if (response.responseCode !== 200 && response.responseCode !== 206) {
       const bodyPreview = typeof response.result === 'string'
@@ -407,6 +409,7 @@ export async function serveRange(
         if (usePost) {
           options.extraData = '';
         }
+        HttpDownloader.applyProxyToOptions(options, fetchUrl);
         const response = await req.request(fetchUrl, options);
         if (response.responseCode === 200 || response.responseCode === 206) {
           const bytes = responseBodyToBytes(response.result);

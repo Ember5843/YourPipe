@@ -2603,6 +2603,106 @@
         {
             "name": "yt_player_playback_speed",
             "value": "播放速度"
+        },
+        {
+            "name": "yt_option_network",
+            "value": "网络"
+        },
+        {
+            "name": "yt_proxy_off",
+            "value": "未启用代理"
+        },
+        {
+            "name": "yt_proxy_incomplete",
+            "value": "代理配置不完整"
+        },
+        {
+            "name": "yt_proxy_enable",
+            "value": "使用 HTTP 代理"
+        },
+        {
+            "name": "yt_proxy_enable_subtitle",
+            "value": "将 YouTube 提取与媒体请求经下方代理转发"
+        },
+        {
+            "name": "yt_proxy_type",
+            "value": "代理类型"
+        },
+        {
+            "name": "yt_proxy_type_http",
+            "value": "HTTP"
+        },
+        {
+            "name": "yt_proxy_type_http_subtitle",
+            "value": "HTTP CONNECT 代理"
+        },
+        {
+            "name": "yt_proxy_type_socks5",
+            "value": "SOCKS5"
+        },
+        {
+            "name": "yt_proxy_socks5_soon",
+            "value": "即将支持"
+        },
+        {
+            "name": "yt_proxy_server",
+            "value": "服务器"
+        },
+        {
+            "name": "yt_proxy_host",
+            "value": "主机"
+        },
+        {
+            "name": "yt_proxy_host_placeholder",
+            "value": "例如 127.0.0.1"
+        },
+        {
+            "name": "yt_proxy_port",
+            "value": "端口"
+        },
+        {
+            "name": "yt_proxy_auth_optional",
+            "value": "认证（可选）"
+        },
+        {
+            "name": "yt_proxy_username",
+            "value": "用户名"
+        },
+        {
+            "name": "yt_proxy_password",
+            "value": "密码"
+        },
+        {
+            "name": "yt_proxy_optional_placeholder",
+            "value": "可选"
+        },
+        {
+            "name": "yt_proxy_test",
+            "value": "测试连接"
+        },
+        {
+            "name": "yt_proxy_testing",
+            "value": "测试中…"
+        },
+        {
+            "name": "yt_proxy_test_ok",
+            "value": "代理可用"
+        },
+        {
+            "name": "yt_proxy_test_failed",
+            "value": "代理测试失败"
+        },
+        {
+            "name": "yt_proxy_test_http_error",
+            "value": "HTTP 状态异常"
+        },
+        {
+            "name": "yt_proxy_test_disabled",
+            "value": "请先启用代理"
+        },
+        {
+            "name": "yt_proxy_loopback_note",
+            "value": "本地播放环回地址（127.0.0.1）不会走此代理。"
         }
     ]
 }

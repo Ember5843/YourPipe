@@ -2603,6 +2603,106 @@
         {
             "name": "yt_player_playback_speed",
             "value": "Playback speed"
+        },
+        {
+            "name": "yt_option_network",
+            "value": "Network"
+        },
+        {
+            "name": "yt_proxy_off",
+            "value": "Proxy off"
+        },
+        {
+            "name": "yt_proxy_incomplete",
+            "value": "Incomplete settings"
+        },
+        {
+            "name": "yt_proxy_enable",
+            "value": "Use HTTP proxy"
+        },
+        {
+            "name": "yt_proxy_enable_subtitle",
+            "value": "Route YouTube and media requests through the proxy below"
+        },
+        {
+            "name": "yt_proxy_type",
+            "value": "Proxy type"
+        },
+        {
+            "name": "yt_proxy_type_http",
+            "value": "HTTP"
+        },
+        {
+            "name": "yt_proxy_type_http_subtitle",
+            "value": "HTTP CONNECT proxy"
+        },
+        {
+            "name": "yt_proxy_type_socks5",
+            "value": "SOCKS5"
+        },
+        {
+            "name": "yt_proxy_socks5_soon",
+            "value": "Coming soon"
+        },
+        {
+            "name": "yt_proxy_server",
+            "value": "Server"
+        },
+        {
+            "name": "yt_proxy_host",
+            "value": "Host"
+        },
+        {
+            "name": "yt_proxy_host_placeholder",
+            "value": "e.g. 127.0.0.1"
+        },
+        {
+            "name": "yt_proxy_port",
+            "value": "Port"
+        },
+        {
+            "name": "yt_proxy_auth_optional",
+            "value": "Authentication (optional)"
+        },
+        {
+            "name": "yt_proxy_username",
+            "value": "Username"
+        },
+        {
+            "name": "yt_proxy_password",
+            "value": "Password"
+        },
+        {
+            "name": "yt_proxy_optional_placeholder",
+            "value": "Optional"
+        },
+        {
+            "name": "yt_proxy_test",
+            "value": "Test connection"
+        },
+        {
+            "name": "yt_proxy_testing",
+            "value": "Testing…"
+        },
+        {
+            "name": "yt_proxy_test_ok",
+            "value": "Proxy reachable"
+        },
+        {
+            "name": "yt_proxy_test_failed",
+            "value": "Proxy test failed"
+        },
+        {
+            "name": "yt_proxy_test_http_error",
+            "value": "Unexpected HTTP status"
+        },
+        {
+            "name": "yt_proxy_test_disabled",
+            "value": "Enable proxy first"
+        },
+        {
+            "name": "yt_proxy_loopback_note",
+            "value": "Local playback proxy (127.0.0.1) never uses this setting."
         }
     ]
 }
