@@ -207,6 +207,8 @@ export class AvPlayerController {
   }
 
   public async switchToVideoEntry(entry: VideoEntry): Promise<void> {
+    // 点击瞬间就亮转圈（不要等选 audio / createPlaybackUrl）
+    this.beginSourceSwitchUi();
     let audio: StreamInfo | undefined = undefined;
     if (this.requiresSeparateAudio(entry.stream)) {
       const cats = this.vm.playerModel.getStreamCategories();
@@ -289,7 +291,25 @@ export class AvPlayerController {
     Logger.info(TAG, `switchToAudioIndex: ${index} `
       + `${audio.audioTrackName || audio.audioLanguage || '-'} itag=${audio.itag} `
       + `track=${audio.audioTrackId || '-'}`);
+    this.beginSourceSwitchUi();
     await this.switchQuality(video, audio);
+  }
+
+  /** Menu click → immediate spinner; cleared when new source is ready or switch fails. */
+  private beginSourceSwitchUi(): void {
+    this.qualitySwitchPending = true;
+    this.qualitySwitchLoadStarted = false;
+    this.vm.isSourceSwitching = true;
+    this.vm.isBuffering = true;
+  }
+
+  private endSourceSwitchUi(keepBuffering: boolean = false): void {
+    this.qualitySwitchPending = false;
+    this.qualitySwitchLoadStarted = false;
+    this.vm.isSourceSwitching = false;
+    if (!keepBuffering) {
+      this.vm.isBuffering = false;
+    }
   }
 
   public setPendingStartFromSec(sec: number): void {
@@ -560,21 +580,21 @@ export class AvPlayerController {
 
     this.vm.playerModel.updateVideoStream(videoStream);
     this.vm.playerModel.updateAudioStream(effectiveAudio);
-    // 立刻给 UI 缓冲态：createPlaybackUrl（SIDX/SABR warm）可能数秒，期间引擎仍报旧源 isBuffering=false
-    this.qualitySwitchPending = true;
-    this.qualitySwitchLoadStarted = false;
-    this.vm.isBuffering = true;
+    // createPlaybackUrl 前保持转圈（SIDX/SABR 重建可能数秒）
+    if (!this.qualitySwitchPending) {
+      this.beginSourceSwitchUi();
+    } else {
+      this.vm.isSourceSwitching = true;
+      this.vm.isBuffering = true;
+    }
 
     const playbackUrl = await this.createPlaybackUrl(videoStream, effectiveAudio, generation);
     if (!this.isMediaSessionCurrent(generation)) {
-      this.qualitySwitchPending = false;
-      this.qualitySwitchLoadStarted = false;
+      this.endSourceSwitchUi(false);
       return;
     }
     if (!playbackUrl) {
-      this.qualitySwitchPending = false;
-      this.qualitySwitchLoadStarted = false;
-      this.vm.isBuffering = false;
+      this.endSourceSwitchUi(false);
       this.setError('[PLAYER] LOCAL_PROXY_FAILED');
       return;
     }
@@ -584,12 +604,11 @@ export class AvPlayerController {
       `hw=${VideoHwCaps.isCodecHardwareFriendly(videoStream.codecs)} pos=${resumePos.toFixed(2)}s`);
     // Manual quality switch always allowed (including 4K VP9/AV1). Engine is mpv.
     this.qualitySwitchLoadStarted = true;
+    this.vm.isSourceSwitching = true;
     this.vm.isBuffering = true;
     const loaded = this.loadPlaybackSource(playbackUrl, resumePos, generation);
     if (!loaded) {
-      this.qualitySwitchPending = false;
-      this.qualitySwitchLoadStarted = false;
-      this.vm.isBuffering = false;
+      this.endSourceSwitchUi(false);
       return;
     }
     if (wasPlaying) {
@@ -1551,22 +1570,22 @@ export class AvPlayerController {
 
     // 更新 ViewModel 字段（ArkTS 自动推送到绑定的 UI）
     this.vm.isPlaying = state.isPlaying;
-    // 切清晰度/音轨：代理重建 + 新 load 完成前强制缓冲指示；勿被旧源 snapshot 清掉
+    // 切清晰度/音轨：代理重建 + 新 load 完成前强制转圈；勿被旧源 snapshot 清掉
     if (this.qualitySwitchPending) {
       const hardError = !!(state.errorMsg && state.errorMsg.length > 0);
       if (hardError) {
-        this.qualitySwitchPending = false;
-        this.qualitySwitchLoadStarted = false;
+        this.endSourceSwitchUi(false);
         this.vm.isBuffering = state.isBuffering;
       } else if (this.qualitySwitchLoadStarted && state.isReady && !state.isBuffering) {
-        this.qualitySwitchPending = false;
-        this.qualitySwitchLoadStarted = false;
-        this.vm.isBuffering = false;
+        // 新源已就绪且不再缓冲
+        this.endSourceSwitchUi(false);
       } else {
+        this.vm.isSourceSwitching = true;
         this.vm.isBuffering = true;
       }
     } else {
       this.vm.isBuffering = state.isBuffering;
+      this.vm.isSourceSwitching = false;
     }
     this.vm.isReady = state.isReady;
     this.vm.isSeeking = state.isSeeking;

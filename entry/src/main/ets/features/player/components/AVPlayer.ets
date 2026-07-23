@@ -1360,8 +1360,8 @@ export struct VideoPlayer {
         this.AudioOnlyCoverLayer()
       }
 
-      // 加载中/缓冲提示层
-      if (this.vm.isBuffering && this.playbackStarted) {
+      // 加载中/缓冲提示层（含清晰度/音轨切换：isSourceSwitching 一点击就亮）
+      if (this.playbackStarted && (this.vm.isBuffering || this.vm.isSourceSwitching)) {
         Column() {
           LoadingProgress()
             .width(48)
@@ -1371,6 +1371,7 @@ export struct VideoPlayer {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
+        .hitTestBehavior(HitTestMode.None)
         .zIndex(CommonConstants.Z_INDEX_BASE + 1)
       }
 

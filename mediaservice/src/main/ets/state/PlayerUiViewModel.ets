@@ -17,6 +17,8 @@ export class PlayerUiViewModel {
   @Track isPlaying: boolean = false;
   @Track isReady: boolean = false;
   @Track isBuffering: boolean = false;
+  /** True from quality/audio menu click until new source is ready — forces spinner even before engine load. */
+  @Track isSourceSwitching: boolean = false;
   @Track isSeeking: boolean = false;
   @Track isEnded: boolean = false;
   @Track currentTime: number = 0;
@@ -55,6 +57,7 @@ export class PlayerUiViewModel {
     this.isPlaying = false;
     this.isReady = false;
     this.isBuffering = false;
+    this.isSourceSwitching = false;
     this.isSeeking = false;
     this.isEnded = false;
     this.currentTime = 0;
