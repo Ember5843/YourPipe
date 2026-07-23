@@ -2242,10 +2242,10 @@ export class YouTubeExtractor {
     const twoCol = nextResponse.contents?.twoColumnWatchNextResults;
     const contents = twoCol?.results?.results?.contents || [];
 
-    // videoPrimaryInfoRenderer → likeCount
+    // videoPrimaryInfoRenderer → likeCount (PipePipe/NewPipe multi-path)
     const primaryInfo = contents.find(c => c.videoPrimaryInfoRenderer)?.videoPrimaryInfoRenderer;
-    if (primaryInfo && playerResponse) {
-      const likeCount = this.extractLikeCount(primaryInfo, playerResponse);
+    if (primaryInfo) {
+      const likeCount = this.extractLikeCount(primaryInfo, playerResponse ?? videoInfo.playerResponse);
       if (likeCount >= 0) {
         videoInfo.likeCount = likeCount;
       }
@@ -2315,31 +2315,159 @@ export class YouTubeExtractor {
     return chapters;
   }
 
-  private extractLikeCount(primary: VideoPrimaryInfoRenderer, playerResponse: PlayerResponse): number {
-    if (playerResponse.videoDetails?.allowRatings === false) {
+  /**
+   * Align with NewPipe/PipePipe getLikeCount:
+   * 1) segmentedLikeDislikeButtonViewModel → accessibilityText
+   * 2) segmentedLikeDislikeButtonRenderer → accessibility label(s)
+   * 3) loose walk of topLevelButtons for any accessibilityText / label with digits
+   */
+  private extractLikeCount(
+    primary: VideoPrimaryInfoRenderer,
+    playerResponse?: PlayerResponse
+  ): number {
+    if (playerResponse?.videoDetails?.allowRatings === false) {
       return -1;
     }
     try {
       const buttons = primary.videoActions?.menuRenderer?.topLevelButtons || [];
+      if (!buttons || buttons.length === 0) {
+        return -1;
+      }
+
+      // Path A — current ViewModel tree (PipePipe / NewPipe primary)
       for (const btn of buttons) {
-        const text = btn.segmentedLikeDislikeButtonViewModel
-          ?.likeButtonViewModel?.likeButtonViewModel
-          ?.toggleButtonViewModel?.toggleButtonViewModel
-          ?.defaultButtonViewModel?.buttonViewModel?.accessibilityText;
-        if (text) {
-          if (text.toLowerCase().includes('no likes')) {
-            return 0;
+        const raw = btn as Record<string, Object>;
+        const fromVm = this.parseLikeDigits(
+          this.readDeepString(raw, [
+            'segmentedLikeDislikeButtonViewModel',
+            'likeButtonViewModel',
+            'likeButtonViewModel',
+            'toggleButtonViewModel',
+            'toggleButtonViewModel',
+            'defaultButtonViewModel',
+            'buttonViewModel',
+            'accessibilityText'
+          ])
+        );
+        if (fromVm >= 0) {
+          return fromVm;
+        }
+      }
+
+      // Path B — pre-Dec-2023 segmentedLikeDislikeButtonRenderer
+      for (const btn of buttons) {
+        const raw = btn as Record<string, Object>;
+        const candidates: Array<string | undefined> = [
+          this.readDeepString(raw, [
+            'segmentedLikeDislikeButtonRenderer', 'likeButton', 'toggleButtonRenderer',
+            'accessibilityData', 'accessibilityData', 'label'
+          ]),
+          this.readDeepString(raw, [
+            'segmentedLikeDislikeButtonRenderer', 'likeButton', 'toggleButtonRenderer',
+            'accessibility', 'label'
+          ]),
+          this.readDeepString(raw, [
+            'segmentedLikeDislikeButtonRenderer', 'likeButton', 'toggleButtonRenderer',
+            'defaultText', 'accessibility', 'accessibilityData', 'label'
+          ]),
+          this.readDeepString(raw, [
+            'toggleButtonRenderer', 'accessibilityData', 'accessibilityData', 'label'
+          ]),
+          this.readDeepString(raw, [
+            'toggleButtonRenderer', 'accessibility', 'label'
+          ])
+        ];
+        for (const text of candidates) {
+          const n = this.parseLikeDigits(text);
+          if (n >= 0) {
+            return n;
           }
-          const digits = text.replace(/\D/g, '');
-          if (digits) {
-            return parseInt(digits);
-          }
+        }
+      }
+
+      // Path C — last resort: any nested accessibility-like string under topLevelButtons
+      for (const btn of buttons) {
+        const found = this.findLikeAccessibilityText(btn as Object);
+        const n = this.parseLikeDigits(found);
+        if (n >= 0) {
+          return n;
         }
       }
     } catch (e) {
       logger.warn('extractLikeCount failed:', e);
     }
     return -1;
+  }
+
+  private parseLikeDigits(text: string | undefined): number {
+    if (!text || text.length === 0) {
+      return -1;
+    }
+    const lower = text.toLowerCase();
+    // English + common CJK “no likes” localizations
+    if (lower.indexOf('no likes') >= 0
+      || text.indexOf('没有人赞过') >= 0
+      || text.indexOf('尚无人赞') >= 0
+      || text.indexOf('還沒有人喜歡') >= 0
+      || text.indexOf('還沒人說讚') >= 0) {
+      return 0;
+    }
+    const digits = text.replace(/[^\d]/g, '');
+    if (!digits) {
+      return -1;
+    }
+    const n = parseInt(digits, 10);
+    return Number.isFinite(n) ? n : -1;
+  }
+
+  private readDeepString(root: Record<string, Object> | undefined, path: string[]): string | undefined {
+    let cur: Object | undefined = root;
+    for (let i = 0; i < path.length; i++) {
+      if (!cur || typeof cur !== 'object') {
+        return undefined;
+      }
+      const map = cur as Record<string, Object>;
+      cur = map[path[i]];
+    }
+    return typeof cur === 'string' ? cur as string : undefined;
+  }
+
+  private findLikeAccessibilityText(node: Object, depth: number = 0): string | undefined {
+    if (!node || depth > 10) {
+      return undefined;
+    }
+    if (typeof node === 'string') {
+      return undefined;
+    }
+    const map = node as Record<string, Object>;
+    const directKeys = ['accessibilityText', 'label'];
+    for (const key of directKeys) {
+      const v = map[key];
+      if (typeof v === 'string' && this.parseLikeDigits(v as string) >= 0) {
+        // Prefer strings that look like like/赞 labels when present.
+        const s = v as string;
+        const lower = s.toLowerCase();
+        if (lower.indexOf('like') >= 0 || s.indexOf('赞') >= 0 || s.indexOf('讚') >= 0
+          || s.indexOf('いいね') >= 0 || /\d/.test(s)) {
+          return s;
+        }
+      }
+    }
+    const keys = Object.keys(map);
+    for (const key of keys) {
+      // Skip huge unrelated blobs
+      if (key === 'trackingParams' || key === 'command' || key === 'onTap') {
+        continue;
+      }
+      const child = map[key];
+      if (child && typeof child === 'object') {
+        const found = this.findLikeAccessibilityText(child, depth + 1);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return undefined;
   }
 
   private extractUploaderInfo(videoInfo: VideoInfo, secondary: VideoSecondaryInfoRenderer): void {

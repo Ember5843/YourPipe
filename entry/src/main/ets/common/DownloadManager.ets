@@ -48,6 +48,18 @@ interface StreamChunkResult {
   bytesWritten: number;
 }
 
+interface HlsVariant {
+  url: string;
+  bandwidth: number;
+  height: number;
+}
+
+interface HlsMediaPlaylist {
+  segments: string[];
+  initUrl: string;
+  isFmp4: boolean;
+}
+
 @Observed
 export class DownloadTask {
   @Track id: string;
@@ -586,12 +598,14 @@ export class DownloadManager {
     }
 
     task.taskDir = this.ensureTaskDir(task);
-    const videoExt = this.getFileExtension(task.videoStream);
-    const audioExt = this.getFileExtension(task.audioStream);
+    // SABR UMP dumps are fragmented MP4/WebM (init + moof/mdat). Prefer container
+    // from mime so FFmpeg remux sees a coherent track dump (PipePipe/yt-lab style).
+    const videoExt = this.getSabrDumpExtension(task.videoStream);
+    const audioExt = this.getSabrDumpExtension(task.audioStream);
     task._videoFilePath = `${task.taskDir}/video.${videoExt}`;
     task._audioFilePath = `${task.taskDir}/audio.${audioExt}`;
     logger.info(`Task ${task.id} SABR download start: video=${this.getStreamLogLabel(task.videoStream)} `
-      + `audio=${this.getStreamLogLabel(task.audioStream)}`);
+      + `audio=${this.getStreamLogLabel(task.audioStream)} dumpExt=v.${videoExt}/a.${audioExt}`);
     this.showToast(this.tr($r('app.string.yt_download_started_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
 
     const videoFile = fs.openSync(task._videoFilePath,
@@ -731,43 +745,76 @@ export class DownloadManager {
         throw new Error('Missing HLS manifest URL');
       }
 
-      const segments = await this.fetchHlsSegments(manifestUrl, task);
-      if (segments.length === 0) {
-        throw new Error('No segments found in HLS manifest');
+      // Master playlist → media playlist; never concat m3u8 text as media.
+      const mediaPlaylistUrl = await this.resolveHlsMediaPlaylistUrl(manifestUrl);
+      const playlist = await this.fetchHlsMediaPlaylist(mediaPlaylistUrl);
+      if (playlist.segments.length === 0) {
+        throw new Error('No segments found in HLS media playlist');
       }
-      logger.info(`Task ${task.id} HLS: ${segments.length} segments to download`);
+      logger.info(`Task ${task.id} HLS: media=${mediaPlaylistUrl} segments=${playlist.segments.length} `
+        + `init=${playlist.initUrl ? 'yes' : 'no'} fmp4=${playlist.isFmp4}`);
 
       task.taskDir = this.ensureTaskDir(task);
-      const outputPath = `${task.taskDir}/output.mp4`;
+      // MPEG-TS segments are valid as .ts; fMP4 needs init+media and is not a plain .mp4 after concat.
+      const safeTitle = this.sanitizeFilename(task.title || task.videoId);
+      const outputExt = playlist.isFmp4 ? 'm4s' : 'ts';
+      const outputPath = `${task.taskDir}/${safeTitle}.${outputExt}`;
       const outputFile = fs.openSync(outputPath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
 
       let totalDownloaded = 0;
-      for (let i = 0; i < segments.length; i++) {
+      const writeParts: string[] = [];
+      if (playlist.initUrl) {
+        writeParts.push(playlist.initUrl);
+      }
+      for (let i = 0; i < playlist.segments.length; i++) {
+        writeParts.push(playlist.segments[i]);
+      }
+
+      for (let i = 0; i < writeParts.length; i++) {
         if (task._cancelled) {
           fs.closeSync(outputFile);
           return;
         }
-        const segData = await this.downloadHlsSegment(segments[i]);
-        const segBytes = segData.byteLength;
-        totalDownloaded += segBytes;
+        const segData = await this.downloadHlsSegment(writeParts[i]);
+        if (!segData || segData.byteLength === 0) {
+          fs.closeSync(outputFile);
+          throw new Error(`Empty HLS part ${i + 1}/${writeParts.length}`);
+        }
+        // Guard against accidentally writing another playlist as a "segment".
+        if (this.looksLikeHlsPlaylist(segData)) {
+          fs.closeSync(outputFile);
+          throw new Error('HLS part is still a playlist text; media playlist resolution failed');
+        }
+        totalDownloaded += segData.byteLength;
         fs.writeSync(outputFile.fd, segData);
-        const pct = Math.round(((i + 1) / segments.length) * 100);
+        const pct = Math.round(((i + 1) / writeParts.length) * 100);
         task.videoProgress = pct;
         task.progress = pct;
         task.downloadedSize = totalDownloaded;
         this.publishDownloadNotification(task);
-        logger.debug(`Task ${task.id} HLS: segment ${i + 1}/${segments.length} done`);
+        logger.debug(`Task ${task.id} HLS: part ${i + 1}/${writeParts.length} done bytes=${segData.byteLength}`);
       }
 
       fs.closeSync(outputFile);
+
+      // fMP4 concat without container rebuild is not a proper MP4; fail clearly rather than ship garbage.
+      if (playlist.isFmp4) {
+        this.safeUnlink(outputPath);
+        throw new Error('HLS fMP4 (CMAF) offline remux is not supported yet; pick Progressive or DASH');
+      }
+
       task.outputPath = outputPath;
       task.status = DownloadStatus.COMPLETED;
       task.progress = 100;
       task.videoProgress = 100;
-      logger.info(`Task ${task.id} HLS completed: output=${outputPath}`);
+      logger.info(`Task ${task.id} HLS completed: output=${outputPath} bytes=${totalDownloaded}`);
       this.publishDownloadNotification(task, true);
       this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
     } catch (error) {
+      if (task._cancelled) {
+        task.status = DownloadStatus.CANCELLED;
+        return;
+      }
       task.status = DownloadStatus.FAILED;
       task.errorMessage = this.getErrorMessage(error);
       logger.error(`Task ${task.id} HLS failed: ${task.errorMessage}`);
@@ -775,10 +822,44 @@ export class DownloadManager {
     }
   }
 
-  private async fetchHlsSegments(manifestUrl: string, task: DownloadTask): Promise<string[]> {
+  private async resolveHlsMediaPlaylistUrl(manifestUrl: string): Promise<string> {
+    const text = await this.fetchHlsText(manifestUrl);
+    if (!text) {
+      throw new Error('Empty HLS manifest');
+    }
+    if (!this.isHlsMasterPlaylist(text)) {
+      return manifestUrl;
+    }
+    const variants = this.parseHlsMasterVariants(text, manifestUrl);
+    if (variants.length === 0) {
+      throw new Error('HLS master playlist has no variants');
+    }
+    // Prefer highest bandwidth / resolution.
+    variants.sort((a: HlsVariant, b: HlsVariant): number => {
+      if (b.bandwidth !== a.bandwidth) {
+        return b.bandwidth - a.bandwidth;
+      }
+      return b.height - a.height;
+    });
+    logger.info(`HLS master: picked bandwidth=${variants[0].bandwidth} height=${variants[0].height} url=${variants[0].url}`);
+    return variants[0].url;
+  }
+
+  private async fetchHlsMediaPlaylist(mediaPlaylistUrl: string): Promise<HlsMediaPlaylist> {
+    const text = await this.fetchHlsText(mediaPlaylistUrl);
+    if (!text) {
+      throw new Error('Empty HLS media playlist');
+    }
+    if (this.isHlsMasterPlaylist(text)) {
+      throw new Error('Expected media playlist but got master playlist');
+    }
+    return this.parseHlsMediaPlaylist(text, mediaPlaylistUrl);
+  }
+
+  private async fetchHlsText(url: string): Promise<string> {
     const request = http.createHttp();
     try {
-      const response = await request.request(manifestUrl, {
+      const response = await request.request(url, {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.STRING,
         header: {
@@ -788,33 +869,112 @@ export class DownloadManager {
         connectTimeout: 15000,
         readTimeout: 15000,
       });
-      const text = typeof response.result === 'string' ? response.result : '';
-      if (!text) {
-        throw new Error('Empty HLS manifest');
-      }
-      return this.parseHlsSegments(text, manifestUrl);
+      return typeof response.result === 'string' ? response.result : '';
     } finally {
       request.destroy();
     }
   }
 
-  private parseHlsSegments(manifestText: string, baseUrl: string): string[] {
+  private isHlsMasterPlaylist(text: string): boolean {
+    return text.indexOf('#EXT-X-STREAM-INF') >= 0;
+  }
+
+  private parseHlsMasterVariants(manifestText: string, baseUrl: string): HlsVariant[] {
     const lines = manifestText.split(/\r?\n/);
-    const segments: string[] = [];
+    const variants: HlsVariant[] = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (!line || line.startsWith('#')) {
+      if (!line.startsWith('#EXT-X-STREAM-INF')) {
         continue;
       }
-      if (line.startsWith('http://') || line.startsWith('https://')) {
-        segments.push(line);
-      } else {
-        const slash = baseUrl.lastIndexOf('/');
-        const base = slash >= 0 ? baseUrl.substring(0, slash + 1) : '';
-        segments.push(base + line);
+      const bandwidthMatch = line.match(/BANDWIDTH=(\d+)/i);
+      const resMatch = line.match(/RESOLUTION=(\d+)x(\d+)/i);
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trim()) {
+        j++;
+      }
+      if (j >= lines.length) {
+        break;
+      }
+      const uriLine = lines[j].trim();
+      if (!uriLine || uriLine.startsWith('#')) {
+        continue;
+      }
+      variants.push({
+        url: this.resolveHlsUrl(uriLine, baseUrl),
+        bandwidth: bandwidthMatch ? parseInt(bandwidthMatch[1], 10) : 0,
+        height: resMatch ? parseInt(resMatch[2], 10) : 0
+      });
+      i = j;
+    }
+    return variants;
+  }
+
+  private parseHlsMediaPlaylist(manifestText: string, baseUrl: string): HlsMediaPlaylist {
+    const lines = manifestText.split(/\r?\n/);
+    const segments: string[] = [];
+    let initUrl: string = '';
+    let isFmp4 = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) {
+        continue;
+      }
+      if (line.startsWith('#EXT-X-MAP:')) {
+        const uriMatch = line.match(/URI="([^"]+)"/i);
+        if (uriMatch && uriMatch[1]) {
+          initUrl = this.resolveHlsUrl(uriMatch[1], baseUrl);
+          isFmp4 = true;
+        }
+        continue;
+      }
+      if (line.startsWith('#')) {
+        continue;
+      }
+      segments.push(this.resolveHlsUrl(line, baseUrl));
+    }
+    // Heuristic: .m4s / .mp4 segment names without MAP still imply fMP4.
+    if (!isFmp4 && segments.length > 0) {
+      const sample = segments[0].toLowerCase();
+      if (sample.indexOf('.m4s') >= 0 || sample.indexOf('mime=video%2fmp4') >= 0 || sample.indexOf('mime=video/mp4') >= 0) {
+        isFmp4 = true;
       }
     }
-    return segments;
+    return { segments: segments, initUrl: initUrl, isFmp4: isFmp4 };
+  }
+
+  private resolveHlsUrl(ref: string, baseUrl: string): string {
+    if (ref.startsWith('http://') || ref.startsWith('https://')) {
+      return ref;
+    }
+    try {
+      // Absolute path on same origin.
+      if (ref.startsWith('/')) {
+        const schemeEnd = baseUrl.indexOf('://');
+        if (schemeEnd > 0) {
+          const pathStart = baseUrl.indexOf('/', schemeEnd + 3);
+          const origin = pathStart > 0 ? baseUrl.substring(0, pathStart) : baseUrl;
+          return origin + ref;
+        }
+      }
+    } catch (_e) {
+    }
+    const slash = baseUrl.lastIndexOf('/');
+    const base = slash >= 0 ? baseUrl.substring(0, slash + 1) : '';
+    return base + ref;
+  }
+
+  private looksLikeHlsPlaylist(data: ArrayBuffer): boolean {
+    if (data.byteLength < 8 || data.byteLength > 512 * 1024) {
+      return false;
+    }
+    try {
+      const bytes = new Uint8Array(data);
+      // #EXTM3U
+      return bytes[0] === 0x23 && bytes[1] === 0x45 && bytes[2] === 0x58 && bytes[3] === 0x54;
+    } catch (_e) {
+      return false;
+    }
   }
 
   private async downloadHlsSegment(url: string): Promise<ArrayBuffer> {
@@ -828,8 +988,11 @@ export class DownloadManager {
           'Referer': 'https://www.youtube.com/',
         },
         connectTimeout: 15000,
-        readTimeout: 15000,
+        readTimeout: 60000,
       });
+      if (response.responseCode !== 200 && response.responseCode !== 206) {
+        throw new Error(`HLS segment HTTP ${response.responseCode}`);
+      }
       return response.result as ArrayBuffer;
     } finally {
       request.destroy();
@@ -953,6 +1116,10 @@ export class DownloadManager {
     const chunkCount = totalBytes > 0 ? Math.ceil(totalBytes / HTTP_CHUNK_SIZE) : 1;
     logger.info(`Task ${task.id} ${type} download start: mode=${totalBytes > 0 ? 'chunked-stream' : 'stream'} chunks=${chunkCount} chunkSize=${HTTP_CHUNK_SIZE} size=${totalBytes || 'unknown'} stream=${this.getStreamLogLabel(stream)}`);
 
+    if (!stream.url || stream.url.length === 0) {
+      throw new Error(`Missing ${type} stream URL`);
+    }
+
     const file = fs.openSync(filePath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
     try {
       if (totalBytes > 0) {
@@ -964,7 +1131,39 @@ export class DownloadManager {
       fs.closeSync(file);
     }
 
-    logger.info(`Task ${task.id} ${type} stream download completed: ${filePath} bytes=${totalBytes || (type === 'video' ? task.videoDownloadedSize : task.audioDownloadedSize)}`);
+    if (task._cancelled) {
+      return;
+    }
+
+    const actualSize = this.getLocalFileSize(filePath);
+    const expected = type === 'video' ? task.videoDownloadedSize : task.audioDownloadedSize;
+    if (actualSize <= 0) {
+      throw new Error(`${type} file is empty after download`);
+    }
+    if (totalBytes > 0 && actualSize !== totalBytes) {
+      throw new Error(`${type} size mismatch file=${actualSize} expected=${totalBytes}`);
+    }
+    if (expected > 0 && actualSize !== expected) {
+      logger.warn(`Task ${task.id} ${type} size note: file=${actualSize} tracked=${expected}`);
+    }
+    // Reject tiny stubs (often HTML/error bodies mislabeled as media).
+    if (actualSize < 1024) {
+      throw new Error(`${type} download too small (${actualSize} B); likely not media`);
+    }
+
+    logger.info(`Task ${task.id} ${type} stream download completed: ${filePath} bytes=${actualSize}`);
+  }
+
+  private getLocalFileSize(path: string): number {
+    try {
+      if (!path || !fs.accessSync(path)) {
+        return 0;
+      }
+      const st = fs.statSync(path);
+      return st.size || 0;
+    } catch (_e) {
+      return 0;
+    }
   }
 
   private async downloadChunkedStream(
@@ -1253,19 +1452,42 @@ export class DownloadManager {
     const outputExt = this.getOutputExtension(task);
     const outputPath = `${task.taskDir}/${safeTitle}.${outputExt}`;
 
+    const videoSize = this.getLocalFileSize(task._videoFilePath);
+    if (videoSize <= 0) {
+      throw new Error('Video track missing before merge');
+    }
+
     if (task.audioStream && task._audioFilePath) {
-      logger.info(`Task ${task.id} mux merge output=${outputExt} videoExt=${this.getFileExtension(task.videoStream)} audioExt=${this.getFileExtension(task.audioStream)}`);
+      const audioSize = this.getLocalFileSize(task._audioFilePath);
+      if (audioSize <= 0) {
+        throw new Error('Audio track missing before merge');
+      }
+      logger.info(`Task ${task.id} mux merge output=${outputExt} videoExt=${this.getFileExtension(task.videoStream)} audioExt=${this.getFileExtension(task.audioStream)} videoBytes=${videoSize} audioBytes=${audioSize}`);
 
       const videoPath = task._videoFilePath;
       const audioPath = task._audioFilePath;
       const outPath = outputPath;
 
       try {
+        // Remove stale incomplete output from a previous failed mux attempt.
+        this.safeUnlink(outPath);
         await runMuxTask(videoPath, audioPath, outPath);
       } catch (e) {
+        this.safeUnlink(outPath);
         const msg = (e as Error).message || String(e);
         logger.error(`Task ${task.id} mux failed: ${msg}`);
         throw new Error(`合并失败: ${msg}`);
+      }
+
+      const outSize = this.getLocalFileSize(outPath);
+      if (outSize <= 0) {
+        this.safeUnlink(outPath);
+        throw new Error('Mux produced empty output');
+      }
+      // Output should at least cover the larger track plus container overhead.
+      if (outSize < Math.max(videoSize, audioSize) * 0.5) {
+        this.safeUnlink(outPath);
+        throw new Error(`Mux output too small (${outSize} B vs video=${videoSize} audio=${audioSize})`);
       }
 
       task.updateMergeProgress(100);
@@ -1276,7 +1498,7 @@ export class DownloadManager {
       this.publishDownloadNotification(task);
     }
 
-    logger.info(`File saved to app downloads: ${outputPath}`);
+    logger.info(`File saved to app downloads: ${outputPath} bytes=${this.getLocalFileSize(outputPath)}`);
     return outputPath;
   }
 
@@ -1420,6 +1642,21 @@ export class DownloadManager {
     if (mime.includes('ogg') || mime.includes('opus')) return 'opus';
     const kind = (stream.kind || '').toLowerCase();
     if (kind.includes('audio')) return 'm4a';
+    return 'mp4';
+  }
+
+  /** Intermediate SABR track dump extension (fMP4/WebM fragments). */
+  private getSabrDumpExtension(stream: StreamInfo): string {
+    const mime = (stream.mimeType || '').toLowerCase();
+    const codecs = (stream.codecs || '').toLowerCase();
+    if (mime.includes('webm') || codecs.includes('vp9') || codecs.includes('vp09')
+      || codecs.includes('av01') || codecs.includes('opus')) {
+      return 'webm';
+    }
+    // audio/mp4 → m4a is fine for a pure audio dump before mux
+    if (mime.includes('audio') && mime.includes('mp4')) {
+      return 'm4a';
+    }
     return 'mp4';
   }
 

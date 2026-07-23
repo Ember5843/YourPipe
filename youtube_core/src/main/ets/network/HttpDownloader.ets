@@ -450,7 +450,8 @@ export class HttpDownloader {
 
   /**
    * Binary POST (SABR protobuf body + UMP response).
-   * Uses ARRAY_BUFFER for both request extraData and response result.
+   * Streamed via requestInStream — OHOS http.request buffers the whole body and rejects
+   * ~50MB+ UMP replies with "response data exceeds the maximum limit" / curl 23.
    */
   async postBinary(
     url: string,
@@ -465,38 +466,12 @@ export class HttpDownloader {
     while (attempt < (enableRetry ? HttpDownloader.MAX_RETRIES : 1)) {
       attempt++;
       try {
-        logger.debug(`POST-BIN ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
-        const requestHeaders = this.processBinaryHeaders(headers, localization);
-        const httpRequest = http.createHttp();
-        // Fresh copy: avoid SharedArrayBuffer / subarray offset issues on OHOS HTTP.
-        const bodyCopy = new ArrayBuffer(data.length);
-        new Uint8Array(bodyCopy).set(data);
-        const httpOptions: http.HttpRequestOptions = {
-          'method': http.RequestMethod.POST,
-          'header': requestHeaders,
-          'extraData': bodyCopy,
-          'expectDataType': http.HttpDataType.ARRAY_BUFFER,
-          'connectTimeout': 30000,
-          'readTimeout': 60000,
-          'usingCache': false
-        };
-        HttpDownloader.applyProxyToOptions(httpOptions, url);
-        const response = await new Promise<http.HttpResponse>((resolve, reject) => {
-          httpRequest.request(url, httpOptions, (err: BusinessError, resp: http.HttpResponse) => {
-            if (!err) {
-              resolve(resp);
-            } else {
-              reject(err);
-            }
-          });
-        });
-        httpRequest.destroy();
+        logger.debug(`POST-BIN-STREAM ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
+        const response = await this.postBinaryStreamOnce(url, data, headers, localization);
         if (response.responseCode && response.responseCode >= 400) {
           let errBody = '';
           try {
-            if (typeof response.result === 'string') {
-              errBody = (response.result as string).substring(0, 300);
-            } else if (response.result instanceof ArrayBuffer) {
+            if (response.result instanceof ArrayBuffer) {
               const u8 = new Uint8Array(response.result as ArrayBuffer);
               const n = Math.min(u8.length, 200);
               let s = '';
@@ -508,7 +483,7 @@ export class HttpDownloader {
           } catch (_e) {
             errBody = '';
           }
-          logger.error(`POST-BIN HTTP ${response.responseCode} bodySnippet=${errBody}`);
+          logger.error(`POST-BIN-STREAM HTTP ${response.responseCode} bodySnippet=${errBody}`);
           const httpError = new HttpError(
             `HTTP ${response.responseCode}`,
             url,
@@ -550,6 +525,119 @@ export class HttpDownloader {
       }
     }
     throw lastError || new HttpError('Unknown error', url, 'POST');
+  }
+
+  /**
+   * One streamed binary POST. Accumulates dataReceive chunks into ArrayBuffer result
+   * (same shape callers expect from buffered request).
+   */
+  private postBinaryStreamOnce(
+    url: string,
+    data: Uint8Array,
+    headers?: Record<string, string[] | string>,
+    localization?: Localization
+  ): Promise<http.HttpResponse> {
+    const requestHeaders = this.processBinaryHeaders(headers, localization);
+    const httpRequest = http.createHttp();
+    const bodyCopy = new ArrayBuffer(data.length);
+    new Uint8Array(bodyCopy).set(data);
+    const httpOptions: http.HttpRequestOptions = {
+      method: http.RequestMethod.POST,
+      header: requestHeaders,
+      extraData: bodyCopy,
+      connectTimeout: 30000,
+      // Large SABR UMP payloads (init + many media segs) need a long read window.
+      readTimeout: 180000,
+      usingCache: false
+    };
+    HttpDownloader.applyProxyToOptions(httpOptions, url);
+
+    return new Promise<http.HttpResponse>((resolve, reject) => {
+      const chunks: ArrayBuffer[] = [];
+      let totalBytes = 0;
+      let responseCode = 0;
+      let responseHeader: Object = new Object();
+      let requestReturned = false;
+      let streamEnded = false;
+      let settled = false;
+
+      const cleanup = (): void => {
+        try {
+          httpRequest.off('headersReceive');
+          httpRequest.off('dataReceive');
+          httpRequest.off('dataEnd');
+        } catch (_e) {
+        }
+        try {
+          httpRequest.destroy();
+        } catch (_e) {
+        }
+      };
+
+      const finishOk = (): void => {
+        if (settled || !requestReturned || !streamEnded) {
+          return;
+        }
+        settled = true;
+        const result = new ArrayBuffer(totalBytes);
+        const out = new Uint8Array(result);
+        let offset = 0;
+        for (let i = 0; i < chunks.length; i++) {
+          const part = new Uint8Array(chunks[i]);
+          out.set(part, offset);
+          offset += part.length;
+        }
+        cleanup();
+        logger.debug(`POST-BIN-STREAM complete status=${responseCode} bytes=${totalBytes}`);
+        const resp: http.HttpResponse = {
+          result: result,
+          responseCode: responseCode,
+          header: responseHeader,
+          cookies: '',
+          resultType: http.HttpDataType.ARRAY_BUFFER
+        } as http.HttpResponse;
+        resolve(resp);
+      };
+
+      const finishErr = (error: Error | Object): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+
+      httpRequest.on('headersReceive', (hdrs: Object) => {
+        responseHeader = hdrs;
+      });
+
+      httpRequest.on('dataReceive', (chunk: ArrayBuffer) => {
+        if (settled) {
+          return;
+        }
+        if (chunk && chunk.byteLength > 0) {
+          // Copy — framework may reuse the buffer on next callback.
+          const copy = new ArrayBuffer(chunk.byteLength);
+          new Uint8Array(copy).set(new Uint8Array(chunk));
+          chunks.push(copy);
+          totalBytes += chunk.byteLength;
+        }
+      });
+
+      httpRequest.on('dataEnd', () => {
+        streamEnded = true;
+        finishOk();
+      });
+
+      httpRequest.requestInStream(url, httpOptions).then((code: number) => {
+        responseCode = code || 0;
+        requestReturned = true;
+        finishOk();
+      }).catch((error: Error) => {
+        finishErr(error);
+      });
+    });
   }
 
   /**

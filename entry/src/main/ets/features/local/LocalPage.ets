@@ -4,6 +4,7 @@ import { ActionHub } from '../../common/ActionHub';
 import { AuthAccountStatus, AuthSessionManager, VideoItem } from 'youtube_core';
 import { customVibrator } from '../../common/VibratorUtil';
 import { UIConfig } from '../../common/AppState';
+import { customAnimationUtil } from '../../common/AnimationUtil';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { DownloadPage } from './DownloadPage';
 import { MediaThumb } from '../../common/components/MediaThumb';
@@ -389,6 +390,7 @@ export struct LocalPage {
                   onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
                 })
               }
+              .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
             }, (item: WatchHistoryItem) => item.videoId)
           }
           .width('100%')

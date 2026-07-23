@@ -17,8 +17,10 @@
 
 extern "C" {
 #include <libavformat/avformat.h>
+#include <libavutil/dict.h>
 #include <libavutil/error.h>
 #include <libavutil/avutil.h>
+#include <libavutil/mathematics.h>
 }
 
 namespace {
@@ -79,7 +81,12 @@ struct Input {
 // Open `path` and locate the first stream of `type`. Throws MuxError on failure.
 void OpenInput(Input& in, const std::string& path, AVMediaType type)
 {
-    int ret = avformat_open_input(&in.fmt, path.c_str(), nullptr, nullptr);
+    // SABR dumps are fMP4 (init + moof/mdat). Give lavf room to probe fragments.
+    AVDictionary* opts = nullptr;
+    av_dict_set(&opts, "probesize", "10000000", 0);
+    av_dict_set(&opts, "analyzeduration", "10000000", 0);
+    int ret = avformat_open_input(&in.fmt, path.c_str(), nullptr, &opts);
+    av_dict_free(&opts);
     if (ret < 0) {
         throw MuxError{"open input failed (" + path + "): " + AvErr(ret)};
     }
@@ -92,10 +99,20 @@ void OpenInput(Input& in, const std::string& path, AVMediaType type)
         const char* what = (type == AVMEDIA_TYPE_VIDEO) ? "video" : "audio";
         throw MuxError{std::string("no ") + what + " stream in " + path};
     }
+    AVStream* st = in.fmt->streams[in.streamIndex];
+    MUX_LOG("open %{public}s type=%{public}s codec=%{public}d tb=%{public}d/%{public}d "
+            "frames=%{public}lld duration=%{public}lld",
+            path.c_str(),
+            type == AVMEDIA_TYPE_VIDEO ? "video" : "audio",
+            st->codecpar ? st->codecpar->codec_id : 0,
+            st->time_base.num, st->time_base.den,
+            static_cast<long long>(st->nb_frames),
+            static_cast<long long>(st->duration));
 }
 
 // Remux: copy video stream from videoPath + audio stream from audioPath into
 // outPath. Container is chosen from outPath's extension. Throws MuxError.
+// A/V packets are interleaved by DTS so progressive players do not black-screen.
 void DoMux(const std::string& videoPath, const std::string& audioPath,
            const std::string& outPath)
 {
@@ -110,7 +127,12 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
     }
 
     // Map: out stream 0 <- video input, out stream 1 <- audio input.
-    struct StreamMap { Input* in; int outIndex; };
+    struct StreamMap {
+        Input* in;
+        int outIndex;
+        AVPacket* peek;  // next packet waiting for interleave, or null when EOF
+        bool eof;
+    };
     std::vector<StreamMap> maps;
     for (Input* in : {&video, &audio}) {
         AVStream* src = in->fmt->streams[in->streamIndex];
@@ -125,7 +147,12 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
             throw MuxError{"failed to copy codec parameters: " + AvErr(ret)};
         }
         dst->codecpar->codec_tag = 0;  // let the muxer pick a valid tag
-        maps.push_back({in, dst->index});
+        dst->time_base = src->time_base;
+        if (src->avg_frame_rate.num > 0 && src->avg_frame_rate.den > 0) {
+            dst->avg_frame_rate = src->avg_frame_rate;
+            dst->r_frame_rate = src->r_frame_rate.num > 0 ? src->r_frame_rate : src->avg_frame_rate;
+        }
+        maps.push_back({in, dst->index, nullptr, false});
     }
 
     // Open the output file (unless the muxer is buffer-only).
@@ -136,41 +163,154 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
             throw MuxError{"cannot open output file " + outPath + ": " + AvErr(ret)};
         }
     }
-    ret = avformat_write_header(out, nullptr);
+    // Progressive MP4: move moov to the front so players can start immediately.
+    AVDictionary* muxOpts = nullptr;
+    if (out->oformat && out->oformat->name &&
+        (std::string(out->oformat->name).find("mp4") != std::string::npos ||
+         std::string(out->oformat->name).find("mov") != std::string::npos ||
+         std::string(out->oformat->name).find("ismv") != std::string::npos)) {
+        av_dict_set(&muxOpts, "movflags", "+faststart", 0);
+    }
+    ret = avformat_write_header(out, &muxOpts);
+    av_dict_free(&muxOpts);
     if (ret < 0) {
         if (!(out->oformat->flags & AVFMT_NOFILE)) avio_closep(&out->pb);
         avformat_free_context(out);
         throw MuxError{"write header failed: " + AvErr(ret)};
     }
 
-    // Copy packets from both inputs, rewriting timestamps into the output
-    // stream's time base. Each input is drained independently to its own EOF,
-    // so audio/video of different durations are both written in full.
-    AVPacket* pkt = av_packet_alloc();
-    if (!pkt) {
-        if (!(out->oformat->flags & AVFMT_NOFILE)) avio_closep(&out->pb);
-        avformat_free_context(out);
-        throw MuxError{"failed to allocate packet"};
+    auto readNext = [](StreamMap& m) -> bool {
+        if (m.eof) {
+            return false;
+        }
+        if (!m.peek) {
+            m.peek = av_packet_alloc();
+            if (!m.peek) {
+                m.eof = true;
+                return false;
+            }
+        }
+        while (true) {
+            int r = av_read_frame(m.in->fmt, m.peek);
+            if (r < 0) {
+                av_packet_free(&m.peek);
+                m.peek = nullptr;
+                m.eof = true;
+                return false;
+            }
+            if (m.peek->stream_index == m.in->streamIndex) {
+                return true;
+            }
+            av_packet_unref(m.peek);
+        }
+    };
+
+    // Prime one packet from each input.
+    for (StreamMap& m : maps) {
+        readNext(m);
     }
+
     std::string failure;
-    for (const StreamMap& m : maps) {
-        AVStream* src = m.in->fmt->streams[m.in->streamIndex];
-        AVStream* dst = out->streams[m.outIndex];
-        while (av_read_frame(m.in->fmt, pkt) >= 0) {
-            if (pkt->stream_index != m.in->streamIndex) {
-                av_packet_unref(pkt);
+    int64_t videoPkts = 0;
+    int64_t audioPkts = 0;
+    while (!maps[0].eof || !maps[1].eof) {
+        // Pick the stream whose next packet has the smaller DTS (in seconds).
+        int pick = -1;
+        double bestTs = 0;
+        for (size_t i = 0; i < maps.size(); ++i) {
+            if (maps[i].eof || !maps[i].peek) {
                 continue;
             }
-            av_packet_rescale_ts(pkt, src->time_base, dst->time_base);
-            pkt->stream_index = m.outIndex;
-            pkt->pos = -1;
-            int wret = av_interleaved_write_frame(out, pkt);
-            av_packet_unref(pkt);
-            if (wret < 0) { failure = "write frame failed: " + AvErr(wret); break; }
+            AVStream* src = maps[i].in->fmt->streams[maps[i].in->streamIndex];
+            int64_t ts = maps[i].peek->dts != AV_NOPTS_VALUE
+                ? maps[i].peek->dts
+                : (maps[i].peek->pts != AV_NOPTS_VALUE ? maps[i].peek->pts : 0);
+            double sec = ts * av_q2d(src->time_base);
+            if (pick < 0 || sec < bestTs) {
+                pick = static_cast<int>(i);
+                bestTs = sec;
+            }
         }
-        if (!failure.empty()) break;
+        if (pick < 0) {
+            break;
+        }
+
+        StreamMap& m = maps[static_cast<size_t>(pick)];
+        AVStream* src = m.in->fmt->streams[m.in->streamIndex];
+        AVStream* dst = out->streams[m.outIndex];
+        AVPacket* pkt = m.peek;
+        m.peek = nullptr;
+
+        av_packet_rescale_ts(pkt, src->time_base, dst->time_base);
+        pkt->stream_index = m.outIndex;
+        pkt->pos = -1;
+        if (pkt->duration < 0) {
+            pkt->duration = 0;
+        }
+        int wret = av_interleaved_write_frame(out, pkt);
+        av_packet_free(&pkt);
+        if (wret < 0) {
+            failure = "write frame failed: " + AvErr(wret);
+            break;
+        }
+        if (pick == 0) {
+            videoPkts++;
+        } else {
+            audioPkts++;
+        }
+        readNext(m);
     }
-    av_packet_free(&pkt);
+
+    // Drain leftovers if interleave loop exited early on one side only.
+    if (failure.empty()) {
+        for (size_t i = 0; i < maps.size(); ++i) {
+            StreamMap& m = maps[i];
+            while (!m.eof) {
+                if (!m.peek && !readNext(m)) {
+                    break;
+                }
+                if (!m.peek) {
+                    break;
+                }
+                AVStream* src = m.in->fmt->streams[m.in->streamIndex];
+                AVStream* dst = out->streams[m.outIndex];
+                AVPacket* pkt = m.peek;
+                m.peek = nullptr;
+                av_packet_rescale_ts(pkt, src->time_base, dst->time_base);
+                pkt->stream_index = m.outIndex;
+                pkt->pos = -1;
+                int wret = av_interleaved_write_frame(out, pkt);
+                av_packet_free(&pkt);
+                if (wret < 0) {
+                    failure = "write frame failed: " + AvErr(wret);
+                    break;
+                }
+                if (i == 0) {
+                    videoPkts++;
+                } else {
+                    audioPkts++;
+                }
+                readNext(m);
+            }
+            if (!failure.empty()) {
+                break;
+            }
+        }
+    }
+
+    for (StreamMap& m : maps) {
+        if (m.peek) {
+            av_packet_free(&m.peek);
+            m.peek = nullptr;
+        }
+    }
+
+    if (failure.empty() && videoPkts == 0) {
+        failure = "no video packets remuxed (black screen risk)";
+    }
+    if (failure.empty() && audioPkts == 0) {
+        failure = "no audio packets remuxed";
+    }
 
     if (failure.empty()) {
         ret = av_write_trailer(out);
@@ -178,8 +318,9 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
     }
     if (!(out->oformat->flags & AVFMT_NOFILE)) avio_closep(&out->pb);
     avformat_free_context(out);
-    MUX_LOG("mux done: %{public}s + %{public}s -> %{public}s (%{public}s)",
+    MUX_LOG("mux done: %{public}s + %{public}s -> %{public}s vPkts=%{public}lld aPkts=%{public}lld (%{public}s)",
             videoPath.c_str(), audioPath.c_str(), outPath.c_str(),
+            static_cast<long long>(videoPkts), static_cast<long long>(audioPkts),
             failure.empty() ? "ok" : failure.c_str());
     if (!failure.empty()) throw MuxError{failure};
 }

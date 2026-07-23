@@ -8,6 +8,7 @@ import { PlaylistCard } from '../../features/playlist/components/PlaylistCard';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { UIConfig } from '../../common/AppState';
+import { customAnimationUtil } from '../../common/AnimationUtil';
 
 
 const logger = AppLog.getInstance('FavoritesPage');
@@ -179,6 +180,7 @@ export struct FavoritesPage {
                     showLiveTag: false
                   })
                 }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
               }, (item: VideoItem) => item.videoId || item.id.toString())
             }
             .width('100%')
@@ -194,6 +196,7 @@ export struct FavoritesPage {
                 showLiveTag: false
               })
             }
+            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
           }, (item: VideoItem) => item.videoId || item.id.toString())
         }
       }
@@ -236,6 +239,7 @@ export struct FavoritesPage {
               forceActionLabel: $r('app.string.yt_action_unfavorite')
             })
           }
+          .transition(customAnimationUtil.isScaleTran(item.playlistId, this.uiConfig))
         }, (item: PlaylistItem) => item.playlistId)
       }
 
@@ -274,6 +278,7 @@ export struct FavoritesPage {
               typeLabel: $r('app.string.yt_local_playlists_tag')
             })
           }
+          .transition(customAnimationUtil.isScaleTran(queue.id, this.uiConfig))
         }, (queue: StoredLocalQueue) => queue.id + queue.videos.length)
       }
     }

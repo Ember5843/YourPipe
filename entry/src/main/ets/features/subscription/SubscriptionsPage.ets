@@ -8,6 +8,7 @@ import { UIConfig } from '../../common/AppState';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { LocalStore } from '../../common/LocalStore';
 import { PreferencesStore } from '../../common/PreferencesStore';
+import { customAnimationUtil } from '../../common/AnimationUtil';
 
 const logger = AppLog.getInstance('SubscriptionsPage');
 
@@ -187,6 +188,7 @@ export struct SubscriptionsPage {
                     useFavoriteToggle: true
                   })
                 }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
               }, (item: VideoItem) => item.id.toString())
             }
             .width('100%')
@@ -207,6 +209,7 @@ export struct SubscriptionsPage {
                   useFavoriteToggle: true
                 })
               }
+              .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
             }, (item: VideoItem) => item.id.toString())
           }
           .width('100%')

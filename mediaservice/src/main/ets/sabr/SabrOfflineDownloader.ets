@@ -161,8 +161,11 @@ export class SabrOfflineDownloader {
     let audioDone = false;
     let consecutiveFetchFails = 0;
 
-    // Inits first (both tracks).
-    const vInit = await videoBuf.readSegment(true);
+    // Inits first (both tracks). Use the same trimmed init as playback:
+    // full UMP init often embeds hierarchical SIDX (reference_type=1) which
+    // lavf rejects or remuxes into a black-screen MP4. Playback already trims
+    // to decoder init only — offline remux must match.
+    const vInit = await videoBuf.readSegment(true, -1, false);
     if (!vInit || vInit.length === 0) {
       throw new Error(`SABR download: empty video init itag=${videoBuf.getItag()}`);
     }
@@ -174,7 +177,7 @@ export class SabrOfflineDownloader {
       videoBytes, audioBytes, videoSeq, audioSeq
     });
 
-    const aInit = await audioBuf.readSegment(true);
+    const aInit = await audioBuf.readSegment(true, -1, false);
     if (!aInit || aInit.length === 0) {
       throw new Error(`SABR download: empty audio init itag=${audioBuf.getItag()}`);
     }

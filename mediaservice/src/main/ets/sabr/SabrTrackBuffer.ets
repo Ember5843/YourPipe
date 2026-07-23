@@ -54,8 +54,17 @@ export class SabrTrackBuffer {
     return this.lease.session.getStreamState().getSegmentEndMs(format, sequenceNumber);
   }
 
-  /** Exact segment access used by the local DASH facade. Undefined means proven EOF. */
-  async readSegment(initSegment: boolean, sequenceNumber: number = -1): Promise<Uint8Array | undefined> {
+  /**
+   * Exact segment access.
+   * @param keepFullInit Offline dump must keep full init (incl. index/SIDX). Playback trims
+   *   SIDX so hierarchical boxes do not break lavf — that trim corrupts remux if used offline.
+   * Undefined return means proven EOF.
+   */
+  async readSegment(
+    initSegment: boolean,
+    sequenceNumber: number = -1,
+    keepFullInit: boolean = false
+  ): Promise<Uint8Array | undefined> {
     await this.ensureReady();
     const request = initSegment
       ? SabrSegmentRequest.init(this.getItag())
@@ -67,6 +76,10 @@ export class SabrTrackBuffer {
       try {
         const segment = await this.lease.session.fetchSegment(request);
         if (initSegment) {
+          if (keepFullInit) {
+            Logger.info(TAG, `offline full init itag=${this.getItag()} bytes=${segment.data.length}`);
+            return segment.data;
+          }
           const format = this.isAudio ? this.lease.audioFormat : this.lease.videoFormat;
           const playbackData = this.lease.session.getStreamState()
             .getPlaybackInitializationData(format, segment.data);

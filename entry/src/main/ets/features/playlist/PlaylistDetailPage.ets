@@ -315,6 +315,7 @@ export struct PlaylistDetailPage {
                     }
                   })
                 }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
               }, (item: VideoItem) => item.videoId || item.id.toString())
             }
             .width('100%')
@@ -359,6 +360,7 @@ export struct PlaylistDetailPage {
                 }
               })
             }
+            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
           }, (item: VideoItem) => item.videoId || item.id.toString())
 
           if (this.isLoadingMore) {

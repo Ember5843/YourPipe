@@ -65,6 +65,8 @@ export struct VideoDetails {
   @Prop videoDescription: string = '';
   @Prop videoDescriptionError: string = '';
   @Prop streams: StreamInfo[] = [];
+  /** True only for currently live broadcasts (not VOD of past lives). */
+  @Prop isLiveNow: boolean = false;
   @Prop viewCount: number = 0;
   @Prop likeCount: string = '0';
   @Prop dislikeCount: string = '0';
@@ -410,7 +412,16 @@ export struct VideoDetails {
     this.streamCategories = categories;
   }
 
+  private isCurrentlyLive(): boolean {
+    // Only isLiveNow from player extraction (liveBroadcastDetails.isLiveNow).
+    // Do NOT use list badge item.isLive — post-live / 直播回放 must stay downloadable.
+    return this.isLiveNow === true;
+  }
+
   private openDownloadDialog(): void {
+    if (this.isCurrentlyLive()) {
+      return;
+    }
     this.classifyStreamsForDownload();
     if (!this.streamCategories ||
       (this.streamCategories.video.length === 0 &&
@@ -624,8 +635,10 @@ export struct VideoDetails {
     Scroll() {
       Row({ space: 10 }) {
         this.SleepTimerActionButton()
-        this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
-          $r('app.string.yt_action_download'), () => { this.openDownloadDialog(); })
+        if (!this.isCurrentlyLive()) {
+          this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
+            $r('app.string.yt_action_download'), () => { this.openDownloadDialog(); })
+        }
         this.ActionButton($r('sys.symbol.info_circle'),
           $r('app.string.yt_stream_info_title'), () => { this.openSheet(2); })
         this.ActionButton($r('sys.symbol.bookmark'),

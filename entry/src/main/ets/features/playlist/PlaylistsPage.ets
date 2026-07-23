@@ -128,7 +128,7 @@ export struct PlaylistsPage {
               forceActionLabel: $r('app.string.yt_action_unfavorite')
             })
           }
-
+          .transition(customAnimationUtil.isScaleTran(item.playlistId, this.uiConfig))
         }, (item: PlaylistItem) => item.playlistId)
       }
     }

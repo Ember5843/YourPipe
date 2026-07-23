@@ -799,6 +799,9 @@ export struct VideoPlayerPage {
                     item: this.video,
                     videoDescription: this.videoSource.videoDescription,
                     streams: this.videoSource.streams || [],
+                    // Extractor sets videoInfo.isLive from isLiveNow only (not isLiveContent).
+                    // List badge item.isLive must not hide download on 直播回放.
+                    isLiveNow: this.videoSource.isLive === true,
                     viewCount: this.videoSource.viewCount || 0,
                     likeCount: this.detailLikeCount,
                     dislikeCount: this.detailDislikeCount,

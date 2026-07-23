@@ -610,6 +610,7 @@ export struct UserPage {
                     useFavoriteToggle: true
                   })
                 }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
               }, (item: VideoItem) => item.videoId || item.id.toString())
             }
             .width('100%')
@@ -647,6 +648,7 @@ export struct UserPage {
                 useFavoriteToggle: true
               })
             }
+            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
           }, (item: VideoItem) => item.videoId || item.id.toString())
 
           if (this.isLoadingMore) {
@@ -721,6 +723,7 @@ export struct UserPage {
                     useFavoriteToggle: true
                   })
                 }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
               }, (item: VideoItem) => item.videoId || item.id.toString())
             }
             .width('100%')
@@ -761,6 +764,7 @@ export struct UserPage {
                 useFavoriteToggle: true
               })
             }
+            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
           }, (item: VideoItem) => item.videoId || item.id.toString())
 
           if (this.isLoadingMoreShorts) {
@@ -836,6 +840,7 @@ export struct UserPage {
                     useFavoriteToggle: true
                   })
                 }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
               }, (item: VideoItem) => item.videoId || item.id.toString())
             }
             .width('100%')
@@ -876,6 +881,7 @@ export struct UserPage {
                 useFavoriteToggle: true
               })
             }
+            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
           }, (item: VideoItem) => item.videoId || item.id.toString())
 
           if (this.isLoadingMoreLive) {
@@ -942,6 +948,7 @@ export struct UserPage {
                 playlist: item
               })
             }
+            .transition(customAnimationUtil.isScaleTran(item.playlistId || item.id.toString(), this.uiConfig))
           }, (item: SearchPlaylistItem) => item.playlistId || item.id.toString())
 
           if (this.isLoadingMorePlaylists) {
