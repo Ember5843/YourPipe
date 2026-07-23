@@ -537,7 +537,7 @@ export struct OptionsDataAccountPage {
 
             ListItem() {
               OptionItem({
-                icon: $r('sys.symbol.wifi'),
+                icon: $r('sys.symbol.qrcode'),
                 title: $r('app.string.yt_device_qr_sign_in'),
                 subtitle: $r('app.string.yt_device_qr_sign_in_subtitle'),
                 iconColor: this.themePrimary,
