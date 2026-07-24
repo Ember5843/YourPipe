@@ -322,9 +322,9 @@ export class YouTubeExtractor {
     if (!metaPr) {
       // Watch HTML path: same login skip as stream extract when anonymous page says LOGIN_REQUIRED.
       const authManager = AuthSessionManager.getInstance();
-      const hasCookieAuth = authManager?.isAuthEnabledForPlayback() === true && !!(authManager?.getCookieStringForPlayback());
+      const hasPlaybackAuth = authManager?.hasAuthForPlayback() === true;
       const watchStatus = watchPr.playabilityStatus?.status?.toUpperCase();
-      if (!hasCookieAuth || watchStatus !== 'LOGIN_REQUIRED') {
+      if (!hasPlaybackAuth || watchStatus !== 'LOGIN_REQUIRED') {
         this.checkPlayabilityStatus(watchPr.playabilityStatus);
       }
     }
@@ -1198,10 +1198,14 @@ export class YouTubeExtractor {
     this.errors = [];
     this.mwebHlsManifestUrl = '';
 
-    const hasCookieAuth = this.hasCookieAuthForRequests();
-    YoutubePlayerClientConfig.applyAuthDefault(hasCookieAuth);
+    // Stream client selection matches cookie/guest: product default mweb (SABR).
+    // OAuth does NOT force tv_downgraded — only Cookie attaches WEB auth on mweb.
+    const webCookieAuth = this.shouldAttachWebCookieAuth();
+    const hasOauth = this.isOauthOnlyPlaybackAuth();
+    YoutubePlayerClientConfig.applyAuthDefault(webCookieAuth || hasOauth, false);
     const selectedClient = YoutubePlayerClientConfig.getYoutubePlayerClient();
-    logger.info(`[STREAM] selectedClient=${selectedClient} cookieAuth=${hasCookieAuth}`);
+    logger.info(`[STREAM] selectedClient=${selectedClient} webCookieAuth=${webCookieAuth} `
+      + `oauthOnly=${hasOauth} streamAuth=webCookieOnly`);
 
     // Stream process cache disabled: always re-hit stream /player (align with fresh extract).
     this.streamsCachedVideoId = '';
@@ -1291,14 +1295,27 @@ export class YouTubeExtractor {
     logger.info(`[STARTUP] attempt=${attemptId} stage=client_version source=`
       + `${WebClientVersionResolver.getCachedOrHardcodedSource()} version=${initialMwebVersion}`);
     const streamStartedAt = Date.now();
+    // mweb/web_safari: Cookie only when present; guest+oauth → anonymous (no Bearer).
     let innertubePlayers = await this.fetchSelectedStreamPlayer(
-      videoId, sts, selectedClient, hasCookieAuth);
+      videoId, sts, selectedClient, webCookieAuth, false);
     if (selectedClient === 'mweb' && !innertubePlayers.player?.streamingData) {
       const resolvedVersion = await versionPromise;
       if (resolvedVersion !== initialMwebVersion) {
         logger.warn(`[STREAM] retry mweb with resolved clientVersion=${resolvedVersion}`);
         innertubePlayers = await this.fetchSelectedStreamPlayer(
-          videoId, sts, selectedClient, hasCookieAuth);
+          videoId, sts, selectedClient, webCookieAuth, false);
+      }
+    }
+    // Restricted / LOGIN_REQUIRED: OAuth may retry TVHTML5 + Bearer (SmartTube).
+    // Cookie path keeps mweb+Cookie; do not inject Bearer onto mweb.
+    const playStatus = innertubePlayers.player?.playabilityStatus?.status?.toUpperCase() || '';
+    if (hasOauth && (playStatus === 'LOGIN_REQUIRED' || playStatus === 'UNPLAYABLE'
+      || !innertubePlayers.player?.streamingData)) {
+      logger.warn(`[STREAM] oauth restricted status=${playStatus || 'empty'} → tv_downgraded+Bearer`);
+      const tvPlayers = await this.fetchSelectedStreamPlayer(
+        videoId, sts, 'tv_downgraded', false, true);
+      if (tvPlayers.player?.streamingData) {
+        innertubePlayers = tvPlayers;
       }
     }
     if (!innertubePlayers.player) {
@@ -1309,8 +1326,10 @@ export class YouTubeExtractor {
       }
       throw new ExtractionException('stream player returned no playerResponse after metadata refresh');
     }
-    logger.info(`[TIMING] video=${videoId} stage=streamPlayer client=${selectedClient} auth=${hasCookieAuth} elapsed=${Date.now() - streamStartedAt}ms`);
-    logger.info(`[STARTUP] attempt=${attemptId} stage=stream_player client=${selectedClient} `
+    const usedClient = innertubePlayers.sourceClient || selectedClient;
+    logger.info(`[TIMING] video=${videoId} stage=streamPlayer client=${usedClient} `
+      + `webCookieAuth=${webCookieAuth} elapsed=${Date.now() - streamStartedAt}ms`);
+    logger.info(`[STARTUP] attempt=${attemptId} stage=stream_player client=${usedClient} `
       + `elapsed=${Date.now() - streamStartedAt}ms`);
 
     // Stream-player metadata is sufficient for ordinary startup. TV downgraded
@@ -1320,8 +1339,9 @@ export class YouTubeExtractor {
     let metaBase: PlayerResponse = innertubePlayers.player
       ?? ({ videoDetails: { videoId: videoId } } as PlayerResponse);
     const streamPr = innertubePlayers.player;
+    // usedClient reflects oauth TV fallback when it won.
     let isLive = this.resolveIsLive(metaBase, streamPr);
-    const isPossibleTvLive = selectedClient === 'tv_downgraded'
+    const isPossibleTvLive = usedClient === 'tv_downgraded'
       && streamPr?.videoDetails?.isLiveContent === true;
     const hlsRecoveryPromise = (isLive || isPossibleTvLive)
       ? ConfiguredPlayerClient.fetchMwebHlsOnly({
@@ -1349,7 +1369,7 @@ export class YouTubeExtractor {
 
     const streamingData = streamPr?.streamingData;
     const isPostLive = this.resolveIsPostLive(metaBase, streamPr);
-    const willUseSabr = selectedClient === 'mweb' && !isLive && !isPostLive
+    const willUseSabr = usedClient === 'mweb' && !isLive && !isPostLive
       && !!streamingData?.serverAbrStreamingUrl;
     const hasDirectDash = !willUseSabr && !!streamingData?.adaptiveFormats?.some(
       (format: Format) => !!(format.url || format.signatureCipher || format.cipher));
@@ -1368,8 +1388,8 @@ export class YouTubeExtractor {
     videoInfo.playerResponse = metaBase;
 
     const hasConfiguredHls = !!(streamPr?.streamingData?.hlsManifestUrl);
-    if ((isLive && (selectedClient === 'tv_downgraded'
-      || (selectedClient === 'web_safari' && !hasConfiguredHls))) || isPossibleTvLive) {
+    if ((isLive && (usedClient === 'tv_downgraded'
+      || (usedClient === 'web_safari' && !hasConfiguredHls))) || isPossibleTvLive) {
       const hls = await hlsRecoveryPromise;
       if (hls) {
         this.mwebHlsManifestUrl = hls;
@@ -1426,7 +1446,8 @@ export class YouTubeExtractor {
     }
     videoInfo.dashMpdUrl = undefined;
 
-    logger.info(`[TIMING] video=${videoId} stage=criticalExtractComplete client=${selectedClient} auth=${hasCookieAuth} elapsed=${Date.now() - criticalStartedAt}ms streams=${videoInfo.streams.length}`);
+    logger.info(`[TIMING] video=${videoId} stage=criticalExtractComplete client=${usedClient} `
+      + `webCookieAuth=${webCookieAuth} elapsed=${Date.now() - criticalStartedAt}ms streams=${videoInfo.streams.length}`);
 
     return videoInfo;
   }
@@ -2015,12 +2036,15 @@ export class YouTubeExtractor {
 
   /**
    * PipePipe single configured stream /player (www + STS + selected client).
+   * @param useWebAuth Cookie on mweb/web only
+   * @param useTvAuth  Bearer on tv_downgraded only
    */
   private async fetchSelectedStreamPlayer(
     videoId: string,
     sts: number | undefined,
     selectedClient: YoutubePlayerClientKey,
-    hasCookieAuth: boolean
+    useWebAuth: boolean = false,
+    useTvAuth: boolean = false
   ): Promise<InnertubePlayerResult> {
     const empty: InnertubePlayerResult = {
       player: undefined,
@@ -2031,7 +2055,8 @@ export class YouTubeExtractor {
       androidCpn: undefined,
       safariCpn: undefined
     };
-    logger.info(`[STREAM] fetchSelectedStreamPlayer client=${selectedClient} sts=${sts ?? '(none)'} auth=${hasCookieAuth}`);
+    logger.info(`[STREAM] fetchSelectedStreamPlayer client=${selectedClient} sts=${sts ?? '(none)'} `
+      + `webAuth=${useWebAuth} tvAuth=${useTvAuth}`);
     const ctx: ClientFetchContext = {
       videoId: videoId,
       hl: this.hl,
@@ -2041,7 +2066,7 @@ export class YouTubeExtractor {
     };
     try {
       const fetched = await ConfiguredPlayerClient.fetch(
-        selectedClient, ctx, this.client, hasCookieAuth);
+        selectedClient, ctx, this.client, useWebAuth, useTvAuth);
       if (!fetched?.playerResponse) {
         this.errors.push(new ExtractorStageError(selectedClient,
           new Error('stream player returned no playerResponse')));
@@ -2132,9 +2157,37 @@ export class YouTubeExtractor {
     };
   }
 
+  /**
+   * Stream player / SABR may attach Cookie (web) or Bearer (tv).
+   * Prefer hasAuthForPlaybackRequests for stream path only.
+   */
   private hasCookieAuthForRequests(): boolean {
+    return this.hasAuthForPlaybackRequests();
+  }
+
+  /** Any playback rail (Cookie/WEB or OAuth/TV) with toggles on. */
+  private hasAuthForPlaybackRequests(): boolean {
     const authManager = AuthSessionManager.getInstance();
-    return authManager?.isAuthEnabledForPlayback() === true && !!(authManager?.getCookieStringForPlayback());
+    return authManager?.hasAuthForPlayback() === true;
+  }
+
+  /**
+   * WEB-shaped endpoints (/player metadata fields, /next, comments) must only
+   * attach Cookie+SAPISIDHASH. OAuth Bearer on WEB clients breaks meta/comments.
+   * Public content works anonymously; cookie login can still personalize.
+   */
+  private shouldAttachWebCookieAuth(): boolean {
+    const authManager = AuthSessionManager.getInstance();
+    return authManager?.hasWebAuthForPlayback() === true;
+  }
+
+  /** OAuth without Cookie → must use TV client + Bearer. */
+  private isOauthOnlyPlaybackAuth(): boolean {
+    const authManager = AuthSessionManager.getInstance();
+    if (!authManager) {
+      return false;
+    }
+    return authManager.hasTvAuthForPlayback() && !authManager.hasWebAuthForPlayback();
   }
 
   /**
@@ -2149,7 +2202,8 @@ export class YouTubeExtractor {
       + `?prettyPrint=false`
       + `&$fields=microformat,playabilityStatus,storyboards,videoDetails`;
     const payload = this.buildDesktopWebPayload(videoId);
-    const withAuth = this.hasCookieAuthForRequests();
+    // Never send OAuth Bearer to WEB metadata player (breaks OAuth-only sessions).
+    const withAuth = this.shouldAttachWebCookieAuth();
     try {
       const resp = await this.client.postJson(
         url,
@@ -2158,7 +2212,7 @@ export class YouTubeExtractor {
         withAuth
       );
       if (resp.responseCode !== 200 || !resp.result) {
-        logger.warn(`[META] WEB metadata player HTTP ${resp.responseCode}`);
+        logger.warn(`[META] WEB metadata player HTTP ${resp.responseCode} webAuth=${withAuth}`);
         return undefined;
       }
       const pr = JSON.parse(resp.result as string) as PlayerResponse;
@@ -2660,7 +2714,7 @@ export class YouTubeExtractor {
     try {
       const url = `https://www.youtube.com/youtubei/v1/next?prettyPrint=false`;
       const response: http.HttpResponse = await this.client.postJson(
-        url, body, this.webApiHeaders(), this.hasCookieAuthForRequests());
+        url, body, this.webApiHeaders(), this.shouldAttachWebCookieAuth());
 
       if (response.responseCode === 200) {
         const ajaxJson = JSON.parse(response.result as string) as Record<string, Object>;
@@ -2689,7 +2743,7 @@ export class YouTubeExtractor {
     try {
       const url = `https://www.youtube.com/youtubei/v1/next?prettyPrint=false`;
       const response: http.HttpResponse = await this.client.postJson(
-        url, body, this.webApiHeaders(), this.hasCookieAuthForRequests());
+        url, body, this.webApiHeaders(), this.shouldAttachWebCookieAuth());
 
       if (response.responseCode === 200) {
         const ajaxJson = JSON.parse(response.result as string) as Record<string, Object>;
@@ -2747,7 +2801,7 @@ export class YouTubeExtractor {
       `https://www.youtube.com/youtubei/v1/next?prettyPrint=false`,
       body,
       this.webApiHeaders(),
-      this.hasCookieAuthForRequests()
+      this.shouldAttachWebCookieAuth()
     );
 
     if (response.responseCode !== 200) {

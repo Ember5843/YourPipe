@@ -4,7 +4,9 @@ import {
   Localization,
   VideoItem,
   fetchBrowseContinuation,
-  fetchBrowsePage
+  fetchBrowsePage,
+  fetchTvBrowseContinuation,
+  fetchTvBrowsePage
 } from 'youtube_core';
 import { AppLog } from '../../common/AppLog';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
@@ -14,6 +16,7 @@ import {
   buildHomeKioskVideoItems,
   getHomeFeedItemsFromTabContent
 } from '../home/utils/HomeFeedUtils';
+import { buildTvBrowseVideoItems, getTvVisitorData } from '../home/utils/TvBrowseUtils';
 import { getTextFromRuns } from '../home/utils/TextUtils';
 
 const logger = AppLog.getInstance('UserLibraryService');
@@ -38,9 +41,16 @@ export class UserLibraryService {
   }
 
   private requireSignedIn(): void {
-    if (AuthSessionManager.getInstance()?.isAuthEnabledForUserData() !== true) {
+    const session = AuthSessionManager.getInstance();
+    if (!session || !session.hasAuthForUserData()) {
       throw new Error('Sign-in required');
     }
+  }
+
+  /** Prefer WEB cookie rail; OAuth-only uses TV browse. */
+  private useTvRail(): boolean {
+    const session = AuthSessionManager.getInstance();
+    return session?.preferredUserDataRail() === 'tv';
   }
 
   async fetchWatchHistory(startId: number = 1): Promise<UserVideoPageResult> {
@@ -78,6 +88,27 @@ export class UserLibraryService {
 
   async fetchSubscribedChannels(): Promise<Array<SubscriptionUser>> {
     this.requireSignedIn();
+    if (this.useTvRail()) {
+      // TV has no clean FEchannels WEB tree; channel list lives on FEsubscriptions nav tabs.
+      logger.info('[UserLibrary] stage=channels rail=tv browseId=FEsubscriptions');
+      const response = await fetchTvBrowsePage(
+        this.localization,
+        this.contentCountry,
+        this.SUBSCRIPTIONS_BROWSE_ID,
+        '',
+        undefined,
+        true
+      );
+      if (!response) {
+        throw new Error('Empty TV channels browse response');
+      }
+      const tvChannels = this.parseTvSubscribedChannels(response as Record<string, Object>);
+      if (tvChannels.length > 0) {
+        return tvChannels;
+      }
+      // Fallback: generic UC scan (may be empty for pure TV payloads)
+      return this.parseSubscribedChannels(response as Record<string, Object>);
+    }
     const response = await fetchBrowsePage(
       this.localization,
       this.contentCountry,
@@ -116,6 +147,22 @@ export class UserLibraryService {
   }
 
   private async fetchAuthBrowse(browseId: string, startId: number): Promise<UserVideoPageResult> {
+    if (this.useTvRail()) {
+      logger.info(`[UserLibrary] stage=browse rail=tv browseId=${browseId}`);
+      const response = await fetchTvBrowsePage(
+        this.localization,
+        this.contentCountry,
+        browseId,
+        '',
+        undefined,
+        true
+      );
+      if (!response) {
+        throw new Error(`Empty TV browse response: ${browseId}`);
+      }
+      return this.parseTvVideoBrowse(response as Record<string, Object>, startId);
+    }
+    logger.info(`[UserLibrary] stage=browse rail=web browseId=${browseId}`);
     const response = await fetchBrowsePage(
       this.localization,
       this.contentCountry,
@@ -135,6 +182,19 @@ export class UserLibraryService {
     visitorData: string,
     startId: number
   ): Promise<UserVideoPageResult> {
+    if (this.useTvRail()) {
+      const response = await fetchTvBrowseContinuation(
+        this.localization,
+        this.contentCountry,
+        nextPageToken,
+        visitorData,
+        true
+      );
+      if (!response) {
+        throw new Error('Empty TV browse continuation response');
+      }
+      return this.parseTvVideoBrowse(response as Record<string, Object>, startId, visitorData);
+    }
     const response = await fetchBrowseContinuation(
       this.localization,
       this.contentCountry,
@@ -146,6 +206,19 @@ export class UserLibraryService {
       throw new Error('Empty browse continuation response');
     }
     return this.parseVideoBrowseContinuation(response as Record<string, Object>, visitorData, startId);
+  }
+
+  private parseTvVideoBrowse(
+    response: Record<string, Object>,
+    startId: number,
+    fallbackVisitor: string = ''
+  ): UserVideoPageResult {
+    const built = buildTvBrowseVideoItems(response, startId);
+    return {
+      items: built.items,
+      nextPageToken: built.nextPageToken,
+      visitorData: getTvVisitorData(response) || fallbackVisitor
+    };
   }
 
   private parseVideoBrowseInitial(response: Record<string, Object>, startId: number): UserVideoPageResult {
@@ -232,6 +305,127 @@ export class UserLibraryService {
 
     logger.info(`parseSubscribedChannels count=${result.length}`);
     return result;
+  }
+
+  /**
+   * TV FEsubscriptions secondary-nav tabs after "All" are per-channel entries.
+   * Channel id is embedded in browseEndpoint.params (base64-ish with UC…).
+   */
+  private parseTvSubscribedChannels(response: Record<string, Object>): Array<SubscriptionUser> {
+    const result: Array<SubscriptionUser> = [];
+    const seen: Record<string, boolean> = {};
+    const contents = response['contents'] as Record<string, Object>;
+    const tvBrowse = contents ? (contents['tvBrowseRenderer'] as Record<string, Object>) : undefined;
+    const content = tvBrowse ? (tvBrowse['content'] as Record<string, Object>) : undefined;
+    const secondary = content ? (content['tvSecondaryNavRenderer'] as Record<string, Object>) : undefined;
+    const sections = secondary ? (secondary['sections'] as Array<Record<string, Object>>) : undefined;
+    const section0 = sections && sections.length > 0
+      ? (sections[0]['tvSecondaryNavSectionRenderer'] as Record<string, Object>)
+      : undefined;
+    const tabs = section0 ? (section0['tabs'] as Array<Record<string, Object>>) : undefined;
+    if (!tabs || tabs.length === 0) {
+      logger.info('parseTvSubscribedChannels tabs=0');
+      return result;
+    }
+
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i];
+      const tabRenderer = (tab['tabRenderer'] as Record<string, Object>)
+        || (tab['expandableTabRenderer'] as Record<string, Object>);
+      if (!tabRenderer) {
+        continue;
+      }
+      const title = ((tabRenderer['title'] as string) || '').trim();
+      if (!title || title.toLowerCase() === 'all') {
+        continue;
+      }
+      const endpoint = tabRenderer['endpoint'] as Record<string, Object>;
+      const browse = endpoint ? (endpoint['browseEndpoint'] as Record<string, Object>) : undefined;
+      const params = browse ? ((browse['params'] as string) || '') : '';
+      const channelId = this.extractChannelIdFromTvParams(params);
+      if (!channelId || seen[channelId]) {
+        continue;
+      }
+      seen[channelId] = true;
+      result.push(new SubscriptionUser(
+        channelId,
+        title,
+        '',
+        '',
+        '',
+        '',
+        ThumbnailPlaceholder.pickColor(channelId, result.length + 1)
+      ));
+    }
+    logger.info(`parseTvSubscribedChannels count=${result.length}`);
+    return result;
+  }
+
+  private extractChannelIdFromTvParams(params: string): string {
+    if (!params || params.length === 0) {
+      return '';
+    }
+    // 1) plain UC… in raw/url-decoded string
+    try {
+      const pct = decodeURIComponent(params.replace(/\+/g, ' '));
+      const mPlain = pct.match(/UC[\w-]{22}/);
+      if (mPlain && mPlain[0]) {
+        return mPlain[0];
+      }
+    } catch (_e) {
+      // ignore
+    }
+    const m0 = params.match(/UC[\w-]{22}/);
+    if (m0 && m0[0]) {
+      return m0[0];
+    }
+    // 2) URL-safe base64 → binary; UC channel id is embedded as ASCII
+    try {
+      let b64 = params.replace(/%3D/gi, '=').replace(/%2B/gi, '+').replace(/%2F/gi, '/');
+      try {
+        b64 = decodeURIComponent(b64);
+      } catch (_e) {
+        // keep b64
+      }
+      b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4 !== 0) {
+        b64 += '=';
+      }
+      const ascii = this.base64ToAscii(b64);
+      const m = ascii.match(/UC[\w-]{22}/);
+      if (m && m[0]) {
+        return m[0];
+      }
+    } catch (_e) {
+      // ignore
+    }
+    return '';
+  }
+
+  private base64ToAscii(b64: string): string {
+    const table =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let out = '';
+    let buffer = 0;
+    let bits = 0;
+    for (let i = 0; i < b64.length; i++) {
+      const ch = b64.charAt(i);
+      if (ch === '=') {
+        break;
+      }
+      const val = table.indexOf(ch);
+      if (val < 0) {
+        continue;
+      }
+      buffer = (buffer << 6) | val;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        const byte = (buffer >> bits) & 0xff;
+        out += String.fromCharCode(byte);
+      }
+    }
+    return out;
   }
 
   private unwrapRichContent(node: Record<string, Object>, key: string): Record<string, Object> | undefined {

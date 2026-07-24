@@ -73,18 +73,21 @@ export class YouTubeHttpClient {
 
   /**
    * 发送 GET 请求
-   * 默认匿名（对齐 PipePipe）。仅在 stream 提取链上把 withAuth 设为 true 才注入登录头。
+   * 默认匿名。withAuth=true → 仅 Cookie+SAPISIDHASH（WEB）。
+   * withTvAuth=true → 仅 Bearer（TV）。二者都 false 绝不附加登录头。
    */
   async get(
     url: string,
     customHeaders?: Record<string, string | string[]>,
-    withAuth: boolean = false
+    withAuth: boolean = false,
+    withTvAuth: boolean = false
   ): Promise<http.HttpResponse> {
     const requestId = YouTubeHttpClient.nextRequestId();
     const target = YouTubeHttpClient.safeRequestTarget(url);
     const startedAt = Date.now();
-    logger.info(`[NET] id=${requestId} phase=start method=GET target=${target} auth=${withAuth}`);
-    const headers = await this.prepareHeaders(customHeaders, url, withAuth);
+    logger.info(`[NET] id=${requestId} phase=start method=GET target=${target} `
+      + `webAuth=${withAuth} tvAuth=${withTvAuth}`);
+    const headers = await this.prepareHeaders(customHeaders, url, withAuth, withTvAuth);
     try {
       const response: http.HttpResponse = await this.downloader.request('GET', url, headers, undefined, this.localization);
       this.saveCookiesFromResponse(response, url);
@@ -98,20 +101,22 @@ export class YouTubeHttpClient {
 
   /**
    * 发送 POST 请求
-   * 默认匿名（对齐 PipePipe）。仅在 stream 提取链上把 withAuth 设为 true 才注入登录头。
+   * 默认匿名。withAuth=WEB Cookie；withTvAuth=Bearer；均 false 则无登录头。
    */
   async post(
     url: string,
     data?: string,
     customHeaders?: Record<string, string | string[]>,
     contentType?: string,
-    withAuth: boolean = false
+    withAuth: boolean = false,
+    withTvAuth: boolean = false
   ): Promise<http.HttpResponse> {
     const requestId = YouTubeHttpClient.nextRequestId();
     const target = YouTubeHttpClient.safeRequestTarget(url);
     const startedAt = Date.now();
-    logger.info(`[NET] id=${requestId} phase=start method=POST target=${target} auth=${withAuth} bytes=${data?.length ?? 0}`);
-    const headers = await this.prepareHeaders(customHeaders, url, withAuth);
+    logger.info(`[NET] id=${requestId} phase=start method=POST target=${target} `
+      + `webAuth=${withAuth} tvAuth=${withTvAuth} bytes=${data?.length ?? 0}`);
+    const headers = await this.prepareHeaders(customHeaders, url, withAuth, withTvAuth);
 
     const postHeaders: Record<string, string[]> = {};
     const headerKeys = Object.keys(headers);
@@ -137,22 +142,23 @@ export class YouTubeHttpClient {
   }
 
   /**
-   * 发送 POST JSON 请求
-   * 默认匿名。stream 提取链显式传 withAuth=true。
+   * 发送 POST JSON 请求。默认匿名。
+   * withAuth = WEB Cookie+SAPISIDHASH only；withTvAuth = Bearer only.
    */
   async postJson(
     url: string,
     data?: object,
     customHeaders?: Record<string, string | string[]>,
-    withAuth: boolean = false
+    withAuth: boolean = false,
+    withTvAuth: boolean = false
   ): Promise<http.HttpResponse> {
     const jsonData = data ? JSON.stringify(data) : undefined;
-    return this.post(url, jsonData, customHeaders, 'application/json', withAuth);
+    return this.post(url, jsonData, customHeaders, 'application/json', withAuth, withTvAuth);
   }
 
   /**
    * Binary POST for SABR (protobuf body, UMP ARRAY_BUFFER response).
-   * Does not inject browser page defaults or application/json — caller owns headers.
+   * Caller owns headers. Auth: WEB Cookie only when withAuth (never OAuth Bearer on SABR).
    */
   async postBinary(
     url: string,
@@ -163,7 +169,8 @@ export class YouTubeHttpClient {
     const requestId = YouTubeHttpClient.nextRequestId();
     const target = YouTubeHttpClient.safeRequestTarget(url);
     const startedAt = Date.now();
-    logger.info(`[NET] id=${requestId} phase=start method=POST_BINARY target=${target} auth=${withAuth} bytes=${data.length}`);
+    logger.info(`[NET] id=${requestId} phase=start method=POST_BINARY target=${target} `
+      + `webAuth=${withAuth} bytes=${data.length}`);
     // Minimal cookie/auth only — SABR googlevideo rejects wrong browser/API defaults.
     const headers: Record<string, string | string[]> = {};
     if (customHeaders) {
@@ -173,17 +180,8 @@ export class YouTubeHttpClient {
       }
     }
     if (withAuth) {
-      const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
-      if (activeAuthSession && activeAuthSession.isAuthEnabledForPlayback()) {
-        const cookieStr = activeAuthSession.getCookieStringForPlayback();
-        if (cookieStr) {
-          headers['Cookie'] = cookieStr;
-        }
-        const authorization = await activeAuthSession.getAuthorizationHeader();
-        if (authorization && authorization.length > 0) {
-          headers['Authorization'] = authorization;
-        }
-      }
+      // SABR is mweb/WEB-shaped: Cookie only, never Bearer.
+      await this.injectWebAuthHeaders(headers);
     }
     try {
       const response = await this.downloader.postBinary(url, data, headers, this.localization);
@@ -197,17 +195,63 @@ export class YouTubeHttpClient {
   }
 
   /**
+   * WEB rail only: Cookie + SAPISIDHASH. Never injects OAuth Bearer.
+   * No-op when cookie playback auth is unavailable.
+   */
+  private async injectWebAuthHeaders(
+    headers: Record<string, string | string[]>
+  ): Promise<void> {
+    const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
+    if (!activeAuthSession || !activeAuthSession.hasWebAuthForPlayback()) {
+      return;
+    }
+    const cookieStr = activeAuthSession.getCookieStringForPlayback();
+    if (cookieStr) {
+      headers['Cookie'] = cookieStr;
+      headers['X-Origin'] = 'https://www.youtube.com';
+      headers['DNT'] = '1';
+    }
+    const authorization = await activeAuthSession.getWebAuthorizationHeader();
+    if (authorization && authorization.length > 0) {
+      headers['Authorization'] = authorization;
+    }
+    logger.info('[NET] authRail=web cookie inject');
+  }
+
+  /**
+   * TV rail only: Bearer access token. Never injects Cookie/SAPISIDHASH.
+   * SmartTube-style for TVHTML5 player/browse only.
+   */
+  private async injectTvAuthHeaders(
+    headers: Record<string, string | string[]>
+  ): Promise<void> {
+    const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
+    if (!activeAuthSession || !activeAuthSession.hasTvAuthForPlayback()) {
+      return;
+    }
+    const authorization = await activeAuthSession.getTvAuthorizationHeader();
+    if (authorization && authorization.length > 0) {
+      headers['Authorization'] = authorization;
+      headers['X-Origin'] = 'https://www.youtube.com';
+      headers['DNT'] = '1';
+      logger.info('[NET] authRail=tv Bearer inject');
+    }
+  }
+
+  /**
    * 准备请求头（合并默认头、Cookie、自定义头）
    *
-   * 对齐 PipePipe DownloaderImpl + addLoggedInHeaders 行为：
-   *   - 默认匿名：仅 SOCS（同意）+ 受限模式 cookie + cookieJar 已有的非鉴权 cookie
-   *   - withAuth=true 时才注入 SAPISIDHASH Authorization + 完整 Cookie + X-Origin + DNT
-   *   - 调用方显式 opt-in：stream Safari、WEB metadata /player、WEB /next 等
+   * 对齐 PipePipe + SmartTube 分轨：
+   *   - 默认匿名：仅 SOCS / cookieJar 非鉴权 cookie
+   *   - withAuth=true → WEB Cookie+SAPISIDHASH only
+   *   - withTvAuth=true → Bearer only
+   *   - 绝不在匿名路径上附带登录信息
    */
   private async prepareHeaders(
     customHeaders?: Record<string, string | string[]>,
     targetUrl?: string,
-    withAuth: boolean = false
+    withAuth: boolean = false,
+    withTvAuth: boolean = false
   ): Promise<Record<string, string | string[]>> {
     const headers: Record<string, string | string[]> = {};
 
@@ -251,22 +295,12 @@ export class YouTubeHttpClient {
         headers['Referer'] = 'https://www.youtube.com/';
       }
 
-      // 登录头：显式 withAuth 时注入（对齐 PipePipe addLoggedInHeaders）
-      // 使用 useAuthForPlayback 开关（播放路径），不影响到用户数据路径
+      // 登录头必须调用方显式 opt-in；WEB 与 TV 互不串轨。
       if (withAuth) {
-        const activeAuthSession = this.authSession || AuthSessionManager.getInstance() || undefined;
-        if (activeAuthSession && activeAuthSession.isAuthEnabledForPlayback()) {
-          const cookieStr = activeAuthSession.getCookieStringForPlayback();
-          if (cookieStr) {
-            headers['Cookie'] = cookieStr;
-            headers['X-Origin'] = 'https://www.youtube.com';
-            headers['DNT'] = '1';
-          }
-          const authorization = await activeAuthSession.getAuthorizationHeader();
-          if (authorization && authorization.length > 0) {
-            headers['Authorization'] = authorization;
-          }
-        }
+        await this.injectWebAuthHeaders(headers);
+      }
+      if (withTvAuth) {
+        await this.injectTvAuthHeaders(headers);
       }
     }
 

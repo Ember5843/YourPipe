@@ -19,28 +19,48 @@ export class AuthProbeError extends Error {
 
 export class SmartTubeAuthProbe {
   private downloader: HttpDownloader = new HttpDownloader();
+  /** Stable per-process device id (UUID), same idea as SmartTube MediaServiceData.getDeviceId(). */
+  private deviceId: string = SmartTubeAuthProbe.newDeviceId();
 
   async requestDeviceCode(): Promise<DeviceCodeResponse> {
-    logger.info('Requesting device code');
+    logger.info(`Requesting device code device_id=${this.deviceId.substring(0, 8)}…`);
+    // Match SmartTube AuthApiHelper.getUserCodeQuery JSON body exactly.
     const body = JSON.stringify({
       'client_id': DebugAuthConstants.CLIENT_ID,
-      'device_id': DebugAuthConstants.DEVICE_ID,
+      'device_id': this.deviceId,
       'model_name': DebugAuthConstants.MODEL_NAME,
       'scope': DebugAuthConstants.SCOPE
     });
 
-    const response = await this.postJson(DebugAuthConstants.DEVICE_CODE_URL, body);
-    const data = JSON.parse(response.result as string) as Record<string, Object>;
-    const result = new DeviceCodeResponse();
-    result.deviceCode = this.readString(data, 'device_code');
-    result.userCode = this.readString(data, 'user_code');
-    result.verificationUrl = this.readString(data, 'verification_url') ||
-      this.readString(data, 'verification_uri') ||
-      DebugAuthConstants.VERIFICATION_URL;
-    result.expiresIn = this.readNumber(data, 'expires_in', 0);
-    result.interval = this.readNumber(data, 'interval', 5);
-    logger.info('Device code received');
-    return result;
+    try {
+      const response = await this.postJson(DebugAuthConstants.DEVICE_CODE_URL, body);
+      const raw = typeof response.result === 'string'
+        ? response.result as string
+        : JSON.stringify(response.result);
+      const data = JSON.parse(raw) as Record<string, Object>;
+      const result = new DeviceCodeResponse();
+      result.deviceCode = this.readString(data, 'device_code');
+      result.userCode = this.readString(data, 'user_code');
+      // Prefer SmartTube human URL for display; API often returns google.com/device.
+      result.verificationUrl = DebugAuthConstants.VERIFICATION_URL;
+      result.expiresIn = this.readNumber(data, 'expires_in', 0);
+      result.interval = this.readNumber(data, 'interval', 5);
+      logger.info(`Device code received user_code=${result.userCode} expires=${result.expiresIn}`);
+      return result;
+    } catch (err) {
+      if (err instanceof HttpError) {
+        const snippet = (err.responseBody || '').substring(0, 300);
+        logger.error(`Device code HTTP ${err.responseCode}: ${snippet || err.message}`);
+        throw new AuthProbeError(
+          err.responseCode === 400 ? 'bad_request' : 'network_error',
+          err.responseCode
+            ? `HTTP ${err.responseCode}${snippet ? `: ${snippet}` : ''}`
+            : (err.message || 'Device code request failed')
+        );
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new AuthProbeError('network_error', msg || 'Device code request failed');
+    }
   }
 
   async pollToken(deviceCode: string): Promise<AuthTokenResponse> {
@@ -68,7 +88,10 @@ export class SmartTubeAuthProbe {
   private async requestToken(body: string): Promise<AuthTokenResponse> {
     try {
       const response = await this.postJson(DebugAuthConstants.TOKEN_URL, body);
-      return this.parseTokenResponse(response.result as string);
+      const raw = typeof response.result === 'string'
+        ? response.result as string
+        : JSON.stringify(response.result);
+      return this.parseTokenResponse(raw);
     } catch (err) {
       const httpError = err as HttpError;
       if (httpError && httpError.responseBody) {
@@ -101,12 +124,37 @@ export class SmartTubeAuthProbe {
       url,
       {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'User-Agent':
+          'Mozilla/5.0 (Linux; Android 10; SMART TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Origin': 'https://www.youtube.com',
+        'Referer': 'https://www.youtube.com/tv'
       },
       body,
       undefined,
       false
     );
+  }
+
+  private static newDeviceId(): string {
+    // UUID v4-ish, unique per process (SmartTube persists; regenerate each cold start is fine).
+    const hexChars: string[] = [
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    ];
+    let out = '';
+    for (let i = 0; i < 36; i++) {
+      if (i === 8 || i === 13 || i === 18 || i === 23) {
+        out += '-';
+      } else if (i === 14) {
+        out += '4';
+      } else if (i === 19) {
+        const idx = Math.floor(Math.random() * 4) + 8;
+        out += hexChars[idx];
+      } else {
+        out += hexChars[Math.floor(Math.random() * 16)];
+      }
+    }
+    return out;
   }
 
   private readString(data: Record<string, Object>, key: string): string {

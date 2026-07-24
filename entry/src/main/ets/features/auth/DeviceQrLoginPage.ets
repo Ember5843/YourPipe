@@ -87,16 +87,15 @@ export struct DeviceQrLoginPage {
   }
 
   private qrPayload(): string {
-    const url = (this.status.verificationUrl || 'https://youtube.com/activate').trim();
     const code = (this.status.userCode || '').trim();
     if (code.length === 0) {
-      return url;
+      // Fallback: human page without prefilled code.
+      return (this.status.verificationUrl || 'https://yt.be/activate').trim();
     }
-    // Encode activate URL + user code so phone scanners open the page with context.
-    if (url.indexOf('?') >= 0) {
-      return `${url}&user_code=${encodeURIComponent(code)}`;
-    }
-    return `${url}?user_code=${encodeURIComponent(code)}`;
+    // SmartTube: QR_SIGN_IN_URL + userCode with spaces → '-'.
+    // Wrong: google.com/device?user_code=… → phone often sees "Bad Request".
+    const normalized = code.replace(/\s+/g, '-');
+    return `https://youtube.com/qr/activate/${normalized}`;
   }
 
   private remainingSec(): number {
@@ -187,7 +186,7 @@ export struct DeviceQrLoginPage {
             .fontColor($r('app.color.yourtube_text_primary'))
             .letterSpacing(2)
 
-          Text(this.status.verificationUrl || 'https://youtube.com/activate')
+          Text(this.status.verificationUrl || 'https://yt.be/activate')
             .fontSize(13)
             .fontColor(this.themePrimary)
             .textAlign(TextAlign.Center)

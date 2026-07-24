@@ -127,16 +127,107 @@ async function applyAuthHeaders(headers: Record<string, string[]>): Promise<void
   if (!authSession || !authSession.isAuthEnabledForUserData()) {
     return;
   }
-  const cookieStr = authSession.getCookieStringForUserData();
-  if (cookieStr && cookieStr.length > 0) {
-    headers['Cookie'] = [cookieStr];
-    headers['X-Origin'] = ['https://www.youtube.com'];
-    headers['DNT'] = ['1'];
+  // WEB browse (recommended home) needs Cookie + SAPISIDHASH like PipePipe addLoggedInHeaders.
+  // OAuth Bearer alone is not accepted for FEwhat_to_watch — do not send it here.
+  if (!authSession.hasCookieAuthForUserData()) {
+    logger.warn('[browse-auth] skip: no cookie SAPISID (OAuth-only or empty cookies)');
+    return;
   }
-  const authorization = await authSession.getAuthorizationHeader();
+  const cookieStr = authSession.getCookieStringForUserData();
+  if (!cookieStr || cookieStr.length === 0) {
+    return;
+  }
+  // Keep consent cookie; overwriting with account cookies alone can trip consent redirects.
+  let cookie = cookieStr;
+  if (cookie.indexOf('SOCS=') < 0) {
+    cookie = `${cookie}; SOCS=CAISAiAD`;
+  }
+  headers['Cookie'] = [cookie];
+  headers['X-Origin'] = ['https://www.youtube.com'];
+  headers['DNT'] = ['1'];
+  const authorization = await authSession.getWebAuthorizationHeader();
   if (authorization && authorization.length > 0) {
     headers['Authorization'] = [authorization];
+  } else {
+    logger.warn('[browse-auth] SAPISIDHASH missing after cookie inject');
   }
+}
+
+/** TV rail headers: Bearer only (SmartTube-style). No Cookie/SAPISIDHASH. */
+async function applyTvAuthHeaders(headers: Record<string, string[]>): Promise<void> {
+  const authSession = AuthSessionManager.getInstance();
+  if (!authSession || !authSession.hasTvAuthForUserData()) {
+    logger.warn('[browse-auth-tv] skip: no OAuth token');
+    return;
+  }
+  headers['X-Origin'] = ['https://www.youtube.com'];
+  headers['DNT'] = ['1'];
+  const authorization = await authSession.getTvAuthorizationHeader();
+  if (authorization && authorization.length > 0) {
+    headers['Authorization'] = [authorization];
+    logger.info('[browse-auth-tv] authRail=tv Bearer attached');
+  } else {
+    logger.warn('[browse-auth-tv] Bearer missing after refresh');
+  }
+}
+
+async function getTvYoutubeHeaders(
+  localization: Localization,
+  withAuth: boolean = false
+): Promise<Record<string, string[]>> {
+  const headers: Record<string, string[]> = {};
+  headers['User-Agent'] = [ClientsConstants.TVHTML5_USER_AGENT];
+  headers['Accept-Language'] = [localization.getLocalizationCode()];
+  headers['X-YouTube-Client-Name'] = [ClientsConstants.TVHTML5_CLIENT_ID];
+  headers['X-YouTube-Client-Version'] = [ClientsConstants.TVHTML5_CLIENT_VERSION];
+  headers['Origin'] = ['https://www.youtube.com'];
+  headers['Referer'] = ['https://www.youtube.com/tv'];
+  if (withAuth) {
+    await applyTvAuthHeaders(headers);
+  }
+  return headers;
+}
+
+function prepareTvJsonBuilder(
+  localization: Localization,
+  contentCountry: ContentCountry,
+  visitorData?: string
+): Record<string, Object> {
+  // Align SmartTube AppClient.TV browse template (tvAppInfo + leanback UA).
+  const client: Record<string, Object> = {
+    'hl': localization.getLanguageCode(),
+    'gl': contentCountry.getCountryCode(),
+    'clientName': ClientsConstants.TVHTML5_CLIENT_NAME,
+    'clientVersion': ClientsConstants.TVHTML5_CLIENT_VERSION,
+    'userAgent': ClientsConstants.TVHTML5_USER_AGENT,
+    'clientScreen': 'WATCH',
+    'platform': ClientsConstants.TVHTML5_CLIENT_PLATFORM,
+    'utcOffsetMinutes': 0,
+    'tvAppInfo': {
+      'appQuality': 'TV_APP_QUALITY_FULL_ANIMATION',
+      'zylonLeftNav': true
+    } as Record<string, Object>,
+    'webpSupport': false,
+    'animatedWebpSupport': true
+  };
+  if (visitorData && visitorData.length > 0) {
+    client['visitorData'] = visitorData;
+  }
+  return {
+    'context': {
+      'client': client,
+      'request': {
+        'internalExperimentFlags': [],
+        'useSsl': true
+      } as Record<string, Object>,
+      'user': {
+        'lockedSafetyMode': false,
+        'enableSafetyMode': false
+      } as Record<string, Object>
+    } as Record<string, Object>,
+    'racyCheckOk': true,
+    'contentCheckOk': true
+  };
 }
 
 async function getYoutubeMusicHeaders(localization: Localization): Promise<Record<string, string[]>> {
@@ -232,6 +323,43 @@ async function getJsonPostResponse(
   );
   const responseObject = JSON.parse(response.result as string);
   return responseObject;
+}
+
+async function getJsonPostResponseTv(
+  endpoint: string,
+  body: string,
+  localization: Localization,
+  withAuth: boolean = true
+): Promise<Object | null> {
+  const headers = await getTvYoutubeHeaders(localization, withAuth);
+  headers['Content-Type'] = ['application/json'];
+  const response: http.HttpResponse = await downloader.post(
+    YOUTUBEI_V1_URL + endpoint + '?' + DISABLE_PRETTY_PRINT_PARAMETER,
+    body,
+    headers,
+    localization,
+    "application/json"
+  );
+  const code = response.responseCode;
+  const raw = typeof response.result === 'string'
+    ? response.result as string
+    : JSON.stringify(response.result);
+  if (code !== 200) {
+    const snippet = raw.substring(0, 240).replace(/\s+/g, ' ');
+    logger.error(`[TV-browse] HTTP ${code} endpoint=${endpoint} body=${snippet}`);
+    return null;
+  }
+  try {
+    const responseObject = JSON.parse(raw) as Object;
+    const asRec = responseObject as Record<string, Object>;
+    if (asRec['error']) {
+      logger.error(`[TV-browse] api error endpoint=${endpoint} ${JSON.stringify(asRec['error']).substring(0, 240)}`);
+    }
+    return responseObject;
+  } catch (e) {
+    logger.error(`[TV-browse] JSON parse failed endpoint=${endpoint}`);
+    return null;
+  }
 }
 
 async function getJsonPostResponseMusic(
@@ -452,6 +580,47 @@ export async function fetchBrowseContinuation(
     undefined,
     withAuth
   );
+}
+
+/**
+ * TV Innertube browse (OAuth Bearer). SmartTube home uses browseId "default".
+ * Caller must parse TV shelf JSON separately from WEB browse.
+ */
+export async function fetchTvBrowsePage(
+  localization: Localization,
+  contentCountry: ContentCountry,
+  browseId: string,
+  params: string = '',
+  visitorData?: string,
+  withAuth: boolean = true
+): Promise<Object | null> {
+  const jsonStruct: Record<string, Object> = prepareTvJsonBuilder(
+    localization,
+    contentCountry,
+    visitorData
+  );
+  jsonStruct['browseId'] = browseId;
+  if (!Utils.isNullOrEmpty(params)) {
+    jsonStruct['params'] = params;
+  }
+  logger.info(`[TV-browse] browseId=${browseId} withAuth=${withAuth}`);
+  return getJsonPostResponseTv('browse', JSON.stringify(jsonStruct), localization, withAuth);
+}
+
+export async function fetchTvBrowseContinuation(
+  localization: Localization,
+  contentCountry: ContentCountry,
+  continuationToken: string,
+  visitorData?: string,
+  withAuth: boolean = true
+): Promise<Object | null> {
+  const jsonStruct: Record<string, Object> = prepareTvJsonBuilder(
+    localization,
+    contentCountry,
+    visitorData
+  );
+  jsonStruct['continuation'] = continuationToken;
+  return getJsonPostResponseTv('browse', JSON.stringify(jsonStruct), localization, withAuth);
 }
 
 export async function fetchSearchSuggestions(

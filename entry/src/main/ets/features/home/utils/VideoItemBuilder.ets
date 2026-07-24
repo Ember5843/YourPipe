@@ -54,6 +54,141 @@ export function buildVideoItemFromReelRenderer(renderer: Record<string, Object>,
   return new VideoItem(id, videoId, title, author, viewCountText, thumbnailUrl, false, placeholderColor, channelId, "", "", "");
 }
 
+/**
+ * SmartTube TV tileRenderer → VideoItem.
+ * videoId: onSelectCommand.watchEndpoint / reelWatchEndpoint
+ * title: metadata.tileMetadataRenderer.title
+ * thumb: header.tileHeaderRenderer.thumbnail
+ */
+export function buildVideoItemFromTileRenderer(tile: Record<string, Object>, id: number): VideoItem | null {
+  const onSelect = tile['onSelectCommand'] as Record<string, Object>;
+  let videoId = '';
+  if (onSelect) {
+    const watch = onSelect['watchEndpoint'] as Record<string, Object>;
+    const reel = onSelect['reelWatchEndpoint'] as Record<string, Object>;
+    videoId = (watch ? (watch['videoId'] as string) : '')
+      || (reel ? (reel['videoId'] as string) : '')
+      || '';
+    if (!videoId) {
+      const executor = onSelect['commandExecutorCommand'] as Record<string, Object>;
+      const commands = executor ? (executor['commands'] as Array<Record<string, Object>>) : undefined;
+      if (commands) {
+        for (let i = 0; i < commands.length; i++) {
+          const cmd = commands[i];
+          const w = cmd['watchEndpoint'] as Record<string, Object>;
+          const r = cmd['reelWatchEndpoint'] as Record<string, Object>;
+          videoId = (w ? (w['videoId'] as string) : '')
+            || (r ? (r['videoId'] as string) : '')
+            || videoId;
+          if (videoId) {
+            break;
+          }
+        }
+      }
+    }
+  }
+  if (!videoId) {
+    return null;
+  }
+
+  const metadata = tile['metadata'] as Record<string, Object>;
+  const tileMeta = metadata ? (metadata['tileMetadataRenderer'] as Record<string, Object>) : undefined;
+  const titleObj = tileMeta ? (tileMeta['title'] as Record<string, Object>) : undefined;
+  let title = getTextFromRuns(titleObj) || 'Untitled';
+  if (title === 'Untitled') {
+    // Shorts tiles often put title only on overlay
+    const header = tile['header'] as Record<string, Object>;
+    const tileHeader = header ? (header['tileHeaderRenderer'] as Record<string, Object>) : undefined;
+    const overlays = tileHeader
+      ? (tileHeader['thumbnailOverlays'] as Array<Record<string, Object>>)
+      : undefined;
+    if (overlays) {
+      for (let i = 0; i < overlays.length; i++) {
+        const tmd = overlays[i]['tileMetadataRenderer'] as Record<string, Object>;
+        const t = tmd ? getTextFromRuns(tmd['title'] as Record<string, Object>) : '';
+        if (t) {
+          title = t;
+          break;
+        }
+      }
+    }
+  }
+
+  let author = '';
+  let viewCount = '';
+  const lines = tileMeta ? (tileMeta['lines'] as Array<Record<string, Object>>) : undefined;
+  if (lines && lines.length > 0) {
+    for (let li = 0; li < lines.length; li++) {
+      const lineRenderer = lines[li]['lineRenderer'] as Record<string, Object>;
+      const lineItems = lineRenderer
+        ? (lineRenderer['items'] as Array<Record<string, Object>>)
+        : undefined;
+      if (!lineItems) {
+        continue;
+      }
+      for (let j = 0; j < lineItems.length; j++) {
+        const lineItem = lineItems[j]['lineItemRenderer'] as Record<string, Object>;
+        if (!lineItem) {
+          continue;
+        }
+        const badge = lineItem['badge'] as Record<string, Object>;
+        const badgeRenderer = badge
+          ? (badge['metadataBadgeRenderer'] as Record<string, Object>)
+          : undefined;
+        const label = badgeRenderer ? ((badgeRenderer['label'] as string) || '') : '';
+        if (label && !author) {
+          author = label;
+        }
+        const text = getTextFromRuns(lineItem['text'] as Record<string, Object>);
+        if (text) {
+          if (!author) {
+            author = text;
+          } else if (!viewCount) {
+            viewCount = text;
+          }
+        }
+      }
+    }
+  }
+
+  let thumbnailUrl = '';
+  const header = tile['header'] as Record<string, Object>;
+  const tileHeader = header ? (header['tileHeaderRenderer'] as Record<string, Object>) : undefined;
+  const trackHeader = header ? (header['trackTileHeaderRenderer'] as Record<string, Object>) : undefined;
+  const thumbObj = (tileHeader ? (tileHeader['thumbnail'] as Record<string, Object>) : undefined)
+    || (trackHeader ? (trackHeader['thumbnail'] as Record<string, Object>) : undefined);
+  if (thumbObj) {
+    thumbnailUrl = getThumbnailUrlFromThumbnailObject(thumbObj);
+  }
+
+  const style = ((tile['style'] as string) || '').toUpperCase();
+  const contentType = ((tile['contentType'] as string) || '').toUpperCase();
+  let isLive = false;
+  if (tileHeader) {
+    const overlays = tileHeader['thumbnailOverlays'] as Array<Record<string, Object>>;
+    if (overlays) {
+      for (let i = 0; i < overlays.length; i++) {
+        const status = overlays[i]['thumbnailOverlayTimeStatusRenderer'] as Record<string, Object>;
+        const st = status ? (((status['style'] as string) || '').toUpperCase()) : '';
+        if (st.indexOf('LIVE') >= 0) {
+          isLive = true;
+          break;
+        }
+      }
+    }
+  }
+
+  const channelId = '';
+  const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, id);
+  // Shorts: still a playable video id
+  void style;
+  void contentType;
+  return new VideoItem(
+    id, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor,
+    channelId, '', '', '', null, false, false
+  );
+}
+
 export function buildVideoItemFromShortsLockupViewModel(lockup: Record<string, Object>, id: number): VideoItem | null {
   const onTap = lockup["onTap"] as Record<string, Object>;
   const innertubeCommand = onTap ? (onTap["innertubeCommand"] as Record<string, Object>) : undefined;

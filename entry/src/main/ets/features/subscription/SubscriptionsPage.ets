@@ -31,7 +31,7 @@ export struct SubscriptionsPage {
   }
 
   private isSignedIn(): boolean {
-    return AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
+    return AuthSessionManager.getInstance()?.hasAuthForUserData() === true;
   }
 
   private syncSubscriptionsToStorage(list: SubscriptionUser[]): void {

@@ -260,7 +260,7 @@ export struct LocalPage {
   private readonly tabTitles: ResourceStr[] = [$r('app.string.yt_local_history'), $r('app.string.yt_download_title')];
 
   private isSignedIn(): boolean {
-    return AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
+    return AuthSessionManager.getInstance()?.hasAuthForUserData() === true;
   }
 
   /** Refresh($$isRefreshing) 已把 isSyncingHistory 置 true；此处只干活并 finally 复位。 */

@@ -41,7 +41,7 @@ export class AuthSessionManager {
   private deviceFlowActive: boolean = false;
   private deviceCode: string = '';
   private deviceUserCode: string = '';
-  private deviceVerificationUrl: string = 'https://youtube.com/activate';
+  private deviceVerificationUrl: string = 'https://yt.be/activate';
   private deviceExpiresAt: number = 0;
   private devicePollIntervalMs: number = 5000;
   private devicePollGeneration: number = 0;
@@ -78,15 +78,22 @@ export class AuthSessionManager {
     status.pollIntervalMs = this.devicePollIntervalMs;
     status.lastError = this.deviceLastError;
     status.lastErrorCode = this.deviceLastErrorCode;
-    if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
+
+    const hasCookie = this.hasWebCredentialStored();
+    const hasOauth = this.hasOauthCredentialStored();
+    status.hasCookieCredential = hasCookie;
+    status.hasRefreshToken = hasOauth;
+    status.accessTokenExpiresAt = hasOauth ? this.accessTokenExpiresAt : 0;
+
+    if (hasCookie && hasOauth) {
+      status.stage = AuthStage.SIGNED_IN;
+      status.authMode = 'both';
+    } else if (hasCookie) {
       status.stage = AuthStage.SIGNED_IN;
       status.authMode = 'cookie';
-      status.hasCookieCredential = true;
-    } else if (this.refreshToken.length > 0) {
+    } else if (hasOauth) {
       status.stage = AuthStage.SIGNED_IN;
       status.authMode = 'oauth';
-      status.hasRefreshToken = true;
-      status.accessTokenExpiresAt = this.accessTokenExpiresAt;
     } else if (this.deviceFlowActive) {
       status.stage = this.deviceStage;
       status.authMode = 'oauth';
@@ -94,6 +101,12 @@ export class AuthSessionManager {
       status.authMode = 'none';
       status.stage = AuthStage.SIGNED_OUT;
     }
+
+    status.canWebUserData = this.hasCookieAuthForUserData();
+    status.canTvUserData = this.hasTvAuthForUserData();
+    status.canPersonalizedHome = status.canWebUserData || status.canTvUserData;
+    status.canWebPlayback = this.hasWebAuthForPlayback();
+    status.canTvPlayback = this.hasTvAuthForPlayback();
     return status;
   }
 
@@ -121,7 +134,7 @@ export class AuthSessionManager {
       }
       this.deviceCode = code.deviceCode;
       this.deviceUserCode = code.userCode;
-      this.deviceVerificationUrl = code.verificationUrl || 'https://youtube.com/activate';
+      this.deviceVerificationUrl = code.verificationUrl || 'https://yt.be/activate';
       this.deviceExpiresAt = Date.now() + Math.max(code.expiresIn, 60) * 1000;
       this.devicePollIntervalMs = Math.max(3, code.interval || 5) * 1000;
       this.deviceStage = AuthStage.WAITING_FOR_USER;
@@ -186,9 +199,7 @@ export class AuthSessionManager {
         return;
       }
       if (token.accessToken.length > 0 || token.refreshToken.length > 0) {
-        // Prefer OAuth-only session for device login; drop cookie so mode is oauth.
-        this.cookieCredential = null;
-        this.persistCookieCredential();
+        // Dual-rail: keep Cookie if present; OAuth coexists (web + tv rails).
         this.authEnabled = true;
         this.persistAuthEnabled();
         this.saveToken(token);
@@ -198,7 +209,7 @@ export class AuthSessionManager {
         this.deviceUserCode = '';
         this.deviceLastError = '';
         this.deviceLastErrorCode = '';
-        logger.info('Device login succeeded');
+        logger.info(`Device login succeeded authMode=${this.getStatus().authMode}`);
         return;
       }
       const err = token.error || '';
@@ -239,10 +250,24 @@ export class AuthSessionManager {
   }
 
   hasCredential(): boolean {
-    if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
-      return true;
-    }
+    return this.hasWebCredentialStored() || this.hasOauthCredentialStored();
+  }
+
+  /** Stored WEB cookie string present (ignores toggles). */
+  hasWebCredentialStored(): boolean {
+    return !!(this.cookieCredential && this.cookieCredential.cookies.length > 0);
+  }
+
+  /** Stored OAuth refresh token present (ignores toggles). */
+  hasOauthCredentialStored(): boolean {
     return this.refreshToken.length > 0;
+  }
+
+  /** Cookie has SAPISID needed for SAPISIDHASH (ignores toggles). */
+  hasWebSapisidStored(): boolean {
+    return !!(this.cookieCredential
+      && this.cookieCredential.cookies.length > 0
+      && this.cookieCredential.sapiSid.length > 0);
   }
 
   isAuthEnabled(): boolean {
@@ -283,9 +308,84 @@ export class AuthSessionManager {
     return this.authEnabled && this.useAuthForUserData && this.hasCredential();
   }
 
-  /** Effective: playback extraction should attach auth. */
+  /**
+   * WEB rail: personalized home / library via Cookie + SAPISIDHASH (FEwhat_to_watch etc.).
+   */
+  hasCookieAuthForUserData(): boolean {
+    if (!this.authEnabled || !this.useAuthForUserData) {
+      return false;
+    }
+    return this.hasWebSapisidStored();
+  }
+
+  /** Alias for WEB user-data capability. */
+  hasWebAuthForUserData(): boolean {
+    return this.hasCookieAuthForUserData();
+  }
+
+  /**
+   * TV rail: personalized browse/player via OAuth Bearer (SmartTube-style).
+   * Does not imply WEB FEwhat_to_watch works.
+   */
+  hasTvAuthForUserData(): boolean {
+    if (!this.authEnabled || !this.useAuthForUserData) {
+      return false;
+    }
+    return this.hasOauthCredentialStored();
+  }
+
+  /** Either rail can attach auth for user-data surfaces. */
+  hasAuthForUserData(): boolean {
+    return this.hasCookieAuthForUserData() || this.hasTvAuthForUserData();
+  }
+
+  /** Effective: playback extraction should attach auth (any rail). */
   isAuthEnabledForPlayback(): boolean {
     return this.authEnabled && this.useAuthForPlayback && this.hasCredential();
+  }
+
+  hasWebAuthForPlayback(): boolean {
+    if (!this.authEnabled || !this.useAuthForPlayback) {
+      return false;
+    }
+    return this.hasWebCredentialStored();
+  }
+
+  hasTvAuthForPlayback(): boolean {
+    if (!this.authEnabled || !this.useAuthForPlayback) {
+      return false;
+    }
+    return this.hasOauthCredentialStored();
+  }
+
+  hasAuthForPlayback(): boolean {
+    return this.hasWebAuthForPlayback() || this.hasTvAuthForPlayback();
+  }
+
+  /**
+   * Preferred rail for user-data: WEB first, else TV, else none.
+   */
+  preferredUserDataRail(): 'none' | 'web' | 'tv' {
+    if (this.hasCookieAuthForUserData()) {
+      return 'web';
+    }
+    if (this.hasTvAuthForUserData()) {
+      return 'tv';
+    }
+    return 'none';
+  }
+
+  /**
+   * Preferred rail for playback: Cookie/WEB first, else OAuth/TV, else none.
+   */
+  preferredPlaybackRail(): 'none' | 'web' | 'tv' {
+    if (this.hasWebAuthForPlayback()) {
+      return 'web';
+    }
+    if (this.hasTvAuthForPlayback()) {
+      return 'tv';
+    }
+    return 'none';
   }
 
   /**
@@ -300,12 +400,36 @@ export class AuthSessionManager {
     return this.hasCredential();
   }
 
+  /**
+   * Legacy mixed header: WEB SAPISIDHASH preferred, else Bearer.
+   * Prefer getWebAuthorizationHeader / getTvAuthorizationHeader at call sites.
+   */
   async getAuthorizationHeader(): Promise<string | undefined> {
+    if (!this.authEnabled) {
+      return undefined;
+    }
+    const web = await this.getWebAuthorizationHeader();
+    if (web) {
+      return web;
+    }
+    return await this.getTvAuthorizationHeader();
+  }
+
+  /** Cookie rail only: SAPISIDHASH … */
+  async getWebAuthorizationHeader(): Promise<string | undefined> {
     if (!this.authEnabled) {
       return undefined;
     }
     if (this.cookieCredential && this.cookieCredential.sapiSid.length > 0) {
       return await SapisidHashUtil.generate(this.cookieCredential.sapiSid);
+    }
+    return undefined;
+  }
+
+  /** TV/OAuth rail only: Bearer … (refreshes access token as needed). */
+  async getTvAuthorizationHeader(): Promise<string | undefined> {
+    if (!this.authEnabled) {
+      return undefined;
     }
     if (!this.refreshToken) {
       return undefined;

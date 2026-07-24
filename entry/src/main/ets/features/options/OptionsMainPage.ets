@@ -62,7 +62,7 @@ export struct OptionsMainPage {
     if (this.authStatus.authEnabled === false) {
       return $r('app.string.yt_data_account_incognito');
     }
-    if (this.authStatus.authMode === 'cookie') {
+    if (this.authStatus.authMode === 'cookie' || this.authStatus.authMode === 'both') {
       return $r('app.string.yt_data_account_cookie');
     }
     return $r('app.string.yt_data_account_signed_in');

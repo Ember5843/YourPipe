@@ -90,6 +90,9 @@ export struct OptionsDataAccountPage {
       if (this.authStatus.authMode === 'cookie') {
         return $r('app.string.yt_auth_subtitle_cookie_active');
       }
+      if (this.authStatus.authMode === 'both') {
+        return $r('app.string.yt_auth_subtitle_cookie_active');
+      }
       return $r('app.string.yt_auth_subtitle_active');
     }
     return $r('app.string.yt_auth_subtitle_incognito');

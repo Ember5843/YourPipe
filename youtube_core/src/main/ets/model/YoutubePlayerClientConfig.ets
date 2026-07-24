@@ -41,16 +41,18 @@ export class YoutubePlayerClientConfig {
   }
 
   /**
-   * When autoByAuth is on (legacy): login may keep tv/mweb; guest leaves tv.
-   * When autoByAuth is off (default): always pin mweb.
+   * Product default: always pin mweb (SABR path) for guest, Cookie, and OAuth.
+   * OAuth must NOT force tv_downgraded on every video — that breaks switch-stream
+   * vs cookie/guest. Restricted content may retry tv_downgraded+Bearer at call site.
+   * Legacy autoByAuth keeps PipePipe login→tv/mweb selection when enabled.
    */
-  static applyAuthDefault(_hasYouTubeLogin: boolean): void {
+  static applyAuthDefault(hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
     if (!YoutubePlayerClientConfig.autoByAuth) {
       YoutubePlayerClientConfig.selected = 'mweb';
       return;
     }
     const current = YoutubePlayerClientConfig.selected;
-    if (_hasYouTubeLogin) {
+    if (hasYouTubeLogin) {
       if (current !== 'tv_downgraded' && current !== 'mweb') {
         YoutubePlayerClientConfig.selected = 'mweb';
       }
@@ -59,8 +61,8 @@ export class YoutubePlayerClientConfig {
     }
   }
 
-  /** Always mweb (SABR experiment). Auth flag ignored. */
-  static resetToAuthDefault(_hasYouTubeLogin: boolean): void {
+  /** Reset to product default mweb (all login modes). */
+  static resetToAuthDefault(_hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
     YoutubePlayerClientConfig.selected = 'mweb';
   }
 

@@ -66,11 +66,16 @@ export class ConfiguredPlayerClient {
     }
   }
 
+  /**
+   * @param useWebAuth Cookie+SAPISIDHASH for mweb/web_safari only
+   * @param useTvAuth  Bearer for tv_downgraded only (SmartTube). Never both.
+   */
   static async fetch(
     key: YoutubePlayerClientKey,
     ctx: ClientFetchContext,
     httpClient: YouTubeHttpClient,
-    useAuthHeaders: boolean
+    useWebAuth: boolean = false,
+    useTvAuth: boolean = false
   ): Promise<ClientFetchResult | undefined> {
     if (!ctx.signatureTimestamp || ctx.signatureTimestamp <= 0) {
       logger.warn(`[${key}] No signatureTimestamp, skipping stream player`);
@@ -121,12 +126,20 @@ export class ConfiguredPlayerClient {
       'X-YouTube-Client-Name': id.clientId,
       'X-YouTube-Client-Version': id.clientVersion
     };
+    if (key === 'tv_downgraded') {
+      headers['Origin'] = 'https://www.youtube.com';
+      headers['Referer'] = 'https://www.youtube.com/tv';
+    }
+
+    // Enforce rail: TV client may only take Bearer; mweb/web only Cookie.
+    const webAuth = key === 'tv_downgraded' ? false : useWebAuth;
+    const tvAuth = key === 'tv_downgraded' ? useTvAuth : false;
 
     const url = `${ClientsConstants.YOUTUBEI_V1_URL}player?prettyPrint=false`;
     try {
-      const response = await httpClient.postJson(url, payload, headers, useAuthHeaders);
+      const response = await httpClient.postJson(url, payload, headers, webAuth, tvAuth);
       if (!response || response.responseCode !== 200 || !response.result) {
-        logger.warn(`[${key}] stream player HTTP ${response?.responseCode}`);
+        logger.warn(`[${key}] stream player HTTP ${response?.responseCode} webAuth=${webAuth} tvAuth=${tvAuth}`);
         return undefined;
       }
       const pr = JSON.parse(response.result as string) as PlayerResponse;
@@ -157,9 +170,10 @@ export class ConfiguredPlayerClient {
   static async fetchMwebHlsOnly(
     ctx: ClientFetchContext,
     httpClient: YouTubeHttpClient,
-    useAuthHeaders: boolean
+    useWebAuth: boolean = false
   ): Promise<string | undefined> {
-    const result = await ConfiguredPlayerClient.fetch('mweb', ctx, httpClient, useAuthHeaders);
+    // Live HLS helper stays anonymous by default (PipePipe); Cookie only if caller opts in.
+    const result = await ConfiguredPlayerClient.fetch('mweb', ctx, httpClient, useWebAuth, false);
     return result?.streamingData?.hlsManifestUrl;
   }
 }

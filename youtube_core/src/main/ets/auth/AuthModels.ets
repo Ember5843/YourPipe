@@ -11,7 +11,7 @@ export enum AuthStage {
 export class DeviceCodeResponse {
   deviceCode: string = '';
   userCode: string = '';
-  verificationUrl: string = 'https://youtube.com/activate';
+  verificationUrl: string = 'https://yt.be/activate';
   expiresIn: number = 0;
   interval: number = 5;
 }
@@ -25,11 +25,19 @@ export class AuthTokenResponse {
   errorDescription: string = '';
 }
 
+/**
+ * Auth transport rail for request injection.
+ * web = Cookie + SAPISIDHASH (PipePipe-style WEB).
+ * tv  = Bearer access token (SmartTube-style TV Innertube).
+ */
+export type AuthRail = 'none' | 'web' | 'tv';
+
 export class AuthAccountStatus {
   stage: AuthStage = AuthStage.SIGNED_OUT;
+  /** none | cookie | oauth | both */
   authMode: string = 'none';
   userCode: string = '';
-  verificationUrl: string = 'https://youtube.com/activate';
+  verificationUrl: string = 'https://yt.be/activate';
   expiresAt: number = 0;
   accessTokenExpiresAt: number = 0;
   hasRefreshToken: boolean = false;
@@ -42,6 +50,16 @@ export class AuthAccountStatus {
   useAuthForUserData: boolean = true;
   /** Fine-grained: attach auth to playback extraction (player API + stream URL cookies). */
   useAuthForPlayback: boolean = true;
+  /** WEB rail ready (Cookie + SAPISID) for personalized browse when toggles allow. */
+  canWebUserData: boolean = false;
+  /** TV rail ready (OAuth) for personalized browse when toggles allow. */
+  canTvUserData: boolean = false;
+  /** Either rail can personalize home / library. */
+  canPersonalizedHome: boolean = false;
+  /** WEB rail ready for playback auth. */
+  canWebPlayback: boolean = false;
+  /** TV rail ready for playback auth. */
+  canTvPlayback: boolean = false;
   lastError: string = '';
   lastErrorCode: string = '';
   pollIntervalMs: number = 3000;

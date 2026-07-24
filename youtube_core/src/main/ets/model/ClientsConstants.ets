@@ -46,15 +46,15 @@ export class ClientsConstants {
   // =====================
   static readonly TVHTML5_CLIENT_ID: string = "7";
   static readonly TVHTML5_CLIENT_NAME: string = "TVHTML5";
-  static readonly TVHTML5_CLIENT_VERSION: string = "7.20250122.15.00";
+  /** Align SmartTube CLIENTS.TV (browse + OAuth). */
+  static readonly TVHTML5_CLIENT_VERSION: string = "7.20260311.12.00";
   static readonly TVHTML5_CLIENT_PLATFORM: string = "GAME_CONSOLE";
   static readonly TVHTML5_DEVICE_MAKE: string = "Sony";
   static readonly TVHTML5_DEVICE_MODEL_AND_OS_NAME: string = "PlayStation 4";
 
+  /** SmartTube DefaultHeaders / CLIENTS.TV Cobalt UA (not PS4 Safari). */
   static readonly TVHTML5_USER_AGENT: string =
-    "Mozilla/5.0 (PlayStation; PlayStation 4/12.00) " +
-      "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
-      "Version/15.4 Safari/605.1.15";
+    "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version";
 
   // =====================
   // TVHTML5 downgraded (PipePipe login default stream client)

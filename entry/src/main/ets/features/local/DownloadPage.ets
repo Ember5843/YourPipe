@@ -17,6 +17,7 @@ import {
   MEDIA_TITLE_SIZE
 } from '../../common/components/MediaCardTokens';
 
+/** Match VideoMediaCard list action geometry. */
 const ACTION_BTN_HEIGHT: number = 24;
 const ACTION_BTN_WIDTH: number = 72;
 const ACTION_BTN_RESERVE: number = 28;
@@ -74,15 +75,16 @@ export struct DownloadPage {
 @Component
 struct DownloadTaskRow {
   @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @ObjectLink task: DownloadTask;
   private downloadManager: DownloadManager = DownloadManager.getInstance();
   @State exporting: boolean = false;
 
   build() {
+    // Layout mirrors VideoMediaCard list: thumb | meta stack (title/author/status) + action bottom-end.
     Row() {
       this.ThumbBlock()
 
-      // 与 VideoMediaCard 列表一致：文字顶对齐，操作按钮钉在右下角
       Stack({ alignContent: Alignment.BottomEnd }) {
         Column() {
           Text(this.task.title)
@@ -105,7 +107,8 @@ struct DownloadTaskRow {
               .margin({ bottom: 2 })
           }
 
-          // 下载中不显示流量/状态行；进度只在右下角胶囊内显示百分比
+          // Third meta line = status (same slot as viewCount on VideoCard).
+          // Active downloads keep this empty; progress lives in the action capsule.
           if (!isActiveStatus(this.task.status)) {
             Text(this.getSubtitle())
               .fontSize(MEDIA_META_SIZE)
@@ -137,6 +140,7 @@ struct DownloadTaskRow {
       offsetX: 0,
       offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
     })
+    .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .onClick(() => {
       if (this.task.status === DownloadStatus.COMPLETED) {
         this.exportTaskToDownloads();
@@ -146,7 +150,8 @@ struct DownloadTaskRow {
 
   @Builder
   ThumbBlock() {
-    Stack({ alignContent: Alignment.Center }) {
+    // Same MediaThumb geometry as VideoMediaCard list thumbs.
+    Stack({ alignContent: Alignment.TopStart }) {
       MediaThumb({
         imageUrl: this.task.thumbnailUrl || '',
         placeholderColor: '#1A1A1A',
@@ -159,12 +164,12 @@ struct DownloadTaskRow {
         SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
           .fontSize(16)
           .fontColor([this.themePrimary])
-          .position({ x: 6, y: 6 })
+          .margin({ left: 6, top: 6 })
       } else if (this.task.status === DownloadStatus.FAILED) {
         SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
           .fontSize(16)
           .fontColor(['#FF4444'])
-          .position({ x: 6, y: 6 })
+          .margin({ left: 6, top: 6 })
       }
     }
     .width(MEDIA_LIST_THUMB_WIDTH)
@@ -177,7 +182,6 @@ struct DownloadTaskRow {
   @Builder
   ActionCapsule() {
     if (isActiveStatus(this.task.status)) {
-      // 下载中：胶囊进度条，点击取消
       Progress({
         value: this.getProgressValue(),
         total: 100,
@@ -196,22 +200,23 @@ struct DownloadTaskRow {
           enableSmoothEffect: true,
           showDefaultPercentage: false
         })
+        .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
         .onClick(() => {
           this.downloadManager.cancelTask(this.task.id);
         })
     } else if (this.task.status === DownloadStatus.COMPLETED) {
+      // Same action button tokens as VideoMediaCard.ActionButton
       Button($r('app.string.yt_download_status_completed'))
         .fontSize(10)
         .fontColor($r('app.color.yourtube_text_inverse'))
         .backgroundColor(this.themePrimary)
         .height(ACTION_BTN_HEIGHT)
-        .constraintSize({ minWidth: ACTION_BTN_WIDTH })
         .padding({ left: 10, right: 10 })
+        .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
         .onClick(() => {
           this.exportTaskToDownloads();
         })
     } else {
-      // 失败 / 已取消：删除
       Button($r('app.string.yt_action_delete'))
         .fontSize(10)
         .fontColor($r('app.color.yourtube_text_inverse'))
@@ -219,8 +224,8 @@ struct DownloadTaskRow {
           ? '#FF4444'
           : $r('app.color.yourtube_button_disabled'))
         .height(ACTION_BTN_HEIGHT)
-        .constraintSize({ minWidth: ACTION_BTN_WIDTH })
         .padding({ left: 10, right: 10 })
+        .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
         .onClick(() => {
           this.downloadManager.deleteTask(this.task.id);
         })

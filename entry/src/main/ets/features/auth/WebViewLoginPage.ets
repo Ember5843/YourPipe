@@ -114,13 +114,35 @@ export struct WebViewLoginPage {
   }
 
   private getAllYouTubeCookies(): string {
+    // Fetch several origins — OHOS WebCookieManager is URL-scoped; missing one
+    // host drops SAPISID/SID and recommended home never authenticates.
+    const urls: string[] = [
+      'https://www.youtube.com',
+      'https://youtube.com',
+      'https://m.youtube.com',
+      'https://music.youtube.com',
+      'https://accounts.google.com',
+      'https://accounts.youtube.com'
+    ];
     try {
-      const ytCookies = web_webview.WebCookieManager.fetchCookieSync('https://www.youtube.com');
-      const musicCookies = web_webview.WebCookieManager.fetchCookieSync('https://music.youtube.com');
-      if (musicCookies && ytCookies) {
-        return this.mergeCookies(ytCookies, musicCookies);
+      let merged = this.extractedCookies || '';
+      for (let i = 0; i < urls.length; i++) {
+        try {
+          const part = web_webview.WebCookieManager.fetchCookieSync(urls[i]);
+          if (part && part.length > 0) {
+            merged = merged.length > 0 ? this.mergeCookies(merged, part) : part;
+          }
+        } catch (_e) {
+          // ignore per-url failures
+        }
       }
-      return ytCookies || musicCookies || this.extractedCookies;
+      const names = (merged || '').split(';').map((p: string) => {
+        const eq = p.indexOf('=');
+        return eq > 0 ? p.substring(0, eq).trim() : '';
+      }).filter((n: string) => n.length > 0);
+      logger.info(`Collected cookies count=${names.length} hasSID=${names.indexOf('SID') >= 0} `
+        + `hasSAPISID=${names.indexOf('SAPISID') >= 0 || names.indexOf('__Secure-3PAPISID') >= 0}`);
+      return merged.length > 0 ? merged : this.extractedCookies;
     } catch (e) {
       logger.warn(`fetch cookies failed: ${e}`);
       return this.extractedCookies;

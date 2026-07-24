@@ -36,7 +36,7 @@ export struct SubscriptionManagePage {
   }
 
   private isSignedIn(): boolean {
-    return AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
+    return AuthSessionManager.getInstance()?.hasAuthForUserData() === true;
   }
 
   private buildPlaceholder(item: SubscriptionUser, index: number): SearchChannelItem {

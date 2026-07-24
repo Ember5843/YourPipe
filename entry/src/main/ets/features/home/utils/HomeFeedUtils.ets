@@ -14,7 +14,12 @@ import {
   getLockupVideoThumbnailUrl,
   getLockupViewCount
 } from './LockupViewModelParser';
-import { buildVideoItemFromReelRenderer, buildVideoItemFromRenderer, buildVideoItemFromShortsLockupViewModel } from './VideoItemBuilder';
+import {
+  buildVideoItemFromReelRenderer,
+  buildVideoItemFromRenderer,
+  buildVideoItemFromShortsLockupViewModel,
+  buildVideoItemFromTileRenderer
+} from './VideoItemBuilder';
 
 export function getHomeKioskItemsFromTabContent(tabContent: Record<string, Object> | undefined): Array<Record<string, Object>> {
   if (!tabContent) return [];
@@ -367,6 +372,17 @@ export function buildHomeKioskVideoItems(
     const shortsLockup = content["shortsLockupViewModel"] as Record<string, Object>;
     if (shortsLockup) {
       const videoItem = buildVideoItemFromShortsLockupViewModel(shortsLockup, idCounter);
+      if (videoItem) {
+        items.push(videoItem);
+        idCounter += 1;
+      }
+      return;
+    }
+
+    // SmartTube TV home/subs: horizontalList items are tileRenderer
+    const tile = content['tileRenderer'] as Record<string, Object>;
+    if (tile) {
+      const videoItem = buildVideoItemFromTileRenderer(tile, idCounter);
       if (videoItem) {
         items.push(videoItem);
         idCounter += 1;

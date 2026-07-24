@@ -601,7 +601,7 @@ struct Index {
 
   /** 登录后用 cookie 同步云端历史 + 订阅频道列表（不阻塞首页）。 */
   private async syncUserLibraryAfterLogin(): Promise<void> {
-    if (AuthSessionManager.getInstance()?.isAuthEnabledForUserData() !== true) {
+    if (AuthSessionManager.getInstance()?.hasAuthForUserData() !== true) {
       return;
     }
     try {
@@ -991,7 +991,7 @@ struct Index {
           this.isLoadingMore = true;
         }
         const homeService = FeedServiceProvider.getInstance().getHomeFeedService();
-        const useAuthContinuation = this.homeFeedSource === 'recommended';
+        const useAuthContinuation = this.homeFeedSource.indexOf('recommended') === 0;
         const feedStyle = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle);
         const kioskResult = reset
           ? await homeService.fetchHomeKioskInitial(startId, feedStyle)
@@ -999,7 +999,8 @@ struct Index {
             this.kioskNextPageToken ?? '',
             this.kioskVisitorData,
             startId,
-            useAuthContinuation
+            useAuthContinuation,
+            this.homeFeedSource
           );
         if (reset) {
           this.videoList = kioskResult.items;
@@ -1061,7 +1062,7 @@ struct Index {
         + `source=${this.homeFeedSource} ${this.describeThrowable(err)}`);
       if (reset && this.homeMode === 'kiosk') {
         const wantedRecommended = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle) === 'recommended'
-          && AuthSessionManager.getInstance()?.isAuthEnabledForUserData() === true;
+          && AuthSessionManager.getInstance()?.hasAuthForUserData() === true;
         const fallbackRes = wantedRecommended
           ? $r('app.string.yt_home_recommended_error')
           : $r('app.string.yt_home_kiosk_error');
@@ -1070,6 +1071,7 @@ struct Index {
           getContext().resourceManager.getStringSync(fallbackRes.id)
         );
         if (wantedRecommended) {
+          // Keep dual-rail prefix so banner gating (indexOf recommended) still works after error.
           this.homeFeedSource = 'recommended';
         }
       } else {
@@ -2275,8 +2277,9 @@ struct Index {
   private homeBannerMax: number = 6;
 
   private shouldShowHomeRecommendBanner(): boolean {
+    // Dual-rail sources: recommended | recommended-web | recommended-tv
     return this.homeMode === 'kiosk'
-      && this.homeFeedSource === 'recommended'
+      && this.homeFeedSource.indexOf('recommended') === 0
       && this.videoList.length > 0;
   }
 
