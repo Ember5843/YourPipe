@@ -4,6 +4,7 @@
 #include <multimedia/player_framework/native_avcapability.h>
 #include <multimedia/player_framework/native_avcodec_base.h>
 #include <mutex>
+#include <string>
 
 namespace {
 
@@ -85,6 +86,45 @@ napi_value ProbeVideoHwDecoders(napi_env env, napi_callback_info /*info*/)
 }
 
 } // namespace
+
+HwDecVideoCaps GetHwDecVideoCaps()
+{
+    EnsureProbed();
+    std::lock_guard<std::mutex> lock(gMutex);
+    return HwDecVideoCaps{gCaps.avc, gCaps.hevc, gCaps.vp9, gCaps.av1, gCaps.vp8};
+}
+
+const char* HwDecCodecsWhitelist()
+{
+    static const std::string kLegacyList = "h264,hevc,vp8,vp9,av1";
+    static const std::string kList = [] {
+        const HwDecVideoCaps caps = GetHwDecVideoCaps();
+        std::string list;
+        const auto add = [&list](bool ok, const char* name) {
+            if (!ok) {
+                return;
+            }
+            if (!list.empty()) {
+                list += ',';
+            }
+            list += name;
+        };
+        add(caps.avc, "h264");
+        add(caps.hevc, "hevc");
+        add(caps.vp8, "vp8");
+        add(caps.vp9, "vp9");
+        add(caps.av1, "av1");
+        if (list.empty()) {
+            // Probe found no hardware at all: treat as probe failure and keep
+            // the legacy behavior rather than disabling hwdec entirely.
+            OH_LOG_Print(LOG_APP, LOG_WARN, kDomain, kTag,
+                         "hw probe empty, keep legacy hwdec-codecs");
+            return kLegacyList;
+        }
+        return list;
+    }();
+    return kList.c_str();
+}
 
 void RegisterHwdecProbeModule(napi_env env, napi_value exports)
 {

@@ -906,7 +906,11 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "hwdec", "ohcodec-copy");
         // Prefer OHCodec; lavc falls back to software when HW is missing.
         SetOptionString(ctx.mpv, "vd-lavc-software-fallback", "yes");
-        SetOptionString(ctx.mpv, "hwdec-codecs", "h264,hevc,vp8,vp9,av1");
+        // Whitelist only codecs with a real hardware decoder on this device (probe
+        // failure keeps the legacy full list inside HwDecCodecsWhitelist()).
+        SetOptionString(ctx.mpv, "hwdec-codecs", HwDecCodecsWhitelist());
+        OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "hwdec-codecs=%{public}s",
+                     HwDecCodecsWhitelist());
         // Cheap libplacebo path: rotate/fullscreen reconfig stays light.
         // video-sync=audio avoids display-resample GPU work; framedrop=vo
         // drops late frames under brief spikes instead of backlog stutter.

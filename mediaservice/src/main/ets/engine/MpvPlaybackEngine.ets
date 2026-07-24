@@ -2,6 +2,7 @@ import { MdkPlayerController as MpvPlayerController, MediaStatus, MediaType, See
 import type { MediaInfo } from '@mediadevkit/libmdk-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
+import { VideoHwCaps } from './VideoHwCaps';
 
 const TAG: string = '[PlayerLog][MpvPlaybackEngine]';
 
@@ -57,6 +58,37 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   /** Mirror of vid on/off for background audio-only only (never used on load/seek). */
   private videoOutputOn: boolean = true;
 
+  /**
+   * hwdec-codecs whitelist derived from the probed hardware decoder caps, so mpv
+   * never tries ohcodec for codecs the chip cannot hardware-decode (e.g. Kirin
+   * mid-range reports no VP9/AV1/VP8 HW). Probe failure (all false) keeps the
+   * legacy full list rather than disabling hwdec entirely.
+   */
+  private static hwdecCodecsWhitelist(): string {
+    const caps = VideoHwCaps.get();
+    const list: string[] = [];
+    if (caps.avc) {
+      list.push('h264');
+    }
+    if (caps.hevc) {
+      list.push('hevc');
+    }
+    if (caps.vp8) {
+      list.push('vp8');
+    }
+    if (caps.vp9) {
+      list.push('vp9');
+    }
+    if (caps.av1) {
+      list.push('av1');
+    }
+    if (list.length === 0) {
+      Logger.warn(TAG, 'hw probe empty, keep legacy hwdec-codecs');
+      return 'h264,hevc,vp8,vp9,av1';
+    }
+    return list.join(',');
+  }
+
   async initialize(_config: EngineConfig): Promise<boolean> {
     if (this.initialized && this.controller !== null) {
       return true;
@@ -82,8 +114,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       if (hwdecEnabled) {
         ctrl.setProperty('hwdec', 'ohcodec-copy');
         // Prefer ohcodec wrappers when multiple decoders exist for a codec.
-        ctrl.setProperty('hwdec-codecs', 'h264,hevc,vp8,vp9,av1');
-        Logger.info(TAG, 'Hardware decoding enabled: ohcodec-copy');
+        ctrl.setProperty('hwdec-codecs', MpvPlaybackEngine.hwdecCodecsWhitelist());
+        Logger.info(TAG, `Hardware decoding enabled: ohcodec-copy hwdec-codecs=${MpvPlaybackEngine.hwdecCodecsWhitelist()}`);
       } else {
         ctrl.setProperty('hwdec', 'no');
         Logger.info(TAG, 'Hardware decoding disabled');
