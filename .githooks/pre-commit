@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Block commits that would leak signing material, AGC credentials, cookies,
+# or personal machine paths. Installed via core.hooksPath=.githooks.
+# The .githooks directory itself is excluded from content scanning because
+# this file legitimately contains the detection patterns.
+set -uo pipefail
+
+fail=0
+scan() { # $1=label $2=regex
+  if git diff --cached -U0 --diff-filter=ACMR -- . ':(exclude).githooks/*' \
+       | grep -E '^\+' | grep -qE "$2"; then
+    echo "pre-commit: blocked — staged content looks like $1 (pattern: $2)" >&2
+    fail=1
+  fi
+}
+
+scan "HarmonyOS signing password blob" '0000001A[0-9A-F]{40,}'
+scan "signing material field with value" '"(storePassword|keyPassword)"[[:space:]]*:[[:space:]]*"[^*][^"]+'
+scan "AGC credential blob" '\[![0-9A-F]{60,}\]'
+scan "agconnect-services.json content" 'agconnect-services\.json'
+scan "personal machine path" '(C:/Users/|/Users/)[A-Za-z0-9_]+/(Desktop|\.ohos)'
+scan "cookie value" '(SAPISID|__Secure-[0-9A-Za-z]+)=[A-Za-z0-9_-]{20,}'
+
+# Blocklisting sensitive paths outright.
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '(^|/)signing-backup/|agconnect-services\.json$'; then
+  echo "pre-commit: blocked — signing-backup/ or agconnect-services.json must never be committed" >&2
+  fail=1
+fi
+
+exit $fail

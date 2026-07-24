@@ -1,50 +1,16 @@
 {
   "app": {
-    "signingConfigs": [
-      {
-        "name": "yourpiperelease",
-        "type": "HarmonyOS",
-        "material": {
-          "storeFile": "YOUR_KEYS_DIR/yourpiperelease.p12",
-          "storePassword": "***REMOVED***",
-          "keyAlias": "yourpiperelease",
-          "keyPassword": "***REMOVED***",
-          "signAlg": "SHA256withECDSA",
-          "profile": "YOUR_KEYS_DIR/yourpipereleaseRelease.p7b",
-          "certpath": "YOUR_KEYS_DIR/yourpiperelease.cer"
-        }
-      },
-      {
-        "name": "pc",
-        "type": "HarmonyOS",
-        "material": {
-          "storeFile": "YOUR_KEYS_DIR/yourpipedebug.p12",
-          "storePassword": "***REMOVED***",
-          "keyAlias": "yourpipedebug",
-          "keyPassword": "***REMOVED***",
-          "signAlg": "SHA256withECDSA",
-          "profile": "YOUR_KEYS_DIR/yourpipedebugDebug.p7b",
-          "certpath": "YOUR_KEYS_DIR/yourpipedebug.cer"
-        }
-      },
-      {
-        "name": "macos",
-        "type": "HarmonyOS",
-        "material": {
-          "certpath": "~/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "***REMOVED***",
-          "profile": "~/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.p7b",
-          "signAlg": "SHA256withECDSA",
-          "storeFile": "~/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.p12",
-          "storePassword": "***REMOVED***"
-        }
-      }
-    ],
+    // Signing is machine-local. Do NOT commit real material (paths/passwords).
+    // Run tools/restore-signing.sh to overlay signing-backup/build-profile.local.json5
+    // (git-ignored, per-machine) before local builds, and tools/strip-signing.sh
+    // afterwards. DevEco users can also configure signing via
+    // File → Project Structure → Signing Configs (writes here — never commit that).
+    "signingConfigs": [],
     "products": [
       {
         "name": "default",
-        "signingConfig": "pc",
+        // Set by restore-signing.sh from your local signingConfigs[].name.
+        // "signingConfig": "default",
         "targetSdkVersion": "6.1.0(23)",
         "compatibleSdkVersion": "6.1.0(23)",
         "runtimeOS": "HarmonyOS",
