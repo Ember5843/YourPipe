@@ -73,7 +73,7 @@ export class SabrLocalDomPoTokenGenerator {
     logger.info('initialization start');
     const helperBytes: Uint8Array = this.resourceManager.getRawFileContentSync('sabr_po_token.js');
     const helper = new util.TextDecoder('utf-8').decodeWithStream(helperBytes);
-    await this.controller.runJavaScript(helper);
+    await this.runJs(helper);
 
     const challengeBody = await requestText(
       'https://www.youtube.com/youtubei/v1/att/get?prettyPrint=false',
@@ -89,9 +89,9 @@ export class SabrLocalDomPoTokenGenerator {
     const interpreter = await requestText(interpreterUrl, http.RequestMethod.GET, undefined, undefined);
     const botGuardInput = new BotGuardInput(challenge.program, challenge.globalName, interpreter);
     const runScript = `yourpipeRunBotGuard(${JSON.stringify(botGuardInput)});true`;
-    await this.controller.runJavaScript(runScript);
+    await this.runJs(runScript);
     await this.waitForStatus('botguard-ready', 15000);
-    const botguardResult = await this.controller.runJavaScript('window.__yourpipeSabr.botguardResponse');
+    const botguardResult = await this.runJs('window.__yourpipeSabr.botguardResponse');
     const botguardResponse = decodeJsString(botguardResult);
 
     const integrityBody = await requestText(
@@ -103,12 +103,12 @@ export class SabrLocalDomPoTokenGenerator {
     const integrityBase64 = String(integrity[0]);
     const expirationSeconds = Number(integrity[1]);
     const integrityBytes = decodeBase64Url(integrityBase64);
-    const createResult = await this.controller.runJavaScript(
+    const createResult = await this.runJs(
       `yourpipeCreateMinter(new Uint8Array([${bytesToCsv(integrityBytes)}]))`);
     const createStatus = decodeJsString(createResult);
     if (createStatus !== 'minter-ready') {
       const jsError = decodeJsString(
-        await this.controller.runJavaScript('window.__yourpipeSabr.error'));
+        await this.runJs('window.__yourpipeSabr.error'));
       throw new Error(`Local DOM minter creation failed: ${jsError || createStatus}`);
     }
     await this.mintIdentifier(visitorData);
@@ -118,7 +118,7 @@ export class SabrLocalDomPoTokenGenerator {
   }
 
   private async mintIdentifier(identifier: string): Promise<Uint8Array | undefined> {
-    const result = await this.controller.runJavaScript(
+    const result = await this.runJs(
       `yourpipeMintPoToken(${JSON.stringify(identifier)})`);
     const csv = decodeJsString(result);
     if (!csv) {
@@ -132,16 +132,29 @@ export class SabrLocalDomPoTokenGenerator {
     return bytes;
   }
 
+  /**
+   * runJavaScript with a hard cap: a wedged ArkWeb bridge must fail fast so the
+   * mint layer above can drop the poisoned promise instead of hanging playback.
+   */
+  private runJs(script: string, timeoutMs: number = 6000): Promise<string> {
+    return Promise.race([
+      this.controller.runJavaScript(script),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(() => reject(new Error(`runJavaScript timeout ${timeoutMs}ms`)), timeoutMs);
+      })
+    ]);
+  }
+
   private async waitForStatus(expected: string, timeoutMs: number): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const raw = await this.controller.runJavaScript('window.__yourpipeSabr.status');
+      const raw = await this.runJs('window.__yourpipeSabr.status', 3000);
       const status = decodeJsString(raw);
       if (status === expected) {
         return;
       }
       if (status === 'error') {
-        const error = decodeJsString(await this.controller.runJavaScript('window.__yourpipeSabr.error'));
+        const error = decodeJsString(await this.runJs('window.__yourpipeSabr.error', 3000));
         throw new Error(error || 'Local DOM BotGuard failed');
       }
       await sleep(50);
