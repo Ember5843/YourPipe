@@ -98,6 +98,10 @@ target_link_libraries(mdk_napi
     # HarmonyOS Video Processing Engine (HDR color-space conversion / metadata
     # generation). Used by the VPE capability probe in vpe_probe.cpp.
     video_processing
+    # OH_NativeWindow_GetSurfaceId — correlates the XComponent OHNativeWindow
+    # pointer with its surfaceId so ApplyWindowOption can safely prefer the
+    # pointer route (avoids HarmonyOS 6 EGL_BAD_MATCH black-video issue).
+    native_window
 )
 
 add_dependencies(mdk_napi mpv_ohcodec_shim)

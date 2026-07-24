@@ -11,6 +11,7 @@
 #include <mpv/stream_cb.h>
 #include <napi/native_api.h>
 #include <rawfile/raw_file_manager.h>
+#include <native_window/external_window.h>
 
 #include "global_napi.h"
 #include "hwdec_probe.h"
@@ -834,20 +835,44 @@ void ApplyWindowOption(PlayerContext& ctx)
     if (!ctx.mpv) {
         return;
     }
-    // mpv's OHOS VO expects "wid" to carry the XComponent *surfaceId* (a uint64
-    // id), which it passes to OH_NativeWindow_CreateNativeWindowFromSurfaceId().
-    // It must NOT be the native window pointer: feeding the pointer value as a
-    // surfaceId makes that call fail (native_window ptr: 0 -> audio but no
-    // video). So always use surfaceId here and never ctx.window.
-    if (ctx.surfaceId.empty() || ctx.surfaceId == "0") {
-        return;
+    // wid protocol with the vendored mpv fork (video/out/ohos_common.c
+    // vo_ohos_init): wid < 2^40 is treated as an OHNativeWindow* pointer and
+    // used directly; wid >= 2^40 is treated as an XComponent surfaceId and
+    // resolved through OH_NativeWindow_CreateNativeWindowFromSurfaceId().
+    // The surfaceId route can produce an EGL_BAD_MATCH surface on HarmonyOS 6
+    // devices (black video while audio keeps playing), so prefer the real
+    // native window pointer captured by OnSurfaceCreated/OnSurfaceChanged.
+    //
+    // Ordering safety: during PiP restore a brand-new XComponent hands us a
+    // fresh surfaceId while ctx.window may still reference the previous
+    // (dying) surface. Only trust the pointer when OH_NativeWindow_GetSurfaceId
+    // proves it belongs to the current surfaceId; otherwise fall back to the
+    // surfaceId route. Also guard the pointer magnitude: values >= 2^40 would
+    // be misrouted as surfaceIds by the mpv-side heuristic.
+    string wid;
+    const char* widSource = "surfaceId";
+    if (ctx.window != nullptr && !ctx.surfaceId.empty() && ctx.surfaceId != "0"
+        && (uintptr_t)ctx.window < (1ULL << 40)) {
+        uint64_t windowSurfaceId = 0;
+        if (OH_NativeWindow_GetSurfaceId((OHNativeWindow*)ctx.window, &windowSurfaceId) == 0
+            && std::to_string(windowSurfaceId) == ctx.surfaceId) {
+            wid = std::to_string((uint64_t)(uintptr_t)ctx.window);
+            widSource = "native-window-ptr";
+        }
+    }
+    if (wid.empty()) {
+        if (ctx.surfaceId.empty() || ctx.surfaceId == "0") {
+            return;
+        }
+        wid = ctx.surfaceId;
     }
     if (ctx.initialized) {
-        SetMpvStringProperty(ctx, "wid", ctx.surfaceId, "set surface id wid property");
+        SetMpvStringProperty(ctx, "wid", wid, "set surface id wid property");
     } else {
-        LogMpvError("set surface id wid option", Mpv().set_option_string(ctx.mpv, "wid", ctx.surfaceId.c_str()));
+        LogMpvError("set surface id wid option", Mpv().set_option_string(ctx.mpv, "wid", wid.c_str()));
     }
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "wid=surfaceId=%{public}s", ctx.surfaceId.c_str());
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "wid=%{public}s source=%{public}s",
+                 wid.c_str(), widSource);
 }
 
 bool EnsureMpv(PlayerContext& ctx)
