@@ -6,8 +6,8 @@ import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNaviga
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 import { AppLog } from '../AppLog';
 
-const APP_VERSION = '0.5.5';
-const APP_BUILD = '1000014';
+const APP_VERSION = '0.5.6';
+const APP_BUILD = '1000015';
 const logger = AppLog.getInstance('AboutPage');
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
@@ -41,6 +41,19 @@ const AI_MODELS: string[] = [
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.5.6', date: '2026-07-24',
+    changes: [
+      $r('app.string.yt_changelog_0_5_6_1'),
+      $r('app.string.yt_changelog_0_5_6_2'),
+      $r('app.string.yt_changelog_0_5_6_3'),
+      $r('app.string.yt_changelog_0_5_6_4'),
+      $r('app.string.yt_changelog_0_5_6_5'),
+      $r('app.string.yt_changelog_0_5_6_6'),
+      $r('app.string.yt_changelog_0_5_6_7'),
+      $r('app.string.yt_changelog_0_5_6_8'),
+    ],
+  },
   {
     version: '0.5.5', date: '2026-07-16',
     changes: [

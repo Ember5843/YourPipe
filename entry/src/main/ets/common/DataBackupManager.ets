@@ -21,7 +21,7 @@ import {
 const logger = AppLog.getInstance('DataBackupManager');
 const BACKUP_APP_ID: string = 'net.yourpipe';
 const BACKUP_VERSION: number = 1;
-const APP_VERSION: string = '0.5.5';
+const APP_VERSION: string = '0.5.6';
 
 export type BackupErrorCode =
   | 'no_context'

@@ -173,6 +173,8 @@ export class PlayerSession {
 
   beginPipHandoff(): void {
     this._pipHandoffPending = true;
+    AppStorage.setOrCreate('isPipHandoffPending', true);
+    this.syncPipPlaceholderVisibility();
     logger.info(`${TAG} PiP handoff pending`);
   }
 
@@ -181,20 +183,40 @@ export class PlayerSession {
       logger.info(`${TAG} PiP handoff cancelled`);
     }
     this._pipHandoffPending = false;
+    AppStorage.setOrCreate('isPipHandoffPending', false);
+    this.syncPipPlaceholderVisibility();
   }
 
   completePipHandoff(): void {
     this._pipHandoffPending = false;
+    AppStorage.setOrCreate('isPipHandoffPending', false);
+    this.syncPipPlaceholderVisibility();
     logger.info(`${TAG} PiP handoff completed`);
   }
 
   setPipRestoring(restoring: boolean): void {
     this._pipRestoring = restoring;
+    AppStorage.setOrCreate('isPipRestoring', restoring);
+    this.syncPipPlaceholderVisibility();
     logger.info(`${TAG} PiP restoring=${restoring}`);
   }
 
+  /**
+   * True while PiP owns media across page tear-down: enter handoff, active PiP,
+   * or restore until the replacement PlayerPage finishes attach.
+   * Must stay true through old-page aboutToDisappear during restore, or
+   * closeForNavigation()/release() clears ADHOC queue and kills the engine.
+   */
   shouldRetainMediaOnPageDisappear(): boolean {
     return this._pipHandoffPending || this._isPiPActive || this._pipRestoring;
+  }
+
+  /**
+   * Placeholder ("画中画运行中") only when PiP owns the surface and the page is
+   * not mid enter-handoff or restore. Avoids flash on startPiP+pop and restore.
+   */
+  shouldShowPipPlaceholder(): boolean {
+    return this._isPiPActive && !this._pipHandoffPending && !this._pipRestoring;
   }
 
   consumeExplicitPageCloseHandled(): boolean {
@@ -209,6 +231,11 @@ export class PlayerSession {
       AppStorage.setOrCreate('isPiPActive', active);
       logger.info(`${TAG} isPiPActive=${active}`);
     }
+    this.syncPipPlaceholderVisibility();
+  }
+
+  private syncPipPlaceholderVisibility(): void {
+    AppStorage.setOrCreate('showPipPlaceholder', this.shouldShowPipPlaceholder());
   }
 
   get isAudioOnlyMode(): boolean {
@@ -742,6 +769,11 @@ export class PlayerSession {
       AppStorage.setOrCreate('playerLoading', false);
       return;
     }
+    // Safety: never tear down media/queue while PiP restore/handoff owns the page.
+    if (this.shouldRetainMediaOnPageDisappear()) {
+      logger.warn(`${TAG} release() ignored during PiP handoff/restore`);
+      return;
+    }
     logger.info(`${TAG} release() called`);
     // 若画中画激活，先停止 PiP（释放播放器前关闭悬浮窗）
     if (this._isPiPActive && this.onStopPiP) {
@@ -765,6 +797,10 @@ export class PlayerSession {
 
   /** Normal navigation away from PlayerPage: close media but retain the queue. */
   closeForNavigation(): void {
+    if (this.shouldRetainMediaOnPageDisappear()) {
+      logger.warn(`${TAG} closeForNavigation() ignored during PiP handoff/restore`);
+      return;
+    }
     logger.info(`${TAG} closeForNavigation() called`);
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
@@ -807,10 +843,14 @@ export class PlayerSession {
     this._lastPlayError = null;
     this._activeExtrasVideoId = '';
     this._cachedChannelProfiles.clear();
-    // 清 PiP 激活状态：避免会话在 PiP 激活时被 reset 后，_isPiPActive / AppStorage.isPiPActive
-    // 残留为 true，导致占位层显示残留或返回键误判已在 PiP。
+    // 清 PiP 标志与占位层，避免 reset 后残留「画中画运行中」或误判 isPiPActive。
     this._pipHandoffPending = false;
     this._pipRestoring = false;
+    this._isPiPActive = false;
+    AppStorage.setOrCreate('isPipHandoffPending', false);
+    AppStorage.setOrCreate('isPipRestoring', false);
+    AppStorage.setOrCreate('isPiPActive', false);
+    AppStorage.setOrCreate('showPipPlaceholder', false);
     if (!keepAudioOnly) {
       this.clearAudioOnlyMode();
     }

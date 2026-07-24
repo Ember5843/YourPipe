@@ -2585,6 +2585,38 @@
             "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs"
         },
         {
+            "name": "yt_changelog_0_5_6_1",
+            "value": "SmartTube-style device QR sign-in for YouTube OAuth; can coexist with Cookie login"
+        },
+        {
+            "name": "yt_changelog_0_5_6_2",
+            "value": "Dual-rail Cookie/WEB + OAuth/TV auth for home, history, subscriptions, and library; public streams stay on mweb, restricted content may fall back to TV"
+        },
+        {
+            "name": "yt_changelog_0_5_6_3",
+            "value": "HTTP proxy settings for extractor, SABR, and media requests (loopback playback stays direct)"
+        },
+        {
+            "name": "yt_changelog_0_5_6_4",
+            "value": "Video chapters in the player with jump-to-chapter and current-chapter highlight"
+        },
+        {
+            "name": "yt_changelog_0_5_6_5",
+            "value": "Better split-screen / floating-window behavior; collapse top player tools into a More menu when space is tight"
+        },
+        {
+            "name": "yt_changelog_0_5_6_6",
+            "value": "Rebuilt playback media lifecycle for more reliable start, source switch, and multi-window use"
+        },
+        {
+            "name": "yt_changelog_0_5_6_7",
+            "value": "Show loading/buffering immediately when changing quality"
+        },
+        {
+            "name": "yt_changelog_0_5_6_8",
+            "value": "Redesigned download list and list entrance animations; improved SABR offline packaging; hide live download entry"
+        },
+        {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "Player API and stream URL authentication"
         },

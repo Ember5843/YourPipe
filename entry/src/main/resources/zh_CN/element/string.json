@@ -2585,6 +2585,38 @@
             "value": "扩充播放、鉴权、令牌、刷新及回退诊断，同时确保日志不记录敏感 Cookie 和签名地址"
         },
         {
+            "name": "yt_changelog_0_5_6_1",
+            "value": "新增 SmartTube 风格设备二维码登录，用手机扫码完成 YouTube OAuth，与 Cookie 登录可并存"
+        },
+        {
+            "name": "yt_changelog_0_5_6_2",
+            "value": "Cookie/WEB 与 OAuth/TV 双轨鉴权：推荐、历史、订阅、资料库按登录能力分流；公开视频统一 mweb 抽流，受限内容再回退 TV"
+        },
+        {
+            "name": "yt_changelog_0_5_6_3",
+            "value": "设置新增 HTTP 代理，提取、SABR 与媒体请求可走代理（本机回环播放仍直连）"
+        },
+        {
+            "name": "yt_changelog_0_5_6_4",
+            "value": "播放页支持视频章节列表，可从章节跳转并高亮当前章节"
+        },
+        {
+            "name": "yt_changelog_0_5_6_5",
+            "value": "优化分屏/悬浮窗与播放器顶栏：真分屏才强制铺满，空间不足时折叠为「更多」菜单"
+        },
+        {
+            "name": "yt_changelog_0_5_6_6",
+            "value": "重构播放媒体生命周期，改善起播、换源与多窗口下的稳定性"
+        },
+        {
+            "name": "yt_changelog_0_5_6_7",
+            "value": "切换画质时立即显示加载/缓冲指示，避免长时间无反馈"
+        },
+        {
+            "name": "yt_changelog_0_5_6_8",
+            "value": "下载列表改版并统一列表入场动画；改进 SABR 离线封装，隐藏直播下载入口"
+        },
+        {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "播放器 API 及流地址鉴权"
         },

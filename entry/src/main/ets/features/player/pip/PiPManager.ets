@@ -224,10 +224,14 @@ export class PiPManager {
         // （悬浮窗已就位、主页 surface 已腾空）再 mount，视觉过渡平滑。
         break;
       case PiPWindow.PiPState.STARTED:
-        // 已进入 PiP：surface 已被悬浮窗接管，主页 XComponent 实际是空帧。
-        // 此时再 mount 占位层填上空白，无闪烁。
+        // 已进入 PiP：surface 已被悬浮窗接管。
+        // Back→PiP keeps handoff pending until page disappears so the full page
+        // never flashes "画中画运行中" before navPathStack.pop().
+        // Home auto-start has no handoff → placeholder can cover the empty surface.
         session.setPiPActive(true);
-        session.completePipHandoff();
+        if (!session.isPipHandoffPending) {
+          session.completePipHandoff();
+        }
         // Keep video decode ON for PiP surface (cancel any background off timer).
         PlayerPresentation.onPipStarted();
         this.applyPlaybackStateToPiP();
@@ -241,6 +245,13 @@ export class PiPManager {
         // Stop MPV before WMS destroys the PiP surface; waiting until STOPPED
         // leaves gpu-next rendering into a dead swapchain and produces
         // VK_ERROR_SURFACE_LOST_KHR. Restore keeps rendering for hand-back.
+        // Restore hand-back must never release media/queue even if reason text
+        // is ambiguous on some devices (ABOUT_TO_RESTORE may already be set).
+        if (this.isRestoreInProgress(session) || this.isRestoreReason(reason)) {
+          logger.info(`${TAG} ABOUT_TO_STOP restore path reason=${reason}; retain media`);
+          session.setPiPActive(false);
+          break;
+        }
         if (this.isDeleteReason(reason)) {
           logger.info(`${TAG} ABOUT_TO_STOP via ${reason}, release session before surface teardown`);
           // This controller belongs to the playback page that is being closed.
@@ -251,6 +262,10 @@ export class PiPManager {
           // Closing the PiP window means closing playback altogether.  Release
           // MPV while the PiP surface is still valid so its Vulkan swapchain is
           // destroyed before WindowManager removes the surface.
+          this.isRestoring = false;
+          this.restoreStopped = false;
+          this.clearRestoreWatchdog();
+          session.setPipRestoring(false);
           session.setPiPActive(false);
           session.release();
           PlayerPresentation.onPipStopped(false);
@@ -258,10 +273,10 @@ export class PiPManager {
         session.setPiPActive(false);
         break;
       case PiPWindow.PiPState.ABOUT_TO_RESTORE:
-        // 点 PiP 恢复按钮：通知外部（Index）确保 PlayerPage 在栈顶，准备重建。
-        // 占位层已在 ABOUT_TO_STOP 提前隐藏，这里只设置 isRestoring 标记。
+        // 点 PiP 恢复按钮：立刻清占位层，避免系统还原出的播放页先闪「画中画运行中」。
         this.isRestoring = true;
         this.restoreStopped = false;
+        session.setPiPActive(false);
         session.setPipRestoring(true);
         this.startRestoreWatchdog();
         if (this.onPipRestore) {
@@ -273,23 +288,27 @@ export class PiPManager {
         // 一次。正常时机已经在 ABOUT_TO_STOP 处理过，这里 setPiPActive(false)
         // 是幂等的，不会再触发 UI 抖动。
         session.setPiPActive(false);
-        // panelActionRestore：恢复到播放页，跳过清理（节点交还播放页继续播）。
-        // requestDelete：用户主动关闭 PiP，意图是彻底停止——直接 release（不看前后台），
-        //   否则后台分支只 pause 不 release，PiP surface 已销毁而 MPV 渲染管线仍指向它，
-        //   触发 VK_ERROR_SURFACE_LOST_KHR 并残留状态导致下次切视频/退出报错。
-        // 其它原因：走 onPipStop 按前后台处理。
+        // panelActionRestore / restore flags：恢复到播放页，跳过清理。
+        // requestDelete：用户主动关闭 PiP → release。
+        // 其它原因：仅在非 restore 时关闭媒体；误判会清空 ADHOC 队列并杀死引擎。
         if (this.suppressNextStopAction) {
           this.suppressNextStopAction = false;
           PlayerPresentation.onPipStopped(false);
           logger.info(`${TAG} STOPPED ignored: old PiP was intentionally replaced`);
-        } else if (reason === 'panelActionRestore') {
-          logger.info(`${TAG} STOPPED via panelActionRestore, skip (will restore)`);
+        } else if (this.isRestoreInProgress(session) || this.isRestoreReason(reason)) {
+          logger.info(`${TAG} STOPPED restore path reason=${reason}; retain media/queue`);
+          this.isRestoring = true;
+          session.setPipRestoring(true);
           PlayerPresentation.onPipStopped(true);
           this.restoreStopped = true;
           this.finishRestoreRebind();
         } else if (this.isDeleteReason(reason)) {
           logger.info(`${TAG} STOPPED via ${reason}, release session + destroy pipController`);
           PlayerPresentation.onPipStopped(false);
+          this.isRestoring = false;
+          this.restoreStopped = false;
+          this.clearRestoreWatchdog();
+          session.setPipRestoring(false);
           session.release();
           // 销毁 PiPController 本身：它持有已销毁播放页的旧 XComponentController，
           // 若残留，下次播新视频 init() 会复用它，导致系统重绑 surface 失败
@@ -300,24 +319,26 @@ export class PiPManager {
           PlayerPresentation.onPipStopped(false);
           this.handleDefaultPipStop();
         }
-        // Restore completion is finalized by finishRestoreRebind once both
-        // STOPPED and the replacement page surface are available. If either
-        // event is still missing, leave the watchdog armed.
-        if (!this.isRestoring) {
-          session.setPipRestoring(false);
+        // Media retain (session.isPipRestoring) stays true until PlayerPage
+        // finishes attach; only clear when this STOPPED was not a restore.
+        if (!this.isRestoreInProgress(session)) {
           this.clearRestoreWatchdog();
         }
         break;
       case PiPWindow.PiPState.ERROR:
         logger.error(`${TAG} PiP error: ${reason}`);
-        const failedDuringRestore = this.isRestoring || session.isPipRestoring;
+        const failedDuringRestore = this.isRestoreInProgress(session);
         session.cancelPipHandoff();
         session.setPiPActive(false);
         PlayerPresentation.onPipStopped(false);
         if (failedDuringRestore) {
-          logger.error(`${TAG} PiP restore failed; closing media session`);
-          session.release();
-          this.destroy();
+          // Keep media alive: restore UI may still rebind the existing session.
+          // Only drop PiP controller bookkeeping; do not release()/clear queue.
+          logger.error(`${TAG} PiP restore failed; keep media session for page rebind`);
+          this.isRestoring = false;
+          this.restoreStopped = false;
+          this.clearRestoreWatchdog();
+          this.destroy(false);
         } else {
           this.isRestoring = false;
           this.restoreStopped = false;
@@ -505,8 +526,10 @@ export class PiPManager {
 
   /**
    * 销毁 PiPController（应用退出 / 全局释放时）。
+   * @param clearSessionRestore when false, keep session.pipRestoring so PlayerPage
+   *   aboutToDisappear still retains media (restore-error soft cleanup).
    */
-  destroy(): void {
+  destroy(clearSessionRestore: boolean = true): void {
     // 先关闭系统 PiP 窗口再置空控制器：否则 PiP 激活时点新视频走 destroy，
     // app 侧控制器没了但系统悬浮窗还在，成为孤儿窗口导致状态错乱。
     const ctrl = this.pipController;
@@ -523,7 +546,9 @@ export class PiPManager {
     this.isInitialized = false;
     this.isRestoring = false;
     this.restoreStopped = false;
-    PlayerSession.getInstance().setPipRestoring(false);
+    if (clearSessionRestore) {
+      PlayerSession.getInstance().setPipRestoring(false);
+    }
     // requestDelete 在 ABOUT_TO_STOP 中已经清除了旧页面 controller。其他 destroy
     // 场景可能仍会复用同一个页面，因此这里不做无条件清理。
     // 同步清 PiP 激活标志，避免占位层/返回键误判残留。
@@ -534,20 +559,35 @@ export class PiPManager {
     this.clearRestoreWatchdog();
   }
 
+  /**
+   * Called by restored PlayerPage after surface rebind. Ends media-retain window
+   * so a later real navigation can closeForNavigation normally.
+   */
+  completePageRestore(): void {
+    this.isRestoring = false;
+    this.restoreStopped = false;
+    this.clearRestoreWatchdog();
+    PlayerSession.getInstance().setPipRestoring(false);
+    logger.info(`${TAG} page restore complete; media retain released`);
+  }
+
   private finishRestoreRebind(): void {
     const restoredController = this.pendingRestoreComponentController;
     if (!restoredController || !this.restoreStopped) {
       return;
     }
+    // Rebind PiP controller to the new page surface, but keep session.pipRestoring
+    // true until PlayerPage.aboutToAppear finishes attach. Clearing it here races
+    // old-page aboutToDisappear → closeForNavigation → empty queue / dead engine.
     this.unregisterCallbacks();
     this.pipController = null;
     this.boundComponentController = null;
     this.isInitialized = false;
     this.componentController = restoredController;
     this.pendingRestoreComponentController = null;
-    this.isRestoring = false;
+    this.isRestoring = true;
     this.restoreStopped = false;
-    PlayerSession.getInstance().setPipRestoring(false);
+    PlayerSession.getInstance().setPipRestoring(true);
     this.clearRestoreWatchdog();
     const ctx = AppStorage.get<common.UIAbilityContext>('context');
     if (!ctx) {
@@ -565,11 +605,14 @@ export class PiPManager {
     this.restoreStopped = false;
     this.restoreWatchdogTimerId = setTimeout(() => {
       this.restoreWatchdogTimerId = -1;
-      if (!this.isRestoring) return;
-      logger.error(`${TAG} restore timed out; closing media session`);
-      PlayerSession.getInstance().release();
-      this.destroy();
-    }, 5000);
+      if (!this.isRestoring && !PlayerSession.getInstance().isPipRestoring) {
+        return;
+      }
+      // Do not release media on timeout: user already restored into the player.
+      // Only drop stuck restore flags so later navigation can clean up normally.
+      logger.warn(`${TAG} restore timed out; keep media session, clear restore flags`);
+      this.completePageRestore();
+    }, 8000);
   }
 
   private clearRestoreWatchdog(): void {
@@ -581,8 +624,28 @@ export class PiPManager {
 
   private handleDefaultPipStop(): void {
     const session = PlayerSession.getInstance();
+    if (this.isRestoreInProgress(session)) {
+      logger.info(`${TAG} default PiP stop skipped: restore in progress`);
+      return;
+    }
     logger.info(`${TAG} default PiP stop -> close media session`);
     session.release();
+  }
+
+  private isRestoreInProgress(session: PlayerSession): boolean {
+    return this.isRestoring || session.isPipRestoring;
+  }
+
+  /** HarmonyOS / OEM variants for restore stop reason. */
+  private isRestoreReason(reason: string): boolean {
+    if (!reason) {
+      return false;
+    }
+    if (reason === 'panelActionRestore') {
+      return true;
+    }
+    const lower = reason.toLowerCase();
+    return lower.indexOf('restore') >= 0;
   }
 
   /** HarmonyOS versions report panel close as either value. */

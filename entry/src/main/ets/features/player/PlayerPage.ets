@@ -96,8 +96,13 @@ export struct VideoPlayerPage {
   @State chapters: ChapterInfo[] = [];
   @State isRetrying: boolean = false;
   @StorageLink('playerLoading') isLoading: boolean = false;
-  /** 画中画是否激活（订阅 PlayerSession.isPiPActive → 显示占位层） */
+  /** 画中画是否激活（引擎/返回键逻辑；占位层见 showPipPlaceholder） */
   @StorageLink('isPiPActive') isPiPActive: boolean = false;
+  /**
+   * Only true when PiP owns the surface and page is not mid handoff/restore.
+   * Prevents flash of "画中画运行中" on startPiP+pop and on restore.
+   */
+  @StorageLink('showPipPlaceholder') showPipPlaceholder: boolean = false;
   /** 会话级仅音频：封面 + 耳机层，禁止 PiP */
   @StorageLink('isAudioOnlyMode') @Watch('onAudioOnlyModeChange') isAudioOnlyMode: boolean = false;
   /** 播放设置（含 pipOnReturn） */
@@ -335,7 +340,14 @@ export struct VideoPlayerPage {
     this.vm = session.controller.vm;
     session.subscribePlaybackExtras(this.playbackExtrasListener);
     this.controller.subscribePlaybackState(this.pagePlaybackStateListener);
-    if (session.playerState === PlayerState.IDLE && this.video) {
+
+    // PiP restore: system recreates this page while media/queue must stay alive.
+    // Attach to the live session first; do not treat as cold open / force re-extract.
+    // Capture retain before attachRestoredMediaSession completes restore flags.
+    const pipRestoreAttach = session.shouldRetainMediaOnPageDisappear();
+    if (pipRestoreAttach) {
+      this.attachRestoredMediaSession(session);
+    } else if (session.playerState === PlayerState.IDLE && this.video) {
       this.isLoading = true;
     }
 
@@ -360,10 +372,18 @@ export struct VideoPlayerPage {
       this.onPlayerWindowSizeChange(size.width, size.height);
     });
 
-    this.onVideoChange().catch((e: Error) => {
-      logger.error(`${TAG} deferred onVideoChange failed: ${e.message || e}`);
-      this.isLoading = false;
-    });
+    // Restore path already bound videoSource above; skip extract unless missing.
+    if (!pipRestoreAttach) {
+      this.onVideoChange().catch((e: Error) => {
+        logger.error(`${TAG} deferred onVideoChange failed: ${e.message || e}`);
+        this.isLoading = false;
+      });
+    } else if (!this.videoSource.streams || this.videoSource.streams.length === 0) {
+      this.onVideoChange().catch((e: Error) => {
+        logger.error(`${TAG} restore fallback onVideoChange failed: ${e.message || e}`);
+        this.isLoading = false;
+      });
+    }
 
     this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
 
@@ -381,6 +401,34 @@ export struct VideoPlayerPage {
     };
 
     harmonyShare.on('knockShare', this.knockShareCallback);
+  }
+
+  /**
+   * PiP → full page: reuse live controller + cached VideoData/queue.
+   * Completes restore retain so subsequent real navigation can tear down.
+   */
+  private attachRestoredMediaSession(session: PlayerSession): void {
+    this.controller = session.controller;
+    this.vm = session.controller.vm;
+    const cached = session.cachedVideoSource;
+    if (cached && (!this.video || !cached.videoId || cached.videoId === this.video.videoId)) {
+      this.videoSource = this.snapshotVideoSource(cached);
+      this.syncDetailStateFromSource(cached);
+    } else if (session.currentVideo && !this.video) {
+      // System restore may rebuild page before selectedVideo AppStorage is wired;
+      // keep queue identity via session current video.
+      AppStorage.setOrCreate('selectedVideo', session.currentVideo);
+    }
+    const playbackState = this.controller.getPlaybackState();
+    this.isLoading = !(playbackState.isBuffered
+      || (playbackState.isReady && !playbackState.isBuffering));
+    logger.info(`${TAG} PiP restore attach video=${this.video?.videoId || session.currentVideo?.videoId || cached?.videoId || '(none)'} `
+      + `state=${session.playerState} streams=${this.videoSource.streams?.length ?? 0}`);
+    // Defer completePageRestore one frame so concurrent old-page aboutToDisappear
+    // still sees shouldRetainMediaOnPageDisappear() == true.
+    setTimeout(() => {
+      PiPManager.getInstance().completePageRestore();
+    }, 0);
   }
 
   aboutToDisappear(): void {
@@ -404,6 +452,11 @@ export struct VideoPlayerPage {
     pip.unregisterPipStateChangeListener();
 
     if (session.shouldRetainMediaOnPageDisappear()) {
+      // Back→PiP: STARTED kept handoff pending so placeholder stayed hidden;
+      // page is gone now — complete handoff while retaining media.
+      if (session.isPipHandoffPending) {
+        session.completePipHandoff();
+      }
       logger.info(`${TAG} page disappeared for PiP handoff/restore; retaining media session`);
       return;
     }
@@ -539,6 +592,18 @@ export struct VideoPlayerPage {
     this.syncPiPAutoStart();
 
     const session = PlayerSession.getInstance();
+    // Restore may land here before aboutToAppear fully binds; never cold-reload
+    // while PiP restore retain is active (would re-extract and thrash queue).
+    if (session.shouldRetainMediaOnPageDisappear()) {
+      this.controller = session.controller;
+      this.vm = session.controller.vm;
+      if (session.cachedVideoSource && (!this.videoSource.streams || this.videoSource.streams.length === 0)) {
+        this.attachRestoredMediaSession(session);
+      } else {
+        PiPManager.getInstance().completePageRestore();
+      }
+      return;
+    }
     if ((session.isReleased || session.playerState === PlayerState.IDLE) && this.video) {
       this.isLoading = true;
       logger.info(`${TAG} Media session is closed while hidden, reloading video`);
@@ -880,8 +945,8 @@ export struct VideoPlayerPage {
         this.VideoPlaceholder()
       }
 
-      // 画中画激活时：typeNode 已迁移到 PiP 窗口，主页面显示占位层提示
-      if (this.isPiPActive) {
+      // 仅驻留在栈上且 surface 已被 PiP 接管时显示；handoff/restore 过渡不显示，避免闪一下
+      if (this.showPipPlaceholder && this.isPageShow) {
         this.PiPPlaceholderLayer()
       }
     }

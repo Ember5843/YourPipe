@@ -2585,6 +2585,38 @@
             "value": "Mehr Diagnosen für Wiedergabe, Anmeldung, Token, Aktualisierung und Fallbacks ohne sensible Cookies oder signierte URLs im Protokoll"
         },
         {
+            "name": "yt_changelog_0_5_6_1",
+            "value": "SmartTube-ähnliche Geräte-QR-Anmeldung für YouTube-OAuth; kann parallel zur Cookie-Anmeldung genutzt werden"
+        },
+        {
+            "name": "yt_changelog_0_5_6_2",
+            "value": "Zweigleisige Cookie/WEB- und OAuth/TV-Authentifizierung für Startseite, Verlauf, Abos und Bibliothek; öffentliche Streams bleiben auf mweb, eingeschränkte Inhalte können auf TV zurückfallen"
+        },
+        {
+            "name": "yt_changelog_0_5_6_3",
+            "value": "HTTP-Proxy-Einstellungen für Extractor, SABR und Medienanfragen (Loopback-Wiedergabe bleibt direkt)"
+        },
+        {
+            "name": "yt_changelog_0_5_6_4",
+            "value": "Videokapitel im Player mit Sprung zum Kapitel und Hervorhebung des aktuellen Kapitels"
+        },
+        {
+            "name": "yt_changelog_0_5_6_5",
+            "value": "Besseres Verhalten bei geteiltem Bildschirm und schwebenden Fenstern; Player-Werkzeuge oben bei wenig Platz in „Mehr“-Menü einklappen"
+        },
+        {
+            "name": "yt_changelog_0_5_6_6",
+            "value": "Überarbeiteter Medien-Lebenszyklus der Wiedergabe für zuverlässigeren Start, Quellenwechsel und Mehrfenster-Betrieb"
+        },
+        {
+            "name": "yt_changelog_0_5_6_7",
+            "value": "Lade-/Pufferanzeige sofort beim Qualitätswechsel anzeigen"
+        },
+        {
+            "name": "yt_changelog_0_5_6_8",
+            "value": "Überarbeitete Download-Liste und Listeneintrittsanimationen; verbesserte SABR-Offline-Verpackung; Live-Download-Eintrag ausgeblendet"
+        },
+        {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "Player-API und Stream-URL-Authentifizierung"
         },

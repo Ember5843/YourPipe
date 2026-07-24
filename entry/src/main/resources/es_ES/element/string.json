@@ -2585,6 +2585,38 @@
             "value": "Más diagnósticos de reproducción, autenticación, tokens, actualización y alternativas sin registrar cookies ni URL firmadas"
         },
         {
+            "name": "yt_changelog_0_5_6_1",
+            "value": "Inicio de sesión por código QR de dispositivo al estilo SmartTube para OAuth de YouTube; puede coexistir con el inicio por Cookie"
+        },
+        {
+            "name": "yt_changelog_0_5_6_2",
+            "value": "Autenticación dual Cookie/WEB y OAuth/TV para inicio, historial, suscripciones y biblioteca; los streams públicos siguen en mweb; el contenido restringido puede recurrir a TV"
+        },
+        {
+            "name": "yt_changelog_0_5_6_3",
+            "value": "Ajustes de proxy HTTP para el extractor, SABR y peticiones de medios (la reproducción en bucle local sigue directa)"
+        },
+        {
+            "name": "yt_changelog_0_5_6_4",
+            "value": "Capítulos de vídeo en el reproductor con salto al capítulo y resaltado del actual"
+        },
+        {
+            "name": "yt_changelog_0_5_6_5",
+            "value": "Mejor comportamiento en pantalla dividida y ventanas flotantes; herramientas superiores del reproductor se pliegan en el menú Más cuando hay poco espacio"
+        },
+        {
+            "name": "yt_changelog_0_5_6_6",
+            "value": "Ciclo de vida de medios de reproducción reconstruido para un inicio, cambio de fuente y uso multiventana más fiables"
+        },
+        {
+            "name": "yt_changelog_0_5_6_7",
+            "value": "Mostrar carga/buffer de inmediato al cambiar la calidad"
+        },
+        {
+            "name": "yt_changelog_0_5_6_8",
+            "value": "Lista de descargas rediseñada y animaciones de entrada; empaquetado SABR sin conexión mejorado; entrada de descarga en directo oculta"
+        },
+        {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "API del reproductor y autenticación de URL de transmisión"
         },

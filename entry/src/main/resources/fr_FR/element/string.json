@@ -2585,6 +2585,38 @@
             "value": "Diagnostics enrichis pour lecture, connexion, jetons, actualisation et replis sans journaliser cookies ni URL signées"
         },
         {
+            "name": "yt_changelog_0_5_6_1",
+            "value": "Connexion par QR d'appareil style SmartTube pour l'OAuth YouTube ; peut coexister avec la connexion Cookie"
+        },
+        {
+            "name": "yt_changelog_0_5_6_2",
+            "value": "Auth double rail Cookie/WEB et OAuth/TV pour l'accueil, l'historique, les abonnements et la bibliothèque ; les flux publics restent en mweb, le contenu restreint peut basculer vers TV"
+        },
+        {
+            "name": "yt_changelog_0_5_6_3",
+            "value": "Paramètres de proxy HTTP pour l'extracteur, SABR et les requêtes média (lecture en boucle locale toujours directe)"
+        },
+        {
+            "name": "yt_changelog_0_5_6_4",
+            "value": "Chapitres vidéo dans le lecteur avec saut et surbrillance du chapitre en cours"
+        },
+        {
+            "name": "yt_changelog_0_5_6_5",
+            "value": "Meilleur comportement en écran partagé / fenêtre flottante ; outils du haut du lecteur regroupés dans le menu Plus si l'espace est limité"
+        },
+        {
+            "name": "yt_changelog_0_5_6_6",
+            "value": "Cycle de vie média de lecture reconstruit pour un démarrage, un changement de source et le multi-fenêtre plus fiables"
+        },
+        {
+            "name": "yt_changelog_0_5_6_7",
+            "value": "Afficher immédiatement le chargement/buffering lors d'un changement de qualité"
+        },
+        {
+            "name": "yt_changelog_0_5_6_8",
+            "value": "Liste de téléchargements refondue et animations d'entrée ; emballage SABR hors ligne amélioré ; entrée de téléchargement live masquée"
+        },
+        {
             "name": "yt_option_auth_use_for_playback_subtitle",
             "value": "API du lecteur et authentification des URL de flux"
         },
