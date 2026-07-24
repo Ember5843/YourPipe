@@ -1,50 +1,14 @@
 {
   "app": {
-    "signingConfigs": [
-      {
-        "name": "yourpiperelease",
-        "type": "HarmonyOS",
-        "material": {
-          "storeFile": "C:/Users/USER/Desktop/npp/keys/yourpiperelease.p12",
-          "storePassword": "REDACTED_SIGNING_SECRET",
-          "keyAlias": "yourpiperelease",
-          "keyPassword": "REDACTED_SIGNING_SECRET",
-          "signAlg": "SHA256withECDSA",
-          "profile": "C:/Users/USER/Desktop/npp/keys/yourpipereleaseRelease.p7b",
-          "certpath": "C:/Users/USER/Desktop/npp/keys/yourpiperelease.cer"
-        }
-      },
-      {
-        "name": "pc",
-        "type": "HarmonyOS",
-        "material": {
-          "storeFile": "C:/Users/USER/Desktop/npp/keys/yourpipedebug.p12",
-          "storePassword": "REDACTED_SIGNING_SECRET",
-          "keyAlias": "yourpipedebug",
-          "keyPassword": "REDACTED_SIGNING_SECRET",
-          "signAlg": "SHA256withECDSA",
-          "profile": "C:/Users/USER/Desktop/npp/keys/yourpipedebugDebug.p7b",
-          "certpath": "C:/Users/USER/Desktop/npp/keys/yourpipedebug.cer"
-        }
-      },
-      {
-        "name": "macos",
-        "type": "HarmonyOS",
-        "material": {
-          "certpath": "/Users/USER/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "REDACTED_SIGNING_SECRET",
-          "profile": "/Users/USER/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.p7b",
-          "signAlg": "SHA256withECDSA",
-          "storeFile": "/Users/USER/.ohos/config/macos_YourPipe_j40ZeE6lNThwkGVvbHWuokqDzZkw_dmJjrgbG3eDbdo=.p12",
-          "storePassword": "REDACTED_SIGNING_SECRET"
-        }
-      }
-    ],
+    // Signing is machine-local. Do not commit real material (paths/passwords).
+    // Configure in DevEco (File → Project Structure → Signing Configs) or restore
+    // your private backup into this file locally (never push secrets).
+    "signingConfigs": [],
     "products": [
       {
         "name": "default",
-        "signingConfig": "pc",
+        // Set to your local signingConfigs[].name after configuring signing.
+        // "signingConfig": "default",
         "targetSdkVersion": "6.1.0(23)",
         "compatibleSdkVersion": "6.1.0(23)",
         "runtimeOS": "HarmonyOS",
