@@ -138,6 +138,9 @@ export class PlayerModel {
   };
 
   @Track public mergedVideoList: VideoEntry[] = [];
+  /** True once background-parsed live HLS variants have been merged into
+   * mergedVideoList. UI uses it to unhide the quality menu for live playback. */
+  @Track public liveQualityReady: boolean = false;
 
   @Track public currentVideoStream?: StreamInfo;
   @Track public currentAudioStream?: StreamInfo;
@@ -253,9 +256,52 @@ export class PlayerModel {
     this.currentVideoStream = undefined;
     this.currentAudioStream = undefined;
     this.currentManifestStream = undefined;
+    this.liveQualityReady = false;
   }
 
   public getStreamCategories(): StreamCategories { return this.categorizedStreams; }
+  /**
+   * Live quality management: replace mergedVideoList with [Auto(master),
+   * ...per-variant entries] once background parsing delivered HLS variants.
+   * For live, the pre-merge list held DASH/OTF adaptive entries which cannot
+   * be played through the proxy (no SIDX), so the list is replaced wholesale
+   * instead of appended to.
+   */
+  public mergeLiveHlsVariants(variants: StreamInfo[], masterUrl: string): void {
+    const seen = new Set<string>();
+    const sorted = variants.filter((s: StreamInfo) => {
+      if (!s.url || s.hasVideo !== true || seen.has(s.url)) return false;
+      seen.add(s.url);
+      return true;
+    }).slice().sort((a: StreamInfo, b: StreamInfo) => (b.height || 0) - (a.height || 0));
+    if (sorted.length === 0) return;
+    const list: VideoEntry[] = [];
+    if (masterUrl.length > 0) {
+      const autoStream: StreamInfo = {
+        url: masterUrl,
+        kind: 'manifest_hls',
+        deliveryMethod: 'HLS',
+        hasVideo: true,
+        hasAudio: true,
+        mimeType: 'application/vnd.apple.mpegurl',
+        sourceClient: 'hls-auto',
+      };
+      list.push({ stream: autoStream } as VideoEntry);
+    }
+    for (const s of sorted) {
+      list.push({ stream: s } as VideoEntry);
+      // Keep categories coherent for future per-track audio work.
+      if (s.hasAudio === true) {
+        this.categorizedStreams.progressive.push(s);
+      } else {
+        this.categorizedStreams.video.push(s);
+      }
+    }
+    this.mergedVideoList = list;
+    this.liveQualityReady = true;
+    Logger.info(TAG, `live HLS variants merged: auto=${masterUrl.length > 0} variants=${sorted.length} `
+      + sorted.map((s: StreamInfo) => s.quality || `${s.height}p`).join(','));
+  }
   public getMergedVideoList(): VideoEntry[] { return this.mergedVideoList; }
   public getCurrentStreams(): CurrentStreams { return { video: this.currentVideoStream, audio: this.currentAudioStream, manifest: this.currentManifestStream }; }
   public updateVideoStream(stream: StreamInfo | undefined): void { this.currentVideoStream = stream; }

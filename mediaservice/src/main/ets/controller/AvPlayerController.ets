@@ -79,6 +79,7 @@ export class AvPlayerController {
   private startupStartedAt: number = 0;
   private startupFileLoadedLogged: boolean = false;
   private startupPlaybackRestartLogged: boolean = false;
+  private startupFirstFrameLogged: boolean = false;
   private avSessionArtworkPublished: boolean = false;
 
   /** 上一次 updateVideoSource 处理过的 source 引用，用于幂等去重。 */
@@ -192,6 +193,7 @@ export class AvPlayerController {
     this.startupStartedAt = startedAt;
     this.startupFileLoadedLogged = false;
     this.startupPlaybackRestartLogged = false;
+    this.startupFirstFrameLogged = false;
   }
 
   public getMergedVideoList(): VideoEntry[] {
@@ -226,6 +228,18 @@ export class AvPlayerController {
       }
     }
     await this.switchQuality(entry.stream, audio);
+  }
+
+  /**
+   * Live quality management: entry pushes background-parsed HLS variants here
+   * after playback already started. Never blocks the startup path.
+   */
+  public addLiveHlsVariants(variants: StreamInfo[]): void {
+    if (!this.isActive() || this.curSource?.isLive !== true || variants.length === 0) {
+      return;
+    }
+    this.vm.playerModel.mergeLiveHlsVariants(variants, this.curSource?.hlsUrl || '');
+    Logger.info(TAG, `live HLS variants merged count=${variants.length}`);
   }
 
   public getAudioStreamList(): StreamInfo[] {
@@ -606,7 +620,11 @@ export class AvPlayerController {
     this.qualitySwitchLoadStarted = true;
     this.vm.isSourceSwitching = true;
     this.vm.isBuffering = true;
-    const loaded = this.loadPlaybackSource(playbackUrl, resumePos, generation);
+    // Live HLS variants (and the Auto master entry) start at the live edge:
+    // a resumed offset can fall outside the DVR window of the new playlist.
+    const isHlsSwitch = ((videoStream.deliveryMethod || '').toUpperCase() === 'HLS')
+      || ((videoStream.kind || '').toLowerCase() === 'manifest_hls');
+    const loaded = this.loadPlaybackSource(playbackUrl, isHlsSwitch ? 0 : resumePos, generation);
     if (!loaded) {
       this.endSourceSwitchUi(false);
       return;
@@ -815,6 +833,7 @@ export class AvPlayerController {
     this.startupStartedAt = 0;
     this.startupFileLoadedLogged = false;
     this.startupPlaybackRestartLogged = false;
+    this.startupFirstFrameLogged = false;
     this.avSessionArtworkPublished = false;
     this.lastUpdatedSourceRef = null;
     this.lastUpdatedVideoId = '';
@@ -1553,6 +1572,14 @@ export class AvPlayerController {
       this.startupPlaybackRestartLogged = true;
       Logger.info(TAG, `[STARTUP] attempt=${this.startupAttemptId} stage=playback_restart ` +
         `elapsed=${Date.now() - this.startupStartedAt}ms`);
+    }
+    // TTFF closing marker: playback state reports playing and the timeline has
+    // advanced past 0 — the first frame has been decoded and presented.
+    if (this.startupAttemptId.length > 0 && !this.startupFirstFrameLogged
+      && state.isPlaying && state.currentTime > 0) {
+      this.startupFirstFrameLogged = true;
+      Logger.info(TAG, `[STARTUP] attempt=${this.startupAttemptId} stage=first_frame ` +
+        `elapsed=${Date.now() - this.startupStartedAt}ms ttff=${Date.now() - this.startupStartedAt}ms`);
     }
 
     if (state.isPlaying && !this.vm.isPlaying) {

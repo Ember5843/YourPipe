@@ -947,7 +947,11 @@ export class YouTubeExtractor {
       : WebClientVersionResolver.getCachedOrHardcoded();
     const sabrInfo = new YoutubeSabrInfo(profile, videoId, cpn, clientVersion, formats);
     sabrInfo.serverAbrStreamingUrl = serverAbr;
-    sabrInfo.visitorData = playerResponse.responseContext?.visitorData;
+    // Pin visitorData per app session (matches web behavior): the PoToken mint
+    // and the SABR X-Goog-Visitor-Id header stay on one value, so BotGuard
+    // initializes once instead of re-initializing (~2s) on every video.
+    sabrInfo.visitorData = YoutubeJavaScriptPlayerManager.getSessionVisitorData(
+      playerResponse.responseContext?.visitorData);
     sabrInfo.videoPlaybackUstreamerConfig =
       playerResponse.playerConfig?.mediaCommonConfig
         ?.mediaUstreamerRequestConfig?.videoPlaybackUstreamerConfig;
@@ -1376,7 +1380,8 @@ export class YouTubeExtractor {
     if (hooks?.onStreamingContext) {
       hooks.onStreamingContext({
         videoId: videoId,
-        visitorData: streamPr?.responseContext?.visitorData || '',
+        visitorData: YoutubeJavaScriptPlayerManager.getSessionVisitorData(
+          streamPr?.responseContext?.visitorData) || '',
         hasDirectDash: hasDirectDash,
         deliveryMethod: willUseSabr ? 'SABR' : (isLive ? 'HLS' : 'DASH'),
         attemptId: hooks.attemptId || ''
@@ -3387,6 +3392,36 @@ export class YouTubeExtractor {
       }
     } catch (e) {
       logger.warn('tryExtractHlsStreams failed:', e);
+    }
+  }
+
+  /**
+   * Live quality management: fetch + parse an HLS master playlist into
+   * per-variant streams. Background use only — never call this from the stream
+   * extraction critical path; the extra manifest GET + parse must not inflate
+   * TTFF. The caller passes the already-deobfuscated manifest URL
+   * (videoInfo.hlsUrl), so no cipher work happens here.
+   */
+  async fetchHlsVariantStreams(manifestUrl: string, videoId: string): Promise<StreamInfo[]> {
+    if (!manifestUrl || manifestUrl.length === 0) return [];
+    try {
+      const response = await this.client.get(manifestUrl);
+      if (response.responseCode !== 200) {
+        logger.warn(`[HLS-VARIANT] master fetch failed code=${response.responseCode} video=${videoId}`);
+        return [];
+      }
+      const manifestContent = response.result as string;
+      if (!manifestContent.includes('#EXT-X-STREAM-INF')) {
+        logger.info(`[HLS-VARIANT] not a master playlist video=${videoId}`);
+        return [];
+      }
+      const hlsResult = parseHlsMasterManifest(manifestContent, videoId);
+      logger.info(`[HLS-VARIANT] parsed video=${videoId} variants=${hlsResult.videoStreams.length} `
+        + `audioTracks=${hlsResult.audioStreams.length}`);
+      return hlsResult.videoStreams;
+    } catch (e) {
+      logger.warn(`[HLS-VARIANT] parse failed video=${videoId}: ${(e as Error).message || e}`);
+      return [];
     }
   }
 

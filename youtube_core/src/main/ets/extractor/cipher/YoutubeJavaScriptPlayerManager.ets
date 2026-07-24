@@ -70,6 +70,26 @@ export class YoutubeJavaScriptPlayerManager {
     return YoutubeJavaScriptPlayerManager.prewarmedVisitorData;
   }
 
+  /** Session-pinned visitorData. YouTube web keeps ONE visitorData per visit and
+   *  mints every PoToken against it; our player responses instead return a fresh
+   *  visitorData per video, which forced BotGuard to re-initialize (~2s) on every
+   *  mint. Pin once per app session: prefer the prewarmed watch-page value, else
+   *  adopt the first player-response value. Never log the value itself. */
+  private static sessionVisitorData: string = '';
+
+  static getSessionVisitorData(responseVisitorData?: string): string {
+    if (YoutubeJavaScriptPlayerManager.sessionVisitorData) {
+      return YoutubeJavaScriptPlayerManager.sessionVisitorData;
+    }
+    const pinned = YoutubeJavaScriptPlayerManager.prewarmedVisitorData || responseVisitorData || '';
+    if (pinned) {
+      YoutubeJavaScriptPlayerManager.sessionVisitorData = pinned;
+      logger.info(`[CipherWarmup] stage=visitorData session_pin source=${
+        YoutubeJavaScriptPlayerManager.prewarmedVisitorData ? 'prewarm' : 'player_response'}`);
+    }
+    return pinned;
+  }
+
   /**
    * Query system Secure Shield (坚盾守护) via Device Security Kit.
    * When on, JIT is disabled globally and local JSVM cipher is slow/unavailable.

@@ -377,6 +377,10 @@
             "value": "最高畫質"
         },
         {
+          "name": "yt_quality_auto",
+          "value": "自動"
+        },
+        {
             "name": "yt_codec_h264_first",
             "value": "自動（H.264 優先）"
         },

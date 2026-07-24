@@ -377,6 +377,10 @@
             "value": "أفضل جودة"
         },
         {
+          "name": "yt_quality_auto",
+          "value": "تلقائي"
+        },
+        {
             "name": "yt_codec_h264_first",
             "value": "تلقائي (H.264 أولوية)"
         },

@@ -1135,7 +1135,11 @@ export struct VideoPlayer {
       || 'Audio';
   }
 
-  private getVideoLabel(stream: StreamInfo): string {
+  private getVideoLabel(stream: StreamInfo): string | Resource {
+    // Live "Auto" entry = master playlist (localized string).
+    if ((stream.kind || '') === 'manifest_hls') {
+      return $r('app.string.yt_quality_auto');
+    }
     const values: string[] = [];
     if (stream.quality?.trim()) values.push(stream.quality);
     if (stream.codecs?.trim()) values.push(stream.codecs);
@@ -1209,7 +1213,8 @@ export struct VideoPlayer {
     if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
       count++;
     }
-    if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
+    if (this.controller.getMergedVideoList().length > 0
+      && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
       count++;
     }
     return count;
@@ -1609,7 +1614,8 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
       }
-      if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
+      if (this.controller.getMergedVideoList().length > 0
+      && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.resolution_video')),
           content: $r('app.string.yt_player_video_quality'),
@@ -1680,7 +1686,8 @@ export struct VideoPlayer {
           .bindMenu(this.AudioMenu())
       }
 
-      if (!this.curSource.isLive && this.controller.getMergedVideoList().length > 0) {
+      if (this.controller.getMergedVideoList().length > 0
+      && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.resolution_video'))
             .fontSize(CONTROL_ICON_SIZE)

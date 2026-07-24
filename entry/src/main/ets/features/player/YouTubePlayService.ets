@@ -19,7 +19,8 @@ import {
   SignInConfirmNotBotException,
   ContentNotAvailableException,
   ContentNotSupportedException,
-  ExtractionException
+  ExtractionException,
+  YoutubeJavaScriptPlayerManager
 } from 'youtube_core';
 import { StreamInfo, SubtitleTrack, sabrSessionStore, LocalMediaProxy } from 'mediaservice';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
@@ -159,15 +160,18 @@ export class YouTubePlayService {
   /**
    * Consume a prefetched result for videoId. A still-running prefetch is awaited
    * (dedup) instead of starting a second extraction. undefined = nothing usable.
+   * A fresh entry is KEPT after a hit: queue revisits (switching back to a
+   * recently played video) reuse it until the TTL expires instead of paying a
+   * full re-extraction + PoToken mint.
    */
   async takePrefetched(videoId: string): Promise<YouTubePlayResult | undefined> {
     const cached = this.prefetchedResults.get(videoId);
     if (cached) {
-      this.prefetchedResults.delete(videoId);
       if (Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
         logger.info(`${TAG} prefetch hit video=${videoId} age=${Date.now() - cached.fetchedAtMs}ms`);
         return cached.result;
       }
+      this.prefetchedResults.delete(videoId);
     }
     const inFlight = this.prefetchInFlight.get(videoId);
     if (inFlight) {
@@ -410,7 +414,10 @@ export class YouTubePlayService {
 
   /** Inject pot= into DASH/progressive stream URLs (not SABR). */
   private async injectDashPoToken(videoInfo: VideoInfo): Promise<void> {
-    const visitorData = videoInfo.playerResponse?.responseContext?.visitorData
+    // Prefer the session-pinned visitorData so the DASH mint reuses the already
+    // initialized BotGuard runtime instead of re-initializing per video.
+    const visitorData = YoutubeJavaScriptPlayerManager.getSessionVisitorData()
+      || videoInfo.playerResponse?.responseContext?.visitorData
       || videoInfo.streams.find(s => s.sabrInfo?.visitorData)?.sabrInfo?.visitorData;
     if (!visitorData || visitorData.length === 0) {
       logger.info(`${TAG} no visitorData, skipping Dash PoToken injection`);

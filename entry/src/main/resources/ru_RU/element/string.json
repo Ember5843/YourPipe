@@ -377,6 +377,10 @@
             "value": "Лучшее качество"
         },
         {
+          "name": "yt_quality_auto",
+          "value": "Авто"
+        },
+        {
             "name": "yt_codec_h264_first",
             "value": "Авто (приоритет H.264)"
         },

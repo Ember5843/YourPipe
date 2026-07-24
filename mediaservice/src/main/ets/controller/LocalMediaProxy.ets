@@ -6,7 +6,8 @@ import { sabrSessionStore } from '../sabr/SabrSessionStore';
 import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
 import { YoutubeSabrFormatMeta, YoutubeSabrInfo } from 'youtube_core';
 import { fetchYoutubeRangeBytes } from '../proxy/RangeProxy';
-import { parseYoutubeDashIndex } from '../proxy/YoutubeDashIndex';
+import { parseYoutubeDashIndex, YoutubeDashSegment } from '../proxy/YoutubeDashIndex';
+import { VideoHwCaps } from '../engine/VideoHwCaps';
 
 const TAG: string = '[PlayerLog][LocalMediaProxy]';
 // PipePipe-aligned UAs (must match extractor ClientsConstants / YoutubeParsingHelper).
@@ -64,6 +65,84 @@ interface LocalMediaSessionInput {
 export class LocalMediaProxy {
   private static serverReady: boolean = false;
   private static serverStartPromise: Promise<boolean> | undefined = undefined;
+  /**
+   * Startup auth gate (P0-2): entry registers a hook that resolves once the
+   * pending DASH PoToken injection finished. Demand-side SIDX fetches await it
+   * so upstream URLs are never consumed before pot= lands, while playback
+   * source submission itself no longer blocks on the WebView mint.
+   */
+  private static startupUrlGate: (() => Promise<void>) | null = null;
+  /** In-memory SIDX prefetch cache (P0-3), keyed by stream URL. Process-local,
+   * disposable — nothing persists, so no recovery-action wiring is required. */
+  private static sidxPrefetchCache: Map<string, YoutubeDashSegment[]> = new Map();
+  private static sidxPrefetchInflight: Map<string, Promise<boolean>> = new Map();
+  private static readonly SIDX_PREFETCH_CACHE_CAP: number = 8;
+
+  static setStartupUrlGate(gate: (() => Promise<void>) | null): void {
+    LocalMediaProxy.startupUrlGate = gate;
+  }
+
+  private static sidxCacheSet(url: string, segments: YoutubeDashSegment[]): void {
+    if (LocalMediaProxy.sidxPrefetchCache.size >= LocalMediaProxy.SIDX_PREFETCH_CACHE_CAP) {
+      const oldest = LocalMediaProxy.sidxPrefetchCache.keys().next();
+      if (!oldest.done) {
+        LocalMediaProxy.sidxPrefetchCache.delete(oldest.value);
+      }
+    }
+    LocalMediaProxy.sidxPrefetchCache.set(url, segments);
+  }
+
+  /**
+   * P0-3: fire-and-forget SIDX prefetch for the most likely initial DASH
+   * tracks. Runs ungated (a missing pot only risks a prefetch-side 403, which
+   * the demand path simply refetches); overlaps the range RTT with PoToken
+   * minting and source bookkeeping.
+   */
+  static prefetchLikelyDashSidx(streams: StreamInfo[], attemptId: string = ''): void {
+    const candidates = streams.filter((s: StreamInfo) => !!s.url
+      && s.deliveryMethod !== 'SABR' && s.kind !== 'sabr'
+      && s.indexRangeStart !== undefined && s.indexRangeEnd !== undefined);
+    if (candidates.length === 0) return;
+    const videos = candidates.filter((s: StreamInfo) => s.hasVideo);
+    const audios = candidates.filter((s: StreamInfo) => !s.hasVideo && s.hasAudio);
+    const hwVideos = videos.filter((s: StreamInfo) => VideoHwCaps.isCodecHardwareFriendly(s.codecs));
+    const vpool = (hwVideos.length > 0 ? hwVideos : videos)
+      .slice().sort((a: StreamInfo, b: StreamInfo) => (b.height || 0) - (a.height || 0));
+    const picked: StreamInfo[] = [];
+    const seenHeights = new Set<number>();
+    for (const s of vpool) {
+      const h = s.height || 0;
+      if (h > 1080) continue; // 4K SIDX prefetch is unlikely to match the default pick
+      if (seenHeights.has(h)) continue;
+      seenHeights.add(h);
+      picked.push(s);
+      if (picked.length >= 3) break;
+    }
+    const apool = audios.slice().sort((a: StreamInfo, b: StreamInfo) => (b.bitrate || 0) - (a.bitrate || 0));
+    if (apool.length > 0) {
+      picked.push(apool[0]);
+    }
+    Logger.info(TAG, `[STARTUP] attempt=${attemptId || '-'} stage=sidx_prefetch_start count=${picked.length}`);
+    for (const s of picked) {
+      const key = s.url;
+      if (LocalMediaProxy.sidxPrefetchCache.has(key) || LocalMediaProxy.sidxPrefetchInflight.has(key)) {
+        continue;
+      }
+      const resource = LocalMediaProxy.toStreamResource(s, !s.hasVideo);
+      const task: Promise<boolean> = LocalMediaProxy.prepareDashSegmentsRequired(resource, true);
+      LocalMediaProxy.sidxPrefetchInflight.set(key, task);
+      task.then((ok: boolean) => {
+        if (ok && resource.dashSegments && resource.dashSegments.length > 0) {
+          LocalMediaProxy.sidxCacheSet(key, resource.dashSegments);
+          Logger.info(TAG, `[STARTUP] attempt=${attemptId || '-'} stage=sidx_prefetch_done itag=${s.itag}`);
+        }
+      }).catch((e: Error) => {
+        Logger.warn(TAG, `sidx prefetch failed itag=${s.itag}: ${e.message || e}`);
+      }).finally(() => {
+        LocalMediaProxy.sidxPrefetchInflight.delete(key);
+      });
+    }
+  }
 
   static async warmup(): Promise<boolean> {
     if (LocalMediaProxy.serverReady || localProxyServer.isRunning()) {
@@ -155,13 +234,44 @@ export class LocalMediaProxy {
     return localProxyServer.addPreparedSession(session);
   }
 
-  /** Required SIDX → SegmentTemplate timeline. Retries transient 403. */
-  private static async prepareDashSegmentsRequired(resource: StreamResource): Promise<boolean> {
+  /** Required SIDX → SegmentTemplate timeline. Retries transient 403.
+   * skipGate: prefetch path only — demand fetches must pass the pot gate. */
+  private static async prepareDashSegmentsRequired(resource: StreamResource, skipGate: boolean = false): Promise<boolean> {
     const start = Number(resource.indexRangeStart);
     const end = Number(resource.indexRangeEnd);
     if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) {
       Logger.error(TAG, `prepareDashSegments: missing indexRange itag=${resource.id}`);
       return false;
+    }
+    // P0-3: warm prefetch cache hit — no network on the demand path.
+    const cached = LocalMediaProxy.sidxPrefetchCache.get(resource.url);
+    if (cached && cached.length > 0) {
+      resource.dashSegments = cached;
+      Logger.info(TAG, `SIDX prefetch hit itag=${resource.id} segments=${cached.length}`);
+      return true;
+    }
+    // A prefetch for the same URL may still be in flight — join it instead of
+    // issuing a duplicate range request.
+    const inflight = LocalMediaProxy.sidxPrefetchInflight.get(resource.url);
+    if (inflight) {
+      await inflight.catch(() => false);
+      const joined = LocalMediaProxy.sidxPrefetchCache.get(resource.url);
+      if (joined && joined.length > 0) {
+        resource.dashSegments = joined;
+        Logger.info(TAG, `SIDX prefetch joined itag=${resource.id} segments=${joined.length}`);
+        return true;
+      }
+    }
+    // P0-2: demand-side barrier — wait for the pending pot injection so the
+    // first upstream fetch consumes URLs that already carry pot=.
+    if (!skipGate && LocalMediaProxy.startupUrlGate) {
+      const gateStartedAt = Date.now();
+      try {
+        await LocalMediaProxy.startupUrlGate();
+        Logger.info(TAG, `[STARTUP] stage=pot_gate_ready itag=${resource.id} elapsed=${Date.now() - gateStartedAt}ms`);
+      } catch (e) {
+        Logger.warn(TAG, `startup url gate failed itag=${resource.id}: ${e}`);
+      }
     }
     // Fresh authenticated TVHTML5 URLs can return 403 while the googlevideo
     // edge authorization propagates. Keep increasing rn until the URL becomes
@@ -181,6 +291,10 @@ export class LocalMediaProxy {
         }
         const bytes = await fetchYoutubeRangeBytes(resource, start, end);
         resource.dashSegments = parseYoutubeDashIndex(bytes, start);
+        if (resource.dashSegments.length > 0) {
+          // Reuse for a later quality switch onto the same URL.
+          LocalMediaProxy.sidxCacheSet(resource.url, resource.dashSegments);
+        }
         Logger.info(TAG, `prepared DASH SIDX itag=${resource.id} segments=${resource.dashSegments.length} `
           + `range=${start}-${end} attempt=${attempt + 1}`);
         return true;

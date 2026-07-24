@@ -389,6 +389,10 @@
             "value": "最高画质"
         },
         {
+          "name": "yt_quality_auto",
+          "value": "自动"
+        },
+        {
             "name": "yt_codec_h264_first",
             "value": "自动（H.264 优先）"
         },
