@@ -19,6 +19,7 @@ import { PlaybackContinuationService } from '../features/player/PlaybackContinua
 import { PlayerSession } from '../common/PlayerSession';
 import { PlayerPresentation } from '../common/PlayerPresentation';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
+import { SabrWebViewPoTokenProvider } from '../features/player/SabrWebViewPoTokenProvider';
 import type { EngineConfig } from 'mediaservice';
 
 const logger = AppLog.getInstance('EntryAbility');
@@ -88,6 +89,15 @@ export default class EntryAbility extends UIAbility {
         AppLogStore.push(level, tag, message);
       });
       YoutubeJavaScriptPlayerManager.startAppPrewarm(this.context)
+        .then(() => {
+          // Layer 1: BotGuard init belongs to app startup, not mid-playback.
+          // The WebView may still be attaching; the provider queues the warm-up
+          // until setMinter fires.
+          const visitorData = YoutubeJavaScriptPlayerManager.getPrewarmedVisitorData();
+          if (visitorData) {
+            SabrWebViewPoTokenProvider.getInstance().warmRuntime(visitorData);
+          }
+        })
         .catch((e: Error) => logger.warn(`Cipher prewarm failed: ${e.message || e}`));
       this.startPlaybackPrewarm();
       LanguageManager.applyPersistedLanguage();
@@ -111,6 +121,9 @@ export default class EntryAbility extends UIAbility {
       logger.warn(`Playback prewarm proxy failed: ${e.message || e}`);
     });
     const service = YouTubePlayService.getInstance(this.context);
+    // P0-2 (TTFF): proxy-side startup gate — demand-side SIDX/segment fetches
+    // wait for the pending pot injection without blocking play() submission.
+    LocalMediaProxy.setStartupUrlGate(() => service.awaitPendingDashPoToken());
     service.initialize().then(() => service.prewarmClientVersion()).then(() => {
       logger.info(`Playback prewarm extractor ready elapsed=${Date.now() - startedAt}ms`);
     }).catch((e: Error) => {

@@ -361,6 +361,14 @@ export class PlayQueueManager {
     return this.currentIndex + 1 < this.queue.length;
   }
 
+  /** Peek the next queue item without consuming it (used by playback prefetch). */
+  peekNext(): VideoItem | null {
+    if (!this.hasNext()) {
+      return null;
+    }
+    return this.queue[this.currentIndex + 1];
+  }
+
   /** Whether there is a previous item available */
   hasPrev(): boolean {
     return this.currentIndex - 1 >= 0;

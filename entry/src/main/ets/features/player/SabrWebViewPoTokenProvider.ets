@@ -31,6 +31,9 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider {
   private mintTimeoutStreak: number = 0;
   /** Circuit breaker: while set, getPoToken fails fast instead of re-entering a wedged WebView. */
   private mintBrokenUntilMs: number = 0;
+  /** Layer 1: BotGuard runtime pre-init state (startup warm-up). */
+  private runtimeWarmed: boolean = false;
+  private pendingWarmVisitorData: string = '';
   /** Hard cap for one mint; covers cold BotGuard init (att/get + interpreter + GenerateIT). */
   private static readonly MINT_TIMEOUT_MS: number = 30000;
   private static readonly MINT_BREAKER_MS: number = 30000;
@@ -42,6 +45,39 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider {
 
   setMinter(mint?: LocalDomMintFn): void {
     this.mint = mint;
+    if (mint && this.pendingWarmVisitorData) {
+      const visitorData = this.pendingWarmVisitorData;
+      this.pendingWarmVisitorData = '';
+      this.warmRuntime(visitorData);
+    }
+  }
+
+  /**
+   * Layer 1: pre-initialize the BotGuard runtime at app startup so the first
+   * real mint (a mid-playback SABR protected response) is only mintIdentifier.
+   * Runs OUTSIDE the shared mintPromise so a concurrent real mint is never
+   * handed a token minted for the warmup identifier.
+   */
+  warmRuntime(visitorData: string): void {
+    if (!visitorData) {
+      return;
+    }
+    if (this.runtimeWarmed) {
+      return;
+    }
+    if (!this.mint) {
+      // WebView not attached yet; setMinter will re-trigger once it is.
+      this.pendingWarmVisitorData = visitorData;
+      return;
+    }
+    this.runtimeWarmed = true;
+    logger.info('warmRuntime: BotGuard pre-init start');
+    this.mint(visitorData, '__warmup__', false).then((token: Uint8Array | undefined) => {
+      logger.info(`warmRuntime: BotGuard pre-init done ok=${!!token}`);
+    }).catch((e: Error) => {
+      this.runtimeWarmed = false;
+      logger.warn(`warmRuntime: BotGuard pre-init failed: ${e.message || e}`);
+    });
   }
 
   async getPoToken(

@@ -21,7 +21,7 @@ import {
   ContentNotSupportedException,
   ExtractionException
 } from 'youtube_core';
-import { StreamInfo, SubtitleTrack, sabrSessionStore } from 'mediaservice';
+import { StreamInfo, SubtitleTrack, sabrSessionStore, LocalMediaProxy } from 'mediaservice';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
 import { SabrWebViewPoTokenProvider } from './SabrWebViewPoTokenProvider';
@@ -38,6 +38,12 @@ export interface YouTubePlayResult {
   mediaSource?: media.MediaSource;
   error?: ErrorInfo;
   errorCode?: YouTubeErrorCode;
+}
+
+/** Layer 4 queue-prefetch cache entry. */
+interface PrefetchedPlayResult {
+  result: YouTubePlayResult;
+  fetchedAtMs: number;
 }
 
 export enum YouTubeErrorCode {
@@ -71,6 +77,21 @@ export class YouTubePlayService {
   private extractor: YouTubeExtractor | undefined = undefined;
   private context: common.UIAbilityContext;
   private isInitializing: boolean = false;
+  /** In-flight DASH PoToken mint/injection for the latest play() (P0-2).
+   * Awaited by the proxy-side startup gate, never by play() itself. */
+  private pendingDashPotPromise: Promise<void> | null = null;
+
+  /** Barrier used by the mediaservice startup gate: resolves when the pending
+   * pot injection for the most recent play() finished (or none was needed). */
+  async awaitPendingDashPoToken(): Promise<void> {
+    const pending = this.pendingDashPotPromise;
+    if (!pending) return;
+    try {
+      await pending;
+    } catch (e) {
+      // Failure is already logged at the injection site; the gate must not break playback.
+    }
+  }
 
   private constructor(context: common.UIAbilityContext) {
     this.context = context;
@@ -81,6 +102,84 @@ export class YouTubePlayService {
       YouTubePlayService.instance = new YouTubePlayService(context);
     }
     return YouTubePlayService.instance;
+  }
+
+  // ── 队列预取（Layer 4）：播放稳定后提前提取下一个视频的流，切换时零网络 ──
+  private static readonly PREFETCH_TTL_MS: number = 30 * 60 * 1000;
+  private prefetchedResults: Map<string, PrefetchedPlayResult> = new Map();
+  private prefetchInFlight: Map<string, Promise<YouTubePlayResult>> = new Map();
+  /** Extraction mutex: YouTubeExtractor is a stateful singleton — prefetch and
+   *  real playback must never extract concurrently. */
+  private extractChain: Promise<void> = Promise.resolve();
+
+  private async extractSerialized(videoId: string, attemptId: string): Promise<VideoInfo> {
+    const run: Promise<VideoInfo> = this.extractChain.then(() => {
+      if (!this.extractor) {
+        throw new Error('extractor not initialized');
+      }
+      return this.extractor.extractVideoStreams(videoId, { attemptId: attemptId });
+    });
+    this.extractChain = run.then(() => undefined).catch(() => undefined);
+    return run;
+  }
+
+  /**
+   * Fire-and-forget light extraction for an upcoming queue item. The result is
+   * consumed by takePrefetched(); misses fall back to the normal play() path.
+   */
+  prefetch(videoId: string): void {
+    if (!videoId) {
+      return;
+    }
+    const cached = this.prefetchedResults.get(videoId);
+    if (cached && Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
+      return;
+    }
+    if (this.prefetchInFlight.has(videoId)) {
+      return;
+    }
+    logger.info(`${TAG} prefetch start video=${videoId}`);
+    const task = this.play(videoId, `prefetch-${Date.now()}`);
+    this.prefetchInFlight.set(videoId, task);
+    task.then((result: YouTubePlayResult) => {
+      this.prefetchInFlight.delete(videoId);
+      if (result.success) {
+        const entry: PrefetchedPlayResult = { result: result, fetchedAtMs: Date.now() };
+        this.prefetchedResults.set(videoId, entry);
+        logger.info(`${TAG} prefetch done video=${videoId} streams=${result.playerStreams?.length || 0}`);
+      } else {
+        logger.warn(`${TAG} prefetch failed video=${videoId} code=${result.errorCode || '-'}`);
+      }
+    }).catch((e: Error) => {
+      this.prefetchInFlight.delete(videoId);
+      logger.warn(`${TAG} prefetch exception video=${videoId}: ${e.message || e}`);
+    });
+  }
+
+  /**
+   * Consume a prefetched result for videoId. A still-running prefetch is awaited
+   * (dedup) instead of starting a second extraction. undefined = nothing usable.
+   */
+  async takePrefetched(videoId: string): Promise<YouTubePlayResult | undefined> {
+    const cached = this.prefetchedResults.get(videoId);
+    if (cached) {
+      this.prefetchedResults.delete(videoId);
+      if (Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
+        logger.info(`${TAG} prefetch hit video=${videoId} age=${Date.now() - cached.fetchedAtMs}ms`);
+        return cached.result;
+      }
+    }
+    const inFlight = this.prefetchInFlight.get(videoId);
+    if (inFlight) {
+      logger.info(`${TAG} prefetch in-flight, awaiting video=${videoId}`);
+      const result = await inFlight.catch(() => undefined);
+      this.prefetchInFlight.delete(videoId);
+      if (result && result.success) {
+        logger.info(`${TAG} prefetch in-flight consumed video=${videoId}`);
+        return result;
+      }
+    }
+    return undefined;
   }
 
   async initialize(): Promise<void> {
@@ -187,9 +286,7 @@ export class YouTubePlayService {
     try {
       logger.info(`${TAG} 开始提取视频流及元数据 (包含 Player JS 和解密)...`);
       const extractStartMs = Date.now();
-      const videoInfo = await this.extractor!.extractVideoStreams(videoId, {
-        attemptId: attemptId
-      });
+      const videoInfo = await this.extractSerialized(videoId, attemptId);
       const extractElapsed = Date.now() - extractStartMs;
       logger.info(`${TAG} 提取完成 elapsed=${extractElapsed}ms streams=${videoInfo.streams.length} subtitles=${videoInfo.subtitleTracks.length} isLive=${videoInfo.isLive}`);
       if (videoInfo.streams.length === 0) {
@@ -207,49 +304,28 @@ export class YouTubePlayService {
       const hasDirectUrlStream = videoInfo.streams.some((stream: YouTubeStreamInfo) =>
         !!stream.url && stream.deliveryMethod !== 'SABR' && stream.kind !== 'sabr');
       if (hasDirectUrlStream) {
-        try {
-          await this.injectDashPoToken(videoInfo);
-        } catch (e) {
+        // P0-2 (TTFF): mint/inject the DASH PoToken in parallel with source
+        // submission instead of blocking play(). The proxy-side gate
+        // (LocalMediaProxy.setStartupUrlGate) is the barrier that guarantees
+        // pot= lands before the first upstream fetch consumes these URLs.
+        this.pendingDashPotPromise = this.injectDashPoToken(videoInfo).catch((e: Error) => {
           logger.warn(`${TAG} Dash PoToken injection failed, continuing without pot: ${String(e)}`);
-        }
+        });
       } else {
+        this.pendingDashPotPromise = null;
         logger.info(`${TAG} all playable streams are SABR; skipping Dash PoToken`);
       }
-      const playerStreams: StreamInfo[] = videoInfo.streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
-        url: stream.url,
-        isUrl: stream.isUrl,
-        itag: stream.itag,
-        hasVideo: stream.hasVideo,
-        hasAudio: stream.hasAudio,
-        kind: stream.kind || '',
-        quality: stream.qualityLabel,
-        format: stream.container,
-        audioQuality: stream.audioQuality,
-        videoQuality: stream.qualityLabel,
-        mimeType: stream.mimeType,
-        codecs: stream.codecs,
-        bitrate: stream.bitrate,
-        fps: stream.videoFps,
-        deliveryMethod: stream.deliveryMethod,
-        height: stream.height,
-        width: stream.width,
-        audioLanguage: stream.audioLanguage,
-        audioTrackId: stream.audioTrackId,
-        audioTrackName: stream.audioTrackName,
-        audioTrackType: stream.audioTrackType,
-        // DASH SegmentBase (用于生成 MPD)
-        initRangeStart: stream.initRange?.start,
-        initRangeEnd: stream.initRange?.end,
-        indexRangeStart: stream.indexRange?.start,
-        indexRangeEnd: stream.indexRange?.end,
-        contentLength: stream.contentLength,
-        approxDurationMs: stream.approxDurationMs,
-        isOtf: stream.isOtf,
-        sourceClient: stream.sourceClient,
-        sabrInfo: stream.sabrInfo,
-      }));
+      const playerStreams: StreamInfo[] = this.mapToPlayerStreams(videoInfo.streams);
 
       logger.info(`${TAG} 流摘要: video_only=${playerStreams.filter(s => s.kind === 'video_only').length} audio_only=${playerStreams.filter(s => s.kind === 'audio_only').length} progressive=${playerStreams.filter(s => s.kind === 'progressive' || s.kind === '').length} sabr=${playerStreams.filter(s => s.kind === 'sabr' || s.deliveryMethod === 'SABR').length} subtitles=${videoInfo.subtitleTracks.length}`);
+      // P0-3 (TTFF): prefetch SIDX for the most likely initial DASH tracks so
+      // the proxy session build can hit a warm cache instead of two range RTTs.
+      // Fire-and-forget; misses fall back to the demand path unchanged.
+      try {
+        LocalMediaProxy.prefetchLikelyDashSidx(playerStreams, attemptId);
+      } catch (e) {
+        logger.warn(`${TAG} sidx prefetch kick failed: ${String(e)}`);
+      }
       return {
         success: true,
         videoInfo: videoInfo,
@@ -274,6 +350,62 @@ export class YouTubePlayService {
     const result = textEncoder.encodeInto(str, buffer);
     // 只转换实际写入的部分
     return helper.encodeToStringSync(buffer.subarray(0, result.written));
+  }
+
+  /** youtube_core StreamInfo → mediaservice StreamInfo (shared by play() and
+   * the live HLS variant path). */
+  private mapToPlayerStreams(streams: YouTubeStreamInfo[]): StreamInfo[] {
+    return streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
+      url: stream.url,
+      isUrl: stream.isUrl,
+      itag: stream.itag,
+      hasVideo: stream.hasVideo,
+      hasAudio: stream.hasAudio,
+      kind: stream.kind || '',
+      quality: stream.qualityLabel,
+      format: stream.container,
+      audioQuality: stream.audioQuality,
+      videoQuality: stream.qualityLabel,
+      mimeType: stream.mimeType,
+      codecs: stream.codecs,
+      bitrate: stream.bitrate,
+      fps: stream.videoFps,
+      deliveryMethod: stream.deliveryMethod,
+      height: stream.height,
+      width: stream.width,
+      audioLanguage: stream.audioLanguage,
+      audioTrackId: stream.audioTrackId,
+      audioTrackName: stream.audioTrackName,
+      audioTrackType: stream.audioTrackType,
+      // DASH SegmentBase (用于生成 MPD)
+      initRangeStart: stream.initRange?.start,
+      initRangeEnd: stream.initRange?.end,
+      indexRangeStart: stream.indexRange?.start,
+      indexRangeEnd: stream.indexRange?.end,
+      contentLength: stream.contentLength,
+      approxDurationMs: stream.approxDurationMs,
+      isOtf: stream.isOtf,
+      sourceClient: stream.sourceClient,
+      sabrInfo: stream.sabrInfo,
+    }));
+  }
+
+  /**
+   * Live quality management: background fetch + parse of the HLS master
+   * playlist into per-variant streams. Must only be called after playback has
+   * started — it adds one manifest GET and must never sit on the TTFF path.
+   */
+  async fetchLiveHlsVariants(videoInfo: VideoInfo): Promise<StreamInfo[]> {
+    if (!videoInfo.isLive || !videoInfo.hlsUrl) return [];
+    if (!this.extractor) await this.initialize();
+    if (!this.extractor) return [];
+    try {
+      const variants = await this.extractor.fetchHlsVariantStreams(videoInfo.hlsUrl, videoInfo.videoId);
+      return this.mapToPlayerStreams(variants);
+    } catch (e) {
+      logger.warn(`${TAG} fetchLiveHlsVariants failed: ${(e as Error).message || e}`);
+      return [];
+    }
   }
 
   /** Inject pot= into DASH/progressive stream URLs (not SABR). */

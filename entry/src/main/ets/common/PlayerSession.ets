@@ -49,6 +49,8 @@ export class PlayerSession {
   private _prepareVideoId: string = '';
   private _prepareGeneration: number = -1;
   private _prepareAttemptId: string = '';
+  /** One-shot timer for the queue-next extraction prefetch (Layer 4). */
+  private _queuePrefetchTimerId: number = -1;
   private _attemptSequence: number = 0;
   /** Invalidates async extraction/source submission across a fresh external open. */
   private _playGeneration: number = 0;
@@ -408,7 +410,7 @@ export class PlayerSession {
       logger.warn(`${TAG} [STARTUP] attempt=${attemptId} stage=engine_prepare_failed error=${e.message || e}`);
     });
     this._preparePromise = Promise.all([
-      playService.play(videoId, attemptId),
+      this.consumePrefetchOrPlay(playService, videoId, attemptId),
       initTask,
       proxyTask
     ]).then((values) => ({
@@ -417,6 +419,47 @@ export class PlayerSession {
       attemptId: attemptId,
       startedAt: startedAt
     } as PreparedPlayback));
+  }
+
+  /**
+   * Layer 4: consume a prefetched extraction for this video when the queue
+   * prefetch already ran; otherwise start the normal play() extraction.
+   */
+  private async consumePrefetchOrPlay(playService: YouTubePlayService,
+    videoId: string, attemptId: string): Promise<YouTubePlayResult> {
+    const hit = await playService.takePrefetched(videoId);
+    if (hit) {
+      logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=prefetch_consume video=${videoId}`);
+      return hit;
+    }
+    return playService.play(videoId, attemptId);
+  }
+
+  /**
+   * Layer 4: once playback of the current video is stable, prefetch the next
+   * queue item's stream data on idle bandwidth. A generation/current-video
+   * check at fire time prevents prefetching after a switch.
+   */
+  private scheduleQueuePrefetch(currentVideoId: string): void {
+    if (this._queuePrefetchTimerId >= 0) {
+      clearTimeout(this._queuePrefetchTimerId);
+      this._queuePrefetchTimerId = -1;
+    }
+    const generation = this._playGeneration;
+    this._queuePrefetchTimerId = setTimeout(() => {
+      this._queuePrefetchTimerId = -1;
+      if (generation !== this._playGeneration || this._currentVideo?.videoId !== currentVideoId) {
+        return;
+      }
+      if (!this._controller.vm.isPlaying) {
+        return;
+      }
+      const next = PlayQueueManager.getInstance().peekNext();
+      if (next?.videoId && next.videoId !== currentVideoId) {
+        logger.info(`${TAG} queue prefetch kick next=${next.videoId}`);
+        YouTubePlayService.getInstance(this._context).prefetch(next.videoId);
+      }
+    }, 6000);
   }
 
   // ──── 播放控制 ────
@@ -624,9 +667,15 @@ export class PlayerSession {
         this._submittedVideoId = videoId;
         this._cachedVideoSource = videoSource;
         this.notifyPlaybackSourceChanged(videoSource, 'source-ready');
+        // Live quality management: parse HLS variants in the background and
+        // merge them into the quality list once ready. Playback never waits.
+        if (videoSource.isLive && videoSource.hlsUrl) {
+          this.fetchLiveVariantsInBackground(playService, result.videoInfo);
+        }
         logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=source_submitted elapsed=${Date.now() - prepared.startedAt}ms`);
         this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
         this.startWatchSaveTimer();
+        this.scheduleQueuePrefetch(videoId);
         return videoSource;
       } else {
         logger.error(`${TAG} play() failed: ${result.error}`);
@@ -653,6 +702,22 @@ export class PlayerSession {
       return '0';
     }
     return count.toLocaleString();
+  }
+
+  /** Live quality: background-parse HLS master variants and merge them into
+   * the controller quality list. Fire-and-forget; playback never waits. */
+  private fetchLiveVariantsInBackground(playService: YouTubePlayService, videoInfo: VideoInfo): void {
+    const videoId = videoInfo.videoId;
+    const startedAt = Date.now();
+    playService.fetchLiveHlsVariants(videoInfo).then((variants) => {
+      if (variants.length === 0 || this._currentVideo?.videoId !== videoId) {
+        return;
+      }
+      logger.info(`${TAG} live HLS variants ready video=${videoId} count=${variants.length} elapsed=${Date.now() - startedAt}ms`);
+      this._controller.addLiveHlsVariants(variants);
+    }).catch((e: Error) => {
+      logger.warn(`${TAG} live HLS variants failed video=${videoId}: ${e.message || e}`);
+    });
   }
 
   private fetchPlaybackExtrasInBackground(playService: YouTubePlayService, videoInfo: VideoInfo): void {
@@ -850,6 +915,10 @@ export class PlayerSession {
     this._prepareVideoId = '';
     this._prepareGeneration = -1;
     this._prepareAttemptId = '';
+    if (this._queuePrefetchTimerId >= 0) {
+      clearTimeout(this._queuePrefetchTimerId);
+      this._queuePrefetchTimerId = -1;
+    }
     this._submittedVideoId = '';
     this._cachedVideoSource = null;
     this._lastPlayError = null;

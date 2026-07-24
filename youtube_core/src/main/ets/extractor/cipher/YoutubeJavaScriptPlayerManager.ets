@@ -4,6 +4,7 @@ import { common } from '@kit.AbilityKit';
 import { YTCoreLogger } from '../../common/YTCoreLogger';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 import { PipePipeApiDecoder, PlayerMetadata, SolveResult } from './PipePipeApiDecoder';
+import { WebClientVersionResolver } from '../../common/WebClientVersionResolver';
 
 const logger = YTCoreLogger.getInstance('YoutubeJavaScriptPlayerManager');
 
@@ -31,6 +32,10 @@ interface CipherDiskCache {
   playerJsUrl: string;
   preprocessedPlayer: string;
   validatedAt: number;
+  /** Layer 0: startup playback metadata persisted beside the player JS so a
+   *  cold start can POST /player without any watch/sw.js round trip first. */
+  signatureTimestamp?: number;
+  webClientVersion?: string;
 }
 
 export enum LocalCipherState {
@@ -47,6 +52,9 @@ export class YoutubeJavaScriptPlayerManager {
   private static readonly RETRY_DELAYS_MS: number[] = [5000, 30000];
   private static readonly PREWARM_VIDEO_ID: string = 'jNQXAC9IVRw';
   private static readonly CACHE_VERSION: number = 1;
+  /** Layer 0: how long disk-persisted STS/clientVersion may be trusted before
+   *  the background watch verify must confirm them again. */
+  private static readonly STARTUP_META_TTL_MS: number = 6 * 60 * 60 * 1000;
   private static prepared: Set<string> = new Set();
   private static preparing: Map<string, Promise<boolean>> = new Map();
   private static failedUntil: Map<string, number> = new Map();
@@ -54,6 +62,13 @@ export class YoutubeJavaScriptPlayerManager {
   private static failureCounts: Map<string, number> = new Map();
   private static cachePath: string = '';
   private static prewarmPromise: Promise<boolean> | undefined = undefined;
+  /** visitorData parsed from the prewarm watch page; consumed by the PoToken
+   *  runtime warm-up so BotGuard init happens at app start, not mid-playback. */
+  private static prewarmedVisitorData: string = '';
+
+  static getPrewarmedVisitorData(): string {
+    return YoutubeJavaScriptPlayerManager.prewarmedVisitorData;
+  }
 
   /**
    * Query system Secure Shield (坚盾守护) via Device Security Kit.
@@ -86,6 +101,45 @@ export class YoutubeJavaScriptPlayerManager {
 
   private static async prewarm(client: YouTubeHttpClient): Promise<boolean> {
     const startedAt = Date.now();
+    // Layer 0 fast path: fresh disk meta → inject STS/clientVersion and prepare the
+    // JSVM straight from disk, so the first extraction can POST /player without
+    // waiting for any watch/sw.js fetch. A background watch fetch still verifies
+    // (and captures visitorData for the PoToken warm-up); staleness is covered
+    // by the extractor's forceFreshPlayerMetadata retry.
+    const disk = YoutubeJavaScriptPlayerManager.readDiskCache();
+    if (disk && (disk.signatureTimestamp ?? 0) > 0
+      && Date.now() - disk.validatedAt < YoutubeJavaScriptPlayerManager.STARTUP_META_TTL_MS) {
+      try {
+        PipePipeApiDecoder.setLocalMetadata({
+          playerId: disk.playerId,
+          signatureTimestamp: disk.signatureTimestamp ?? 0
+        });
+        if (disk.webClientVersion && disk.webClientVersion.length > 0) {
+          WebClientVersionResolver.setCached(disk.webClientVersion);
+        }
+        const prepared = await cipher.preparePlayer(disk.playerId, disk.preprocessedPlayer) as NativePrepareResult;
+        if (prepared.prepared) {
+          YoutubeJavaScriptPlayerManager.prepared.add(disk.playerId);
+          YoutubeJavaScriptPlayerManager.setReady(disk.playerId, 'disk');
+          logger.info(`[CipherWarmup] stage=ready source=DISK_META player=${disk.playerId} `
+            + `sts=${disk.signatureTimestamp} elapsed=${Date.now() - startedAt}ms`);
+          YoutubeJavaScriptPlayerManager.prewarmFromNetwork(client).then((ok: boolean) => {
+            logger.info(`[CipherWarmup] stage=background_verify ok=${ok}`);
+          }).catch((e: Error) => {
+            logger.warn('[CipherWarmup] background verify failed', e);
+          });
+          return true;
+        }
+        logger.warn('[CipherWarmup] native rejected disk meta player, falling back to network');
+      } catch (e) {
+        logger.warn('[CipherWarmup] disk meta fast path failed, falling back to network', e);
+      }
+    }
+    return YoutubeJavaScriptPlayerManager.prewarmFromNetwork(client);
+  }
+
+  private static async prewarmFromNetwork(client: YouTubeHttpClient): Promise<boolean> {
+    const startedAt = Date.now();
     try {
       const url = `https://www.youtube.com/watch?v=${YoutubeJavaScriptPlayerManager.PREWARM_VIDEO_ID}`
         + '&bpctr=9999999999&has_verified=1&hl=en';
@@ -103,11 +157,19 @@ export class YoutubeJavaScriptPlayerManager {
       const playerId = idMatch[1];
       const stsMatch = /"STS"\s*:\s*(\d+)/.exec(html);
       const signatureTimestamp = stsMatch?.[1] ? parseInt(stsMatch[1], 10) : 0;
+      const vdMatch = /"visitorData"\s*:\s*"([^"]+)"/.exec(html);
+      if (vdMatch?.[1]) {
+        YoutubeJavaScriptPlayerManager.prewarmedVisitorData = vdMatch[1];
+        logger.info('[CipherWarmup] stage=visitorData captured');
+      }
       if (signatureTimestamp > 0) {
         PipePipeApiDecoder.setLocalMetadata({
           playerId: playerId,
           signatureTimestamp: signatureTimestamp
         });
+        // Layer 0: persist STS (+ whatever clientVersion is known) next to the
+        // player JS so the next cold start can take the disk fast path.
+        YoutubeJavaScriptPlayerManager.persistStartupMeta(signatureTimestamp, true);
         logger.info(`[CipherWarmup] stage=metadata player=${playerId} sts=${signatureTimestamp}`);
       }
 
@@ -146,12 +208,15 @@ export class YoutubeJavaScriptPlayerManager {
     preprocessedPlayer: string): void {
     if (!YoutubeJavaScriptPlayerManager.cachePath) return;
     try {
+      const meta = PipePipeApiDecoder.peekCachedMetadata();
       const cache: CipherDiskCache = {
         version: YoutubeJavaScriptPlayerManager.CACHE_VERSION,
         playerId: playerId,
         playerJsUrl: playerJsUrl,
         preprocessedPlayer: preprocessedPlayer,
-        validatedAt: Date.now()
+        validatedAt: Date.now(),
+        signatureTimestamp: meta?.signatureTimestamp ?? 0,
+        webClientVersion: WebClientVersionResolver.peekCached()
       };
       const file = fs.openSync(YoutubeJavaScriptPlayerManager.cachePath,
         fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
@@ -159,6 +224,35 @@ export class YoutubeJavaScriptPlayerManager {
       fs.closeSync(file);
     } catch (e) {
       logger.warn(`[CipherWarmup] stage=cache_write_failed player=${playerId}`, e);
+    }
+  }
+
+  /**
+   * Layer 0: read-modify-write the cipher disk cache to refresh startup playback
+   * metadata (STS + WEB clientVersion) without touching the player payload.
+   * markValidated is set only after a fresh watch fetch verified the player.
+   */
+  static persistStartupMeta(signatureTimestamp: number, markValidated: boolean): void {
+    if (!YoutubeJavaScriptPlayerManager.cachePath) return;
+    try {
+      const existing = YoutubeJavaScriptPlayerManager.readDiskCache();
+      if (!existing) return;
+      const next: CipherDiskCache = {
+        version: existing.version,
+        playerId: existing.playerId,
+        playerJsUrl: existing.playerJsUrl,
+        preprocessedPlayer: existing.preprocessedPlayer,
+        validatedAt: markValidated ? Date.now() : existing.validatedAt,
+        signatureTimestamp: signatureTimestamp > 0
+          ? signatureTimestamp : (existing.signatureTimestamp ?? 0),
+        webClientVersion: WebClientVersionResolver.peekCached() || existing.webClientVersion
+      };
+      const file = fs.openSync(YoutubeJavaScriptPlayerManager.cachePath,
+        fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+      fs.writeSync(file.fd, JSON.stringify(next));
+      fs.closeSync(file);
+    } catch (e) {
+      logger.warn('[CipherWarmup] stage=meta_persist_failed', e);
     }
   }
 
