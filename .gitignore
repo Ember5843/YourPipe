@@ -1,4 +1,4 @@
-﻿/node_modules
+/node_modules
 /oh_modules
 /local.properties
 /.idea
@@ -22,9 +22,11 @@ YT_DECODER_SERVICE.md
 .deveco/plans/
 
 # AI platform configs (local-only, not shared)
+.agents/
 .claude/
 .codex/
 .cursor/
+.kimi-code/
 .opencode/
 .trae/
 

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Reusable player N-API bridge for OHOS.
  *
  * The public ArkTS API and native module name stay compatible with the
