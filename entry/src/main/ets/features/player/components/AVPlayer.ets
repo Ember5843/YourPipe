@@ -1716,7 +1716,9 @@ export struct VideoPlayer {
         .width(CONTROL_SLOT_SIZE)
         .height(CONTROL_SLOT_SIZE)
         .onClick(() => {
-          PlayerSession.getInstance().release();
+          // Explicit close button: force teardown so the page pop never leaves
+          // an invisible dangling playback session behind.
+          PlayerSession.getInstance().release(true);
           this.actionHub.closePage();
         })
 

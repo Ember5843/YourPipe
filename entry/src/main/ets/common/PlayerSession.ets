@@ -74,8 +74,6 @@ export class PlayerSession {
   /** release() 时调用，用于停止 PiP（避免循环 import，由 PiPManager 注入） */
   onStopPiP: (() => Promise<void>) | null = null;
 
-  /** PlayerSession 被 release 销毁时由外部（Index.ets）设置的回调，用于清理 NavStack */
-  onSessionReleased?: () => void;
   private playbackExtrasListeners: Set<(source: VideoData) => void> = new Set();
 
   subscribePlaybackExtras(listener: (source: VideoData) => void): void {
@@ -480,7 +478,11 @@ export class PlayerSession {
       this.saveWatchHistory();
       this.stopWatchSaveTimer();
       logger.info(`${TAG} media switch ${this._currentVideo.videoId} -> ${videoId}`);
-      this.resetSession(true, false);
+      // Preserve PiP flags when switching media inside an active PiP session
+      // (PiP panel NEXT/PREV or in-page queue switch): the system PiP window is
+      // still showing, so clearing isPiPActive here would desync presentation,
+      // play/pause sync and destroy() guards from the real window state.
+      this.resetSession(true, false, this._isPiPActive);
     }
 
     if (this._currentVideo?.videoId === video.videoId
@@ -762,7 +764,13 @@ export class PlayerSession {
 
   // ──── 生命周期 ────
 
-  release(): void {
+  /**
+   * @param force explicit user exits (back key / page close button) pass true:
+   *   the PiP retain guard exists only to protect passive page tear-down during
+   *   system PiP restore/handoff; a deliberate exit must always tear down media,
+   *   otherwise the page pops while playback continues invisibly (dangling player).
+   */
+  release(force: boolean = false): void {
     if (this._controller.playerState === PlayerState.RELEASED) return;
     if (this._controller.playerState === PlayerState.IDLE && !this._currentVideo && !this._preparePromise) {
       this._explicitPageCloseHandled = true;
@@ -770,7 +778,7 @@ export class PlayerSession {
       return;
     }
     // Safety: never tear down media/queue while PiP restore/handoff owns the page.
-    if (this.shouldRetainMediaOnPageDisappear()) {
+    if (!force && this.shouldRetainMediaOnPageDisappear()) {
       logger.warn(`${TAG} release() ignored during PiP handoff/restore`);
       return;
     }
@@ -825,8 +833,12 @@ export class PlayerSession {
    * @param preserveAudioOnly when true, keep isAudioOnlyMode and re-apply
    *   video-off on the new controller (used by play/ensureInitialized).
    *   forceReset/release always pass false.
+   * @param preservePiP when true, keep the PiP ownership flags (isPiPActive /
+   *   handoff / restoring). Only play() media switches inside an active PiP
+   *   session pass true; every teardown path (release/closeForNavigation/
+   *   forceReset) must clear them.
    */
-  private resetSession(preserveAudioOnly: boolean = false, clearSurface: boolean = false): void {
+  private resetSession(preserveAudioOnly: boolean = false, clearSurface: boolean = false, preservePiP: boolean = false): void {
     this._playGeneration++;
     const keepAudioOnly = preserveAudioOnly && this._isAudioOnlyMode;
     this._controller.closeMediaSession(clearSurface);
@@ -843,14 +855,16 @@ export class PlayerSession {
     this._lastPlayError = null;
     this._activeExtrasVideoId = '';
     this._cachedChannelProfiles.clear();
-    // 清 PiP 标志与占位层，避免 reset 后残留「画中画运行中」或误判 isPiPActive。
-    this._pipHandoffPending = false;
-    this._pipRestoring = false;
-    this._isPiPActive = false;
-    AppStorage.setOrCreate('isPipHandoffPending', false);
-    AppStorage.setOrCreate('isPipRestoring', false);
-    AppStorage.setOrCreate('isPiPActive', false);
-    AppStorage.setOrCreate('showPipPlaceholder', false);
+    if (!preservePiP) {
+      // 清 PiP 标志与占位层，避免 reset 后残留「画中画运行中」或误判 isPiPActive。
+      this._pipHandoffPending = false;
+      this._pipRestoring = false;
+      this._isPiPActive = false;
+      AppStorage.setOrCreate('isPipHandoffPending', false);
+      AppStorage.setOrCreate('isPipRestoring', false);
+      AppStorage.setOrCreate('isPiPActive', false);
+      AppStorage.setOrCreate('showPipPlaceholder', false);
+    }
     if (!keepAudioOnly) {
       this.clearAudioOnlyMode();
     }

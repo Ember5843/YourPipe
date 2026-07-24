@@ -48,7 +48,11 @@ export class PiPManager {
   private hasPlaybackState: boolean = false;
   private lastIsPlaying: boolean = false;
   private desiredAutoStart: boolean = false;
-  private suppressNextStopAction: boolean = false;
+  /** Instance-scoped suppression: only a STOPPED from this intentionally-destroyed
+   *  controller may be swallowed, and only until its stopPiP() settles. Prevents
+   *  the flag from leaking into the next controller generation (which previously
+   *  swallowed a legitimate restore STOPPED and broke the surface rebind). */
+  private suppressStopFor: PiPWindow.PiPController | null = null;
   private pendingRestoreComponentController: XComponentController | null = null;
   private restoreWatchdogTimerId: number = -1;
   private restoreStopped: boolean = false;
@@ -241,17 +245,22 @@ export class PiPManager {
         // 还回主页。提前 unmount 占位层让主页 XComponent 露出，与系统缩放动画
         // 同步过渡；否则要等到 STOPPED 才 unmount，悬浮窗已消失而占位层还在，
         // 会出现"先黑屏闪一下再露画面"。
+        // End the enter-handoff HERE, not in page aboutToDisappear: the system
+        // keeps the popped PlayerPage alive across the whole PiP lifetime (it is
+        // needed for restore), so pipHandoffPending would still be true when the
+        // delete branch below calls session.release() — the retain guard would
+        // swallow it and leave a dangling player after the PiP window closes.
+        session.completePipHandoff();
         // Closing the PiP panel is equivalent to destroying the playback page.
         // Stop MPV before WMS destroys the PiP surface; waiting until STOPPED
         // leaves gpu-next rendering into a dead swapchain and produces
         // VK_ERROR_SURFACE_LOST_KHR. Restore keeps rendering for hand-back.
-        // Restore hand-back must never release media/queue even if reason text
-        // is ambiguous on some devices (ABOUT_TO_RESTORE may already be set).
-        if (this.isRestoreInProgress(session) || this.isRestoreReason(reason)) {
-          logger.info(`${TAG} ABOUT_TO_STOP restore path reason=${reason}; retain media`);
-          session.setPiPActive(false);
-          break;
-        }
+        // DELETE MUST BE CHECKED FIRST: a delete reason is unambiguous user-close
+        // and can never be part of a restore sequence. Restore flags may be stale
+        // (on devices where the restored page never re-fires aboutToAppear/
+        // onPageShow, completePageRestore is only reached via the 8s watchdog);
+        // letting isRestoreInProgress win here would swallow the close and leave
+        // a dangling player — exactly the "restore → PiP again → close" bug.
         if (this.isDeleteReason(reason)) {
           logger.info(`${TAG} ABOUT_TO_STOP via ${reason}, release session before surface teardown`);
           // This controller belongs to the playback page that is being closed.
@@ -267,8 +276,19 @@ export class PiPManager {
           this.clearRestoreWatchdog();
           session.setPipRestoring(false);
           session.setPiPActive(false);
-          session.release();
+          // Force: closing the PiP window is an explicit teardown of playback,
+          // the retain guard must never veto it (dangling player otherwise).
+          session.release(true);
           PlayerPresentation.onPipStopped(false);
+          session.setPiPActive(false);
+          break;
+        }
+        // Restore hand-back must never release media/queue even if reason text
+        // is ambiguous on some devices (ABOUT_TO_RESTORE may already be set).
+        if (this.isRestoreInProgress(session) || this.isRestoreReason(reason)) {
+          logger.info(`${TAG} ABOUT_TO_STOP restore path reason=${reason}; retain media`);
+          session.setPiPActive(false);
+          break;
         }
         session.setPiPActive(false);
         break;
@@ -291,10 +311,27 @@ export class PiPManager {
         // panelActionRestore / restore flags：恢复到播放页，跳过清理。
         // requestDelete：用户主动关闭 PiP → release。
         // 其它原因：仅在非 restore 时关闭媒体；误判会清空 ADHOC 队列并杀死引擎。
-        if (this.suppressNextStopAction) {
-          this.suppressNextStopAction = false;
+        if (this.suppressStopFor) {
+          this.suppressStopFor = null;
           PlayerPresentation.onPipStopped(false);
           logger.info(`${TAG} STOPPED ignored: old PiP was intentionally replaced`);
+        } else if (this.isDeleteReason(reason)) {
+          // Delete first (same rule as ABOUT_TO_STOP): unambiguous user-close
+          // must win over possibly-stale restore flags.
+          logger.info(`${TAG} STOPPED via ${reason}, release session + destroy pipController`);
+          PlayerPresentation.onPipStopped(false);
+          this.isRestoring = false;
+          this.restoreStopped = false;
+          this.clearRestoreWatchdog();
+          session.setPipRestoring(false);
+          // Force: same explicit-teardown semantics as the ABOUT_TO_STOP delete
+          // branch (this is the fallback when ABOUT_TO_STOP was never delivered).
+          session.release(true);
+          // 销毁 PiPController 本身：它持有已销毁播放页的旧 XComponentController，
+          // 若残留，下次播新视频 init() 会复用它，导致系统重绑 surface 失败
+          // (SetXComponentController: swap xComponent failed / OnInitXComponentController failed)。
+          // destroy 后 isInitialized=false，下次 init 重建绑定新 XComponentController 的干净控制器。
+          this.destroy();
         } else if (this.isRestoreInProgress(session) || this.isRestoreReason(reason)) {
           logger.info(`${TAG} STOPPED restore path reason=${reason}; retain media/queue`);
           this.isRestoring = true;
@@ -302,19 +339,6 @@ export class PiPManager {
           PlayerPresentation.onPipStopped(true);
           this.restoreStopped = true;
           this.finishRestoreRebind();
-        } else if (this.isDeleteReason(reason)) {
-          logger.info(`${TAG} STOPPED via ${reason}, release session + destroy pipController`);
-          PlayerPresentation.onPipStopped(false);
-          this.isRestoring = false;
-          this.restoreStopped = false;
-          this.clearRestoreWatchdog();
-          session.setPipRestoring(false);
-          session.release();
-          // 销毁 PiPController 本身：它持有已销毁播放页的旧 XComponentController，
-          // 若残留，下次播新视频 init() 会复用它，导致系统重绑 surface 失败
-          // (SetXComponentController: swap xComponent failed / OnInitXComponentController failed)。
-          // destroy 后 isInitialized=false，下次 init 重建绑定新 XComponentController 的干净控制器。
-          this.destroy();
         } else {
           PlayerPresentation.onPipStopped(false);
           this.handleDefaultPipStop();
@@ -534,11 +558,28 @@ export class PiPManager {
     // app 侧控制器没了但系统悬浮窗还在，成为孤儿窗口导致状态错乱。
     const ctrl = this.pipController;
     if (ctrl) {
-      this.suppressNextStopAction = PlayerSession.getInstance().isPiPActive;
+      // Scope suppression to this controller instance: it covers a STOPPED that was
+      // already queued before unregisterCallbacks() below takes effect, and it is
+      // released as soon as stopPiP() settles. It must never leak into the next
+      // controller generation (a stale flag previously swallowed a legitimate
+      // restore STOPPED and permanently broke the PiP surface rebind).
+      this.suppressStopFor = ctrl;
       ctrl.stopPiP().catch((e: Error) => {
-        this.suppressNextStopAction = false;
         logger.warn(`${TAG} stopPiP during destroy failed: ${e.message}`);
+      }).finally(() => {
+        if (this.suppressStopFor === ctrl) {
+          this.suppressStopFor = null;
+        }
       });
+      // Safety net: if the stopPiP() promise never settles (system hang), the
+      // suppression must still expire — a stuck flag would swallow the next
+      // controller's legitimate STOPPED and recreate the dangling-player bug.
+      setTimeout(() => {
+        if (this.suppressStopFor === ctrl) {
+          this.suppressStopFor = null;
+          logger.warn(`${TAG} suppress expired by timeout: stopPiP never settled`);
+        }
+      }, 3000);
     }
     this.unregisterCallbacks();
     this.pipController = null;
@@ -564,6 +605,16 @@ export class PiPManager {
    * so a later real navigation can closeForNavigation normally.
    */
   completePageRestore(): void {
+    // Fallback: if the restore STOPPED never arrived (or was consumed elsewhere),
+    // the new page surface is still parked in pendingRestoreComponentController and
+    // finishRestoreRebind() would wait forever. The page has finished attach, so
+    // force the rebind now; otherwise pipController stays bound to a dead surface
+    // and the next back→PiP startPiP() fails on a stale XComponent.
+    if (this.pendingRestoreComponentController) {
+      logger.warn(`${TAG} restore STOPPED missing; forcing PiP rebind on page restore complete`);
+      this.restoreStopped = true;
+      this.finishRestoreRebind();
+    }
     this.isRestoring = false;
     this.restoreStopped = false;
     this.clearRestoreWatchdog();
@@ -628,8 +679,10 @@ export class PiPManager {
       logger.info(`${TAG} default PiP stop skipped: restore in progress`);
       return;
     }
+    // PiP is gone and this was not a restore: keeping media alive without any
+    // window or surface is exactly the dangling-player state. Force teardown.
     logger.info(`${TAG} default PiP stop -> close media session`);
-    session.release();
+    session.release(true);
   }
 
   private isRestoreInProgress(session: PlayerSession): boolean {

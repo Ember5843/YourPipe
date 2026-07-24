@@ -1244,9 +1244,10 @@ struct Index {
     // the exception: its controller is bound to the old page's XComponent.
     const session = PlayerSession.getInstance();
     AppStorage.setOrCreate('playerLoading', true);
-    if (session.isPiPActive) {
-      PiPManager.getInstance().destroy();
-    }
+    // Unconditional PiP teardown: destroy() is idempotent when no controller
+    // exists, and guarding on isPiPActive misses mid-restore / handoff states
+    // (isPiPActive is already false there) or a flag desynced by a media switch.
+    PiPManager.getInstance().destroy();
     // Every navigation initiated outside the player is a fresh media session,
     // including reopening the same video. Never reuse an old extracted URL,
     // active extraction Promise, proxy session, MPV source, or cached VideoData.
@@ -1728,7 +1729,7 @@ struct Index {
             });
             return true;
           }
-          session.release();
+          session.release(true);
           this.navPathStack.pop();
           return true;
         }

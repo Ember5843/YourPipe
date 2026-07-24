@@ -4,6 +4,12 @@ import { PreferencesStore } from './PreferencesStore';
 const logger = AppLog.getInstance('WatchHistoryStore');
 const APP_STORAGE_KEY = 'watchHistory';
 
+/** mergeRemoteHistory 内部使用：远端条目 + 是否为本地已知锚点。 */
+interface HistoryMergeEntry {
+  item: WatchHistoryItem;
+  isAnchor: boolean;
+}
+
 export interface WatchHistoryItem {
   videoId: string;       // YouTube 视频 ID（唯一键）
   title: string;         // 视频标题
@@ -165,10 +171,16 @@ export class WatchHistoryStore {
   }
 
   /**
-   * 单向合并云端历史：
-   * - 已有本地条目：保留 lastWatchedAt / progress / duration，只补全元数据
-   * - 仅云端有的条目：按云端列表顺序（最新在前）从 now 递减赋时间戳，保证最新在顶部
-   * - 最终按 lastWatchedAt 降序；已见过的条目时间戳不变，重复同步不会乱序冲顶
+   * 单向合并云端历史（FEhistory 最新在前，但无真实时间戳）：
+   * - 已有本地条目：保留 lastWatchedAt / progress / duration，只补全元数据，
+   *   并作为时间「锚点」；
+   * - 仅云端有的条目：不再一律按 now 赋时（那会每次同步都把整页云端历史
+   *   冲顶），而是利用远端列表顺序在相邻锚点之间线性插值：
+   *     · 位于两个锚点之间 → 取区间内递减插值，保持云端相对顺序且不会
+   *       越过本地真正更新的记录；
+   *     · 位于所有锚点之前（比本地任何记录都新）→ 从 now 递减，本就该置顶；
+   *     · 位于所有锚点之后 → 从最旧锚点继续往下递减，沉到正确位置。
+   * - 重复同步幂等：锚点时间戳不变，新条目插值结果稳定，不再乱序冲顶。
    */
   static mergeRemoteHistory(remote: WatchHistoryItem[]): void {
     if (!remote || remote.length === 0) {
@@ -179,14 +191,13 @@ export class WatchHistoryStore {
     local.forEach((item) => {
       localMap[item.videoId] = item;
     });
-    const merged: WatchHistoryItem[] = [];
-    const seen: Record<string, boolean> = {};
-    const now = Date.now();
-    // FEhistory 为最新在前；仅对新条目按序递减赋时（间隔 1 分钟），最新在顶部。
-    // 不要压到「比本地最旧还更旧」——那会把整页云端历史沉到列表底部。
-    const newBase = now;
-    let newIndex = 0;
 
+    const now = Date.now();
+    const seen: Record<string, boolean> = {};
+    const MERGE_GAP_MS = 60_000;
+
+    // 1) 去重远端列表，区分锚点（本地已知）与新条目，保持远端最新在前的顺序。
+    const entries: HistoryMergeEntry[] = [];
     remote.forEach((item) => {
       const id = (item.videoId || '').trim();
       if (!id || seen[id]) {
@@ -195,37 +206,74 @@ export class WatchHistoryStore {
       seen[id] = true;
       const prev = localMap[id];
       if (prev) {
-        const next: WatchHistoryItem = {
-          videoId: id,
-          title: (item.title && item.title.length > 0) ? item.title : prev.title,
-          author: (item.author && item.author.length > 0) ? item.author : prev.author,
-          thumbnailUrl: (item.thumbnailUrl && item.thumbnailUrl.length > 0) ? item.thumbnailUrl : prev.thumbnailUrl,
-          durationSec: prev.durationSec > 0 ? prev.durationSec : (item.durationSec || 0),
-          progressSec: prev.progressSec,
-          lastWatchedAt: prev.lastWatchedAt > 0 ? prev.lastWatchedAt : (item.lastWatchedAt || now),
-          channelId: prev.channelId || item.channelId || '',
-          channelAvatarUrl: prev.channelAvatarUrl || item.channelAvatarUrl || '',
-          channelHandle: prev.channelHandle || item.channelHandle || ''
-        };
-        merged.push(next);
+        entries.push({
+          item: {
+            videoId: id,
+            title: (item.title && item.title.length > 0) ? item.title : prev.title,
+            author: (item.author && item.author.length > 0) ? item.author : prev.author,
+            thumbnailUrl: (item.thumbnailUrl && item.thumbnailUrl.length > 0) ? item.thumbnailUrl : prev.thumbnailUrl,
+            durationSec: prev.durationSec > 0 ? prev.durationSec : (item.durationSec || 0),
+            progressSec: prev.progressSec,
+            lastWatchedAt: prev.lastWatchedAt > 0 ? prev.lastWatchedAt : (item.lastWatchedAt || now),
+            channelId: prev.channelId || item.channelId || '',
+            channelAvatarUrl: prev.channelAvatarUrl || item.channelAvatarUrl || '',
+            channelHandle: prev.channelHandle || item.channelHandle || ''
+          },
+          isAnchor: true
+        });
       } else {
-        const next: WatchHistoryItem = {
-          videoId: id,
-          title: item.title || id,
-          author: item.author || '',
-          thumbnailUrl: item.thumbnailUrl || '',
-          durationSec: item.durationSec || 0,
-          progressSec: 0,
-          lastWatchedAt: newBase - newIndex * 60_000,
-          channelId: item.channelId || '',
-          channelAvatarUrl: item.channelAvatarUrl || '',
-          channelHandle: item.channelHandle || ''
-        };
-        newIndex += 1;
-        merged.push(next);
+        entries.push({
+          item: {
+            videoId: id,
+            title: item.title || id,
+            author: item.author || '',
+            thumbnailUrl: item.thumbnailUrl || '',
+            durationSec: item.durationSec || 0,
+            progressSec: 0,
+            lastWatchedAt: 0,
+            channelId: item.channelId || '',
+            channelAvatarUrl: item.channelAvatarUrl || '',
+            channelHandle: item.channelHandle || ''
+          },
+          isAnchor: false
+        });
       }
     });
 
+    // 2) 按连续段为新条目赋插值时间戳。
+    let i = 0;
+    while (i < entries.length) {
+      if (entries[i].isAnchor) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < entries.length && !entries[j].isAnchor) {
+        j++;
+      }
+      const newerIdx = i - 1;
+      const olderIdx = j < entries.length ? j : -1;
+      const newerTs = newerIdx >= 0 ? entries[newerIdx].item.lastWatchedAt : -1;
+      const olderTs = olderIdx >= 0 ? entries[olderIdx].item.lastWatchedAt : -1;
+      for (let k = i; k < j; k++) {
+        const offset = k - i + 1;
+        let ts: number;
+        if (newerTs > 0 && olderTs > 0 && newerTs > olderTs) {
+          // 两个锚点之间线性插值（保持单调递减，不会越过任一锚点）。
+          ts = newerTs - Math.floor((newerTs - olderTs) * offset / (j - i + 1));
+        } else if (newerTs > 0) {
+          // 最旧锚点之下：继续向下递减。
+          ts = newerTs - offset * MERGE_GAP_MS;
+        } else {
+          // 所有锚点之上（比本地任何记录都新）：从 now 递减置顶。
+          ts = now - k * MERGE_GAP_MS;
+        }
+        entries[k].item.lastWatchedAt = Math.max(1, ts);
+      }
+      i = j;
+    }
+
+    const merged: WatchHistoryItem[] = entries.map((entry) => entry.item);
     local.forEach((item) => {
       if (!seen[item.videoId]) {
         merged.push(item);
