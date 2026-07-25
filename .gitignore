@@ -14,10 +14,6 @@
 
 # Documents & configs (not part of app code)
 CLAUDE.md
-DASH_SEEK_FIX.md
-MPV_SETTINGS_IMPLEMENTATION.md
-YT_DECODER_SERVICE.md
-课程报告大纲.md
 .mcp.json
 .deveco/plans/
 
@@ -64,16 +60,13 @@ keys/
 # Machine-local signing material (never commit)
 /signing-backup/
 
-# Local research/capture working files (never commit)
+# Local research/capture/scratch notes (never commit)
 /wb-req/
 /backups/
+/youtube-research/
 /audio-only-log.txt
 /runlog-*.txt
+/*-analysis.md
+/*-design.md
 /youtube-network-capture.json
 /yt-browser-*.json
-/youtube-browser-cache-analysis.md
-/youtube-startup-analysis.md
-/youtube-startup-analysis.md
-/startup-prefetch-design.md
-/video-switch-flow-analysis.md
-/youtube-research/
