@@ -15,6 +15,7 @@ import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { image } from '@kit.ImageKit';
 import { PlaybackEngineState } from '../engine/PlaybackEngine';
+import { HttpDownloader } from 'youtube_core';
 
 const TAG = '[AvSessionManager]';
 
@@ -243,12 +244,14 @@ export class AvSessionManager {
   private async downloadThumbnailPixelMap(url: string): Promise<image.PixelMap | undefined> {
     try {
       const req = http.createHttp();
-      const resp = await req.request(url, {
+      const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
         connectTimeout: 8000,
         readTimeout: 10000,
-      });
+      };
+      HttpDownloader.applyProxyToOptions(options, url);
+      const resp = await req.request(url, options);
       req.destroy();
       if (resp.responseCode !== 200 || !resp.result) {
         Logger.warn(TAG, `downloadThumbnailPixelMap: HTTP ${resp.responseCode}`);

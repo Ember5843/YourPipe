@@ -130,7 +130,7 @@
         },
         {
             "name": "yt_option_log_subtitle",
-            "value": "查看最近运行记录"
+            "value": "查看运行记录"
         },
         {
             "name": "yt_log_title",
@@ -142,7 +142,7 @@
         },
         {
             "name": "yt_log_enable_subtitle",
-            "value": "启动后将捕获应用运行日志"
+            "value": "启动后记录运行日志"
         },
         {
             "name": "yt_log_disabled_hint",
@@ -182,7 +182,7 @@
         },
         {
             "name": "yt_option_about_subtitle",
-            "value": "版本与致谢信息"
+            "value": "版本与致谢"
         },
         {
             "name": "yt_option_in_development",
@@ -389,8 +389,8 @@
             "value": "最高画质"
         },
         {
-          "name": "yt_quality_auto",
-          "value": "自动"
+            "name": "yt_quality_auto",
+            "value": "自动"
         },
         {
             "name": "yt_codec_h264_first",
@@ -1130,7 +1130,7 @@
         },
         {
             "name": "yt_option_reset_settings_subtitle",
-            "value": "将所有设置重置为默认值"
+            "value": "恢复默认设置"
         },
         {
             "name": "yt_option_clear_all_data",
@@ -1138,7 +1138,7 @@
         },
         {
             "name": "yt_option_clear_all_data_subtitle",
-            "value": "删除所有存储的数据，包括历史记录和缓存"
+            "value": "清除历史、缓存等全部数据"
         },
         {
             "name": "yt_toast_reset_settings_done",
@@ -1250,7 +1250,7 @@
         },
         {
             "name": "yt_option_data_account_subtitle",
-            "value": "管理登录状态与本地数据"
+            "value": "登录与本地数据"
         },
         {
             "name": "yt_section_account",
@@ -1270,7 +1270,7 @@
         },
         {
             "name": "yt_option_export_data_subtitle",
-            "value": "将本地数据备份为 JSON 文件"
+            "value": "备份本地数据为 JSON"
         },
         {
             "name": "yt_option_restore_data",
@@ -1278,7 +1278,7 @@
         },
         {
             "name": "yt_option_restore_data_subtitle",
-            "value": "从 JSON 备份文件恢复数据"
+            "value": "从 JSON 恢复数据"
         },
         {
             "name": "yt_backup_item_settings",
@@ -1362,7 +1362,7 @@
         },
         {
             "name": "yt_option_sync_library_on_launch_subtitle",
-            "value": "登录后启动时单向拉取云端观看历史与订阅列表"
+            "value": "启动时拉取云端历史与订阅"
         },
         {
             "name": "yt_option_auth_session",
@@ -1374,7 +1374,7 @@
         },
         {
             "name": "yt_option_sign_out_subtitle",
-            "value": "清除已保存的登录信息"
+            "value": "清除登录信息"
         },
         {
             "name": "yt_confirm_sign_out",
@@ -1546,15 +1546,15 @@
         },
         {
             "name": "yt_auth_subtitle_cookie_active",
-            "value": "已登录 (Cookie) · 登录态浏览中"
+            "value": "已登录 (Cookie)"
         },
         {
             "name": "yt_auth_subtitle_active",
-            "value": "已登录 · 登录态浏览中"
+            "value": "已登录"
         },
         {
             "name": "yt_auth_subtitle_incognito",
-            "value": "已保存登录 · 无痕浏览中"
+            "value": "已保存登录 · 无痕"
         },
         {
             "name": "yt_auth_notice_title",
@@ -1578,7 +1578,7 @@
         },
         {
             "name": "yt_cookie_import_subtitle",
-            "value": "粘贴浏览器 Cookie / EditThisCookie JSON"
+            "value": "粘贴浏览器 Cookie"
         },
         {
             "name": "yt_cookie_import_help",
@@ -1638,7 +1638,7 @@
         },
         {
             "name": "yt_google_web_sign_in_subtitle",
-            "value": "通过网页登录 YouTube / Google"
+            "value": "网页登录 YouTube"
         },
         {
             "name": "yt_google_web_sign_in_title",
@@ -1670,7 +1670,7 @@
         },
         {
             "name": "yt_playback_pip_on_return_subtitle",
-            "value": "按返回键或 Home 键时自动弹出画中画窗口"
+            "value": "返回/Home 时自动进入画中画"
         },
         {
             "name": "yt_playback_player",
@@ -1686,7 +1686,7 @@
         },
         {
             "name": "yt_playback_gesture_seek_subtitle",
-            "value": "在视频画面上横向滑动以预览并跳转播放位置"
+            "value": "画面横向滑动调进度"
         },
         {
             "name": "yt_playback_gesture_brightness",
@@ -1694,7 +1694,7 @@
         },
         {
             "name": "yt_playback_gesture_brightness_subtitle",
-            "value": "在视频画面左半侧上下滑动以调节屏幕亮度"
+            "value": "画面左侧上下滑调亮度"
         },
         {
             "name": "yt_playback_gesture_volume",
@@ -1702,7 +1702,7 @@
         },
         {
             "name": "yt_playback_gesture_volume_subtitle",
-            "value": "在视频画面右半侧上下滑动以调节播放音量"
+            "value": "画面右侧上下滑调音量"
         },
         {
             "name": "yt_playback_background_audio_only",
@@ -1710,7 +1710,15 @@
         },
         {
             "name": "yt_playback_background_audio_only_subtitle",
-            "value": "进入后台后延迟关闭视频解码，仅保留声音以节省电量；分享、投屏和画中画不受影响"
+            "value": "后台关闭视频解码以省电"
+        },
+        {
+            "name": "yt_playback_auto_play_next",
+            "value": "自动播放下一个视频"
+        },
+        {
+            "name": "yt_playback_auto_play_next_subtitle",
+            "value": "启动时作为队列自动播放默认值"
         },
         {
             "name": "yt_playback_video_off_delay",
@@ -1722,7 +1730,7 @@
         },
         {
             "name": "yt_playback_hwdec_subtitle",
-            "value": "启用硬件加速解码，降低功耗并提升性能"
+            "value": "硬件加速解码，更省电"
         },
         {
             "name": "yt_playback_gpu_rendering",
@@ -2502,7 +2510,7 @@
         },
         {
             "name": "yt_option_auth_use_for_user_data_subtitle",
-            "value": "首页推荐、订阅、观看历史、搜索"
+            "value": "Feed、订阅、历史、搜索"
         },
         {
             "name": "yt_option_auth_use_for_playback",
@@ -2622,7 +2630,7 @@
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
-            "value": "播放器 API 及流地址鉴权"
+            "value": "播放接口与流地址鉴权"
         },
         {
             "name": "yt_player_more_tools",
@@ -2658,7 +2666,7 @@
         },
         {
             "name": "yt_proxy_enable_subtitle",
-            "value": "将 YouTube 提取与媒体请求经下方代理转发"
+            "value": "经下方代理访问 YouTube"
         },
         {
             "name": "yt_proxy_type",
@@ -2746,7 +2754,7 @@
         },
         {
             "name": "yt_device_qr_sign_in_subtitle",
-            "value": "手机扫码，或打开 youtube.com/activate"
+            "value": "扫码或打开 youtube.com/activate"
         },
         {
             "name": "yt_device_login_help",

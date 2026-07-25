@@ -1,4 +1,4 @@
-import { WebClientVersionResolver } from 'youtube_core';
+import { HttpDownloader, WebClientVersionResolver } from 'youtube_core';
 import web_webview from '@ohos.web.webview';
 import { http } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
@@ -180,13 +180,15 @@ async function requestText(
       headers['x-goog-api-key'] = API_KEY;
       headers['x-user-agent'] = 'grpc-web-javascript/0.1';
     }
-    const response = await request.request(url, {
+    const options: http.HttpRequestOptions = {
       method: method,
       header: headers,
       extraData: body,
       connectTimeout: 15000,
       readTimeout: 30000
-    });
+    };
+    HttpDownloader.applyProxyToOptions(options, url);
+    const response = await request.request(url, options);
     if (response.responseCode !== 200) {
       throw new Error(`HTTP ${response.responseCode} for ${url}`);
     }

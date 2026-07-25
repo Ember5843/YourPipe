@@ -16,6 +16,12 @@ interface OpenSourceItem {
   name: string;
   desc: Resource;
   license: string;
+  icon: Resource;
+}
+
+interface AiModelItem {
+  name: string;
+  icon: Resource;
 }
 
 interface ChangelogEntry {
@@ -25,19 +31,44 @@ interface ChangelogEntry {
 }
 
 const OPEN_SOURCE_ITEMS: OpenSourceItem[] = [
-  { name: 'NewPipe', desc: $r('app.string.yt_about_oss_newpipe_desc'), license: 'GPL-3.0' },
-  { name: 'iPlay', desc: $r('app.string.yt_about_oss_iplay_desc'), license: 'MIT' },
-  { name: 'yt-dlp', desc: $r('app.string.yt_about_oss_ytdlp_desc'), license: 'Unlicense' },
-  { name: 'FinVideo', desc: $r('app.string.yt_about_oss_finvideo_desc'), license: 'GPL-3.0' },
-  { name: '华为开发者案例', desc: $r('app.string.yt_about_oss_hmsamples_desc'), license: '参考' },
+  {
+    name: 'NewPipe',
+    desc: $r('app.string.yt_about_oss_newpipe_desc'),
+    license: 'GPL-3.0',
+    icon: $r('app.media.about_logo_newpipe'),
+  },
+  {
+    name: 'iPlay',
+    desc: $r('app.string.yt_about_oss_iplay_desc'),
+    license: 'MIT',
+    icon: $r('app.media.about_logo_iplay'),
+  },
+  {
+    name: 'yt-dlp',
+    desc: $r('app.string.yt_about_oss_ytdlp_desc'),
+    license: 'Unlicense',
+    icon: $r('app.media.about_logo_ytdlp'),
+  },
+  {
+    name: 'FinVideo',
+    desc: $r('app.string.yt_about_oss_finvideo_desc'),
+    license: 'GPL-3.0',
+    icon: $r('app.media.about_logo_finvideo'),
+  },
+  {
+    name: '华为开发者案例',
+    desc: $r('app.string.yt_about_oss_hmsamples_desc'),
+    license: '参考',
+    icon: $r('app.media.about_logo_hmsamples'),
+  },
 ];
 
-const AI_MODELS: string[] = [
-  'Kimi k2.6',
-  'Deepseek v4 pro',
-  'Google Gemini 3.1',
-  'Claude Sonnet 4.7',
-  'GPT 5.5',
+const AI_MODELS: AiModelItem[] = [
+  { name: 'Kimi k2.6', icon: $r('app.media.about_logo_kimi') },
+  { name: 'Deepseek v4 pro', icon: $r('app.media.about_logo_deepseek') },
+  { name: 'Google Gemini 3.1', icon: $r('app.media.about_logo_gemini') },
+  { name: 'Claude Sonnet 4.7', icon: $r('app.media.about_logo_claude') },
+  { name: 'GPT 5.5', icon: $r('app.media.about_logo_openai') },
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
@@ -260,44 +291,24 @@ struct SubPageHeader {
 
 @Component
 struct OpenSourcePage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onBack: () => void = () => {};
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
   build() {
     Column() {
       Scroll() {
-        Column({ space: 8 }) {
+        Column({ space: 6 }) {
           ForEach(OPEN_SOURCE_ITEMS, (item: OpenSourceItem) => {
-            Column({ space: 6 }) {
-              Row() {
-                Text(item.name)
-                  .fontSize(15)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor($r('app.color.yourtube_text_primary'))
-                  .layoutWeight(1)
-                Text(item.license)
-                  .fontSize(11)
-                  .fontColor(this.themePrimary)
-                  .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                  .borderRadius(6)
-                  .backgroundColor('#1AD32F2F')
-              }
-              .width('100%').alignItems(VerticalAlign.Center)
-
-              Text(item.desc)
-                .fontSize(13)
-                .fontColor($r('app.color.yourtube_text_quaternary'))
-                .lineHeight(20)
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 14, bottom: 14 })
-            .borderRadius(12)
-            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            OptionItem({
+              imageIcon: item.icon,
+              title: item.name,
+              subtitle: `${item.license} · ${getContext().resourceManager.getStringSync(item.desc.id)}`,
+              showChevron: false,
+              subtitleMaxLines: 2,
+            })
           }, (item: OpenSourceItem) => item.name)
         }
         .width('100%')
-        .padding({ left: 16, right: 16, bottom: 24 })
+        .padding({ left: 16, right: 16, bottom: 24, top: 8 })
       }
       .width('100%').layoutWeight(1)
       .clip(false)
@@ -315,34 +326,26 @@ struct OpenSourcePage {
 @Component
 struct AiModelsPage {
   onBack: () => void = () => {};
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
   build() {
     Column() {
-      Column({ space: 0 }) {
-        ForEach(AI_MODELS, (model: string, index: number) => {
-          Row({ space: 12 }) {
-            SymbolGlyph($r('sys.symbol.star_fill'))
-              .fontSize(16)
-              .fontColor(['#8B5CF6'])
-            Text(model)
-              .fontSize(15)
-              .fontColor($r('app.color.yourtube_text_primary'))
-              .layoutWeight(1)
-          }
-          .width('100%')
-          .padding({ top: 16, bottom: 16, left: 16, right: 16 })
-          .alignItems(VerticalAlign.Center)
-
-          if (index < AI_MODELS.length - 1) {
-            Divider().color($r('sys.color.comp_divider')).margin({ left: 16 })
-          }
-        }, (model: string) => model)
+      Scroll() {
+        Column({ space: 6 }) {
+          ForEach(AI_MODELS, (model: AiModelItem) => {
+            OptionItem({
+              imageIcon: model.icon,
+              title: model.name,
+              showChevron: false,
+            })
+          }, (model: AiModelItem) => model.name)
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, bottom: 24, top: 8 })
       }
-      .width('100%')
-      .borderRadius(12)
-      .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-      .margin({ left: 16, right: 16, top: 8 })
+      .width('100%').layoutWeight(1)
+      .clip(false)
+      .edgeEffect(EdgeEffect.Spring).scrollBar(BarState.Off)
+      .align(Alignment.Top)
     }
     .width('100%').height('100%')
     .padding({ top: 56 })
@@ -394,12 +397,12 @@ struct ChangelogPage {
             }
             .width('100%')
             .padding({ left: 16, right: 16, top: 14, bottom: 14 })
-            .borderRadius(12)
+            .borderRadius(16)
             .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-            .border(index === 0 ? { width: 1, color: this.themePrimary, radius: 12 } : { width: 0 })
+            .border(index === 0 ? { width: 1, color: this.themePrimary, radius: 16 } : { width: 0 })
           }, (item: ChangelogEntry) => item.version)
         }
-        .width('100%').padding({ left: 16, right: 16, bottom: 24 })
+        .width('100%').padding({ left: 16, right: 16, bottom: 24, top: 8 })
       }
       .width('100%').layoutWeight(1)
       .edgeEffect(EdgeEffect.Spring).scrollBar(BarState.Off)
@@ -508,94 +511,32 @@ export struct AboutPage {
               .textAlign(TextAlign.Center)
               .lineHeight(21)
 
-            // ── 社群 ──
-            Column({ space: 8 }) {
-              // 应用包名
-              Row({ space: 10 }) {
-                Text('ID')
-                  .fontSize(13).fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.yourtube_text_inverse'))
-                  .width(32).height(32)
-                  .textAlign(TextAlign.Center)
-                  .borderRadius(8)
-                  .backgroundColor(this.themePrimary)
-                Column({ space: 2 }) {
-                  Text($r('app.string.yt_about_package_name'))
-                    .fontSize(13).fontWeight(FontWeight.Medium)
-                    .fontColor($r('app.color.yourtube_text_primary'))
-                  Text('com.talon.yourpipe')
-                    .fontSize(12).fontColor($r('app.color.yourtube_text_hint'))
-                }
-                .alignItems(HorizontalAlign.Start).layoutWeight(1)
-                SymbolGlyph($r('sys.symbol.chevron_right'))
-                  .fontSize(14).fontColor([$r('app.color.yourtube_text_hint')])
-              }
-              .width('100%')
-              .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-              .borderRadius(12)
-              .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-              .alignItems(VerticalAlign.Center)
-              .onClick(() => this.copyToClipboard('com.talon.yourpipe'))
-
-              // QQ 群
-              Row({ space: 10 }) {
-                Text('QQ')
-                  .fontSize(13).fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.yourtube_text_inverse'))
-                  .width(32).height(32)
-                  .textAlign(TextAlign.Center)
-                  .borderRadius(8)
-                  .backgroundColor('#12B7F5')
-                Column({ space: 2 }) {
-                  Text($r('app.string.yt_about_qq_group'))
-                    .fontSize(13).fontWeight(FontWeight.Medium)
-                    .fontColor($r('app.color.yourtube_text_primary'))
-                  Text('2167068947')
-                    .fontSize(12).fontColor($r('app.color.yourtube_text_hint'))
-                }
-                .alignItems(HorizontalAlign.Start).layoutWeight(1)
-                SymbolGlyph($r('sys.symbol.chevron_right'))
-                  .fontSize(14).fontColor([$r('app.color.yourtube_text_hint')])
-              }
-              .width('100%')
-              .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-              .borderRadius(12)
-              .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-              .alignItems(VerticalAlign.Center)
-              .onClick(() => this.copyToClipboard('2167068947'))
-
-              // Telegram
-              Row({ space: 10 }) {
-                Text('TG')
-                  .fontSize(13).fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.yourtube_text_inverse'))
-                  .width(32).height(32)
-                  .textAlign(TextAlign.Center)
-                  .borderRadius(8)
-                  .backgroundColor('#2AABEE')
-                Column({ space: 2 }) {
-                  Text($r('app.string.yt_about_tg_group'))
-                    .fontSize(13).fontWeight(FontWeight.Medium)
-                    .fontColor($r('app.color.yourtube_text_primary'))
-                  Text('t.me/yourpipegroup')
-                    .fontSize(12).fontColor($r('app.color.yourtube_text_hint'))
-                }
-                .alignItems(HorizontalAlign.Start).layoutWeight(1)
-                SymbolGlyph($r('sys.symbol.chevron_right'))
-                  .fontSize(14).fontColor([$r('app.color.yourtube_text_hint')])
-              }
-              .width('100%')
-              .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-              .borderRadius(12)
-              .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-              .alignItems(VerticalAlign.Center)
-              .onClick(() => this.copyToClipboard('t.me/yourpipegroup'))
+            // ── 社群 / 标识 ──
+            Column({ space: 6 }) {
+              OptionItem({
+                imageIcon: $r('app.media.app_icon'),
+                title: $r('app.string.yt_about_package_name'),
+                subtitle: 'com.talon.yourpipe',
+                onClickAction: () => this.copyToClipboard('com.talon.yourpipe'),
+              })
+              OptionItem({
+                imageIcon: $r('app.media.about_logo_qq'),
+                title: $r('app.string.yt_about_qq_group'),
+                subtitle: '2167068947',
+                onClickAction: () => this.copyToClipboard('2167068947'),
+              })
+              OptionItem({
+                imageIcon: $r('app.media.about_logo_telegram'),
+                title: $r('app.string.yt_about_tg_group'),
+                subtitle: 't.me/yourpipegroup',
+                onClickAction: () => this.copyToClipboard('t.me/yourpipegroup'),
+              })
             }
             .width('100%')
           }
           .width('100%')
           .alignItems(HorizontalAlign.Center)
-          .padding({ top: 20, bottom: 24, left: 20, right: 20 })
+          .padding({ top: 20, bottom: 24, left: 16, right: 16 })
 
           Divider()
             .color($r('sys.color.comp_divider'))
@@ -603,20 +544,18 @@ export struct AboutPage {
 
           // ── 子页面入口列表 ──────────────────────────────────
           Column({ space: 6 }) {
-            // 分节标题
             Row() {
               Text($r('app.string.yt_about_project_info'))
                 .fontSize(13).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.yourtube_text_secondary'))
-                .letterSpacing(0.5)
             }
             .width('100%').padding({ left: 4, top: 8, bottom: 4 })
 
             OptionItem({
-              icon: $r('sys.symbol.translate'),
+              icon: $r('sys.symbol.doc_plaintext'),
               title: $r('app.string.yt_about_open_source'),
               subtitle: `${OPEN_SOURCE_ITEMS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_projects').id)}`,
-              iconColor: $r('app.color.yourtube_option_icon_language'),
+              iconColor: this.themePrimary,
               onClickAction: () => { this.aboutNavStack.pushPathByName('open_source', null); }
             })
 
@@ -624,7 +563,7 @@ export struct AboutPage {
               icon: $r('sys.symbol.star_fill'),
               title: $r('app.string.yt_about_ai_models'),
               subtitle: `${AI_MODELS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_models').id)}`,
-              iconColor: '#8B5CF6',
+              iconColor: this.themePrimary,
               onClickAction: () => { this.aboutNavStack.pushPathByName('ai_models', null); }
             })
 
@@ -632,7 +571,7 @@ export struct AboutPage {
               icon: $r('sys.symbol.clock'),
               title: $r('app.string.yt_about_changelog'),
               subtitle: `${getContext().resourceManager.getStringSync($r('app.string.yt_label_latest_version').id)}${CHANGELOG[0].version}`,
-              iconColor: $r('app.color.yourtube_option_icon_palette'),
+              iconColor: this.themePrimary,
               onClickAction: () => { this.aboutNavStack.pushPathByName('changelog', null); }
             })
           }

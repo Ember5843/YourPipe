@@ -270,6 +270,7 @@ export class DataBackupManager {
     const playbackConfig = PlaybackConfig.loadFromPreferences();
     AppStorage.setOrCreate('uiConfig', uiConfig);
     AppStorage.setOrCreate('playbackConfig', playbackConfig);
+    AppStorage.setOrCreate('autoPlayQueue', playbackConfig.autoPlayNext);
   }
 
   private static restoreSubscriptions(items: SubscriptionUser[]): void {

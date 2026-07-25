@@ -78,7 +78,7 @@
         },
         {
             "name": "yt_option_color_subtitle",
-            "value": "Thema und Akzentfarben"
+            "value": "Design- und Akzentfarben"
         },
         {
             "name": "yt_option_appearance",
@@ -118,7 +118,7 @@
         },
         {
             "name": "yt_option_log_subtitle",
-            "value": "Neueste Laufzeitprotokolle anzeigen"
+            "value": "Letzte Protokolle anzeigen"
         },
         {
             "name": "yt_log_title",
@@ -130,7 +130,7 @@
         },
         {
             "name": "yt_log_enable_subtitle",
-            "value": "Nach dem Start werden App-Laufzeitprotokolle erfasst"
+            "value": "Logs nach dem Start erfassen"
         },
         {
             "name": "yt_log_disabled_hint",
@@ -377,8 +377,8 @@
             "value": "Beste Qualität"
         },
         {
-          "name": "yt_quality_auto",
-          "value": "Automatisch"
+            "name": "yt_quality_auto",
+            "value": "Automatisch"
         },
         {
             "name": "yt_codec_h264_first",
@@ -998,7 +998,7 @@
         },
         {
             "name": "yt_option_sync_library_on_launch_subtitle",
-            "value": "Bei Anmeldung Cloud-Verlauf und Abos beim Start abrufen"
+            "value": "Cloud-Verlauf und Abos beim Start laden"
         },
         {
             "name": "yt_option_auth_session",
@@ -1010,7 +1010,7 @@
         },
         {
             "name": "yt_option_sign_out_subtitle",
-            "value": "Gespeicherte Anmeldung loeschen"
+            "value": "Anmeldung löschen"
         },
         {
             "name": "yt_confirm_sign_out",
@@ -1190,7 +1190,7 @@
         },
         {
             "name": "yt_option_reset_settings_subtitle",
-            "value": "Alle Einstellungen auf Standardwerte zurücksetzen"
+            "value": "Standardeinstellungen wiederherstellen"
         },
         {
             "name": "yt_option_clear_all_data",
@@ -1198,7 +1198,7 @@
         },
         {
             "name": "yt_option_clear_all_data_subtitle",
-            "value": "Alle gespeicherten Daten löschen, einschließlich Verlauf und Cache"
+            "value": "Verlauf, Cache und alle Daten löschen"
         },
         {
             "name": "yt_toast_reset_settings_done",
@@ -1298,7 +1298,7 @@
         },
         {
             "name": "yt_option_data_account_subtitle",
-            "value": "Anmeldestatus und lokale Daten verwalten"
+            "value": "Anmeldung und lokale Daten"
         },
         {
             "name": "yt_section_account",
@@ -1318,7 +1318,7 @@
         },
         {
             "name": "yt_option_export_data_subtitle",
-            "value": "Lokale Daten als JSON-Datei sichern"
+            "value": "Lokale Daten als JSON sichern"
         },
         {
             "name": "yt_option_restore_data",
@@ -1326,7 +1326,7 @@
         },
         {
             "name": "yt_option_restore_data_subtitle",
-            "value": "Daten aus einer JSON-Sicherungsdatei wiederherstellen"
+            "value": "Aus JSON-Backup wiederherstellen"
         },
         {
             "name": "yt_backup_item_settings",
@@ -1542,19 +1542,19 @@
         },
         {
             "name": "yt_auth_subtitle_sign_in",
-            "value": "Für personalisierte Empfehlungen anmelden"
+            "value": "Anmelden für personalisierte Feeds"
         },
         {
             "name": "yt_auth_subtitle_cookie_active",
-            "value": "Angemeldet (Cookie) · Authentifiziertes Browsen"
+            "value": "Angemeldet (Cookie)"
         },
         {
             "name": "yt_auth_subtitle_active",
-            "value": "Angemeldet · Authentifiziertes Browsen"
+            "value": "Angemeldet"
         },
         {
             "name": "yt_auth_subtitle_incognito",
-            "value": "Anmeldung gespeichert · Inkognito-Browsen"
+            "value": "Anmeldung gespeichert · Inkognito"
         },
         {
             "name": "yt_auth_notice_title",
@@ -1578,7 +1578,7 @@
         },
         {
             "name": "yt_cookie_import_subtitle",
-            "value": "Browser-Cookie oder EditThisCookie-JSON einfügen"
+            "value": "Browser-Cookies einfügen"
         },
         {
             "name": "yt_cookie_import_help",
@@ -1638,7 +1638,7 @@
         },
         {
             "name": "yt_google_web_sign_in_subtitle",
-            "value": "Im Web bei YouTube / Google anmelden"
+            "value": "Web-Anmeldung bei YouTube"
         },
         {
             "name": "yt_google_web_sign_in_title",
@@ -1670,7 +1670,7 @@
         },
         {
             "name": "yt_playback_pip_on_return_subtitle",
-            "value": "Beim Drücken von Zurück oder Home automatisch Bild-in-Bild öffnen"
+            "value": "Auto-PiP bei Zurück/Home"
         },
         {
             "name": "yt_playback_player",
@@ -1686,7 +1686,7 @@
         },
         {
             "name": "yt_playback_gesture_seek_subtitle",
-            "value": "Horizontal über das Video wischen, um die Wiedergabeposition anzusehen und zu ändern"
+            "value": "Horizontal wischen zum Spulen"
         },
         {
             "name": "yt_playback_gesture_brightness",
@@ -1694,7 +1694,7 @@
         },
         {
             "name": "yt_playback_gesture_brightness_subtitle",
-            "value": "Auf der linken Videohälfte vertikal wischen, um die Bildschirmhelligkeit anzupassen"
+            "value": "Links wischen für Helligkeit"
         },
         {
             "name": "yt_playback_gesture_volume",
@@ -1702,7 +1702,7 @@
         },
         {
             "name": "yt_playback_gesture_volume_subtitle",
-            "value": "Auf der rechten Videohälfte vertikal wischen, um die Lautstärke anzupassen"
+            "value": "Rechts wischen für Lautstärke"
         },
         {
             "name": "yt_playback_background_audio_only",
@@ -1710,7 +1710,15 @@
         },
         {
             "name": "yt_playback_background_audio_only_subtitle",
-            "value": "Video-Dekodierung im Hintergrund deaktivieren, um Strom zu sparen; Teilen, Übertragen und Bild-in-Bild sind nicht betroffen"
+            "value": "Video im Hintergrund aus für Stromsparen"
+        },
+        {
+            "name": "yt_playback_auto_play_next",
+            "value": "Nächstes Video automatisch abspielen"
+        },
+        {
+            "name": "yt_playback_auto_play_next_subtitle",
+            "value": "Standard für Warteschlangen-Autoplay beim Start"
         },
         {
             "name": "yt_playback_video_off_delay",
@@ -1722,7 +1730,7 @@
         },
         {
             "name": "yt_playback_hwdec_subtitle",
-            "value": "Hardware-beschleunigte Decodierung für geringeren Stromverbrauch und bessere Leistung verwenden"
+            "value": "Hardware-Dekodierung, sparsamer"
         },
         {
             "name": "yt_playback_gpu_rendering",
@@ -2622,7 +2630,7 @@
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
-            "value": "Player-API und Stream-URL-Authentifizierung"
+            "value": "Player-API und Stream-Auth"
         },
         {
             "name": "yt_player_more_tools",
@@ -2658,7 +2666,7 @@
         },
         {
             "name": "yt_proxy_enable_subtitle",
-            "value": "Route YouTube and media requests through the proxy below"
+            "value": "YouTube über Proxy unten"
         },
         {
             "name": "yt_proxy_type",
@@ -2670,7 +2678,7 @@
         },
         {
             "name": "yt_proxy_type_http_subtitle",
-            "value": "HTTP CONNECT proxy"
+            "value": "HTTP-CONNECT-Proxy"
         },
         {
             "name": "yt_proxy_type_socks5",
@@ -2746,7 +2754,7 @@
         },
         {
             "name": "yt_device_qr_sign_in_subtitle",
-            "value": "Scan with phone or open youtube.com/activate"
+            "value": "Scannen oder youtube.com/activate öffnen"
         },
         {
             "name": "yt_device_login_help",

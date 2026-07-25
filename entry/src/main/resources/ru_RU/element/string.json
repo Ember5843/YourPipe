@@ -78,7 +78,7 @@
         },
         {
             "name": "yt_option_color_subtitle",
-            "value": "Тема и акцентные цвета"
+            "value": "Цвета темы"
         },
         {
             "name": "yt_option_appearance",
@@ -118,7 +118,7 @@
         },
         {
             "name": "yt_option_log_subtitle",
-            "value": "Просмотр недавних записей"
+            "value": "Смотреть недавние логи"
         },
         {
             "name": "yt_log_title",
@@ -130,7 +130,7 @@
         },
         {
             "name": "yt_log_enable_subtitle",
-            "value": "После запуска будет захват журналов работы приложения"
+            "value": "Записывать логи после запуска"
         },
         {
             "name": "yt_log_disabled_hint",
@@ -377,8 +377,8 @@
             "value": "Лучшее качество"
         },
         {
-          "name": "yt_quality_auto",
-          "value": "Авто"
+            "name": "yt_quality_auto",
+            "value": "Авто"
         },
         {
             "name": "yt_codec_h264_first",
@@ -1014,7 +1014,7 @@
         },
         {
             "name": "yt_option_sync_library_on_launch_subtitle",
-            "value": "При входе подтягивать историю и подписки при запуске"
+            "value": "Загружать историю и подписки при запуске"
         },
         {
             "name": "yt_option_auth_session",
@@ -1026,7 +1026,7 @@
         },
         {
             "name": "yt_option_sign_out_subtitle",
-            "value": "Очистить сохранённые учётные данные"
+            "value": "Выйти из аккаунта"
         },
         {
             "name": "yt_confirm_sign_out",
@@ -1194,19 +1194,19 @@
         },
         {
             "name": "yt_auth_subtitle_sign_in",
-            "value": "Войдите для персональных рекомендаций"
+            "value": "Войдите для персональной ленты"
         },
         {
             "name": "yt_auth_subtitle_cookie_active",
-            "value": "Вход выполнен (Cookie) · Авторизованный просмотр"
+            "value": "Вход выполнен (Cookie)"
         },
         {
             "name": "yt_auth_subtitle_active",
-            "value": "Вход выполнен · Авторизованный просмотр"
+            "value": "Вход выполнен"
         },
         {
             "name": "yt_auth_subtitle_incognito",
-            "value": "Вход сохранён · Просмотр инкогнито"
+            "value": "Вход сохранён · Инкогнито"
         },
         {
             "name": "yt_auth_notice_title",
@@ -1230,7 +1230,7 @@
         },
         {
             "name": "yt_cookie_import_subtitle",
-            "value": "Вставьте Cookie браузера или JSON EditThisCookie"
+            "value": "Вставить cookie браузера"
         },
         {
             "name": "yt_cookie_import_help",
@@ -1290,7 +1290,7 @@
         },
         {
             "name": "yt_google_web_sign_in_subtitle",
-            "value": "Войдите в YouTube / Google через веб"
+            "value": "Вход через веб"
         },
         {
             "name": "yt_google_web_sign_in_title",
@@ -1322,7 +1322,7 @@
         },
         {
             "name": "yt_playback_pip_on_return_subtitle",
-            "value": "Автоматически открывать «картинку в картинке» при нажатии «Назад» или «Домой»"
+            "value": "Авто PiP при «Назад»/«Домой»"
         },
         {
             "name": "yt_playback_player",
@@ -1338,7 +1338,7 @@
         },
         {
             "name": "yt_playback_gesture_seek_subtitle",
-            "value": "Проведите по видео горизонтально для предпросмотра и смены позиции"
+            "value": "Горизонтальный свайп — перемотка"
         },
         {
             "name": "yt_playback_gesture_brightness",
@@ -1346,7 +1346,7 @@
         },
         {
             "name": "yt_playback_gesture_brightness_subtitle",
-            "value": "Проведите вертикально по левой половине видео для настройки яркости"
+            "value": "Слева — яркость"
         },
         {
             "name": "yt_playback_gesture_volume",
@@ -1354,7 +1354,7 @@
         },
         {
             "name": "yt_playback_gesture_volume_subtitle",
-            "value": "Проведите вертикально по правой половине видео для настройки громкости"
+            "value": "Справа — громкость"
         },
         {
             "name": "yt_playback_background_audio_only",
@@ -1362,7 +1362,15 @@
         },
         {
             "name": "yt_playback_background_audio_only_subtitle",
-            "value": "Отключать декодирование видео в фоне для экономии энергии; общий доступ, трансляция и PiP не затрагиваются"
+            "value": "Без видео в фоне для экономии"
+        },
+        {
+            "name": "yt_playback_auto_play_next",
+            "value": "Автоматически воспроизводить следующее видео"
+        },
+        {
+            "name": "yt_playback_auto_play_next_subtitle",
+            "value": "По умолчанию для автоплея очереди"
         },
         {
             "name": "yt_playback_video_off_delay",
@@ -1374,7 +1382,7 @@
         },
         {
             "name": "yt_playback_hwdec_subtitle",
-            "value": "Использовать аппаратно-ускоренное декодирование для снижения энергопотребления и повышения производительности"
+            "value": "Аппаратное декодирование, меньше расход"
         },
         {
             "name": "yt_playback_gpu_rendering",
@@ -1718,7 +1726,7 @@
         },
         {
             "name": "yt_option_reset_settings_subtitle",
-            "value": "Сбросить все настройки по умолчанию"
+            "value": "Сбросить настройки"
         },
         {
             "name": "yt_option_clear_all_data",
@@ -1726,7 +1734,7 @@
         },
         {
             "name": "yt_option_clear_all_data_subtitle",
-            "value": "Удалить все сохранённые данные, включая историю и кэш"
+            "value": "Очистить историю, кэш и все данные"
         },
         {
             "name": "yt_toast_reset_settings_done",
@@ -1770,7 +1778,7 @@
         },
         {
             "name": "yt_option_data_account_subtitle",
-            "value": "Управление статусом входа и локальными данными"
+            "value": "Вход и локальные данные"
         },
         {
             "name": "yt_section_account",
@@ -1790,7 +1798,7 @@
         },
         {
             "name": "yt_option_export_data_subtitle",
-            "value": "Резервное копирование локальных данных в файл JSON"
+            "value": "Резервная копия в JSON"
         },
         {
             "name": "yt_option_restore_data",
@@ -1798,7 +1806,7 @@
         },
         {
             "name": "yt_option_restore_data_subtitle",
-            "value": "Восстановление данных из файла резервной копии JSON"
+            "value": "Восстановить из JSON"
         },
         {
             "name": "yt_backup_item_settings",
@@ -2622,7 +2630,7 @@
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
-            "value": "API плеера и аутентификация URL потока"
+            "value": "API плеера и auth потоков"
         },
         {
             "name": "yt_player_more_tools",
@@ -2658,7 +2666,7 @@
         },
         {
             "name": "yt_proxy_enable_subtitle",
-            "value": "Route YouTube and media requests through the proxy below"
+            "value": "YouTube через прокси ниже"
         },
         {
             "name": "yt_proxy_type",
@@ -2670,7 +2678,7 @@
         },
         {
             "name": "yt_proxy_type_http_subtitle",
-            "value": "HTTP CONNECT proxy"
+            "value": "HTTP CONNECT прокси"
         },
         {
             "name": "yt_proxy_type_socks5",
@@ -2746,7 +2754,7 @@
         },
         {
             "name": "yt_device_qr_sign_in_subtitle",
-            "value": "Scan with phone or open youtube.com/activate"
+            "value": "Сканировать или youtube.com/activate"
         },
         {
             "name": "yt_device_login_help",

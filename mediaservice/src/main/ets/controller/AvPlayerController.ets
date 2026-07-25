@@ -21,6 +21,7 @@ import { PlayerUiViewModel } from '../state/PlayerUiViewModel';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
+import { HttpDownloader } from 'youtube_core';
 
 export interface NativeLogBridgeFns {
   start: () => void;
@@ -1316,7 +1317,7 @@ export class AvPlayerController {
   private async fetchText(url: string): Promise<string> {
     const request = http.createHttp();
     try {
-      const response = await request.request(url, {
+      const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.STRING,
         header: {
@@ -1325,7 +1326,9 @@ export class AvPlayerController {
         },
         connectTimeout: 8000,
         readTimeout: 10000,
-      });
+      };
+      HttpDownloader.applyProxyToOptions(options, url);
+      const response = await request.request(url, options);
       Logger.info(TAG, `manifest fetchText: code=${response.responseCode} resultType=${typeof response.result} len=${typeof response.result === 'string' ? response.result.length : 0}`);
       return typeof response.result === 'string' ? response.result : '';
     } catch (e) {

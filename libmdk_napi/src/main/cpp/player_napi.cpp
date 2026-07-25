@@ -1527,8 +1527,22 @@ napi_value GetProperty(napi_env env, napi_callback_info info)
 {
     size_t argc = 2; napi_value args[2];
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    const auto key = ToString(env, args[1]);
+    const auto value = lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) -> string {
+        mpv_handle* handle = ctx.mpv;
+        if (!handle || !Mpv().get_property_string || key.empty()) {
+            return {};
+        }
+        char* val = Mpv().get_property_string(handle, key.c_str());
+        if (!val) {
+            return {};
+        }
+        string out(val);
+        Mpv().free(val);
+        return out;
+    });
     napi_value result = nullptr;
-    napi_create_string_utf8(env, "", 0, &result);
+    napi_create_string_utf8(env, value.c_str(), value.size(), &result);
     return result;
 }
 

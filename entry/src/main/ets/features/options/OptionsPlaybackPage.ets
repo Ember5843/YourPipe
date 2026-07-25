@@ -86,10 +86,24 @@ export struct OptionsPlaybackPage {
               }
             })
           }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_playback_auto_play_next'),
+              subtitle: $r('app.string.yt_playback_auto_play_next_subtitle'),
+              isOn: this.playbackConfig.autoPlayNext,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig(cfg => cfg.autoPlayNext = val);
+              }
+            })
+          }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .borderRadius(16)
         .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
         if (PiPManager.getInstance().isPiPSupported()) {
           ListItem() {

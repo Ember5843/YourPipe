@@ -46,7 +46,7 @@
         },
         {
             "name": "yt_option_log_subtitle",
-            "value": "View recent runtime logs"
+            "value": "View recent logs"
         },
         {
             "name": "yt_option_about",
@@ -206,7 +206,7 @@
         },
         {
             "name": "yt_log_enable_subtitle",
-            "value": "Capture app runtime logs after launch"
+            "value": "Capture logs after launch"
         },
         {
             "name": "yt_log_disabled_hint",
@@ -377,8 +377,8 @@
             "value": "Best Quality"
         },
         {
-          "name": "yt_quality_auto",
-          "value": "Auto"
+            "name": "yt_quality_auto",
+            "value": "Auto"
         },
         {
             "name": "yt_codec_h264_first",
@@ -1086,7 +1086,7 @@
         },
         {
             "name": "yt_option_sync_library_on_launch_subtitle",
-            "value": "When signed in, pull cloud watch history and subscriptions at startup"
+            "value": "Pull cloud history and subscriptions on launch"
         },
         {
             "name": "yt_option_auth_session",
@@ -1098,7 +1098,7 @@
         },
         {
             "name": "yt_option_sign_out_subtitle",
-            "value": "Clear saved login credentials"
+            "value": "Clear saved sign-in"
         },
         {
             "name": "yt_confirm_sign_out",
@@ -1266,19 +1266,19 @@
         },
         {
             "name": "yt_auth_subtitle_sign_in",
-            "value": "Sign in for personalized recommendations"
+            "value": "Sign in for personalized feed"
         },
         {
             "name": "yt_auth_subtitle_cookie_active",
-            "value": "Signed in (Cookie) · Authenticated browsing"
+            "value": "Signed in (Cookie)"
         },
         {
             "name": "yt_auth_subtitle_active",
-            "value": "Signed in · Authenticated browsing"
+            "value": "Signed in"
         },
         {
             "name": "yt_auth_subtitle_incognito",
-            "value": "Sign-in saved · Incognito browsing"
+            "value": "Saved sign-in · Incognito"
         },
         {
             "name": "yt_auth_notice_title",
@@ -1302,7 +1302,7 @@
         },
         {
             "name": "yt_cookie_import_subtitle",
-            "value": "Paste a browser Cookie or EditThisCookie JSON"
+            "value": "Paste browser cookies"
         },
         {
             "name": "yt_cookie_import_help",
@@ -1362,7 +1362,7 @@
         },
         {
             "name": "yt_google_web_sign_in_subtitle",
-            "value": "Sign in to YouTube / Google on the web"
+            "value": "Sign in via web"
         },
         {
             "name": "yt_google_web_sign_in_title",
@@ -1394,7 +1394,7 @@
         },
         {
             "name": "yt_playback_pip_on_return_subtitle",
-            "value": "Open picture-in-picture automatically when you press Back or Home"
+            "value": "Auto PiP on Back or Home"
         },
         {
             "name": "yt_playback_player",
@@ -1410,7 +1410,7 @@
         },
         {
             "name": "yt_playback_gesture_seek_subtitle",
-            "value": "Swipe horizontally on the video to preview and change the playback position"
+            "value": "Swipe horizontally to seek"
         },
         {
             "name": "yt_playback_gesture_brightness",
@@ -1418,7 +1418,7 @@
         },
         {
             "name": "yt_playback_gesture_brightness_subtitle",
-            "value": "Swipe vertically on the left half of the video to adjust screen brightness"
+            "value": "Swipe left side for brightness"
         },
         {
             "name": "yt_playback_gesture_volume",
@@ -1426,7 +1426,7 @@
         },
         {
             "name": "yt_playback_gesture_volume_subtitle",
-            "value": "Swipe vertically on the right half of the video to adjust playback volume"
+            "value": "Swipe right side for volume"
         },
         {
             "name": "yt_playback_background_audio_only",
@@ -1434,7 +1434,15 @@
         },
         {
             "name": "yt_playback_background_audio_only_subtitle",
-            "value": "Turn off video decoding after entering the background to save power; sharing, casting, and PiP are unaffected"
+            "value": "Disable video in background to save power"
+        },
+        {
+            "name": "yt_playback_auto_play_next",
+            "value": "Autoplay next video"
+        },
+        {
+            "name": "yt_playback_auto_play_next_subtitle",
+            "value": "Default for queue autoplay on launch"
         },
         {
             "name": "yt_playback_video_off_delay",
@@ -1446,7 +1454,7 @@
         },
         {
             "name": "yt_playback_hwdec_subtitle",
-            "value": "Use hardware-accelerated decoding for lower power use and better performance"
+            "value": "Hardware decode for lower power"
         },
         {
             "name": "yt_playback_gpu_rendering",
@@ -1850,7 +1858,7 @@
         },
         {
             "name": "yt_option_reset_settings_subtitle",
-            "value": "Reset all settings to default values"
+            "value": "Restore default settings"
         },
         {
             "name": "yt_option_clear_all_data",
@@ -1858,7 +1866,7 @@
         },
         {
             "name": "yt_option_clear_all_data_subtitle",
-            "value": "Delete all stored data including history and cache"
+            "value": "Clear history, cache, and all data"
         },
         {
             "name": "yt_option_recovery",
@@ -1870,7 +1878,7 @@
         },
         {
             "name": "yt_option_data_account_subtitle",
-            "value": "Manage sign-in status and local data"
+            "value": "Sign-in and local data"
         },
         {
             "name": "yt_option_google_login",
@@ -1882,7 +1890,7 @@
         },
         {
             "name": "yt_option_export_data_subtitle",
-            "value": "Back up local data as a JSON file"
+            "value": "Back up local data as JSON"
         },
         {
             "name": "yt_option_restore_data",
@@ -1890,7 +1898,7 @@
         },
         {
             "name": "yt_option_restore_data_subtitle",
-            "value": "Restore data from a JSON backup file"
+            "value": "Restore from a JSON backup"
         },
         {
             "name": "yt_section_account",
@@ -2622,7 +2630,7 @@
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
-            "value": "Player API and stream URL authentication"
+            "value": "Player API and stream auth"
         },
         {
             "name": "yt_player_more_tools",
@@ -2658,7 +2666,7 @@
         },
         {
             "name": "yt_proxy_enable_subtitle",
-            "value": "Route YouTube and media requests through the proxy below"
+            "value": "Route YouTube via the proxy below"
         },
         {
             "name": "yt_proxy_type",
@@ -2746,7 +2754,7 @@
         },
         {
             "name": "yt_device_qr_sign_in_subtitle",
-            "value": "Scan with phone or open youtube.com/activate"
+            "value": "Scan code or open youtube.com/activate"
         },
         {
             "name": "yt_device_login_help",

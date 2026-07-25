@@ -280,6 +280,7 @@ struct Index {
     const defaultPlaybackConfig = new PlaybackConfig();
     this.playbackConfig = defaultPlaybackConfig;
     PlaybackConfig.saveToPreferences(defaultPlaybackConfig);
+    AppStorage.setOrCreate('autoPlayQueue', defaultPlaybackConfig.autoPlayNext);
     DownloadManager.getInstance().refreshTaskPool();
 
     // 3. 重置网络代理
@@ -380,6 +381,7 @@ struct Index {
     this.uiConfig = defaultUiConfig;
     const defaultPlaybackConfig = new PlaybackConfig();
     this.playbackConfig = defaultPlaybackConfig;
+    AppStorage.setOrCreate('autoPlayQueue', defaultPlaybackConfig.autoPlayNext);
     const defaultProxy = NetworkProxyConfig.resetToDefault();
     AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
 
@@ -2335,6 +2337,8 @@ struct Index {
   private savePlaybackConfig(next: PlaybackConfig): void {
     this.playbackConfig = next;
     PlaybackConfig.saveToPreferences(next);
+    // 设置变更立即对当前会话的队列自动播放开关生效
+    AppStorage.setOrCreate('autoPlayQueue', next.autoPlayNext);
   }
 
   private showResetSettingsConfirmDialog(): void {

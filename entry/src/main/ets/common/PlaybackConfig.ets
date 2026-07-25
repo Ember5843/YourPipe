@@ -92,6 +92,8 @@ export class PlaybackConfig {
   backgroundAudioOnly: boolean = true;
   /** 进入后台后多久关视频（秒），0=立即 */
   backgroundVideoOffDelaySec: BackgroundVideoOffDelay = '15';
+  /** 是否继续播放下一个视频（每次启动时作为队列自动播放会话开关的默认值） */
+  autoPlayNext: boolean = true;
 
   // MPV 播放器设置
   /** 硬件解码开关 */
@@ -117,6 +119,7 @@ export class PlaybackConfig {
     next.pipOnReturn = this.pipOnReturn;
     next.backgroundAudioOnly = this.backgroundAudioOnly;
     next.backgroundVideoOffDelaySec = this.backgroundVideoOffDelaySec;
+    next.autoPlayNext = this.autoPlayNext;
     next.hwdecEnabled = this.hwdecEnabled;
     next.cacheSecs = this.cacheSecs;
     next.demuxerReadaheadSecs = this.demuxerReadaheadSecs;
@@ -137,6 +140,7 @@ export class PlaybackConfig {
     const delay = PreferencesStore.getString('cfg_pb_backgroundVideoOffDelaySec', '15');
     cfg.backgroundVideoOffDelaySec = BACKGROUND_VIDEO_OFF_DELAY_LABELS.includes(delay as BackgroundVideoOffDelay)
       ? delay as BackgroundVideoOffDelay : '15';
+    cfg.autoPlayNext = PreferencesStore.getString('cfg_pb_autoPlayNext', 'true') === 'true';
 
     // MPV 播放器设置
     cfg.hwdecEnabled = PreferencesStore.getString('cfg_pb_hwdecEnabled', 'true') === 'true';
@@ -162,6 +166,7 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_pipOnReturn', cfg.pipOnReturn ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_backgroundAudioOnly', cfg.backgroundAudioOnly ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_backgroundVideoOffDelaySec', cfg.backgroundVideoOffDelaySec);
+    PreferencesStore.setString('cfg_pb_autoPlayNext', cfg.autoPlayNext ? 'true' : 'false');
 
     // MPV 播放器设置
     PreferencesStore.setString('cfg_pb_hwdecEnabled', cfg.hwdecEnabled ? 'true' : 'false');

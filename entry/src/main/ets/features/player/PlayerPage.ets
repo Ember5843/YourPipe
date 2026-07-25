@@ -29,7 +29,7 @@ import { initTabData } from '../../common/model/TabViewModel';
 import { TabItem } from '../../common/model/TabItem';
 import { Constants } from '../../common/Constants';
 import { YouTubePlayService } from './YouTubePlayService';
-import { ChapterInfo, VideoItem } from 'youtube_core';
+import { ChapterInfo, HttpDownloader, VideoItem } from 'youtube_core';
 import { ActionHub, ActionHubEvent } from '../../common/ActionHub';
 import { CommentNavWrapper } from './components/CommentNavWrapper';
 import { AvPlayerController, PlayerUiViewModel } from 'mediaservice';
@@ -148,12 +148,14 @@ export struct VideoPlayerPage {
     }
     try {
       const downloader = http.createHttp();
-      const data = await downloader.request(thumbnailUrl, {
+      const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
         connectTimeout: 5000,
         readTimeout: 8000,
-      });
+      };
+      HttpDownloader.applyProxyToOptions(options, thumbnailUrl);
+      const data = await downloader.request(thumbnailUrl, options);
       downloader.destroy();
       if (data.responseCode === 200 && data.result instanceof ArrayBuffer) {
         const file = fs.openSync(localPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);

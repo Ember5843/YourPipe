@@ -109,6 +109,8 @@ export class AppState {
     // 初始化播放设置
     const playbackConfig = PlaybackConfig.loadFromPreferences();
     AppStorage.setOrCreate('playbackConfig', playbackConfig);
+    // 会话级队列自动播放开关，每次启动用设置中的默认值初始化
+    AppStorage.setOrCreate('autoPlayQueue', playbackConfig.autoPlayNext);
     const networkProxyConfig = NetworkProxyConfig.load();
     AppStorage.setOrCreate('networkProxyConfig', networkProxyConfig);
     NetworkProxyConfig.applySystemAndProviders(networkProxyConfig);

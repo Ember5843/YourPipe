@@ -12,7 +12,7 @@ import { notificationManager } from '@kit.NotificationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { taskpool } from '@kit.ArkTS';
 import { UIConfig } from './AppState';
-import { AuthSessionManager } from 'youtube_core';
+import { AuthSessionManager, HttpDownloader } from 'youtube_core';
 
 const logger = AppLog.getInstance('DownloadManager');
 const DOWNLOAD_ROOT: string = 'downloads';
@@ -859,7 +859,7 @@ export class DownloadManager {
   private async fetchHlsText(url: string): Promise<string> {
     const request = http.createHttp();
     try {
-      const response = await request.request(url, {
+      const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.STRING,
         header: {
@@ -868,7 +868,9 @@ export class DownloadManager {
         },
         connectTimeout: 15000,
         readTimeout: 15000,
-      });
+      };
+      HttpDownloader.applyProxyToOptions(options, url);
+      const response = await request.request(url, options);
       return typeof response.result === 'string' ? response.result : '';
     } finally {
       request.destroy();
@@ -980,7 +982,7 @@ export class DownloadManager {
   private async downloadHlsSegment(url: string): Promise<ArrayBuffer> {
     const request = http.createHttp();
     try {
-      const response = await request.request(url, {
+      const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
         header: {
@@ -989,7 +991,9 @@ export class DownloadManager {
         },
         connectTimeout: 15000,
         readTimeout: 60000,
-      });
+      };
+      HttpDownloader.applyProxyToOptions(options, url);
+      const response = await request.request(url, options);
       if (response.responseCode !== 200 && response.responseCode !== 206) {
         throw new Error(`HLS segment HTTP ${response.responseCode}`);
       }
@@ -1351,15 +1355,17 @@ export class DownloadManager {
         tryFinish();
       });
 
+      const streamOptions: http.HttpRequestOptions = {
+        method: http.RequestMethod.GET,
+        header,
+        connectTimeout: 30000,
+        readTimeout: 120000,
+        usingCache: false
+      };
+      HttpDownloader.applyProxyToOptions(streamOptions, url);
       httpRequest.requestInStream(
         url,
-        {
-          method: http.RequestMethod.GET,
-          header,
-          connectTimeout: 30000,
-          readTimeout: 120000,
-          usingCache: false
-        }
+        streamOptions
       ).then((code: number) => {
         responseCode = code || 0;
         requestReturned = true;

@@ -78,7 +78,7 @@
         },
         {
             "name": "yt_option_color_subtitle",
-            "value": "السمة والألوان المميزة"
+            "value": "ألوان السمة والتأكيد"
         },
         {
             "name": "yt_option_appearance",
@@ -118,7 +118,7 @@
         },
         {
             "name": "yt_option_log_subtitle",
-            "value": "عرض سجلات التشغيل الأخيرة"
+            "value": "عرض السجلات الأخيرة"
         },
         {
             "name": "yt_log_title",
@@ -130,7 +130,7 @@
         },
         {
             "name": "yt_log_enable_subtitle",
-            "value": "بعد التشغيل، سيتم التقاط سجلات تشغيل التطبيق"
+            "value": "تسجيل السجلات بعد التشغيل"
         },
         {
             "name": "yt_log_disabled_hint",
@@ -170,7 +170,7 @@
         },
         {
             "name": "yt_option_about_subtitle",
-            "value": "الإصدار والشكر"
+            "value": "الإصدار والإشادات"
         },
         {
             "name": "yt_option_in_development",
@@ -377,8 +377,8 @@
             "value": "أفضل جودة"
         },
         {
-          "name": "yt_quality_auto",
-          "value": "تلقائي"
+            "name": "yt_quality_auto",
+            "value": "تلقائي"
         },
         {
             "name": "yt_codec_h264_first",
@@ -1014,7 +1014,7 @@
         },
         {
             "name": "yt_option_sync_library_on_launch_subtitle",
-            "value": "عند تسجيل الدخول، جلب السجل والاشتراكات عند التشغيل"
+            "value": "جلب السجل والاشتراكات عند التشغيل"
         },
         {
             "name": "yt_option_auth_session",
@@ -1026,7 +1026,7 @@
         },
         {
             "name": "yt_option_sign_out_subtitle",
-            "value": "مسح بيانات اعتماد تسجيل الدخول المحفوظة"
+            "value": "مسح تسجيل الدخول"
         },
         {
             "name": "yt_confirm_sign_out",
@@ -1194,19 +1194,19 @@
         },
         {
             "name": "yt_auth_subtitle_sign_in",
-            "value": "سجّل الدخول للحصول على توصيات مخصصة"
+            "value": "سجّل الدخول لتغذية مخصصة"
         },
         {
             "name": "yt_auth_subtitle_cookie_active",
-            "value": "تم تسجيل الدخول (Cookie) · تصفح موثّق"
+            "value": "مسجّل الدخول (Cookie)"
         },
         {
             "name": "yt_auth_subtitle_active",
-            "value": "تم تسجيل الدخول · تصفح موثّق"
+            "value": "مسجّل الدخول"
         },
         {
             "name": "yt_auth_subtitle_incognito",
-            "value": "تم حفظ تسجيل الدخول · تصفح خفي"
+            "value": "دخول محفوظ · تصفح خاص"
         },
         {
             "name": "yt_auth_notice_title",
@@ -1230,7 +1230,7 @@
         },
         {
             "name": "yt_cookie_import_subtitle",
-            "value": "الصق Cookie المتصفح أو JSON من EditThisCookie"
+            "value": "لصق ملفات تعريف الارتباط"
         },
         {
             "name": "yt_cookie_import_help",
@@ -1290,7 +1290,7 @@
         },
         {
             "name": "yt_google_web_sign_in_subtitle",
-            "value": "سجّل الدخول إلى YouTube / Google عبر الويب"
+            "value": "تسجيل دخول عبر الويب"
         },
         {
             "name": "yt_google_web_sign_in_title",
@@ -1322,7 +1322,7 @@
         },
         {
             "name": "yt_playback_pip_on_return_subtitle",
-            "value": "فتح صورة داخل صورة تلقائيًا عند الضغط على رجوع أو الصفحة الرئيسية"
+            "value": "PiP تلقائي عند الرجوع/الرئيسية"
         },
         {
             "name": "yt_playback_player",
@@ -1338,7 +1338,7 @@
         },
         {
             "name": "yt_playback_gesture_seek_subtitle",
-            "value": "مرر أفقياً على الفيديو لمعاينة موضع التشغيل وتغييره"
+            "value": "اسحب أفقياً للتقديم"
         },
         {
             "name": "yt_playback_gesture_brightness",
@@ -1346,7 +1346,7 @@
         },
         {
             "name": "yt_playback_gesture_brightness_subtitle",
-            "value": "مرر عمودياً على النصف الأيسر من الفيديو لضبط سطوع الشاشة"
+            "value": "اليسار: السطوع"
         },
         {
             "name": "yt_playback_gesture_volume",
@@ -1354,7 +1354,7 @@
         },
         {
             "name": "yt_playback_gesture_volume_subtitle",
-            "value": "مرر عمودياً على النصف الأيمن من الفيديو لضبط مستوى الصوت"
+            "value": "اليمين: الصوت"
         },
         {
             "name": "yt_playback_background_audio_only",
@@ -1362,7 +1362,15 @@
         },
         {
             "name": "yt_playback_background_audio_only_subtitle",
-            "value": "إيقاف فك ترميز الفيديو في الخلفية لتوفير الطاقة؛ المشاركة والبث و PiP لا تتأثر"
+            "value": "إيقاف الفيديو في الخلفية لتوفير الطاقة"
+        },
+        {
+            "name": "yt_playback_auto_play_next",
+            "value": "تشغيل الفيديو التالي تلقائيًا"
+        },
+        {
+            "name": "yt_playback_auto_play_next_subtitle",
+            "value": "افتراضي التشغيل التلقائي للطابور عند التشغيل"
         },
         {
             "name": "yt_playback_video_off_delay",
@@ -1374,7 +1382,7 @@
         },
         {
             "name": "yt_playback_hwdec_subtitle",
-            "value": "استخدام فك التشفير المعجل بالأجهزة لتقليل استهلاك الطاقة وتحسين الأداء"
+            "value": "فك تشفير عتادي أوفر للطاقة"
         },
         {
             "name": "yt_playback_gpu_rendering",
@@ -1718,7 +1726,7 @@
         },
         {
             "name": "yt_option_reset_settings_subtitle",
-            "value": "إعادة تعيين جميع الإعدادات إلى القيم الافتراضية"
+            "value": "استعادة الإعدادات الافتراضية"
         },
         {
             "name": "yt_option_clear_all_data",
@@ -1726,7 +1734,7 @@
         },
         {
             "name": "yt_option_clear_all_data_subtitle",
-            "value": "حذف جميع البيانات المخزنة، بما في ذلك السجل وذاكرة التخزين المؤقت"
+            "value": "مسح السجل والذاكرة المؤقتة وكل البيانات"
         },
         {
             "name": "yt_toast_reset_settings_done",
@@ -1770,7 +1778,7 @@
         },
         {
             "name": "yt_option_data_account_subtitle",
-            "value": "إدارة حالة تسجيل الدخول والبيانات المحلية"
+            "value": "الحساب والبيانات المحلية"
         },
         {
             "name": "yt_section_account",
@@ -1790,7 +1798,7 @@
         },
         {
             "name": "yt_option_export_data_subtitle",
-            "value": "نسخ البيانات المحلية احتياطيًا كملف JSON"
+            "value": "نسخ البيانات المحلية كـ JSON"
         },
         {
             "name": "yt_option_restore_data",
@@ -1798,7 +1806,7 @@
         },
         {
             "name": "yt_option_restore_data_subtitle",
-            "value": "استعادة البيانات من ملف نسخة احتياطية JSON"
+            "value": "استعادة من نسخة JSON"
         },
         {
             "name": "yt_backup_item_settings",
@@ -2622,7 +2630,7 @@
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
-            "value": "API المشغل ومصادقة عنوان URL للبث"
+            "value": "واجهة المشغّل ومصادقة البث"
         },
         {
             "name": "yt_player_more_tools",
@@ -2658,7 +2666,7 @@
         },
         {
             "name": "yt_proxy_enable_subtitle",
-            "value": "Route YouTube and media requests through the proxy below"
+            "value": "توجيه YouTube عبر الوكيل أدناه"
         },
         {
             "name": "yt_proxy_type",
@@ -2670,7 +2678,7 @@
         },
         {
             "name": "yt_proxy_type_http_subtitle",
-            "value": "HTTP CONNECT proxy"
+            "value": "وكيل HTTP CONNECT"
         },
         {
             "name": "yt_proxy_type_socks5",
@@ -2746,7 +2754,7 @@
         },
         {
             "name": "yt_device_qr_sign_in_subtitle",
-            "value": "Scan with phone or open youtube.com/activate"
+            "value": "امسح أو افتح youtube.com/activate"
         },
         {
             "name": "yt_device_login_help",

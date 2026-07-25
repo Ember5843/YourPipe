@@ -78,7 +78,7 @@
         },
         {
             "name": "yt_option_color_subtitle",
-            "value": "Thème et couleurs d'accent"
+            "value": "Couleurs du thème et d'accent"
         },
         {
             "name": "yt_option_appearance",
@@ -118,7 +118,7 @@
         },
         {
             "name": "yt_option_log_subtitle",
-            "value": "Afficher les journaux récents"
+            "value": "Voir les journaux récents"
         },
         {
             "name": "yt_log_title",
@@ -130,7 +130,7 @@
         },
         {
             "name": "yt_log_enable_subtitle",
-            "value": "Capturer les journaux d'exécution après le démarrage"
+            "value": "Capturer les journaux au lancement"
         },
         {
             "name": "yt_log_disabled_hint",
@@ -170,7 +170,7 @@
         },
         {
             "name": "yt_option_about_subtitle",
-            "value": "Version et remerciements"
+            "value": "Version et crédits"
         },
         {
             "name": "yt_option_in_development",
@@ -377,8 +377,8 @@
             "value": "Meilleure qualité"
         },
         {
-          "name": "yt_quality_auto",
-          "value": "Automatique"
+            "name": "yt_quality_auto",
+            "value": "Automatique"
         },
         {
             "name": "yt_codec_h264_first",
@@ -1014,7 +1014,7 @@
         },
         {
             "name": "yt_option_sync_library_on_launch_subtitle",
-            "value": "Si connecte, recuperer l historique et les abonnements au demarrage"
+            "value": "Charger historique et abonnements au démarrage"
         },
         {
             "name": "yt_option_auth_session",
@@ -1026,7 +1026,7 @@
         },
         {
             "name": "yt_option_sign_out_subtitle",
-            "value": "Effacer les identifiants enregistres"
+            "value": "Effacer la connexion"
         },
         {
             "name": "yt_confirm_sign_out",
@@ -1194,15 +1194,15 @@
         },
         {
             "name": "yt_auth_subtitle_sign_in",
-            "value": "Connectez-vous pour des recommandations personnalisées"
+            "value": "Connectez-vous pour un fil personnalisé"
         },
         {
             "name": "yt_auth_subtitle_cookie_active",
-            "value": "Connecté (Cookie) · Navigation authentifiée"
+            "value": "Connecté (Cookie)"
         },
         {
             "name": "yt_auth_subtitle_active",
-            "value": "Connecté · Navigation authentifiée"
+            "value": "Connecté"
         },
         {
             "name": "yt_auth_subtitle_incognito",
@@ -1230,7 +1230,7 @@
         },
         {
             "name": "yt_cookie_import_subtitle",
-            "value": "Collez un Cookie du navigateur ou le JSON EditThisCookie"
+            "value": "Coller les cookies du navigateur"
         },
         {
             "name": "yt_cookie_import_help",
@@ -1290,7 +1290,7 @@
         },
         {
             "name": "yt_google_web_sign_in_subtitle",
-            "value": "Connectez-vous à YouTube / Google sur le web"
+            "value": "Connexion web YouTube"
         },
         {
             "name": "yt_google_web_sign_in_title",
@@ -1322,7 +1322,7 @@
         },
         {
             "name": "yt_playback_pip_on_return_subtitle",
-            "value": "Ouvrir le picture-in-picture automatiquement en appuyant sur Retour ou Accueil"
+            "value": "PiP auto sur Retour/Accueil"
         },
         {
             "name": "yt_playback_player",
@@ -1338,7 +1338,7 @@
         },
         {
             "name": "yt_playback_gesture_seek_subtitle",
-            "value": "Balayez horizontalement la vidéo pour prévisualiser et modifier la position"
+            "value": "Glisser horizontalement pour chercher"
         },
         {
             "name": "yt_playback_gesture_brightness",
@@ -1346,7 +1346,7 @@
         },
         {
             "name": "yt_playback_gesture_brightness_subtitle",
-            "value": "Balayez verticalement la moitié gauche pour régler la luminosité de l’écran"
+            "value": "Côté gauche : luminosité"
         },
         {
             "name": "yt_playback_gesture_volume",
@@ -1354,7 +1354,7 @@
         },
         {
             "name": "yt_playback_gesture_volume_subtitle",
-            "value": "Balayez verticalement la moitié droite pour régler le volume"
+            "value": "Côté droit : volume"
         },
         {
             "name": "yt_playback_background_audio_only",
@@ -1362,7 +1362,15 @@
         },
         {
             "name": "yt_playback_background_audio_only_subtitle",
-            "value": "Désactiver le décodage vidéo en arrière-plan pour économiser l'énergie ; partage, casting et PiP ne sont pas affectés"
+            "value": "Couper la vidéo en arrière-plan pour économiser"
+        },
+        {
+            "name": "yt_playback_auto_play_next",
+            "value": "Lire automatiquement la vidéo suivante"
+        },
+        {
+            "name": "yt_playback_auto_play_next_subtitle",
+            "value": "Valeur par défaut de lecture auto au lancement"
         },
         {
             "name": "yt_playback_video_off_delay",
@@ -1374,7 +1382,7 @@
         },
         {
             "name": "yt_playback_hwdec_subtitle",
-            "value": "Utiliser le décodage accéléré par matériel pour réduire la consommation et améliorer les performances"
+            "value": "Décodage matériel, moins de conso"
         },
         {
             "name": "yt_playback_gpu_rendering",
@@ -1718,7 +1726,7 @@
         },
         {
             "name": "yt_option_reset_settings_subtitle",
-            "value": "Réinitialiser tous les paramètres aux valeurs par défaut"
+            "value": "Restaurer les paramètres par défaut"
         },
         {
             "name": "yt_option_clear_all_data",
@@ -1726,7 +1734,7 @@
         },
         {
             "name": "yt_option_clear_all_data_subtitle",
-            "value": "Supprimer toutes les données stockées, y compris l'historique et le cache"
+            "value": "Effacer historique, cache et toutes les données"
         },
         {
             "name": "yt_toast_reset_settings_done",
@@ -1770,7 +1778,7 @@
         },
         {
             "name": "yt_option_data_account_subtitle",
-            "value": "Gérer l'état de connexion et les données locales"
+            "value": "Compte et données locales"
         },
         {
             "name": "yt_section_account",
@@ -1790,7 +1798,7 @@
         },
         {
             "name": "yt_option_export_data_subtitle",
-            "value": "Sauvegarder les données locales en fichier JSON"
+            "value": "Sauvegarder les données locales en JSON"
         },
         {
             "name": "yt_option_restore_data",
@@ -1798,7 +1806,7 @@
         },
         {
             "name": "yt_option_restore_data_subtitle",
-            "value": "Restaurer les données depuis un fichier de sauvegarde JSON"
+            "value": "Restaurer depuis une sauvegarde JSON"
         },
         {
             "name": "yt_backup_item_settings",
@@ -2502,7 +2510,7 @@
         },
         {
             "name": "yt_option_auth_use_for_user_data_subtitle",
-            "value": "Fil d actualité, abonnements, historique, recherche"
+            "value": "Fil, abonnements, historique, recherche"
         },
         {
             "name": "yt_option_auth_use_for_playback",
@@ -2622,7 +2630,7 @@
         },
         {
             "name": "yt_option_auth_use_for_playback_subtitle",
-            "value": "API du lecteur et authentification des URL de flux"
+            "value": "API lecteur et auth des flux"
         },
         {
             "name": "yt_player_more_tools",
@@ -2658,7 +2666,7 @@
         },
         {
             "name": "yt_proxy_enable_subtitle",
-            "value": "Route YouTube and media requests through the proxy below"
+            "value": "Passer YouTube par le proxy ci-dessous"
         },
         {
             "name": "yt_proxy_type",
@@ -2670,7 +2678,7 @@
         },
         {
             "name": "yt_proxy_type_http_subtitle",
-            "value": "HTTP CONNECT proxy"
+            "value": "Proxy HTTP CONNECT"
         },
         {
             "name": "yt_proxy_type_socks5",
@@ -2746,7 +2754,7 @@
         },
         {
             "name": "yt_device_qr_sign_in_subtitle",
-            "value": "Scan with phone or open youtube.com/activate"
+            "value": "Scanner ou ouvrir youtube.com/activate"
         },
         {
             "name": "yt_device_login_help",
