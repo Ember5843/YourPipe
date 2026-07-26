@@ -9,6 +9,10 @@ import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
+import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { ActionHub } from '../../common/ActionHub';
+import { SubscriptionUser } from '../../common/SubscriptionModel';
+import { SubscriptionFeedItem } from '../../common/SubscriptionFeedStore';
 
 
 const logger = AppLog.getInstance('FavoritesPage');
@@ -20,6 +24,9 @@ export struct FavoritesPage {
   @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
+  @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
+  @StorageLink('subscriptionFeed') feedItems: SubscriptionFeedItem[] = [];
+  @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State overviewMap: Record<string, SearchPlaylistItem> = {};
@@ -138,8 +145,92 @@ export struct FavoritesPage {
     }
   }
 
+  /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
+  private getWideListColumns(): number {
+    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
+    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
+    return getWideListColumnCount(contentWidth);
+  }
+
+  private getFeedCoverUrls(): string[] {
+    const urls: string[] = [];
+    for (const item of this.feedItems) {
+      if (item.thumbnailUrl && urls.indexOf(item.thumbnailUrl) < 0) {
+        urls.push(item.thumbnailUrl);
+      }
+      if (urls.length >= 4) {
+        break;
+      }
+    }
+    return urls;
+  }
+
+  @Builder
+  private SubscriptionFeedEntry() {
+    ListItem() {
+      Row({ space: 12 }) {
+        if (this.getFeedCoverUrls().length > 0) {
+          GridRow({ columns: 2, gutter: 0 }) {
+            ForEach(this.getFeedCoverUrls(), (url: string) => {
+              GridCol({ span: 1 }) {
+                Image(url)
+                  .width(32)
+                  .height(32)
+                  .objectFit(ImageFit.Cover)
+              }
+            }, (url: string) => url)
+          }
+          .width(64)
+          .height(64)
+          .borderRadius(8)
+          .clip(true)
+        } else {
+          Column() {
+            SymbolGlyph($r('sys.symbol.person_2_fill'))
+              .fontSize(28)
+              .fontColor([Color.White])
+          }
+          .width(64)
+          .height(64)
+          .borderRadius(8)
+          .backgroundColor($r('app.color.yourtube_theme_primary'))
+          .justifyContent(FlexAlign.Center)
+        }
+
+        Column({ space: 4 }) {
+          Text($r('app.string.yt_sub_feed_entry_title'))
+            .fontSize(16)
+            .fontColor($r('app.color.yourtube_text_primary'))
+            .fontWeight(FontWeight.Medium)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(getContext().resourceManager.getStringSync($r('app.string.yt_sub_feed_entry_subtitle').id, this.subscriptions.length))
+            .fontSize(12)
+            .fontColor($r('app.color.yourtube_text_secondary'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+          .fontSize(20)
+          .fontColor([$r('app.color.yourtube_text_hint')])
+      }
+      .width('100%')
+      .padding(12)
+      .backgroundColor($r('app.color.yourtube_bg_surface'))
+      .borderRadius(12)
+      .onClick(() => {
+        this.actionHub.openSubscriptionFeed();
+      })
+    }
+  }
+
   build() {
     List({ space: 4 }) {
+      this.SubscriptionFeedEntry()
+
       // 收藏的视频部分
       ListItem() {
         Text($r('app.string.yt_fav_videos_title'))
@@ -173,6 +264,27 @@ export struct FavoritesPage {
               ForEach(this.favorites, (item: VideoItem) => {
                 GridCol({ span: 1 }) {
                   VideoCardGrid({
+                    video: item,
+                    actionLabel: $r('app.string.yt_action_unfavorite'),
+                    actionType: 'remove',
+                    showViewCount: false,
+                    showLiveTag: false
+                  })
+                }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
+              }, (item: VideoItem) => item.videoId || item.id.toString())
+            }
+            .width('100%')
+          }
+        } else if (this.getWideListColumns() > 1) {
+          ListItem() {
+            GridRow({
+              columns: this.getWideListColumns(),
+              gutter: { x: 8, y: 4 }
+            }) {
+              ForEach(this.favorites, (item: VideoItem) => {
+                GridCol({ span: 1 }) {
+                  VideoCard({
                     video: item,
                     actionLabel: $r('app.string.yt_action_unfavorite'),
                     actionType: 'remove',

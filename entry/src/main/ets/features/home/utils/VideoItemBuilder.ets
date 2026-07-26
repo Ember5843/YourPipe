@@ -1,5 +1,6 @@
 import { VideoItem } from 'youtube_core';
 import { ThumbnailPlaceholder } from '../../../common/ThumbnailPlaceholder';
+import { RelativeTimeParser } from '../../../common/utils/RelativeTimeParser';
 import { getTextFromRuns } from './TextUtils';
 import {
   getThumbnailUrlFromThumbnailObject,
@@ -32,7 +33,47 @@ export function buildVideoItemFromRenderer(
   const thumbnailUrl = getThumbFromRenderer(renderer);
   const channelId = getChannelId(renderer);
   const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, id);
-  return new VideoItem(id, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", "", null, isPremium, requiresMembership);
+  const item = new VideoItem(id, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", "", null, isPremium, requiresMembership);
+  item.publishedTimeText = getPublishedTimeText(renderer);
+  return item;
+}
+
+/** publishedTimeText 直取；lockup 布局退化为在 metadata 行里找能解析为相对时间的文本。 */
+function getPublishedTimeText(renderer: Record<string, Object>): string {
+  const direct = getTextFromRuns(renderer["publishedTimeText"]);
+  if (direct) {
+    return direct;
+  }
+  const metadata = renderer["metadata"] as Record<string, Object>;
+  const lmv = metadata
+    ? (metadata["lockupMetadataViewModel"] as Record<string, Object>)
+    : undefined;
+  const meta = lmv ? (lmv["metadata"] as Record<string, Object>) : undefined;
+  const cmv = meta
+    ? (meta["contentMetadataViewModel"] as Record<string, Object>)
+    : undefined;
+  const rows = cmv
+    ? (cmv["metadataRows"] as Array<Record<string, Object>>)
+    : undefined;
+  if (!rows) {
+    return "";
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const parts = rows[i]
+      ? (rows[i]["metadataParts"] as Array<Record<string, Object>>)
+      : undefined;
+    if (!parts) {
+      continue;
+    }
+    for (let j = 0; j < parts.length; j++) {
+      const text = parts[j] ? (parts[j]["text"] as Record<string, Object>) : undefined;
+      const content = text ? ((text["content"] as string) || "") : "";
+      if (content.length > 0 && RelativeTimeParser.parse(content) > 0) {
+        return content;
+      }
+    }
+  }
+  return "";
 }
 
 export function buildVideoItemFromReelRenderer(renderer: Record<string, Object>, id: number): VideoItem | null {

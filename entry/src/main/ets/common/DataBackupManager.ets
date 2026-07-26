@@ -5,6 +5,7 @@ import { AppLog } from './AppLog';
 import { PreferencesStore } from './PreferencesStore';
 import { LocalStore } from './LocalStore';
 import { WatchHistoryStore, WatchHistoryItem } from './WatchHistoryStore';
+import { SubscriptionFeedStore, SubscriptionFeedItem } from './SubscriptionFeedStore';
 import { SearchHistoryStore, SearchHistoryItem } from './SearchHistoryStore';
 import { UIConfig } from './AppState';
 import { PlaybackConfig } from './PlaybackConfig';
@@ -50,6 +51,7 @@ export class DataBackupManager {
     const items: BackupItems = {
       settings: undefined,
       subscriptions: undefined,
+      subscriptionFeed: undefined,
       favorites: undefined,
       playlists: undefined,
       localQueues: undefined,
@@ -65,6 +67,9 @@ export class DataBackupManager {
           break;
         case 'subscriptions':
           items.subscriptions = AppStorage.get<SubscriptionUser[]>('subscriptions') ?? [];
+          break;
+        case 'subscriptionFeed':
+          items.subscriptionFeed = SubscriptionFeedStore.getItems();
           break;
         case 'favorites':
           items.favorites = AppStorage.get<VideoItem[]>('favorites') ?? [];
@@ -190,6 +195,7 @@ export class DataBackupManager {
       switch (key) {
         case 'settings': return items.settings;
         case 'subscriptions': return items.subscriptions;
+        case 'subscriptionFeed': return items.subscriptionFeed;
         case 'favorites': return items.favorites;
         case 'playlists': return items.playlists;
         case 'localQueues': return items.localQueues;
@@ -214,6 +220,7 @@ export class DataBackupManager {
       switch (key) {
         case 'settings': return items.settings;
         case 'subscriptions': return items.subscriptions;
+        case 'subscriptionFeed': return items.subscriptionFeed;
         case 'favorites': return items.favorites;
         case 'playlists': return items.playlists;
         case 'localQueues': return items.localQueues;
@@ -234,6 +241,9 @@ export class DataBackupManager {
           break;
         case 'subscriptions':
           DataBackupManager.restoreSubscriptions(value as SubscriptionUser[]);
+          break;
+        case 'subscriptionFeed':
+          SubscriptionFeedStore.replaceAll(Array.isArray(value) ? value as SubscriptionFeedItem[] : []);
           break;
         case 'favorites':
           DataBackupManager.restoreFavorites(value as VideoItem[]);
@@ -277,6 +287,8 @@ export class DataBackupManager {
     const list = Array.isArray(items) ? items : [];
     AppStorage.setOrCreate('subscriptions', list);
     PreferencesStore.setString('subscriptionsJson', LocalStore.saveSubscriptions(list));
+    // 订阅列表被恢复覆盖 → 动态缓存清零，下次进入动态页重新拉取
+    SubscriptionFeedStore.clear();
   }
 
   private static restoreFavorites(items: VideoItem[]): void {

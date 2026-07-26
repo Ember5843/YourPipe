@@ -1,7 +1,7 @@
 import { WatchHistoryStore, WatchHistoryItem } from '../../common/WatchHistoryStore';
 import { DownloadManager, DownloadTask } from '../../common/DownloadManager';
 import { ActionHub } from '../../common/ActionHub';
-import { AuthAccountStatus, AuthSessionManager, VideoItem } from 'youtube_core';
+import { AuthAccountStatus, AuthSessionManager, SearchPlaylistItem, VideoItem } from 'youtube_core';
 import { customVibrator } from '../../common/VibratorUtil';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
@@ -21,6 +21,7 @@ import {
   MEDIA_TITLE_SIZE
 } from '../../common/components/MediaCardTokens';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
+import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 import { AppLog } from '../../common/AppLog';
 
 const logger = AppLog.getInstance('LocalPage');
@@ -81,8 +82,28 @@ struct HistoryCard {
     this.isShowContextMenu = false;
   }
 
+  private isPlaylistEntry(): boolean {
+    return WatchHistoryStore.playlistIdOf(this.item.videoId).length > 0;
+  }
+
+  private playlistTypeLabel(): string {
+    if (!this.isPlaylistEntry()) {
+      return '';
+    }
+    try {
+      return getContext().resourceManager.getStringSync($r('app.string.yt_filter_playlists').id);
+    } catch (_e) {
+      return '';
+    }
+  }
+
   private openAudioOnly(): void {
     this.isShowContextMenu = false;
+    // 播放列表条目没有单视频可音频续播，按普通打开处理（进入列表）
+    if (this.isPlaylistEntry()) {
+      this.onOpen(this.item);
+      return;
+    }
     this.actionHub.openVideo(this.toVideoItem(), undefined, true);
   }
 
@@ -130,7 +151,8 @@ struct HistoryCard {
           placeholderColor: '#1A1A1A',
           widthVp: MEDIA_LIST_THUMB_WIDTH,
           heightVp: MEDIA_LIST_THUMB_HEIGHT,
-          borderRadiusVp: MEDIA_THUMB_RADIUS
+          borderRadiusVp: MEDIA_THUMB_RADIUS,
+          typeLabel: this.playlistTypeLabel()
         })
 
         Column() {
@@ -246,6 +268,7 @@ export struct LocalPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   onSwitchOuterTab: (index: number) => void = (_index: number) => {};
   @StorageLink('watchHistory') history: WatchHistoryItem[] = [];
+  @StorageLink('deviceWidth') deviceWidth: number = 0;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
@@ -293,7 +316,21 @@ export struct LocalPage {
     WatchHistoryStore.clear();
   }
 
+  /** 条式历史列表在宽屏（平板展开/2in1/电视）下的列数 */
+  private getWideListColumns(): number {
+    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
+    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - 24);
+    return getWideListColumnCount(contentWidth);
+  }
+
   private openVideo(item: WatchHistoryItem, audioOnly: boolean = false): void {
+    // 播放列表来源的历史：点击打开对应列表
+    const playlistId = WatchHistoryStore.playlistIdOf(item.videoId);
+    if (playlistId) {
+      this.actionHub.openPlaylist(
+        new SearchPlaylistItem(0, playlistId, item.title, '', '', item.thumbnailUrl, '', '#1A1A1A'));
+      return;
+    }
     const video = new VideoItem(
       0,
       item.videoId,
@@ -383,15 +420,35 @@ export struct LocalPage {
               }
             }
 
-            ForEach(this.history, (item: WatchHistoryItem) => {
+            if (this.getWideListColumns() > 1) {
               ListItem() {
-                HistoryCard({
-                  item: item,
-                  onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
-                })
+                GridRow({
+                  columns: this.getWideListColumns(),
+                  gutter: { x: 8, y: 8 }
+                }) {
+                  ForEach(this.history, (item: WatchHistoryItem) => {
+                    GridCol({ span: 1 }) {
+                      HistoryCard({
+                        item: item,
+                        onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
+                      })
+                    }
+                    .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
+                  }, (item: WatchHistoryItem) => item.videoId)
+                }
+                .width('100%')
               }
-              .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
-            }, (item: WatchHistoryItem) => item.videoId)
+            } else {
+              ForEach(this.history, (item: WatchHistoryItem) => {
+                ListItem() {
+                  HistoryCard({
+                    item: item,
+                    onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
+                  })
+                }
+                .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
+              }, (item: WatchHistoryItem) => item.videoId)
+            }
           }
           .width('100%')
           .height('100%')

@@ -1929,6 +1929,38 @@
             "value": "YouTube 訂閱動態"
         },
         {
+            "name": "yt_sub_feed_title",
+            "value": "訂閱動態"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "訂閱動態"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "%d 個訂閱頻道"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "%d 個新影片"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "下拉重新整理取得訂閱頻道的最新影片"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "訂閱動態快取"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "訂閱動態快速模式 (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "使用輕量 RSS 抓取，請求更少但資訊不完整"
+        },
+        {
             "name": "yt_backup_error_no_context",
             "value": "無法取得應用程式內容"
         },

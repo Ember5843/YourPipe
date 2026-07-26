@@ -26,8 +26,45 @@ export interface WatchHistoryItem {
 export class WatchHistoryStore {
   private static readonly KEY: string = 'watch_history';
   private static readonly MAX_COUNT: number = 100;
+  /** 播放列表来源的历史条目：videoId 以此前缀编码（playlist:<playlistId>） */
+  static readonly PLAYLIST_KEY_PREFIX: string = 'playlist:';
   /** 进度超过这个比例时视为完播，下次从头播放 */
   private static readonly FINISHED_THRESHOLD: number = 0.9;
+
+  /** 从历史条目 key 解析播放列表 id；非播放列表条目返回 '' */
+  static playlistIdOf(videoId: string): string {
+    if (videoId && videoId.startsWith(WatchHistoryStore.PLAYLIST_KEY_PREFIX)) {
+      return videoId.substring(WatchHistoryStore.PLAYLIST_KEY_PREFIX.length);
+    }
+    return '';
+  }
+
+  /**
+   * 记录一条“播放列表”历史：从播放列表/本地队列进入播放时，
+   * 历史保存列表本身而不是单个视频。按 playlistId 去重并置顶。
+   */
+  static recordPlaylist(playlistId: string, playlistName: string, thumbnailUrl: string): void {
+    const id = (playlistId || '').trim();
+    if (!id) return;
+    const key = WatchHistoryStore.PLAYLIST_KEY_PREFIX + id;
+    const all = WatchHistoryStore.getAll();
+    const filtered = all.filter((item: WatchHistoryItem) => item.videoId !== key);
+    const item: WatchHistoryItem = {
+      videoId: key,
+      title: playlistName || id,
+      author: '',
+      thumbnailUrl: thumbnailUrl || '',
+      durationSec: 0,
+      progressSec: 0,
+      lastWatchedAt: Date.now(),
+      channelId: '',
+      channelAvatarUrl: '',
+      channelHandle: ''
+    };
+    filtered.unshift(item);
+    WatchHistoryStore.save(filtered.slice(0, WatchHistoryStore.MAX_COUNT));
+    WatchHistoryStore.syncToAppStorage();
+  }
 
   /**
    * 记录/更新一条观看历史，并保存当前进度。

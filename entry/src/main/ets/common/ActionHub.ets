@@ -18,6 +18,7 @@ export class ActionHub {
   openChannel: (channel: SearchChannelItem) => void = () => {};
   openChannelById: (channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string) => void = () => {};
   openPlaylist: (playlist: SearchPlaylistItem) => void = () => {};
+  openSubscriptionFeed: () => void = () => {};
   closePage: () => void = () => {};
   addFavorite: (video: VideoItem) => void = () => {};
   removeFavorite: (videoId: string) => void = () => {};

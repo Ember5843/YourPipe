@@ -32,6 +32,8 @@ export struct BackupItemPickerDialog {
         return $r('app.string.yt_backup_item_settings');
       case 'subscriptions':
         return $r('app.string.yt_backup_item_subscriptions');
+      case 'subscriptionFeed':
+        return $r('app.string.yt_backup_item_subscription_feed');
       case 'favorites':
         return $r('app.string.yt_backup_item_favorites');
       case 'playlists':

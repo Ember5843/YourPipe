@@ -1581,6 +1581,38 @@
             "value": "خلاصة اشتراكات YouTube"
         },
         {
+            "name": "yt_sub_feed_title",
+            "value": "موجز الاشتراكات"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "موجز الاشتراكات"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "%d قنوات مشتركة"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "%d فيديوهات جديدة"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "اسحب للتحديث للحصول على أحدث الفيديوهات من اشتراكاتك"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "ذاكرة موجز الاشتراكات"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "وضع موجز الاشتراكات السريع (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "جلب عبر RSS خفيف؛ طلبات أقل لكن بيانات غير كاملة"
+        },
+        {
             "name": "yt_setting_home_layout",
             "value": "تخطيط الصفحة الرئيسية"
         },

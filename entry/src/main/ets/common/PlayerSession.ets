@@ -808,6 +808,18 @@ export class PlayerSession {
       return;
     }
     try {
+      // 播放列表/本地队列来源：历史记录列表本身，点击回到列表而非单个视频
+      const queue = PlayQueueManager.getInstance();
+      if ((queue.sourceType === QueueSourceType.REMOTE || queue.sourceType === QueueSourceType.LOCAL)
+        && queue.sourceId.trim().length > 0) {
+        WatchHistoryStore.recordPlaylist(
+          queue.sourceId,
+          queue.sourceName,
+          this._currentVideo?.thumbnailUrl || ''
+        );
+        logger.info(`${TAG} Saved playlist history: ${queue.sourceId}`);
+        return;
+      }
       const progressSec = this._controller.vm.currentTime;
       const durationSec = this._controller.vm.durationTime;
       WatchHistoryStore.record(

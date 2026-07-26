@@ -14,6 +14,7 @@ import { ChannelInfoService, ChannelProfile } from '../../features/user/ChannelI
 import { SubscriptionFeedService } from '../../features/subscription/SubscriptionFeedService';
 import { UIConfig } from '../../common/AppState';
 import { VideoCard } from '../../common/components/VideoCard';
+import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 import { VideoCardGrid } from '../../common/components/VideoCardGrid';
 import { PlaylistCard } from '../../features/playlist/components/PlaylistCard';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
@@ -95,6 +96,13 @@ export struct UserPage {
       return 2;
     }
     return 1;
+  }
+
+  /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
+  private getWideListColumns(): number {
+    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
+    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
+    return getWideListColumnCount(contentWidth);
   }
 
   private getChannelId(): string {
@@ -636,6 +644,52 @@ export struct UserPage {
         .onReachEnd(() => {
           this.loadMoreVideos();
         })
+      } else if (this.getWideListColumns() > 1) {
+        Scroll() {
+          Column() {
+            GridRow({
+              columns: this.getWideListColumns(),
+              gutter: { x: 8, y: 4 }
+            }) {
+              ForEach(this.videoList, (item: VideoItem) => {
+                GridCol({ span: 1 }) {
+                  VideoCard({
+                    video: item,
+                    actionLabel: $r('app.string.yt_action_favorite'),
+                    actionType: 'favorite',
+                    showAuthor: false,
+                    useFavoriteToggle: true
+                  })
+                }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
+              }, (item: VideoItem) => item.videoId || item.id.toString())
+            }
+            .width('100%')
+
+            if (this.isLoadingMore) {
+              Row() {
+                LoadingProgress()
+                  .color(this.themePrimary)
+                  .width(26)
+                  .height(26)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+            }
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .backgroundColor($r('app.color.yourtube_bg_page'))
+        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
+        .edgeEffect(EdgeEffect.Spring)
+        .scrollBar(BarState.Off)
+        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+        .layoutWeight(1)
+        .onReachEnd(() => {
+          this.loadMoreVideos();
+        })
       } else {
         List({ space: 4, scroller: this.scrollerForList }) {
           ForEach(this.videoList, (item: VideoItem) => {
@@ -716,6 +770,52 @@ export struct UserPage {
               ForEach(this.shortsList, (item: VideoItem) => {
                 GridCol({ span: 1 }) {
                   VideoCardGrid({
+                    video: item,
+                    actionLabel: $r('app.string.yt_action_favorite'),
+                    actionType: 'favorite',
+                    showAuthor: false,
+                    useFavoriteToggle: true
+                  })
+                }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
+              }, (item: VideoItem) => item.videoId || item.id.toString())
+            }
+            .width('100%')
+
+            if (this.isLoadingMoreShorts) {
+              Row() {
+                LoadingProgress()
+                  .color(this.themePrimary)
+                  .width(26)
+                  .height(26)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+            }
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .backgroundColor($r('app.color.yourtube_bg_page'))
+        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
+        .edgeEffect(EdgeEffect.Spring)
+        .scrollBar(BarState.Off)
+        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+        .layoutWeight(1)
+        .onReachEnd(() => {
+          this.loadMoreShorts();
+        })
+      } else if (this.getWideListColumns() > 1) {
+        Scroll() {
+          Column() {
+            GridRow({
+              columns: this.getWideListColumns(),
+              gutter: { x: 8, y: 4 }
+            }) {
+              ForEach(this.shortsList, (item: VideoItem) => {
+                GridCol({ span: 1 }) {
+                  VideoCard({
                     video: item,
                     actionLabel: $r('app.string.yt_action_favorite'),
                     actionType: 'favorite',
@@ -869,6 +969,52 @@ export struct UserPage {
         .onReachEnd(() => {
           this.loadMoreLive();
         })
+      } else if (this.getWideListColumns() > 1) {
+        Scroll() {
+          Column() {
+            GridRow({
+              columns: this.getWideListColumns(),
+              gutter: { x: 8, y: 4 }
+            }) {
+              ForEach(this.liveList, (item: VideoItem) => {
+                GridCol({ span: 1 }) {
+                  VideoCard({
+                    video: item,
+                    actionLabel: $r('app.string.yt_action_favorite'),
+                    actionType: 'favorite',
+                    showAuthor: false,
+                    useFavoriteToggle: true
+                  })
+                }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
+              }, (item: VideoItem) => item.videoId || item.id.toString())
+            }
+            .width('100%')
+
+            if (this.isLoadingMoreLive) {
+              Row() {
+                LoadingProgress()
+                  .color(this.themePrimary)
+                  .width(26)
+                  .height(26)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+            }
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .backgroundColor($r('app.color.yourtube_bg_page'))
+        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
+        .edgeEffect(EdgeEffect.Spring)
+        .scrollBar(BarState.Off)
+        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+        .layoutWeight(1)
+        .onReachEnd(() => {
+          this.loadMoreLive();
+        })
       } else {
         List({ space: 4, scroller: this.scrollerForList }) {
           ForEach(this.liveList, (item: VideoItem) => {
@@ -940,6 +1086,48 @@ export struct UserPage {
           .margin({ top: 20 })
           .width('100%')
           .textAlign(TextAlign.Center)
+      } else if (this.getWideListColumns() > 1) {
+        Scroll() {
+          Column() {
+            GridRow({
+              columns: this.getWideListColumns(),
+              gutter: { x: 8, y: 4 }
+            }) {
+              ForEach(this.playlistList, (item: SearchPlaylistItem) => {
+                GridCol({ span: 1 }) {
+                  PlaylistCard({
+                    playlist: item
+                  })
+                }
+                .transition(customAnimationUtil.isScaleTran(item.playlistId || item.id.toString(), this.uiConfig))
+              }, (item: SearchPlaylistItem) => item.playlistId || item.id.toString())
+            }
+            .width('100%')
+
+            if (this.isLoadingMorePlaylists) {
+              Row() {
+                LoadingProgress()
+                  .color(this.themePrimary)
+                  .width(26)
+                  .height(26)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+            }
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .backgroundColor($r('app.color.yourtube_bg_page'))
+        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
+        .edgeEffect(EdgeEffect.Spring)
+        .scrollBar(BarState.Off)
+        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+        .layoutWeight(1)
+        .onReachEnd(() => {
+          this.loadMorePlaylists();
+        })
       } else {
         List({ space: 4, scroller: this.scrollerForList }) {
           ForEach(this.playlistList, (item: SearchPlaylistItem) => {

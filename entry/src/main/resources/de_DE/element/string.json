@@ -1929,6 +1929,38 @@
             "value": "YouTube-Abonnement-Feed"
         },
         {
+            "name": "yt_sub_feed_title",
+            "value": "Abo-Feed"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "Abo-Feed"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "%d abonnierte Kanäle"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "%d neue Videos"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "Zum Aktualisieren ziehen, um die neuesten Videos deiner Abos zu laden"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "Abo-Feed-Zwischenspeicher"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "Schneller Abo-Feed (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "Abruf über leichtgewichtiges RSS; weniger Anfragen, aber unvollständige Metadaten"
+        },
+        {
             "name": "yt_backup_error_no_context",
             "value": "App-Kontext konnte nicht abgerufen werden"
         },

@@ -17,6 +17,7 @@ import { DataBackupManager, BackupError } from '../../common/DataBackupManager';
 import { BackupItemKey, AppBackupData, ALL_BACKUP_ITEM_KEYS } from '../../common/model/BackupModels';
 import { AuthStateHelper } from '../../common/AuthStateHelper';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
+import { PreferencesStore } from '../../common/PreferencesStore';
 import { AppLog } from '../../common/AppLog';
 
 const logger = AppLog.getInstance('OptionsDataAccountPage');
@@ -51,6 +52,7 @@ export struct OptionsDataAccountPage {
   };
 
   @State isBusy: boolean = false;
+  @State private isFeedFastMode: boolean = PreferencesStore.getString('cfg_feed_fast_mode', 'false') === 'true';
   @State private showCookieImport: boolean = false;
   @State private cookieInput: string = '';
   @State private cookieImportMessage: string = '';
@@ -730,6 +732,31 @@ export struct OptionsDataAccountPage {
                 this.params.updateUiConfig(cfg => {
                   cfg.syncUserLibraryOnLaunch = val;
                 });
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_sub_feed_title') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_feed_fast_mode_title'),
+              subtitle: $r('app.string.yt_feed_fast_mode_subtitle'),
+              isOn: this.isFeedFastMode,
+              themeColor: this.themePrimary,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.isFeedFastMode = val;
+                PreferencesStore.setString('cfg_feed_fast_mode', val ? 'true' : 'false');
               }
             })
           }

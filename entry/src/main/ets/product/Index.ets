@@ -29,6 +29,8 @@ import { HomeRecommendSwiper } from '../features/home/components/HomeRecommendSw
 import { ErrorPage } from '../common/components/ErrorPage';
 import { SearchPage, SearchPageLaunchParams } from '../features/search/SearchPage';
 import { SubscriptionManagePage } from '../features/subscription/SubscriptionManagePage';
+import { SubscriptionFeedPage } from '../features/subscription/SubscriptionFeedPage';
+import { SubscriptionFeedStore } from '../common/SubscriptionFeedStore';
 import { SubscriptionScrollCoordinator } from '../features/subscription/SubscriptionScrollCoordinator';
 import { FavoritesPage } from '../features/favorites/FavoritesPage';
 import { LocalPage } from '../features/local/LocalPage';
@@ -388,6 +390,7 @@ struct Index {
     // 6. 清空各业务数据
     this.subscriptions = [];
     AppStorage.setOrCreate('subscriptions', []);
+    SubscriptionFeedStore.clear();
     this.favorites = [];
     AppStorage.setOrCreate('favorites', []);
     this.playlists = [];
@@ -599,6 +602,8 @@ struct Index {
 
   private syncSubscriptionsToStorage(): void {
     PreferencesStore.setString('subscriptionsJson', LocalStore.saveSubscriptions(this.subscriptions));
+    // 订阅列表变化（增/删/云端合并）→ 动态缓存清零，下次进入动态页重新拉取
+    SubscriptionFeedStore.clear();
   }
 
   /** 登录后用 cookie 同步云端历史 + 订阅频道列表（不阻塞首页）。 */
@@ -779,6 +784,10 @@ struct Index {
     };
     this.actionHub.openPlaylist = (playlist: SearchPlaylistItem) => {
       this.openPlaylistPage(playlist);
+    };
+    this.actionHub.openSubscriptionFeed = () => {
+      this.showOptions = false;
+      this.navPathStack.pushPath({ name: 'SubscriptionFeedPage' });
     };
     this.actionHub.closePage = () => {
       this.closeCurrentPage();
@@ -1744,6 +1753,8 @@ struct Index {
       PlaylistDetailPage({
         playlist: this.selectedPlaylist ?? new SearchPlaylistItem(0, '', 'Untitled', '', '', '', '', '#CCCCCC')
       })
+    } else if (name === 'SubscriptionFeedPage') {
+      SubscriptionFeedPage()
     }
   }
 

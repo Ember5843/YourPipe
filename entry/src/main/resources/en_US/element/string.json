@@ -1653,6 +1653,38 @@
             "value": "YouTube subscriptions feed"
         },
         {
+            "name": "yt_sub_feed_title",
+            "value": "Subscription feed"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "Subscription feed"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "%d subscribed channels"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "%d new videos"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "Pull to refresh for the latest videos from your subscriptions"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "Subscription feed cache"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "Fast subscription feed (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "Fetch via lightweight RSS; fewer requests but incomplete metadata"
+        },
+        {
             "name": "yt_action_open_browser",
             "value": "Open in browser"
         },

@@ -156,7 +156,12 @@ export struct PlaylistCard {
     if (typeof this.typeLabel === 'string') {
       return this.typeLabel;
     }
-    return '';
+    // Resource 形式的标签（如搜索页传入的 $r）需解析成字符串，否则角标为空
+    try {
+      return getContext().resourceManager.getStringSync((this.typeLabel as Resource).id);
+    } catch (_e) {
+      return '';
+    }
   }
 
   build() {

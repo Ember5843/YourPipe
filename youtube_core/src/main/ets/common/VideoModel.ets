@@ -14,6 +14,8 @@ export class VideoItem {
   channelHandle: string;
   videoDescription: string;
   videoDescriptionError: string | null;
+  /** 发布时间的本地化相对文本（如 "3 days ago" / "3 天前"），由 entry 侧解析；无则空串 */
+  publishedTimeText: string = '';
 
   constructor(
     id: number,

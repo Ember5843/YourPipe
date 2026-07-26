@@ -18,6 +18,7 @@ import { MediaThumb } from '../../common/components/MediaThumb';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
 import { PlayQueueSourceHint } from '../player/PlayQueueManager';
+import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 
 const logger = AppLog.getInstance('PlaylistDetailPage');
 
@@ -88,6 +89,13 @@ export struct PlaylistDetailPage {
       return 2;
     }
     return 1;
+  }
+
+  /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
+  private getWideListColumns(): number {
+    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
+    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
+    return getWideListColumnCount(contentWidth);
   }
 
   private async loadPlaylistVideos(): Promise<void> {
@@ -345,6 +353,53 @@ export struct PlaylistDetailPage {
           if (!this.isLoading && !this.isLoadingMore && this.nextPageToken) {
             this.loadMoreVideos();
           }
+        })
+      } else if (this.getWideListColumns() > 1) {
+        Scroll() {
+          Column() {
+            GridRow({
+              columns: this.getWideListColumns(),
+              gutter: { x: 8, y: 4 }
+            }) {
+              ForEach(this.videoList, (item: VideoItem, index: number) => {
+                GridCol({ span: 1 }) {
+                  VideoCard({
+                    video: item,
+                    actionLabel: $r('app.string.yt_action_favorite'),
+                    actionType: 'favorite',
+                    useFavoriteToggle: true,
+                    onOpenVideo: () => {
+                      this.openPlaylistVideo(item, index);
+                    }
+                  })
+                }
+                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
+              }, (item: VideoItem) => item.videoId || item.id.toString())
+            }
+            .width('100%')
+
+            if (this.isLoadingMore) {
+              Row() {
+                LoadingProgress()
+                  .color(this.themePrimary)
+                  .width(26)
+                  .height(26)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+            }
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
+        .edgeEffect(EdgeEffect.Spring)
+        .scrollBar(BarState.Off)
+        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+        .height('100%')
+        .onReachEnd(() => {
+          this.loadMoreVideos();
         })
       } else {
         List({ space: 4, scroller: this.scrollerForList }) {

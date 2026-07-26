@@ -1,6 +1,7 @@
 export type BackupItemKey =
   | 'settings'
   | 'subscriptions'
+  | 'subscriptionFeed'
   | 'favorites'
   | 'playlists'
   | 'localQueues'
@@ -11,6 +12,7 @@ export type BackupItemKey =
 export const ALL_BACKUP_ITEM_KEYS: BackupItemKey[] = [
   'settings',
   'subscriptions',
+  'subscriptionFeed',
   'favorites',
   'playlists',
   'localQueues',
@@ -22,6 +24,7 @@ export const ALL_BACKUP_ITEM_KEYS: BackupItemKey[] = [
 export interface BackupItems {
   settings: Object | undefined;
   subscriptions: Object | undefined;
+  subscriptionFeed: Object | undefined;
   favorites: Object | undefined;
   playlists: Object | undefined;
   localQueues: Object | undefined;

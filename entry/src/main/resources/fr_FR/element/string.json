@@ -1581,6 +1581,38 @@
             "value": "Flux d'abonnements YouTube"
         },
         {
+            "name": "yt_sub_feed_title",
+            "value": "Flux d'abonnements"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "Flux d'abonnements"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "%d chaînes suivies"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "%d nouvelles vidéos"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "Tirez pour actualiser et voir les dernières vidéos de vos abonnements"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "Cache du flux d'abonnements"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "Mode rapide du flux (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "Récupération via RSS léger ; moins de requêtes mais métadonnées incomplètes"
+        },
+        {
             "name": "yt_setting_home_layout",
             "value": "Mise en page de l'accueil"
         },

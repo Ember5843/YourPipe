@@ -1581,6 +1581,38 @@
             "value": "Feed de suscripciones de YouTube"
         },
         {
+            "name": "yt_sub_feed_title",
+            "value": "Feed de suscripciones"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "Feed de suscripciones"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "%d canales suscritos"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "%d vídeos nuevos"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "Desliza para actualizar y ver los últimos vídeos de tus suscripciones"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "Caché del feed de suscripciones"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "Modo rápido del feed (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "Obtención mediante RSS ligero; menos solicitudes pero metadatos incompletos"
+        },
+        {
             "name": "yt_setting_home_layout",
             "value": "Diseño de inicio"
         },

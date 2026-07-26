@@ -1581,6 +1581,38 @@
             "value": "Лента подписок YouTube"
         },
         {
+            "name": "yt_sub_feed_title",
+            "value": "Лента подписок"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "Лента подписок"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "Подписки: %d"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "Новых видео: %d"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "Потяните, чтобы обновить ленту подписок"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "Кэш ленты подписок"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "Быстрый режим ленты (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "Загрузка через лёгкий RSS; меньше запросов, но неполные метаданные"
+        },
+        {
             "name": "yt_setting_home_layout",
             "value": "Макет главной"
         },
