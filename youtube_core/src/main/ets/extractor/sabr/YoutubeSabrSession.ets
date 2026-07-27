@@ -300,6 +300,9 @@ export class YoutubeSabrSession {
     }
 
     // Always honor server backoff before the next POST (prevents rn++ storm).
+    // Logged-in sessions can get an empty first response with a multi-second
+    // backoff; retrying early just burns the no-media budget and the server
+    // keeps returning the remaining cooldown anyway.
     const waitMs = this.getBackoffRemainingMs();
     if (waitMs > 0) {
       logger.info(`[SABR] honor backoff ${waitMs}ms before rn=${this.requestNumber + 1}`);
@@ -363,7 +366,21 @@ export class YoutubeSabrSession {
       }
     } else {
       this.consecutiveNoMedia++;
-      this.scheduleBackoff(decoded.backoffTimeMs);
+      // Empty response without a PoToken usually means "come back with a PoToken"
+      // (authenticated sessions hit this on rn=1 with a multi-second backoff).
+      // Mint immediately instead of waiting out the backoff empty-handed.
+      if (!this.streamState.getRawPoToken() && this.poTokenProvider) {
+        const applied = await this.applyPoTokenForProtectedResponse();
+        if (applied) {
+          this.consecutiveNoMedia = 0;
+          this.backoffUntilMs = 0;
+          logger.info('[SABR] empty response: PoToken applied, retrying without backoff');
+        } else {
+          this.scheduleBackoff(decoded.backoffTimeMs);
+        }
+      } else {
+        this.scheduleBackoff(decoded.backoffTimeMs);
+      }
     }
 
     logger.info(`[SABR] pump segments=${decoded.segments.length} `

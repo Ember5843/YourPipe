@@ -2,7 +2,7 @@ import { StreamInfo } from '../model/VideoData';
 import Logger from '../utils/Logger';
 import { localProxyServer } from '../proxy/LocalProxyServer';
 import { makeEmptySession, StreamResource } from '../proxy/SessionStore';
-import { sabrSessionStore } from '../sabr/SabrSessionStore';
+import { sabrSessionStore, SabrLease } from '../sabr/SabrSessionStore';
 import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
 import { YoutubeSabrFormatMeta, YoutubeSabrInfo } from 'youtube_core';
 import { fetchYoutubeRangeBytes } from '../proxy/RangeProxy';
@@ -391,8 +391,9 @@ export class LocalMediaProxy {
     Logger.info(TAG, `createSabrDualSession: video=${videoItag} audio=${audioItag} `
       + `track=${audio.audioTrackId || audioFmt.audioTrackId || '-'} `
       + `name=${audio.audioTrackName || audioFmt.audioTrackName || '-'} durationMs=${durationMs}`);
+    let lease: SabrLease | undefined = undefined;
     try {
-      const lease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth);
+      lease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth);
       const dur = durationMs || video.approxDurationMs || audio.approxDurationMs || 0;
       const videoBuf = new SabrTrackBuffer(lease, false, dur);
       const audioBuf = new SabrTrackBuffer(lease, true, dur);
@@ -415,6 +416,11 @@ export class LocalMediaProxy {
       return localProxyServer.addPreparedSession(session);
     } catch (e) {
       Logger.error(TAG, `createSabrDualSession failed: ${e}`);
+      // Do not leak the lease on warm failure — a stale half-open session would
+      // be reused by the next play attempt of the same video.
+      if (lease) {
+        sabrSessionStore.release(lease.key);
+      }
       return '';
     }
   }

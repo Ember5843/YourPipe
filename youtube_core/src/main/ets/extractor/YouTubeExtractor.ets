@@ -1300,6 +1300,7 @@ export class YouTubeExtractor {
       + `${WebClientVersionResolver.getCachedOrHardcodedSource()} version=${initialMwebVersion}`);
     const streamStartedAt = Date.now();
     // mweb/web_safari: Cookie only when present; guest+oauth → anonymous (no Bearer).
+    // webCookieAuth already honors the useAuthForPlayback setting.
     let innertubePlayers = await this.fetchSelectedStreamPlayer(
       videoId, sts, selectedClient, webCookieAuth, false);
     if (selectedClient === 'mweb' && !innertubePlayers.player?.streamingData) {
