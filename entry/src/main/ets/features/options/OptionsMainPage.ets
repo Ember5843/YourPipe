@@ -103,6 +103,10 @@ export struct OptionsMainPage {
       return;
     }
     this.updateChecking = true;
+    this.getUIContext().getPromptAction().showToast({
+      message: $r('app.string.yt_update_checking'),
+      duration: 1500
+    });
     try {
       const result: UpdateCheckResult = await UpdateChecker.check();
       if (result.status === 'failed') {
@@ -119,11 +123,20 @@ export struct OptionsMainPage {
         });
         return;
       }
+      const res = getContext(this).resourceManager;
       const versionLine = `v${result.remoteVersionName}`
         + (result.remoteVersionCode > 0 ? ` (${result.remoteVersionCode})` : '');
+      const lines: string[] = [
+        `${res.getStringSync($r('app.string.yt_update_current_version').id)} `
+          + `v${result.localVersionName} (${result.localVersionCode})`,
+        `${res.getStringSync($r('app.string.yt_update_new_version').id)} ${versionLine}`
+      ];
+      if (result.publishedAt) {
+        lines.push(`${res.getStringSync($r('app.string.yt_update_release_time').id)} ${result.publishedAt}`);
+      }
       AlertDialog.show({
         title: $r('app.string.yt_update_available_title'),
-        message: versionLine,
+        message: lines.join('\n'),
         alignment: DialogAlignment.Center,
         primaryButton: {
           value: $r('app.string.yt_update_open_appgallery'),

@@ -877,6 +877,22 @@
             "value": "GitHub 页面"
         },
         {
+            "name": "yt_update_checking",
+            "value": "正在检查更新…"
+        },
+        {
+            "name": "yt_update_current_version",
+            "value": "当前版本"
+        },
+        {
+            "name": "yt_update_new_version",
+            "value": "新版本"
+        },
+        {
+            "name": "yt_update_release_time",
+            "value": "更新时间"
+        },
+        {
             "name": "yt_error_load_failed",
             "value": "加载失败"
         },

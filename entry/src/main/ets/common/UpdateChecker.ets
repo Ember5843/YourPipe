@@ -22,6 +22,7 @@ export interface UpdateCheckResult {
   remoteVersionCode: number;
   releaseUrl: string;
   notes: string;
+  publishedAt: string;
   error?: string;
 }
 
@@ -35,6 +36,7 @@ interface GithubRelease {
   name?: string;
   html_url?: string;
   body?: string;
+  published_at?: string;
   assets?: GithubReleaseAsset[];
 }
 
@@ -60,13 +62,15 @@ export class UpdateChecker {
       remoteVersionName: '',
       remoteVersionCode: 0,
       releaseUrl: GITHUB_REPO_URL,
-      notes: ''
+      notes: '',
+      publishedAt: ''
     };
     try {
       logger.info(`check start local=${local.versionName}(${local.versionCode})`);
       const release = await UpdateChecker.requestJson(RELEASE_API_URL) as GithubRelease;
       result.releaseUrl = release.html_url || GITHUB_REPO_URL;
       result.notes = UpdateChecker.trimNotes(release.body || '');
+      result.publishedAt = (release.published_at || '').substring(0, 10);
       const remote = await UpdateChecker.resolveRemoteVersion(release);
       result.remoteVersionName = remote.versionName;
       result.remoteVersionCode = remote.versionCode;

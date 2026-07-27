@@ -849,6 +849,22 @@
             "value": "Página de GitHub"
         },
         {
+            "name": "yt_update_checking",
+            "value": "Buscando actualizaciones…"
+        },
+        {
+            "name": "yt_update_current_version",
+            "value": "Versión actual"
+        },
+        {
+            "name": "yt_update_new_version",
+            "value": "Nueva versión"
+        },
+        {
+            "name": "yt_update_release_time",
+            "value": "Publicada"
+        },
+        {
             "name": "yt_error_load_failed",
             "value": "Error al cargar"
         },
