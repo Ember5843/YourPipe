@@ -1,5 +1,6 @@
 import { http } from '@kit.NetworkKit';
 import { bundleManager } from '@kit.AbilityKit';
+import { util } from '@kit.ArkTS';
 import { HttpDownloader } from 'youtube_core';
 import { AppLog } from './AppLog';
 
@@ -63,8 +64,7 @@ export class UpdateChecker {
     };
     try {
       logger.info(`check start local=${local.versionName}(${local.versionCode})`);
-      const releaseRaw = await UpdateChecker.requestText(RELEASE_API_URL);
-      const release = JSON.parse(releaseRaw) as GithubRelease;
+      const release = await UpdateChecker.requestJson(RELEASE_API_URL) as GithubRelease;
       result.releaseUrl = release.html_url || GITHUB_REPO_URL;
       result.notes = UpdateChecker.trimNotes(release.body || '');
       const remote = await UpdateChecker.resolveRemoteVersion(release);
@@ -102,13 +102,13 @@ export class UpdateChecker {
     for (const asset of assets) {
       if (asset.name === VERSION_ASSET_NAME && asset.browser_download_url) {
         try {
-          const raw = await UpdateChecker.requestText(asset.browser_download_url);
-          const parsed = JSON.parse(raw) as RemoteVersionJson;
+          const parsed = await UpdateChecker.requestJson(asset.browser_download_url) as RemoteVersionJson;
           const code = parsed.versionCode ?? 0;
           if (code > 0) {
             const remote: LocalVersion = { versionName: parsed.versionName || '', versionCode: code };
             return remote;
           }
+          logger.warn(`version.json asset missing versionCode: name=${parsed.versionName}`);
         } catch (e) {
           logger.warn(`version.json asset parse failed: ${String(e)}`);
         }
@@ -149,7 +149,12 @@ export class UpdateChecker {
     return trimmed.substring(0, MAX_NOTES_CHARS) + '…';
   }
 
-  private static requestText(url: string): Promise<string> {
+  /**
+   * GET + JSON parse. OHOS http auto-parses bodies into Object when the
+   * response Content-Type is application/json (GitHub serves version.json
+   * that way), returns string otherwise; handle both plus ArrayBuffer.
+   */
+  private static requestJson(url: string): Promise<Object> {
     const request = http.createHttp();
     const options: http.HttpRequestOptions = {
       method: http.RequestMethod.GET,
@@ -165,7 +170,17 @@ export class UpdateChecker {
       if (response.responseCode !== 200) {
         throw new Error(`HTTP ${response.responseCode} for ${url}`);
       }
-      return typeof response.result === 'string' ? response.result : String(response.result);
+      const body = response.result;
+      logger.info(`requestJson target=${url} type=${typeof body} ` +
+        `isBuffer=${body instanceof ArrayBuffer}`);
+      if (typeof body === 'string') {
+        return JSON.parse(body) as Object;
+      }
+      if (body instanceof ArrayBuffer) {
+        const text = new util.TextDecoder('utf-8').decodeWithStream(new Uint8Array(body));
+        return JSON.parse(text) as Object;
+      }
+      return body as Object;
     }).finally(() => {
       request.destroy();
     });

@@ -5,6 +5,11 @@ import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
 import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
 import { AuthAccountStatus, AuthStage } from 'youtube_core';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
+import { common } from '@kit.AbilityKit';
+import { AppLog } from '../../common/AppLog';
+import { APPGALLERY_TEST_URL, UpdateChecker, UpdateCheckResult } from '../../common/UpdateChecker';
+
+const logger = AppLog.getInstance('OptionsMainPage');
 
 const APP_VERSION: string = '0.5.7';
 
@@ -88,6 +93,64 @@ export struct OptionsMainPage {
       case YourtubeDarkMode.SYSTEM:
       default:
         return $r('app.string.yt_dark_mode_system');
+    }
+  }
+
+  private updateChecking: boolean = false;
+
+  private async checkForUpdates(): Promise<void> {
+    if (this.updateChecking) {
+      return;
+    }
+    this.updateChecking = true;
+    try {
+      const result: UpdateCheckResult = await UpdateChecker.check();
+      if (result.status === 'failed') {
+        this.getUIContext().getPromptAction().showToast({
+          message: $r('app.string.yt_update_check_failed'),
+          duration: 2500
+        });
+        return;
+      }
+      if (result.status === 'upToDate') {
+        this.getUIContext().getPromptAction().showToast({
+          message: $r('app.string.yt_update_up_to_date'),
+          duration: 2000
+        });
+        return;
+      }
+      const versionLine = `v${result.remoteVersionName}`
+        + (result.remoteVersionCode > 0 ? ` (${result.remoteVersionCode})` : '');
+      AlertDialog.show({
+        title: $r('app.string.yt_update_available_title'),
+        message: versionLine,
+        alignment: DialogAlignment.Center,
+        primaryButton: {
+          value: $r('app.string.yt_update_open_appgallery'),
+          fontColor: this.themePrimary,
+          action: () => {
+            this.openExternalLink(APPGALLERY_TEST_URL);
+          }
+        },
+        secondaryButton: {
+          value: $r('app.string.yt_update_open_github'),
+          action: () => {
+            this.openExternalLink(result.releaseUrl);
+          }
+        }
+      });
+    } finally {
+      this.updateChecking = false;
+    }
+  }
+
+  private openExternalLink(url: string): void {
+    try {
+      logger.info(`openExternalLink url=${url}`);
+      const context = getContext(this) as common.UIAbilityContext;
+      context.openLink(url, { appLinkingOnly: false });
+    } catch (e) {
+      logger.error(`openExternalLink failed: ${String(e)}`);
     }
   }
 
@@ -189,6 +252,18 @@ export struct OptionsMainPage {
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onRecoveryClick
+          })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          OptionItem({
+            icon: $r('sys.symbol.download_fill'),
+            title: $r('app.string.yt_about_check_update'),
+            subtitle: $r('app.string.yt_about_check_update_subtitle'),
+            iconColor: this.themePrimary,
+            clickEffectEnabled: this.params.clickEffectEnabled,
+            onClickAction: () => { this.checkForUpdates(); }
           })
         }
         .padding({ left: 0, right: 0 })
