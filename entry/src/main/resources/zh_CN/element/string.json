@@ -849,6 +849,34 @@
             "value": "更新日志"
         },
         {
+            "name": "yt_about_check_update",
+            "value": "检查更新"
+        },
+        {
+            "name": "yt_about_check_update_subtitle",
+            "value": "获取 GitHub 最新版本"
+        },
+        {
+            "name": "yt_update_check_failed",
+            "value": "检查更新失败，请稍后重试"
+        },
+        {
+            "name": "yt_update_up_to_date",
+            "value": "已是最新版本"
+        },
+        {
+            "name": "yt_update_available_title",
+            "value": "发现新版本"
+        },
+        {
+            "name": "yt_update_open_appgallery",
+            "value": "AppGallery 安装"
+        },
+        {
+            "name": "yt_update_open_github",
+            "value": "GitHub 页面"
+        },
+        {
             "name": "yt_error_load_failed",
             "value": "加载失败"
         },
@@ -2627,6 +2655,38 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "扩充播放、鉴权、令牌、刷新及回退诊断，同时确保日志不记录敏感 Cookie 和签名地址"
+        },
+        {
+            "name": "yt_changelog_0_5_7_1",
+            "value": "关于页新增「检查更新」：对比 GitHub 最新 Release 的构建号，发现新版本可一键跳转 AppGallery 测试安装或 GitHub 发布页"
+        },
+        {
+            "name": "yt_changelog_0_5_7_2",
+            "value": "新增订阅动态页：按时间聚合订阅频道更新；播放列表记录观看历史并显示进度徽标；列表适配宽屏布局"
+        },
+        {
+            "name": "yt_changelog_0_5_7_3",
+            "value": "新增「自动播放下一个」设置开关；关于页补全开源项目标识；媒体数据请求支持走 HTTP 代理"
+        },
+        {
+            "name": "yt_changelog_0_5_7_4",
+            "value": "起播提速：播放中预提取队列下一视频、BotGuard 开机预热、STS/客户端版本元数据落盘复用"
+        },
+        {
+            "name": "yt_changelog_0_5_7_5",
+            "value": "直播支持 HLS 多画质变体解析与切换；SIDX 索引启动预取；visitorData 会话级钉扎减少重复取流"
+        },
+        {
+            "name": "yt_changelog_0_5_7_6",
+            "value": "SABR 稳定性：PoToken 铸造加超时与熔断、空响应即时补发 PoToken、会话构建失败正确释放租约"
+        },
+        {
+            "name": "yt_changelog_0_5_7_7",
+            "value": "修复自动连播重复触发与换源竞态（源提交收敛为单一写入方）；修复画中画关闭/恢复泄漏与观看历史合并顺序"
+        },
+        {
+            "name": "yt_changelog_0_5_7_8",
+            "value": "修复 HarmonyOS 6 视频无画面（OHNativeWindow 直传 mpv）；硬件解码能力改为按设备探测声明"
         },
         {
             "name": "yt_changelog_0_5_6_1",

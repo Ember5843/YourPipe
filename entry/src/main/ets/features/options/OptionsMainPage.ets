@@ -6,7 +6,7 @@ import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
 import { AuthAccountStatus, AuthStage } from 'youtube_core';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 
-const APP_VERSION: string = '0.5.6';
+const APP_VERSION: string = '0.5.7';
 
 interface OptionsMainPageParams {
   clickEffectEnabled: ClickEffect | null;

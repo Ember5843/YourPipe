@@ -821,6 +821,34 @@
             "value": "Registro de cambios"
         },
         {
+            "name": "yt_about_check_update",
+            "value": "Buscar actualizaciones"
+        },
+        {
+            "name": "yt_about_check_update_subtitle",
+            "value": "Obtener la última versión desde GitHub"
+        },
+        {
+            "name": "yt_update_check_failed",
+            "value": "Error al buscar actualizaciones, inténtalo de nuevo más tarde"
+        },
+        {
+            "name": "yt_update_up_to_date",
+            "value": "Ya tienes la última versión"
+        },
+        {
+            "name": "yt_update_available_title",
+            "value": "Nueva versión disponible"
+        },
+        {
+            "name": "yt_update_open_appgallery",
+            "value": "Instalar desde AppGallery"
+        },
+        {
+            "name": "yt_update_open_github",
+            "value": "Página de GitHub"
+        },
+        {
             "name": "yt_error_load_failed",
             "value": "Error al cargar"
         },
@@ -2627,6 +2655,38 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "Más diagnósticos de reproducción, autenticación, tokens, actualización y alternativas sin registrar cookies ni URL firmadas"
+        },
+        {
+            "name": "yt_changelog_0_5_7_1",
+            "value": "La página Acerca de añade «Buscar actualizaciones»: compara el número de compilación del último Release de GitHub y ofrece acceso directo a la instalación de prueba de AppGallery o a la página del release en GitHub"
+        },
+        {
+            "name": "yt_changelog_0_5_7_2",
+            "value": "Nueva página de Suscripciones: agrupa las novedades de los canales por fecha; las listas de reproducción guardan el historial con insignias de progreso; las listas se adaptan a pantallas anchas"
+        },
+        {
+            "name": "yt_changelog_0_5_7_3",
+            "value": "Nuevo ajuste «Reproducir siguiente automáticamente»; logotipos de proyectos de código abierto en Acerca de; las solicitudes de datos multimedia pueden usar el proxy HTTP"
+        },
+        {
+            "name": "yt_changelog_0_5_7_4",
+            "value": "Inicio más rápido: preextracción del siguiente video en cola durante la reproducción, precalentamiento de BotGuard al arrancar y reutilización en disco de los metadatos STS/versión de cliente"
+        },
+        {
+            "name": "yt_changelog_0_5_7_5",
+            "value": "Los directos admiten variantes de calidad HLS con cambio; precarga del índice SIDX al inicio; visitorData fijado por sesión reduce extracciones repetidas"
+        },
+        {
+            "name": "yt_changelog_0_5_7_6",
+            "value": "Estabilidad SABR: la generación de PoToken tiene tiempo de espera y disyuntor, las respuestas vacías solicitan PoToken al instante y los fallos al crear la sesión liberan el lease"
+        },
+        {
+            "name": "yt_changelog_0_5_7_7",
+            "value": "Corregidos el avance automático duplicado y las carreras al cambiar de fuente (envío de fuente de escritor único); corregidas fugas al cerrar/restaurar PiP y el orden de fusión del historial"
+        },
+        {
+            "name": "yt_changelog_0_5_7_8",
+            "value": "Corregido video en negro en HarmonyOS 6 (OHNativeWindow directo a mpv); las capacidades de decodificación por hardware ahora se detectan según el dispositivo"
         },
         {
             "name": "yt_changelog_0_5_6_1",

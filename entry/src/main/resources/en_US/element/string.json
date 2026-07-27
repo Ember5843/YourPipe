@@ -821,6 +821,34 @@
             "value": "Changelog"
         },
         {
+            "name": "yt_about_check_update",
+            "value": "Check for updates"
+        },
+        {
+            "name": "yt_about_check_update_subtitle",
+            "value": "Get the latest release from GitHub"
+        },
+        {
+            "name": "yt_update_check_failed",
+            "value": "Update check failed, please try again later"
+        },
+        {
+            "name": "yt_update_up_to_date",
+            "value": "You're up to date"
+        },
+        {
+            "name": "yt_update_available_title",
+            "value": "Update available"
+        },
+        {
+            "name": "yt_update_open_appgallery",
+            "value": "Install via AppGallery"
+        },
+        {
+            "name": "yt_update_open_github",
+            "value": "GitHub page"
+        },
+        {
             "name": "yt_error_load_failed",
             "value": "Loading failed"
         },
@@ -2627,6 +2655,38 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs"
+        },
+        {
+            "name": "yt_changelog_0_5_7_1",
+            "value": "About page gains \"Check for updates\": compares the build number of the latest GitHub Release and offers one-tap jumps to the AppGallery test install or the GitHub release page"
+        },
+        {
+            "name": "yt_changelog_0_5_7_2",
+            "value": "New Subscriptions feed: aggregates channel updates by time; playlists track watch history with progress badges; lists adapt to wide screens"
+        },
+        {
+            "name": "yt_changelog_0_5_7_3",
+            "value": "New \"Auto-play next\" setting; About page adds open-source project logos; media data requests can go through the HTTP proxy"
+        },
+        {
+            "name": "yt_changelog_0_5_7_4",
+            "value": "Faster startup: prefetches the next queued video during playback, BotGuard warmup at launch, and on-disk reuse of STS/client version metadata"
+        },
+        {
+            "name": "yt_changelog_0_5_7_5",
+            "value": "Live streams support HLS quality variants with switching; SIDX index prefetch at startup; session-pinned visitorData reduces repeated extraction"
+        },
+        {
+            "name": "yt_changelog_0_5_7_6",
+            "value": "SABR stability: PoToken minting gains a timeout and circuit breaker, empty responses trigger an immediate PoToken mint, and session build failures release the lease correctly"
+        },
+        {
+            "name": "yt_changelog_0_5_7_7",
+            "value": "Fixed duplicate auto-advance and source-switch races (source submission is now single-writer); fixed PiP close/restore leaks and watch-history merge ordering"
+        },
+        {
+            "name": "yt_changelog_0_5_7_8",
+            "value": "Fixed blank video on HarmonyOS 6 (pass OHNativeWindow directly to mpv); hardware decoder capabilities are now probed per device"
         },
         {
             "name": "yt_changelog_0_5_6_1",

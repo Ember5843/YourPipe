@@ -821,6 +821,34 @@
             "value": "Journal des modifications"
         },
         {
+            "name": "yt_about_check_update",
+            "value": "Vérifier les mises à jour"
+        },
+        {
+            "name": "yt_about_check_update_subtitle",
+            "value": "Obtenir la dernière version sur GitHub"
+        },
+        {
+            "name": "yt_update_check_failed",
+            "value": "Échec de la vérification des mises à jour, veuillez réessayer plus tard"
+        },
+        {
+            "name": "yt_update_up_to_date",
+            "value": "Vous êtes à jour"
+        },
+        {
+            "name": "yt_update_available_title",
+            "value": "Nouvelle version disponible"
+        },
+        {
+            "name": "yt_update_open_appgallery",
+            "value": "Installer via AppGallery"
+        },
+        {
+            "name": "yt_update_open_github",
+            "value": "Page GitHub"
+        },
+        {
             "name": "yt_error_load_failed",
             "value": "Échec du chargement"
         },
@@ -2627,6 +2655,38 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "Diagnostics enrichis pour lecture, connexion, jetons, actualisation et replis sans journaliser cookies ni URL signées"
+        },
+        {
+            "name": "yt_changelog_0_5_7_1",
+            "value": "La page À propos ajoute « Vérifier les mises à jour » : compare le numéro de build de la dernière release GitHub et propose d'ouvrir l'installation test AppGallery ou la page GitHub de la release"
+        },
+        {
+            "name": "yt_changelog_0_5_7_2",
+            "value": "Nouvelle page Abonnements : regroupe les nouveautés des chaînes par date ; les playlists enregistrent l'historique avec badges de progression ; les listes s'adaptent aux écrans larges"
+        },
+        {
+            "name": "yt_changelog_0_5_7_3",
+            "value": "Nouveau réglage « Lecture automatique de la vidéo suivante » ; logos des projets open source dans À propos ; les requêtes de données média peuvent passer par le proxy HTTP"
+        },
+        {
+            "name": "yt_changelog_0_5_7_4",
+            "value": "Démarrage plus rapide : pré-extraction de la vidéo suivante de la file pendant la lecture, préchauffage BotGuard au lancement et réutilisation sur disque des métadonnées STS/version client"
+        },
+        {
+            "name": "yt_changelog_0_5_7_5",
+            "value": "Les directs prennent en charge les variantes de qualité HLS avec bascule ; préchargement de l'index SIDX au démarrage ; visitorData épinglé par session pour réduire les extractions répétées"
+        },
+        {
+            "name": "yt_changelog_0_5_7_6",
+            "value": "Stabilité SABR : génération du PoToken avec timeout et coupe-circuit, PoToken immédiat sur réponses vides, libération correcte du lease en cas d'échec de création de session"
+        },
+        {
+            "name": "yt_changelog_0_5_7_7",
+            "value": "Correction de l'avance automatique en double et des conflits de changement de source (soumission de source à rédacteur unique) ; correction des fuites PiP fermeture/restauration et de l'ordre de fusion de l'historique"
+        },
+        {
+            "name": "yt_changelog_0_5_7_8",
+            "value": "Correction de l'écran noir sur HarmonyOS 6 (OHNativeWindow passé directement à mpv) ; les capacités de décodage matériel sont désormais détectées selon l'appareil"
         },
         {
             "name": "yt_changelog_0_5_6_1",

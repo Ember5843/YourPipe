@@ -805,6 +805,34 @@
             "value": "Änderungsprotokoll"
         },
         {
+            "name": "yt_about_check_update",
+            "value": "Nach Updates suchen"
+        },
+        {
+            "name": "yt_about_check_update_subtitle",
+            "value": "Neueste Version von GitHub laden"
+        },
+        {
+            "name": "yt_update_check_failed",
+            "value": "Suche nach Updates fehlgeschlagen, bitte später erneut versuchen"
+        },
+        {
+            "name": "yt_update_up_to_date",
+            "value": "App ist auf dem neuesten Stand"
+        },
+        {
+            "name": "yt_update_available_title",
+            "value": "Update verfügbar"
+        },
+        {
+            "name": "yt_update_open_appgallery",
+            "value": "Über AppGallery installieren"
+        },
+        {
+            "name": "yt_update_open_github",
+            "value": "GitHub-Seite"
+        },
+        {
             "name": "yt_error_load_failed",
             "value": "Laden fehlgeschlagen"
         },
@@ -2627,6 +2655,38 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "Mehr Diagnosen für Wiedergabe, Anmeldung, Token, Aktualisierung und Fallbacks ohne sensible Cookies oder signierte URLs im Protokoll"
+        },
+        {
+            "name": "yt_changelog_0_5_7_1",
+            "value": "Über-Seite mit „Nach Updates suchen“: vergleicht die Build-Nummer des neuesten GitHub-Releases und bietet Sprünge zur AppGallery-Testinstallation oder zur GitHub-Release-Seite"
+        },
+        {
+            "name": "yt_changelog_0_5_7_2",
+            "value": "Neue Abo-Übersicht: bündelt Kanal-Updates nach Zeit; Wiedergabelisten speichern den Verlauf mit Fortschritts-Badges; Listen passen sich breiten Bildschirmen an"
+        },
+        {
+            "name": "yt_changelog_0_5_7_3",
+            "value": "Neue Einstellung „Nächstes Video automatisch abspielen“; Open-Source-Logos auf der Über-Seite; Mediendaten-Anfragen können über den HTTP-Proxy laufen"
+        },
+        {
+            "name": "yt_changelog_0_5_7_4",
+            "value": "Schnellerer Start: Prefetch des nächsten Videos in der Warteschlange, BotGuard-Warm-up beim Start, STS-/Client-Versionsmetadaten werden auf Disk wiederverwendet"
+        },
+        {
+            "name": "yt_changelog_0_5_7_5",
+            "value": "Livestreams unterstützen HLS-Qualitätsvarianten mit Umschaltung; SIDX-Index-Prefetch beim Start; sitzungsgebundene visitorData reduziert erneute Extraktion"
+        },
+        {
+            "name": "yt_changelog_0_5_7_6",
+            "value": "SABR-Stabilität: PoToken-Mint mit Timeout und Circuit Breaker, sofortiges PoToken bei leeren Antworten, Lease-Freigabe bei fehlgeschlagenem Session-Aufbau"
+        },
+        {
+            "name": "yt_changelog_0_5_7_7",
+            "value": "Doppeltes Auto-Advance und Quellenwechsel-Races behoben (Quellübermittlung nun Single-Writer); PiP-Schließen/Wiederherstellen-Leaks und Verlaufs-Zusammenführung korrigiert"
+        },
+        {
+            "name": "yt_changelog_0_5_7_8",
+            "value": "Schwarzes Bild auf HarmonyOS 6 behoben (OHNativeWindow direkt an mpv); Hardware-Decoder-Fähigkeiten werden nun pro Gerät ermittelt"
         },
         {
             "name": "yt_changelog_0_5_6_1",

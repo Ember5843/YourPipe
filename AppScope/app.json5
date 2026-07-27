@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.talon.yourpipe",
     "vendor": "talon",
-    "versionCode": 1000015,
-    "versionName": "0.5.6",
+    "versionCode": 1000016,
+    "versionName": "0.5.7",
     "icon": "$media:app_icon",
     "label": "$string:app_name"
   }

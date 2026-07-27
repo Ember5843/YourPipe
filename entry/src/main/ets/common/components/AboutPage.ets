@@ -2,12 +2,14 @@ import { UIConfig } from '../AppState';
 import { customAnimationUtil } from '../AnimationUtil';
 import { OptionItem } from './OptionItem';
 import { pasteboard } from '@kit.BasicServicesKit';
+import { common } from '@kit.AbilityKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 import { AppLog } from '../AppLog';
+import { APPGALLERY_TEST_URL, UpdateChecker, UpdateCheckResult } from '../UpdateChecker';
 
-const APP_VERSION = '0.5.6';
-const APP_BUILD = '1000015';
+const APP_VERSION = '0.5.7';
+const APP_BUILD = '1000016';
 const logger = AppLog.getInstance('AboutPage');
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
@@ -72,6 +74,19 @@ const AI_MODELS: AiModelItem[] = [
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.5.7', date: '2026-07-27',
+    changes: [
+      $r('app.string.yt_changelog_0_5_7_1'),
+      $r('app.string.yt_changelog_0_5_7_2'),
+      $r('app.string.yt_changelog_0_5_7_3'),
+      $r('app.string.yt_changelog_0_5_7_4'),
+      $r('app.string.yt_changelog_0_5_7_5'),
+      $r('app.string.yt_changelog_0_5_7_6'),
+      $r('app.string.yt_changelog_0_5_7_7'),
+      $r('app.string.yt_changelog_0_5_7_8'),
+    ],
+  },
   {
     version: '0.5.6', date: '2026-07-24',
     changes: [
@@ -436,6 +451,64 @@ export struct AboutPage {
     });
   }
 
+  private updateChecking: boolean = false;
+
+  private async checkForUpdates(): Promise<void> {
+    if (this.updateChecking) {
+      return;
+    }
+    this.updateChecking = true;
+    try {
+      const result: UpdateCheckResult = await UpdateChecker.check();
+      if (result.status === 'failed') {
+        this.getUIContext().getPromptAction().showToast({
+          message: $r('app.string.yt_update_check_failed'),
+          duration: 2500
+        });
+        return;
+      }
+      if (result.status === 'upToDate') {
+        this.getUIContext().getPromptAction().showToast({
+          message: $r('app.string.yt_update_up_to_date'),
+          duration: 2000
+        });
+        return;
+      }
+      const versionLine = `v${result.remoteVersionName}`
+        + (result.remoteVersionCode > 0 ? ` (${result.remoteVersionCode})` : '');
+      AlertDialog.show({
+        title: $r('app.string.yt_update_available_title'),
+        message: `${versionLine}\n\n${result.notes}`,
+        alignment: DialogAlignment.Center,
+        primaryButton: {
+          value: $r('app.string.yt_update_open_appgallery'),
+          fontColor: this.themePrimary,
+          action: () => {
+            this.openExternalLink(APPGALLERY_TEST_URL);
+          }
+        },
+        secondaryButton: {
+          value: $r('app.string.yt_update_open_github'),
+          action: () => {
+            this.openExternalLink(result.releaseUrl);
+          }
+        }
+      });
+    } finally {
+      this.updateChecking = false;
+    }
+  }
+
+  private openExternalLink(url: string): void {
+    try {
+      logger.info(`openExternalLink url=${url}`);
+      const context = getContext(this) as common.UIAbilityContext;
+      context.openLink(url, { appLinkingOnly: false });
+    } catch (e) {
+      logger.error(`openExternalLink failed: ${String(e)}`);
+    }
+  }
+
   // 根据导航名称渲染子页面
   @Builder
   aboutPageBuilder(name: string) {
@@ -573,6 +646,14 @@ export struct AboutPage {
               subtitle: `${getContext().resourceManager.getStringSync($r('app.string.yt_label_latest_version').id)}${CHANGELOG[0].version}`,
               iconColor: this.themePrimary,
               onClickAction: () => { this.aboutNavStack.pushPathByName('changelog', null); }
+            })
+
+            OptionItem({
+              icon: $r('sys.symbol.download_fill'),
+              title: $r('app.string.yt_about_check_update'),
+              subtitle: $r('app.string.yt_about_check_update_subtitle'),
+              iconColor: this.themePrimary,
+              onClickAction: () => { this.checkForUpdates(); }
             })
           }
           .width('100%').padding({ left: 16, right: 16 })
