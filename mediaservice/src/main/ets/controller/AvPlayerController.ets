@@ -83,11 +83,6 @@ export class AvPlayerController {
   private startupFirstFrameLogged: boolean = false;
   private avSessionArtworkPublished: boolean = false;
 
-  /** 上一次 updateVideoSource 处理过的 source 引用，用于幂等去重。 */
-  private lastUpdatedSourceRef: VideoData | null = null;
-  /** 上一次 updateVideoSource 处理过的 videoId，用于幂等去重（引用比较在 @State/@Link 下不可靠）。 */
-  private lastUpdatedVideoId: string = '';
-
   // Error recovery state
   private errorRetryCount: number = 0;
   private isRecovering: boolean = false;
@@ -488,18 +483,8 @@ export class AvPlayerController {
       return;
     }
 
-    // 幂等：PlayerSession 与 AVPlayer.onSourceChange 会先后推同一个 source，
-    // 如果 controller 第二次仍跑完整 load 流程会让 MPV 重新建立 timeline / decoder，
-    // 直播场景下还会因为 length=0 的 EDL 被 MPV 立刻判 EOF 触发自动 skip。
-    // 注意：ArkUI 的 @State/@Link 传递会破坏对象引用一致性，故按 videoId 去重。
-    const newVideoId = newSource.videoId || '';
-    if (newVideoId.length > 0 && this.lastUpdatedVideoId === newVideoId) {
-      Logger.debug(TAG, `updateVideoSource ignored: same videoId=${newVideoId}`);
-      return;
-    }
-    this.lastUpdatedVideoId = newVideoId;
-    this.lastUpdatedSourceRef = newSource;
-
+    // Source submission has a single writer (PlayerSession.play()); duplicate
+    // suppression lives there. A submission here always means a real load.
     this.resetPlaybackState();
     this.deferCurrentSessionDestroy();
     this.curSource = newSource;
@@ -836,8 +821,6 @@ export class AvPlayerController {
     this.startupPlaybackRestartLogged = false;
     this.startupFirstFrameLogged = false;
     this.avSessionArtworkPublished = false;
-    this.lastUpdatedSourceRef = null;
-    this.lastUpdatedVideoId = '';
     this.errorRetryCount = 0;
     this.isRecovering = false;
     this.lastKnownGoodPosition = 0;

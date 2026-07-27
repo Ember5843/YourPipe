@@ -448,7 +448,7 @@ export class PlayerSession {
     const generation = this._playGeneration;
     this._queuePrefetchTimerId = setTimeout(() => {
       this._queuePrefetchTimerId = -1;
-      if (generation !== this._playGeneration || this._currentVideo?.videoId !== currentVideoId) {
+      if (!this.isPlayContextCurrent(generation, currentVideoId)) {
         return;
       }
       if (!this._controller.vm.isPlaying) {
@@ -471,7 +471,27 @@ export class PlayerSession {
     this._controller.onPreviousCommand = () => {
       this.playPreviousFromQueue();
     };
+    this._controller.subscribeEnded(this.onPlaybackEnded);
   }
+
+  private _lastAutoAdvanceFromVideoId: string = '';
+
+  private onPlaybackEnded = (): void => {
+    const autoPlay = AppStorage.get<boolean>('autoPlayQueue') ?? true;
+    if (!autoPlay) {
+      return;
+    }
+    const fromVideoId = this._currentVideo?.videoId || '';
+    if (fromVideoId.length > 0 && fromVideoId === this._lastAutoAdvanceFromVideoId) {
+      logger.warn(`${TAG} auto-advance suppressed: duplicate ended for ${fromVideoId}`);
+      return;
+    }
+    this._lastAutoAdvanceFromVideoId = fromVideoId;
+    logger.info(`${TAG} playback ended, auto-advancing from ${fromVideoId || 'unknown'}`);
+    this.playNextFromQueue().catch((e: Error) => {
+      logger.warn(`${TAG} auto-advance failed: ${e.message || e}`);
+    });
+  };
 
   private bindQueueSwitchHandler(): void {
     PlayQueueManager.getInstance().onSwitchVideo = (video: VideoItem) => {
@@ -556,6 +576,10 @@ export class PlayerSession {
     }
   }
 
+  private isPlayContextCurrent(generation: number, videoId: string): boolean {
+    return generation === this._playGeneration && this._currentVideo?.videoId === videoId;
+  }
+
   private async doPlay(video: VideoItem, videoId: string, generation: number): Promise<VideoData | null> {
     try {
       const playService = YouTubePlayService.getInstance(this._context);
@@ -574,7 +598,7 @@ export class PlayerSession {
       logger.info(`${TAG} [TIMING] video=${videoId} extract+MPV init elapsed=${Date.now() - startedAt}ms`);
 
       if (prepared.generation !== this._playGeneration
-        || generation !== this._playGeneration || this._currentVideo?.videoId !== videoId) {
+        || !this.isPlayContextCurrent(generation, videoId)) {
         logger.info(`${TAG} doPlay() result discarded: session changed during extraction`);
         return null;
       }
@@ -660,11 +684,12 @@ export class PlayerSession {
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
         logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=source_submit elapsed=${Date.now() - prepared.startedAt}ms`);
         await this._controller.updateVideoSource(videoSource);
-        if (generation !== this._playGeneration || this._currentVideo?.videoId !== videoId) {
+        if (!this.isPlayContextCurrent(generation, videoId)) {
           logger.info(`${TAG} source completion discarded: session changed during submission`);
           return null;
         }
         this._submittedVideoId = videoId;
+        this._lastAutoAdvanceFromVideoId = '';
         this._cachedVideoSource = videoSource;
         this.notifyPlaybackSourceChanged(videoSource, 'source-ready');
         // Live quality management: parse HLS variants in the background and
@@ -932,6 +957,7 @@ export class PlayerSession {
       this._queuePrefetchTimerId = -1;
     }
     this._submittedVideoId = '';
+    this._lastAutoAdvanceFromVideoId = '';
     this._cachedVideoSource = null;
     this._lastPlayError = null;
     this._activeExtrasVideoId = '';

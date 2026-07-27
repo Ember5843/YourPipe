@@ -642,7 +642,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const wasReady: boolean = this.isReady;
     const buffering: boolean = (status & MediaStatus.Buffering) !== 0 || (status & MediaStatus.Stalled) !== 0;
     const seeking: boolean = (status & MediaStatus.Seeking) !== 0;
-    const ended: boolean = (status & MediaStatus.End) !== 0;
+    const ended: boolean = this.acceptsNativeTimeline && (status & MediaStatus.End) !== 0;
     const prepared: boolean = (status & MediaStatus.Prepared) !== 0;
     const loaded: boolean = (status & MediaStatus.Loaded) !== 0;
     const buffered: boolean = (status & MediaStatus.Buffered) !== 0;

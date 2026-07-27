@@ -292,19 +292,6 @@ export struct VideoPlayer {
   private cacheCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private cacheCanvasCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cacheCanvasSettings);
   private seekableRangesListener = () => { this.drawCacheRanges(); };
-  private isHandlingEnded: boolean = false;
-  private onEnded = () => {
-    if (this.isHandlingEnded) {
-      return;
-    }
-    this.isHandlingEnded = true;
-    const autoPlay = AppStorage.get<boolean>('autoPlayQueue') ?? true;
-    if (!autoPlay) {
-      this.isHandlingEnded = false;
-      return;
-    }
-    PlayerSession.getInstance().playNextFromQueue().finally(() => { this.isHandlingEnded = false; });
-  };
   // 屏幕实件订阅者：监听 SCREEN_OFF / SCREEN_ON 以关闭/恢复视频输出
   private screenEventSubscriber: commonEventManager.CommonEventSubscriber | null = null;
   @State showForwardHint: boolean = false;
@@ -376,14 +363,13 @@ export struct VideoPlayer {
     };
   }
 
-  async onSourceChange(): Promise<void> {
+  onSourceChange(): void {
     this.resetTransientUi('source-change');
-    // 切换源时更新本地流状态标记
+    // Source submission is owned exclusively by PlayerSession.play() ->
+    // controller.updateVideoSource(). This watcher only mirrors UI state.
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
     this.playbackStarted = false;
 
-    Logger.info(TAG, `Source changed to: ${this.curSource.name}. hasStreams: ${this.hasStreams}. Triggering updateVideoSource.`);
-    await this.controller.updateVideoSource(this.curSource);
     this.syncPlaybackStateFromController();
 
     this.preCalculateRects();
@@ -400,7 +386,6 @@ export struct VideoPlayer {
     if (this.lastController && this.lastController !== this.controller) {
       this.lastController.unsubscribeProgress(this.progressListener);
       this.lastController.unsubscribePlaybackState(this.playbackStateListener);
-      this.lastController.unsubscribeEnded(this.onEnded);
       this.lastController.removeErrorListener(this.errorListener);
       this.lastController.removeWaitingForBufferListener(this.waitingForBufferListener);
       this.lastController.removeSeekableRangesListener(this.seekableRangesListener);
@@ -410,7 +395,6 @@ export struct VideoPlayer {
     if (this.controller) {
       this.controller.subscribeProgress(this.progressListener);
       this.controller.subscribePlaybackState(this.playbackStateListener);
-      this.controller.subscribeEnded(this.onEnded);
       this.controller.addErrorListener(this.errorListener);
       this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
       this.controller.addSeekableRangesListener(this.seekableRangesListener);
@@ -496,7 +480,6 @@ export struct VideoPlayer {
     // 注册进度监听（节流后的 currentTime/durationTime）
     this.controller.subscribeProgress(this.progressListener);
     this.controller.subscribePlaybackState(this.playbackStateListener);
-    this.controller.subscribeEnded(this.onEnded);
     // 错误与特殊状态监听
     this.controller.addErrorListener(this.errorListener);
     this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
@@ -1934,7 +1917,6 @@ export struct VideoPlayer {
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
     this.controller.unsubscribePlaybackState(this.playbackStateListener);
-    this.controller.unsubscribeEnded(this.onEnded);
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
