@@ -833,6 +833,10 @@
             "value": "Telegram 群组"
         },
         {
+            "name": "yt_about_github_repo",
+            "value": "GitHub 仓库"
+        },
+        {
             "name": "yt_about_project_info",
             "value": "项目信息"
         },
@@ -870,11 +874,11 @@
         },
         {
             "name": "yt_update_open_appgallery",
-            "value": "AppGallery 安装"
+            "value": "AppTest"
         },
         {
             "name": "yt_update_open_github",
-            "value": "GitHub 页面"
+            "value": "GitHub"
         },
         {
             "name": "yt_update_checking",

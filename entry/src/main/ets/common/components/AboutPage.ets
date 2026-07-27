@@ -1,13 +1,16 @@
 import { UIConfig } from '../AppState';
 import { customAnimationUtil } from '../AnimationUtil';
 import { OptionItem } from './OptionItem';
+import { PlaybackSectionTitle } from './PlaybackSectionTitle';
 import { pasteboard } from '@kit.BasicServicesKit';
+import { common } from '@kit.AbilityKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from './HdsTitleBar';
 import { AppLog } from '../AppLog';
 
 const APP_VERSION = '0.5.7';
 const APP_BUILD = '1000016';
+const GITHUB_REPO_URL = 'https://github.com/Ember5843/YourPipe';
 const logger = AppLog.getInstance('AboutPage');
 
 // ─── 数据 ──────────────────────────────────────────────────────────────────────
@@ -449,6 +452,16 @@ export struct AboutPage {
     });
   }
 
+  private openExternalLink(url: string): void {
+    try {
+      logger.info(`openExternalLink url=${url}`);
+      const context = getContext(this) as common.UIAbilityContext;
+      context.openLink(url, { appLinkingOnly: false });
+    } catch (e) {
+      logger.error(`openExternalLink failed: ${String(e)}`);
+    }
+  }
+
   // 根据导航名称渲染子页面
   @Builder
   aboutPageBuilder(name: string) {
@@ -525,68 +538,84 @@ export struct AboutPage {
               .lineHeight(21)
 
             // ── 社群 / 标识 ──
-            Column({ space: 6 }) {
+            Column({ space: 0 }) {
               OptionItem({
                 imageIcon: $r('app.media.app_icon'),
                 title: $r('app.string.yt_about_package_name'),
                 subtitle: 'com.talon.yourpipe',
+                transparentBackground: true,
                 onClickAction: () => this.copyToClipboard('com.talon.yourpipe'),
               })
+              Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
               OptionItem({
                 imageIcon: $r('app.media.about_logo_qq'),
                 title: $r('app.string.yt_about_qq_group'),
                 subtitle: '2167068947',
+                transparentBackground: true,
                 onClickAction: () => this.copyToClipboard('2167068947'),
               })
+              Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
               OptionItem({
                 imageIcon: $r('app.media.about_logo_telegram'),
                 title: $r('app.string.yt_about_tg_group'),
                 subtitle: 't.me/yourpipegroup',
+                transparentBackground: true,
                 onClickAction: () => this.copyToClipboard('t.me/yourpipegroup'),
+              })
+              Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
+              OptionItem({
+                imageIcon: $r('app.media.about_logo_github'),
+                title: $r('app.string.yt_about_github_repo'),
+                subtitle: 'github.com/Ember5843/YourPipe',
+                transparentBackground: true,
+                onClickAction: () => this.openExternalLink(GITHUB_REPO_URL),
               })
             }
             .width('100%')
+            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            .borderRadius(16)
+            .clip(true)
           }
           .width('100%')
           .alignItems(HorizontalAlign.Center)
           .padding({ top: 20, bottom: 24, left: 16, right: 16 })
 
-          Divider()
-            .color($r('sys.color.comp_divider'))
-            .margin({ left: 16, right: 16, bottom: 6 })
+          // ── 项目信息 ────────────────────────────────────────
+          Column({ space: 0 }) {
+            PlaybackSectionTitle({ title: $r('app.string.yt_about_project_info') })
 
-          // ── 子页面入口列表 ──────────────────────────────────
-          Column({ space: 6 }) {
-            Row() {
-              Text($r('app.string.yt_about_project_info'))
-                .fontSize(13).fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.yourtube_text_secondary'))
+            Column({ space: 0 }) {
+              OptionItem({
+                icon: $r('sys.symbol.doc_plaintext'),
+                title: $r('app.string.yt_about_open_source'),
+                subtitle: `${OPEN_SOURCE_ITEMS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_projects').id)}`,
+                iconColor: this.themePrimary,
+                transparentBackground: true,
+                onClickAction: () => { this.aboutNavStack.pushPathByName('open_source', null); }
+              })
+              Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
+              OptionItem({
+                icon: $r('sys.symbol.star_fill'),
+                title: $r('app.string.yt_about_ai_models'),
+                subtitle: `${AI_MODELS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_models').id)}`,
+                iconColor: this.themePrimary,
+                transparentBackground: true,
+                onClickAction: () => { this.aboutNavStack.pushPathByName('ai_models', null); }
+              })
+              Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
+              OptionItem({
+                icon: $r('sys.symbol.clock'),
+                title: $r('app.string.yt_about_changelog'),
+                subtitle: `${getContext().resourceManager.getStringSync($r('app.string.yt_label_latest_version').id)}${CHANGELOG[0].version}`,
+                iconColor: this.themePrimary,
+                transparentBackground: true,
+                onClickAction: () => { this.aboutNavStack.pushPathByName('changelog', null); }
+              })
             }
-            .width('100%').padding({ left: 4, top: 8, bottom: 4 })
-
-            OptionItem({
-              icon: $r('sys.symbol.doc_plaintext'),
-              title: $r('app.string.yt_about_open_source'),
-              subtitle: `${OPEN_SOURCE_ITEMS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_projects').id)}`,
-              iconColor: this.themePrimary,
-              onClickAction: () => { this.aboutNavStack.pushPathByName('open_source', null); }
-            })
-
-            OptionItem({
-              icon: $r('sys.symbol.star_fill'),
-              title: $r('app.string.yt_about_ai_models'),
-              subtitle: `${AI_MODELS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_models').id)}`,
-              iconColor: this.themePrimary,
-              onClickAction: () => { this.aboutNavStack.pushPathByName('ai_models', null); }
-            })
-
-            OptionItem({
-              icon: $r('sys.symbol.clock'),
-              title: $r('app.string.yt_about_changelog'),
-              subtitle: `${getContext().resourceManager.getStringSync($r('app.string.yt_label_latest_version').id)}${CHANGELOG[0].version}`,
-              iconColor: this.themePrimary,
-              onClickAction: () => { this.aboutNavStack.pushPathByName('changelog', null); }
-            })
+            .width('100%')
+            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            .borderRadius(16)
+            .clip(true)
           }
           .width('100%').padding({ left: 16, right: 16 })
 

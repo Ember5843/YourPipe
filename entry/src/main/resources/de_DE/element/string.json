@@ -789,6 +789,10 @@
             "value": "Telegram-Gruppe"
         },
         {
+            "name": "yt_about_github_repo",
+            "value": "GitHub-Repository"
+        },
+        {
             "name": "yt_about_project_info",
             "value": "Projektinformationen"
         },
@@ -826,11 +830,11 @@
         },
         {
             "name": "yt_update_open_appgallery",
-            "value": "Über AppGallery installieren"
+            "value": "AppTest"
         },
         {
             "name": "yt_update_open_github",
-            "value": "GitHub-Seite"
+            "value": "GitHub"
         },
         {
             "name": "yt_update_checking",

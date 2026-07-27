@@ -805,6 +805,10 @@
             "value": "مجموعة Telegram"
         },
         {
+            "name": "yt_about_github_repo",
+            "value": "مستودع GitHub"
+        },
+        {
             "name": "yt_about_project_info",
             "value": "معلومات المشروع"
         },
@@ -842,11 +846,11 @@
         },
         {
             "name": "yt_update_open_appgallery",
-            "value": "التثبيت عبر AppGallery"
+            "value": "AppTest"
         },
         {
             "name": "yt_update_open_github",
-            "value": "صفحة GitHub"
+            "value": "GitHub"
         },
         {
             "name": "yt_update_checking",

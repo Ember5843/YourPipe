@@ -805,6 +805,10 @@
             "value": "Группа Telegram"
         },
         {
+            "name": "yt_about_github_repo",
+            "value": "Репозиторий GitHub"
+        },
+        {
             "name": "yt_about_project_info",
             "value": "Информация о проекте"
         },
@@ -842,11 +846,11 @@
         },
         {
             "name": "yt_update_open_appgallery",
-            "value": "Установить через AppGallery"
+            "value": "AppTest"
         },
         {
             "name": "yt_update_open_github",
-            "value": "Страница GitHub"
+            "value": "GitHub"
         },
         {
             "name": "yt_update_checking",

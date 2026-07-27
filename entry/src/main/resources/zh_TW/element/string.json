@@ -805,6 +805,10 @@
             "value": "Telegram 群組"
         },
         {
+            "name": "yt_about_github_repo",
+            "value": "GitHub 倉庫"
+        },
+        {
             "name": "yt_about_project_info",
             "value": "專案資訊"
         },
@@ -842,11 +846,11 @@
         },
         {
             "name": "yt_update_open_appgallery",
-            "value": "AppGallery 安裝"
+            "value": "AppTest"
         },
         {
             "name": "yt_update_open_github",
-            "value": "GitHub 頁面"
+            "value": "GitHub"
         },
         {
             "name": "yt_update_checking",
