@@ -25,11 +25,11 @@ YourPipe is a YouTube client for **OpenHarmony / HarmonyOS**. It extracts stream
 | | |
 |---|---|
 | **Package** | `com.talon.yourpipe` |
-| **Version** | `0.5.6` |
+| **Version** | `0.5.8` |
 | **Target SDK** | `6.1.0(23)` · HarmonyOS · stage model |
 | **Devices** | phone · tablet · 2in1 · tv · car |
 
-Product VOD typically goes through a **SABR** dual-track local proxy into MPV (mweb player client). Names such as `libmdk_napi` / `MdkPlayerView` are **legacy** from [libmdk-napi](https://github.com/wang-bin/libmdk-napi); the runtime player is MPV only.
+Product VOD typically goes through a **SABR** dual-track local proxy into MPV (mweb player client). Playback is **MPV only**: the `libmpv_napi` module is a NAPI bridge over a vendored `libmpv.so`, originally derived from [libmdk-napi](https://github.com/wang-bin/libmdk-napi) (historical `mdk` names exist only in old commits).
 
 ---
 
@@ -53,7 +53,7 @@ Main tabs: **Home · Subscriptions · Favorites · Local**. Search and Options o
 
 ```text
 entry  →  mediaservice  →  youtube_core
-  │              └────→  @mediadevkit/libmdk-napi  (MPV bridge)
+  │              └────→  @yourpipe/libmpv-napi  (MPV bridge)
   └──────────→  youtube_core
 ```
 
@@ -62,7 +62,7 @@ entry  →  mediaservice  →  youtube_core
 | `entry` | UI, pages, preferences, auth, PoToken WebView |
 | `mediaservice` | Playback engine, AV session, local media proxy, offline download |
 | `youtube_core` | YouTube extraction, cipher, HLS/SABR session, auth storage |
-| `libmdk_napi` | NAPI bridge to MPV (+ vendored FFmpeg / libmpv on arm64) |
+| `libmpv_napi` | NAPI bridge to MPV (+ vendored FFmpeg / libmpv on arm64) |
 
 `arm64-v8a` is the product playback ABI. `x86_64` builds use a player stub (UI only).
 
@@ -113,7 +113,7 @@ Behavior and naming draw on these open projects (not alternate runtimes inside t
 | [NewPipe](https://github.com/TeamNewPipe/NewPipe) | Client UX reference |
 | [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) | Extraction / stream models |
 | [PipePipe](https://github.com/InfinityLoop1308/PipePipe) | Player-client / extractor compatibility |
-| [libmdk-napi](https://github.com/wang-bin/libmdk-napi) | Historical NAPI / view naming |
+| [libmdk-napi](https://github.com/wang-bin/libmdk-napi) | Historical origin of the NAPI bridge structure and naming |
 | [MPV](https://github.com/mpv-player/mpv) | Playback core (libmpv) |
 
 ---

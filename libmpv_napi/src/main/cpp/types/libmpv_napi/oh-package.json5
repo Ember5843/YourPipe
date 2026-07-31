@@ -1,0 +1,6 @@
+{
+  "name": "libmpv_napi.so",
+  "types": "./index.d.ts",
+  "version": "0.2.0",
+  "description": "Type declarations for the libmpv OHOS native module"
+}

@@ -62,8 +62,8 @@
       "srcPath": "./youtube_core"
     },
     {
-      "name": "libmdk_napi",
-      "srcPath": "./libmdk_napi",
+      "name": "libmpv_napi",
+      "srcPath": "./libmpv_napi",
       "targets": [
         {
           "name": "default",

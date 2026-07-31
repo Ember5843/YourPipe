@@ -1,0 +1,22 @@
+{
+  "name": "@yourpipe/libmpv-napi",
+  "version": "0.2.0",
+  "description": "MPV player NAPI bridge for YourPipe (OpenHarmony)",
+  "homepage": "https://github.com/Ember5843/YourPipe",
+  "repository": "https://github.com/Ember5843/YourPipe",
+  "main": "src/main/ets/index.ets",
+  "author": "YourPipe",
+  "license": "MIT",
+  "dependencies": {
+    "libmpv_napi.so": "file:./src/main/cpp/types/libmpv_napi"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "player",
+    "HDR",
+    "DolbyVision",
+    "alpha",
+    "FFmpeg",
+    "MediaPlayer",
+  ]
+}

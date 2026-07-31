@@ -1,5 +1,5 @@
-import { MdkPlayerController as MpvPlayerController, MediaStatus, MediaType, SeekFlag, PlaybackState as NativePlaybackState } from '@mediadevkit/libmdk-napi';
-import type { MediaInfo } from '@mediadevkit/libmdk-napi';
+import { MpvPlayerController, MediaStatus, MediaType, SeekFlag, PlaybackState as NativePlaybackState } from '@yourpipe/libmpv-napi';
+import type { MediaInfo } from '@yourpipe/libmpv-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
 import { VideoHwCaps } from './VideoHwCaps';

@@ -1,0 +1,11 @@
+{
+  "module": {
+    "name": "libmpv_napi",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet",
+      "2in1"
+    ]
+  }
+}

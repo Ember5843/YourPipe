@@ -1,4 +1,4 @@
-import { probeVideoHwDecoders, VideoHwDecoderCaps } from '@mediadevkit/libmdk-napi';
+import { probeVideoHwDecoders, VideoHwDecoderCaps } from '@yourpipe/libmpv-napi';
 import Logger from '../utils/Logger';
 
 const TAG: string = '[PlayerLog][VideoHwCaps]';
