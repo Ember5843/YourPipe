@@ -1,4 +1,5 @@
 import {
+  SabrProtocolException,
   YoutubeSabrFormatMeta,
   YoutubeSabrInfo
 } from 'youtube_core';
@@ -367,10 +368,9 @@ export class SabrOfflineDownloader {
         onEmpty();
         return false;
       }
-      if (msg.indexOf('segment not available') >= 0
-        || msg.indexOf('policy-only') >= 0
-        || msg.indexOf('protected no-media') >= 0
-        || msg.indexOf('repeated no-media') >= 0) {
+      const transient = e instanceof SabrProtocolException
+        && (e.kind === 'protection' || e.kind === 'no_media');
+      if (transient || msg.indexOf('segment not available') >= 0) {
         Logger.warn(TAG, `tryWriteNext itag=${buf.getItag()} seq=${sequence}: ${msg}`);
         return false;
       }

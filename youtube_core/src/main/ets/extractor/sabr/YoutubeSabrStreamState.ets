@@ -7,6 +7,7 @@ import {
 } from './SabrDecodedResponse';
 import { SabrMediaHeader } from './SabrMediaHeader';
 import { SabrMediaSegment } from './SabrMediaSegment';
+import { SabrServerEpoch } from './SabrServerEpoch';
 import { YoutubeSabrFormatMeta } from './YoutubeSabrInfo';
 import { parseMp4SegmentIndex, SabrSegmentIndex } from './SabrMp4SegmentIndex';
 
@@ -220,15 +221,15 @@ class FormatProgress {
 }
 
 /**
- * Per-session track progress + cookie/context state (PipePipe YoutubeSabrStreamState subset).
+ * Per-session track progress + seek/player-time state (PipePipe
+ * YoutubeSabrStreamState subset). Server-epoch state (playbackCookie,
+ * sabrContexts, poToken) lives in SabrServerEpoch; the public accessors
+ * below keep their signatures and delegate to it.
  */
 export class YoutubeSabrStreamState {
   private audio: FormatProgress;
   private video: FormatProgress;
-  private playbackCookie?: Uint8Array;
-  private poToken?: Uint8Array;
-  private sabrContexts: Map<number, SabrContextUpdate> = new Map();
-  private activeSabrContextTypes: Set<number> = new Set();
+  private epoch: SabrServerEpoch;
   private playerTimeMsOverride: number = -1;
   private enabledTrackTypesBitfield: number = SABR_TRACK_BOTH;
   private selectAudioFormat: boolean = true;
@@ -236,16 +237,22 @@ export class YoutubeSabrStreamState {
   private writeTopLevelPlayerTimeMs: boolean = true;
   private playbackRate: number = 1.0;
 
-  constructor(audioFormat: YoutubeSabrFormatMeta, videoFormat: YoutubeSabrFormatMeta) {
+  constructor(audioFormat: YoutubeSabrFormatMeta, videoFormat: YoutubeSabrFormatMeta,
+    epoch: SabrServerEpoch) {
     this.audio = new FormatProgress(audioFormat);
     this.video = new FormatProgress(videoFormat);
+    this.epoch = epoch;
+  }
+
+  getEpoch(): SabrServerEpoch {
+    return this.epoch;
   }
 
   ingest(response: SabrDecodedResponse): boolean {
     let progressed = false;
     if (response.nextRequestPolicy) {
       if (response.nextRequestPolicy.playbackCookie) {
-        this.playbackCookie = response.nextRequestPolicy.playbackCookie;
+        this.epoch.playbackCookie = response.nextRequestPolicy.playbackCookie;
       }
     }
     for (const meta of response.formatInitializationMetadata) {
@@ -282,22 +289,22 @@ export class YoutubeSabrStreamState {
       return;
     }
     // writePolicy 2 = KEEP_EXISTING
-    if (update.writePolicy === 2 && this.sabrContexts.has(update.type)) {
+    if (update.writePolicy === 2 && this.epoch.sabrContexts.has(update.type)) {
       return;
     }
-    this.sabrContexts.set(update.type, update);
+    this.epoch.sabrContexts.set(update.type, update);
     if (update.sendByDefault) {
-      this.activeSabrContextTypes.add(update.type);
+      this.epoch.activeSabrContextTypes.add(update.type);
     }
   }
 
   private ingestContextSendingPolicy(policy: SabrContextSendingPolicy): void {
     for (const type of policy.types) {
-      this.activeSabrContextTypes.add(type);
+      this.epoch.activeSabrContextTypes.add(type);
     }
     for (const type of policy.disposeTypes) {
-      this.activeSabrContextTypes.delete(type);
-      this.sabrContexts.delete(type);
+      this.epoch.activeSabrContextTypes.delete(type);
+      this.epoch.sabrContexts.delete(type);
     }
   }
 
@@ -446,25 +453,25 @@ export class YoutubeSabrStreamState {
   }
 
   getRawPlaybackCookie(): Uint8Array | undefined {
-    return this.playbackCookie;
+    return this.epoch.playbackCookie;
   }
 
   getRawPoToken(): Uint8Array | undefined {
-    return this.poToken;
+    return this.epoch.poToken;
   }
 
   setPoToken(token?: Uint8Array): void {
-    this.poToken = token;
+    this.epoch.poToken = token;
   }
 
   clearPlaybackCookie(): void {
-    this.playbackCookie = undefined;
+    this.epoch.playbackCookie = undefined;
   }
 
   getActiveSabrContexts(): SabrContextUpdate[] {
     const out: SabrContextUpdate[] = [];
-    this.activeSabrContextTypes.forEach((type: number) => {
-      const ctx = this.sabrContexts.get(type);
+    this.epoch.activeSabrContextTypes.forEach((type: number) => {
+      const ctx = this.epoch.sabrContexts.get(type);
       if (ctx) {
         out.push(ctx);
       }

@@ -5,8 +5,12 @@ import { YoutubePlayerClientKey } from '../../model/YoutubePlayerClientConfig';
 import { WebClientVersionResolver } from '../../common/WebClientVersionResolver';
 import { YTCoreLogger } from '../../common/YTCoreLogger';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
+import { SessionIdentityManager } from '../identity/SessionIdentityManager';
 
 const logger = YTCoreLogger.getInstance('ConfiguredPlayerClient');
+
+/** Hard cap for the player PoToken hook — extraction must never wait on BotGuard. */
+const PLAYER_PO_TOKEN_TIMEOUT_MS = 5000;
 
 interface PlayerIdentity {
   key: YoutubePlayerClientKey;
@@ -120,6 +124,34 @@ export class ConfiguredPlayerClient {
       'racyCheckOk': true
     };
 
+    // Stage 2 identity pass: web-like clients carry the pinned session
+    // visitorData and, when the injected hook can mint one fast enough, a
+    // visitor-bound player PoToken. tv_downgraded stays token-free
+    // (PipePipe 7673caed). A missing/slow/failed hook never blocks extraction.
+    if (key === 'mweb' || key === 'web_safari') {
+      const identityVisitorData = SessionIdentityManager.current()?.visitorData || '';
+      if (identityVisitorData) {
+        client['visitorData'] = identityVisitorData;
+      }
+      let playerPoToken: string | undefined = undefined;
+      try {
+        playerPoToken = await withTimeoutMs(
+          SessionIdentityManager.getPlayerPoToken(id.clientName, id.clientVersion, id.userAgent),
+          PLAYER_PO_TOKEN_TIMEOUT_MS);
+      } catch (e) {
+        logger.warn(`[${key}] player PoToken hook failed: ${String(e)}`);
+      }
+      if (playerPoToken) {
+        payload['serviceIntegrityDimensions'] = {
+          'poToken': playerPoToken
+        } as Record<string, Object>;
+        logger.info(`[${key}] player PoToken applied len=${playerPoToken.length} `
+          + `hasVisitorData=${identityVisitorData.length > 0}`);
+      } else {
+        logger.debug(`[${key}] player PoToken unavailable, sending without integrity dimensions`);
+      }
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'User-Agent': id.userAgent,
@@ -185,4 +217,15 @@ function randomCpn(): string {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+}
+
+/** Rejects with 'player PoToken timeout' after ms so extraction never stalls. */
+function withTimeoutMs<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timerId: number = -1;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timerId = setTimeout(() => reject(new Error('player PoToken timeout')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timerId);
+  });
 }

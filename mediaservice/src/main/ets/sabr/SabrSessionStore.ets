@@ -1,4 +1,5 @@
 import {
+  SabrInfoReloader,
   SabrMediaSegment,
   SabrPoTokenProvider,
   SabrSegmentRequest,
@@ -37,6 +38,7 @@ class SabrSessionStoreImpl {
   private leases: Map<string, SabrLease> = new Map();
   private httpClient?: YouTubeHttpClient;
   private poTokenProvider?: SabrPoTokenProvider;
+  private infoReloader?: SabrInfoReloader;
 
   setHttpClient(client: YouTubeHttpClient): void {
     this.httpClient = client;
@@ -44,6 +46,10 @@ class SabrSessionStoreImpl {
 
   setPoTokenProvider(provider?: SabrPoTokenProvider): void {
     this.poTokenProvider = provider;
+  }
+
+  setInfoReloader(reloader?: SabrInfoReloader): void {
+    this.infoReloader = reloader;
   }
 
   makeKey(
@@ -74,7 +80,8 @@ class SabrSessionStoreImpl {
       throw new Error('SabrSessionStore: YouTubeHttpClient not set');
     }
     const session = new YoutubeSabrSession(
-      info, audioFormat, videoFormat, this.httpClient, this.poTokenProvider, useAuth);
+      info, audioFormat, videoFormat, this.httpClient, this.poTokenProvider, useAuth,
+      this.infoReloader);
     const lease: SabrLease = {
       key: key,
       session: session,

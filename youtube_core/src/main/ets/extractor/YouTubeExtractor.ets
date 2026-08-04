@@ -916,45 +916,12 @@ export class YouTubeExtractor {
     cpn: string,
     sourceClient: string
   ): Promise<boolean> {
-    if (!playerResponse?.streamingData) {
+    const sabrInfo = await this.buildSabrInfo(videoId, playerResponse, cpn, sourceClient);
+    if (!sabrInfo) {
       return false;
     }
-    const sd = playerResponse.streamingData;
-    let serverAbr = sd.serverAbrStreamingUrl || '';
-    if (!serverAbr) {
-      return false;
-    }
-    const serverAbrBefore = serverAbr;
-    try {
-      serverAbr = await this.deobfuscateManifestUrl(serverAbr);
-      if (serverAbr !== serverAbrBefore) {
-        logger.info(`[SABR] serverAbr n-deobfuscated len ${serverAbrBefore.length}->${serverAbr.length}`);
-      } else if (/[?&]n=/.test(serverAbrBefore) || /\/n\//.test(serverAbrBefore)) {
-        logger.warn('[SABR] serverAbr still has encrypted n (decode may have failed)');
-      }
-    } catch (e) {
-      logger.warn('[SABR] n-deobfuscate serverAbr failed:', e);
-    }
-
-    const formats = this.parseSabrFormats(sd);
-    if (formats.length === 0) {
-      return false;
-    }
-
-    const profile = sourceClient === 'web_safari' ? 'web' : 'mweb';
-    const clientVersion = sourceClient === 'web_safari'
-      ? ClientsConstants.SAFARI_CLIENT_VERSION
-      : WebClientVersionResolver.getCachedOrHardcoded();
-    const sabrInfo = new YoutubeSabrInfo(profile, videoId, cpn, clientVersion, formats);
-    sabrInfo.serverAbrStreamingUrl = serverAbr;
-    // Pin visitorData per app session (matches web behavior): the PoToken mint
-    // and the SABR X-Goog-Visitor-Id header stay on one value, so BotGuard
-    // initializes once instead of re-initializing (~2s) on every video.
-    sabrInfo.visitorData = YoutubeJavaScriptPlayerManager.getSessionVisitorData(
-      playerResponse.responseContext?.visitorData);
-    sabrInfo.videoPlaybackUstreamerConfig =
-      playerResponse.playerConfig?.mediaCommonConfig
-        ?.mediaUstreamerRequestConfig?.videoPlaybackUstreamerConfig;
+    const serverAbr = sabrInfo.serverAbrStreamingUrl || '';
+    const formats = sabrInfo.formats;
 
     for (const fmt of formats) {
       if (fmt.isAudio) {
@@ -1047,6 +1014,92 @@ export class YouTubeExtractor {
     logger.info(`[SABR] reserved bootstrap streams audio=${this.cachedAudioStreams.length} `
       + `videoOnly=${this.cachedVideoOnlyStreams.length} serverAbrLen=${serverAbr.length}`);
     return this.cachedAudioStreams.length > 0 || this.cachedVideoOnlyStreams.length > 0;
+  }
+
+  /**
+   * SABR bootstrap builder shared by buildSabrStreams and reprobeSabrInfo:
+   * n-deobfuscate the serverAbr URL, parse formats, pin the session
+   * visitorData, attach the ustreamer config. undefined = no usable bootstrap.
+   */
+  private async buildSabrInfo(
+    videoId: string,
+    playerResponse: PlayerResponse | undefined,
+    cpn: string,
+    sourceClient: string
+  ): Promise<YoutubeSabrInfo | undefined> {
+    if (!playerResponse?.streamingData) {
+      return undefined;
+    }
+    const sd = playerResponse.streamingData;
+    let serverAbr = sd.serverAbrStreamingUrl || '';
+    if (!serverAbr) {
+      return undefined;
+    }
+    const serverAbrBefore = serverAbr;
+    try {
+      serverAbr = await this.deobfuscateManifestUrl(serverAbr);
+      if (serverAbr !== serverAbrBefore) {
+        logger.info(`[SABR] serverAbr n-deobfuscated len ${serverAbrBefore.length}->${serverAbr.length}`);
+      } else if (/[?&]n=/.test(serverAbrBefore) || /\/n\//.test(serverAbrBefore)) {
+        logger.warn('[SABR] serverAbr still has encrypted n (decode may have failed)');
+      }
+    } catch (e) {
+      logger.warn('[SABR] n-deobfuscate serverAbr failed:', e);
+    }
+
+    const formats = this.parseSabrFormats(sd);
+    if (formats.length === 0) {
+      return undefined;
+    }
+
+    const profile = sourceClient === 'web_safari' ? 'web' : 'mweb';
+    const clientVersion = sourceClient === 'web_safari'
+      ? ClientsConstants.SAFARI_CLIENT_VERSION
+      : WebClientVersionResolver.getCachedOrHardcoded();
+    const sabrInfo = new YoutubeSabrInfo(profile, videoId, cpn, clientVersion, formats);
+    sabrInfo.serverAbrStreamingUrl = serverAbr;
+    // Pin visitorData per app session (matches web behavior): the PoToken mint
+    // and the SABR X-Goog-Visitor-Id header stay on one value, so BotGuard
+    // initializes once instead of re-initializing (~2s) on every video.
+    sabrInfo.visitorData = YoutubeJavaScriptPlayerManager.getSessionVisitorData(
+      playerResponse.responseContext?.visitorData);
+    sabrInfo.videoPlaybackUstreamerConfig =
+      playerResponse.playerConfig?.mediaCommonConfig
+        ?.mediaUstreamerRequestConfig?.videoPlaybackUstreamerConfig;
+    return sabrInfo;
+  }
+
+  /**
+   * Re-probe the SABR bootstrap mid-playback (RELOAD_PLAYER / ROTATE_IDENTITY).
+   * Callers MUST serialize this against extractVideoStreams (entry extractChain)
+   * — the extractor is a stateful singleton. STS reuses the normal cache path;
+   * the stream /player call mirrors the mweb playback request (Cookie only when
+   * present). Returns undefined on any failure; the session falls through to
+   * the next policy action instead of hard-failing here.
+   */
+  async reprobeSabrInfo(videoId: string): Promise<YoutubeSabrInfo | undefined> {
+    const startedAt = Date.now();
+    logger.info(`[SABR] reprobe start video=${videoId}`);
+    try {
+      const sts = await this.resolveSignatureTimestamp(videoId, undefined, `sabr-reprobe-${videoId}`);
+      if (sts === undefined || sts <= 0) {
+        logger.warn(`[SABR] reprobe failed video=${videoId} reason=sts_unavailable`);
+        return undefined;
+      }
+      const webCookieAuth = this.shouldAttachWebCookieAuth();
+      const players = await this.fetchSelectedStreamPlayer(videoId, sts, 'mweb', webCookieAuth, false);
+      if (!players.player?.streamingData) {
+        logger.warn(`[SABR] reprobe failed video=${videoId} reason=no_streaming_data`);
+        return undefined;
+      }
+      const info = await this.buildSabrInfo(videoId, players.player, players.cpn || '', 'mweb');
+      logger.info(`[SABR] reprobe done video=${videoId} ok=${!!info} `
+        + `elapsed=${Date.now() - startedAt}ms`);
+      return info;
+    } catch (e) {
+      logger.warn(`[SABR] reprobe exception video=${videoId}: ${(e as Error).message || e}`);
+      return undefined;
+    }
   }
 
   private parseSabrFormats(sd: StreamingData): YoutubeSabrFormatMeta[] {
@@ -1353,7 +1406,7 @@ export class YouTubeExtractor {
         videoId: videoId,
         hl: this.hl,
         gl: this.gl,
-        visitorData: undefined,
+        visitorData: YoutubeJavaScriptPlayerManager.getSessionVisitorData() || undefined,
         signatureTimestamp: sts
       }, this.client, false).catch((e: Error) => {
         logger.warn(`[STREAM] MWEB HLS helper failed: ${e.message || e}`);
@@ -2067,7 +2120,11 @@ export class YouTubeExtractor {
       videoId: videoId,
       hl: this.hl,
       gl: this.gl,
-      visitorData: undefined,
+      // Stage 2: web-like clients carry the pinned session identity; TV stays
+      // token-free (PipePipe 7673caed). No pin yet → undefined (first request).
+      visitorData: selectedClient === 'tv_downgraded'
+        ? undefined
+        : YoutubeJavaScriptPlayerManager.getSessionVisitorData() || undefined,
       signatureTimestamp: sts
     };
     try {

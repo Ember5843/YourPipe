@@ -131,7 +131,13 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
           decoded.formatInitializationMetadata.push(decodeFormatInitMeta(part.data));
           break;
         }
-        case PART_SABR_SEEK:
+        case PART_SABR_SEEK: {
+          // Minimal handling: decode the reason for diagnostics. We do not execute the
+          // server-demanded reposition (PipePipe doesn't either); the response is still
+          // counted as no-media by the pump, so repeated seeks hit the existing budgets.
+          decoded.sabrSeekReason = decodeSabrSeekReason(part.data);
+          break;
+        }
         default:
           if (part.type !== PART_MEDIA && part.type !== PART_MEDIA_END
             && part.type !== PART_MEDIA_HEADER) {
@@ -223,6 +229,16 @@ function decodeStreamProtection(data: Uint8Array): StreamProtectionResult {
     }
   }
   return result;
+}
+
+/** SABR_SEEK part: field 1 = seek reason varint (-1 when absent). */
+function decodeSabrSeekReason(data: Uint8Array): number {
+  for (const field of sabrReadFields(data)) {
+    if (field.number === 1 && field.wireType === WIRE_VARINT) {
+      return field.varint | 0;
+    }
+  }
+  return -1;
 }
 
 function decodeContextUpdate(data: Uint8Array): SabrContextUpdate {

@@ -11,4 +11,11 @@ export interface SabrPoTokenProvider {
     streamState: YoutubeSabrStreamState,
     forceRefresh: boolean
   ): Promise<Uint8Array | undefined>;
+
+  /**
+   * ROTATE_IDENTITY: drop every token minted against the current session
+   * identity (and the identity pin itself) so the next mint runs on the
+   * re-probed visitorData. Returns true when the invalidation took effect.
+   */
+  invalidatePoTokenIdentity?(info: YoutubeSabrInfo): Promise<boolean>;
 }

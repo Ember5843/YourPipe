@@ -1,4 +1,4 @@
-import { SabrMediaSegment, SabrSegmentRequest } from 'youtube_core';
+import { SabrMediaSegment, SabrProtocolException, SabrSegmentRequest } from 'youtube_core';
 import Logger from '../utils/Logger';
 import { SabrLease, sabrSessionStore } from './SabrSessionStore';
 
@@ -91,16 +91,13 @@ export class SabrTrackBuffer {
         }
         return segment.data;
       } catch (e) {
-        if (this.lease.session.isBeyondEnd(request)
-          || String(e).indexOf('segment beyond end') >= 0) {
+        if (this.lease.session.isBeyondEnd(request)) {
           return undefined;
         }
-        const message = String(e);
-        const transient = message.indexOf('policy-only') >= 0
-          || message.indexOf('protected no-media') >= 0
-          || message.indexOf('repeated no-media') >= 0;
+        const transient = e instanceof SabrProtocolException
+          && (e.kind === 'protection' || e.kind === 'no_media');
         if (!transient || attempt >= 3) {
-          throw e instanceof Error ? e : new Error(message);
+          throw e instanceof Error ? e : new Error(String(e));
         }
         const waitMs = Math.max(250, this.lease.session.getBackoffRemainingMs());
         Logger.warn(TAG, `wait transient itag=${this.getItag()} seq=${sequenceNumber} `
@@ -271,7 +268,9 @@ export class SabrTrackBuffer {
   }
 
   private backoffUntilClearedAllowRetry(): void {
-    // Drop sticky stall so seek can POST after prepareSeek cleared session backoff.
+    // Drop the sticky stall so a seek may POST again. Session-level server backoff
+    // survives the seek (prepareSeek no longer clears it); pumpOnce still honors it,
+    // and the pump loop above stops while session.isInBackoff().
     this.stalledProtected = false;
     this.emptyPumpStreak = 0;
   }
@@ -383,9 +382,8 @@ export class SabrTrackBuffer {
         this.emptyPumpStreak = 0;
         return;
       } catch (e) {
-        const msg = String(e);
-        if (msg.indexOf('protected no-media') >= 0 || msg.indexOf('policy-only') >= 0
-          || msg.indexOf('repeated no-media') >= 0) {
+        if (e instanceof SabrProtocolException
+          && (e.kind === 'protection' || e.kind === 'no_media')) {
           this.stalledProtected = true;
           Logger.warn(TAG, `fetch next seq=${next} stalled (no free-pump): ${e}`);
           return;

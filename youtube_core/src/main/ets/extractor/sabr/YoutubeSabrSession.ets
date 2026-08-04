@@ -5,7 +5,17 @@ import { SabrDecodedResponse } from './SabrDecodedResponse';
 import { SabrMediaSegment, SabrSegmentRequest } from './SabrMediaSegment';
 import { SabrProtocolException } from './SabrProtocolException';
 import { requireUmpContentType, sabrDecodeBody } from './SabrResponseDecoder';
+import { SabrInfoReloader } from './SabrInfoReloader';
 import { SabrPoTokenProvider } from './SabrPoTokenProvider';
+import { SabrServerEpoch } from './SabrServerEpoch';
+import { BuiltinSabrSessionPolicy } from './policy/BuiltinSabrSessionPolicy';
+import {
+  SABR_MAX_ATTESTATION_IDENTITY_ROTATIONS,
+  SABR_MAX_PO_TOKEN_REFRESHES,
+  SABR_MAX_RELOADS_PER_SESSION,
+  SabrPolicyContext,
+  SabrSessionPolicy
+} from './policy/SabrSessionPolicy';
 import { YoutubeSabrFormatMeta, YoutubeSabrInfo } from './YoutubeSabrInfo';
 import { YoutubeSabrRequestBuilder } from './YoutubeSabrRequestBuilder';
 import { YoutubeSabrStreamState } from './YoutubeSabrStreamState';
@@ -13,9 +23,6 @@ import { YoutubeSabrStreamState } from './YoutubeSabrStreamState';
 const logger = YTCoreLogger.getInstance('YoutubeSabrSession');
 
 const MAX_REQUESTS_PER_SEGMENT = 16;
-const MAX_POLICY_ONLY_RESPONSES = 3;
-const MAX_REDIRECTS = 3;
-const MAX_PO_TOKEN_REFRESHES = 2;
 const MAX_BACKOFF_MS = 30000;
 const MAX_CACHE_BYTES = 32 * 1024 * 1024;
 const SEEK_KEEP_WINDOW_MS = 8000;
@@ -32,10 +39,10 @@ export class YoutubeSabrSession {
   private streamState: YoutubeSabrStreamState;
   private httpClient: YouTubeHttpClient;
   private poTokenProvider?: SabrPoTokenProvider;
-  private serverAbrStreamingUrl: string;
-  private requestNumber: number = 0;
-  private redirectCount: number = 0;
-  private poTokenRefreshes: number = 0;
+  private infoReloader?: SabrInfoReloader;
+  /** Server-owned epoch state: url/rn/redirect/backoff/token-refresh counters. */
+  private epoch: SabrServerEpoch;
+  private policy: SabrSessionPolicy = new BuiltinSabrSessionPolicy();
   private segmentCache: Map<string, SabrMediaSegment> = new Map();
   private cacheOrder: string[] = [];
   private cachedBytes: number = 0;
@@ -46,9 +53,10 @@ export class YoutubeSabrSession {
   /** Serialize pumps — concurrent A/V ensureReady must not dual-fire rn=1. */
   private pumpBusy: boolean = false;
   private pumpWaiters: Array<() => void> = [];
-  /** Server-requested cooldown (Date.now() deadline). Honored before every POST. */
-  private backoffUntilMs: number = 0;
   private consecutiveNoMedia: number = 0;
+  /** ROTATE_IDENTITY attempts (session-scoped, survives an epoch reset). */
+  private attestationRotations: number = 0;
+  private consecutiveAttestationPending: number = 0;
   private poTokenWarmup?: Promise<boolean>;
 
   constructor(
@@ -57,7 +65,8 @@ export class YoutubeSabrSession {
     videoFormat: YoutubeSabrFormatMeta,
     httpClient: YouTubeHttpClient,
     poTokenProvider?: SabrPoTokenProvider,
-    useAuth: boolean = false
+    useAuth: boolean = false,
+    infoReloader?: SabrInfoReloader
   ) {
     if (!audioFormat.isAudio) {
       throw new SabrProtocolException(`SABR audio format must be audio: itag=${audioFormat.itag}`);
@@ -74,8 +83,9 @@ export class YoutubeSabrSession {
     this.httpClient = httpClient;
     this.poTokenProvider = poTokenProvider;
     this.useAuth = useAuth;
-    this.streamState = new YoutubeSabrStreamState(audioFormat, videoFormat);
-    this.serverAbrStreamingUrl = info.serverAbrStreamingUrl;
+    this.infoReloader = infoReloader;
+    this.epoch = new SabrServerEpoch(info.serverAbrStreamingUrl);
+    this.streamState = new YoutubeSabrStreamState(audioFormat, videoFormat, this.epoch);
   }
 
   getStreamState(): YoutubeSabrStreamState {
@@ -127,7 +137,7 @@ export class YoutubeSabrSession {
 
   /** Remaining server backoff ms (0 if clear). */
   getBackoffRemainingMs(): number {
-    return Math.max(0, this.backoffUntilMs - Date.now());
+    return Math.max(0, this.epoch.backoffUntilMs - Date.now());
   }
 
   isInBackoff(): boolean {
@@ -163,7 +173,7 @@ export class YoutubeSabrSession {
    */
   async fetchSegment(request: SabrSegmentRequest): Promise<SabrMediaSegment> {
     if (this.closed) {
-      throw new SabrProtocolException('SABR session closed');
+      throw new SabrProtocolException('SABR session closed', 'closed');
     }
     const cached = this.segmentCache.get(request.cacheKey());
     if (cached) {
@@ -196,7 +206,7 @@ export class YoutubeSabrSession {
     let policyRecoveryApplied = false;
     for (let attempt = 0; attempt < MAX_REQUESTS_PER_SEGMENT; attempt++) {
       if (this.closed) {
-        throw new SabrProtocolException('SABR session closed');
+        throw new SabrProtocolException('SABR session closed', 'closed');
       }
       const decoded = await this.pumpOnce();
       const hit = this.segmentCache.get(request.cacheKey());
@@ -206,67 +216,104 @@ export class YoutubeSabrSession {
       if (this.isBeyondEnd(request)) {
         throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`);
       }
-      if (decoded.sabrError) {
-        throw new SabrProtocolException(
-          `SABR error while fetching ${request.cacheKey()}: ${decoded.sabrError}`);
-      }
-      if (decoded.reloadRequested) {
-        throw new SabrProtocolException(
-          `SABR reload requested (not auto-reprobed yet): ${decoded.summarizeNoMediaResponse()}`);
+      // Track the attestation-pending streak before the policy sees the response.
+      if (decoded.isNoMediaResponse() && decoded.isAttestationPending()) {
+        this.consecutiveAttestationPending++;
+      } else {
+        this.consecutiveAttestationPending = 0;
       }
       // SABR can send later segments while leaving the exact requested sequence as a hole.
       // Rewind the advertised range once so the server is told honestly to refill that hole.
       const observedAheadHole = !request.initSegment && this.hasCachedMediaAfter(request);
-      if (!request.initSegment && requestFormat && !holeRecoveryApplied
+      const holeRecoveryAvailable = !request.initSegment && !!requestFormat && !holeRecoveryApplied
         && (observedAheadHole
-          || requestTargetMs + 500 < this.streamState.getBufferedEndMs(requestFormat))) {
-        holeRecoveryApplied = true;
-        if (observedAheadHole) {
-          this.backoffUntilMs = 0;
-          this.consecutiveNoMedia = 0;
-          this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
-        } else {
-          this.prepareForRewind(requestTargetMs);
+          || requestTargetMs + 500 < this.streamState.getBufferedEndMs(requestFormat));
+      const policyRecoveryAvailable = !request.initSegment && !!requestFormat
+        && !policyRecoveryApplied;
+      const policyCtx: SabrPolicyContext = {
+        phase: 'fetch',
+        redirectCount: this.epoch.redirectCount,
+        poTokenRefreshes: this.epoch.poTokenRefreshes,
+        consecutiveNoMedia: this.consecutiveNoMedia,
+        policyOnly: policyOnly,
+        hasPoToken: !!this.streamState.getRawPoToken(),
+        hasPoTokenProvider: !!this.poTokenProvider,
+        requestKey: request.cacheKey(),
+        holeRecoveryAvailable: holeRecoveryAvailable,
+        policyRecoveryAvailable: policyRecoveryAvailable,
+        reloads: this.epoch.reloads,
+        attestationRotations: this.attestationRotations,
+        consecutiveAttestationPending: this.consecutiveAttestationPending,
+        hasInfoReloader: !!this.infoReloader,
+        canRotateIdentity: !!this.poTokenProvider
+          && !!this.poTokenProvider.invalidatePoTokenIdentity
+      };
+      const actions = this.policy.evaluate(decoded, policyCtx);
+      for (const action of actions) {
+        if (action.type === 'fail') {
+          throw new SabrProtocolException(action.message, action.kind);
         }
-        logger.info(`[SABR] recover hole itag=${request.itag} seq=${request.sequenceNumber} `
-          + `targetMs=${requestTargetMs} observedAhead=${observedAheadHole}`);
-        continue;
-      }
-      if (decoded.isProtectionBoundaryNoMediaResponse()) {
-        const applied = await this.applyPoTokenForProtectedResponse();
-        if (!applied) {
-          // No PO yet: stop immediately. Caller must serve cache / wait, not free-pump.
-          throw new SabrProtocolException(
-            `SABR protected no-media: ${decoded.summarizeNoMediaResponse()}`);
+        if (action.type === 'apply_po_token') {
+          const applied = await this.applyPoTokenForProtectedResponse();
+          if (applied) {
+            break;
+          }
+          continue; // No PO yet: the chain's next action decides the fallback.
         }
-        continue;
-      }
-      if (decoded.isPolicyOnlyResponse()) {
-        policyOnly++;
-        if (policyOnly >= MAX_POLICY_ONLY_RESPONSES) {
+        if (action.type === 'rotate_identity') {
+          const rotated = await this.executeRotateIdentity();
+          if (rotated) {
+            break;
+          }
+          continue;
+        }
+        if (action.type === 'reload_player') {
+          const reloaded = await this.executeReloadPlayer(action.message || 'policy');
+          if (reloaded) {
+            break;
+          }
+          continue;
+        }
+        if (action.type === 'recover_hole') {
+          if (!requestFormat) {
+            break;
+          }
+          holeRecoveryApplied = true;
+          if (observedAheadHole) {
+            // Keep server backoff: a hole refill must honor the cooldown too.
+            this.consecutiveNoMedia = 0;
+            this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
+          } else {
+            this.prepareForRewind(requestTargetMs);
+          }
+          logger.info(`[SABR] recover hole itag=${request.itag} seq=${request.sequenceNumber} `
+            + `targetMs=${requestTargetMs} observedAhead=${observedAheadHole}`);
+          break;
+        }
+        if (action.type === 'recover_policy') {
+          if (!requestFormat) {
+            break;
+          }
           // PipePipe's stream pump repositions an outstanding near-edge demand when the
           // server keeps acknowledging policy but returns no media. Without that step we
           // resend the same buffered range and playback cookie forever, then expose a
           // broken proxy response to the player. Re-advertise only the demanded track;
           // keep the companion timeline intact so normal A/V read-ahead can continue.
-          if (!request.initSegment && requestFormat && !policyRecoveryApplied) {
-            policyRecoveryApplied = true;
-            policyOnly = 0;
-            this.backoffUntilMs = 0;
-            this.consecutiveNoMedia = 0;
-            this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
-            logger.info(`[SABR] recover policy-only itag=${request.itag} `
-              + `seq=${request.sequenceNumber} targetMs=${requestTargetMs}`);
-            continue;
-          }
-          throw new SabrProtocolException(
-            `SABR repeated policy-only responses: ${decoded.summarizeNoMediaResponse()}`);
+          policyRecoveryApplied = true;
+          policyOnly = 0;
+          // Keep server backoff: repositioning the demand must not bypass the cooldown.
+          this.consecutiveNoMedia = 0;
+          this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
+          logger.info(`[SABR] recover policy-only itag=${request.itag} `
+            + `seq=${request.sequenceNumber} targetMs=${requestTargetMs}`);
+          break;
         }
-        continue;
-      }
-      if (this.consecutiveNoMedia >= MAX_POLICY_ONLY_RESPONSES && decoded.isNoMediaResponse()) {
-        throw new SabrProtocolException(
-          `SABR repeated no-media: ${decoded.summarizeNoMediaResponse()}`);
+        if (action.type === 'count_policy_only') {
+          policyOnly++;
+          break;
+        }
+        // 'continue' / 'retry': nothing to execute; the fetch loop pumps again.
+        break;
       }
     }
     throw new SabrProtocolException(`SABR segment not available: ${request.cacheKey()}`);
@@ -296,7 +343,7 @@ export class YoutubeSabrSession {
 
   private async pumpOnceLocked(): Promise<SabrDecodedResponse> {
     if (this.closed) {
-      throw new SabrProtocolException('SABR session closed');
+      throw new SabrProtocolException('SABR session closed', 'closed');
     }
 
     // Always honor server backoff before the next POST (prevents rn++ storm).
@@ -305,11 +352,11 @@ export class YoutubeSabrSession {
     // keeps returning the remaining cooldown anyway.
     const waitMs = this.getBackoffRemainingMs();
     if (waitMs > 0) {
-      logger.info(`[SABR] honor backoff ${waitMs}ms before rn=${this.requestNumber + 1}`);
+      logger.info(`[SABR] honor backoff ${waitMs}ms before rn=${this.epoch.requestNumber + 1}`);
       await sleepMs(Math.min(waitMs, MAX_BACKOFF_MS));
     }
 
-    const isFirst = this.requestNumber === 0
+    const isFirst = this.epoch.requestNumber === 0
       && !this.streamState.isInitialized(this.audioFormat)
       && !this.streamState.isInitialized(this.videoFormat);
     const body = isFirst
@@ -319,12 +366,13 @@ export class YoutubeSabrSession {
         this.info, this.audioFormat, this.videoFormat, this.streamState);
 
     const url = YoutubeSabrRequestBuilder.withSabrSessionParameters(
-      this.serverAbrStreamingUrl, this.info.cpn, this.requestNumber);
+      this.epoch.serverAbrStreamingUrl, this.info.cpn, this.epoch.requestNumber);
 
     const headers = this.buildSabrHeaders();
     const hasUstreamer = !!(this.info.videoPlaybackUstreamerConfig
       && this.info.videoPlaybackUstreamerConfig.length > 0);
-    logger.info(`[SABR] POST rn=${this.requestNumber + 1} body=${body.length} urlLen=${url.length} `
+    logger.info(`[SABR] POST rn=${this.epoch.requestNumber + 1} body=${body.length} `
+      + `urlLen=${url.length} `
       + `profile=${this.info.profile} ustreamer=${hasUstreamer} `
       + `a=${this.audioFormat.itag} v=${this.videoFormat.itag} `
       + `lmA=${this.audioFormat.lastModified || 0} lmV=${this.videoFormat.lastModified || 0}`);
@@ -338,16 +386,38 @@ export class YoutubeSabrSession {
     logger.info(`[SABR] response status=${status} bytes=${bodyBytes.length} ct=${contentType}`);
 
     const decoded = sabrDecodeBody(bodyBytes);
-    this.requestNumber++;
+    this.epoch.requestNumber++;
 
-    // Redirect
-    if (decoded.redirectUrl && decoded.redirectUrl.length > 0) {
-      if (this.redirectCount >= MAX_REDIRECTS) {
-        throw new SabrProtocolException(`SABR too many redirects: ${decoded.redirectUrl}`);
+    const pumpCtx: SabrPolicyContext = {
+      phase: 'pump',
+      redirectCount: this.epoch.redirectCount,
+      poTokenRefreshes: this.epoch.poTokenRefreshes,
+      consecutiveNoMedia: this.consecutiveNoMedia,
+      policyOnly: 0,
+      hasPoToken: !!this.streamState.getRawPoToken(),
+      hasPoTokenProvider: !!this.poTokenProvider,
+      requestKey: '',
+      holeRecoveryAvailable: false,
+      policyRecoveryAvailable: false,
+      reloads: this.epoch.reloads,
+      attestationRotations: this.attestationRotations,
+      consecutiveAttestationPending: this.consecutiveAttestationPending,
+      hasInfoReloader: !!this.infoReloader,
+      canRotateIdentity: !!this.poTokenProvider
+        && !!this.poTokenProvider.invalidatePoTokenIdentity
+    };
+    const actions = this.policy.evaluate(decoded, pumpCtx);
+
+    // Pre-ingest control: apply the redirect swap / fail on the redirect limit.
+    for (const action of actions) {
+      if (action.type === 'fail') {
+        throw new SabrProtocolException(action.message, action.kind);
       }
-      this.redirectCount++;
-      this.serverAbrStreamingUrl = decoded.redirectUrl;
-      logger.info(`[SABR] redirect #${this.redirectCount} urlLen=${decoded.redirectUrl.length}`);
+      if (action.type === 'apply_redirect') {
+        this.epoch.redirectCount++;
+        this.epoch.serverAbrStreamingUrl = action.url;
+        logger.info(`[SABR] redirect #${this.epoch.redirectCount} urlLen=${action.url.length}`);
+      }
     }
 
     this.streamState.ingest(decoded);
@@ -357,29 +427,32 @@ export class YoutubeSabrSession {
     this.evictCacheIfNeeded();
 
     if (decoded.segments.length > 0) {
-      this.redirectCount = 0;
-      this.poTokenRefreshes = 0;
+      this.epoch.redirectCount = 0;
+      this.epoch.poTokenRefreshes = 0;
       this.consecutiveNoMedia = 0;
-      this.backoffUntilMs = 0;
+      this.consecutiveAttestationPending = 0;
+      this.epoch.backoffUntilMs = 0;
       if (decoded.streamProtectionStatus >= 2 && !this.streamState.getRawPoToken()) {
         this.startPoTokenWarmup();
       }
     } else {
       this.consecutiveNoMedia++;
-      // Empty response without a PoToken usually means "come back with a PoToken"
-      // (authenticated sessions hit this on rn=1 with a multi-second backoff).
-      // Mint immediately instead of waiting out the backoff empty-handed.
-      if (!this.streamState.getRawPoToken() && this.poTokenProvider) {
-        const applied = await this.applyPoTokenForProtectedResponse();
-        if (applied) {
-          this.consecutiveNoMedia = 0;
-          this.backoffUntilMs = 0;
-          logger.info('[SABR] empty response: PoToken applied, retrying without backoff');
-        } else {
-          this.scheduleBackoff(decoded.backoffTimeMs);
+      // Post-ingest control for an empty response: try PoToken, else back off.
+      for (const action of actions) {
+        if (action.type === 'apply_po_token') {
+          const applied = await this.applyPoTokenForProtectedResponse();
+          if (applied) {
+            this.consecutiveNoMedia = 0;
+            this.epoch.backoffUntilMs = 0;
+            logger.info('[SABR] empty response: PoToken applied, retrying without backoff');
+            break;
+          }
+          continue;
         }
-      } else {
-        this.scheduleBackoff(decoded.backoffTimeMs);
+        if (action.type === 'sleep_backoff') {
+          this.scheduleBackoff(action.ms);
+          break;
+        }
       }
     }
 
@@ -388,7 +461,8 @@ export class YoutubeSabrSession {
       + `seq=${summarizeSegmentSequences(decoded)} `
       + `protection=${decoded.streamProtectionStatus} `
       + `policy=${decoded.nextRequestPolicy?.summarize() || 'none'} `
-      + `reload=${decoded.reloadRequested} noMedia=${this.consecutiveNoMedia}`);
+      + `reload=${decoded.reloadRequested} seek=${decoded.sabrSeekReason} `
+      + `noMedia=${this.consecutiveNoMedia}`);
     return decoded;
   }
 
@@ -403,21 +477,22 @@ export class YoutubeSabrSession {
     }
     const capped = Math.min(ms, MAX_BACKOFF_MS);
     const until = Date.now() + capped;
-    if (until > this.backoffUntilMs) {
-      this.backoffUntilMs = until;
-      logger.info(`[SABR] schedule backoff ${capped}ms (until=${this.backoffUntilMs})`);
+    if (until > this.epoch.backoffUntilMs) {
+      this.epoch.backoffUntilMs = until;
+      logger.info(`[SABR] schedule backoff ${capped}ms (until=${this.epoch.backoffUntilMs})`);
     }
   }
 
+  // Server backoff survives seeks and local stall resets (PipePipe demand backoff
+  // semantics): a local reposition must never bypass the server's cooldown, or the
+  // next POST just hits the protection boundary again and burns the mint budget.
   prepareForRewind(targetMs: number): void {
-    this.backoffUntilMs = 0;
     this.consecutiveNoMedia = 0;
     this.streamState.prepareForSeek(targetMs);
     this.evictOutsideWindow(targetMs);
   }
 
   prepareForForwardJump(targetMs: number): void {
-    this.backoffUntilMs = 0;
     this.consecutiveNoMedia = 0;
     this.streamState.prepareForSeek(targetMs);
     this.evictOutsideWindow(targetMs);
@@ -575,11 +650,127 @@ export class YoutubeSabrSession {
     if (await this.maybeApplyPoToken(false)) {
       return true;
     }
-    if (this.poTokenRefreshes < MAX_PO_TOKEN_REFRESHES) {
-      this.poTokenRefreshes++;
+    if (this.epoch.poTokenRefreshes < SABR_MAX_PO_TOKEN_REFRESHES) {
+      this.epoch.poTokenRefreshes++;
       return await this.maybeApplyPoToken(true);
     }
     return false;
+  }
+
+  /**
+   * RELOAD_PLAYER (PipePipe protected_no_media_reload): re-probe the SABR
+   * bootstrap and swap it in place — requestNumber/playerTime/bufferedRanges
+   * survive, only the url + redirect/token-refresh budgets reset. Returns
+   * false when the action is unavailable or the re-probe failed (the policy
+   * chain then falls through); throws kind='protocol' on a broken new info
+   * or when the identity changed but no fresh PO token could be minted.
+   */
+  private async executeReloadPlayer(reason: string): Promise<boolean> {
+    if (!this.infoReloader || this.epoch.reloads >= SABR_MAX_RELOADS_PER_SESSION) {
+      return false;
+    }
+    this.epoch.reloads++;
+    const videoId = this.info.videoId;
+    logger.info(`[SABR] reload player video=${videoId} reason=${reason} `
+      + `attempt=${this.epoch.reloads}/${SABR_MAX_RELOADS_PER_SESSION} rn=${this.epoch.requestNumber}`);
+    let newInfo: YoutubeSabrInfo | undefined = undefined;
+    try {
+      newInfo = await this.infoReloader.reloadSabrInfo(this.info, reason);
+    } catch (e) {
+      logger.warn(`[SABR] reload player reloader threw video=${videoId}: ${String(e)}`);
+      return false;
+    }
+    if (!newInfo) {
+      logger.warn(`[SABR] reload player reprobe failed video=${videoId}`);
+      return false;
+    }
+    if (!newInfo.serverAbrStreamingUrl) {
+      throw new SabrProtocolException('SABR reload returned no streaming URL', 'protocol');
+    }
+    const previousVisitorData = this.info.visitorData || '';
+    const hadPoToken = !!this.streamState.getRawPoToken();
+    const visitorChanged = (newInfo.visitorData || '') !== previousVisitorData;
+    this.info = newInfo;
+    this.epoch.serverAbrStreamingUrl = newInfo.serverAbrStreamingUrl;
+    this.epoch.redirectCount = 0;
+    this.epoch.poTokenRefreshes = 0;
+    this.consecutiveAttestationPending = 0;
+    logger.info(`[SABR] reload player applied video=${videoId} visitorChanged=${visitorChanged} `
+      + `rn=${this.epoch.requestNumber} urlLen=${newInfo.serverAbrStreamingUrl.length}`);
+    if (visitorChanged) {
+      // PoToken is bound to the visitor identity; the old token is invalid now
+      // (PipePipe 3d309951: fail when a needed re-mint comes back empty).
+      this.streamState.setPoToken(undefined);
+      if (hadPoToken && !(await this.maybeApplyPoToken(false))) {
+        throw new SabrProtocolException(
+          'SABR reload changed visitor identity without a fresh PO token', 'protocol');
+      }
+    }
+    return true;
+  }
+
+  /**
+   * ROTATE_IDENTITY: invalidate the pinned visitor identity, re-probe, and
+   * require the visitorData to actually change — then start a fresh epoch
+   * (rn=0, cookie/contexts/backoff/poToken cleared) while local progress and
+   * the segment cache survive. Returns false (chain falls through) when
+   * unavailable, the re-probe failed, or the identity did not change.
+   */
+  private async executeRotateIdentity(): Promise<boolean> {
+    const provider = this.poTokenProvider;
+    if (!this.infoReloader || !provider || !provider.invalidatePoTokenIdentity
+      || this.attestationRotations >= SABR_MAX_ATTESTATION_IDENTITY_ROTATIONS) {
+      return false;
+    }
+    this.attestationRotations++;
+    const videoId = this.info.videoId;
+    logger.info(`[SABR] rotate identity video=${videoId} `
+      + `attempt=${this.attestationRotations}/${SABR_MAX_ATTESTATION_IDENTITY_ROTATIONS}`);
+    const previousVisitorData = this.info.visitorData || '';
+    let invalidated = false;
+    try {
+      invalidated = await provider.invalidatePoTokenIdentity(this.info);
+    } catch (e) {
+      logger.warn(`[SABR] rotate identity invalidate threw video=${videoId}: ${String(e)}`);
+      return false;
+    }
+    if (!invalidated) {
+      logger.warn(`[SABR] rotate identity invalidate refused video=${videoId}`);
+      return false;
+    }
+    let newInfo: YoutubeSabrInfo | undefined = undefined;
+    try {
+      newInfo = await this.infoReloader.reloadSabrInfo(this.info, 'rotate_identity');
+    } catch (e) {
+      logger.warn(`[SABR] rotate identity reloader threw video=${videoId}: ${String(e)}`);
+      return false;
+    }
+    if (!newInfo || !newInfo.serverAbrStreamingUrl) {
+      logger.warn(`[SABR] rotate identity reprobe failed video=${videoId}`);
+      return false;
+    }
+    const visitorChanged = (newInfo.visitorData || '') !== previousVisitorData;
+    if (!visitorChanged) {
+      // Rotating onto the same identity proves rotation is impossible right
+      // now; count it as a failure so the chain degrades to PoToken/reload.
+      logger.warn(`[SABR] rotate identity visitorData unchanged video=${videoId}`);
+      return false;
+    }
+    this.info = newInfo;
+    this.epoch.resetServerState();
+    this.epoch.serverAbrStreamingUrl = newInfo.serverAbrStreamingUrl;
+    this.epoch.requestNumber = 0;
+    this.epoch.redirectCount = 0;
+    this.epoch.backoffUntilMs = 0;
+    this.epoch.poTokenRefreshes = 0;
+    this.consecutiveAttestationPending = 0;
+    logger.info(`[SABR] rotate identity applied video=${videoId} visitorChanged=true `
+      + `urlLen=${newInfo.serverAbrStreamingUrl.length}`);
+    if (!(await this.maybeApplyPoToken(false))) {
+      throw new SabrProtocolException(
+        'SABR identity rotated without a fresh PO token', 'protocol');
+    }
+    return true;
   }
 
   private startPoTokenWarmup(): void {

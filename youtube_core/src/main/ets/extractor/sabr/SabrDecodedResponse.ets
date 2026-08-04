@@ -83,6 +83,8 @@ export class SabrDecodedResponse {
   reloadRequested: boolean = false;
   streamProtectionStatus: number = -1;
   streamProtectionMaxRetries: number = -1;
+  /** SABR_SEEK part reason (-1 = no seek part). Decoded for diagnostics only. */
+  sabrSeekReason: number = -1;
   sabrContextUpdates: SabrContextUpdate[] = [];
   sabrContextSendingPolicy?: SabrContextSendingPolicy;
   formatInitializationMetadata: SabrFormatInitMeta[] = [];
@@ -112,6 +114,16 @@ export class SabrDecodedResponse {
     return this.isNoMediaResponse() && this.streamProtectionStatus >= 3;
   }
 
+  /** Stream protection pending (status==2): server asks for attestation progress. */
+  isAttestationPending(): boolean {
+    return this.streamProtectionStatus === 2;
+  }
+
+  /** Stream protection required (status>=3): hard boundary, no local retry helps. */
+  isAttestationRequired(): boolean {
+    return this.streamProtectionStatus >= 3;
+  }
+
   getIntegrityIssues(): string[] {
     const issues: string[] = [];
     for (const header of this.mediaHeaders) {
@@ -129,7 +141,7 @@ export class SabrDecodedResponse {
 
   summarizeNoMediaResponse(): string {
     return `protection=${this.streamProtectionStatus}/${this.streamProtectionMaxRetries} `
-      + `reload=${this.reloadRequested} redirect=${!!this.redirectUrl} `
+      + `reload=${this.reloadRequested} seek=${this.sabrSeekReason} redirect=${!!this.redirectUrl} `
       + `error=${this.sabrError || 'none'} policy=${this.nextRequestPolicy?.summarize() || 'none'}`;
   }
 }

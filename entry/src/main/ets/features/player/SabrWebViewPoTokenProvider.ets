@@ -1,4 +1,10 @@
-import type { SabrPoTokenProvider, YoutubeSabrInfo, YoutubeSabrStreamState } from 'youtube_core';
+import type {
+  SabrPoTokenProvider,
+  SessionPoTokenHook,
+  YoutubeSabrInfo,
+  YoutubeSabrStreamState
+} from 'youtube_core';
+import { YoutubeJavaScriptPlayerManager } from 'youtube_core';
 import { AppLog } from '../../common/AppLog';
 import { poTokenBytesToString } from './SabrLocalDomPoTokenGenerator';
 
@@ -15,16 +21,24 @@ interface CachedDashPoToken {
   mintedAtMs: number;
 }
 
+/** Visitor-bound player-request PoToken (session token, not video-bound). */
+interface CachedPlayerPoToken {
+  tokenStr: string;
+  visitorData: string;
+  mintedAtMs: number;
+}
+
 export type LocalDomMintFn = (
   visitorData: string,
   videoId: string,
   forceRefresh: boolean
 ) => Promise<Uint8Array | undefined>;
 
-export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider {
+export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionPoTokenHook {
   private static instance: SabrWebViewPoTokenProvider = new SabrWebViewPoTokenProvider();
   private cache: Map<string, CachedPoToken> = new Map();
   private dashCache: Map<string, CachedDashPoToken> = new Map();
+  private playerTokenCache?: CachedPlayerPoToken;
   private mint?: LocalDomMintFn;
   private mintPromise?: Promise<Uint8Array | undefined>;
   /** Consecutive mint timeouts — the wedged ArkWeb-bridge signature. */
@@ -38,6 +52,8 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider {
   private static readonly MINT_TIMEOUT_MS: number = 30000;
   private static readonly MINT_BREAKER_MS: number = 30000;
   private static readonly MINT_BREAKER_STREAK: number = 2;
+  /** Player PoToken mint cap: runtime is warm here, so mintIdentifier must be fast. */
+  private static readonly PLAYER_MINT_TIMEOUT_MS: number = 5000;
 
   static getInstance(): SabrWebViewPoTokenProvider {
     return SabrWebViewPoTokenProvider.instance;
@@ -78,6 +94,85 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider {
       this.runtimeWarmed = false;
       logger.warn(`warmRuntime: BotGuard pre-init failed: ${e.message || e}`);
     });
+  }
+
+  /**
+   * ROTATE_IDENTITY: drop the pinned session identity so the session re-probe
+   * pins a fresh visitorData, then clear every token minted against the old
+   * identity for this video. The next mint re-initializes BotGuard because
+   * SabrLocalDomPoTokenGenerator sees a different visitorData. The breaker
+   * state resets too — a wedged WebView on the old identity must not fail
+   * fast against the new one.
+   */
+  async invalidatePoTokenIdentity(info: YoutubeSabrInfo): Promise<boolean> {
+    YoutubeJavaScriptPlayerManager.resetSessionVisitorData();
+    this.cache.delete(info.videoId);
+    this.dashCache.delete(info.videoId);
+    this.playerTokenCache = undefined;
+    this.runtimeWarmed = false;
+    this.pendingWarmVisitorData = '';
+    this.mintTimeoutStreak = 0;
+    this.mintBrokenUntilMs = 0;
+    logger.info(`invalidatePoTokenIdentity video=${info.videoId}: identity pin + token caches cleared`);
+    return true;
+  }
+
+  /**
+   * Visitor-bound player-request PoToken (SessionPoTokenHook; session token,
+   * not video-bound — minted under the fixed '__player__' identifier).
+   * Fast-skips when the BotGuard runtime is not warm and nothing is cached:
+   * extraction cold start must never wait for BotGuard init. The short mint
+   * cap here pairs with the caller-side race in ConfiguredPlayerClient.
+   */
+  async getPlayerPoToken(
+    clientName: string,
+    clientVersion: string,
+    _userAgent: string,
+    visitorData: string
+  ): Promise<string | undefined> {
+    if (!visitorData) {
+      return undefined;
+    }
+    const cached = this.playerTokenCache;
+    if (cached && cached.visitorData === visitorData
+      && Date.now() - cached.mintedAtMs < 6 * 60 * 60 * 1000) {
+      return cached.tokenStr;
+    }
+    if (!this.mint) {
+      logger.debug('getPlayerPoToken: Local DOM ArkWeb is not attached');
+      return undefined;
+    }
+    if (!this.runtimeWarmed) {
+      logger.debug('getPlayerPoToken: skip, BotGuard runtime not warm yet');
+      return undefined;
+    }
+    logger.info(`getPlayerPoToken: mint start client=${clientName} version=${clientVersion}`);
+    let timerId: number = -1;
+    let raw: Uint8Array | undefined = undefined;
+    try {
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timerId = setTimeout(() => reject(new Error('mint timeout')),
+          SabrWebViewPoTokenProvider.PLAYER_MINT_TIMEOUT_MS);
+      });
+      raw = await Promise.race([this.mint(visitorData, '__player__', false), timeout]);
+    } catch (e) {
+      logger.warn(`getPlayerPoToken: mint error client=${clientName}: ${String(e)}`);
+      return undefined;
+    } finally {
+      clearTimeout(timerId);
+    }
+    if (!raw || raw.length === 0) {
+      logger.warn(`getPlayerPoToken: mint returned empty client=${clientName}`);
+      return undefined;
+    }
+    const tokenStr = poTokenBytesToString(raw);
+    this.playerTokenCache = {
+      tokenStr: tokenStr,
+      visitorData: visitorData,
+      mintedAtMs: Date.now()
+    };
+    logger.info(`getPlayerPoToken: success client=${clientName} len=${tokenStr.length}`);
+    return tokenStr;
   }
 
   async getPoToken(

@@ -20,7 +20,10 @@ import {
   ContentNotAvailableException,
   ContentNotSupportedException,
   ExtractionException,
-  YoutubeJavaScriptPlayerManager
+  YoutubeJavaScriptPlayerManager,
+  YoutubeSabrInfo,
+  SabrInfoReloader,
+  SessionIdentityManager
 } from 'youtube_core';
 import { StreamInfo, SubtitleTrack, sabrSessionStore, LocalMediaProxy } from 'mediaservice';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
@@ -45,6 +48,26 @@ export interface YouTubePlayResult {
 interface PrefetchedPlayResult {
   result: YouTubePlayResult;
   fetchedAtMs: number;
+}
+
+/**
+ * Bridges SABR session RELOAD_PLAYER / ROTATE_IDENTITY re-probes into the
+ * play service extraction mutex. A class (not an object literal) so the
+ * ArkTS typed-object-literal rule is satisfied across the HAR boundary.
+ */
+class PlayServiceSabrInfoReloader implements SabrInfoReloader {
+  private readonly reprobe:
+    (info: YoutubeSabrInfo, reason: string) => Promise<YoutubeSabrInfo | undefined>;
+
+  constructor(
+    reprobe: (info: YoutubeSabrInfo, reason: string) => Promise<YoutubeSabrInfo | undefined>
+  ) {
+    this.reprobe = reprobe;
+  }
+
+  reloadSabrInfo(info: YoutubeSabrInfo, reason: string): Promise<YoutubeSabrInfo | undefined> {
+    return this.reprobe(info, reason);
+  }
 }
 
 export enum YouTubeErrorCode {
@@ -125,6 +148,26 @@ export class YouTubePlayService {
   }
 
   /**
+   * SABR RELOAD_PLAYER / ROTATE_IDENTITY re-probe. Serialized through the same
+   * extraction mutex as play()/prefetch — the extractor is a stateful singleton,
+   * so a mid-playback re-probe must never run beside a real extraction.
+   */
+  private async reprobeSabrInfoSerialized(
+    info: YoutubeSabrInfo,
+    reason: string
+  ): Promise<YoutubeSabrInfo | undefined> {
+    logger.info(`${TAG} sabr reprobe queued video=${info.videoId} reason=${reason}`);
+    const run: Promise<YoutubeSabrInfo | undefined> = this.extractChain.then(() => {
+      if (!this.extractor) {
+        throw new Error('extractor not initialized');
+      }
+      return this.extractor.reprobeSabrInfo(info.videoId);
+    });
+    this.extractChain = run.then(() => undefined).catch(() => undefined);
+    return run;
+  }
+
+  /**
    * Fire-and-forget light extraction for an upcoming queue item. The result is
    * consumed by takePrefetched(); misses fall back to the normal play() path.
    */
@@ -199,6 +242,12 @@ export class YouTubePlayService {
       this.syncExtractorLocale();
       sabrSessionStore.setHttpClient(this.extractor.getHttpClient());
       sabrSessionStore.setPoTokenProvider(SabrWebViewPoTokenProvider.getInstance());
+      // Stage 2: player /player requests pick up visitor-bound PoTokens through
+      // the identity layer; the provider fast-skips while BotGuard is cold.
+      SessionIdentityManager.setPlayerPoTokenHook(SabrWebViewPoTokenProvider.getInstance());
+      sabrSessionStore.setInfoReloader(new PlayServiceSabrInfoReloader(
+        (info: YoutubeSabrInfo, reason: string): Promise<YoutubeSabrInfo | undefined> =>
+          this.reprobeSabrInfoSerialized(info, reason)));
       logger.info(`${TAG} YouTubePlayService initialized`);
     } catch (e) {
       this.extractor = undefined;
@@ -414,11 +463,11 @@ export class YouTubePlayService {
 
   /** Inject pot= into DASH/progressive stream URLs (not SABR). */
   private async injectDashPoToken(videoInfo: VideoInfo): Promise<void> {
-    // Prefer the session-pinned visitorData so the DASH mint reuses the already
-    // initialized BotGuard runtime instead of re-initializing per video.
-    const visitorData = YoutubeJavaScriptPlayerManager.getSessionVisitorData()
-      || videoInfo.playerResponse?.responseContext?.visitorData
-      || videoInfo.streams.find(s => s.sabrInfo?.visitorData)?.sabrInfo?.visitorData;
+    // Identity layer is the single visitorData source: the session-pinned value
+    // (pinned from this extraction's player response when still unpinned) so the
+    // DASH mint reuses the already initialized BotGuard runtime.
+    const visitorData = YoutubeJavaScriptPlayerManager.getSessionVisitorData(
+      videoInfo.playerResponse?.responseContext?.visitorData);
     if (!visitorData || visitorData.length === 0) {
       logger.info(`${TAG} no visitorData, skipping Dash PoToken injection`);
       return;

@@ -5,6 +5,7 @@ import { YTCoreLogger } from '../../common/YTCoreLogger';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 import { PipePipeApiDecoder, PlayerMetadata, SolveResult } from './PipePipeApiDecoder';
 import { WebClientVersionResolver } from '../../common/WebClientVersionResolver';
+import { SessionIdentityManager } from '../identity/SessionIdentityManager';
 
 const logger = YTCoreLogger.getInstance('YoutubeJavaScriptPlayerManager');
 
@@ -74,20 +75,41 @@ export class YoutubeJavaScriptPlayerManager {
    *  mints every PoToken against it; our player responses instead return a fresh
    *  visitorData per video, which forced BotGuard to re-initialize (~2s) on every
    *  mint. Pin once per app session: prefer the prewarmed watch-page value, else
-   *  adopt the first player-response value. Never log the value itself. */
-  private static sessionVisitorData: string = '';
-
+   *  adopt the first player-response value. After an identity invalidation
+   *  (ROTATE_IDENTITY) the order flips — the fresh player-response value wins so
+   *  the rotation lands on a new identity. The pin itself lives in
+   *  SessionIdentityManager. Never log the value itself. */
   static getSessionVisitorData(responseVisitorData?: string): string {
-    if (YoutubeJavaScriptPlayerManager.sessionVisitorData) {
-      return YoutubeJavaScriptPlayerManager.sessionVisitorData;
+    const existing = SessionIdentityManager.current();
+    if (existing) {
+      return existing.visitorData;
     }
-    const pinned = YoutubeJavaScriptPlayerManager.prewarmedVisitorData || responseVisitorData || '';
+    const repinAfterInvalidate = SessionIdentityManager.wasInvalidatedSinceLastPin();
+    const pinned = repinAfterInvalidate
+      ? (responseVisitorData || YoutubeJavaScriptPlayerManager.prewarmedVisitorData || '')
+      : (YoutubeJavaScriptPlayerManager.prewarmedVisitorData || responseVisitorData || '');
     if (pinned) {
-      YoutubeJavaScriptPlayerManager.sessionVisitorData = pinned;
-      logger.info(`[CipherWarmup] stage=visitorData session_pin source=${
-        YoutubeJavaScriptPlayerManager.prewarmedVisitorData ? 'prewarm' : 'player_response'}`);
+      SessionIdentityManager.pin(pinned);
+      if (repinAfterInvalidate) {
+        const source = !!responseVisitorData && pinned === responseVisitorData
+          ? 'player_response' : 'prewarm';
+        logger.info(`[CipherWarmup] stage=visitorData repin_after_invalidate source=${source}`);
+      } else {
+        logger.info(`[CipherWarmup] stage=visitorData session_pin source=${
+          YoutubeJavaScriptPlayerManager.prewarmedVisitorData ? 'prewarm' : 'player_response'}`);
+      }
     }
     return pinned;
+  }
+
+  /**
+   * Drop the pinned session identity (ROTATE_IDENTITY). The next
+   * getSessionVisitorData call re-pins from the prewarmed value or the fresh
+   * player response, and tokens minted against the old identity must be
+   * discarded by the caller's provider.
+   */
+  static resetSessionVisitorData(): void {
+    SessionIdentityManager.invalidate();
   }
 
   /**
