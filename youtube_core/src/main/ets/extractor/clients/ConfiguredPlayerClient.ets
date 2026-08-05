@@ -71,8 +71,10 @@ export class ConfiguredPlayerClient {
   }
 
   /**
-   * @param useWebAuth Cookie+SAPISIDHASH for mweb/web_safari only
-   * @param useTvAuth  Bearer for tv_downgraded only (SmartTube). Never both.
+   * @param useWebAuth Cookie+SAPISIDHASH — attaches to ANY client when a cookie
+   *   credential exists, including tv_downgraded (PipePipe addLoggedInHeaders:
+   *   TVHTML5 /player is authed via Cookie+SAPISIDHASH, not OAuth).
+   * @param useTvAuth  Bearer for tv_downgraded only (SmartTube OAuth-only fallback).
    */
   static async fetch(
     key: YoutubePlayerClientKey,
@@ -124,11 +126,12 @@ export class ConfiguredPlayerClient {
       'racyCheckOk': true
     };
 
-    // Stage 2 identity pass: web-like clients carry the pinned session
+    // Stage 2 identity pass: non-TV clients carry the pinned session
     // visitorData and, when the injected hook can mint one fast enough, a
-    // visitor-bound player PoToken. tv_downgraded stays token-free
-    // (PipePipe 7673caed). A missing/slow/failed hook never blocks extraction.
-    if (key === 'mweb' || key === 'web_safari') {
+    // visitor-bound player PoToken (PipePipe prepareSessionPoTokenPlayerRequest
+    // skips only TVHTML5). tv_downgraded stays token-free (PipePipe 7673caed).
+    // A missing/slow/failed hook never blocks extraction.
+    if (key !== 'tv_downgraded') {
       const identityVisitorData = SessionIdentityManager.current()?.visitorData || '';
       if (identityVisitorData) {
         client['visitorData'] = identityVisitorData;
@@ -163,9 +166,12 @@ export class ConfiguredPlayerClient {
       headers['Referer'] = 'https://www.youtube.com/tv';
     }
 
-    // Enforce rail: TV client may only take Bearer; mweb/web only Cookie.
-    const webAuth = key === 'tv_downgraded' ? false : useWebAuth;
-    const tvAuth = key === 'tv_downgraded' ? useTvAuth : false;
+    // PipePipe addLoggedInHeaders: Cookie+SAPISIDHASH attaches to any client
+    // (TVHTML5 included) when a cookie credential exists. OAuth Bearer stays a
+    // TV-only fallback for OAuth-only (cookie-less) sessions; Cookie wins when
+    // both rails somehow apply.
+    const webAuth = useWebAuth;
+    const tvAuth = key === 'tv_downgraded' && !useWebAuth ? useTvAuth : false;
 
     const url = `${ClientsConstants.YOUTUBEI_V1_URL}player?prettyPrint=false`;
     try {

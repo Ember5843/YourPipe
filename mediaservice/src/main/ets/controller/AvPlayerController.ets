@@ -71,6 +71,9 @@ export class AvPlayerController {
 
   private currentLocalMediaSessionId: string = '';
   private pendingDestroySessionId: string = '';
+  /** EDL dual-track playback uses a second (audio) single-url session beside the main one. */
+  private currentEdlAudioSessionId: string = '';
+  private pendingDestroyEdlAudioSessionId: string = '';
   /** Prevent outgoing MPV snapshots from being routed into a newly-created local media session. */
   private localTimelineAwaitingReady: boolean = false;
   private localTimelineExpectedStartMs: number = 0;
@@ -105,6 +108,17 @@ export class AvPlayerController {
   /** Snapshot for diagnostics / future UI; system owns duck gain on AudioSession path. */
   private savedVolume: number = 100;
   public onErrorNeedsUserAction?: (errorMsg: string) => void;
+  /**
+   * 同 URL 快速重试耗尽后的升级钩子:由 entry(PlayerSession)注入,
+   * 重新提取当前视频的新鲜流 URL 并原地重载(对齐 PipePipe
+   * setRecovery+reloadPlayQueueManager / SmartTube reloadVideo ——
+   * 媒体层瞬时错误永不跳下一首)。
+   */
+  public onRetryWithFreshStreams?: (resumePosSec: number) => void;
+
+  getLastKnownGoodPosition(): number {
+    return this.lastKnownGoodPosition;
+  }
 
   get playerState(): PlayerState {
     return this.stateMachine.currentState;
@@ -1061,7 +1075,7 @@ export class AvPlayerController {
 
       case 'DASH':
         if (audio && this.isSeparatedDash(video, audio)) {
-          return await this.buildDualDashUrl(video, audio, generation);
+          return await this.buildDualEdlUrl(video, audio, generation);
         }
         return await this.buildSingleProxyUrl(video, generation);
 
@@ -1123,7 +1137,75 @@ export class AvPlayerController {
     }
   }
 
-  /** Dual adaptive VOD: static local DASH only. No EDL fallback. */
+  /**
+   * Dual adaptive VOD via MPV-native EDL (pre-SABR production pattern, cf97a08):
+   * two open-range single-url sessions + edl:// !new_stream/!delay_open.
+   * Production path for direct-link clients (android_vr / tv_downgraded) —
+   * bypasses the SIDX / DASH-demuxer stack (MPV DASH is not used for these).
+   * buildDualDashUrl below is retained only as reference for a static-DASH rollback.
+   */
+  private async buildDualEdlUrl(video: StreamInfo, audio: StreamInfo,
+    generation: number = this.mediaSessionGeneration): Promise<string> {
+    const durationMs = this.resolveDurationMs(video, audio);
+    if (durationMs <= 0) {
+      Logger.error(TAG, 'buildDualEdlUrl: dual stream with unknown duration, refusing');
+      return '';
+    }
+    const videoSessionId = await LocalMediaProxy.createSingleUrlSession(video.url, video);
+    if (!videoSessionId) {
+      Logger.error(TAG, 'buildDualEdlUrl: video session unavailable');
+      return '';
+    }
+    const audioSessionId = await LocalMediaProxy.createSingleUrlSession(audio.url, audio);
+    if (!audioSessionId) {
+      Logger.error(TAG, 'buildDualEdlUrl: audio session unavailable');
+      LocalMediaProxy.destroySession(videoSessionId);
+      return '';
+    }
+    if (!this.isMediaSessionCurrent(generation)) {
+      LocalMediaProxy.destroySession(videoSessionId);
+      LocalMediaProxy.destroySession(audioSessionId);
+      return '';
+    }
+    const videoUrl = LocalMediaProxy.getPlaybackUrl(videoSessionId);
+    const audioUrl = LocalMediaProxy.getPlaybackUrl(audioSessionId);
+    if (!videoUrl.startsWith('http://127.0.0.1:') || !audioUrl.startsWith('http://127.0.0.1:')) {
+      Logger.error(TAG, `buildDualEdlUrl: invalid track urls video=${videoSessionId} audio=${audioSessionId}`);
+      LocalMediaProxy.destroySession(videoSessionId);
+      LocalMediaProxy.destroySession(audioSessionId);
+      return '';
+    }
+    this.currentLocalMediaSessionId = videoSessionId;
+    this.currentEdlAudioSessionId = audioSessionId;
+
+    const durationSec = (durationMs / 1000).toFixed(3);
+    const parts: string[] = [];
+    // Video track
+    parts.push('!new_stream', '!no_clip', '!no_chapters');
+    let vDelay = `!delay_open,media_type=video,codec=${this.codecToMpv(video.codecs || '')}`;
+    if ((video.width || 0) > 0) vDelay += `,w=${video.width}`;
+    if ((video.height || 0) > 0) vDelay += `,h=${video.height}`;
+    if ((video.fps || 0) > 0) vDelay += `,fps=${video.fps}`;
+    parts.push(vDelay);
+    if ((video.bitrate || 0) > 0) {
+      parts.push(`!track_meta,title=${edlMeta(video.quality || 'video')},byterate=${Math.floor((video.bitrate || 0) * 1000 / 8)}`);
+    }
+    parts.push(`${videoUrl},length=${durationSec}`);
+    // Audio track
+    parts.push('!new_stream', '!no_clip', '!no_chapters');
+    parts.push(`!delay_open,media_type=audio,codec=${this.codecToMpv(audio.codecs || '')}`);
+    if ((audio.bitrate || 0) > 0) {
+      parts.push(`!track_meta,title=${edlMeta(audio.quality || 'audio')},byterate=${Math.floor((audio.bitrate || 0) * 1000 / 8)}`);
+    }
+    parts.push(`${audioUrl},length=${durationSec}`);
+
+    const edlUrl = 'edl://' + parts.join(';') + ';';
+    Logger.info(TAG, `buildDualEdlUrl: video=[itag=${video.itag} ${video.quality} ${video.codecs}] audio=[itag=${audio.itag} ${audio.codecs}] durationMs=${durationMs}`);
+    Logger.debug(TAG, `buildDualEdlUrl: edl=${edlUrl}`);
+    return edlUrl;
+  }
+
+  /** Static-DASH variant retained for reference/rollback; not on the production path. */
   private async buildDualDashUrl(video: StreamInfo, audio: StreamInfo,
     generation: number): Promise<string> {
     const durationMs = this.resolveDurationMs(video, audio);
@@ -1173,10 +1255,18 @@ export class AvPlayerController {
       // Previous pending session not yet destroyed (e.g. rapid switching)
       LocalMediaProxy.destroySession(this.pendingDestroySessionId);
     }
+    if (this.pendingDestroyEdlAudioSessionId) {
+      LocalMediaProxy.destroySession(this.pendingDestroyEdlAudioSessionId);
+    }
     if (this.currentLocalMediaSessionId) {
       this.pendingDestroySessionId = this.currentLocalMediaSessionId;
       LocalMediaProxy.markSessionStale(this.currentLocalMediaSessionId);
       this.currentLocalMediaSessionId = '';
+    }
+    if (this.currentEdlAudioSessionId) {
+      this.pendingDestroyEdlAudioSessionId = this.currentEdlAudioSessionId;
+      LocalMediaProxy.markSessionStale(this.currentEdlAudioSessionId);
+      this.currentEdlAudioSessionId = '';
     }
     this.localTimelineAwaitingReady = false;
     this.localTimelineExpectedStartMs = 0;
@@ -1234,6 +1324,10 @@ export class AvPlayerController {
       LocalMediaProxy.destroySession(this.currentLocalMediaSessionId);
     }
     this.currentLocalMediaSessionId = '';
+    if (this.currentEdlAudioSessionId) {
+      LocalMediaProxy.destroySession(this.currentEdlAudioSessionId);
+    }
+    this.currentEdlAudioSessionId = '';
     this.localTimelineAwaitingReady = false;
     this.localTimelineExpectedStartMs = 0;
     this.localTimelineMismatchLogged = false;
@@ -1244,6 +1338,10 @@ export class AvPlayerController {
     if (this.pendingDestroySessionId) {
       LocalMediaProxy.destroySession(this.pendingDestroySessionId);
       this.pendingDestroySessionId = '';
+    }
+    if (this.pendingDestroyEdlAudioSessionId) {
+      LocalMediaProxy.destroySession(this.pendingDestroyEdlAudioSessionId);
+      this.pendingDestroyEdlAudioSessionId = '';
     }
   }
 
@@ -1643,6 +1741,10 @@ export class AvPlayerController {
       LocalMediaProxy.destroySession(this.pendingDestroySessionId);
       this.pendingDestroySessionId = '';
     }
+    if (state.isReady && this.pendingDestroyEdlAudioSessionId) {
+      LocalMediaProxy.destroySession(this.pendingDestroyEdlAudioSessionId);
+      this.pendingDestroyEdlAudioSessionId = '';
+    }
 
     // 仅音频等：load 后引擎可能回到默认 vid=auto，就绪时重放期望值
     if (state.isReady) {
@@ -1738,6 +1840,15 @@ export class AvPlayerController {
       } finally {
         this.isRecovering = false;
       }
+      return;
+    }
+
+    // 同 URL 快速重试已耗尽:升级给 entry 做"重新提取新鲜流 URL + 原地重载"
+    // (PipePipe reloadPlayQueueManager 语义),而不是直接报错/放弃。
+    if (this.onRetryWithFreshStreams) {
+      Logger.info(TAG, `handlePlaybackError: escalate to fresh-stream retry resumePos=${resumePos.toFixed(2)}s`);
+      this.errorRetryCount = 0;
+      this.onRetryWithFreshStreams(resumePos);
       return;
     }
 
@@ -1860,4 +1971,9 @@ class BackgroundTaskStateListener implements StateChangeListener {
   onStateChange(_from: PlayerState, to: PlayerState): void {
     this.owner._bgTaskOnStateChange(to);
   }
+}
+
+/** EDL directive values must not contain the ';' / ',' separators. */
+function edlMeta(text: string): string {
+  return text.replace(/[;,]/g, '_');
 }

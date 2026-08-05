@@ -2,7 +2,7 @@ import { StreamResource } from './SessionStore';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { http, socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
-import { HttpDownloader } from 'youtube_core';
+import { HttpDownloader, HttpProxyOptions } from 'youtube_core';
 import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][RangeProxy]';
@@ -168,6 +168,35 @@ function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
   return h;
 }
 
+/**
+ * RCP session for the Android/iOS empty-body videoplayback POST.
+ * @ohos.net.http rejects zero-length bodies at parameter validation
+ * (NETSTACK error 401) whether extraData is '' or ArrayBuffer(0), and sending
+ * no body gets HTTP 411 from googlevideo. RCP accepts an empty-string body and
+ * sends Content-Length: 0 — the shape PipePipe's OkHttp path uses. GET stays
+ * on @ohos.net.http (RCP streaming was 403-prone for TVHTML5 range probes).
+ */
+function createYoutubePostSession(url: string): rcp.Session {
+  const config: rcp.Configuration = {
+    transfer: { timeout: { connectMs: TIMEOUT_MS, transferMs: TIMEOUT_MS } }
+  };
+  const snap = HttpProxyOptions.getSnapshot();
+  if (snap.kind === 'http' && HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
+    const auth = snap.username
+      ? `${encodeURIComponent(snap.username)}:${encodeURIComponent(snap.password || '')}@`
+      : '';
+    config.proxy = {
+      url: `http://${auth}${snap.host.trim()}:${snap.port}`,
+      exclusions: snap.exclusionList && snap.exclusionList.length > 0
+        ? snap.exclusionList
+        : HttpProxyOptions.defaultExclusions()
+    };
+  } else {
+    config.proxy = 'no-proxy';
+  }
+  return rcp.createSession({ requestConfiguration: config });
+}
+
 function uaKind(resource: StreamResource): string {
   const ua = resource.userAgent || '';
   if (ua.includes('Cobalt')) return 'tv-cobalt';
@@ -186,6 +215,16 @@ function describeYoutubeRequest(resource: StreamResource, method: string, fetchU
   return `itag=${resource.id} sourceClient=${resource.sourceClient || '-'} c=${client} method=${method} `
     + `range=${rangeSpec} uaKind=${uaKind(resource)} html5Hdr=${html5Headers} `
     + `${youtubeUrlFingerprint(fetchUrl)}`;
+}
+
+/** NETSTACK BusinessError does not stringify via String() — log code/message explicitly. */
+function describeError(e: Object): string {
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  try {
+    return JSON.stringify(e);
+  } catch (_e) {
+    return String(e);
+  }
 }
 
 function headersToHttpRecord(headers: rcp.RequestHeaders): Record<string, string> {
@@ -216,8 +255,10 @@ function responseBodyToBytes(result: string | Object | ArrayBuffer): Uint8Array 
 
 /**
  * Fetch a small exact YouTube byte range for DASH SIDX preprocessing.
- * Uses @ohos.net.http (same stack as youtube_core extractor) — RCP streaming
- * has produced consistent 403 on TVHTML5 indexRange probes.
+ * Android/iOS: empty-body POST over RCP (see createYoutubePostSession).
+ * Other clients: GET via @ohos.net.http (same stack as youtube_core
+ * extractor) — RCP streaming has produced consistent 403 on TVHTML5
+ * indexRange probes.
  */
 export async function fetchYoutubeRangeBytes(
   resource: StreamResource,
@@ -226,24 +267,39 @@ export async function fetchYoutubeRangeBytes(
 ): Promise<Uint8Array> {
   const rangeSpec = `${start}-${end}`;
   const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
-  const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
   const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
-  const method = usePost ? 'POST' : 'GET';
-  Logger.info(TAG, `SIDX fetch: transport=http ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+  if (usePost) {
+    Logger.info(TAG, `SIDX fetch: transport=rcp ${describeYoutubeRequest(resource, 'POST', fetchUrl, rangeSpec)}`);
+    const rcpSession = createYoutubePostSession(fetchUrl);
+    try {
+      const dest = new BufferWriter();
+      const req = new rcp.Request(fetchUrl, 'POST', makeYoutubeHeaders(resource), '');
+      req.destination = { kind: 'stream', stream: dest };
+      const resp = await rcpSession.fetch(req);
+      if (resp.statusCode !== 200 && resp.statusCode !== 206) {
+        Logger.warn(TAG, `SIDX upstream ${resp.statusCode}: transport=rcp `
+          + `${describeYoutubeRequest(resource, 'POST', fetchUrl, rangeSpec)}`);
+        throw new Error(`SIDX upstream status ${resp.statusCode}`);
+      }
+      const bytes = dest.bytes();
+      Logger.info(TAG, `SIDX ok itag=${resource.id} bytes=${bytes.length} range=${rangeSpec} transport=rcp`);
+      return bytes;
+    } finally {
+      rcpSession.close();
+    }
+  }
+  const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
+  Logger.info(TAG, `SIDX fetch: transport=http ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
   const req = http.createHttp();
   try {
     const options: http.HttpRequestOptions = {
-      method: usePost ? http.RequestMethod.POST : http.RequestMethod.GET,
+      method: http.RequestMethod.GET,
       header: headers,
       expectDataType: http.HttpDataType.ARRAY_BUFFER,
       connectTimeout: TIMEOUT_MS,
       readTimeout: TIMEOUT_MS,
       usingCache: false,
     };
-    // Android/iOS: empty-body POST (PipePipe). Do not set Content-Type.
-    if (usePost) {
-      options.extraData = '';
-    }
     HttpDownloader.applyProxyToOptions(options, fetchUrl);
     const response = await req.request(fetchUrl, options);
     if (response.responseCode !== 200 && response.responseCode !== 206) {
@@ -251,7 +307,7 @@ export async function fetchYoutubeRangeBytes(
         ? response.result.substring(0, 160)
         : `bytes=${responseBodyToBytes(response.result).length}`;
       Logger.warn(TAG, `SIDX upstream ${response.responseCode}: transport=http body=${bodyPreview} `
-        + `${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+        + `${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
       throw new Error(`SIDX upstream status ${response.responseCode}`);
     }
     const bytes = responseBodyToBytes(response.result);
@@ -358,7 +414,17 @@ export async function serveRange(
   const total = resource.contentLength;
   const parsed = parseRangeHeader(rangeHeader, total);
   const start = parsed.start;
-  const end = parsed.end >= 0 ? parsed.end : (total > 0 ? total - 1 : start + 2 * 1024 * 1024 - 1);
+  let end = parsed.end >= 0 ? parsed.end : (total > 0 ? total - 1 : start + 2 * 1024 * 1024 - 1);
+
+  // Cap a single upstream fetch at 10MB — YouTube throttles large range
+  // requests (~80KB/s), and a bounded in-flight download keeps seek cheap.
+  // FFmpeg reconnects at the truncated EOF (reconnect_at_eof=1) and continues
+  // with the next range, so playback is unaffected.
+  const MAX_CHUNK_SIZE = 10 * 1024 * 1024;
+  if (end - start + 1 > MAX_CHUNK_SIZE) {
+    end = start + MAX_CHUNK_SIZE - 1;
+    Logger.info(TAG, `serveRange: chunk-capped to ${MAX_CHUNK_SIZE} bytes resource=${resource.id} start=${start}`);
+  }
 
   const contentType = contentTypeFor(resource);
 
@@ -385,30 +451,80 @@ export async function serveRange(
   let lastError = '';
   const writer = new TcpWriter(conn, start, end, total, contentType, standaloneResponse);
 
-  // YouTube videoplayback: buffer via @ohos.net.http (same stack as extractor).
-  // RCP streaming has been 403-prone for TVHTML5 range probes.
+  // YouTube videoplayback. Android/iOS: empty-body POST over RCP (see
+  // createYoutubePostSession), streamed straight to the socket. Other clients:
+  // buffered GET via @ohos.net.http (same stack as extractor) — RCP streaming
+  // has been 403-prone for TVHTML5 range probes.
   if (resource.isYoutubePlayback) {
+    const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
+    if (usePost) {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
+        if (attempt === 0) {
+          Logger.info(TAG, `serveRange yt: transport=rcp ${describeYoutubeRequest(resource, 'POST', fetchUrl, rangeSpec)}`);
+        }
+        const rcpSession = createYoutubePostSession(fetchUrl);
+        let retryDelayMs: number = 0;
+        try {
+          const req = new rcp.Request(fetchUrl, 'POST', makeYoutubeHeaders(resource), '');
+          req.destination = { kind: 'stream', stream: writer };
+          const resp = await rcpSession.fetch(req);
+          if (resp.statusCode === 200 || resp.statusCode === 206) {
+            return;
+          }
+          lastError = `status=${resp.statusCode}`;
+          Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} resource=${resource.id} `
+            + `${describeYoutubeRequest(resource, 'POST', fetchUrl, rangeSpec)}`);
+          if (resp.statusCode >= 400 && resp.statusCode < 500) {
+            if (resp.statusCode === 403 || resp.statusCode === 410) {
+              // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
+              // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
+              retryDelayMs = 1000 * (attempt + 1);
+              Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
+            } else {
+              if (!writer.hasEmittedAny()) {
+                await sendError(conn, 502, `upstream ${resp.statusCode}`);
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          lastError = describeError(e as Object);
+          Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resource.id}`);
+        } finally {
+          rcpSession.close();
+        }
+        if (writer.hasEmittedAny()) {
+          Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resource.id} range=${rangeSpec} err=${lastError}`);
+          return;
+        }
+        if (attempt < MAX_RETRIES) {
+          await new Promise<void>(r => setTimeout(r, retryDelayMs > 0 ? retryDelayMs : 300 * (attempt + 1)));
+        }
+      }
+      Logger.error(TAG, `serveRange failed: ${lastError} resource=${resource.id}`);
+      if (!writer.hasEmittedAny()) {
+        await sendError(conn, 502, `upstream failed: ${lastError}`);
+      }
+      return;
+    }
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
       const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
-      const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
-      const method = usePost ? 'POST' : 'GET';
       if (attempt === 0) {
-        Logger.info(TAG, `serveRange yt: transport=http ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+        Logger.info(TAG, `serveRange yt: transport=http ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
       }
       const req = http.createHttp();
+      let retryDelayMs: number = 0;
       try {
         const options: http.HttpRequestOptions = {
-          method: usePost ? http.RequestMethod.POST : http.RequestMethod.GET,
+          method: http.RequestMethod.GET,
           header: headers,
           expectDataType: http.HttpDataType.ARRAY_BUFFER,
           connectTimeout: TIMEOUT_MS,
           readTimeout: TIMEOUT_MS,
           usingCache: false,
         };
-        if (usePost) {
-          options.extraData = '';
-        }
         HttpDownloader.applyProxyToOptions(options, fetchUrl);
         const response = await req.request(fetchUrl, options);
         if (response.responseCode === 200 || response.responseCode === 206) {
@@ -425,16 +541,23 @@ export async function serveRange(
             ? response.result.substring(0, 120)
             : `bytes=${responseBodyToBytes(response.result).length}`;
           Logger.warn(TAG, `serveRange: upstream ${response.responseCode} resource=${resource.id} `
-            + `body=${bodyPreview} ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+            + `body=${bodyPreview} ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
           if (response.responseCode >= 400 && response.responseCode < 500) {
-            if (!writer.hasEmittedAny()) {
-              await sendError(conn, 502, `upstream ${response.responseCode}`);
+            if (response.responseCode === 403 || response.responseCode === 410) {
+              // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
+              // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
+              retryDelayMs = 1000 * (attempt + 1);
+              Logger.warn(TAG, `serveRange: upstream ${response.responseCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
+            } else {
+              if (!writer.hasEmittedAny()) {
+                await sendError(conn, 502, `upstream ${response.responseCode}`);
+              }
+              return;
             }
-            return;
           }
         }
       } catch (e) {
-        lastError = String(e);
+        lastError = describeError(e as Object);
         Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resource.id}`);
       } finally {
         req.destroy();
@@ -444,7 +567,7 @@ export async function serveRange(
         return;
       }
       if (attempt < MAX_RETRIES) {
-        await new Promise<void>(r => setTimeout(r, 300 * (attempt + 1)));
+        await new Promise<void>(r => setTimeout(r, retryDelayMs > 0 ? retryDelayMs : 300 * (attempt + 1)));
       }
     }
     Logger.error(TAG, `serveRange failed: ${lastError} resource=${resource.id}`);

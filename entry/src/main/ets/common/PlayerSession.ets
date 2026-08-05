@@ -63,6 +63,14 @@ export class PlayerSession {
   private _activeExtrasVideoId: string = '';
   private _pendingResumeSec: number = -1;
   private _pendingAutoPlay: boolean | null = null;
+  /** 下一次 prepare 跳过 prefetch,强制新鲜提取(失败重试用,一次性) */
+  private _forceRefreshNextPrepare: boolean = false;
+  /** 假结束/媒体层失败的原地重试预算(对齐 PipePipe/SmartTube:永不因瞬时错误跳下一首) */
+  private _failureRetryCount: number = 0;
+  private _failureRetryInFlight: boolean = false;
+  private _failureRetryVideoId: string = '';
+  private readonly MAX_FAILURE_RETRIES: number = 5;
+  private readonly FAILURE_RETRY_BACKOFF_MS: number[] = [1000, 2000, 4000, 8000, 16000];
   /** 画中画是否激活（由 PiPManager.onStateChange 设置） */
   private _isPiPActive: boolean = false;
   private _pipHandoffPending: boolean = false;
@@ -427,10 +435,15 @@ export class PlayerSession {
    */
   private async consumePrefetchOrPlay(playService: YouTubePlayService,
     videoId: string, attemptId: string): Promise<YouTubePlayResult> {
-    const hit = await playService.takePrefetched(videoId);
-    if (hit) {
-      logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=prefetch_consume video=${videoId}`);
-      return hit;
+    // 失败重试路径要求新鲜提取:跳过可能同样过期的 prefetch 结果(一次性标志)
+    const forceRefresh = this._forceRefreshNextPrepare;
+    this._forceRefreshNextPrepare = false;
+    if (!forceRefresh) {
+      const hit = await playService.takePrefetched(videoId);
+      if (hit) {
+        logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=prefetch_consume video=${videoId}`);
+        return hit;
+      }
     }
     return playService.play(videoId, attemptId);
   }
@@ -472,11 +485,30 @@ export class PlayerSession {
       this.playPreviousFromQueue();
     };
     this._controller.subscribeEnded(this.onPlaybackEnded);
+    // 同 URL 快速重试耗尽后的升级:重新提取新鲜流 URL 原地重载当前条目
+    this._controller.onRetryWithFreshStreams = (resumePosSec: number) => {
+      this.retryCurrentWithFreshStreams(resumePosSec);
+    };
+    // 真正开播后重置失败重试预算
+    this._controller.subscribePlaybackState((state) => {
+      if (state.isPlaying && this._failureRetryCount > 0) {
+        this._failureRetryCount = 0;
+      }
+    });
   }
 
   private _lastAutoAdvanceFromVideoId: string = '';
 
   private onPlaybackEnded = (): void => {
+    // 假结束识别:代理上游 4xx / EDL 分段全灭会让 mpv 提前报 End(进度远未到片尾)。
+    // 对齐 PipePipe/SmartTube:媒体层瞬时失败原地重试当前条目,绝不自动跳下一首。
+    const state = this._controller.getPlaybackState();
+    if (state.duration > 0 && state.currentTime < state.duration - 2) {
+      logger.warn(`${TAG} premature end: pos=${state.currentTime.toFixed(2)}s dur=${state.duration.toFixed(2)}s `
+        + `video=${this._currentVideo?.videoId || 'unknown'} — treating as failure, retrying in place`);
+      this.retryCurrentWithFreshStreams(state.currentTime);
+      return;
+    }
     const autoPlay = AppStorage.get<boolean>('autoPlayQueue') ?? true;
     if (!autoPlay) {
       return;
@@ -492,6 +524,63 @@ export class PlayerSession {
       logger.warn(`${TAG} auto-advance failed: ${e.message || e}`);
     });
   };
+
+  /**
+   * 失败原地重试:强制新鲜提取当前视频的流 URL 并原地重载
+   * (PipePipe setRecovery+reloadPlayQueueManager / SmartTube reloadVideo 语义)。
+   * 有界:同一 videoId 最多 MAX_FAILURE_RETRIES 次,退避 1/2/4/8/16s;
+   * 预算耗尽走 _lastPlayError 错误通道,仍不跳下一首。
+   */
+  private retryCurrentWithFreshStreams(resumePosSec: number): void {
+    const video = this._currentVideo;
+    const videoId = video?.videoId || '';
+    if (!video || videoId.length === 0) {
+      return;
+    }
+    if (this._failureRetryInFlight) {
+      logger.info(`${TAG} fresh-stream retry dedup: already in flight video=${videoId}`);
+      return;
+    }
+    if (this._failureRetryVideoId !== videoId) {
+      this._failureRetryVideoId = videoId;
+      this._failureRetryCount = 0;
+    }
+    if (this._failureRetryCount >= this.MAX_FAILURE_RETRIES) {
+      logger.error(`${TAG} fresh-stream retry budget exhausted video=${videoId}, giving up (queue NOT advanced)`);
+      this._lastPlayError = new ErrorInfo(
+        'PLAYBACK_FAILED',
+        $r('app.string.yt_error_playback_failed'),
+        { isRetryable: true }
+      );
+      return;
+    }
+    this._failureRetryInFlight = true;
+    const attempt = this._failureRetryCount++;
+    const delayMs = this.FAILURE_RETRY_BACKOFF_MS[Math.min(attempt, this.FAILURE_RETRY_BACKOFF_MS.length - 1)];
+    const generation = this._playGeneration;
+    logger.warn(`${TAG} fresh-stream retry #${attempt + 1}/${this.MAX_FAILURE_RETRIES} `
+      + `video=${videoId} resume=${resumePosSec.toFixed(2)}s delay=${delayMs}ms`);
+    setTimeout(async () => {
+      if (!this.isPlayContextCurrent(generation, videoId)) {
+        logger.info(`${TAG} fresh-stream retry discarded: session changed video=${videoId}`);
+        this._failureRetryInFlight = false;
+        return;
+      }
+      // 绕过 play() 去重与 prefetch(可能同样过期),强制新鲜提取
+      this._submittedVideoId = '';
+      this._preparePromise = null;
+      this._forceRefreshNextPrepare = true;
+      this._pendingResumeSec = resumePosSec;
+      this._pendingAutoPlay = true;
+      try {
+        await this.play(video);
+      } catch (e) {
+        logger.warn(`${TAG} fresh-stream retry play() failed: ${(e as Error).message || e}`);
+      } finally {
+        this._failureRetryInFlight = false;
+      }
+    }, delayMs);
+  }
 
   private bindQueueSwitchHandler(): void {
     PlayQueueManager.getInstance().onSwitchVideo = (video: VideoItem) => {
@@ -958,6 +1047,10 @@ export class PlayerSession {
     }
     this._submittedVideoId = '';
     this._lastAutoAdvanceFromVideoId = '';
+    this._failureRetryCount = 0;
+    this._failureRetryInFlight = false;
+    this._failureRetryVideoId = '';
+    this._forceRefreshNextPrepare = false;
     this._cachedVideoSource = null;
     this._lastPlayError = null;
     this._activeExtrasVideoId = '';

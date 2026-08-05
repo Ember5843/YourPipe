@@ -23,7 +23,8 @@ import {
   YoutubeJavaScriptPlayerManager,
   YoutubeSabrInfo,
   SabrInfoReloader,
-  SessionIdentityManager
+  SessionIdentityManager,
+  YoutubePlayerClientConfig
 } from 'youtube_core';
 import { StreamInfo, SubtitleTrack, sabrSessionStore, LocalMediaProxy } from 'mediaservice';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
@@ -368,7 +369,7 @@ export class YouTubePlayService {
         this.pendingDashPotPromise = null;
         logger.info(`${TAG} all playable streams are SABR; skipping Dash PoToken`);
       }
-      const playerStreams: StreamInfo[] = this.mapToPlayerStreams(videoInfo.streams);
+      const playerStreams: StreamInfo[] = this.mapToPlayerStreams(videoInfo.streams, videoInfo.durationMs);
 
       logger.info(`${TAG} 流摘要: video_only=${playerStreams.filter(s => s.kind === 'video_only').length} audio_only=${playerStreams.filter(s => s.kind === 'audio_only').length} progressive=${playerStreams.filter(s => s.kind === 'progressive' || s.kind === '').length} sabr=${playerStreams.filter(s => s.kind === 'sabr' || s.deliveryMethod === 'SABR').length} subtitles=${videoInfo.subtitleTracks.length}`);
       // P0-3 (TTFF): prefetch SIDX for the most likely initial DASH tracks so
@@ -406,8 +407,11 @@ export class YouTubePlayService {
   }
 
   /** youtube_core StreamInfo → mediaservice StreamInfo (shared by play() and
-   * the live HLS variant path). */
-  private mapToPlayerStreams(streams: YouTubeStreamInfo[]): StreamInfo[] {
+   * the live HLS variant path). durationMs backfills approxDurationMs for
+   * clients (e.g. android_vr) whose formats omit it — the EDL/DASH dual-track
+   * builders refuse to build without a duration. */
+  private mapToPlayerStreams(streams: YouTubeStreamInfo[], durationMs?: number): StreamInfo[] {
+    const fallbackDuration = durationMs && durationMs > 0 ? durationMs : undefined;
     return streams.map((stream: YouTubeStreamInfo): StreamInfo => ({
       url: stream.url,
       isUrl: stream.isUrl,
@@ -436,7 +440,7 @@ export class YouTubePlayService {
       indexRangeStart: stream.indexRange?.start,
       indexRangeEnd: stream.indexRange?.end,
       contentLength: stream.contentLength,
-      approxDurationMs: stream.approxDurationMs,
+      approxDurationMs: stream.approxDurationMs ?? fallbackDuration,
       isOtf: stream.isOtf,
       sourceClient: stream.sourceClient,
       sabrInfo: stream.sabrInfo,
@@ -454,7 +458,7 @@ export class YouTubePlayService {
     if (!this.extractor) return [];
     try {
       const variants = await this.extractor.fetchHlsVariantStreams(videoInfo.hlsUrl, videoInfo.videoId);
-      return this.mapToPlayerStreams(variants);
+      return this.mapToPlayerStreams(variants, videoInfo.durationMs);
     } catch (e) {
       logger.warn(`${TAG} fetchLiveHlsVariants failed: ${(e as Error).message || e}`);
       return [];
@@ -463,6 +467,12 @@ export class YouTubePlayService {
 
   /** Inject pot= into DASH/progressive stream URLs (not SABR). */
   private async injectDashPoToken(videoInfo: VideoInfo): Promise<void> {
+    // PipePipe: tv_downgraded is fully token-free — /player carries no pot and
+    // media URLs never get pot= either (PipePipe's pot-append is commented out).
+    if (YoutubePlayerClientConfig.getYoutubePlayerClient() === 'tv_downgraded') {
+      logger.info(`${TAG} tv_downgraded is token-free; skipping Dash PoToken injection`);
+      return;
+    }
     // Identity layer is the single visitorData source: the session-pinned value
     // (pinned from this extraction's player response when still unpinned) so the
     // DASH mint reuses the already initialized BotGuard runtime.

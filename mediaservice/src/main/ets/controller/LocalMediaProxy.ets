@@ -300,8 +300,9 @@ export class LocalMediaProxy {
         return true;
       } catch (e) {
         resource.dashSegments = undefined;
+        const errText = e instanceof Error ? `${e.name}: ${e.message}` : JSON.stringify(e);
         Logger.warn(TAG, `DASH SIDX attempt=${attempt + 1} elapsed=${Date.now() - retryStartedAt}ms `
-          + `itag=${resource.id}: ${e}`);
+          + `itag=${resource.id}: ${errText}`);
         attempt++;
       }
     }

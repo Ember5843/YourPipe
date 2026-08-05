@@ -2,30 +2,17 @@
  * PipePipe-aligned single stream player client selection.
  * Keys match PipePipe NewPipe.setYoutubePlayerClient allow-list.
  *
- * Product experiment (YourPipe / yt-lab SABR path): always prefer mweb so
- * VOD can use serverAbrStreamingUrl + SABR. Login no longer switches to
- * tv_downgraded by default.
+ * Product default (PipePipe reconcileYoutubePlayerClient): guest is pinned to
+ * android_vr (adaptiveFormats direct URLs, session pot on /player) and signed-in
+ * to tv_downgraded (token-free direct URLs). mweb (SABR) remains available as an
+ * opt-in/debug selection via setYoutubePlayerClient.
  */
 export type YoutubePlayerClientKey = 'mweb' | 'web_safari' | 'android_vr' | 'tv_downgraded';
 
 export class YoutubePlayerClientConfig {
-  private static selected: YoutubePlayerClientKey = 'mweb';
-  /** When false (default for experiment), auth state never forces tv_downgraded. */
-  private static autoByAuth: boolean = false;
+  private static selected: YoutubePlayerClientKey = 'android_vr';
 
   private constructor() {}
-
-  /**
-   * Legacy PipePipe switch: signed-in → tv_downgraded, guest → mweb.
-   * Experiment keeps this off so playback stays on mweb.
-   */
-  static setAutoByAuth(enabled: boolean): void {
-    YoutubePlayerClientConfig.autoByAuth = enabled;
-  }
-
-  static isAutoByAuth(): boolean {
-    return YoutubePlayerClientConfig.autoByAuth;
-  }
 
   static setYoutubePlayerClient(client: string): void {
     if (client === 'mweb' || client === 'web_safari'
@@ -33,7 +20,7 @@ export class YoutubePlayerClientConfig {
       YoutubePlayerClientConfig.selected = client;
       return;
     }
-    YoutubePlayerClientConfig.selected = 'mweb';
+    YoutubePlayerClientConfig.selected = 'android_vr';
   }
 
   static getYoutubePlayerClient(): YoutubePlayerClientKey {
@@ -41,36 +28,23 @@ export class YoutubePlayerClientConfig {
   }
 
   /**
-   * Product default: always pin mweb (SABR path) for guest, Cookie, and OAuth.
-   * OAuth must NOT force tv_downgraded on every video — that breaks switch-stream
-   * vs cookie/guest. Restricted content may retry tv_downgraded+Bearer at call site.
-   * Legacy autoByAuth keeps PipePipe login→tv/mweb selection when enabled.
+   * Product default (PipePipe): signed-in → tv_downgraded, guest → android_vr.
+   * Both resolve to direct adaptiveFormats URLs; mweb/SABR is opt-in only.
    */
   static applyAuthDefault(hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
-    if (!YoutubePlayerClientConfig.autoByAuth) {
-      YoutubePlayerClientConfig.selected = 'mweb';
-      return;
-    }
-    const current = YoutubePlayerClientConfig.selected;
-    if (hasYouTubeLogin) {
-      if (current !== 'tv_downgraded' && current !== 'mweb') {
-        YoutubePlayerClientConfig.selected = 'mweb';
-      }
-    } else if (current === 'tv_downgraded') {
-      YoutubePlayerClientConfig.selected = 'mweb';
-    }
+    YoutubePlayerClientConfig.selected = hasYouTubeLogin ? 'tv_downgraded' : 'android_vr';
   }
 
-  /** Reset to product default mweb (all login modes). */
-  static resetToAuthDefault(_hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
-    YoutubePlayerClientConfig.selected = 'mweb';
+  /** Reset to the product default for the given auth state. */
+  static resetToAuthDefault(hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
+    YoutubePlayerClientConfig.selected = hasYouTubeLogin ? 'tv_downgraded' : 'android_vr';
   }
 
   static allowedClients(hasYouTubeLogin: boolean): YoutubePlayerClientKey[] {
-    // Keep tv_downgraded selectable for debugging when signed in; product default is mweb.
+    // Product default first; mweb (SABR) stays selectable for debugging.
     if (hasYouTubeLogin) {
-      return ['mweb', 'tv_downgraded'];
+      return ['tv_downgraded', 'mweb'];
     }
-    return ['mweb', 'web_safari', 'android_vr'];
+    return ['android_vr', 'mweb', 'web_safari'];
   }
 }

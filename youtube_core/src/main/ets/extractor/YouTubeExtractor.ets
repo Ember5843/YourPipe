@@ -1255,14 +1255,15 @@ export class YouTubeExtractor {
     this.errors = [];
     this.mwebHlsManifestUrl = '';
 
-    // Stream client selection matches cookie/guest: product default mweb (SABR).
-    // OAuth does NOT force tv_downgraded — only Cookie attaches WEB auth on mweb.
+    // PipePipe reconcileYoutubePlayerClient: signed-in (Cookie or OAuth-only) →
+    // tv_downgraded, guest → android_vr. Cookie+SAPISIDHASH attaches to whichever
+    // client is selected (PipePipe addLoggedInHeaders).
     const webCookieAuth = this.shouldAttachWebCookieAuth();
     const hasOauth = this.isOauthOnlyPlaybackAuth();
     YoutubePlayerClientConfig.applyAuthDefault(webCookieAuth || hasOauth, false);
     const selectedClient = YoutubePlayerClientConfig.getYoutubePlayerClient();
     logger.info(`[STREAM] selectedClient=${selectedClient} webCookieAuth=${webCookieAuth} `
-      + `oauthOnly=${hasOauth} streamAuth=webCookieOnly`);
+      + `oauthOnly=${hasOauth}`);
 
     // Stream process cache disabled: always re-hit stream /player (align with fresh extract).
     this.streamsCachedVideoId = '';
@@ -1352,22 +1353,26 @@ export class YouTubeExtractor {
     logger.info(`[STARTUP] attempt=${attemptId} stage=client_version source=`
       + `${WebClientVersionResolver.getCachedOrHardcodedSource()} version=${initialMwebVersion}`);
     const streamStartedAt = Date.now();
-    // mweb/web_safari: Cookie only when present; guest+oauth → anonymous (no Bearer).
-    // webCookieAuth already honors the useAuthForPlayback setting.
+    // Dual auth rails: Cookie+SAPISIDHASH on any client (PipePipe); OAuth-only
+    // sessions get Bearer on tv_downgraded directly (SmartTube) — the retry
+    // below only covers the case where a non-TV client was manually selected.
+    // webCookieAuth/hasOauth already honor the useAuthForPlayback setting.
+    const tvBearerAuth = selectedClient === 'tv_downgraded' && hasOauth;
     let innertubePlayers = await this.fetchSelectedStreamPlayer(
-      videoId, sts, selectedClient, webCookieAuth, false);
+      videoId, sts, selectedClient, webCookieAuth, tvBearerAuth);
     if (selectedClient === 'mweb' && !innertubePlayers.player?.streamingData) {
       const resolvedVersion = await versionPromise;
       if (resolvedVersion !== initialMwebVersion) {
         logger.warn(`[STREAM] retry mweb with resolved clientVersion=${resolvedVersion}`);
         innertubePlayers = await this.fetchSelectedStreamPlayer(
-          videoId, sts, selectedClient, webCookieAuth, false);
+          videoId, sts, selectedClient, webCookieAuth, tvBearerAuth);
       }
     }
-    // Restricted / LOGIN_REQUIRED: OAuth may retry TVHTML5 + Bearer (SmartTube).
-    // Cookie path keeps mweb+Cookie; do not inject Bearer onto mweb.
+    // Restricted / LOGIN_REQUIRED: OAuth may retry TVHTML5 + Bearer (SmartTube)
+    // when the selected client is not already tv_downgraded (e.g. manual mweb).
+    // Cookie path keeps the selected client+Cookie; do not inject Bearer onto it.
     const playStatus = innertubePlayers.player?.playabilityStatus?.status?.toUpperCase() || '';
-    if (hasOauth && (playStatus === 'LOGIN_REQUIRED' || playStatus === 'UNPLAYABLE'
+    if (selectedClient !== 'tv_downgraded' && hasOauth && (playStatus === 'LOGIN_REQUIRED' || playStatus === 'UNPLAYABLE'
       || !innertubePlayers.player?.streamingData)) {
       logger.warn(`[STREAM] oauth restricted status=${playStatus || 'empty'} → tv_downgraded+Bearer`);
       const tvPlayers = await this.fetchSelectedStreamPlayer(
@@ -2095,8 +2100,9 @@ export class YouTubeExtractor {
 
   /**
    * PipePipe single configured stream /player (www + STS + selected client).
-   * @param useWebAuth Cookie on mweb/web only
-   * @param useTvAuth  Bearer on tv_downgraded only
+   * @param useWebAuth Cookie+SAPISIDHASH on any client incl. tv_downgraded
+   *   (PipePipe addLoggedInHeaders)
+   * @param useTvAuth  Bearer on tv_downgraded only (OAuth-only fallback)
    */
   private async fetchSelectedStreamPlayer(
     videoId: string,
