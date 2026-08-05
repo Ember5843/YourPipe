@@ -2937,12 +2937,20 @@
             "value": "Tus credenciales se guardan solo en este dispositivo y nunca se suben a servidores de terceros. Puedes cerrar sesión o activar el modo incógnito en cualquier momento en «Datos y cuenta»; al cerrar sesión se borran los datos de tu cuenta."
         },
         {
+            "name": "yt_guide_p3_user_data",
+            "value": "Para datos del usuario: Obtiene suscripciones, listas de reproducción, historial, búsquedas y otros datos de la cuenta."
+        },
+        {
+            "name": "yt_guide_p3_playback",
+            "value": "Para reproducción: Solicita las URL de reproducción con tu identidad iniciada para evitar la detección como robot."
+        },
+        {
             "name": "yt_guide_p4_title",
-            "value": "Cómo funcionan las URL de reproducción"
+            "value": "Proxy de red"
         },
         {
             "name": "yt_guide_p4_desc",
-            "value": "Antes de la reproducción, la app resuelve las URL directas del vídeo y las sirve al reproductor a través de un proxy local, por lo que la primera reproducción puede tardar unos segundos. En redes restringidas puedes configurar un proxy HTTP o SOCKS5 en «Configuración → Network»."
+            "value": "En redes restringidas, activa un proxy HTTP o SOCKS5 en «Configuración → Red» e introduce la dirección del servidor y el puerto. El proxy solo se aplica a solicitudes externas; las direcciones de bucle local de reproducción lo omiten."
         },
         {
             "name": "yt_guide_p5_title",

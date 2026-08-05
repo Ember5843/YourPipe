@@ -2937,12 +2937,20 @@
             "value": "Vos identifiants sont stockés uniquement sur cet appareil et ne sont jamais envoyés à des serveurs tiers. Vous pouvez à tout moment vous déconnecter ou activer le mode incognito dans « Données et compte » ; la déconnexion efface les données de votre compte."
         },
         {
+            "name": "yt_guide_p3_user_data",
+            "value": "Pour les données utilisateur : récupère les abonnements, playlists, historique, recherches et autres données du compte."
+        },
+        {
+            "name": "yt_guide_p3_playback",
+            "value": "Pour la lecture : demande les URL de lecture avec votre identité connectée afin d’éviter la détection comme robot."
+        },
+        {
             "name": "yt_guide_p4_title",
-            "value": "Fonctionnement des URL de lecture"
+            "value": "Proxy réseau"
         },
         {
             "name": "yt_guide_p4_desc",
-            "value": "Avant la lecture, l'application résout les URL directes du flux vidéo et les fournit au lecteur via un proxy local ; la première lecture peut donc prendre quelques secondes. Sur les réseaux restreints, vous pouvez configurer un proxy HTTP ou SOCKS5 dans « Paramètres → Network »."
+            "value": "Sur un réseau restreint, activez un proxy HTTP ou SOCKS5 dans « Paramètres → Réseau », puis renseignez l’adresse du serveur et le port. Le proxy ne s’applique qu’aux requêtes externes ; les adresses de bouclage de lecture locale le contournent."
         },
         {
             "name": "yt_guide_p5_title",

@@ -11,6 +11,7 @@ export type HelpGuideMode = 'firstLaunch' | 'fromSettings';
 
 export interface HelpGuidePageParams {
   mode: HelpGuideMode;
+  onResetSettings: () => void;
   onFinish: () => void;
 }
 
@@ -18,6 +19,7 @@ interface GuidePageItem {
   illustration: Resource | null;
   title: ResourceStr;
   desc: ResourceStr;
+  details: ResourceStr[];
   isWelcome: boolean;
 }
 
@@ -31,7 +33,11 @@ export struct HelpGuidePage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
   @Consume('safeAreaTop') safeAreaTop: number;
   @Consume('safeAreaBottom') safeAreaBottom: number;
-  @Prop params: HelpGuidePageParams = { mode: 'fromSettings', onFinish: () => {} };
+  @Prop params: HelpGuidePageParams = {
+    mode: 'fromSettings',
+    onResetSettings: () => {},
+    onFinish: () => {}
+  };
   @State currentIndex: number = 0;
   @State welcomeShown: boolean = false;
 
@@ -40,36 +46,45 @@ export struct HelpGuidePage {
       illustration: null,
       title: $r('app.string.new_app_name'),
       desc: $r('app.string.yt_guide_p1_desc'),
+      details: [],
       isWelcome: true
     },
     {
       illustration: $r('app.media.guide_signin'),
       title: $r('app.string.yt_guide_p2_title'),
       desc: $r('app.string.yt_guide_p2_desc'),
+      details: [],
       isWelcome: false
     },
     {
       illustration: $r('app.media.guide_account'),
       title: $r('app.string.yt_guide_p3_title'),
       desc: $r('app.string.yt_guide_p3_desc'),
+      details: [
+        $r('app.string.yt_guide_p3_user_data'),
+        $r('app.string.yt_guide_p3_playback')
+      ],
       isWelcome: false
     },
     {
       illustration: $r('app.media.guide_network'),
       title: $r('app.string.yt_guide_p4_title'),
       desc: $r('app.string.yt_guide_p4_desc'),
+      details: [],
       isWelcome: false
     },
     {
       illustration: $r('app.media.guide_quality'),
       title: $r('app.string.yt_guide_p5_title'),
       desc: $r('app.string.yt_guide_p5_desc'),
+      details: [],
       isWelcome: false
     },
     {
       illustration: $r('app.media.guide_download'),
       title: $r('app.string.yt_guide_p6_title'),
       desc: $r('app.string.yt_guide_p6_desc'),
+      details: [],
       isWelcome: false
     }
   ];
@@ -138,9 +153,11 @@ export struct HelpGuidePage {
     Column({ space: 0 }) {
       if (item.illustration !== null) {
         Image(item.illustration)
-          .width('72%')
+          .width('100%')
           .aspectRatio(1.5)
           .objectFit(ImageFit.Contain)
+          .borderRadius($r('app.float.common_border_radius_7'))
+          .clip(true)
       }
 
       Text(item.title)
@@ -148,7 +165,7 @@ export struct HelpGuidePage {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.yourtube_text_primary'))
         .textAlign(TextAlign.Center)
-        .margin({ top: 28 })
+        .margin({ top: item.details.length > 0 ? 20 : 28 })
 
       Text(item.desc)
         .fontSize(15)
@@ -156,6 +173,33 @@ export struct HelpGuidePage {
         .textAlign(TextAlign.Center)
         .lineHeight(24)
         .margin({ top: 14 })
+
+      if (item.details.length > 0) {
+        Column({ space: 10 }) {
+          ForEach(item.details, (detail: ResourceStr, index: number) => {
+            Row({ space: 10 }) {
+              Row()
+                .width(4)
+                .height(24)
+                .borderRadius(2)
+                .backgroundColor(this.themePrimary)
+
+              Text(detail)
+                .fontSize(12)
+                .fontColor($r('app.color.yourtube_text_primary'))
+                .lineHeight(18)
+                .layoutWeight(1)
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Top)
+            .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+            .borderRadius($r('app.float.common_border_radius_5'))
+            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          }, (_detail: ResourceStr, index: number) => `guide_detail_${index}`)
+        }
+        .width('100%')
+        .margin({ top: 12 })
+      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Center)
@@ -188,12 +232,21 @@ export struct HelpGuidePage {
             if (item.isWelcome) {
               this.WelcomeContent()
             } else {
-              this.StandardContent(item)
+              Scroll() {
+                Column() {
+                  this.StandardContent(item)
+                }
+                .width('100%')
+                .padding({ top: 20, bottom: 20 })
+              }
+              .width('100%')
+              .height('100%')
+              .scrollBar(BarState.Off)
             }
           }
           .width('100%')
           .height('100%')
-          .justifyContent(FlexAlign.Center)
+          .justifyContent(item.isWelcome ? FlexAlign.Center : FlexAlign.Start)
           .padding({ left: 32, right: 32 })
           // 翻页内容动画：非当前页淡出并横向偏移
           .opacity(this.currentIndex === index ? 1 : 0)
@@ -223,6 +276,22 @@ export struct HelpGuidePage {
       }
       .justifyContent(FlexAlign.Center)
       .margin({ bottom: 20 })
+
+      if (this.isLastPage()) {
+        Button($r('app.string.yt_option_reset_settings'))
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.themePrimary)
+          .backgroundColor(Color.Transparent)
+          .border({ width: 1, color: this.themePrimary })
+          .borderRadius(24)
+          .width('72%')
+          .height(48)
+          .margin({ bottom: 12 })
+          .onClick(() => {
+            this.params.onResetSettings();
+          })
+      }
 
       // 主按钮：下一页 / 完成
       Button(this.isLastPage() ? $r('app.string.yt_guide_done') : $r('app.string.yt_guide_next'))

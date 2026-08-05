@@ -2937,12 +2937,20 @@
             "value": "Deine Anmeldedaten werden nur auf diesem Gerät gespeichert und niemals auf Server von Drittanbietern hochgeladen. Du kannst dich jederzeit unter „Daten & Konto“ abmelden oder den Inkognito-Modus aktivieren; beim Abmelden werden deine Kontodaten gelöscht."
         },
         {
+            "name": "yt_guide_p3_user_data",
+            "value": "Für Benutzerdaten: Ruft Abos, Playlists, Verlauf, Suchanfragen und weitere Kontodaten ab."
+        },
+        {
+            "name": "yt_guide_p3_playback",
+            "value": "Für Wiedergabe: Fordert Wiedergabe-URLs mit deiner angemeldeten Identität an, um Bot-Erkennung zu vermeiden."
+        },
+        {
             "name": "yt_guide_p4_title",
-            "value": "So funktionieren die Wiedergabe-URLs"
+            "value": "Netzwerkproxy"
         },
         {
             "name": "yt_guide_p4_desc",
-            "value": "Vor der Wiedergabe ermittelt die App die direkten Stream-URLs des Videos und stellt sie dem Player über einen lokalen Proxy bereit, daher kann die erste Wiedergabe einige Sekunden dauern. In eingeschränkten Netzwerken kannst du unter „Einstellungen → Network“ einen HTTP- oder SOCKS5-Proxy konfigurieren."
+            "value": "In eingeschränkten Netzwerken kannst du unter „Einstellungen → Netzwerk“ einen HTTP- oder SOCKS5-Proxy aktivieren und Serveradresse sowie Port eingeben. Der Proxy gilt nur für externe Netzwerkanfragen; lokale Loopback-Adressen der Wiedergabe umgehen ihn."
         },
         {
             "name": "yt_guide_p5_title",

@@ -54,7 +54,7 @@ import { PlaybackToggleRow } from '../common/components/PlaybackToggleRow';
 import { PlaybackSectionTitle } from '../common/components/PlaybackSectionTitle';
 import { OptionsMainPage } from '../features/options/OptionsMainPage';
 import { OptionsAppearancePage } from '../features/options/OptionsAppearancePage';
-import { COLOR_PRESETS } from '../common/ThemeManager';
+import { COLOR_PRESETS, ThemeManager } from '../common/ThemeManager';
 import { OptionsPlaybackPage } from '../features/options/OptionsPlaybackPage';
 import { OptionsLanguageAndRegionPage } from '../features/options/OptionsLanguageAndRegionPage';
 import { OptionsRecoveryPage } from '../features/options/OptionsRecoveryPage';
@@ -274,12 +274,13 @@ struct Index {
     DownloadManager.getInstance().refreshTaskPool();
   }
 
-  /** 恢复所有配置为默认值 */
-  private resetAllConfigs(): void {
+  /** 恢复默认配置；登录凭据保存在独立数据库中，不受这里影响。 */
+  private applyDefaultConfigs(): void {
     // 1. 重置 UIConfig 为默认值
     const defaultUiConfig = new UIConfig();
     this.uiConfig = defaultUiConfig;
     UIConfig.saveToPreferences(defaultUiConfig);
+    ThemeManager.apply(defaultUiConfig.colorPreset);
 
     // 2. 重置 PlaybackConfig 为默认值
     const defaultPlaybackConfig = new PlaybackConfig();
@@ -292,7 +293,7 @@ struct Index {
     const defaultProxy = NetworkProxyConfig.resetToDefault();
     AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
 
-    // 4. 重置帮助引导已读标记（恢复默认后首次启动引导会再次显示）
+    // 4. 下次启动重新显示引导
     PreferencesStore.setString(PREF_HELP_GUIDE_SEEN, 'false');
 
     // 5. 应用深色模式
@@ -306,7 +307,11 @@ struct Index {
       }
     });
 
-    // 6. 提示用户
+  }
+
+  /** 恢复所有配置为默认值 */
+  private resetAllConfigs(): void {
+    this.applyDefaultConfigs();
     this.getUIContext().getPromptAction().showToast({
       message: $r('app.string.yt_toast_reset_settings_done'),
       duration: 2000
@@ -1640,6 +1645,9 @@ struct Index {
           HelpGuidePage({
             params: {
               mode: 'firstLaunch',
+              onResetSettings: () => {
+                this.showResetSettingsConfirmDialog();
+              },
               onFinish: () => {
                 this.showHelpGuide = false;
               }
@@ -1994,6 +2002,9 @@ struct Index {
         HelpGuidePage({
           params: {
             mode: 'fromSettings',
+            onResetSettings: () => {
+              this.showResetSettingsConfirmDialog();
+            },
             onFinish: () => {
               this.popOptionsPath();
             }

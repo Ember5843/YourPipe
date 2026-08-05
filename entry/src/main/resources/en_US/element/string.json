@@ -2937,12 +2937,20 @@
             "value": "Your credentials are stored only on this device and are never uploaded to third-party servers. You can sign out or enable incognito mode at any time under Data & Account; signing out clears your account data."
         },
         {
+            "name": "yt_guide_p3_user_data",
+            "value": "Use for user data: Retrieves subscriptions, playlists, history, searches, and other account data."
+        },
+        {
+            "name": "yt_guide_p3_playback",
+            "value": "Use for playback: Requests playback URLs as your signed-in identity to help avoid bot detection."
+        },
+        {
             "name": "yt_guide_p4_title",
-            "value": "How playback URLs work"
+            "value": "Network proxy"
         },
         {
             "name": "yt_guide_p4_desc",
-            "value": "Before playback, the app resolves the video's direct stream URLs and serves them to the player through a local proxy, so the first play may take a few seconds. On restricted networks you can configure an HTTP or SOCKS5 proxy under Settings → Network."
+            "value": "On restricted networks, enable an HTTP or SOCKS5 proxy under Settings → Network and enter the server address and port. The proxy applies only to external network requests; local playback loopback addresses bypass it."
         },
         {
             "name": "yt_guide_p5_title",
