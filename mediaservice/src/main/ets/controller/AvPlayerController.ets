@@ -1188,14 +1188,15 @@ export class AvPlayerController {
     if ((video.fps || 0) > 0) vDelay += `,fps=${video.fps}`;
     parts.push(vDelay);
     if ((video.bitrate || 0) > 0) {
-      parts.push(`!track_meta,title=${edlMeta(video.quality || 'video')},byterate=${Math.floor((video.bitrate || 0) * 1000 / 8)}`);
+      // YouTube bitrate is bit/s; byterate must be byte/s and fit mpv's int32 EDL parser.
+      parts.push(`!track_meta,title=${edlMeta(video.quality || 'video')},byterate=${Math.floor((video.bitrate || 0) / 8)}`);
     }
     parts.push(`${videoUrl},length=${durationSec}`);
     // Audio track
     parts.push('!new_stream', '!no_clip', '!no_chapters');
     parts.push(`!delay_open,media_type=audio,codec=${this.codecToMpv(audio.codecs || '')}`);
     if ((audio.bitrate || 0) > 0) {
-      parts.push(`!track_meta,title=${edlMeta(audio.quality || 'audio')},byterate=${Math.floor((audio.bitrate || 0) * 1000 / 8)}`);
+      parts.push(`!track_meta,title=${edlMeta(audio.quality || 'audio')},byterate=${Math.floor((audio.bitrate || 0) / 8)}`);
     }
     parts.push(`${audioUrl},length=${durationSec}`);
 
