@@ -500,6 +500,14 @@ export class PlayerSession {
   private _lastAutoAdvanceFromVideoId: string = '';
 
   private onPlaybackEnded = (): void => {
+    // 切集窗口的假结束:新视频流尚未提交成功时收到的 End 必然来自旧媒体
+    // (mpv 停旧源 / EDL 双轨收尾可能再次上报 End,relay 的边沿检测又已被
+    // closeMediaSession 复位)。此时若跳转,会与首次 End 的跳转叠加成隔一个。
+    const endingVideoId = this._currentVideo?.videoId || '';
+    if (endingVideoId.length > 0 && this._submittedVideoId !== endingVideoId) {
+      logger.warn(`${TAG} ended ignored: source for ${endingVideoId} not yet submitted (stale end from previous media)`);
+      return;
+    }
     // 假结束识别:代理上游 4xx / EDL 分段全灭会让 mpv 提前报 End(进度远未到片尾)。
     // 对齐 PipePipe/SmartTube:媒体层瞬时失败原地重试当前条目,绝不自动跳下一首。
     const state = this._controller.getPlaybackState();

@@ -2984,7 +2984,7 @@ export class YouTubeExtractor {
       const authorName = authorTextObj ? this.getTextFromObject(authorTextObj) : '';
       const authorThumbnail = renderer['authorThumbnail'] as Record<string, Object>;
       const thumbnails = authorThumbnail ? authorThumbnail['thumbnails'] as Array<Record<string, string>> : null;
-      const avatarUrl = (thumbnails && thumbnails.length > 0) ? thumbnails[0]['url'] : '';
+      const avatarUrl = fixThumbnailUrl((thumbnails && thumbnails.length > 0) ? thumbnails[0]['url'] : '');
       const contentTextObj = renderer['contentText'] as Record<string, Object>;
       const commentText = contentTextObj ? this.getTextFromObject(contentTextObj) : '';
       const publishedTimeTextObj = renderer['publishedTimeText'] as Record<string, Object>;
@@ -3040,7 +3040,13 @@ export class YouTubeExtractor {
       const commentId = properties['commentId'] as string || (viewModel['commentId'] as string);
       const authorName = author['displayName'] as string;
       const avatarSources = this.getNestedValue(avatar, 'image.sources') as Array<Record<string, string>>;
-      const avatarUrl = (avatarSources && avatarSources.length > 0) ? avatarSources[0]['url'] : '';
+      let avatarUrl = (avatarSources && avatarSources.length > 0) ? avatarSources[0]['url'] : '';
+      if (!avatarUrl) {
+        // PipePipe fallback: some initial comment responses omit the avatar object
+        // but provide the same image URL directly in the author payload.
+        avatarUrl = (author['avatarThumbnailUrl'] as string) || '';
+      }
+      avatarUrl = fixThumbnailUrl(avatarUrl);
       const content = properties['content'] as Record<string, Object>;
       const commentText = content ? (content['content'] as string) : '';
       const publishedTimeText = properties['publishedTime'] as string;
