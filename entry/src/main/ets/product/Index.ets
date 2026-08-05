@@ -60,6 +60,7 @@ import { OptionsLanguageAndRegionPage } from '../features/options/OptionsLanguag
 import { OptionsRecoveryPage } from '../features/options/OptionsRecoveryPage';
 import { OptionsDataAccountPage } from '../features/options/OptionsDataAccountPage';
 import { OptionsNetworkPage } from '../features/options/OptionsNetworkPage';
+import { HelpGuidePage, PREF_HELP_GUIDE_SEEN } from '../features/help/HelpGuidePage';
 import { NetworkProxyConfig } from '../common/NetworkProxyConfig';
 import { LanguagePickerDialog, LanguagePickerItem } from '../common/components/LanguagePickerDialog';
 import { LanguagePickerPage } from '../common/components/LanguagePickerPage';
@@ -130,6 +131,8 @@ struct Index {
   @StorageLink('pendingPlaybackContinuation') @Watch('onPendingContinuationChanged') pendingPlaybackContinuation: string = '';
   @Provide('actionHub') actionHub: ActionHub = new ActionHub();
   @State showOptions: boolean = false;
+  /** 首次启动帮助引导全屏覆盖层（cfg_help_seen 未读时显示） */
+  @State showHelpGuide: boolean = false;
   @State isLoadingMore: boolean = false;
   @State isInitialLoading: boolean = false;
   @State isHomeRefreshing: boolean = false;
@@ -289,7 +292,10 @@ struct Index {
     const defaultProxy = NetworkProxyConfig.resetToDefault();
     AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
 
-    // 4. 应用深色模式
+    // 4. 重置帮助引导已读标记（恢复默认后首次启动引导会再次显示）
+    PreferencesStore.setString(PREF_HELP_GUIDE_SEEN, 'false');
+
+    // 5. 应用深色模式
     Promise.resolve().then(() => {
       const colorMode = ColorModeManager.resolveMode(defaultUiConfig.darkMode);
       AppStorage.setOrCreate('currentColorMode', colorMode);
@@ -300,7 +306,7 @@ struct Index {
       }
     });
 
-    // 5. 提示用户
+    // 6. 提示用户
     this.getUIContext().getPromptAction().showToast({
       message: $r('app.string.yt_toast_reset_settings_done'),
       duration: 2000
@@ -432,6 +438,14 @@ struct Index {
   aboutToAppear() {
     this.ensureStores();
     this.buildPickerItems();
+    // 首次启动帮助引导：只看 cfg_help_seen 持久化变量，与是否首次安装无关。
+    // 延迟到首帧之后置位：aboutToAppear 里同步置 true 时 bindContentCover 可能不弹出。
+    if (PreferencesStore.getString(PREF_HELP_GUIDE_SEEN, 'false') !== 'true') {
+      logger.info('help guide unseen, scheduling first-launch cover');
+      setTimeout(() => {
+        this.showHelpGuide = true;
+      }, 500);
+    }
     this.initLanguageSettings();
     this.bindActionHub();
     // 沉浸光感能力检测：支持则注入 ADAPTIVE/ADAPTIVE，不支持则 undefined（让 HdsTabs / titleBar 走默认渲染）
@@ -1620,6 +1634,22 @@ struct Index {
           });
         })
 
+        // 首次启动帮助引导：全屏覆盖层（if 增删组件，不依赖模态系统的挂载时序；
+        // 实测 bindSheet/bindContentCover 在启动早期绑 Navigation 体系节点均不生效）
+        if (this.showHelpGuide) {
+          HelpGuidePage({
+            params: {
+              mode: 'firstLaunch',
+              onFinish: () => {
+                this.showHelpGuide = false;
+              }
+            }
+          })
+            .width('100%')
+            .height('100%')
+            .transition(TransitionEffect.OPACITY.animation({ duration: 250 }))
+        }
+
       }
       .width('100%')
       .height('100%')
@@ -1930,6 +1960,7 @@ struct Index {
               onNetworkClick: () => { this.pushOptionsPath('network'); },
               onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
               onLogClick: () => { this.pushOptionsPath('log_page'); },
+              onHelpClick: () => { this.pushOptionsPath('help_page'); },
               onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
               onAboutClick: () => { this.pushOptionsPath('about_page'); }
             }
@@ -1958,7 +1989,30 @@ struct Index {
 
   @Builder
   OptionsPageMap(name: string) {
-    if (name === 'language') {
+    if (name === 'help_page') {
+      HdsNavDestination() {
+        HelpGuidePage({
+          params: {
+            mode: 'fromSettings',
+            onFinish: () => {
+              this.popOptionsPath();
+            }
+          }
+        })
+      }
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_help'),
+        onBack: () => {
+          this.popOptionsPath();
+        }
+      }))
+      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .onBackPressed(() => {
+        this.popOptionsPath();
+        return true;
+      })
+    } else if (name === 'language') {
       HdsNavDestination() {
           OptionsLanguageAndRegionPage({
             params: {

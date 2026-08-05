@@ -2895,6 +2895,70 @@
         {
             "name": "yt_device_login_retry",
             "value": "重试"
+        },
+        {
+            "name": "yt_option_help",
+            "value": "幫助"
+        },
+        {
+            "name": "yt_option_help_subtitle",
+            "value": "新手引導與基本使用說明"
+        },
+        {
+            "name": "yt_guide_skip",
+            "value": "跳過"
+        },
+        {
+            "name": "yt_guide_next",
+            "value": "下一頁"
+        },
+        {
+            "name": "yt_guide_done",
+            "value": "完成"
+        },
+        {
+            "name": "yt_guide_p1_desc",
+            "value": "開源的 YouTube 第三方客戶端：本機 MPV 播放、無廣告，資料只儲存在你自己的裝置上。"
+        },
+        {
+            "name": "yt_guide_p2_title",
+            "value": "登入 YouTube 帳號"
+        },
+        {
+            "name": "yt_guide_p2_desc",
+            "value": "在「設定 → 資料與帳號」中透過網頁或掃碼登入。登入後可以查看你的訂閱和播放清單等帳號內容；不登入也可以以訪客身份正常使用。"
+        },
+        {
+            "name": "yt_guide_p3_title",
+            "value": "帳號資料管理"
+        },
+        {
+            "name": "yt_guide_p3_desc",
+            "value": "登入憑據只儲存在本機，不會上傳到任何第三方伺服器。你可以隨時在「資料與帳號」中登出或開啟無痕模式，登出後帳號資料將被清除。"
+        },
+        {
+            "name": "yt_guide_p4_title",
+            "value": "播放地址取得"
+        },
+        {
+            "name": "yt_guide_p4_desc",
+            "value": "播放前應用會解析影片的直接地址，並透過本機代理提供給播放器，因此首次播放可能需要幾秒鐘。網絡受限時可在「設定 → 網絡」中配置 HTTP 或 SOCKS5 代理。"
+        },
+        {
+            "name": "yt_guide_p5_title",
+            "value": "清晰度與緩存"
+        },
+        {
+            "name": "yt_guide_p5_desc",
+            "value": "在「設定 → 播放」中可以設定預設清晰度、流動網絡清晰度和緩存時長，按需節省流量或提升畫質。"
+        },
+        {
+            "name": "yt_guide_p6_title",
+            "value": "下載與本地"
+        },
+        {
+            "name": "yt_guide_p6_desc",
+            "value": "支援把影片下載到本機離線觀看，下載內容在「本地」頁管理。「清除應用全部資料」不會刪除你已下載的檔案。"
         }
     ]
 }

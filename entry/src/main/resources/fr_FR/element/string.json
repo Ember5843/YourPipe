@@ -2895,6 +2895,70 @@
         {
             "name": "yt_device_login_retry",
             "value": "Try again"
+        },
+        {
+            "name": "yt_option_help",
+            "value": "Aide"
+        },
+        {
+            "name": "yt_option_help_subtitle",
+            "value": "Guide rapide et utilisation de base"
+        },
+        {
+            "name": "yt_guide_skip",
+            "value": "Passer"
+        },
+        {
+            "name": "yt_guide_next",
+            "value": "Suivant"
+        },
+        {
+            "name": "yt_guide_done",
+            "value": "Terminer"
+        },
+        {
+            "name": "yt_guide_p1_desc",
+            "value": "Un client YouTube open source avec lecture MPV locale et sans publicité — vos données restent sur votre propre appareil."
+        },
+        {
+            "name": "yt_guide_p2_title",
+            "value": "Se connecter à YouTube"
+        },
+        {
+            "name": "yt_guide_p2_desc",
+            "value": "Connectez-vous via une page web ou un QR code dans « Paramètres → Données et compte ». Une fois connecté, vous pouvez voir vos abonnements, vos playlists et les autres contenus du compte ; le mode invité fonctionne aussi sans connexion."
+        },
+        {
+            "name": "yt_guide_p3_title",
+            "value": "Gestion des données du compte"
+        },
+        {
+            "name": "yt_guide_p3_desc",
+            "value": "Vos identifiants sont stockés uniquement sur cet appareil et ne sont jamais envoyés à des serveurs tiers. Vous pouvez à tout moment vous déconnecter ou activer le mode incognito dans « Données et compte » ; la déconnexion efface les données de votre compte."
+        },
+        {
+            "name": "yt_guide_p4_title",
+            "value": "Fonctionnement des URL de lecture"
+        },
+        {
+            "name": "yt_guide_p4_desc",
+            "value": "Avant la lecture, l'application résout les URL directes du flux vidéo et les fournit au lecteur via un proxy local ; la première lecture peut donc prendre quelques secondes. Sur les réseaux restreints, vous pouvez configurer un proxy HTTP ou SOCKS5 dans « Paramètres → Network »."
+        },
+        {
+            "name": "yt_guide_p5_title",
+            "value": "Qualité et cache"
+        },
+        {
+            "name": "yt_guide_p5_desc",
+            "value": "Dans « Paramètres → Lecture », vous pouvez définir la qualité par défaut, la qualité sur réseau mobile et la durée du cache — économisez des données ou améliorez la qualité selon vos préférences."
+        },
+        {
+            "name": "yt_guide_p6_title",
+            "value": "Téléchargements et fichiers locaux"
+        },
+        {
+            "name": "yt_guide_p6_desc",
+            "value": "Les vidéos peuvent être téléchargées pour être visionnées hors ligne et sont gérées dans l'onglet « Local ». « Effacer toutes les données de l'app » ne supprime jamais vos fichiers téléchargés."
         }
     ]
 }

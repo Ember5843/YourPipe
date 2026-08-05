@@ -2895,6 +2895,70 @@
         {
             "name": "yt_device_login_retry",
             "value": "Try again"
+        },
+        {
+            "name": "yt_option_help",
+            "value": "Help"
+        },
+        {
+            "name": "yt_option_help_subtitle",
+            "value": "Quick guide and basic usage"
+        },
+        {
+            "name": "yt_guide_skip",
+            "value": "Skip"
+        },
+        {
+            "name": "yt_guide_next",
+            "value": "Next"
+        },
+        {
+            "name": "yt_guide_done",
+            "value": "Done"
+        },
+        {
+            "name": "yt_guide_p1_desc",
+            "value": "An open-source YouTube client with local MPV playback and no ads — your data stays on your own device."
+        },
+        {
+            "name": "yt_guide_p2_title",
+            "value": "Sign in to YouTube"
+        },
+        {
+            "name": "yt_guide_p2_desc",
+            "value": "Sign in via web page or QR code under Settings → Data & Account. Once signed in you can see your subscriptions, playlists and other account content; guest mode also works without signing in."
+        },
+        {
+            "name": "yt_guide_p3_title",
+            "value": "Account data management"
+        },
+        {
+            "name": "yt_guide_p3_desc",
+            "value": "Your credentials are stored only on this device and are never uploaded to third-party servers. You can sign out or enable incognito mode at any time under Data & Account; signing out clears your account data."
+        },
+        {
+            "name": "yt_guide_p4_title",
+            "value": "How playback URLs work"
+        },
+        {
+            "name": "yt_guide_p4_desc",
+            "value": "Before playback, the app resolves the video's direct stream URLs and serves them to the player through a local proxy, so the first play may take a few seconds. On restricted networks you can configure an HTTP or SOCKS5 proxy under Settings → Network."
+        },
+        {
+            "name": "yt_guide_p5_title",
+            "value": "Quality and cache"
+        },
+        {
+            "name": "yt_guide_p5_desc",
+            "value": "Under Settings → Playback you can set the default quality, mobile-network quality and cache duration — save data or boost quality as you prefer."
+        },
+        {
+            "name": "yt_guide_p6_title",
+            "value": "Downloads and local files"
+        },
+        {
+            "name": "yt_guide_p6_desc",
+            "value": "Videos can be downloaded for offline viewing and are managed on the Local tab. \"Clear all data\" never deletes your downloaded files."
         }
     ]
 }

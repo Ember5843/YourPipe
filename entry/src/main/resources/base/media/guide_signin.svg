@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="240" viewBox="0 0 360 240">
+  <rect x="60" y="40" width="240" height="150" rx="16" fill="#F1680D" opacity="0.12"/>
+  <rect x="60" y="40" width="240" height="150" rx="16" fill="none" stroke="#F1680D" stroke-width="4"/>
+  <rect x="60" y="40" width="240" height="30" rx="16" fill="#F1680D" opacity="0.25"/>
+  <circle cx="80" cy="55" r="5" fill="#F1680D"/>
+  <circle cx="98" cy="55" r="5" fill="#F1680D" opacity="0.6"/>
+  <circle cx="116" cy="55" r="5" fill="#F1680D" opacity="0.35"/>
+  <rect x="140" y="90" width="80" height="56" rx="14" fill="#F1680D"/>
+  <path d="M172 104 L196 118 L172 132 Z" fill="#FFFFFF"/>
+  <circle cx="262" cy="150" r="22" fill="#FFFFFF" stroke="#F1680D" stroke-width="4"/>
+  <circle cx="258" cy="144" r="7" fill="none" stroke="#F1680D" stroke-width="4"/>
+  <path d="M262 148 L274 160 M268 156 L274 152" stroke="#F1680D" stroke-width="4" stroke-linecap="round"/>
+  <rect x="88" y="96" width="40" height="8" rx="4" fill="#F1680D" opacity="0.4"/>
+  <rect x="88" y="112" width="52" height="8" rx="4" fill="#F1680D" opacity="0.25"/>
+  <rect x="88" y="128" width="34" height="8" rx="4" fill="#F1680D" opacity="0.25"/>
+</svg>

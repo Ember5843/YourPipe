@@ -2895,6 +2895,70 @@
         {
             "name": "yt_device_login_retry",
             "value": "Try again"
+        },
+        {
+            "name": "yt_option_help",
+            "value": "Hilfe"
+        },
+        {
+            "name": "yt_option_help_subtitle",
+            "value": "Kurzanleitung und grundlegende Nutzung"
+        },
+        {
+            "name": "yt_guide_skip",
+            "value": "Überspringen"
+        },
+        {
+            "name": "yt_guide_next",
+            "value": "Weiter"
+        },
+        {
+            "name": "yt_guide_done",
+            "value": "Fertig"
+        },
+        {
+            "name": "yt_guide_p1_desc",
+            "value": "Ein Open-Source-YouTube-Client mit lokaler MPV-Wiedergabe und ohne Werbung – deine Daten bleiben auf deinem eigenen Gerät."
+        },
+        {
+            "name": "yt_guide_p2_title",
+            "value": "Bei YouTube anmelden"
+        },
+        {
+            "name": "yt_guide_p2_desc",
+            "value": "Melde dich unter „Einstellungen → Daten & Konto“ per Webseite oder QR-Code an. Nach der Anmeldung kannst du deine Abos, Playlists und andere Kontoinhalte sehen; der Gastmodus funktioniert auch ohne Anmeldung."
+        },
+        {
+            "name": "yt_guide_p3_title",
+            "value": "Kontodatenverwaltung"
+        },
+        {
+            "name": "yt_guide_p3_desc",
+            "value": "Deine Anmeldedaten werden nur auf diesem Gerät gespeichert und niemals auf Server von Drittanbietern hochgeladen. Du kannst dich jederzeit unter „Daten & Konto“ abmelden oder den Inkognito-Modus aktivieren; beim Abmelden werden deine Kontodaten gelöscht."
+        },
+        {
+            "name": "yt_guide_p4_title",
+            "value": "So funktionieren die Wiedergabe-URLs"
+        },
+        {
+            "name": "yt_guide_p4_desc",
+            "value": "Vor der Wiedergabe ermittelt die App die direkten Stream-URLs des Videos und stellt sie dem Player über einen lokalen Proxy bereit, daher kann die erste Wiedergabe einige Sekunden dauern. In eingeschränkten Netzwerken kannst du unter „Einstellungen → Network“ einen HTTP- oder SOCKS5-Proxy konfigurieren."
+        },
+        {
+            "name": "yt_guide_p5_title",
+            "value": "Qualität und Cache"
+        },
+        {
+            "name": "yt_guide_p5_desc",
+            "value": "Unter „Einstellungen → Wiedergabe“ kannst du die Standardqualität, die Qualität im Mobilfunknetz und die Cache-Dauer einstellen – spare Daten oder erhöhe die Qualität, ganz nach Bedarf."
+        },
+        {
+            "name": "yt_guide_p6_title",
+            "value": "Downloads und lokale Dateien"
+        },
+        {
+            "name": "yt_guide_p6_desc",
+            "value": "Videos können zum Offline-Ansehen heruntergeladen und auf dem Tab „Lokal“ verwaltet werden. „Gesamte App-Daten löschen“ löscht deine heruntergeladenen Dateien niemals."
         }
     ]
 }

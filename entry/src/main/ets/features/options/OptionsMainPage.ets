@@ -24,6 +24,7 @@ interface OptionsMainPageParams {
   onNetworkClick: () => void;
   onAppearanceClick: () => void;
   onLogClick: () => void;
+  onHelpClick: () => void;
   onRecoveryClick: () => void;
   onAboutClick: () => void;
 }
@@ -47,6 +48,7 @@ export struct OptionsMainPage {
     onNetworkClick: () => {},
     onAppearanceClick: () => {},
     onLogClick: () => {},
+    onHelpClick: () => {},
     onRecoveryClick: () => {},
     onAboutClick: () => {}
   };
@@ -242,6 +244,18 @@ export struct OptionsMainPage {
 
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_option_group_others') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          OptionItem({
+            icon: $r('sys.symbol.questionmark_circle'),
+            title: $r('app.string.yt_option_help'),
+            subtitle: $r('app.string.yt_option_help_subtitle'),
+            iconColor: this.themePrimary,
+            clickEffectEnabled: this.params.clickEffectEnabled,
+            onClickAction: this.params.onHelpClick
+          })
         }
         .padding({ left: 0, right: 0 })
 

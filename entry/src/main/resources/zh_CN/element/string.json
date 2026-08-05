@@ -2895,6 +2895,70 @@
         {
             "name": "yt_device_login_retry",
             "value": "重试"
+        },
+        {
+            "name": "yt_option_help",
+            "value": "帮助"
+        },
+        {
+            "name": "yt_option_help_subtitle",
+            "value": "新手引导与基础使用说明"
+        },
+        {
+            "name": "yt_guide_skip",
+            "value": "跳过"
+        },
+        {
+            "name": "yt_guide_next",
+            "value": "下一页"
+        },
+        {
+            "name": "yt_guide_done",
+            "value": "完成"
+        },
+        {
+            "name": "yt_guide_p1_desc",
+            "value": "开源的 YouTube 第三方客户端：本地 MPV 播放、无广告，数据只保存在你自己的设备上。"
+        },
+        {
+            "name": "yt_guide_p2_title",
+            "value": "登录 YouTube 账户"
+        },
+        {
+            "name": "yt_guide_p2_desc",
+            "value": "在「设置 → 数据与账户」中通过网页或扫码登录。登录后可以查看你的订阅和播放列表等账户内容；不登录也可以以访客身份正常使用。"
+        },
+        {
+            "name": "yt_guide_p3_title",
+            "value": "账户数据管理"
+        },
+        {
+            "name": "yt_guide_p3_desc",
+            "value": "登录凭据只保存在本机，不会上传到任何第三方服务器。你可以随时在「数据与账户」中退出登录或开启隐身模式，退出后账户数据将被清除。"
+        },
+        {
+            "name": "yt_guide_p4_title",
+            "value": "播放地址获取"
+        },
+        {
+            "name": "yt_guide_p4_desc",
+            "value": "播放前应用会解析视频的直接地址，并通过本地代理提供给播放器，因此首次播放可能需要几秒钟。网络受限时可在「设置 → 网络」中配置 HTTP 或 SOCKS5 代理。"
+        },
+        {
+            "name": "yt_guide_p5_title",
+            "value": "清晰度与缓存"
+        },
+        {
+            "name": "yt_guide_p5_desc",
+            "value": "在「设置 → 播放」中可以设置默认清晰度、移动网络清晰度和缓存时长，按需节省流量或提升画质。"
+        },
+        {
+            "name": "yt_guide_p6_title",
+            "value": "下载与本地"
+        },
+        {
+            "name": "yt_guide_p6_desc",
+            "value": "支持把视频下载到本地离线观看，下载内容在「本地」页管理。「清除全部数据」不会删除你已下载的文件。"
         }
     ]
 }

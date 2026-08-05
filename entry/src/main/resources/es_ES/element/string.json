@@ -2895,6 +2895,70 @@
         {
             "name": "yt_device_login_retry",
             "value": "Try again"
+        },
+        {
+            "name": "yt_option_help",
+            "value": "Ayuda"
+        },
+        {
+            "name": "yt_option_help_subtitle",
+            "value": "Guía rápida y uso básico"
+        },
+        {
+            "name": "yt_guide_skip",
+            "value": "Omitir"
+        },
+        {
+            "name": "yt_guide_next",
+            "value": "Siguiente"
+        },
+        {
+            "name": "yt_guide_done",
+            "value": "Listo"
+        },
+        {
+            "name": "yt_guide_p1_desc",
+            "value": "Un cliente de YouTube de código abierto con reproducción MPV local y sin anuncios: tus datos permanecen en tu propio dispositivo."
+        },
+        {
+            "name": "yt_guide_p2_title",
+            "value": "Iniciar sesión en YouTube"
+        },
+        {
+            "name": "yt_guide_p2_desc",
+            "value": "Inicia sesión desde la página web o con un código QR en «Configuración → Datos y cuenta». Una vez iniciada la sesión podrás ver tus suscripciones, listas de reproducción y demás contenido de la cuenta; el modo invitado también funciona sin iniciar sesión."
+        },
+        {
+            "name": "yt_guide_p3_title",
+            "value": "Gestión de datos de la cuenta"
+        },
+        {
+            "name": "yt_guide_p3_desc",
+            "value": "Tus credenciales se guardan solo en este dispositivo y nunca se suben a servidores de terceros. Puedes cerrar sesión o activar el modo incógnito en cualquier momento en «Datos y cuenta»; al cerrar sesión se borran los datos de tu cuenta."
+        },
+        {
+            "name": "yt_guide_p4_title",
+            "value": "Cómo funcionan las URL de reproducción"
+        },
+        {
+            "name": "yt_guide_p4_desc",
+            "value": "Antes de la reproducción, la app resuelve las URL directas del vídeo y las sirve al reproductor a través de un proxy local, por lo que la primera reproducción puede tardar unos segundos. En redes restringidas puedes configurar un proxy HTTP o SOCKS5 en «Configuración → Network»."
+        },
+        {
+            "name": "yt_guide_p5_title",
+            "value": "Calidad y caché"
+        },
+        {
+            "name": "yt_guide_p5_desc",
+            "value": "En «Configuración → Reproducción» puedes configurar la calidad predeterminada, la calidad en redes móviles y la duración de la caché: ahorra datos o mejora la calidad según prefieras."
+        },
+        {
+            "name": "yt_guide_p6_title",
+            "value": "Descargas y archivos locales"
+        },
+        {
+            "name": "yt_guide_p6_desc",
+            "value": "Los vídeos se pueden descargar para verlos sin conexión y se gestionan en la pestaña «Local». «Borrar todos los datos de la app» nunca elimina tus archivos descargados."
         }
     ]
 }
