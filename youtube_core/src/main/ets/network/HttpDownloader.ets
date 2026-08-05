@@ -224,7 +224,22 @@ export class HttpDownloader {
       options.usingProxy = proxy;
       return;
     }
-    // socks5 reserved — treat as direct until platform support is product-ready
+    // SOCKS5: route through the loopback HTTP CONNECT bridge. The bridge owns
+    // the native SOCKS5 tunnel (host/port/auth), so the http stack only sees
+    // 127.0.0.1. No port (bridge not started) → stay direct.
+    if (snap.kind === 'socks5') {
+      const localPort = snap.socks5LocalPort;
+      if (localPort && localPort > 0) {
+        options.usingProxy = {
+          host: '127.0.0.1',
+          port: localPort,
+          exclusionList: []
+        };
+      } else {
+        options.usingProxy = false;
+      }
+      return;
+    }
     options.usingProxy = false;
   }
 

@@ -2774,7 +2774,7 @@
         },
         {
             "name": "yt_proxy_enable",
-            "value": "使用 HTTP 代理"
+            "value": "使用代理"
         },
         {
             "name": "yt_proxy_enable_subtitle",
@@ -2797,8 +2797,8 @@
             "value": "SOCKS5"
         },
         {
-            "name": "yt_proxy_socks5_soon",
-            "value": "即将支持"
+            "name": "yt_proxy_type_socks5_subtitle",
+            "value": "SOCKS5 CONNECT"
         },
         {
             "name": "yt_proxy_server",

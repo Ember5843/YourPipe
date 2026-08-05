@@ -181,7 +181,17 @@ function createYoutubePostSession(url: string): rcp.Session {
     transfer: { timeout: { connectMs: TIMEOUT_MS, transferMs: TIMEOUT_MS } }
   };
   const snap = HttpProxyOptions.getSnapshot();
-  if (snap.kind === 'http' && HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
+  if (snap.kind === 'socks5' && HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
+    const localPort = snap.socks5LocalPort;
+    if (localPort && localPort > 0) {
+      config.proxy = {
+        url: `http://127.0.0.1:${localPort}`,
+        createTunnel: 'always'
+      };
+    } else {
+      config.proxy = 'no-proxy';
+    }
+  } else if (snap.kind === 'http' && HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
     const auth = snap.username
       ? `${encodeURIComponent(snap.username)}:${encodeURIComponent(snap.password || '')}@`
       : '';

@@ -11,6 +11,8 @@ export interface AppHttpProxySnapshot {
   username: string;
   password: string;
   exclusionList: string[];
+  /** Loopback HTTP CONNECT bridge port when kind==='socks5'. Absent/0 = direct. */
+  socks5LocalPort?: number;
 }
 
 export type AppHttpProxyProvider = () => AppHttpProxySnapshot | undefined;

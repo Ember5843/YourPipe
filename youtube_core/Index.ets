@@ -55,6 +55,7 @@ export * from './src/main/ets/common/SearchResultModel';
 export * from './src/main/ets/common/Utils';
 export * from './src/main/ets/network/HttpDownloader';
 export * from './src/main/ets/network/HttpProxyOptions';
+export * from './src/main/ets/network/Socks5Bridge';
 export * from './src/main/ets/common/SearchQueryHandlerFactory';
 export * from './src/main/ets/common/YoutubeSearchQueryHanderFactory';
 export * from './src/main/ets/common/YTCoreLogger';

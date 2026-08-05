@@ -3,6 +3,7 @@ import type { MediaInfo } from '@yourpipe/libmpv-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
 import { VideoHwCaps } from './VideoHwCaps';
+import { HttpProxyOptions } from 'youtube_core';
 
 const TAG: string = '[PlayerLog][MpvPlaybackEngine]';
 
@@ -221,6 +222,38 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // Surface sizing is handled through setVideoSurfaceSize.
   }
 
+  /**
+   * Apply mpv network-proxy for direct MPV fetches (HLS masters/segments).
+   * http kind talks to the upstream proxy directly; socks5 routes through the
+   * loopback HTTP CONNECT bridge (127.0.0.1) which owns the native SOCKS5
+   * tunnel. Loopback / exclusion targets stay direct (empty proxy URL).
+   */
+  private applyNetworkProxy(ctrl: MpvPlayerController, url: string): void {
+    try {
+      const snap = HttpProxyOptions.getSnapshot();
+      let proxyUrl = '';
+      if (HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
+        if (snap.kind === 'http') {
+          const auth = snap.username
+            ? `${encodeURIComponent(snap.username)}:${encodeURIComponent(snap.password || '')}@`
+            : '';
+          proxyUrl = `http://${auth}${snap.host.trim()}:${snap.port}`;
+        } else if (snap.kind === 'socks5') {
+          const localPort = snap.socks5LocalPort;
+          if (localPort && localPort > 0) {
+            proxyUrl = `http://127.0.0.1:${localPort}`;
+          }
+        }
+      }
+      ctrl.setProperty('network-proxy', proxyUrl);
+      if (proxyUrl.length > 0) {
+        Logger.info(TAG, `network-proxy on kind=${snap.kind} url=${proxyUrl.length > 8 ? proxyUrl.substring(0, 8) + '***' : proxyUrl}`);
+      }
+    } catch (e) {
+      Logger.warn(TAG, `applyNetworkProxy failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   load(source: string, startPos: number): boolean {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return false;
@@ -276,6 +309,11 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setProperty('demuxer-readahead-secs', `${this.engineConfig.mpvDemuxerReadaheadSecs ?? 8}`);
       ctrl.setProperty('cache-secs', `${this.engineConfig.mpvCacheSecs ?? 10}`);
     }
+
+    // HLS / any direct MPV network fetch must honor the app proxy. Local loopback
+    // (edl / local DASH sessions) is bypassed by shouldBypass, so this never
+    // affects the LocalProxyServer path.
+    this.applyNetworkProxy(ctrl, this.sourceUrl);
 
     try {
       const isEdl = this.sourceUrl.startsWith('edl://');

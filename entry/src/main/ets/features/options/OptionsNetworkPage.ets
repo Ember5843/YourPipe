@@ -1,11 +1,11 @@
 import { http } from '@kit.NetworkKit';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
-import { OptionItem } from '../../common/components/OptionItem';
+import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
-import { customAnimationUtil } from '../../common/AnimationUtil';
 import { UIConfig } from '../../common/AppState';
 import { HttpDownloader } from 'youtube_core';
+import { SelectOption } from 'mediaservice';
 import { AppLog } from '../../common/AppLog';
 
 const logger = AppLog.getInstance('OptionsNetworkPage');
@@ -35,16 +35,19 @@ export struct OptionsNetworkPage {
     this.params.onConfigChanged(this.networkProxyConfig);
   }
 
+  private getProxyKindOptions(): SelectOption[] {
+    return [
+      { value: $r('app.string.yt_proxy_type_http') } as SelectOption,
+      { value: $r('app.string.yt_proxy_type_socks5') } as SelectOption
+    ];
+  }
+
   private async runProxyTest(): Promise<void> {
     if (this.testing) {
       return;
     }
     if (!this.networkProxyConfig.enabled) {
       this.testMessage = $r('app.string.yt_proxy_test_disabled');
-      return;
-    }
-    if (this.networkProxyConfig.kind === 'socks5') {
-      this.testMessage = $r('app.string.yt_proxy_socks5_soon');
       return;
     }
     if (!this.networkProxyConfig.isReady()) {
@@ -109,57 +112,24 @@ export struct OptionsNetworkPage {
         .borderRadius(16)
         .clip(true)
 
-        ListItem() {
-          PlaybackSectionTitle({ title: $r('app.string.yt_proxy_type') })
-        }
-        .padding({ left: 0, right: 0 })
-
         ListItemGroup() {
           ListItem() {
-            OptionItem({
-              icon: $r('sys.symbol.wifi'),
-              title: $r('app.string.yt_proxy_type_http'),
-              subtitle: $r('app.string.yt_proxy_type_http_subtitle'),
-              showChevron: false,
-              iconColor: this.themePrimary,
-              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+            PlaybackSelectRow({
+              title: $r('app.string.yt_proxy_type'),
+              options: this.getProxyKindOptions(),
+              selectedIndex: this.networkProxyConfig.kind === 'socks5' ? 1 : 0,
+              fontColor: this.params.themeColor,
               transparentBackground: true,
-              onClickAction: () => {
-                this.networkProxyConfig.kind = 'http';
+              onChange: (index: number) => {
+                this.networkProxyConfig.kind = index === 1 ? 'socks5' : 'http';
                 this.persist();
               }
             })
-          }
-
-          ListItem() {
-            Row({ space: 12 }) {
-              SymbolGlyph($r('sys.symbol.lock_shield'))
-                .fontSize(24)
-                .fontColor([$r('app.color.yourtube_icon_hint')])
-                .opacity(0.45)
-              Column() {
-                Text($r('app.string.yt_proxy_type_socks5'))
-                  .fontWeight(FontWeight.Medium)
-                  .fontSize(16)
-                  .fontColor($r('app.color.yourtube_text_quaternary'))
-                Text($r('app.string.yt_proxy_socks5_soon'))
-                  .fontSize(13)
-                  .fontColor($r('app.color.yourtube_text_quaternary'))
-                  .margin({ top: 4 })
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-            }
-            .width('100%')
-            .constraintSize({ minHeight: 56 })
-            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-            .opacity(0.7)
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .borderRadius(16)
         .clip(true)
-        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_proxy_server') })
@@ -168,59 +138,45 @@ export struct OptionsNetworkPage {
 
         ListItemGroup() {
           ListItem() {
-            Column({ space: 8 }) {
-              Text($r('app.string.yt_proxy_host'))
-                .fontSize(13)
-                .fontColor($r('app.color.yourtube_text_quaternary'))
-                .width('100%')
-              TextInput({
-                text: this.networkProxyConfig.host,
-                placeholder: $r('app.string.yt_proxy_host_placeholder')
+            TextInput({
+              text: this.networkProxyConfig.host,
+              placeholder: $r('app.string.yt_proxy_host')
+            })
+              .width('100%')
+              .height(56)
+              .fontSize(15)
+              .fontColor($r('app.color.yourtube_text_primary'))
+              .padding({ left: 16, right: 16 })
+              .backgroundColor(Color.Transparent)
+              .onChange((v: string) => {
+                this.networkProxyConfig.host = v.trim();
               })
-                .width('100%')
-                .height(44)
-                .fontSize(15)
-                .backgroundColor(Color.Transparent)
-                .onChange((v: string) => {
-                  this.networkProxyConfig.host = v.trim();
-                })
-                .onSubmit(() => {
-                  this.persist();
-                })
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-            .alignItems(HorizontalAlign.Start)
+              .onSubmit(() => {
+                this.persist();
+              })
           }
 
           ListItem() {
-            Column({ space: 8 }) {
-              Text($r('app.string.yt_proxy_port'))
-                .fontSize(13)
-                .fontColor($r('app.color.yourtube_text_quaternary'))
-                .width('100%')
-              TextInput({
-                text: `${this.networkProxyConfig.port}`,
-                placeholder: '7890'
+            TextInput({
+              text: `${this.networkProxyConfig.port}`,
+              placeholder: $r('app.string.yt_proxy_port')
+            })
+              .width('100%')
+              .height(56)
+              .fontSize(15)
+              .fontColor($r('app.color.yourtube_text_primary'))
+              .padding({ left: 16, right: 16 })
+              .type(InputType.Number)
+              .backgroundColor(Color.Transparent)
+              .onChange((v: string) => {
+                const n = parseInt(v, 10);
+                if (Number.isFinite(n)) {
+                  this.networkProxyConfig.port = Math.max(1, Math.min(65535, n));
+                }
               })
-                .width('100%')
-                .height(44)
-                .fontSize(15)
-                .type(InputType.Number)
-                .backgroundColor(Color.Transparent)
-                .onChange((v: string) => {
-                  const n = parseInt(v, 10);
-                  if (Number.isFinite(n)) {
-                    this.networkProxyConfig.port = Math.max(1, Math.min(65535, n));
-                  }
-                })
-                .onSubmit(() => {
-                  this.persist();
-                })
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-            .alignItems(HorizontalAlign.Start)
+              .onSubmit(() => {
+                this.persist();
+              })
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
@@ -235,56 +191,42 @@ export struct OptionsNetworkPage {
 
         ListItemGroup() {
           ListItem() {
-            Column({ space: 8 }) {
-              Text($r('app.string.yt_proxy_username'))
-                .fontSize(13)
-                .fontColor($r('app.color.yourtube_text_quaternary'))
-                .width('100%')
-              TextInput({
-                text: this.networkProxyConfig.username,
-                placeholder: $r('app.string.yt_proxy_optional_placeholder')
+            TextInput({
+              text: this.networkProxyConfig.username,
+              placeholder: $r('app.string.yt_proxy_username')
+            })
+              .width('100%')
+              .height(56)
+              .fontSize(15)
+              .fontColor($r('app.color.yourtube_text_primary'))
+              .padding({ left: 16, right: 16 })
+              .backgroundColor(Color.Transparent)
+              .onChange((v: string) => {
+                this.networkProxyConfig.username = v;
               })
-                .width('100%')
-                .height(44)
-                .fontSize(15)
-                .backgroundColor(Color.Transparent)
-                .onChange((v: string) => {
-                  this.networkProxyConfig.username = v;
-                })
-                .onSubmit(() => {
-                  this.persist();
-                })
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-            .alignItems(HorizontalAlign.Start)
+              .onSubmit(() => {
+                this.persist();
+              })
           }
 
           ListItem() {
-            Column({ space: 8 }) {
-              Text($r('app.string.yt_proxy_password'))
-                .fontSize(13)
-                .fontColor($r('app.color.yourtube_text_quaternary'))
-                .width('100%')
-              TextInput({
-                text: this.networkProxyConfig.password,
-                placeholder: $r('app.string.yt_proxy_optional_placeholder')
+            TextInput({
+              text: this.networkProxyConfig.password,
+              placeholder: $r('app.string.yt_proxy_password')
+            })
+              .width('100%')
+              .height(56)
+              .fontSize(15)
+              .fontColor($r('app.color.yourtube_text_primary'))
+              .padding({ left: 16, right: 16 })
+              .type(InputType.Password)
+              .backgroundColor(Color.Transparent)
+              .onChange((v: string) => {
+                this.networkProxyConfig.password = v;
               })
-                .width('100%')
-                .height(44)
-                .fontSize(15)
-                .type(InputType.Password)
-                .backgroundColor(Color.Transparent)
-                .onChange((v: string) => {
-                  this.networkProxyConfig.password = v;
-                })
-                .onSubmit(() => {
-                  this.persist();
-                })
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-            .alignItems(HorizontalAlign.Start)
+              .onSubmit(() => {
+                this.persist();
+              })
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))

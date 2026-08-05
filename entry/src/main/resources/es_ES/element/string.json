@@ -2774,7 +2774,7 @@
         },
         {
             "name": "yt_proxy_enable",
-            "value": "Use HTTP proxy"
+            "value": "Use proxy"
         },
         {
             "name": "yt_proxy_enable_subtitle",
@@ -2797,8 +2797,8 @@
             "value": "SOCKS5"
         },
         {
-            "name": "yt_proxy_socks5_soon",
-            "value": "Coming soon"
+            "name": "yt_proxy_type_socks5_subtitle",
+            "value": "SOCKS5 CONNECT"
         },
         {
             "name": "yt_proxy_server",
