@@ -60,7 +60,7 @@ class DescriptionSegment {
 
 @Component
 export struct VideoDetails {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop @Watch('onItemChanged') item: VideoItem;
   @Prop videoDescription: string = '';
   @Prop videoDescriptionError: string = '';

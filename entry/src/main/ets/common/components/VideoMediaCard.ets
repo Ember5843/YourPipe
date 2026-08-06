@@ -27,7 +27,7 @@ interface ContextMenuItem {
 }
 
 const SYMBOL_FONT_SIZE: number = 16;
-const ACTION_BTN_HEIGHT: number = 24;
+const ACTION_BTN_HEIGHT: number = 28;
 const ACTION_BTN_RESERVE: number = 28;
 
 /**
@@ -38,7 +38,7 @@ const ACTION_BTN_RESERVE: number = 28;
  */
 @Component
 export struct VideoMediaCard {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop video: VideoItem;
   /** 'list' | 'grid' */
   @Prop layoutMode: string = 'list';
@@ -315,7 +315,7 @@ export struct VideoMediaCard {
   @Builder
   ActionButton() {
     Button(this.getActionLabel())
-      .fontSize(10)
+      .fontSize(12)
       .fontColor($r('app.color.yourtube_text_inverse'))
       .backgroundColor(this.getActionColor())
       .height(ACTION_BTN_HEIGHT)

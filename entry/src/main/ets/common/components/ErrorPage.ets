@@ -2,7 +2,7 @@ import { UIConfig } from '../AppState';
 
 @Component
 export struct ErrorPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @State errorMessage: ResourceStr = '';
   onRetry?: () => void = undefined;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
@@ -44,7 +44,7 @@ export struct ErrorPage {
           Button() {
             Row() {
               SymbolGlyph($r('sys.symbol.arrow_clockwise'))
-                .fontSize(18)
+                .fontSize(16)
                 .fontColor([Color.White])
                 .margin({ right: 6 })
               Text($r('app.string.yt_action_retry'))
@@ -56,9 +56,9 @@ export struct ErrorPage {
             .alignItems(VerticalAlign.Center)
           }
           .width(120)
-          .height(40)
+          .height(36)
           .backgroundColor(this.themePrimary)
-          .borderRadius(20)
+          .borderRadius(18)
           .onClick(() => {
             if (this.onRetry) {
               this.onRetry();

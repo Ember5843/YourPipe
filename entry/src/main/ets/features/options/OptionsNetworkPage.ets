@@ -2,6 +2,7 @@ import { http } from '@kit.NetworkKit';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
+import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
 import { UIConfig } from '../../common/AppState';
 import { HttpDownloader } from 'youtube_core';
@@ -17,12 +18,12 @@ interface OptionsNetworkPageParams {
 
 @Component
 export struct OptionsNetworkPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('networkProxyConfig') networkProxyConfig: NetworkProxyConfig = new NetworkProxyConfig();
 
   @Prop params: OptionsNetworkPageParams = {
-    themeColor: '#F1680D',
+    themeColor: '#E53935',
     onConfigChanged: () => {}
   };
 
@@ -109,7 +110,7 @@ export struct OptionsNetworkPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
         ListItemGroup() {
@@ -128,7 +129,7 @@ export struct OptionsNetworkPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
         ListItem() {
@@ -180,7 +181,7 @@ export struct OptionsNetworkPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
@@ -230,7 +231,7 @@ export struct OptionsNetworkPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 

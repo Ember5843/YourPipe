@@ -43,7 +43,8 @@ import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
 import { DeviceQrLoginPage } from '../features/auth/DeviceQrLoginPage';
 import { SabrPoTokenWebRuntime } from '../features/player/SabrPoTokenWebRuntime';
 import { AuthStateHelper } from '../common/AuthStateHelper';
-import { customAnimationUtil } from '../common/AnimationUtil';
+import { customAnimationUtil } from '../common/AnimationUtil';
+import { ThemeColorUtil } from '../common/ThemeColorUtil';
 import { LanguageManager } from '../common/LanguageManager';
 import { SearchLocaleManager } from '../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../common/FeedServiceProvider';
@@ -80,7 +81,7 @@ import { TipsDialog, curves } from '@kit.ArkUI';
 import { UIConfig, YourtubeDarkMode } from '../common/AppState';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LogPage } from '../common/components/LogPage';
-import { AboutPage } from '../common/components/AboutPage';
+import { AboutPage, OpenSourcePage, AiModelsPage, ChangelogPage } from '../common/components/AboutPage';
 import { buildTitleMenu, buildYourTubeTitleBar, buildSheetTitleBar } from '../common/components/HdsTitleBar';
 import { MaterialUtil } from '../common/utils/MaterialUtil';
 import {
@@ -1690,7 +1691,7 @@ struct Index {
       SubscriptionScrollCoordinator.scroller])
     .bindSheet($$this.showOptions, this.OptionsPanel(this.optionsDepth), {
       detents: [SheetSize.LARGE],
-      dragBar: false,
+      dragBar: true,
       backgroundColor: $r('sys.color.ohos_id_color_dialog_bg'),
       preferType: SheetType.CENTER,
       showClose: false,
@@ -1942,43 +1943,28 @@ struct Index {
     }
   }
 
+
   @Builder OptionsPanel(depth: number) {
     HdsNavigation(this.optionsNavStack) {
-      Column() {
-        Row() {
-          Rect()
-            .width(42)
-            .height(4)
-            .fill($r('app.color.yourtube_divider'))
-            .radius(2)
-        }
+      OptionsMainPage({
+          params: {
+            clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+            appLangItems: this.appLangItems,
+            contentLangItems: this.contentLangItems,
+            contentCountryItems: this.contentCountryItems,
+            onDataAccountClick: () => { this.pushOptionsPath('data_account'); },
+            onLanguageClick: () => { this.pushOptionsPath('language'); },
+            onPlaybackClick: () => { this.pushOptionsPath('playback'); },
+            onNetworkClick: () => { this.pushOptionsPath('network'); },
+            onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
+            onLogClick: () => { this.pushOptionsPath('log_page'); },
+            onHelpClick: () => { this.pushOptionsPath('help_page'); },
+            onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
+            onAboutClick: () => { this.pushOptionsPath('about_page'); }
+          }
+        })
         .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 8, bottom: 6 })
-
-        OptionsMainPage({
-            params: {
-              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
-              appLangItems: this.appLangItems,
-              contentLangItems: this.contentLangItems,
-              contentCountryItems: this.contentCountryItems,
-              onDataAccountClick: () => { this.pushOptionsPath('data_account'); },
-              onLanguageClick: () => { this.pushOptionsPath('language'); },
-              onPlaybackClick: () => { this.pushOptionsPath('playback'); },
-              onNetworkClick: () => { this.pushOptionsPath('network'); },
-              onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
-              onLogClick: () => { this.pushOptionsPath('log_page'); },
-              onHelpClick: () => { this.pushOptionsPath('help_page'); },
-              onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
-              onAboutClick: () => { this.pushOptionsPath('about_page'); }
-            }
-          })
-          .width('100%')
-          .layoutWeight(1)
-      }
-      .width('100%')
-      .height('100%')
-      .backgroundColor(Color.Transparent)
+        .height('100%')
     }
     .mode(NavigationMode.Stack)
     .navDestination(this.OptionsPageMap)
@@ -1987,12 +1973,16 @@ struct Index {
       title: $r('app.string.yt_option_title'),
       onBack: depth > 0 ? () => {
         this.popOptionsPath();
-      } : undefined
+      } : undefined,
+      menus: [
+        buildTitleMenu($r('sys.symbol.xmark'), $r('app.string.yt_action_close'), () => {
+          this.showOptions = false;
+        })
+      ]
     }))
     .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
     .clip(true)
   }
-
 
 
   @Builder
@@ -2012,8 +2002,8 @@ struct Index {
         })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_help'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_help'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2039,8 +2029,8 @@ struct Index {
           })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_section_language_region'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_section_language_region'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2063,8 +2053,8 @@ struct Index {
         })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_data_account'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_data_account'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2100,8 +2090,8 @@ struct Index {
         })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_device_qr_sign_in'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_device_qr_sign_in'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2136,8 +2126,8 @@ struct Index {
         })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_google_web_sign_in_title'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_google_web_sign_in_title'),
         onBack: () => {
           if (this.webViewLoginBackHandler && this.webViewLoginBackHandler()) {
             return;
@@ -2166,8 +2156,8 @@ struct Index {
           })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_appearance'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_appearance'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2189,8 +2179,8 @@ struct Index {
         })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_network'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_network'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2237,8 +2227,8 @@ struct Index {
         })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_log_title'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_log_title'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2251,10 +2241,64 @@ struct Index {
     } else if (name === 'about_page') {
       HdsNavDestination() {
         AboutPage({
-          onBack: () => { this.popOptionsPath(); }
+          onNavigate: (subPage: string) => { this.pushOptionsPath(subPage); }
         })
       }
-      .hideTitleBar(true)
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_about'),
+        onBack: () => {
+          this.popOptionsPath();
+        }
+      }))
+      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .onBackPressed(() => {
+        this.popOptionsPath();
+        return true;
+      })
+    } else if (name === 'about_open_source') {
+      HdsNavDestination() {
+        OpenSourcePage()
+      }
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_about_open_source'),
+        onBack: () => {
+          this.popOptionsPath();
+        }
+      }))
+      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .onBackPressed(() => {
+        this.popOptionsPath();
+        return true;
+      })
+    } else if (name === 'about_ai_models') {
+      HdsNavDestination() {
+        AiModelsPage()
+      }
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_about_ai_models'),
+        onBack: () => {
+          this.popOptionsPath();
+        }
+      }))
+      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .onBackPressed(() => {
+        this.popOptionsPath();
+        return true;
+      })
+    } else if (name === 'about_changelog') {
+      HdsNavDestination() {
+        ChangelogPage()
+      }
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_about_changelog'),
+        onBack: () => {
+          this.popOptionsPath();
+        }
+      }))
       .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
       .onBackPressed(() => {
         this.popOptionsPath();
@@ -2272,8 +2316,8 @@ struct Index {
           })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_section_playback'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_section_playback'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2293,8 +2337,8 @@ struct Index {
           })
       }
       .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_recovery'),
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_recovery'),
         onBack: () => {
           this.popOptionsPath();
         }
@@ -2323,26 +2367,31 @@ struct Index {
   }
 
   @Builder TabBarBuilder(iconRes: Resource, label: ResourceStr, index: number) {
-    Column({ space: 3 }) {
-      SymbolGlyph(iconRes)
-        .fontSize(this.activeTabIndex === index ? 23 : 21)
-        .fontColor([this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary')])
-        .symbolEffect(customAnimationUtil.isIconEffect(this.uiConfig), this.activeTabIndex === index)
-
-      Text(label)
-        .fontSize(10)
-        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary'))
-        .fontWeight(this.activeTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-    }
-    .width(70)
-    .height(54)
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
-    .borderRadius(18)
-    .backgroundColor(Color.Transparent)
-    .scale({ x: this.activeTabIndex === index ? 1.0 : 0.94, y: this.activeTabIndex === index ? 1.0 : 0.94 })
+    Column({ space: 2 }) {
+      SymbolGlyph(iconRes)
+        .fontSize(24)
+        .fontColor([this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary')])
+        .symbolEffect(customAnimationUtil.isIconEffect(this.uiConfig), this.activeTabIndex === index)
+
+      Text(label)
+        .fontSize(11)
+        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary'))
+        .fontWeight(this.activeTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width(70)
+    .height(54)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .borderRadius(18)
+    .backgroundColor(this.activeTabIndex === index ?
+      ThemeColorUtil.selectedBackground(this.themePrimary) : Color.Transparent)
+    .shadow(this.activeTabIndex === index ?
+      { radius: 10, color: '#33000000', offsetX: 0, offsetY: 3 } :
+      { radius: 0, color: '#00000000', offsetX: 0, offsetY: 0 })
+    .translate({ x: 0, y: this.activeTabIndex === index ? -5 : -2 })
+    .animation({ duration: 220, curve: Curve.EaseOut })
   }
 
   @Builder LoadingBuilder() {

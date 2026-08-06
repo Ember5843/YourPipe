@@ -11,7 +11,7 @@ interface OptionsRecoveryPageParams {
 @Component
 export struct OptionsRecoveryPage {
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
 
   @Prop params: OptionsRecoveryPageParams = {
     onResetSettingsClick: () => {},

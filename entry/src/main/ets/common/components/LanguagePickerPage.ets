@@ -4,7 +4,7 @@ import { buildYourTubeTitleBar } from './HdsTitleBar';
 
 @Component
 export struct LanguagePickerPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop title: ResourceStr = '';
   @Prop items: LanguagePickerItem[] = [];
   @Prop selectedCode: string = '';
@@ -39,7 +39,7 @@ export struct LanguagePickerPage {
         this.filterItems(val);
       })
       .height(38)
-      .borderRadius(19)
+      .borderRadius(20)
       .fontSize(14)
       .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
       .margin({ left: 16, right: 16, bottom: 8 })
@@ -117,8 +117,8 @@ export struct LanguagePickerPage {
       .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
     }
     .titleMode(HdsNavDestinationTitleMode.MINI)
-    .titleBar(buildYourTubeTitleBar({
-      title: this.title,
+    .titleBar(buildYourTubeTitleBar({
+      title: this.title,
       onBack: () => {
         this.onBack();
       },

@@ -10,7 +10,7 @@
 
 @Component
 export struct TabErrorPanel {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   /** 错误消息（支持字符串或资源 ID） */
   @Prop errorMessage: string | Resource = '';
 

@@ -88,7 +88,7 @@ interface MySurfaceRect {
 @Preview
 @Component
 export struct VideoPlayer {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Consume('actionHub') actionHub: ActionHub;
   @StorageProp('navBarHeight') navBarHeight: number = 0;
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
@@ -1764,7 +1764,7 @@ export struct VideoPlayer {
 
       if (this.curSource.isLive) {
         Row({ space: 6 }) {
-          Circle({ width: 8, height: 8 }).fill('#FF3B30')
+          Circle({ width: 8, height: 8 }).fill($r('app.color.yourtube_rec_indicator'))
           Text($r('app.string.yt_label_live'))
             .fontColor(Color.White).fontSize(13).fontWeight(FontWeight.Medium)
         }

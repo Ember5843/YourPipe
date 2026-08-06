@@ -1,4 +1,5 @@
 import { AppLog } from '../../common/AppLog';
+import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 import common from '@ohos.app.ability.common';
 import { systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
@@ -19,13 +20,14 @@ import { VideoCardGrid } from '../../common/components/VideoCardGrid';
 import { PlaylistCard } from '../../features/playlist/components/PlaylistCard';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
+import { SubTabBarItem } from '../../common/components/SubTabBar';
 
 const logger = AppLog.getInstance('UserPage');
 
 
 @Component
 export struct UserPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop channel: SearchChannelItem;
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
@@ -494,7 +496,8 @@ export struct UserPage {
             .width(72)
             .height(72)
             .objectFit(ImageFit.Cover)
-            .borderRadius(36)
+            .borderRadius(36)
+            .clip(true)
             .backgroundColor(this.displayChannel.thumbnailColor || $r('app.color.yourtube_icon_hint'))
         } else {
           Circle()
@@ -557,23 +560,7 @@ export struct UserPage {
 
   @Builder
   UserTabBarBuilder(label: ResourceStr, index: number) {
-    Column() {
-      Text(label)
-        .fontSize(14)
-        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_button_disabled'))
-        .fontWeight(this.activeTabIndex === index ? FontWeight.Medium : FontWeight.Regular)
-        .padding({ top: 12, bottom: 10 })
-        .width('100%')
-        .textAlign(TextAlign.Center)
-
-      Rect()
-        .height(2)
-        .width('100%')
-        .fill(this.activeTabIndex === index ? this.themePrimary : Color.Transparent)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    SubTabBarItem(label, this.activeTabIndex === index, this.themePrimary)
   }
 
   @Builder
@@ -1262,7 +1249,7 @@ export struct UserPage {
         Scroll(this.scrollerForScroll) {
           Column() {
             // 顶部内容退避区域：避让状态栏 + 标题栏（与主页一致）
-            Row().width('100%').height(this.safeAreaTop + 56)
+            Row().width('100%').height(this.safeAreaTop + TITLE_BAR_HEIGHT)
             this.UserInfoSection()
             Tabs({
               barPosition: BarPosition.Start
@@ -1289,7 +1276,7 @@ export struct UserPage {
               .tabBar(this.UserTabBarBuilder($r('app.string.yt_tab_about'), 4))
             }
             .vertical(false)
-            .barHeight(44)
+            .barHeight(48)
             .barOverlap(false)
             .barMode(BarMode.Fixed, { nonScrollableLayoutStyle: LayoutStyle.ALWAYS_CENTER })
             .barWidth('100%')

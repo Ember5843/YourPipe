@@ -1,4 +1,5 @@
 import { AppLog } from '../../common/AppLog';
+import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 import common from '@ohos.app.ability.common';
 import { systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
@@ -24,7 +25,7 @@ const logger = AppLog.getInstance('PlaylistDetailPage');
 
 @Component
 export struct PlaylistDetailPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop playlist: SearchPlaylistItem;
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
@@ -466,7 +467,7 @@ export struct PlaylistDetailPage {
         Scroll(this.scrollerForScroll) {
           Column() {
             // 顶部内容退避区域：避让状态栏 + 标题栏（与主页一致）
-            Row().width('100%').height(this.safeAreaTop + 56)
+            Row().width('100%').height(this.safeAreaTop + TITLE_BAR_HEIGHT)
             this.PlaylistInfoSection()
             this.PlaylistVideos()
           }

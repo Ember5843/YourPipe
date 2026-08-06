@@ -2,6 +2,7 @@ import { SelectOption } from 'mediaservice';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
+import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 import { UIConfig } from '../../common/AppState';
 import {
   PlaybackConfig, VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, GPU_API_LABELS,
@@ -24,12 +25,12 @@ interface OptionsPlaybackPageParams {
 
 @Component
 export struct OptionsPlaybackPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
 
   @Prop params: OptionsPlaybackPageParams = {
-    themeColor: '#F1680D',
+    themeColor: '#E53935',
     updatePlaybackConfig: () => {},
     updateUiConfig: () => {},
     getQualityDisplay: (quality) => quality
@@ -101,7 +102,7 @@ export struct OptionsPlaybackPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
@@ -126,7 +127,7 @@ export struct OptionsPlaybackPage {
             }
           }
           .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-          .borderRadius(16)
+          .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
         }
 
@@ -194,7 +195,7 @@ export struct OptionsPlaybackPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
@@ -244,7 +245,7 @@ export struct OptionsPlaybackPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
@@ -297,7 +298,7 @@ export struct OptionsPlaybackPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
@@ -322,7 +323,7 @@ export struct OptionsPlaybackPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
         ListItem() {

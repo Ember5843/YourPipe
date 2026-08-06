@@ -6,7 +6,7 @@ export struct OptionItem {
   @Prop title: ResourceStr = '';
   @Prop subtitle: ResourceStr = '';
   @Prop showChevron: boolean = true;
-  @Prop iconColor: ResourceColor = '#F1680D';
+  @Prop iconColor: ResourceColor = '#E53935';
   @Prop clickEffectEnabled: ClickEffect | null = null;
   @Prop transparentBackground: boolean = false;
   @Prop subtitleMaxLines: number = 1;

@@ -11,7 +11,7 @@ const logger = AppLog.getInstance('CommentList');
 
 @Component
 export struct CommentList {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop @Watch('onVideoIdChanged') videoId: string;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @State comments: CommentItem[] = [];
@@ -199,7 +199,7 @@ export struct CommentList {
             Circle()
               .width(36)
               .height(36)
-              .fill(item.authorThumbnailColor || '#CCCCCC')
+              .fill(item.authorThumbnailColor || $r('app.color.yourtube_icon_hint'))
             Text(item.authorName.charAt(0).toUpperCase())
               .fontSize(16)
               .fontColor(Color.White)

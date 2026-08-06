@@ -86,7 +86,7 @@ struct HomeRecommendBannerPage {
 
 @Component
 export struct HomeRecommendSwiper {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageProp('deviceWidth') deviceWidthPx: number = 0;
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm';
   @Prop videos: VideoItem[] = [];

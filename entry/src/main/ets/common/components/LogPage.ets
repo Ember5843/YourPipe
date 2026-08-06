@@ -14,6 +14,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { UIConfig } from '../AppState';
 import { AppLogStore, LogData, LogSession } from '../AppLogStore';
 import { customAnimationUtil } from '../AnimationUtil';
+import { SECTION_CARD_RADIUS } from './MediaCardTokens';
 
 const logger = AppLog.getInstance('LogPage');
 
@@ -39,7 +40,7 @@ function formatLogTime(ms: number): string {
  */
 @Component
 struct SessionCard {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   /** 细粒度绑定到 @Observed LogSession */
   @ObjectLink session: LogSession;
   /** 在列表中的显示序号（由外部按倒序传入，最新 Session 序号最大） */
@@ -72,10 +73,10 @@ struct SessionCard {
               Circle()
                 .width(6)
                 .height(6)
-                .fill('#FF4444')
+                .fill($r('app.color.yourtube_error'))
               Text($r('app.string.yt_log_session_active'))
                 .fontSize(11)
-                .fontColor('#FF4444')
+                .fontColor($r('app.color.yourtube_error'))
             }
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
             .borderRadius(8)
@@ -125,7 +126,7 @@ struct SessionCard {
         Button({ type: ButtonType.Circle, stateEffect: true }) {
           SymbolGlyph($r('sys.symbol.trash'))
             .fontSize(16)
-            .fontColor(['#FF4444'])
+            .fontColor([$r('app.color.yourtube_error')])
         }
         .width(32)
         .height(32)
@@ -147,7 +148,7 @@ struct SessionCard {
 
 @Component
 export struct LogPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   /** 从 Index.ets 的 optionsNavStack 传入，用于返回 */
   onBack?: () => void;
 
@@ -300,7 +301,7 @@ export struct LogPage {
             })
         }
         .width('100%')
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .constraintSize({ minHeight: 56 })
         .padding({ left: 16, right: 16, top: 12, bottom: 12 })
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
@@ -322,7 +323,7 @@ export struct LogPage {
           if (this.logFilterError) {
             Text(this.logFilterError)
               .fontSize(12)
-              .fontColor('#FF4444')
+              .fontColor($r('app.color.yourtube_error'))
               .width('100%')
               .margin({ top: 4 })
           }
@@ -334,16 +335,16 @@ export struct LogPage {
           Row({ space: 12 }) {
             SymbolGlyph($r('sys.symbol.trash'))
               .fontSize(18)
-              .fontColor(['#FF4444'])
+              .fontColor([$r('app.color.yourtube_error')])
               .width(28)
             Text($r('app.string.yt_log_delete_all_confirm'))
               .fontSize(15)
               .fontWeight(FontWeight.Medium)
-              .fontColor('#FF4444')
+              .fontColor($r('app.color.yourtube_error'))
               .layoutWeight(1)
           }
           .width('100%')
-          .borderRadius(16)
+          .borderRadius(SECTION_CARD_RADIUS)
           .constraintSize({ minHeight: 52 })
           .padding({ left: 16, right: 16, top: 12, bottom: 12 })
           .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
@@ -355,7 +356,7 @@ export struct LogPage {
               message: '',
               primaryButton: {
                 value: $r('app.string.yt_log_delete_confirm_yes'),
-                fontColor: '#FF4444',
+                fontColor: $r('app.color.yourtube_error'),
                 action: () => {
                   AppLogStore.clear();
                 }

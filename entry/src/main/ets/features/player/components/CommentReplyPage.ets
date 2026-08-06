@@ -13,7 +13,7 @@ const TITLE_BAR_SAFE_HEIGHT: number = 56;
 
 @Component
 export struct CommentReplyPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @State parentComment: CommentItem | null = null;
   @State replies: CommentItem[] = [];
   @State isLoading: boolean = false;
@@ -155,7 +155,7 @@ export struct CommentReplyPage {
               .height(32)
               .borderRadius(16)
           } else {
-            Circle().width(32).height(32).fill(item.authorThumbnailColor || '#CCCCCC')
+            Circle().width(32).height(32).fill(item.authorThumbnailColor || $r('app.color.yourtube_icon_hint'))
             Text(item.authorName.charAt(0).toUpperCase()).fontSize(14).fontColor(Color.White)
           }
         }

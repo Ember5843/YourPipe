@@ -14,7 +14,7 @@ export class LanguagePickerItem {
 
 @CustomDialog
 export struct LanguagePickerDialog {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   controller: CustomDialogController = new CustomDialogController({ builder: LanguagePickerDialog({}) });
   title: ResourceStr = '';
   items: LanguagePickerItem[] = [];
@@ -164,7 +164,7 @@ export struct LanguagePickerDialog {
 
 @CustomDialog
 export struct UIPickerLanguageDialog {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   controller: CustomDialogController = new CustomDialogController({ builder: UIPickerLanguageDialog({}) });
   title: ResourceStr = '';
   items: LanguagePickerItem[] = [];

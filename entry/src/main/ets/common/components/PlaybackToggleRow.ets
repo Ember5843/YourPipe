@@ -3,7 +3,7 @@ export struct PlaybackToggleRow {
   @Prop title: ResourceStr;
   @Prop subtitle: ResourceStr = '';
   @Prop isOn: boolean;
-  @Prop themeColor: ResourceColor = '#F1680D';
+  @Prop themeColor: ResourceColor = '#E53935';
   @Prop transparentBackground: boolean = false;
   onChange?: (val: boolean) => void;
 

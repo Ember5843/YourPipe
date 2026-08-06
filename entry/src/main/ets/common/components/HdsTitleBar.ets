@@ -27,6 +27,7 @@ export interface YourTubeTitleBarOptions {
   backLabel?: ResourceStr;
   bottomBuilder?: () => void;
   bottomHeight?: Length;
+  stackBuilder?: () => void;
   immersiveShadow?: boolean;
   materialEffect?: SystemMaterialParams;
   avoidLayoutSafeArea?: boolean;
@@ -79,6 +80,10 @@ export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavi
       height: options.bottomHeight ?? 52,
       showType: BottomBuilderShowType.DIRECTLY_SHOW
     };
+  }
+
+  if (options.stackBuilder) {
+    content.stackBuilder = options.stackBuilder;
   }
 
   const transparentBackground: HdsNavigationBackgroundStyle = {

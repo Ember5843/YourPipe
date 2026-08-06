@@ -2,6 +2,7 @@ import { SelectOption } from 'mediaservice';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
+import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
 import { ColorPresetItem, COLOR_PRESETS, ThemeManager } from '../../common/ThemeManager';
 
@@ -17,7 +18,7 @@ export struct OptionsAppearancePage {
   @StorageProp('themePrimaryColor') themePrimary: string = COLOR_PRESETS[0].primary;
 
   @Prop params: OptionsAppearancePageParams = {
-    themeColor: '#F1680D',
+    themeColor: '#E53935',
     applyDarkModeSelection: () => {},
     updateUiConfig: () => {}
   };
@@ -88,7 +89,7 @@ export struct OptionsAppearancePage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
         ListItem() {
@@ -124,7 +125,7 @@ export struct OptionsAppearancePage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
         ListItem() {
@@ -148,7 +149,7 @@ export struct OptionsAppearancePage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
       }
       .width('100%')

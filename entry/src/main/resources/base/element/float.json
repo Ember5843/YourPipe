@@ -1,10 +1,6 @@
 {
   "float": [
-    {
-      "name": "page_text_font_size",
-      "value": "50fp"
-    },
-    {
+        {
       "name": "comment_font_size",
       "value": "16fp"
     },
@@ -96,55 +92,7 @@
       "name": "common_image_size_11",
       "value": "40vp"
     },
-    {
-      "name": "live_comment_border_radius",
-      "value": "8vp"
-    },
-    {
-      "name": "live_comment_font_size",
-      "value": "12fp"
-    },
-    {
-      "name": "live_comment_margin_bottom",
-      "value": "12vp"
-    },
-    {
-      "name": "live_comment_padding",
-      "value": "6vp"
-    },
-    {
-      "name": "live_comment_padding_left",
-      "value": "8vp"
-    },
-    {
-      "name": "live_mask_padding_right_lg",
-      "value": "32vp"
-    },
-    {
-      "name": "live_store_map_margin",
-      "value": "4vp"
-    },
-    {
-      "name": "live_store_map_size",
-      "value": "36vp"
-    },
-    {
-      "name": "number_of_viewers_font_size",
-      "value": "10fp"
-    },
-    {
-      "name": "official_review_border_radius",
-      "value": "4vp"
-    },
-    {
-      "name": "official_review_margin",
-      "value": "6vp"
-    },
-    {
-      "name": "official_review_padding",
-      "value": "4vp"
-    },
-    {
+                                                    {
       "name": "page_col_padding_lg",
       "value": "32vp"
     },
@@ -156,87 +104,7 @@
       "name": "page_col_padding_sm",
       "value": "16vp"
     },
-    {
-      "name": "shop_list_image_size",
-      "value": "60vp"
-    },
-    {
-      "name": "shop_list_image_size_lg",
-      "value": "72vp"
-    },
-    {
-      "name": "shop_list_text_font_size",
-      "value": "14fp"
-    },
-    {
-      "name": "shop_list_text_line_height",
-      "value": "19vp"
-    },
-    {
-      "name": "shop_list_text_margin",
-      "value": "4vp"
-    },
-    {
-      "name": "shop_list_text_margin_lg",
-      "value": "6vp"
-    },
-    {
-      "name": "shop_text_padding_bottom",
-      "value": "10vp"
-    },
-    {
-      "name": "shop_text_padding_bottom_lg",
-      "value": "16vp"
-    },
-    {
-      "name": "shop_text_padding_left_lg",
-      "value": "8vp"
-    },
-    {
-      "name": "shop_text_padding_top",
-      "value": "8vp"
-    },
-    {
-      "name": "shop_text_padding_top_lg",
-      "value": "12vp"
-    },
-    {
-      "name": "shop_width",
-      "value": "60vp"
-    },
-    {
-      "name": "shop_width_index0",
-      "value": "180vp"
-    },
-    {
-      "name": "shop_width_index0_lg",
-      "value": "216vp"
-    },
-    {
-      "name": "shop_width_lg",
-      "value": "72vp"
-    },
-    {
-      "name": "store_border_radius",
-      "value": "18vp"
-    },
-    {
-      "name": "store_height",
-      "value": "36vp"
-    },
-    {
-      "name": "store_margin_right",
-      "value": "16vp"
-    },
-    {
-      "name": "store_margin_top",
-      "value": "12vp"
-    },
-    {
-      "name": "store_name_font_size",
-      "value": "12fp"
-    },
-    {
+                                                                                    {
       "name": "opacity_9",
       "value": "0.9"
     },

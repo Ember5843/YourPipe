@@ -18,14 +18,14 @@ interface OptionsLanguageAndRegionPageParams {
 
 @Component
 export struct OptionsLanguageAndRegionPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
   @Prop params: OptionsLanguageAndRegionPageParams = {
     appLangItems: [] as LanguagePickerItem[],
     contentLangItems: [] as LanguagePickerItem[],
     contentCountryItems: [] as LanguagePickerItem[],
-    themeColor: '#F1680D',
+    themeColor: '#E53935',
     clickEffectEnabled: null,
     updateUiConfig: () => {},
     reloadHomeForSearchLocaleChange: () => {},

@@ -4,6 +4,7 @@ import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { OptionItem } from '../../common/components/OptionItem';
 import { BackupItemPickerDialog } from '../../common/components/BackupItemPickerDialog';
+import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import {
@@ -39,7 +40,7 @@ interface OptionsDataAccountPageParams {
 
 @Component
 export struct OptionsDataAccountPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
 
@@ -636,7 +637,7 @@ export struct OptionsDataAccountPage {
             }
           }
           .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-          .borderRadius(16)
+          .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
           .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
         } else {
@@ -684,7 +685,7 @@ export struct OptionsDataAccountPage {
             }
           }
           .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-          .borderRadius(16)
+          .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
           .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
@@ -737,7 +738,7 @@ export struct OptionsDataAccountPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
@@ -762,7 +763,7 @@ export struct OptionsDataAccountPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
@@ -797,7 +798,7 @@ export struct OptionsDataAccountPage {
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(16)
+        .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
       }

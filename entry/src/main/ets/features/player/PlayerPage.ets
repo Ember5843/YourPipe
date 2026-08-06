@@ -27,7 +27,6 @@ import { VideoPlayer } from './components/AVPlayer';
 // 播放器错误统一由 VideoPlayer / AVPlayer 内部处理，不再使用 ErrorPage 短路
 import { initTabData } from '../../common/model/TabViewModel';
 import { TabItem } from '../../common/model/TabItem';
-import { Constants } from '../../common/Constants';
 import { YouTubePlayService } from './YouTubePlayService';
 import { ChapterInfo, HttpDownloader, VideoItem } from 'youtube_core';
 import { ActionHub, ActionHubEvent } from '../../common/ActionHub';
@@ -38,6 +37,7 @@ import { PlayQueueList } from './components/PlayQueueList';
 import { PiPManager } from './pip/PiPManager';
 import { PlaybackConfig } from '../../common/PlaybackConfig';
 import { MediaThumb } from '../../common/components/MediaThumb';
+import { SubTabBarItem } from '../../common/components/SubTabBar';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
 
 const logger = AppLog.getInstance('PlayerPage');
@@ -46,7 +46,7 @@ const TAG: string = '[PlayerLog][VideoPlayerPage]';
 
 @Component
 export struct VideoPlayerPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageProp('selectedVideo') @Watch('onVideoChange') video: VideoItem | null = null;
   @StorageProp('deviceHeight') deviceHeight: number =
     AppStorage.get<number>('deviceHeight') || 0;
@@ -727,19 +727,7 @@ export struct VideoPlayerPage {
 
   @Builder
   tabBuilder(index: number, name: string | Resource) {
-    Column() {
-      Text(name)
-        .fontColor(this.currentTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_secondary'))
-        .fontSize(16)
-        .fontWeight(this.currentTabIndex === index ? FontWeight.Normal : FontWeight.Medium)
-        .lineHeight(22)
-        .margin({ top: 17, bottom: 7 })
-      Divider()
-        .width(48)
-        .strokeWidth(Constants.STROKE_WIDTH)
-        .color(this.themePrimary)
-        .opacity(this.currentTabIndex === index ? 1 : 0)
-    }
+    SubTabBarItem(name, this.currentTabIndex === index, this.themePrimary)
   }
 
   @Builder
@@ -834,10 +822,10 @@ export struct VideoPlayerPage {
             .maxLines(3)
             .padding({ left: 24, right: 24 })
           Button($r('app.string.yt_action_retry'))
-            .height(32)
+            .height(36)
             .padding({ left: 16, right: 16 })
             .backgroundColor(this.themePrimary)
-            .borderRadius(16)
+            .borderRadius(18)
             .onClick(() => { this.retryLoadVideo(); })
         }
       } else if (this.isLoading) {
@@ -905,7 +893,7 @@ export struct VideoPlayerPage {
       .borderRadius({ topLeft: 16, topRight: 16 })
       .barMode(BarMode.Fixed)
       .barWidth(Const.WIDTH_FULL_PERCENT)
-      .barHeight(52)
+      .barHeight(48)
       .onAnimationStart((index: number, targetIndex: number) => {
         this.currentTabIndex = targetIndex;
       })

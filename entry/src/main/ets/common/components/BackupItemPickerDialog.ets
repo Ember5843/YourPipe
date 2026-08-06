@@ -3,6 +3,7 @@ import { BackupItemKey, ALL_BACKUP_ITEM_KEYS } from '../model/BackupModels';
 @CustomDialog
 export struct BackupItemPickerDialog {
   controller: CustomDialogController = new CustomDialogController({ builder: BackupItemPickerDialog({}) });
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   title: ResourceStr = '';
   @State selected: BackupItemKey[] = [];
   onCancel?: () => void;
@@ -67,7 +68,7 @@ export struct BackupItemPickerDialog {
             Row({ space: 12 }) {
               Checkbox()
                 .select(this.isSelected(key))
-                .selectedColor($r('app.color.yourtube_theme_primary'))
+                .selectedColor(this.themePrimary)
                 .width(20)
                 .height(20)
 
@@ -106,7 +107,7 @@ export struct BackupItemPickerDialog {
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .layoutWeight(1)
-          .backgroundColor($r('app.color.yourtube_theme_primary'))
+          .backgroundColor(this.themePrimary)
           .fontColor(Color.White)
           .enabled(this.selected.length > 0)
           .onClick(() => {

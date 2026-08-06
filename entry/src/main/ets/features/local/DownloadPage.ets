@@ -31,7 +31,7 @@ function isActiveStatus(status: DownloadStatus): boolean {
 
 @Component
 export struct DownloadPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('downloadTasks') tasks: DownloadTask[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
@@ -74,7 +74,7 @@ export struct DownloadPage {
 
 @Component
 struct DownloadTaskRow {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @ObjectLink task: DownloadTask;
   private downloadManager: DownloadManager = DownloadManager.getInstance();
@@ -168,7 +168,7 @@ struct DownloadTaskRow {
       } else if (this.task.status === DownloadStatus.FAILED) {
         SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
           .fontSize(16)
-          .fontColor(['#FF4444'])
+          .fontColor([$r('app.color.yourtube_error')])
           .margin({ left: 6, top: 6 })
       }
     }
@@ -221,7 +221,7 @@ struct DownloadTaskRow {
         .fontSize(10)
         .fontColor($r('app.color.yourtube_text_inverse'))
         .backgroundColor(this.task.status === DownloadStatus.FAILED
-          ? '#FF4444'
+          ? $r('app.color.yourtube_error')
           : $r('app.color.yourtube_button_disabled'))
         .height(ACTION_BTN_HEIGHT)
         .padding({ left: 10, right: 10 })
@@ -287,7 +287,7 @@ struct DownloadTaskRow {
 
   private getStatusColor(): ResourceColor {
     if (this.task.status === DownloadStatus.FAILED) {
-      return '#FF4444';
+      return $r('app.color.yourtube_error');
     }
     if (this.task.status === DownloadStatus.COMPLETED || isActiveStatus(this.task.status)) {
       return this.themePrimary;

@@ -1,6 +1,7 @@
 import { curves } from '@kit.ArkUI';
 import { AppLog } from '../../common/AppLog';
 import { PreferencesStore } from '../../common/PreferencesStore';
+import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 
 const logger = AppLog.getInstance('HelpGuidePage');
 
@@ -30,7 +31,7 @@ interface GuidePageItem {
  */
 @Component
 export struct HelpGuidePage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Consume('safeAreaTop') safeAreaTop: number;
   @Consume('safeAreaBottom') safeAreaBottom: number;
   @Prop params: HelpGuidePageParams = {
@@ -120,7 +121,7 @@ export struct HelpGuidePage {
       Image($r('app.media.app_icon'))
         .width(96)
         .height(96)
-        .borderRadius(24)
+        .borderRadius(SECTION_CARD_RADIUS)
         .scale({ x: this.welcomeShown ? 1 : 0.6, y: this.welcomeShown ? 1 : 0.6 })
         .opacity(this.welcomeShown ? 1 : 0)
         .animation({ duration: 500, curve: curves.springMotion(0.5, 0.7) })
@@ -284,7 +285,7 @@ export struct HelpGuidePage {
           .fontColor(this.themePrimary)
           .backgroundColor(Color.Transparent)
           .border({ width: 1, color: this.themePrimary })
-          .borderRadius(24)
+          .borderRadius(SECTION_CARD_RADIUS)
           .width('72%')
           .height(48)
           .margin({ bottom: 12 })
@@ -299,7 +300,7 @@ export struct HelpGuidePage {
         .fontWeight(FontWeight.Medium)
         .fontColor(Color.White)
         .backgroundColor(this.themePrimary)
-        .borderRadius(24)
+        .borderRadius(SECTION_CARD_RADIUS)
         .width('72%')
         .height(48)
         .margin({ bottom: this.safeAreaBottom > 0 ? this.safeAreaBottom + 16 : 32 })

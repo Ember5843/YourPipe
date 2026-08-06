@@ -1,4 +1,5 @@
 import { AppLog } from '../../common/AppLog';
+import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { SubscriptionFeedItem, SubscriptionFeedStore } from '../../common/SubscriptionFeedStore';
 import { SubscriptionFeedService } from './SubscriptionFeedService';
@@ -15,7 +16,7 @@ const logger = AppLog.getInstance('SubscriptionFeedPage');
 
 @Component
 export struct SubscriptionFeedPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
@@ -184,7 +185,7 @@ export struct SubscriptionFeedPage {
   build() {
     HdsNavDestination() {
       Column() {
-        Row().width('100%').height(this.safeAreaTop + 56)
+        Row().width('100%').height(this.safeAreaTop + TITLE_BAR_HEIGHT)
         if (this.newItemsCount > 0) {
           Text(getContext().resourceManager.getStringSync($r('app.string.yt_sub_feed_new_items').id, this.newItemsCount))
             .fontSize(12)

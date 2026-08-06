@@ -3,12 +3,12 @@ import { ThemeColorUtil } from '../ThemeColorUtil';
 
 @Component
 export struct PlaybackSelectRow {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop title: ResourceStr;
   @Prop options: Array<SelectOption>;
   @Prop @Watch('onSelectedIndexChange') selectedIndex: number;
   @State selectedValue: string = '';
-  @Prop fontColor: ResourceColor = '#F1680D';
+  @Prop fontColor: ResourceColor = '#E53935';
   @Prop transparentBackground: boolean = false;
   onChange?: (index: number) => void;
 

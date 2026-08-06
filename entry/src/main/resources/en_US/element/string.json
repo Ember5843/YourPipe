@@ -49,6 +49,10 @@
             "value": "View recent logs"
         },
         {
+            "name": "yt_action_close",
+            "value": "Close"
+        },
+        {
             "name": "yt_option_about",
             "value": "About"
         },

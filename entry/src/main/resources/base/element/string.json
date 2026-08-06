@@ -177,6 +177,10 @@
             "value": "取消"
         },
         {
+            "name": "yt_action_close",
+            "value": "关闭"
+        },
+        {
             "name": "yt_option_about",
             "value": "关于"
         },

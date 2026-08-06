@@ -13,7 +13,7 @@ enum LoginState {
 
 @Component
 export struct WebViewLoginPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   onSuccess?: () => void;
   onCancel?: () => void;
   onRegisterBackHandler?: (handler: () => boolean) => void;

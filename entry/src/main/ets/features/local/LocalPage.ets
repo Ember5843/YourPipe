@@ -8,6 +8,7 @@ import { customAnimationUtil } from '../../common/AnimationUtil';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { DownloadPage } from './DownloadPage';
 import { MediaThumb } from '../../common/components/MediaThumb';
+import { SubTabBarItem } from '../../common/components/SubTabBar';
 import {
   MEDIA_CARD_RADIUS,
   MEDIA_CARD_SHADOW_OFFSET_Y,
@@ -18,7 +19,8 @@ import {
   MEDIA_META_SIZE,
   MEDIA_THUMB_RADIUS,
   MEDIA_TITLE_LINE_HEIGHT,
-  MEDIA_TITLE_SIZE
+  MEDIA_TITLE_SIZE,
+  TITLE_BAR_HEIGHT
 } from '../../common/components/MediaCardTokens';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
@@ -53,7 +55,7 @@ const SYMBOL_FONT_SIZE: number = 16;
 
 @Component
 struct HistoryCard {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop item: WatchHistoryItem;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @State isShowContextMenu: boolean = false;
@@ -265,7 +267,7 @@ struct HistoryCard {
 
 @Component
 export struct LocalPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   onSwitchOuterTab: (index: number) => void = (_index: number) => {};
   @StorageLink('watchHistory') history: WatchHistoryItem[] = [];
   @StorageLink('deviceWidth') deviceWidth: number = 0;
@@ -354,14 +356,8 @@ export struct LocalPage {
         Refresh({ refreshing: $$this.isSyncingHistory }) {
           List({ space: 8 }) {
             ListItem() {
-              Row() {
-                Text($r('app.string.yt_local_history'))
-                  .fontSize(18)
-                  .fontColor($r('app.color.yourtube_text_primary'))
-                  .fontWeight(FontWeight.Bold)
-                  .layoutWeight(1);
-
-                if (this.history.length > 0) {
+              if (this.history.length > 0) {
+                Row() {
                   Text($r('app.string.yt_action_clear_all'))
                     .fontSize(13)
                     .fontColor($r('app.color.yourtube_text_hint'))
@@ -381,10 +377,10 @@ export struct LocalPage {
                       });
                     });
                 }
+                .width('100%')
+                .justifyContent(FlexAlign.End)
+                .padding({ top: 16, bottom: 4, left: 4, right: 4 });
               }
-              .width('100%')
-              .alignItems(VerticalAlign.Center)
-              .padding({ top: 16, bottom: 4, left: 4, right: 4 });
             }
 
             ListItem() {
@@ -476,16 +472,6 @@ export struct LocalPage {
       // ── Tab 1: 下载 ──
       TabContent() {
         Column() {
-          Row() {
-            Text($r('app.string.yt_download_title'))
-              .fontSize(18)
-              .fontColor($r('app.color.yourtube_text_primary'))
-              .fontWeight(FontWeight.Bold)
-              .layoutWeight(1)
-          }
-          .width('100%')
-          .padding({ top: 16, bottom: 12, left: 4, right: 4 })
-
           DownloadPage()
         }
         .width('100%')
@@ -504,25 +490,12 @@ export struct LocalPage {
     })
     .width('100%')
     .height('100%')
-    .padding({ top: this.safeAreaTop + 56 })
+    .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT })
     .backgroundColor($r('app.color.yourtube_bg_page'))
   }
 
   @Builder
   TabBarBuilder(index: number) {
-    Column() {
-      Text(this.tabTitles[index])
-        .fontSize(16)
-        .fontColor(this.currentTabIndex === index
-          ? this.themePrimary
-          : $r('app.color.yourtube_text_secondary'))
-        .fontWeight(this.currentTabIndex === index ? FontWeight.Medium : FontWeight.Normal)
-        .margin({ top: 12, bottom: 6 })
-      Divider()
-        .width(36)
-        .strokeWidth(2)
-        .color(this.themePrimary)
-        .opacity(this.currentTabIndex === index ? 1 : 0)
-    }
+    SubTabBarItem(this.tabTitles[index], this.currentTabIndex === index, this.themePrimary)
   }
 }

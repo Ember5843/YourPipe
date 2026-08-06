@@ -17,7 +17,9 @@ import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 import { UIConfig } from '../../common/AppState';
 import { SearchHistoryStore, SearchHistoryItem } from '../../common/SearchHistoryStore';
 import type { BusinessError } from '@kit.BasicServicesKit';
-import { HdsNavDestination } from '@kit.UIDesignKit';
+import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
+import { buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
+import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 
 const logger = AppLog.getInstance('SearchPage');
 
@@ -32,7 +34,7 @@ export class SearchPageLaunchParams {
 @Preview
 @Component
 export struct SearchPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
@@ -60,6 +62,8 @@ export struct SearchPage {
   private readonly GRID_GUTTER: number = 8;
   private readonly SEARCH_RESULT_SIDE_PADDING: number = 12;
   private suggestionTimer: number = -1;
+  private readonly resultScroller: Scroller = new Scroller();
+  private readonly suggestionScroller: Scroller = new Scroller();
   private hasAppliedInitialQuery: boolean = false;
   private isInitialSearchInFlight: boolean = false;
   @State selectedOption: string = 'yt_all';
@@ -470,7 +474,7 @@ export struct SearchPage {
           .width('100%')
           .padding({ left: 16, right: 16, top: 8, bottom: 8 })
 
-          List({ space: 4 }) {
+          List({ space: 4, scroller: this.suggestionScroller }) {
             ForEach(this.searchHistory, (item: SearchHistoryItem) => {
               ListItem() {
                 Row() {
@@ -507,9 +511,10 @@ export struct SearchPage {
                   this.showDeleteConfirmDialog(item.query);
                 }))
             }, (item: SearchHistoryItem) => item.query + item.timestamp.toString())
-          }
-          .width('100%')
-          .backgroundColor($r('app.color.yourtube_bg_surface'))
+          }
+          .width('100%')
+          .backgroundColor($r('app.color.yourtube_bg_surface'))
+          .scrollBar(BarState.Off)
         } else {
           Column() {
             SymbolGlyph($r('sys.symbol.clock'))
@@ -535,7 +540,7 @@ export struct SearchPage {
         .justifyContent(FlexAlign.Center)
         .margin({ top: 8 })
       } else if (this.suggestions.length > 0) {
-        List({ space: 4 }) {
+        List({ space: 4, scroller: this.suggestionScroller }) {
           ForEach(this.suggestions, (item: string) => {
             ListItem() {
               Row() {
@@ -569,15 +574,16 @@ export struct SearchPage {
               this.runSearch(true);
             })
           }, (item: string) => item)
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_surface'))
+        }
+        .width('100%')
+        .backgroundColor($r('app.color.yourtube_bg_surface'))
+        .scrollBar(BarState.Off)
       }
     }
     .width('100%')
     .layoutWeight(1)
     .backgroundColor($r('app.color.yourtube_bg_surface'))
-    .padding({ bottom: this.safeAreaBottom + 16 })
+    .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT, bottom: this.safeAreaBottom + 16 })
   }
 
   @Builder ResultView() {
@@ -591,7 +597,7 @@ export struct SearchPage {
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)
-        .margin({ top: 20 })
+        .margin({ top: this.safeAreaTop + TITLE_BAR_HEIGHT + 20 })
       } else if (typeof this.errorMessage === 'string' && this.errorMessage.length > 0 && this.results.length === 0) {
         // 显示错误页面（有错误且无结果时）
         ErrorPage({
@@ -612,12 +618,14 @@ export struct SearchPage {
               .fontColor($r('app.color.yourtube_text_quaternary'))
           }
           .width('100%')
-          .padding({ top: 32 })
+          .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT + 32 })
           .alignItems(HorizontalAlign.Center)
          } else {
            if (this.uiConfig.homeLayoutMode === 'grid') {
-             Scroll() {
+             Scroll(this.resultScroller) {
                Column() {
+                 Blank().height(this.safeAreaTop + TITLE_BAR_HEIGHT)
+
                  Row() {
                    Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
                      .fontSize(12)
@@ -693,12 +701,15 @@ export struct SearchPage {
               .backgroundColor($r('app.color.yourtube_bg_page'))
               .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 })
               .edgeEffect(EdgeEffect.Spring)
+              .scrollBar(BarState.Off)
               .onReachEnd(() => {
                 this.runSearch(false);
               })
             } else if (this.getWideListColumns() > 1) {
-              Scroll() {
+              Scroll(this.resultScroller) {
                 Column() {
+                  Blank().height(this.safeAreaTop + TITLE_BAR_HEIGHT)
+
                   Row() {
                     Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
                       .fontSize(12)
@@ -764,11 +775,18 @@ export struct SearchPage {
               .backgroundColor($r('app.color.yourtube_bg_page'))
               .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 })
               .edgeEffect(EdgeEffect.Spring)
+              .scrollBar(BarState.Off)
               .onReachEnd(() => {
                 this.runSearch(false);
               })
             } else {
-              List({ space: 4 }) {
+              List({ space: 4, scroller: this.resultScroller }) {
+                ListItem() {
+                  Column() {
+                  }
+                  .height(this.safeAreaTop + TITLE_BAR_HEIGHT)
+                }
+
                 ListItem() {
                   Row() {
                     Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
@@ -823,6 +841,7 @@ export struct SearchPage {
               .backgroundColor($r('app.color.yourtube_bg_page'))
               .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 })
               .edgeEffect(EdgeEffect.Spring)
+              .scrollBar(BarState.Off)
               .onReachEnd(() => {
                 this.runSearch(false);
               })
@@ -848,7 +867,7 @@ export struct SearchPage {
       .defaultFocus(this.initialQuery.trim().length === 0)
       .focusable(this.searchInputFocusable)
       .borderRadius(20)
-      .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+      .shadow({ radius: 8, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
       .searchIcon({
         size: 20,
         color: $r('app.color.yourtube_text_hint')
@@ -896,7 +915,7 @@ export struct SearchPage {
       .width(40)
       .height(40)
       .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-      .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+      .shadow({ radius: 8, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
       .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
       .onClick(() => {
         this.actionHub.closePage();
@@ -912,7 +931,7 @@ export struct SearchPage {
       .width(40)
       .height(40)
       .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-      .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+      .shadow({ radius: 8, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
       .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
       .onClick(() => {
         this.lastOptionBeforeDialog = this.selectedOption;
@@ -920,17 +939,13 @@ export struct SearchPage {
       })
     }
     .width('100%')
-    .constraintSize({ minHeight: this.safeAreaTop + 56 })
-    .padding({ left: 12, right: 12, top: this.safeAreaTop + 8, bottom: 8 })
-    .backgroundColor($r('app.color.yourtube_bg_page'))
-    .shadow({ radius: 8, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+    .height(56)
+    .padding({ left: 12, right: 12 })
   }
 
   build() {
     HdsNavDestination() {
       Column() {
-        this.SearchTitleBar()
-
         if (this.isResultMode) {
           this.ResultView()
         } else {
@@ -941,8 +956,15 @@ export struct SearchPage {
       .height('100%')
       .backgroundColor($r('app.color.yourtube_bg_page'))
     }
+    .titleMode(HdsNavDestinationTitleMode.MINI)
+    .titleBar(buildYourTubeTitleBar({
+      title: '',
+      avoidLayoutSafeArea: true,
+      stackBuilder: () => { this.SearchTitleBar() }
+    }))
+    .hideBackButton(true)
+    .bindToScrollable([this.resultScroller, this.suggestionScroller])
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
-    .hideTitleBar(true)
     .onBackPressed(() => {
       this.actionHub.closePage();
       return true;

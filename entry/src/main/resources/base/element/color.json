@@ -9,10 +9,6 @@
       "value": "#F1F3F5"
     },
     {
-      "name": "common_background_2",
-      "value": "#F7F7F7"
-    },
-    {
       "name": "common_background_3",
       "value": "#0D000000"
     },
@@ -201,6 +197,10 @@
       "value": "#D32F2F"
     },
     {
+      "name": "yourtube_rec_indicator",
+      "value": "#FF3B30"
+    },
+    {
       "name": "yourtube_text_warning",
       "value": "#D32F2F"
     },
@@ -275,10 +275,6 @@
     {
       "name": "image_fill_color",
       "value": "#99000000"
-    },
-    {
-      "name": "yourtube_border_color",
-      "value": "#E0E0E0"
     }
   ]
 }

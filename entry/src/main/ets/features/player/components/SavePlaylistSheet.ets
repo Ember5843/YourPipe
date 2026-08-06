@@ -11,7 +11,7 @@ import { customAnimationUtil } from '../../../common/AnimationUtil';
  */
 @Component
 export struct SavePlaylistSheet {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   /** 当前要保存的视频 */
   @Prop video: VideoItem;
   /** 双向绑定的显隐状态，由外层 bindSheet 持有 */

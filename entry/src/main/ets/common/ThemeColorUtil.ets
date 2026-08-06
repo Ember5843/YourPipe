@@ -1,4 +1,6 @@
-const DEFAULT_PRIMARY_COLOR = '#F1680D';
+export const DEFAULT_THEME_PRIMARY = '#E53935';
+
+const DEFAULT_PRIMARY_COLOR = DEFAULT_THEME_PRIMARY;
 
 export class ThemeColorUtil {
   static withAlpha(color: string, alpha: string): string {

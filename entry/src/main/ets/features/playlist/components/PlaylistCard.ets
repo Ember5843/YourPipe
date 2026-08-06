@@ -19,7 +19,7 @@ const SYMBOL_FONT_SIZE: number = 16;
 
 @Component
 export struct PlaylistCard {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop playlist: SearchPlaylistItem;
   @Prop typeLabel: ResourceStr = $r('app.string.yt_tab_playlists');
   @Prop enableOpen: boolean = true;
@@ -221,10 +221,10 @@ export struct PlaylistCard {
         Blank();
         Row() {
           Button(this.getActionLabel())
-            .fontSize(10)
+            .fontSize(12)
             .fontColor($r('app.color.yourtube_text_inverse'))
             .backgroundColor(this.isFavorited() ? $r('app.color.yourtube_button_disabled') : this.themePrimary)
-            .height(24)
+            .height(28)
             .padding({ left: 10, right: 10 })
             .onClick(() => {
               this.handleAction();

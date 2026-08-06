@@ -20,7 +20,7 @@ enum DownloadMode {
 
 @CustomDialog
 export struct DownloadDialog {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   controller: CustomDialogController;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
@@ -93,13 +93,29 @@ export struct DownloadDialog {
 
   build() {
     Column() {
-      Text($r('app.string.yt_download_title'))
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.yourtube_text_primary'))
-        .width('100%')
-        .textAlign(TextAlign.Center)
-        .padding({ top: 24, bottom: 12 })
+      Row() {
+        Text($r('app.string.yt_download_title'))
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.yourtube_text_primary'))
+          .layoutWeight(1)
+
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
+          SymbolGlyph($r('sys.symbol.xmark'))
+            .fontSize(16)
+            .fontColor([$r('app.color.yourtube_text_quaternary')])
+        }
+        .width(32)
+        .height(32)
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .onClick(() => {
+          this.onCancel();
+          this.controller.close();
+        })
+      }
+      .width('100%')
+      .padding({ left: 20, right: 16, top: 18, bottom: 10 })
+      .alignItems(VerticalAlign.Center)
 
       Scroll() {
         Column() {
@@ -335,7 +351,7 @@ export struct DownloadDialog {
     .width('85%')
     .constraintSize({ maxWidth: 460 })
     .backgroundColor($r('app.color.yourtube_bg_surface'))
-    .borderRadius(24)
+    .borderRadius(20)
     .shadow(ShadowStyle.OUTER_DEFAULT_MD)
   }
 

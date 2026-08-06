@@ -133,7 +133,7 @@ export struct MediaThumb {
       if (this.showLive && this.isLive) {
         // Reuse player LIVE style: red dot + LIVE label.
         Row({ space: 4 }) {
-          Circle({ width: 6, height: 6 }).fill('#FF3B30')
+          Circle({ width: 6, height: 6 }).fill($r('app.color.yourtube_rec_indicator'))
           Text($r('app.string.yt_label_live'))
             .fontSize(8)
             .fontWeight(FontWeight.Medium)

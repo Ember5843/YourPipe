@@ -18,7 +18,7 @@ const SYMBOL_FONT_SIZE: number = 16;
 
 @Component
 export struct ChannelCard {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop channel: SearchChannelItem;
   @Prop typeLabel: ResourceStr = $r('app.string.yt_label_user');
   @Prop showDescription: boolean = true;
@@ -132,7 +132,8 @@ export struct ChannelCard {
             .width(56)
             .height(56)
             .objectFit(ImageFit.Cover)
-            .borderRadius(28)
+            .borderRadius(28)
+            .clip(true)
             .backgroundColor(this.channel.thumbnailColor || $r('app.color.yourtube_icon_hint'));
         } else {
           Circle()

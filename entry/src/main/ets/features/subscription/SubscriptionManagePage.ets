@@ -1,4 +1,5 @@
 import { AppLog } from '../../common/AppLog';
+import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { UIConfig } from '../../common/AppState';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
@@ -233,22 +234,15 @@ export struct SubscriptionManagePage {
         List({ scroller: SubscriptionScrollCoordinator.scroller, space: 4 }) {
           ListItem() {
             Column() {
-              Text($r('app.string.yt_sub_manage_title'))
-                .fontSize(20)
-                .fontColor($r('app.color.yourtube_text_primary'))
-                .fontWeight(FontWeight.Medium)
-                .width('100%')
               if (this.syncMessage.length > 0) {
                 Text(this.syncMessage)
                   .fontSize(12)
                   .fontColor($r('app.color.yourtube_text_hint'))
-                  .margin({ top: 6 })
                   .width('100%')
               } else if (this.isSignedIn()) {
                 Text($r('app.string.yt_sub_pull_to_sync'))
                   .fontSize(12)
                   .fontColor($r('app.color.yourtube_text_hint'))
-                  .margin({ top: 6 })
                   .width('100%')
               }
             }
@@ -308,7 +302,7 @@ export struct SubscriptionManagePage {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.safeAreaTop + 56 })
+    .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT })
     .backgroundColor($r('app.color.yourtube_bg_page'))
   }
 }

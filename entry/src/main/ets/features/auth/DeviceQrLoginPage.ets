@@ -10,7 +10,7 @@ const logger = AppLog.getInstance('DeviceQrLoginPage');
 
 @Component
 export struct DeviceQrLoginPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   onSuccess?: () => void;
   onCancel?: () => void;
 

@@ -1,4 +1,5 @@
 import { AppLog } from '../../common/AppLog';
+import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 import { VideoItem } from 'youtube_core';
 import { PlaylistItem, StoredLocalQueue } from '../../common/PlaylistModel';
 import { SearchPlaylistItem } from 'youtube_core';
@@ -19,6 +20,7 @@ const logger = AppLog.getInstance('FavoritesPage');
 
 @Component
 export struct FavoritesPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('favorites') favorites: VideoItem[] = [];
   @StorageLink('playlists') playlists: PlaylistItem[] = [];
   @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
@@ -193,7 +195,7 @@ export struct FavoritesPage {
           .width(64)
           .height(64)
           .borderRadius(8)
-          .backgroundColor($r('app.color.yourtube_theme_primary'))
+          .backgroundColor(this.themePrimary)
           .justifyContent(FlexAlign.Center)
         }
 
@@ -395,7 +397,7 @@ export struct FavoritesPage {
       }
     }
     .width('100%')
-    .padding({ left: 12, right: 12, top: this.safeAreaTop + 56, bottom: this.safeAreaBottom + 72 })
+    .padding({ left: 12, right: 12, top: this.safeAreaTop + TITLE_BAR_HEIGHT, bottom: this.safeAreaBottom + 72 })
     .edgeEffect(EdgeEffect.Spring)
     .height('100%')
     .backgroundColor($r('app.color.yourtube_bg_page'))

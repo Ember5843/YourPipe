@@ -4,9 +4,9 @@ import { OptionItem } from './OptionItem';
 import { PlaybackSectionTitle } from './PlaybackSectionTitle';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode } from '@kit.UIDesignKit';
-import { buildYourTubeTitleBar } from './HdsTitleBar';
 import { AppLog } from '../AppLog';
+import { ThemeColorUtil } from '../ThemeColorUtil';
+import { SECTION_CARD_RADIUS } from './MediaCardTokens';
 
 const APP_VERSION = '0.5.7';
 const APP_BUILD = '1000016';
@@ -306,8 +306,7 @@ struct SubPageHeader {
 // ─── 子页面：开源项目 ──────────────────────────────────────────────────────────
 
 @Component
-struct OpenSourcePage {
-  onBack: () => void = () => {};
+export struct OpenSourcePage {
 
   build() {
     Column() {
@@ -332,7 +331,6 @@ struct OpenSourcePage {
       .align(Alignment.Top)
     }
     .width('100%').height('100%')
-    .padding({ top: 56 })
     .backgroundColor(Color.Transparent)
   }
 }
@@ -340,8 +338,7 @@ struct OpenSourcePage {
 // ─── 子页面：AI 模型 ───────────────────────────────────────────────────────────
 
 @Component
-struct AiModelsPage {
-  onBack: () => void = () => {};
+export struct AiModelsPage {
 
   build() {
     Column() {
@@ -364,7 +361,6 @@ struct AiModelsPage {
       .align(Alignment.Top)
     }
     .width('100%').height('100%')
-    .padding({ top: 56 })
     .backgroundColor(Color.Transparent)
   }
 }
@@ -372,9 +368,8 @@ struct AiModelsPage {
 // ─── 子页面：更新日志 ──────────────────────────────────────────────────────────
 
 @Component
-struct ChangelogPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
-  onBack: () => void = () => {};
+export struct ChangelogPage {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
 
   build() {
     Column() {
@@ -393,7 +388,7 @@ struct ChangelogPage {
                     .fontColor(this.themePrimary)
                     .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                     .borderRadius(4)
-                    .backgroundColor('#1AD32F2F')
+                    .backgroundColor(ThemeColorUtil.selectedBackground(this.themePrimary))
                 }
                 Blank()
                 Text(item.date)
@@ -413,7 +408,7 @@ struct ChangelogPage {
             }
             .width('100%')
             .padding({ left: 16, right: 16, top: 14, bottom: 14 })
-            .borderRadius(16)
+            .borderRadius(SECTION_CARD_RADIUS)
             .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
             .border(index === 0 ? { width: 1, color: this.themePrimary, radius: 16 } : { width: 0 })
           }, (item: ChangelogEntry) => item.version)
@@ -425,7 +420,6 @@ struct ChangelogPage {
       .align(Alignment.Top)
     }
     .width('100%').height('100%')
-    .padding({ top: 56 })
     .backgroundColor(Color.Transparent)
   }
 }
@@ -434,10 +428,9 @@ struct ChangelogPage {
 
 @Component
 export struct AboutPage {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
-  onBack?: () => void;
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
+  onNavigate: (name: string) => void = () => {};
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
-  @State private aboutNavStack: NavPathStack = new NavPathStack();
   private aboutScroller: Scroller = new Scroller();
 
   private copyToClipboard(text: string): void {
@@ -459,51 +452,6 @@ export struct AboutPage {
       context.openLink(url, { appLinkingOnly: false });
     } catch (e) {
       logger.error(`openExternalLink failed: ${String(e)}`);
-    }
-  }
-
-  // 根据导航名称渲染子页面
-  @Builder
-  aboutPageBuilder(name: string) {
-    if (name === 'open_source') {
-      HdsNavDestination() {
-        OpenSourcePage({ onBack: () => { this.aboutNavStack.pop(); } })
-      }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildYourTubeTitleBar({
-        title: $r('app.string.yt_about_open_source'),
-        onBack: () => {
-          this.aboutNavStack.pop();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => { this.aboutNavStack.pop(); return true; })
-    } else if (name === 'ai_models') {
-      HdsNavDestination() {
-        AiModelsPage({ onBack: () => { this.aboutNavStack.pop(); } })
-      }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildYourTubeTitleBar({
-        title: $r('app.string.yt_about_ai_models'),
-        onBack: () => {
-          this.aboutNavStack.pop();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => { this.aboutNavStack.pop(); return true; })
-    } else if (name === 'changelog') {
-      HdsNavDestination() {
-        ChangelogPage({ onBack: () => { this.aboutNavStack.pop(); } })
-      }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildYourTubeTitleBar({
-        title: $r('app.string.yt_about_changelog'),
-        onBack: () => {
-          this.aboutNavStack.pop();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => { this.aboutNavStack.pop(); return true; })
     }
   }
 
@@ -573,7 +521,7 @@ export struct AboutPage {
             }
             .width('100%')
             .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-            .borderRadius(16)
+            .borderRadius(SECTION_CARD_RADIUS)
             .clip(true)
           }
           .width('100%')
@@ -591,7 +539,7 @@ export struct AboutPage {
                 subtitle: `${OPEN_SOURCE_ITEMS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_projects').id)}`,
                 iconColor: this.themePrimary,
                 transparentBackground: true,
-                onClickAction: () => { this.aboutNavStack.pushPathByName('open_source', null); }
+                onClickAction: () => { this.onNavigate('about_open_source'); }
               })
               Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
               OptionItem({
@@ -600,7 +548,7 @@ export struct AboutPage {
                 subtitle: `${AI_MODELS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_models').id)}`,
                 iconColor: this.themePrimary,
                 transparentBackground: true,
-                onClickAction: () => { this.aboutNavStack.pushPathByName('ai_models', null); }
+                onClickAction: () => { this.onNavigate('about_ai_models'); }
               })
               Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
               OptionItem({
@@ -609,12 +557,12 @@ export struct AboutPage {
                 subtitle: `${getContext().resourceManager.getStringSync($r('app.string.yt_label_latest_version').id)}${CHANGELOG[0].version}`,
                 iconColor: this.themePrimary,
                 transparentBackground: true,
-                onClickAction: () => { this.aboutNavStack.pushPathByName('changelog', null); }
+                onClickAction: () => { this.onNavigate('about_changelog'); }
               })
             }
             .width('100%')
             .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-            .borderRadius(16)
+            .borderRadius(SECTION_CARD_RADIUS)
             .clip(true)
           }
           .width('100%').padding({ left: 16, right: 16 })
@@ -638,28 +586,10 @@ export struct AboutPage {
       .align(Alignment.Top)
     }
     .width('100%').height('100%')
-    .padding({ top: 56 })
     .backgroundColor(Color.Transparent)
   }
 
   build() {
-    HdsNavigation(this.aboutNavStack) {
-      this.MainContent()
-    }
-    .navDestination(this.aboutPageBuilder)
-    .bindToScrollable([this.aboutScroller])
-    .titleMode(HdsNavigationTitleMode.MINI)
-    .titleBar(buildYourTubeTitleBar({
-      title: $r('app.string.yt_option_about'),
-      onBack: () => {
-        if (this.onBack) {
-          this.onBack();
-        }
-      }
-    }))
-    .hideToolBar(true)
-    .mode(NavigationMode.Stack)
-    .width('100%').height('100%')
-    .backgroundColor(Color.Transparent)
+    this.MainContent()
   }
 }

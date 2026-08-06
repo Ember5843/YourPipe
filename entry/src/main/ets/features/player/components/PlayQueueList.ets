@@ -36,7 +36,7 @@ class PlayQueueListListener extends QueueChangeListener {
 
 @Component
 export struct PlayQueueList {
-  @StorageProp('themePrimaryColor') themePrimary: string = '#F1680D';
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @State queue: VideoItem[] = [];
   @State currentIndex: number = -1;
   @State sourceType: QueueSourceType = QueueSourceType.NONE;
