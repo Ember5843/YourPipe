@@ -28,8 +28,6 @@ CLAUDE.md
 
 # Trellis workflow (local-only, not shared)
 .trellis/
-AGENTS.md
-**/AGENTS.md
 
 # Local artifacts
 .cache/
