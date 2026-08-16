@@ -1,15 +1,17 @@
 {
   "app": {
-    // Signing is machine-local. Do NOT commit real material (paths/passwords).
-    // Run tools/restore-signing.sh to overlay signing-backup/build-profile.local.json5
-    // (git-ignored, per-machine) before local builds, and tools/strip-signing.sh
-    // afterwards. DevEco users can also configure signing via
-    // File → Project Structure → Signing Configs (writes here — never commit that).
+    // Template for the git-ignored, machine-local build-profile.json5.
+    // Fresh clone: cp build-profile.template.json5 build-profile.json5.
+    // Signing is machine-local — do NOT put real material (paths/passwords)
+    // in this committed template. Run tools/restore-signing.sh to overlay
+    // signing-backup/build-profile.local.json5 (git-ignored, per-machine)
+    // before local builds. DevEco users can also configure signing via
+    // File → Project Structure → Signing Configs (writes to the local file).
     "signingConfigs": [],
     "products": [
       {
         "name": "default",
-        // Set by restore-signing.sh from your local signingConfigs[].name.
+        // Set in your local build-profile.json5 (e.g. by restore-signing.sh).
         // "signingConfig": "default",
         "targetSdkVersion": "6.1.0(23)",
         "compatibleSdkVersion": "6.1.0(23)",

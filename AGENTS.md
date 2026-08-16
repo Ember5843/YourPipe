@@ -162,13 +162,14 @@ new shells see the change.
 
 - **Lint**: `code-linter.json5` (root) — `@performance/recommended` +
   `@typescript-eslint/recommended` + `@security/*` blocking unsafe crypto.
-- **Signing**: open-source intent is EMPTY `signingConfigs` in committed
-  `build-profile.json5` (sanitized template also in
-  `signing-backup/build-profile.sanitized.json5`). Real material must never
-  be committed — git history is scrubbed and `.githooks/pre-commit` blocks
-  it. For local builds: `tools/restore-signing.sh` overlays git-ignored
-  `signing-backup/build-profile.local.json5`; `tools/strip-signing.sh`
-  reverts. Never `git add` `build-profile.json5` while signing is restored.
+- **Signing**: `build-profile.json5` is **git-ignored** (machine-local); the
+  committed `build-profile.template.json5` is the sanitized template with EMPTY
+  `signingConfigs`. Fresh clones: `cp build-profile.template.json5
+  build-profile.json5` (DevEco sync needs it). Real material must never be
+  committed — git history is scrubbed and `.githooks/pre-commit` blocks it.
+  For local builds: `tools/restore-signing.sh` overlays git-ignored
+  `signing-backup/build-profile.local.json5` (seeding from the template when
+  missing); `tools/strip-signing.sh` resets to the template (hygiene only).
 - **Sandbox**: `devecocli build` / `run` / `update` are outside sandbox;
   escalate when the environment requires it.
 
@@ -181,8 +182,9 @@ mediaservice/              — playback engine → mediaservice/AGENTS.md
 youtube_core/              — YouTube extractor → youtube_core/AGENTS.md
 libmpv_napi/               — MPV NAPI bridge → libmpv_napi/AGENTS.md
 tools/                     — restore/strip signing helpers
-signing-backup/            — local signing overlay + sanitized empty template (git-ignored material)
-build-profile.json5        — root Hvigor config (modules, products, signing)
+signing-backup/            — local signing overlay (git-ignored material)
+build-profile.json5        — root Hvigor config (git-ignored, machine-local; seed from template)
+build-profile.template.json5 — committed sanitized template for build-profile.json5
 code-linter.json5          — ArkTS lint rules
 hvigorfile.ts              — Hvigor entry
 ```

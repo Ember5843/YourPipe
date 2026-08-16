@@ -41,6 +41,7 @@ tools/*.ps1
 
 # Secrets / signing — never commit
 **/agconnect-services.json
+/build-profile.json5
 build-profile.local.json5
 **/local.properties
 **/*.p12

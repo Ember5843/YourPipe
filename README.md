@@ -86,9 +86,11 @@ entry  →  mediaservice  →  youtube_core
    ```
 
 2. Open the project root in DevEco Studio and sync ohpm dependencies.
+   `build-profile.json5` is git-ignored (machine-local) — copy it from the
+   committed template first: `cp build-profile.template.json5 build-profile.json5`.
 
-3. Configure **signing** under **File → Project Structure → Signing Configs**.  
-   Public `build-profile.json5` ships with empty `signingConfigs` — **never commit** keystores, passwords, profiles, or certificates.
+3. Configure **signing** under **File → Project Structure → Signing Configs** (writes
+   into your local, git-ignored `build-profile.json5`). **Never commit** keystores, passwords, profiles, or certificates.
 
 4. Optional: if you use AppGallery Connect, put the AGC services config under  
    `entry/src/main/resources/rawfile/` (that file is git-ignored).
