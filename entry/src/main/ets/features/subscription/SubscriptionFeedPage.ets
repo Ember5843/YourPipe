@@ -95,7 +95,7 @@ export struct SubscriptionFeedPage {
   @Builder
   private FeedContent() {
     if (this.feedItems.length === 0) {
-      Scroll() {
+      Scroll(this.scrollerForScroll) {
         Column() {
           Text(this.subscriptions.length === 0
             ? $r('app.string.yt_empty_no_subs')
@@ -112,7 +112,7 @@ export struct SubscriptionFeedPage {
       .align(Alignment.Top)
       .scrollBar(BarState.Off)
     } else if (this.uiConfig.homeLayoutMode === 'grid') {
-      Scroll() {
+      Scroll(this.scrollerForScroll) {
         GridRow({
           columns: this.getVideoGridColumnCount(),
           gutter: { x: 8, y: 8 }
@@ -137,7 +137,7 @@ export struct SubscriptionFeedPage {
       .edgeEffect(EdgeEffect.Spring)
       .align(Alignment.Top)
     } else if (this.getWideListColumns() > 1) {
-      Scroll() {
+      Scroll(this.scrollerForScroll) {
         GridRow({
           columns: this.getWideListColumns(),
           gutter: { x: 8, y: 4 }
@@ -162,7 +162,7 @@ export struct SubscriptionFeedPage {
       .edgeEffect(EdgeEffect.Spring)
       .align(Alignment.Top)
     } else {
-      List({ space: 4 }) {
+      List({ space: 4, scroller: this.scrollerForScroll }) {
         ForEach(this.feedItems, (item: SubscriptionFeedItem) => {
           ListItem() {
             VideoCard({

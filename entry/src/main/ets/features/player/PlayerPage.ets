@@ -727,7 +727,7 @@ export struct VideoPlayerPage {
 
   @Builder
   tabBuilder(index: number, name: string | Resource) {
-    SubTabBarItem(name, this.currentTabIndex === index, this.themePrimary)
+    SubTabBarItem({ label: name, selected: this.currentTabIndex === index, themePrimary: this.themePrimary })
   }
 
   @Builder

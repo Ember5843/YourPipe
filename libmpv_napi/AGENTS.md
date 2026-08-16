@@ -92,8 +92,10 @@ libmpv_napi/src/main/
 ## 4. Native binary pipeline (out-of-tree, in WSL)
 `libmpv.so.2` and the FFmpeg static libs are **NOT built by Hvigor**. They
 are built in WSL and then vendored here:
-- Upstream MPV source: `\\wsl.localhost\Ubuntu-22.04\home\dyzxp\mpv`
-- Cross-compile recipe: `\\wsl.localhost\Ubuntu-22.04\home\dyzxp\libmpv-ohos-build`
+- Upstream MPV source: `mpv` checkout in your WSL home
+  (e.g. `\\wsl.localhost\<distro>\home\<user>\mpv`)
+- Cross-compile recipe: `libmpv-ohos-build` in your WSL home
+  (e.g. `\\wsl.localhost\<distro>\home\<user>\libmpv-ohos-build`)
 - Outputs land in:
   - `libmpv_napi/src/main/cpp/mpv-sdk/lib/${OHOS_ARCH}/libmpv.so.2` (+ headers in `include/mpv/`)
   - `libmpv_napi/src/main/cpp/ffmpeg-sdk/lib/${OHOS_ARCH}/libav*.a` (+ headers in `include/`)

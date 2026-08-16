@@ -496,6 +496,6 @@ export struct LocalPage {
 
   @Builder
   TabBarBuilder(index: number) {
-    SubTabBarItem(this.tabTitles[index], this.currentTabIndex === index, this.themePrimary)
+    SubTabBarItem({ label: this.tabTitles[index], selected: this.currentTabIndex === index, themePrimary: this.themePrimary })
   }
 }

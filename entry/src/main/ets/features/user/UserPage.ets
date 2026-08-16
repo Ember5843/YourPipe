@@ -560,7 +560,7 @@ export struct UserPage {
 
   @Builder
   UserTabBarBuilder(label: ResourceStr, index: number) {
-    SubTabBarItem(label, this.activeTabIndex === index, this.themePrimary)
+    SubTabBarItem({ label: label, selected: this.activeTabIndex === index, themePrimary: this.themePrimary })
   }
 
   @Builder
@@ -625,9 +625,12 @@ export struct UserPage {
           .width('100%')
         }
         .width('100%')
-        .layoutWeight(1)
-        .padding({ left: 12, right: 12, top: 4, bottom: 4 })
+        .backgroundColor($r('app.color.yourtube_bg_page'))
+        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
         .edgeEffect(EdgeEffect.Spring)
+        .scrollBar(BarState.Off)
+        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+        .layoutWeight(1)
         .onReachEnd(() => {
           this.loadMoreVideos();
         })

@@ -198,7 +198,7 @@ export struct PlayQueueList {
   }
 
   @Builder
-  Thumbnail(item: VideoItem, isPlaying: boolean) {
+  Thumbnail(item: VideoItem, index: number) {
     Stack({ alignContent: Alignment.Center }) {
       MediaThumb({
         imageUrl: item.thumbnailUrl || '',
@@ -210,7 +210,9 @@ export struct PlayQueueList {
         isLive: item.isLive
       })
 
-      if (isPlaying) {
+      // 在 body 内比较 this.currentIndex（建立 this 依赖）；若以 isPlaying 快照
+      // 按值传入，切歌时波形遮罩不会随状态刷新（V1 @Builder 按值冻结）。
+      if (index === this.currentIndex) {
         Column() {
           SymbolGlyph($r('sys.symbol.waveform'))
             .fontSize(20)
@@ -231,7 +233,7 @@ export struct PlayQueueList {
   @Builder
   QueueRow(item: VideoItem, index: number) {
     Row() {
-      this.Thumbnail(item, index === this.currentIndex)
+      this.Thumbnail(item, index)
 
       Column() {
         Text(item.title || '')

@@ -153,12 +153,35 @@ export struct HelpGuidePage {
   private StandardContent(item: GuidePageItem) {
     Column({ space: 0 }) {
       if (item.illustration !== null) {
-        Image(item.illustration)
+        if (this.params.mode === 'firstLaunch') {
+          // 首启全屏：插图占满文本之外的剩余空间并垂直居中，文本永远完整可见，
+          // 高度受限时插图自动缩小而不是挤出文本
+          Column() {
+            Image(item.illustration)
+              .width('100%')
+              // 大屏（平板/2in1）下限制插图最大宽度，避免横向几乎铺满全屏；
+              // maxHeight 100% 让插图在高度紧张时收缩进剩余空间
+              .constraintSize({ maxWidth: 480, maxHeight: '100%' })
+              .aspectRatio(1.5)
+              .objectFit(ImageFit.Contain)
+              .borderRadius($r('app.float.common_border_radius_7'))
+              .clip(true)
+          }
           .width('100%')
-          .aspectRatio(1.5)
-          .objectFit(ImageFit.Contain)
-          .borderRadius($r('app.float.common_border_radius_7'))
-          .clip(true)
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
+        } else {
+          // fromSettings（Options sheet）：高度有限，插图按自然尺寸展示，
+          // 整页包在 Scroll 里，放不下时向下滑动查看
+          Image(item.illustration)
+            .width('100%')
+            .constraintSize({ maxWidth: 480 })
+            .aspectRatio(1.5)
+            .objectFit(ImageFit.Contain)
+            .borderRadius($r('app.float.common_border_radius_7'))
+            .clip(true)
+            .margin({ top: 12 })
+        }
       }
 
       Text(item.title)
@@ -166,14 +189,14 @@ export struct HelpGuidePage {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.yourtube_text_primary'))
         .textAlign(TextAlign.Center)
-        .margin({ top: item.details.length > 0 ? 20 : 28 })
+        .margin({ top: item.details.length > 0 ? 16 : 20 })
 
       Text(item.desc)
         .fontSize(15)
         .fontColor($r('app.color.yourtube_text_secondary'))
         .textAlign(TextAlign.Center)
         .lineHeight(24)
-        .margin({ top: 14 })
+        .margin({ top: 12 })
 
       if (item.details.length > 0) {
         Column({ space: 10 }) {
@@ -203,7 +226,11 @@ export struct HelpGuidePage {
       }
     }
     .width('100%')
+    // firstLaunch 全屏：占满 Swiper 视口配合插图 layoutWeight 弹性适配；
+    // fromSettings：包在 Scroll 内，必须按内容换行（撑满视口会导致无法下滑）
+    .height(this.params.mode === 'firstLaunch' ? '100%' : 'auto')
     .alignItems(HorizontalAlign.Center)
+    .padding({ bottom: 12 })
   }
 
   build() {
@@ -222,9 +249,11 @@ export struct HelpGuidePage {
         }
       }
       .width('100%')
-      .height(44)
-      // firstLaunch 覆盖层位于 Navigation 内容区（标题栏之下），需额外避开标题栏高度
-      .margin({ top: this.safeAreaTop + (this.params.mode === 'firstLaunch' ? 48 : 8) })
+      .height(this.params.mode === 'firstLaunch' ? 44 : 8)
+      // firstLaunch 覆盖层位于 Navigation 内容区（标题栏之下），需额外避开标题栏高度；
+      // fromSettings 嵌在 Options sheet 内（自带标题栏和 insets），不能再叠加 safeAreaTop，
+      // 否则内容被整体下压、底部文本被挤出可视区
+      .margin({ top: this.params.mode === 'firstLaunch' ? this.safeAreaTop + 48 : 0 })
 
       // 内容：Swiper 翻页
       Swiper() {
@@ -232,16 +261,17 @@ export struct HelpGuidePage {
           Column() {
             if (item.isWelcome) {
               this.WelcomeContent()
+            } else if (this.params.mode === 'firstLaunch') {
+              // 首启全屏：内容按可用高度弹性收缩（插图 layoutWeight），整页一屏展示
+              this.StandardContent(item)
             } else {
+              // fromSettings（Options sheet）：插图按自然尺寸展示，可下滑查看
               Scroll() {
-                Column() {
-                  this.StandardContent(item)
-                }
-                .width('100%')
-                .padding({ top: 20, bottom: 20 })
+                this.StandardContent(item)
               }
               .width('100%')
               .height('100%')
+              .align(Alignment.Top)
               .scrollBar(BarState.Off)
             }
           }
@@ -287,6 +317,7 @@ export struct HelpGuidePage {
           .border({ width: 1, color: this.themePrimary })
           .borderRadius(SECTION_CARD_RADIUS)
           .width('72%')
+          .constraintSize({ maxWidth: 400 })
           .height(48)
           .margin({ bottom: 12 })
           .onClick(() => {
@@ -302,6 +333,7 @@ export struct HelpGuidePage {
         .backgroundColor(this.themePrimary)
         .borderRadius(SECTION_CARD_RADIUS)
         .width('72%')
+        .constraintSize({ maxWidth: 400 })
         .height(48)
         .margin({ bottom: this.safeAreaBottom > 0 ? this.safeAreaBottom + 16 : 32 })
         .onClick(() => {

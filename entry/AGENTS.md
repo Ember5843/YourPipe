@@ -64,7 +64,10 @@ Persistent state and shared singletons:
 Reusable components: `HdsTitleBar`, video cards / grids / thumbs, error / about /
 log / tab error panels, option rows, backup + language pickers, placeholders.
 `SubTabBar` (`SubTabBarItem`) is the shared in-page sub-tab builder (48vp bar,
-16fp, 36×2 theme-color indicator) used by Local / Player / User pages.
+16fp, 36×2 theme-color indicator) used by Local / Player / User pages. It takes
+a single `SubTabBarItemParams` object-literal param (by-reference refresh) —
+global `@Builder`s with multiple by-value params never re-render on caller
+state changes; keep new shared builders on the same single-param pattern.
 Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 `SECTION_CARD_RADIUS`, `TITLE_BAR_HEIGHT`); floating-title-bar pages reserve
 `safeAreaTop + TITLE_BAR_HEIGHT` at content top and set
