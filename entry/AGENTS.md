@@ -90,9 +90,9 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 - `AppLogStore.init(enabled, context.filesDir)`.
 - `AuthSessionManager.init(context)` (youtube_core) + `AuthStateHelper.refresh()`.
 - `YoutubePlayerClientConfig.resetToAuthDefault(...)` — product default is
-  `tv_downgraded` when signed in, `android_vr` for guests (both resolve to
-  direct adaptiveFormats URLs); **mweb** (SABR) is an opt-in/debug selection,
-  not the default.
+  `tv_downgraded` when signed in, `visionos` for guests (both resolve to
+  direct adaptiveFormats URLs; visionos is pot-free via the GAPIS endpoint).
+  **mweb** (SABR) is an opt-in/debug selection, not the default.
 - SABR wiring in `YouTubePlayService.initialize()`:
   `sabrSessionStore.setPoTokenProvider(...)` (UMP per-video pot),
   `sabrSessionStore.setInfoReloader(...)` (mid-playback re-probe, serialized

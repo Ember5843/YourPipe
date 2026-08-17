@@ -122,6 +122,25 @@ export class ClientsConstants {
     "com.google.android.youtube/21.03.36 (Linux; U; Android 16; GB) gzip";
 
   // =====================
+  // VISIONOS (Apple Vision Pro) — PipePipe guest default stream client
+  // =====================
+  static readonly VISIONOS_CLIENT_ID: string = "101";
+  static readonly VISIONOS_CLIENT_NAME: string = "VISIONOS";
+  static readonly VISIONOS_CLIENT_VERSION: string = "1.02";
+  static readonly VISIONOS_DEVICE_MAKE: string = "Apple";
+  static readonly VISIONOS_DEVICE_MODEL: string = "RealityDevice14,1";
+  static readonly VISIONOS_OS_NAME: string = "visionOS";
+  static readonly VISIONOS_OS_VERSION: string = "25.6.0.23O471";
+  static readonly VISIONOS_USER_AGENT_VERSION: string = "25_6_0";
+
+  /** PipePipe getVisionOsUserAgent — country code is the request localization's. */
+  static visionOsUserAgent(countryCode: string = 'US'): string {
+    return "com.google.visionos.youtube/" + ClientsConstants.VISIONOS_CLIENT_VERSION
+      + "(" + ClientsConstants.VISIONOS_DEVICE_MODEL + "; U; CPU visionOS "
+      + ClientsConstants.VISIONOS_USER_AGENT_VERSION + " like Mac OS X; " + countryCode + ")";
+  }
+
+  // =====================
   // ANDROID_VR (Android VR / Oculus Quest 3) — PipePipe 5.1.1
   // =====================
   static readonly ANDROID_VR_CLIENT_ID: string = "28";
@@ -159,5 +178,7 @@ export class ClientsConstants {
   // YouTube API URLs
   // =====================
   static readonly YOUTUBEI_V1_URL: string = "https://www.youtube.com/youtubei/v1/";
+  /** PipePipe YOUTUBEI_V1_GAPIS_URL — non-web clients (e.g. VISIONOS) player endpoint. */
+  static readonly YOUTUBEI_V1_GAPIS_URL: string = "https://youtubei.googleapis.com/youtubei/v1/";
   static readonly INNERTUBE_API_KEY: string = "AIzaSyBw-K-P3oV_O6m13v7C-C0p8n5v9m6o7p4";
 }

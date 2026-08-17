@@ -75,8 +75,8 @@ export default class EntryAbility extends UIAbility {
       AppLogStore.init(logEnabled, this.context.filesDir);
       AuthSessionManager.init(this.context);
       AuthStateHelper.refresh();
-      // SABR experiment: always mweb (login cookies still attach via auth flags;
-      // do not switch stream client to tv_downgraded).
+      // Stream client default (PipePipe reconcileYoutubePlayerClient): guest →
+      // visionos (token-free direct URLs), signed-in → tv_downgraded.
       const usePlaybackAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true
         && !!(AuthSessionManager.getInstance()?.getCookieStringForPlayback());
       YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);

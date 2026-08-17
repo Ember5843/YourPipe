@@ -101,10 +101,12 @@ youtube_core/src/main/
 ## 3. Extractor flow (playback-critical path)
 1. **Resolve video ID** from URL or ID string.
 2. **Client selection** via `YoutubePlayerClientConfig` (single client):
-   - allow-list: `mweb` | `web_safari` | `android_vr` | `tv_downgraded`
-   - **product default follows PipePipe**: guest → `android_vr`, signed-in →
+   - allow-list: `mweb` | `web_safari` | `visionos` | `android_vr` | `tv_downgraded`
+   - **product default follows PipePipe**: guest → `visionos` (pot-free,
+     POSTs the GAPIS endpoint `youtubei.googleapis.com`, no sts/pot), signed-in →
      `tv_downgraded` (entry calls `resetToAuthDefault`/`applyAuthDefault`);
-     both resolve to direct adaptiveFormats URLs. `mweb` (SABR) is an
+     both resolve to direct adaptiveFormats URLs. `android_vr` is a guest
+     fallback that requires a session pot. `mweb` (SABR) is an
      opt-in/debug selection only
    - `tv_downgraded` + Bearer doubles as the **restricted / OAuth recovery**
      path (skipped when the selected client already is tv_downgraded)
@@ -223,16 +225,19 @@ youtube_core/src/main/
   without a token, on a protection boundary, and as a background warmup when
   media arrives with status>=2 and no token. Mint is bounded by a 30s timeout
   + circuit breaker in the entry provider.
-- **Session pot on the player request**: every non-TV /player request
+- **Session pot on the player request**: every non-TV Innertube /player request
   (mweb / web_safari / android_vr — PipePipe `prepareSessionPoTokenPlayerRequest`
-  skips only TVHTML5) carries `context.client.visitorData` in the body
+  skips only TVHTML5; `visionos` hits the GAPIS endpoint and is pot-free by
+  design) carries `context.client.visitorData` in the body
   (identity-layer value; the request headers stay Content-Type / UA /
   Client-Name / Client-Version only — `X-Goog-Visitor-Id` appears only on
   non-web UMP POSTs) and, when the BotGuard runtime is already warm,
   `serviceIntegrityDimensions.poToken` — sourced through
   `SessionIdentityManager.setPlayerPoTokenHook` (entry provider, content
-  binding = the visitorData string itself, ~128B session pot, 5s cap,
-  fast-skip when cold so TTFF never waits on BotGuard). tv_downgraded requests
+  binding = the visitorData string itself, ~128B session pot, 5s cap; when
+  the BotGuard runtime is cold it attempts ONE bounded cold mint under the
+  same 5s cap instead of skipping — an un-potted android_vr response 403s on
+  googlevideo — and falls back to skipping on timeout). tv_downgraded requests
   stay entirely token-free (PipePipe 7673caed). The UMP streamerContext
   carries the separate per-video pot (content binding = `videoId`, ~91B).
   Identity invalidation clears all three caches (UMP, dash, player).
@@ -241,6 +246,22 @@ youtube_core/src/main/
 - `ConfiguredPlayerClient` — **sole** stream player path (PipePipe shape).
   All keys POST `www.youtube.com/youtubei/v1/player` with
   `playbackContext.signatureTimestamp` + client-specific UA / Client-Name.
+- **`visionos` is the exception** (PipePipe `fetchVisionOsJsonPlayer` /
+  `prepareJsonBuilder`): POST `youtubei.googleapis.com/youtubei/v1/player?prettyPrint=false&t=<12 random chars>&id=<videoId>`,
+  body = `context.client{clientName/clientVersion/clientScreen=WATCH/
+  platform=MOBILE/deviceMake/deviceModel/osName/osVersion/hl/gl/
+  utcOffsetMinutes=0/[visitorData]}` + `context.request{internalExperimentFlags,
+  useSsl}` + `context.user{lockedSafetyMode}` — **no** playbackContext/
+  signatureTimestamp/pot; headers = Content-Type + visionOS UA +
+  `X-Goog-Api-Format-Version: 2` only.
+- **Live classification** (`resolveIsLive` / `resolveIsPostLive`) follows
+  PipePipe `setStreamType`: `videoDetails.isLive` is the primary LIVE signal,
+  `isPostLiveDvr` marks DVR replays, microformat `isLiveNow` and
+  `liveStreamability`+HLS are fallbacks. Never rely on microformat alone —
+  visionos GAPIS responses carry no microformat block (a running live was
+  misclassified as post-live and sent down the DASH path → infinite buffer).
+  The anonymous MWEB HLS helper only fires when the selected client's
+  response lacks `hlsManifestUrl`.
 - Auth attachment is **rail-aware**: mweb uses Cookie/SAPISIDHASH only;
   TV client uses Bearer only. Never stuff Bearer into Cookie fields or
   Cookie into TV headers.
@@ -275,12 +296,17 @@ AuthSession (credentials may coexist)
 
 Priority when both present:
   user-data / home: WEB first → else TV → else kiosk
-  playback:        Cookie first → else OAuth+TV client → else anonymous mweb
+  playback:        Cookie/OAuth → tv_downgraded → else anonymous visionos
 
 Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
 ```
 - `AuthSessionManager.init(context)` — bootstraps storage; called from entry.
 - Prefer `getWebAuthorizationHeader` / `getTvAuthorizationHeader` at call sites.
+- Credential-state changes (login/logout/rail switch) must reset the pinned
+  session identity + PoToken caches (PipePipe LocalDomPoTokenProvider
+  credential-bound isolation): entry `AuthStateHelper.refresh()` does this via
+  a credential-rail fingerprint → `resetSessionVisitorData()` +
+  `SabrWebViewPoTokenProvider.resetForAuthChange()`.
 - `SmartTubeAuthProbe` — OAuth **device-code** sign-in (entry `DeviceQrLoginPage`).
 - Cookie WebView login is entry-owned (`WebViewLoginPage`); this module stores credentials.
 - `DebugAuthConstants` holds OAuth client/device URLs used by the device flow;

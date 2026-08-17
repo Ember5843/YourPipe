@@ -3,24 +3,25 @@
  * Keys match PipePipe NewPipe.setYoutubePlayerClient allow-list.
  *
  * Product default (PipePipe reconcileYoutubePlayerClient): guest is pinned to
- * android_vr (adaptiveFormats direct URLs, session pot on /player) and signed-in
- * to tv_downgraded (token-free direct URLs). mweb (SABR) remains available as an
- * opt-in/debug selection via setYoutubePlayerClient.
+ * visionos (token-free adaptiveFormats direct URLs) and signed-in to
+ * tv_downgraded (token-free direct URLs). android_vr stays selectable; mweb
+ * (SABR) remains available as an opt-in/debug selection via
+ * setYoutubePlayerClient.
  */
-export type YoutubePlayerClientKey = 'mweb' | 'web_safari' | 'android_vr' | 'tv_downgraded';
+export type YoutubePlayerClientKey = 'mweb' | 'web_safari' | 'visionos' | 'android_vr' | 'tv_downgraded';
 
 export class YoutubePlayerClientConfig {
-  private static selected: YoutubePlayerClientKey = 'android_vr';
+  private static selected: YoutubePlayerClientKey = 'visionos';
 
   private constructor() {}
 
   static setYoutubePlayerClient(client: string): void {
-    if (client === 'mweb' || client === 'web_safari'
+    if (client === 'mweb' || client === 'web_safari' || client === 'visionos'
       || client === 'android_vr' || client === 'tv_downgraded') {
       YoutubePlayerClientConfig.selected = client;
       return;
     }
-    YoutubePlayerClientConfig.selected = 'android_vr';
+    YoutubePlayerClientConfig.selected = 'visionos';
   }
 
   static getYoutubePlayerClient(): YoutubePlayerClientKey {
@@ -28,16 +29,17 @@ export class YoutubePlayerClientConfig {
   }
 
   /**
-   * Product default (PipePipe): signed-in → tv_downgraded, guest → android_vr.
-   * Both resolve to direct adaptiveFormats URLs; mweb/SABR is opt-in only.
+   * Product default (PipePipe): signed-in → tv_downgraded, guest → visionos.
+   * Both resolve to token-free direct adaptiveFormats URLs; mweb/SABR is
+   * opt-in only.
    */
   static applyAuthDefault(hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
-    YoutubePlayerClientConfig.selected = hasYouTubeLogin ? 'tv_downgraded' : 'android_vr';
+    YoutubePlayerClientConfig.selected = hasYouTubeLogin ? 'tv_downgraded' : 'visionos';
   }
 
   /** Reset to the product default for the given auth state. */
   static resetToAuthDefault(hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
-    YoutubePlayerClientConfig.selected = hasYouTubeLogin ? 'tv_downgraded' : 'android_vr';
+    YoutubePlayerClientConfig.selected = hasYouTubeLogin ? 'tv_downgraded' : 'visionos';
   }
 
   static allowedClients(hasYouTubeLogin: boolean): YoutubePlayerClientKey[] {
@@ -45,6 +47,6 @@ export class YoutubePlayerClientConfig {
     if (hasYouTubeLogin) {
       return ['tv_downgraded', 'mweb'];
     }
-    return ['android_vr', 'mweb', 'web_safari'];
+    return ['visionos', 'android_vr', 'mweb', 'web_safari'];
   }
 }

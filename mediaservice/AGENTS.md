@@ -99,12 +99,17 @@ stable local URL. Session types in `SessionStore`:
 | `youtube-dual` | Progressive/DASH dual (video+audio) with SIDX/`YoutubeDashIndex` (reference/rollback only, not on the production path) |
 | `sabr-dual` | SABR UMP dual tracks via `sabrSessionStore` (mweb opt-in path) |
 
-**Direct-link dual path (product VOD: android_vr / tv_downgraded)**:
+**Direct-link dual path (product VOD: visionos / tv_downgraded)**:
 `AvPlayerController.buildDualEdlUrl` creates two `single` open-range sessions
 (video + audio) and hands MPV a native `edl://` URL
 (`!new_stream` / `!delay_open`, the pre-SABR production pattern). MPV never
 touches a DASH demuxer for these clients; the SIDX `youtube-dual` static
 manifest path (`buildDualDashUrl`) is retained for reference only.
+Upstream transports in `RangeProxy`: VISIONOS (and TVHTML5) googlevideo
+requests stream over RCP (visionos = body-less GET) so MPV's first byte never
+waits for a full buffered chunk; other clients use buffered `@ohos.net.http`
+GET. Connect timeout is 10s (PipePipe OkHttp parity); transfer/read stays 30s
+(RCP `transferMs` covers the whole stream).
 
 **SABR dual path (mweb opt-in)**:
 1. Extractor returns SABR bootstrap (`YoutubeSabrInfo` / streams with SABR delivery).
@@ -114,8 +119,9 @@ manifest path (`buildDualDashUrl`) is retained for reference only.
 5. Offline: `SabrOfflineDownloader` for entry downloads.
 
 Startup: demand-side SIDX fetches gate on the pending DASH PoToken injection
-(`LocalMediaProxy.setStartupUrlGate`); likely initial tracks get a
-fire-and-forget SIDX prefetch.
+(`LocalMediaProxy.setStartupUrlGate`). The former fire-and-forget SIDX
+prefetch was removed from the play path — its cache was only consumed by the
+non-product `youtube-dual` session, so it was dead traffic on the EDL path.
 
 **Pacing / lease rules**:
 - The SABR session owns the UMP server backoff: `pumpOnce` waits out the

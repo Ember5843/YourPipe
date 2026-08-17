@@ -16,8 +16,10 @@
 - **What it is**: YouTube client for OpenHarmony / HarmonyOS. Plays YouTube
   content through a native **MPV** pipeline (vendored `libmpv.so` + static
   `libav*` for mux/remux). Product VOD path is **direct-link DASH** (guest:
-  `android_vr` /player + session pot → adaptiveFormats direct URLs → dual-track
-  local proxy → MPV; signed-in: `tv_downgraded`, token-free). The mweb
+  `visionos` /player via the GAPIS endpoint, pot-free — PipePipe parity →
+  adaptiveFormats direct URLs → dual-track local proxy → MPV; signed-in:
+  `tv_downgraded`, token-free). `android_vr` remains as a fallback selection
+  (requires a session pot). The mweb
   **SABR/UMP** path is kept as an opt-in/debug selection. The `libmpv_napi` module
   (`MpvPlayerView` / `MpvPlayerController`) is the NAPI bridge to MPV,
   originally derived from the upstream `wang-bin/libmdk-napi` package
@@ -201,8 +203,9 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
 - **Player stack**: product backend is MPV only (`libmpv_napi` +
   `MpvPlaybackEngine`). Do not reintroduce a second decoder/player path.
 - **Playback media path**: product VOD is direct-link-first (guest
-  `android_vr` / signed-in `tv_downgraded` → adaptiveFormats direct URLs →
-  local range/DASH proxy). The mweb **SABR** path is an opt-in/debug selection:
+  `visionos` / signed-in `tv_downgraded` → adaptiveFormats direct URLs →
+  local range/DASH proxy). `android_vr` is a fallback guest selection that
+  requires a session pot. The mweb **SABR** path is an opt-in/debug selection:
   extractor bootstraps SABR; `youtube_core` owns UMP session fetch;
   `mediaservice` owns lease/store/serve + MPV load URL; `entry` owns PoToken
   WebView mint.

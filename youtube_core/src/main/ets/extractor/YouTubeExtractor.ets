@@ -624,9 +624,9 @@ export class YouTubeExtractor {
     }
     
     videoInfo.viewCount = this.parseIntSafe(vd.viewCount) || this.parseIntSafe(micro.viewCount);
-    // 使用 liveBroadcastDetails.isLiveNow 区分直播与回放
-    // vd.isLiveContent 对回放也返回 true，只有 isLiveNow 代表真正在直播
-    videoInfo.isLive = micro.liveBroadcastDetails?.isLiveNow === true;
+    // PipePipe setStreamType parity: vd.isLive / isPostLiveDvr / isLiveNow —
+    // vd.isLiveContent alone is also true for replays of past lives.
+    videoInfo.isLive = this.resolveIsLive(playerResponse);
     videoInfo.description = vd.shortDescription || this.extractTextFromRuns(micro.description) || '';
 
     const thumbs = vd.thumbnail?.thumbnails || micro.thumbnail?.thumbnails || [];
@@ -845,25 +845,39 @@ export class YouTubeExtractor {
     this.streamsCachedVideoId = videoId;
   }
 
+  /**
+   * PipePipe setStreamType parity: videoDetails.isLive is the primary signal
+   * (visionos GAPIS responses carry no microformat block, so isLiveNow-only
+   * detection misclassified a running live as post-live); microformat
+   * isLiveNow and the liveStreamability+HLS branch are fallbacks.
+   */
   private resolveIsLive(meta: PlayerResponse, player?: PlayerResponse): boolean {
+    if (meta.videoDetails?.isLive === true || player?.videoDetails?.isLive === true) {
+      return true;
+    }
     if (meta.microformat?.playerMicroformatRenderer?.liveBroadcastDetails?.isLiveNow === true) {
       return true;
     }
     if (player?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails?.isLiveNow === true) {
       return true;
     }
-    // Fallback: isLiveContent alone is true for VOD of past lives; prefer isLiveNow only.
-    return false;
+    const pr = player ?? meta;
+    const hasStreamability = !!pr.playabilityStatus?.liveStreamability
+      || !!meta.playabilityStatus?.liveStreamability;
+    return hasStreamability && !!(pr.streamingData?.hlsManifestUrl || this.mwebHlsManifestUrl);
   }
 
   private resolveIsPostLive(meta: PlayerResponse, player?: PlayerResponse): boolean {
-    // Approximate PipePipe isPostLiveDvr: was live content, not live now, has HLS.
     const pr = player ?? meta;
+    // PipePipe setStreamType: explicit isPostLiveDvr flag wins when present.
+    if (pr.videoDetails?.isPostLiveDvr === true || meta.videoDetails?.isPostLiveDvr === true) {
+      return true;
+    }
+    // Heuristic fallback: was live content, is NOT live now, has HLS.
     const isLiveContent = pr.videoDetails?.isLiveContent === true
       || meta.videoDetails?.isLiveContent === true;
-    const isLiveNow = meta.microformat?.playerMicroformatRenderer?.liveBroadcastDetails?.isLiveNow === true
-      || pr.microformat?.playerMicroformatRenderer?.liveBroadcastDetails?.isLiveNow === true;
-    return isLiveContent && !isLiveNow && !!(pr.streamingData?.hlsManifestUrl || this.mwebHlsManifestUrl);
+    return isLiveContent && !this.resolveIsLive(meta, pr)
+      && !!(pr.streamingData?.hlsManifestUrl || this.mwebHlsManifestUrl);
   }
 
   /**
@@ -1256,7 +1270,7 @@ export class YouTubeExtractor {
     this.mwebHlsManifestUrl = '';
 
     // PipePipe reconcileYoutubePlayerClient: signed-in (Cookie or OAuth-only) →
-    // tv_downgraded, guest → android_vr. Cookie+SAPISIDHASH attaches to whichever
+    // tv_downgraded, guest → visionos. Cookie+SAPISIDHASH attaches to whichever
     // client is selected (PipePipe addLoggedInHeaders).
     const webCookieAuth = this.shouldAttachWebCookieAuth();
     const hasOauth = this.isOauthOnlyPlaybackAuth();
@@ -1406,7 +1420,11 @@ export class YouTubeExtractor {
     let isLive = this.resolveIsLive(metaBase, streamPr);
     const isPossibleTvLive = usedClient === 'tv_downgraded'
       && streamPr?.videoDetails?.isLiveContent === true;
+    // PipePipe: the anonymous MWEB HLS helper only fires when the selected
+    // client's response has no hlsManifestUrl of its own (visionos live
+    // responses already carry one — an extra /player RTT would be wasted).
     const hlsRecoveryPromise = (isLive || isPossibleTvLive)
+      && !innertubePlayers.player?.streamingData?.hlsManifestUrl
       ? ConfiguredPlayerClient.fetchMwebHlsOnly({
         videoId: videoId,
         hl: this.hl,
@@ -2705,6 +2723,7 @@ export class YouTubeExtractor {
       'stream': 6,
       'mweb': 6,
       'web_safari': 6,
+      'visionos': 6,
       'android_vr': 6,
       'tv_downgraded': 6,
       'safari': 4,

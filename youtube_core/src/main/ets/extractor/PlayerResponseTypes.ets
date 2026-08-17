@@ -22,6 +22,11 @@ export interface VideoDetails {
   isPrivate?: boolean;
   isUnpluggedCorpus?: boolean;
   isLiveContent?: boolean;
+  /** PipePipe setStreamType: primary LIVE_STREAM signal (present on visionos
+   * GAPIS responses that carry no microformat block). */
+  isLive?: boolean;
+  /** PipePipe setStreamType: POST_LIVE_STREAM signal (DVR replay of an ended live). */
+  isPostLiveDvr?: boolean;
   shortDescription?: string;
 }
 
@@ -427,6 +432,8 @@ export interface PlayabilityStatus {
   desktopLegacyAgeGateReason?: number | string | boolean;
   playableInEmbed?: boolean;
   miniplayer?: Miniplayer;
+  /** Presence marks live-streamability (PipePipe setStreamType LIVE_STREAM branch). */
+  liveStreamability?: Record<string, Object>;
   contextParams?: string;
   errorScreen?: ErrorScreen;
 }

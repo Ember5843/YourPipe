@@ -19,6 +19,9 @@ const ANDROID_VR_USER_AGENT: string =
   'com.google.android.apps.youtube.vr.oculus/1.65.10 '
   + '(Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
 const IOS_USER_AGENT: string = 'com.google.ios.youtube/20.03.02(iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X; GB)';
+// PipePipe getVisionOsUserAgent (country code fixed to GB, matching the other constants).
+const VISIONOS_USER_AGENT: string =
+  'com.google.visionos.youtube/1.02(RealityDevice14,1; U; CPU visionOS 25_6_0 like Mac OS X; GB)';
 const SAFARI_USER_AGENT: string =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) '
   + 'Version/15.5 Safari/605.1.15,gzip(gfe)';
@@ -529,6 +532,12 @@ export class LocalMediaProxy {
       case 'ios':
       case 'IOS':
         return IOS_USER_AGENT;
+      case 'visionos':
+      case 'VISIONOS':
+        // Token-free direct URLs; media fetches stay on the GET path with
+        // the visionos UA (PipePipe treats VISIONOS like other non-mobile
+        // streaming URLs — GET + no Origin/Referer).
+        return VISIONOS_USER_AGENT;
       case 'web_safari':
       case 'safari':
         return SAFARI_USER_AGENT;

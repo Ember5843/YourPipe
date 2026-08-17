@@ -7,6 +7,12 @@ import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][RangeProxy]';
 const MAX_RETRIES = 2;
+// PipePipe parity: OkHttp DataSource uses ~8s connect/read timeouts. 10s here
+// bounds connect (and socket-read inactivity) so a dead googlevideo edge fails
+// into retry quickly instead of stalling the pipeline for 30s.
+const CONNECT_TIMEOUT_MS = 10000;
+// Total-transfer / read-inactivity budget. RCP transferMs covers the whole
+// stream, so it stays generous to avoid aborting long media transfers.
 const TIMEOUT_MS = 30000;
 const requestNumberMap: Map<string, number> = new Map<string, number>();
 
@@ -116,6 +122,13 @@ function isIosUrl(url: string): boolean {
   return getYoutubeClient(url) === 'IOS';
 }
 
+// PipePipe: VISIONOS videoplayback is a plain GET (not a mobile POST), but it
+// must still be streamed — buffering the whole capped chunk before first byte
+// adds seconds to TTFF on slow links.
+function isVisionOsUrl(url: string): boolean {
+  return getYoutubeClient(url) === 'VISIONOS';
+}
+
 // PipePipe: exact c=WEB only (not MWEB / WEB_EMBEDDED / …)
 function isWebUrl(url: string): boolean {
   return getYoutubeClient(url) === 'WEB';
@@ -169,16 +182,19 @@ function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
 }
 
 /**
- * RCP session for the Android/iOS empty-body videoplayback POST.
- * @ohos.net.http rejects zero-length bodies at parameter validation
- * (NETSTACK error 401) whether extraData is '' or ArrayBuffer(0), and sending
- * no body gets HTTP 411 from googlevideo. RCP accepts an empty-string body and
- * sends Content-Length: 0 — the shape PipePipe's OkHttp path uses. GET stays
- * on @ohos.net.http (RCP streaming was 403-prone for TVHTML5 range probes).
+ * RCP session for streamed YouTube videoplayback fetches.
+ * Android/iOS: empty-body POST — @ohos.net.http rejects zero-length bodies at
+ * parameter validation (NETSTACK error 401) whether extraData is '' or
+ * ArrayBuffer(0), and sending no body gets HTTP 411 from googlevideo; RCP
+ * accepts an empty-string body and sends Content-Length: 0 — the shape
+ * PipePipe's OkHttp path uses. VISIONOS: body-less GET on the same RCP
+ * streaming path (first byte must not wait for the whole capped chunk).
+ * Other clients' GET stays on @ohos.net.http (RCP streaming was 403-prone
+ * for TVHTML5 range probes).
  */
 function createYoutubePostSession(url: string): rcp.Session {
   const config: rcp.Configuration = {
-    transfer: { timeout: { connectMs: TIMEOUT_MS, transferMs: TIMEOUT_MS } }
+    transfer: { timeout: { connectMs: CONNECT_TIMEOUT_MS, transferMs: TIMEOUT_MS } }
   };
   const snap = HttpProxyOptions.getSnapshot();
   if (snap.kind === 'socks5' && HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
@@ -306,7 +322,7 @@ export async function fetchYoutubeRangeBytes(
       method: http.RequestMethod.GET,
       header: headers,
       expectDataType: http.HttpDataType.ARRAY_BUFFER,
-      connectTimeout: TIMEOUT_MS,
+      connectTimeout: CONNECT_TIMEOUT_MS,
       readTimeout: TIMEOUT_MS,
       usingCache: false,
     };
@@ -467,16 +483,22 @@ export async function serveRange(
   // has been 403-prone for TVHTML5 range probes.
   if (resource.isYoutubePlayback) {
     const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
-    if (usePost) {
+    const useStreamingGet = !usePost && isVisionOsUrl(resource.url);
+    if (usePost || useStreamingGet) {
+      const method = usePost ? 'POST' : 'GET';
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
         if (attempt === 0) {
-          Logger.info(TAG, `serveRange yt: transport=rcp ${describeYoutubeRequest(resource, 'POST', fetchUrl, rangeSpec)}`);
+          Logger.info(TAG, `serveRange yt: transport=rcp ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
         }
         const rcpSession = createYoutubePostSession(fetchUrl);
         let retryDelayMs: number = 0;
         try {
-          const req = new rcp.Request(fetchUrl, 'POST', makeYoutubeHeaders(resource), '');
+          // GET must not carry a body (PipePipe plain GET); POST keeps the
+          // empty-string body — googlevideo 411s on a body-less POST.
+          const req = usePost
+            ? new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource), '')
+            : new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource));
           req.destination = { kind: 'stream', stream: writer };
           const resp = await rcpSession.fetch(req);
           if (resp.statusCode === 200 || resp.statusCode === 206) {
@@ -484,7 +506,7 @@ export async function serveRange(
           }
           lastError = `status=${resp.statusCode}`;
           Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} resource=${resource.id} `
-            + `${describeYoutubeRequest(resource, 'POST', fetchUrl, rangeSpec)}`);
+            + `${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
           if (resp.statusCode >= 400 && resp.statusCode < 500) {
             if (resp.statusCode === 403 || resp.statusCode === 410) {
               // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
@@ -531,7 +553,7 @@ export async function serveRange(
           method: http.RequestMethod.GET,
           header: headers,
           expectDataType: http.HttpDataType.ARRAY_BUFFER,
-          connectTimeout: TIMEOUT_MS,
+          connectTimeout: CONNECT_TIMEOUT_MS,
           readTimeout: TIMEOUT_MS,
           usingCache: false,
         };
@@ -591,7 +613,7 @@ export async function serveRange(
     const sessionHeaders = makeHeaders(resource);
     const rcpSession = rcp.createSession({
       headers: sessionHeaders,
-      requestConfiguration: { transfer: { timeout: { connectMs: TIMEOUT_MS, transferMs: TIMEOUT_MS } } }
+      requestConfiguration: { transfer: { timeout: { connectMs: CONNECT_TIMEOUT_MS, transferMs: TIMEOUT_MS } } }
     });
     try {
       const dest: rcp.DownloadToStream = { kind: 'stream', stream: writer };

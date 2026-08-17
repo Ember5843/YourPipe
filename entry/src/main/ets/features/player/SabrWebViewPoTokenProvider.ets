@@ -97,6 +97,24 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
   }
 
   /**
+   * PipePipe LocalDomPoTokenProvider credential-bound cache isolation: a login
+   * /logout/account switch invalidates every token minted under the previous
+   * credential state. Drops all per-video + player token caches and the
+   * BotGuard warm flag; the caller is responsible for also resetting the
+   * pinned session identity (YoutubeJavaScriptPlayerManager.resetSessionVisitorData).
+   */
+  resetForAuthChange(): void {
+    this.cache.clear();
+    this.dashCache.clear();
+    this.playerTokenCache = undefined;
+    this.runtimeWarmed = false;
+    this.pendingWarmVisitorData = '';
+    this.mintTimeoutStreak = 0;
+    this.mintBrokenUntilMs = 0;
+    logger.info('resetForAuthChange: token caches + BotGuard warm state cleared');
+  }
+
+  /**
    * ROTATE_IDENTITY: drop the pinned session identity so the session re-probe
    * pins a fresh visitorData, then clear every token minted against the old
    * identity for this video. The next mint re-initializes BotGuard because
@@ -120,9 +138,13 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
   /**
    * Visitor-bound player-request PoToken (SessionPoTokenHook; session token,
    * not video-bound — minted under the fixed '__player__' identifier).
-   * Fast-skips when the BotGuard runtime is not warm and nothing is cached:
-   * extraction cold start must never wait for BotGuard init. The short mint
-   * cap here pairs with the caller-side race in ConfiguredPlayerClient.
+   * PipePipe parity: pot-requiring clients (android_vr) send the session pot
+   * on /player, so a cold BotGuard runtime must NOT silently skip — unpotted
+   * direct URLs 403 on googlevideo. When cold we attempt one bounded cold
+   * mint (BotGuard init runs inline inside SabrLocalDomPoTokenGenerator);
+   * PLAYER_MINT_TIMEOUT_MS below plus the caller-side race in
+   * ConfiguredPlayerClient (PLAYER_PO_TOKEN_TIMEOUT_MS) bound the delay, and
+   * a timeout falls back to the old skip behavior.
    */
   async getPlayerPoToken(
     clientName: string,
@@ -142,9 +164,13 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
       logger.debug('getPlayerPoToken: Local DOM ArkWeb is not attached');
       return undefined;
     }
-    if (!this.runtimeWarmed) {
-      logger.debug('getPlayerPoToken: skip, BotGuard runtime not warm yet');
-      return undefined;
+    const coldStart = !this.runtimeWarmed;
+    if (coldStart) {
+      // Cold BotGuard: try one bounded cold mint instead of skipping (see doc
+      // above). Mark warm optimistically so concurrent calls take this path;
+      // a mint failure below resets the flag so the next call retries cold.
+      logger.info('getPlayerPoToken: BotGuard runtime cold, attempting bounded cold mint');
+      this.runtimeWarmed = true;
     }
     logger.info(`getPlayerPoToken: mint start client=${clientName} version=${clientVersion}`);
     let timerId: number = -1;
@@ -156,6 +182,9 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
       });
       raw = await Promise.race([this.mint(visitorData, '__player__', false), timeout]);
     } catch (e) {
+      if (coldStart) {
+        this.runtimeWarmed = false;
+      }
       logger.warn(`getPlayerPoToken: mint error client=${clientName}: ${String(e)}`);
       return undefined;
     } finally {

@@ -372,14 +372,10 @@ export class YouTubePlayService {
       const playerStreams: StreamInfo[] = this.mapToPlayerStreams(videoInfo.streams, videoInfo.durationMs);
 
       logger.info(`${TAG} 流摘要: video_only=${playerStreams.filter(s => s.kind === 'video_only').length} audio_only=${playerStreams.filter(s => s.kind === 'audio_only').length} progressive=${playerStreams.filter(s => s.kind === 'progressive' || s.kind === '').length} sabr=${playerStreams.filter(s => s.kind === 'sabr' || s.deliveryMethod === 'SABR').length} subtitles=${videoInfo.subtitleTracks.length}`);
-      // P0-3 (TTFF): prefetch SIDX for the most likely initial DASH tracks so
-      // the proxy session build can hit a warm cache instead of two range RTTs.
-      // Fire-and-forget; misses fall back to the demand path unchanged.
-      try {
-        LocalMediaProxy.prefetchLikelyDashSidx(playerStreams, attemptId);
-      } catch (e) {
-        logger.warn(`${TAG} sidx prefetch kick failed: ${String(e)}`);
-      }
+      // SIDX prefetch removed: its cache is consumed only by the reference
+      // youtube-dual session builder, never by the product EDL single-session
+      // path — the prefetch was dead upstream traffic inside the TTFF window.
+      // (LocalMediaProxy.prefetchLikelyDashSidx stays available for the dual path.)
       return {
         success: true,
         videoInfo: videoInfo,
@@ -467,10 +463,11 @@ export class YouTubePlayService {
 
   /** Inject pot= into DASH/progressive stream URLs (not SABR). */
   private async injectDashPoToken(videoInfo: VideoInfo): Promise<void> {
-    // PipePipe: tv_downgraded is fully token-free — /player carries no pot and
-    // media URLs never get pot= either (PipePipe's pot-append is commented out).
-    if (YoutubePlayerClientConfig.getYoutubePlayerClient() === 'tv_downgraded') {
-      logger.info(`${TAG} tv_downgraded is token-free; skipping Dash PoToken injection`);
+    // PipePipe: tv_downgraded and visionos are fully token-free — /player
+    // carries no pot and media URLs never get pot= either.
+    const clientKey = YoutubePlayerClientConfig.getYoutubePlayerClient();
+    if (clientKey === 'tv_downgraded' || clientKey === 'visionos') {
+      logger.info(`${TAG} ${clientKey} is token-free; skipping Dash PoToken injection`);
       return;
     }
     // Identity layer is the single visitorData source: the session-pinned value

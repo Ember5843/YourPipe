@@ -83,6 +83,9 @@ export class ConfiguredPlayerClient {
     useWebAuth: boolean = false,
     useTvAuth: boolean = false
   ): Promise<ClientFetchResult | undefined> {
+    if (key === 'visionos') {
+      return ConfiguredPlayerClient.fetchVisionOs(ctx, httpClient, useWebAuth);
+    }
     if (!ctx.signatureTimestamp || ctx.signatureTimestamp <= 0) {
       logger.warn(`[${key}] No signatureTimestamp, skipping stream player`);
       return undefined;
@@ -198,6 +201,91 @@ export class ConfiguredPlayerClient {
       return result;
     } catch (e) {
       logger.warn(`[${key}] fetch failed:`, e);
+      return undefined;
+    }
+  }
+
+  /**
+   * PipePipe fetchVisionOsJsonPlayer: token-free guest client.
+   * POST youtubei.googleapis.com (GAPIS) — body has NO playbackContext /
+   * signatureTimestamp and NO serviceIntegrityDimensions; pot is never minted
+   * for this client. visitorData is the pinned session value when available
+   * (PipePipe fetches one from innertube when absent; we skip that extra RTT
+   * and omit the field instead).
+   */
+  static async fetchVisionOs(
+    ctx: ClientFetchContext,
+    httpClient: YouTubeHttpClient,
+    useWebAuth: boolean = false
+  ): Promise<ClientFetchResult | undefined> {
+    const cpn = randomCpn();
+    const client: Record<string, Object> = {
+      'clientName': ClientsConstants.VISIONOS_CLIENT_NAME,
+      'clientVersion': ClientsConstants.VISIONOS_CLIENT_VERSION,
+      'clientScreen': ClientsConstants.WATCH_CLIENT_SCREEN,
+      'platform': ClientsConstants.MOBILE_CLIENT_PLATFORM,
+      'deviceMake': ClientsConstants.VISIONOS_DEVICE_MAKE,
+      'deviceModel': ClientsConstants.VISIONOS_DEVICE_MODEL,
+      'osName': ClientsConstants.VISIONOS_OS_NAME,
+      'osVersion': ClientsConstants.VISIONOS_OS_VERSION,
+      'hl': ctx.hl,
+      'gl': ctx.gl,
+      'utcOffsetMinutes': 0
+    };
+    const visitorData = SessionIdentityManager.current()?.visitorData
+      || ctx.visitorData || '';
+    if (visitorData.length > 0) {
+      client['visitorData'] = visitorData;
+    }
+
+    const payload: Record<string, Object> = {
+      'context': {
+        'client': client,
+        'request': {
+          'internalExperimentFlags': [] as Object[],
+          'useSsl': true
+        } as Record<string, Object>,
+        'user': {
+          'lockedSafetyMode': false
+        } as Record<string, Object>
+      } as Record<string, Object>,
+      'videoId': ctx.videoId,
+      'cpn': cpn,
+      'contentCheckOk': true,
+      'racyCheckOk': true
+    };
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': ClientsConstants.visionOsUserAgent(ctx.gl),
+      'X-Goog-Api-Format-Version': '2'
+    };
+
+    const url = `${ClientsConstants.YOUTUBEI_V1_GAPIS_URL}player?prettyPrint=false`
+      + `&t=${randomCpn().substring(0, 12)}&id=${ctx.videoId}`;
+    try {
+      const response = await httpClient.postJson(url, payload, headers, useWebAuth, false);
+      if (!response || response.responseCode !== 200 || !response.result) {
+        logger.warn(`[visionos] stream player HTTP ${response?.responseCode} webAuth=${useWebAuth}`);
+        return undefined;
+      }
+      const pr = JSON.parse(response.result as string) as PlayerResponse;
+      if (!pr) {
+        return undefined;
+      }
+      const result: ClientFetchResult = {
+        streamingData: pr.streamingData,
+        cpn: cpn,
+        sourceClient: 'visionos',
+        playerResponse: pr
+      };
+      const sd = pr.streamingData;
+      logger.info(`[visionos] status=${pr.playabilityStatus?.status || '(none)'} `
+        + `adaptive=${sd?.adaptiveFormats?.length ?? 0} formats=${sd?.formats?.length ?? 0} `
+        + `hasServerAbr=${!!sd?.serverAbrStreamingUrl} hasHls=${!!sd?.hlsManifestUrl}`);
+      return result;
+    } catch (e) {
+      logger.warn('[visionos] fetch failed:', e);
       return undefined;
     }
   }
