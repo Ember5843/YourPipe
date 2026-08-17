@@ -6,6 +6,8 @@ import common from '@ohos.app.ability.common';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
 import { TabErrorPanel } from '../../../common/components/TabErrorPanel';
+import { CommentTranslateButton, CommentTranslatedText, CommentTranslateStateStore } from './CommentTranslateSection';
+import { TranslationService } from '../../../common/TranslationService';
 
 const logger = AppLog.getInstance('CommentList');
 
@@ -246,6 +248,11 @@ export struct CommentList {
         .lineHeight(20)
         .textAlign(TextAlign.Start)
 
+      if (TranslationService.shouldOfferTranslation(item.commentText)) {
+        CommentTranslatedText({ state: CommentTranslateStateStore.get(item.id, item.commentText) })
+          .margin({ left: 48 })
+      }
+
       // 交互栏
       Row() {
         Row() {
@@ -256,6 +263,14 @@ export struct CommentList {
 
         if (item.isHeartedByAuthor) {
           SymbolGlyph($r('sys.symbol.heart_fill')).fontSize(14).fontColor([Color.Red])
+            .margin({ right: 24 })
+        }
+
+        if (TranslationService.shouldOfferTranslation(item.commentText)) {
+          CommentTranslateButton({
+            state: CommentTranslateStateStore.get(item.id, item.commentText),
+            commentId: item.id
+          })
             .margin({ right: 24 })
         }
 

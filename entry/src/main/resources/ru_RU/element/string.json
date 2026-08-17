@@ -297,6 +297,18 @@
             "value": "Настройки языка"
         },
         {
+            "name": "yt_section_content_translation",
+            "value": "Перевод контента"
+        },
+        {
+            "name": "yt_setting_translation_language",
+            "value": "Переводить на"
+        },
+        {
+            "name": "yt_follow_app_language",
+            "value": "Как в приложении"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "Язык интерфейса"
         },
@@ -631,6 +643,22 @@
         {
             "name": "yt_label_like",
             "value": "Нравится"
+        },
+        {
+            "name": "yt_translate_action",
+            "value": "Перевести"
+        },
+        {
+            "name": "yt_show_original",
+            "value": "Показать оригинал"
+        },
+        {
+            "name": "yt_translating",
+            "value": "Перевод…"
+        },
+        {
+            "name": "yt_translate_failed",
+            "value": "Ошибка перевода, нажмите для повтора"
         },
         {
             "name": "yt_label_dislike",

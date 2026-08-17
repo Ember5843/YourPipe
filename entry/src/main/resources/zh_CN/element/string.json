@@ -309,6 +309,18 @@
             "value": "语言设置"
         },
         {
+            "name": "yt_section_content_translation",
+            "value": "内容翻译"
+        },
+        {
+            "name": "yt_setting_translation_language",
+            "value": "翻译目标语言"
+        },
+        {
+            "name": "yt_follow_app_language",
+            "value": "跟随应用语言"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "应用 UI 语言"
         },
@@ -659,6 +671,22 @@
         {
             "name": "yt_label_like",
             "value": "赞"
+        },
+        {
+            "name": "yt_translate_action",
+            "value": "翻译"
+        },
+        {
+            "name": "yt_show_original",
+            "value": "查看原文"
+        },
+        {
+            "name": "yt_translating",
+            "value": "翻译中…"
+        },
+        {
+            "name": "yt_translate_failed",
+            "value": "翻译失败，点击重试"
         },
         {
             "name": "yt_label_dislike",

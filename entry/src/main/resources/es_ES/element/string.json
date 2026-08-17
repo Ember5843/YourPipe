@@ -297,6 +297,18 @@
             "value": "Configuración de idioma"
         },
         {
+            "name": "yt_section_content_translation",
+            "value": "Traducción de contenido"
+        },
+        {
+            "name": "yt_setting_translation_language",
+            "value": "Traducir a"
+        },
+        {
+            "name": "yt_follow_app_language",
+            "value": "Seguir idioma de la app"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "Idioma de la app"
         },
@@ -631,6 +643,22 @@
         {
             "name": "yt_label_like",
             "value": "Me gusta"
+        },
+        {
+            "name": "yt_translate_action",
+            "value": "Traducir"
+        },
+        {
+            "name": "yt_show_original",
+            "value": "Mostrar original"
+        },
+        {
+            "name": "yt_translating",
+            "value": "Traduciendo…"
+        },
+        {
+            "name": "yt_translate_failed",
+            "value": "Error de traducción, toca para reintentar"
         },
         {
             "name": "yt_label_dislike",

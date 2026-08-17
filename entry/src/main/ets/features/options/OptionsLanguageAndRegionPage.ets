@@ -71,6 +71,18 @@ export struct OptionsLanguageAndRegionPage {
     return this.params.contentCountryItems.map(item => ({ value: item.localizedName } as SelectOption));
   }
 
+  /** 'default' + 应用支持的语言；default 项显示为「跟随应用语言」 */
+  private getTranslationLangItems(): LanguagePickerItem[] {
+    const followApp = getContext().resourceManager.getStringSync($r('app.string.yt_follow_app_language').id);
+    const items: LanguagePickerItem[] = [new LanguagePickerItem('default', followApp, followApp)];
+    for (const item of this.params.appLangItems) {
+      if (item.code !== 'default') {
+        items.push(item);
+      }
+    }
+    return items;
+  }
+
   build() {
     Column() {
       List({ space: 6 }) {
@@ -127,6 +139,30 @@ export struct OptionsLanguageAndRegionPage {
         .borderRadius(16)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_section_content_translation') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_translation_language'),
+              options: this.getTranslationLangItems().map(item => ({ value: item.localizedName } as SelectOption)),
+              selectedIndex: Math.max(0, this.getTranslationLangItems().findIndex(it => it.code === this.uiConfig.translationLanguage)),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const code = this.getTranslationLangItems()[index].code;
+                this.params.updateUiConfig(cfg => cfg.translationLanguage = code);
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(16)
+        .clip(true)
       }
       .width('100%')
       .layoutWeight(1)

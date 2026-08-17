@@ -18,6 +18,8 @@ export class UIConfig {
   systemLanguage: string = 'en-Latn';
   searchLanguage: string = 'default';
   searchCountry: string = 'default';
+  /** Comment translation target: 'default' follows the app UI language. */
+  translationLanguage: string = 'default';
   colorPreset: string = 'default';
   isVibrate: boolean = true;
   isAnimation: boolean = true;
@@ -39,6 +41,7 @@ export class UIConfig {
     next.systemLanguage = this.systemLanguage;
     next.searchLanguage = this.searchLanguage;
     next.searchCountry = this.searchCountry;
+    next.translationLanguage = this.translationLanguage;
     next.colorPreset = this.colorPreset;
     next.isVibrate = this.isVibrate;
     next.isAnimation = this.isAnimation;
@@ -65,6 +68,7 @@ export class UIConfig {
     config.userLanguage = PreferencesStore.getString('cfg_userLanguage', 'default');
     config.searchLanguage = PreferencesStore.getString('cfg_searchLanguage', 'default');
     config.searchCountry = PreferencesStore.getString('cfg_searchCountry', 'default');
+    config.translationLanguage = PreferencesStore.getString('cfg_translationLanguage', 'default');
     config.colorPreset = PreferencesStore.getString('cfg_colorPreset', 'default');
     config.enableLogger = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
     config.homeLayoutMode = PreferencesStore.getString('cfg_homeLayoutMode', 'list');
@@ -88,6 +92,7 @@ export class UIConfig {
     PreferencesStore.setString('cfg_userLanguage', config.userLanguage);
     PreferencesStore.setString('cfg_searchLanguage', config.searchLanguage);
     PreferencesStore.setString('cfg_searchCountry', config.searchCountry);
+    PreferencesStore.setString('cfg_translationLanguage', config.translationLanguage);
     PreferencesStore.setString('cfg_colorPreset', config.colorPreset);
     PreferencesStore.setString('cfg_enableLogger', config.enableLogger ? 'true' : 'false');
     PreferencesStore.setString('cfg_homeLayoutMode', config.homeLayoutMode);

@@ -297,6 +297,18 @@
             "value": "إعدادات اللغة"
         },
         {
+            "name": "yt_section_content_translation",
+            "value": "ترجمة المحتوى"
+        },
+        {
+            "name": "yt_setting_translation_language",
+            "value": "الترجمة إلى"
+        },
+        {
+            "name": "yt_follow_app_language",
+            "value": "اتباع لغة التطبيق"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "لغة التطبيق"
         },
@@ -631,6 +643,22 @@
         {
             "name": "yt_label_like",
             "value": "إعجاب"
+        },
+        {
+            "name": "yt_translate_action",
+            "value": "ترجمة"
+        },
+        {
+            "name": "yt_show_original",
+            "value": "عرض الأصل"
+        },
+        {
+            "name": "yt_translating",
+            "value": "جارٍ الترجمة…"
+        },
+        {
+            "name": "yt_translate_failed",
+            "value": "فشلت الترجمة، انقر لإعادة المحاولة"
         },
         {
             "name": "yt_label_dislike",

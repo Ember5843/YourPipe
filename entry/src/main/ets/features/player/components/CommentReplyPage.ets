@@ -7,6 +7,8 @@ import { UIConfig } from '../../../common/AppState';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from '../../../common/components/HdsTitleBar';
 import { AppLog } from '../../../common/AppLog';
+import { CommentTranslateButton, CommentTranslatedText, CommentTranslateStateStore } from './CommentTranslateSection';
+import { TranslationService } from '../../../common/TranslationService';
 
 const logger = AppLog.getInstance('CommentReplyPage');
 const TITLE_BAR_SAFE_HEIGHT: number = 56;
@@ -177,9 +179,22 @@ export struct CommentReplyPage {
         .lineHeight(20)
         .textAlign(TextAlign.Start)
 
+      if (TranslationService.shouldOfferTranslation(item.commentText)) {
+        CommentTranslatedText({ state: CommentTranslateStateStore.get(item.id, item.commentText) })
+          .margin({ left: 44 })
+      }
+
       Row() {
         SymbolGlyph($r('sys.symbol.hand_thumbsup')).fontSize(12).fontColor([$r('app.color.yourtube_text_quaternary')])
         Text(item.likeCount.toString()).fontSize(11).fontColor($r('app.color.yourtube_text_quaternary')).margin({ left: 4 })
+
+        if (TranslationService.shouldOfferTranslation(item.commentText)) {
+          CommentTranslateButton({
+            state: CommentTranslateStateStore.get(item.id, item.commentText),
+            commentId: item.id
+          })
+            .margin({ left: 24 })
+        }
       }
       .margin({ top: 8, left: 44, bottom: 8 })
       .justifyContent(FlexAlign.Start)
