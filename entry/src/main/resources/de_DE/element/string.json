@@ -2705,6 +2705,34 @@
             "value": "Mehr Diagnosen für Wiedergabe, Anmeldung, Token, Aktualisierung und Fallbacks ohne sensible Cookies oder signierte URLs im Protokoll"
         },
         {
+            "name": "yt_changelog_0_5_8_1",
+            "value": "Kommentarübersetzung: „Übersetzen\"-Button unter jedem Kommentar (Google Übersetzer) zeigt die Übersetzung direkt an, ein Tippen schaltet zurück zum Original"
+        },
+        {
+            "name": "yt_changelog_0_5_8_2",
+            "value": "Neue Gruppe „Inhaltsübersetzung\" unter Sprache und Region: Zielsprache folgt standardmäßig der App-Sprache, kann aber manuell gewählt werden"
+        },
+        {
+            "name": "yt_changelog_0_5_8_3",
+            "value": "Schnellerer Wiedergabestart wie PipePipe: ohne Login nutzt die Wiedergabe den visionos-Client für direkte Streams (ohne PoToken), mit Login tv_downgraded"
+        },
+        {
+            "name": "yt_changelog_0_5_8_4",
+            "value": "Endloses Laden bei Livestreams behoben: Live-Einstufung korrigiert, Livestreams starten normal"
+        },
+        {
+            "name": "yt_changelog_0_5_8_5",
+            "value": "Anmeldepfade korrigiert: Cookie- und OAuth-Identitäten getrennt, Web-Metadaten/Kommentare mischen keine Anmeldedaten mehr"
+        },
+        {
+            "name": "yt_changelog_0_5_8_6",
+            "value": "System-Mediensteuerung zeigt Titel und Autor des aktuellen Videos: AVSession-Metadaten behoben"
+        },
+        {
+            "name": "yt_changelog_0_5_8_7",
+            "value": "UI-Fixes: Tab-Hervorhebung, Tablet-Guide-Layout, verschachteltes Scrollen im Kanal-Kartenmodus"
+        },
+        {
             "name": "yt_changelog_0_5_7_1",
             "value": "Über-Seite mit „Nach Updates suchen“: vergleicht die Build-Nummer des neuesten GitHub-Releases und bietet Sprünge zur AppGallery-Testinstallation oder zur GitHub-Release-Seite"
         },

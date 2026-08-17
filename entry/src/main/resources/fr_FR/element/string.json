@@ -2705,6 +2705,34 @@
             "value": "Diagnostics enrichis pour lecture, connexion, jetons, actualisation et replis sans journaliser cookies ni URL signées"
         },
         {
+            "name": "yt_changelog_0_5_8_1",
+            "value": "Traduction des commentaires : bouton « Traduire » sous chaque commentaire (Google Traduction), traduction affichée sur place, retour à l’original en un appui"
+        },
+        {
+            "name": "yt_changelog_0_5_8_2",
+            "value": "Nouveau groupe « Traduction du contenu » dans Langue et région : la langue cible suit celle de l’app par défaut ou se choisit manuellement"
+        },
+        {
+            "name": "yt_changelog_0_5_8_3",
+            "value": "Démarrage plus rapide aligné sur PipePipe : hors connexion, lecture via le client visionos en direct (sans PoToken) ; connecté, tv_downgraded"
+        },
+        {
+            "name": "yt_changelog_0_5_8_4",
+            "value": "Chargement infini des directs corrigé : classification des livestreams corrigée, lecture normale"
+        },
+        {
+            "name": "yt_changelog_0_5_8_5",
+            "value": "Correctifs de connexion : identités cookie et OAuth isolées, les requêtes web ne mélangent plus les identifiants"
+        },
+        {
+            "name": "yt_changelog_0_5_8_6",
+            "value": "Les contrôles multimédias système affichent le titre et l’auteur de la vidéo : métadonnées AVSession corrigées"
+        },
+        {
+            "name": "yt_changelog_0_5_8_7",
+            "value": "Correctifs d’interface : surbrillance des onglets, guide sur tablette, défilement imbriqué en mode carte des chaînes"
+        },
+        {
             "name": "yt_changelog_0_5_7_1",
             "value": "La page À propos ajoute « Vérifier les mises à jour » : compare le numéro de build de la dernière release GitHub et propose d'ouvrir l'installation test AppGallery ou la page GitHub de la release"
         },

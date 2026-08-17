@@ -2705,6 +2705,34 @@
             "value": "Más diagnósticos de reproducción, autenticación, tokens, actualización y alternativas sin registrar cookies ni URL firmadas"
         },
         {
+            "name": "yt_changelog_0_5_8_1",
+            "value": "Traducción de comentarios: botón «Traducir» bajo cada comentario (Google Translate); la traducción se muestra en el mismo lugar y se vuelve al original con un toque"
+        },
+        {
+            "name": "yt_changelog_0_5_8_2",
+            "value": "Nuevo grupo «Traducción de contenido» en Idioma y región: el idioma de traducción sigue al de la app por defecto o se elige manualmente"
+        },
+        {
+            "name": "yt_changelog_0_5_8_3",
+            "value": "Inicio más rápido al estilo PipePipe: sin sesión se usa el cliente visionos para streams directos (sin PoToken); con sesión, tv_downgraded"
+        },
+        {
+            "name": "yt_changelog_0_5_8_4",
+            "value": "Corregida la carga infinita de los directos: clasificación de emisiones en vivo corregida y reproducción normal"
+        },
+        {
+            "name": "yt_changelog_0_5_8_5",
+            "value": "Rutas de inicio de sesión corregidas: identidades de cookie y OAuth aisladas; las solicitudes web ya no mezclan credenciales"
+        },
+        {
+            "name": "yt_changelog_0_5_8_6",
+            "value": "Los controles multimedia del sistema muestran título y autor del vídeo actual: corregidos los metadatos de AVSession"
+        },
+        {
+            "name": "yt_changelog_0_5_8_7",
+            "value": "Correcciones de interfaz: resaltado de pestañas, guía en tablet y scroll anidado en modo tarjeta de canales"
+        },
+        {
             "name": "yt_changelog_0_5_7_1",
             "value": "La página Acerca de añade «Buscar actualizaciones»: compara el número de compilación del último Release de GitHub y ofrece acceso directo a la instalación de prueba de AppGallery o a la página del release en GitHub"
         },

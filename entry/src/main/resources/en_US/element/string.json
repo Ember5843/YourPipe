@@ -2709,6 +2709,34 @@
             "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs"
         },
         {
+            "name": "yt_changelog_0_5_8_1",
+            "value": "Comment translation: a \"Translate\" button below each comment (Google Translate) shows the translation in place and switches back to the original with one tap"
+        },
+        {
+            "name": "yt_changelog_0_5_8_2",
+            "value": "New \"Content translation\" group in Language & Region: the target language follows the app language by default and can also be set manually"
+        },
+        {
+            "name": "yt_changelog_0_5_8_3",
+            "value": "Faster startup aligned with PipePipe: signed-out playback uses the visionos client for direct streaming (no PoToken); signed-in uses tv_downgraded"
+        },
+        {
+            "name": "yt_changelog_0_5_8_4",
+            "value": "Fix endless loading on live streams: live entry classification corrected so live playback starts normally"
+        },
+        {
+            "name": "yt_changelog_0_5_8_5",
+            "value": "Sign-in path fixes: cookie and OAuth identity rails are isolated, so web metadata/comment requests no longer mix credentials"
+        },
+        {
+            "name": "yt_changelog_0_5_8_6",
+            "value": "System media controls now show the current video title and author: fix occasionally empty AVSession metadata"
+        },
+        {
+            "name": "yt_changelog_0_5_8_7",
+            "value": "UI fixes: bottom tab highlight refresh, tablet guide layout, nested scrolling in channel card mode"
+        },
+        {
             "name": "yt_changelog_0_5_7_1",
             "value": "About page gains \"Check for updates\": compares the build number of the latest GitHub Release and offers one-tap jumps to the AppGallery test install or the GitHub release page"
         },

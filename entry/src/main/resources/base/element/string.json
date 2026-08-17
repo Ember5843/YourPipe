@@ -2709,6 +2709,34 @@
             "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs"
         },
         {
+            "name": "yt_changelog_0_5_8_1",
+            "value": "评论区翻译：评论下方新增「翻译」按钮（Google 翻译引擎），译文原位展示、可一键切回原文"
+        },
+        {
+            "name": "yt_changelog_0_5_8_2",
+            "value": "「语言与地区」新增「内容翻译」设置组：翻译目标语言默认跟随应用语言，也可手动指定"
+        },
+        {
+            "name": "yt_changelog_0_5_8_3",
+            "value": "起播提速对齐 PipePipe：未登录默认改用 visionos 客户端直连取流（免 PoToken），登录态用 tv_downgraded"
+        },
+        {
+            "name": "yt_changelog_0_5_8_4",
+            "value": "修复直播一直转圈：直播条目分类修正，直播流可正常起播"
+        },
+        {
+            "name": "yt_changelog_0_5_8_5",
+            "value": "登录路径修复：Cookie 与 OAuth 双轨身份隔离，网页元数据/评论请求不再串用凭据"
+        },
+        {
+            "name": "yt_changelog_0_5_8_6",
+            "value": "系统播控显示当前视频标题与作者：修复 AVSession 元数据偶发为空"
+        },
+        {
+            "name": "yt_changelog_0_5_8_7",
+            "value": "界面修复：底部标签高亮刷新、平板引导页布局、频道页卡片模式嵌套滚动"
+        },
+        {
             "name": "yt_changelog_0_5_7_1",
             "value": "关于页新增「检查更新」：对比 GitHub 最新 Release 的构建号，发现新版本可一键跳转 AppGallery 测试安装或 GitHub 发布页"
         },

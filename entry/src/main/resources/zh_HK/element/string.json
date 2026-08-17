@@ -2705,6 +2705,34 @@
             "value": "扩充播放、鉴权、令牌、刷新及回退诊斷，同时确保日志不记錄敏感 Cookie 和签名地址"
         },
         {
+            "name": "yt_changelog_0_5_8_1",
+            "value": "評論區翻譯：評論下方新增「翻譯」按鈕（Google 翻譯引擎），譯文原位展示、可一鍵切回原文"
+        },
+        {
+            "name": "yt_changelog_0_5_8_2",
+            "value": "「語言與地區」新增「內容翻譯」設定組：翻譯目標語言預設跟隨應用程式語言，也可手動指定"
+        },
+        {
+            "name": "yt_changelog_0_5_8_3",
+            "value": "起播提速對齊 PipePipe：未登入預設改用 visionos 用戶端直連取流（免 PoToken），登入態用 tv_downgraded"
+        },
+        {
+            "name": "yt_changelog_0_5_8_4",
+            "value": "修復直播一直轉圈：直播條目分類修正，直播流可正常起播"
+        },
+        {
+            "name": "yt_changelog_0_5_8_5",
+            "value": "登入路徑修復：Cookie 與 OAuth 雙軌身分隔離，網頁中繼資料/評論請求不再串用憑據"
+        },
+        {
+            "name": "yt_changelog_0_5_8_6",
+            "value": "系統播控顯示當前影片標題與作者：修復 AVSession 中繼資料偶發為空"
+        },
+        {
+            "name": "yt_changelog_0_5_8_7",
+            "value": "介面修復：底部標籤高亮刷新、平板引導頁佈局、頻道頁卡片模式巢狀捲動"
+        },
+        {
             "name": "yt_changelog_0_5_7_1",
             "value": "關於頁新增「檢查更新」：對比 GitHub 最新 Release 的組建編號，發現新版本可一鍵跳轉 AppGallery 測試安裝或 GitHub 發佈頁"
         },
