@@ -11,8 +11,8 @@
 > write changelogs, commit history, or “recent change” bullet lists.
 
 ## 1. Project
-- **Name / package**: YourPipe (`com.talon.yourpipe`, vendor `talon`, v0.5.7,
-  versionCode 1000017).
+- **Name / package**: YourPipe (`com.talon.yourpipe`, vendor `talon`, v0.5.8,
+  versionCode 1000020).
 - **What it is**: YouTube client for OpenHarmony / HarmonyOS. Plays YouTube
   content through a native **MPV** pipeline (vendored `libmpv.so` + static
   `libav*` for mux/remux). Product VOD path is **direct-link DASH** (guest:

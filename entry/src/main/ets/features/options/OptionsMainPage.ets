@@ -11,7 +11,7 @@ import { APPGALLERY_TEST_URL, UpdateChecker, UpdateCheckResult } from '../../com
 
 const logger = AppLog.getInstance('OptionsMainPage');
 
-const APP_VERSION: string = '0.5.7';
+const APP_VERSION: string = '0.5.8';
 
 interface OptionsMainPageParams {
   clickEffectEnabled: ClickEffect | null;

@@ -96,7 +96,7 @@ export class UpdateChecker {
       return local;
     } catch (e) {
       logger.warn(`readLocalVersion failed, fallback constants: ${String(e)}`);
-      const fallback: LocalVersion = { versionName: '0.5.7', versionCode: 1000016 };
+      const fallback: LocalVersion = { versionName: '0.5.8', versionCode: 1000020 };
       return fallback;
     }
   }

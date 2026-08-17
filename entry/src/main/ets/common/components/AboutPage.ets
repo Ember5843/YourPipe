@@ -8,8 +8,8 @@ import { AppLog } from '../AppLog';
 import { ThemeColorUtil } from '../ThemeColorUtil';
 import { SECTION_CARD_RADIUS } from './MediaCardTokens';
 
-const APP_VERSION = '0.5.7';
-const APP_BUILD = '1000016';
+const APP_VERSION = '0.5.8';
+const APP_BUILD = '1000020';
 const GITHUB_REPO_URL = 'https://github.com/Ember5843/YourPipe';
 const logger = AppLog.getInstance('AboutPage');
 
