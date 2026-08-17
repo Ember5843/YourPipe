@@ -735,14 +735,17 @@ export class PlayerSession {
         }
         const videoSource: VideoData = {
           name: this._defaultSource.name,
-          description: result.videoInfo.title || '',
+          // 展示元数据直接以播放中的条目为准：tv_downgraded 等 client 的
+          // /player 响应可能不带 videoDetails，此时用 feed 条目的标题/作者兜底，
+          // 系统播控（AVSession）与播放页看到的始终是同一个标题。
+          description: result.videoInfo.title || video.title || '',
           time: this._defaultSource.time,
           auto: this._defaultSource.auto,
           head: this._defaultSource.head,
           likeCount: this._defaultSource.likeCount,
           commentCount: this._defaultSource.commentCount,
           shareCount: this._defaultSource.shareCount,
-          author: result.videoInfo.author || '',
+          author: result.videoInfo.author || video.author || '',
           channelId: result.videoInfo.channelId || '',
           videoDescription: result.videoInfo.description || '',
           play: true,
