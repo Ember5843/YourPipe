@@ -14,9 +14,12 @@ export interface AuthBackupState {
   cookieCredentialJson: string;
 }
 
+/** 鉴权持久化 preferences 存储名（"清除所有数据"需要按此名擦除，entry 侧经 Index 导出引用）。 */
+export const AUTH_STORAGE_NAME = 'yourpipe_auth_poc';
+
 export class AuthSessionManager {
   private static instance: AuthSessionManager | null = null;
-  private static readonly STORAGE_NAME: string = 'yourpipe_auth_poc';
+  private static readonly STORAGE_NAME: string = AUTH_STORAGE_NAME;
   private static readonly REFRESH_TOKEN_KEY: string = 'refresh_token';
   private static readonly COOKIE_CREDENTIAL_KEY: string = 'cookie_auth_credential';
   private static readonly AUTH_ENABLED_KEY: string = 'auth_enabled';

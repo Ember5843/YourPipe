@@ -131,12 +131,15 @@ export class Cookie {
   }
 }
 
+/** Cookie 持久化 preferences 存储名（"清除所有数据"需要按此名擦除，entry 侧经 Index 导出引用）。 */
+export const YOUTUBE_COOKIE_STORAGE_NAME = 'youtube_cookies';
+
 /**
  * CookieJar - 管理 HTTP Cookie 的存储和检索
  */
 export class CookieJar {
   private cookies: Map<string, Cookie> = new Map();
-  private storageName: string = 'youtube_cookies';
+  private storageName: string = YOUTUBE_COOKIE_STORAGE_NAME;
   private context: Context;
 
   constructor(context: Context) {

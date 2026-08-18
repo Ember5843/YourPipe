@@ -8,7 +8,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import type { BusinessError } from '@kit.BasicServicesKit';
 import { ActionHub, ActionHubEvent } from '../common/ActionHub';
 import { AuthSessionManager, SearchChannelItem, SearchPlaylistItem,
-  YoutubeJavaScriptPlayerManager } from 'youtube_core';
+  YoutubeJavaScriptPlayerManager, YOUTUBE_COOKIE_STORAGE_NAME, AUTH_STORAGE_NAME } from 'youtube_core';
 import { VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../common/SubscriptionModel';
 import { LocalStore } from '../common/LocalStore';
@@ -330,7 +330,7 @@ struct Index {
     const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (hostContext) {
       try {
-        const cookiePrefs = preferences.getPreferencesSync(hostContext, { name: 'youtube_cookies' });
+        const cookiePrefs = preferences.getPreferencesSync(hostContext, { name: YOUTUBE_COOKIE_STORAGE_NAME });
         cookiePrefs.clearSync();
         cookiePrefs.flush();
       } catch (e) {
@@ -339,7 +339,7 @@ struct Index {
       // prefs 清除够不到 extractor 持有的内存 cookie jar，同步清内存网络状态
       YouTubePlayService.getInstance(hostContext).resetNetworkState();
       try {
-        const authPrefs = preferences.getPreferencesSync(hostContext, { name: 'yourpipe_auth_poc' });
+        const authPrefs = preferences.getPreferencesSync(hostContext, { name: AUTH_STORAGE_NAME });
         authPrefs.clearSync();
         authPrefs.flush();
       } catch (e) {
