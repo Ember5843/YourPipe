@@ -1,8 +1,6 @@
 import { AppLog } from '../../common/AppLog';
+import { sharePlainText } from '../../common/utils/ShareUtil';
 import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
-import common from '@ohos.app.ability.common';
-import { systemShare } from '@kit.ShareKit';
-import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { ActionHub } from '../../common/ActionHub';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
@@ -199,22 +197,10 @@ export struct PlaylistDetailPage {
   }
 
   private async handleShare(): Promise<void> {
-    try {
-      const playlistId = (this.playlist.playlistId || '').trim();
-      const title = this.playlist.name || getContext().resourceManager.getStringSync($r('app.string.yt_tab_playlists').id);
-      const url = playlistId ? `https://www.youtube.com/playlist?list=${playlistId}` : '';
-      const content = url ? `${title}\n${url}` : title;
-      const data: systemShare.SharedData = new systemShare.SharedData({
-        utd: utd.UniformDataType.PLAIN_TEXT,
-        content
-      });
-      const controller: systemShare.ShareController = new systemShare.ShareController(data);
-      const uiContext: UIContext = this.getUIContext();
-      const context: common.UIAbilityContext = uiContext.getHostContext() as common.UIAbilityContext;
-      controller.show(context, { anchor: this.SHARE_BUTTON_ID });
-    } catch (err) {
-      logger.error('share failed:', JSON.stringify(err));
-    }
+    const playlistId = (this.playlist.playlistId || '').trim();
+    const title = this.playlist.name || getContext().resourceManager.getStringSync($r('app.string.yt_tab_playlists').id);
+    const url = playlistId ? `https://www.youtube.com/playlist?list=${playlistId}` : '';
+    sharePlainText(this.getUIContext(), title, url, { anchor: this.SHARE_BUTTON_ID });
   }
 
   @Builder

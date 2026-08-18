@@ -33,8 +33,8 @@ import { PlayerPresentation } from '../../../common/PlayerPresentation';
 import common from '@ohos.app.ability.common';
 import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSession';
 import { systemShare } from '@kit.ShareKit';
-import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { AppLog } from '../../../common/AppLog';
+import { sharePlainText } from '../../../common/utils/ShareUtil';
 
 const TAG: string = '[VideoDetails]';
 const logger = AppLog.getInstance('VideoDetails');
@@ -1074,26 +1074,13 @@ export struct VideoDetails {
   private shareVideo(): void {
     // OVERLAY: share sheet may fire ability onBackground; keep video ON.
     PlayerPresentation.beginOverlay('share');
-    try {
-      const videoId = (this.item.videoId || '').trim();
-      const title = this.item.title || '';
-      const url = videoId ? `https://www.youtube.com/watch?v=${videoId}` : '';
-      const content = url ? `${title}\n${url}` : title;
-      const data: systemShare.SharedData = new systemShare.SharedData({
-        utd: utd.UniformDataType.PLAIN_TEXT,
-        content
-      });
-      const controller: systemShare.ShareController = new systemShare.ShareController(data);
-      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      controller.show(context, {
-        selectionMode: systemShare.SelectionMode.SINGLE
-      }).catch((err: Object) => {
+    const videoId = (this.item.videoId || '').trim();
+    const title = this.item.title || '';
+    const url = videoId ? `https://www.youtube.com/watch?v=${videoId}` : '';
+    sharePlainText(this.getUIContext(), title, url,
+      { selectionMode: systemShare.SelectionMode.SINGLE },
+      () => {
         PlayerPresentation.endOverlay('share-error');
-        Logger.error(TAG, `share video failed: ${JSON.stringify(err)}`);
       });
-    } catch (err) {
-      PlayerPresentation.endOverlay('share-throw');
-      Logger.error(TAG, `share video failed: ${JSON.stringify(err)}`);
-    }
   }
 }

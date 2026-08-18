@@ -1,8 +1,5 @@
 import { AppLog } from '../../common/AppLog';
 import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
-import common from '@ohos.app.ability.common';
-import { systemShare } from '@kit.ShareKit';
-import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { ActionHub } from '../../common/ActionHub';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
@@ -21,6 +18,7 @@ import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/H
 import { SubTabBarItem } from '../../common/components/SubTabBar';
 import { ChannelVideoTab } from './components/ChannelVideoTab';
 import { KioskPageResult } from '../home/ChannelService';
+import { sharePlainText } from '../../common/utils/ShareUtil';
 
 const logger = AppLog.getInstance('UserPage');
 
@@ -231,22 +229,10 @@ export struct UserPage {
   }
 
   private async handleShare(): Promise<void> {
-    try {
-      const channelId = (this.channel.channelId || '').trim();
-      const channelName = this.channel.name || getContext().resourceManager.getStringSync($r('app.string.yt_label_user').id);
-      const url = channelId ? `https://www.youtube.com/channel/${channelId}` : '';
-      const content = url ? `${channelName}\n${url}` : channelName;
-      const data: systemShare.SharedData = new systemShare.SharedData({
-        utd: utd.UniformDataType.PLAIN_TEXT,
-        content
-      });
-      const controller: systemShare.ShareController = new systemShare.ShareController(data);
-      const uiContext: UIContext = this.getUIContext();
-      const context: common.UIAbilityContext = uiContext.getHostContext() as common.UIAbilityContext;
-      controller.show(context, { anchor: this.SHARE_BUTTON_ID });
-    } catch (err) {
-      logger.error('share failed:', JSON.stringify(err));
-    }
+    const channelId = (this.channel.channelId || '').trim();
+    const channelName = this.channel.name || getContext().resourceManager.getStringSync($r('app.string.yt_label_user').id);
+    const url = channelId ? `https://www.youtube.com/channel/${channelId}` : '';
+    sharePlainText(this.getUIContext(), channelName, url, { anchor: this.SHARE_BUTTON_ID });
   }
 
   private async loadVideos(): Promise<void> {

@@ -3,8 +3,7 @@ import window from '@ohos.window';
 import common from '@ohos.app.ability.common';
 import { ConfigurationConstant } from '@kit.AbilityKit';
 import { i18n } from '@kit.LocalizationKit';
-import { systemShare } from '@kit.ShareKit';
-import { uniformTypeDescriptor as utd, preferences } from '@kit.ArkData';
+import { preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import type { BusinessError } from '@kit.BasicServicesKit';
 import { ActionHub, ActionHubEvent } from '../common/ActionHub';
@@ -44,6 +43,7 @@ import { SabrPoTokenWebRuntime } from '../features/player/SabrPoTokenWebRuntime'
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { customAnimationUtil } from '../common/AnimationUtil';
+import { sharePlainText } from '../common/utils/ShareUtil';
 import { ThemeColorUtil } from '../common/ThemeColorUtil';
 import { LanguageManager } from '../common/LanguageManager';
 import { FeedServiceProvider } from '../common/FeedServiceProvider';
@@ -1386,66 +1386,24 @@ struct Index {
   }
 
   private shareVideo(video: VideoItem): void {
-    try {
-      const videoId = (video.videoId || '').trim();
-      const title = video.title || getContext().resourceManager.getStringSync($r('app.string.yt_filter_videos').id);
-      const url = videoId ? `https://www.youtube.com/watch?v=${videoId}` : '';
-      const content = url ? `${title}\n${url}` : title;
-      const data: systemShare.SharedData = new systemShare.SharedData({
-        utd: utd.UniformDataType.PLAIN_TEXT,
-        content
-      });
-      const controller: systemShare.ShareController = new systemShare.ShareController(data);
-      const uiContext: UIContext = this.getUIContext();
-      const context: common.UIAbilityContext = uiContext.getHostContext() as common.UIAbilityContext;
-      controller.show(context, {
-        selectionMode: systemShare.SelectionMode.SINGLE
-      });
-    } catch (err) {
-      logger.error('share video failed:', JSON.stringify(err));
-    }
+    const videoId = (video.videoId || '').trim();
+    const title = video.title || '';
+    const url = videoId ? `https://www.youtube.com/watch?v=${videoId}` : '';
+    sharePlainText(this.getUIContext(), title, url);
   }
 
   private shareChannel(channel: SearchChannelItem): void {
-    try {
-      const channelId = (channel.channelId || '').trim();
-      const name = channel.name || getContext().resourceManager.getStringSync($r('app.string.yt_label_user').id);
-      const url = channelId ? `https://www.youtube.com/channel/${channelId}` : '';
-      const content = url ? `${name}\n${url}` : name;
-      const data: systemShare.SharedData = new systemShare.SharedData({
-        utd: utd.UniformDataType.PLAIN_TEXT,
-        content
-      });
-      const controller: systemShare.ShareController = new systemShare.ShareController(data);
-      const uiContext: UIContext = this.getUIContext();
-      const context: common.UIAbilityContext = uiContext.getHostContext() as common.UIAbilityContext;
-      controller.show(context, {
-        selectionMode: systemShare.SelectionMode.SINGLE
-      });
-    } catch (err) {
-      logger.error('share channel failed:', JSON.stringify(err));
-    }
+    const channelId = (channel.channelId || '').trim();
+    const name = channel.name || getContext().resourceManager.getStringSync($r('app.string.yt_label_user').id);
+    const url = channelId ? `https://www.youtube.com/channel/${channelId}` : '';
+    sharePlainText(this.getUIContext(), name, url);
   }
 
   private sharePlaylist(playlist: SearchPlaylistItem): void {
-    try {
-      const playlistId = (playlist.playlistId || '').trim();
-      const name = playlist.name || getContext().resourceManager.getStringSync($r('app.string.yt_filter_playlists').id);
-      const url = playlistId ? `https://www.youtube.com/playlist?list=${playlistId}` : '';
-      const content = url ? `${name}\n${url}` : name;
-      const data: systemShare.SharedData = new systemShare.SharedData({
-        utd: utd.UniformDataType.PLAIN_TEXT,
-        content
-      });
-      const controller: systemShare.ShareController = new systemShare.ShareController(data);
-      const uiContext: UIContext = this.getUIContext();
-      const context: common.UIAbilityContext = uiContext.getHostContext() as common.UIAbilityContext;
-      controller.show(context, {
-        selectionMode: systemShare.SelectionMode.SINGLE
-      });
-    } catch (err) {
-      logger.error('share playlist failed:', JSON.stringify(err));
-    }
+    const playlistId = (playlist.playlistId || '').trim();
+    const name = playlist.name || getContext().resourceManager.getStringSync($r('app.string.yt_filter_playlists').id);
+    const url = playlistId ? `https://www.youtube.com/playlist?list=${playlistId}` : '';
+    sharePlainText(this.getUIContext(), name, url);
   }
 
   private initLanguageSettings(): void {
