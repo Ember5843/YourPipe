@@ -51,6 +51,11 @@ class LocaleContext {
   }
 }
 
+interface HeaderMetadataPart {
+  content: string;
+  hasLabel: boolean;
+}
+
 export class ChannelInfoService {
   private readonly VIDEOS_TAB_PARAMS: string = 'EgZ2aWRlb3PyBgQKAjoA';
 
@@ -161,16 +166,23 @@ export class ChannelInfoService {
   }
 
   private extractHandle(root: Record<string, Object>): string {
+    // vanityChannelUrl is a full URL (https://www.youtube.com/@handle) — keep
+    // only the '@handle' part.
     const metadata = this.asRecord(root['metadata']);
     const channelMetadata = this.asRecord(metadata?.['channelMetadataRenderer']);
-    const handle = this.asString(channelMetadata?.['vanityChannelUrl']);
+    const handle = this.handleFromVanityUrl(this.asString(channelMetadata?.['vanityChannelUrl']));
     if (handle) {
-      return `@${handle}`;
+      return handle;
     }
     const header = this.asRecord(root['header']);
     const c4 = this.asRecord(header?.['c4TabbedHeaderRenderer']);
     const c4Handle = c4 ? this.readText(c4['vanityChannelUrl']) : '';
-    return c4Handle ? `@${c4Handle}` : '';
+    return this.handleFromVanityUrl(c4Handle);
+  }
+
+  private handleFromVanityUrl(url: string): string {
+    const at = (url || '').indexOf('@');
+    return at >= 0 ? url.substring(at) : '';
   }
 
   private extractAvatarUrl(root: Record<string, Object>): string {
@@ -295,52 +307,19 @@ export class ChannelInfoService {
       // pageHeaderRenderer (modern format) - follow PipePipe's getSubscriberCountFromPageChannelHeader
       const pageHeader = this.asRecord(header['pageHeaderRenderer']);
       if (pageHeader) {
-        const pageHeaderContent = this.asRecord(pageHeader['content']);
-        const pageHeaderViewModel = this.asRecord(pageHeaderContent?.['pageHeaderViewModel']);
-        const metadata = this.asRecord(pageHeaderViewModel?.['metadata']);
-        const contentMetadata = this.asRecord(metadata?.['contentMetadataViewModel']);
-        const metadataRows = this.asArray(contentMetadata?.['metadataRows']);
-        if (metadataRows) {
-          // First pass: look for explicit "subscriber" keyword
-          for (let r = 0; r < metadataRows.length; r++) {
-            const row = this.asRecord(metadataRows[r]);
-            const parts = this.asArray(row?.['metadataParts']);
-            if (!parts) continue;
-            for (let p = 0; p < parts.length; p++) {
-              const part = this.asRecord(parts[p]);
-              const text = this.asRecord(part?.['text']);
-              const content = this.asString(text?.['content']);
-              if (content && content.toLowerCase().includes('subscriber')) {
-                return content;
-              }
-            }
+        const parts = this.readHeaderMetadataParts(pageHeader);
+        // First pass: explicit "subscriber" keyword (English responses).
+        for (const part of parts) {
+          if (part.content.toLowerCase().includes('subscriber')) {
+            return part.content;
           }
-
-          // Second pass: use accessibilityLabel as fallback (localized responses)
-          for (let r = 0; r < metadataRows.length; r++) {
-            const row = this.asRecord(metadataRows[r]);
-            const parts = this.asArray(row?.['metadataParts']);
-            if (!parts || parts.length === 0) continue;
-
-            if (parts.length > 1) {
-              const firstPart = this.asRecord(parts[0]);
-              if (firstPart && firstPart['accessibilityLabel']) {
-                const text = this.asRecord(firstPart['text']);
-                const content = this.asString(text?.['content']);
-                if (content && !content.startsWith('@')) {
-                  return content;
-                }
-              }
-            } else {
-              const part = this.asRecord(parts[0]);
-              if (part && part['accessibilityLabel']) {
-                const text = this.asRecord(part['text']);
-                const content = this.asString(text?.['content']);
-                if (content && !content.startsWith('@')) {
-                  return content;
-                }
-              }
-            }
+        }
+        // Fallback for localized responses: current layout is
+        // [@handle (no label), subscribers (has accessibilityLabel), videos (no label)] —
+        // the subscriber count is the labeled part that is not the handle.
+        for (const part of parts) {
+          if (part.hasLabel && !part.content.startsWith('@')) {
+            return part.content;
           }
         }
       }
@@ -368,49 +347,59 @@ export class ChannelInfoService {
       // pageHeaderRenderer (modern format) - scan all metadataRows
       const pageHeader = this.asRecord(header['pageHeaderRenderer']);
       if (pageHeader) {
-        const pageHeaderContent = this.asRecord(pageHeader['content']);
-        const pageHeaderViewModel = this.asRecord(pageHeaderContent?.['pageHeaderViewModel']);
-        const metadata = this.asRecord(pageHeaderViewModel?.['metadata']);
-        const contentMetadata = this.asRecord(metadata?.['contentMetadataViewModel']);
-        const metadataRows = this.asArray(contentMetadata?.['metadataRows']);
-        if (metadataRows) {
-          // Look for explicit "video" keyword
-          for (let r = 0; r < metadataRows.length; r++) {
-            const row = this.asRecord(metadataRows[r]);
-            const parts = this.asArray(row?.['metadataParts']);
-            if (!parts) continue;
-            for (let p = 0; p < parts.length; p++) {
-              const part = this.asRecord(parts[p]);
-              const text = this.asRecord(part?.['text']);
-              const content = this.asString(text?.['content']);
-              if (content && content.toLowerCase().includes('video')) {
-                return content;
-              }
-            }
+        const parts = this.readHeaderMetadataParts(pageHeader);
+        // First pass: explicit "video" keyword (English responses).
+        for (const part of parts) {
+          if (part.content.toLowerCase().includes('video')) {
+            return part.content;
           }
-
-          // Fallback: use accessibilityLabel, second part in multi-part rows
-          for (let r = 0; r < metadataRows.length; r++) {
-            const row = this.asRecord(metadataRows[r]);
-            const parts = this.asArray(row?.['metadataParts']);
-            if (!parts || parts.length < 2) continue;
-
-            // The video count is typically the second part
-            const videoPart = this.asRecord(parts[1]);
-            if (videoPart && videoPart['accessibilityLabel']) {
-              const text = this.asRecord(videoPart['text']);
-              const content = this.asString(text?.['content']);
-              if (content && !content.startsWith('@')) {
-                return content;
-              }
-            }
-          }
+        }
+        // Fallback for localized responses: the video count is the non-@
+        // part WITHOUT an accessibilityLabel (the labeled one is the
+        // subscriber count). If every candidate is labeled, take the one
+        // after the subscriber part.
+        const candidates = parts.filter(p => p.content.length > 0 && !p.content.startsWith('@'));
+        const unlabeled = candidates.filter(p => !p.hasLabel);
+        if (unlabeled.length > 0) {
+          return unlabeled[0].content;
+        }
+        if (candidates.length > 1) {
+          return candidates[1].content;
         }
       }
     }
 
     // Fallback: check metadata.channelMetadataRenderer (no video count available here)
     return '';
+  }
+
+  /** Flatten pageHeaderRenderer metadata parts: [@handle, subscribers (labeled), videos, ...]. */
+  private readHeaderMetadataParts(pageHeader: Record<string, Object>): HeaderMetadataPart[] {
+    const result: HeaderMetadataPart[] = [];
+    const pageHeaderContent = this.asRecord(pageHeader['content']);
+    const pageHeaderViewModel = this.asRecord(pageHeaderContent?.['pageHeaderViewModel']);
+    const metadata = this.asRecord(pageHeaderViewModel?.['metadata']);
+    const contentMetadata = this.asRecord(metadata?.['contentMetadataViewModel']);
+    const metadataRows = this.asArray(contentMetadata?.['metadataRows']);
+    if (!metadataRows) {
+      return result;
+    }
+    for (let r = 0; r < metadataRows.length; r++) {
+      const row = this.asRecord(metadataRows[r]);
+      const parts = this.asArray(row?.['metadataParts']);
+      if (!parts) {
+        continue;
+      }
+      for (let p = 0; p < parts.length; p++) {
+        const part = this.asRecord(parts[p]);
+        const text = this.asRecord(part?.['text']);
+        const content = this.asString(text?.['content']);
+        if (content) {
+          result.push({ content: content, hasLabel: !!part?.['accessibilityLabel'] });
+        }
+      }
+    }
+    return result;
   }
 
   private pickLargestImageUrl(list: Array<Object> | null): string {
