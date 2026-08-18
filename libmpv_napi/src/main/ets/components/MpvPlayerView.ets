@@ -7,6 +7,12 @@ export enum VideoFit {
   Fill = 2,    // stretch to fill, ignore aspect ratio
 }
 
+// DORMANT: 产品渲染走 entry 内联 XComponent + surfaceId；启用条件：entry 切换到 MpvPlayerView/libraryname 路径
+// This component is kept as a standby render path. The product player
+// (mediaservice AvPlayerController + entry AVPlayer.ets) uses an inline
+// XComponent (id 'PlayerXComponent', no libraryname) and routes the surface
+// via controller.setVideoSurfaceId()/setVideoSurfaceSize(), so the
+// libraryname-driven native surface callbacks never fire in production.
 @Component
 export struct MpvPlayerView {
   controller: MpvPlayerController = new MpvPlayerController();

@@ -18,23 +18,18 @@
 > Durable architecture only — no changelogs.
 
 ## 1. Public surface (`oh-package.json5#main` → `src/main/ets/index.ets`)
-- `MpvPlayerView` — ArkUI component wrapping `XComponent` for native
-  rendering. Implements the render-area decoupling strategy (fixed
-  native-resolution surface + compositor `.scale()` fit transform).
+- `MpvPlayerView` — ArkUI component wrapping `XComponent` (with
+  `libraryname: 'mpv_napi'`) for native rendering. **DORMANT standby path**:
+  the product player renders through entry's inline XComponent + `surfaceId`
+  (see §5); this component is retained for a possible switch back to the
+  libraryname-driven path.
 - `MpvPlayerController` — TS controller over the native player (load,
   play, pause, seek, set/get properties, register event callback).
-- Enums: `ColorSpace`, `LogLevel`, `MediaStatus`, `MediaType`,
-  `PlaybackState`, `SeekFlag`, `VideoEffect`, `VideoFit`.
+- Enums: `MediaStatus`, `MediaType`, `PlaybackState`, `SeekFlag`, `VideoFit`.
 - `MediaInfo` + codec parameter / stream info types.
 - `muxAudioVideo` — local-file remux (re-exported via `mediaservice`).
-- Global options: `setGlobalOption*` / `getGlobalOption*` (apply to the
-  MPV instance), `setResourceManager`, `version`.
 - HW probe: `probeVideoHwDecoders` + `VideoHwDecoderCaps` (OHOS decoder
   capability query for upper layers).
-- Aspect-ratio helpers: `IgnoreAspectRatio`, `KeepAspectRatio`,
-  `KeepAspectRatioCrop`.
-- Timestamp constants: `TimeScaleForInt` (`1000.0`), `TimestampEOS`
-  (`Number.MAX_VALUE`).
 
 ## 2. Layout
 ```
@@ -42,10 +37,10 @@ libmpv_napi/src/main/
   ets/
     index.ets                          — public re-exports
     enums.ets                          — MPV / media enums
-    global.ets                         — global MPV options + mux + probe + version
+    global.ets                         — mux + HW decoder probe
     media-info.ets                     — MediaInfo, codec/stream parameter types
     components/
-      MpvPlayerView.ets                — ArkUI component (XComponent + compositor scale)
+      MpvPlayerView.ets                — ArkUI component (XComponent + compositor scale); DORMANT standby, see §5
     controller/
       MpvPlayerController.ets          — TS controller
   cpp/
@@ -54,7 +49,7 @@ libmpv_napi/src/main/
     player_napi_stub.cpp               — x86_64 emulator UI stub (no libmpv)
     media_info_napi.cpp                — MediaInfo marshalling
     mux_napi.cpp                       — FFmpeg mux/remux NAPI
-    global_napi.cpp                    — global options NAPI
+    global_napi.cpp                    — shared NAPI helpers (ToString / Undefined / log handler)
     hwdec_probe.cpp / .h               — OHOS HW decoder capability probe;
                                          also derives the hwdec-codecs whitelist
                                          (probe-filtered, legacy full list on probe failure)
@@ -74,7 +69,7 @@ libmpv_napi/src/main/
   - `mpv_ohcodec_shim` (SHARED) — the OHOS hardware codec adapter for MPV,
     copied next to `libmpv_napi.so` at install time.
 - Product links:
-  - `ace_napi.z`, `ace_ndk.z`, `hilog_ndk.z`, `rawfile.z`, `ohfileuri`,
+  - `ace_napi.z`, `ace_ndk.z`, `hilog_ndk.z`, `ohfileuri`,
     `native_window` (surface / XComponent correlation)
   - FFmpeg static libs from `ffmpeg-sdk/lib/${OHOS_ARCH}/` (libavformat,
     libavcodec, libavutil, libswresample, libdav1d, libxml2, libmbedtls*;
@@ -102,20 +97,28 @@ are built in WSL and then vendored here:
 - Run the WSL build, then copy the new outputs into this repo. Hvigor picks
   them up at the next build. Today only **arm64-v8a** is vendored.
 
-## 5. Render-area decoupling
-- The `XComponent` is laid out at the **video's native resolution**, so its
-  surface buffer is the native size and MPV renders 1:1 into it.
-- The component size never changes when the display area changes
-  (fullscreen toggle, rotation). Instead, a compositor-side `.scale()`
-  transform fits the native surface into the area. `.scale()` is a GPU
-  transform — it does not resize the surface, so MPV is never reconfigured
-  (no slow path) and size changes are instant.
-- See `MpvPlayerView.ets` for the implementation; the `videoFit` prop
-  controls the fit mode (`Contain` / `Cover` / `Fill`).
+## 5. Render surface: product path vs dormant standby
+- **Product path**: entry `AVPlayer.ets` lays out an **inline XComponent**
+  (`id: 'PlayerXComponent'`, **no `libraryname`**) sized by `.aspectRatio()`.
+  On `onLoad`, entry reads `getXComponentSurfaceId()` and routes it through
+  `AvPlayerController` → `MpvPlaybackEngine` → `controller.setVideoSurfaceId()`
+  / `setVideoSurfaceSize()`. The bridge pushes that size to mpv via the
+  `ohos-surface-size` property (`ApplySurfaceSize`) so the VO reconfigures on
+  fullscreen/rotation without native XComponent callbacks.
+- **DORMANT standby path**: `MpvPlayerView` uses an XComponent **with
+  `libraryname: 'mpv_napi'`**, which activates the native surface callback
+  chain (`OnSurfaceCreated/Changed/Destroyed` in `player_napi.cpp`) and the
+  `native-window-ptr` branch of `ApplyWindowOption`. On the product path none
+  of that fires — `ctx.window` stays null and `wid` is always the surfaceId.
+  Enable condition: entry switches its player UI to `MpvPlayerView` /
+  libraryname. The component also implements the render-area decoupling
+  strategy (fixed native-resolution surface + compositor `.scale()` fit
+  transform; `videoFit` controls `Contain` / `Cover` / `Fill`).
 - **`wid` protocol** (vendored mpv fork, `vo_ohos`): `wid < 2^40` is an
   `OHNativeWindow*` used directly; `wid >= 2^40` is an XComponent
   `surfaceId`. The bridge prefers the native-window pointer when the
-  XComponent provides a window and falls back to the `surfaceId`.
+  XComponent provides a window and falls back to the `surfaceId` (product:
+  always the surfaceId).
 
 ## 6. Conventions
 - **Single product path**: this bridge exists to drive MPV. Do not grow a

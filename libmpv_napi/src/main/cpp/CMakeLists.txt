@@ -67,7 +67,6 @@ target_link_libraries(mpv_napi
     ace_napi.z
     ace_ndk.z
     hilog_ndk.z
-    rawfile.z
     ohfileuri
     # FFmpeg's aarch64 NEON asm addresses global data with ADRP+ADD (non-PIC).
     # In a shared lib those globals are preemptible by default, so the linker

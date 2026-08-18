@@ -136,11 +136,6 @@ napi_value GetPosition(napi_env env, napi_callback_info /*info*/)
     return MakeDouble(env, 0);
 }
 
-napi_value Buffered(napi_env env, napi_callback_info /*info*/)
-{
-    return MakeDouble(env, 0);
-}
-
 napi_value GetSeekableRangesJson(napi_env env, napi_callback_info /*info*/)
 {
     return MakeString(env, "[]");
@@ -188,28 +183,9 @@ napi_value GetMediaInfo(napi_env env, napi_callback_info /*info*/)
     return info;
 }
 
-napi_value Version(napi_env env, napi_callback_info /*info*/)
-{
-    return MakeInt(env, 0);
-}
-
 napi_value FfmpegVersion(napi_env env, napi_callback_info /*info*/)
 {
     return MakeString(env, "stub-x86_64");
-}
-
-napi_value GetGlobalOptionString(napi_env env, napi_callback_info /*info*/)
-{
-    napi_value result = nullptr;
-    napi_get_null(env, &result);
-    return result;
-}
-
-napi_value GetGlobalOptionInt(napi_env env, napi_callback_info /*info*/)
-{
-    napi_value result = nullptr;
-    napi_get_null(env, &result);
-    return result;
 }
 
 napi_value MuxAudioVideo(napi_env env, napi_callback_info /*info*/)
@@ -244,7 +220,6 @@ napi_value Init(napi_env env, napi_value exports)
         {"ensurePlayer", nullptr, EnsurePlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"releasePlayer", nullptr, ReleasePlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setMedia", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setMediaSource", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"play", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"pause", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"stop", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -253,16 +228,9 @@ napi_value Init(napi_env env, napi_value exports)
         {"seekWithFlags", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setPlaybackRate", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVolume", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setLoop", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setProperty", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getProperty", nullptr, GetProperty, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setColorSpace", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setVideoEffect", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setDecoders", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setActiveTracks", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setAudioBackends", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getPosition", nullptr, GetPosition, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"buffered", nullptr, Buffered, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getSeekableRangesJson", nullptr, GetSeekableRangesJson, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getState", nullptr, GetState, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getMediaStatus", nullptr, GetMediaStatus, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -270,14 +238,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"isPlaying", nullptr, IsPlaying, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceSize", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceId", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"version", nullptr, Version, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"ffmpegVersion", nullptr, FfmpegVersion, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setGlobalOptionString", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"getGlobalOptionString", nullptr, GetGlobalOptionString, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setGlobalOptionInt", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"getGlobalOptionInt", nullptr, GetGlobalOptionInt, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setGlobalOptionFloat", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setResourceManager", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"command", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},

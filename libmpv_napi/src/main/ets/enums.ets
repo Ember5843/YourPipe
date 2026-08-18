@@ -1,14 +1,3 @@
-export enum ColorSpace {
-  Unknown = 0,
-  BT709 = 1,
-  BT2100_PQ = 2,
-  SCRGB = 3,
-  ExtendedLinearDisplayP3 = 4,
-  ExtendedSRGB = 5,
-  ExtendedLinearSRGB = 6,
-  BT2100_HLG = 7,
-}
-
 export enum MediaType {
   Unknown = -1,
   Video = 0,
@@ -48,23 +37,5 @@ export enum SeekFlag {
   InCache = 1 << 10,
   Backward = 1 << 16,
   Default = KeyFrame | FromStart | InCache,
-}
-
-export enum LogLevel {
-  Off = 0,
-  Error = 1,
-  Warning = 2,
-  Info = 3,
-  Debug = 4,
-  All = 5,
-}
-
-export enum VideoEffect {
-  Brightness = 0,
-  Contrast = 1,
-  Hue = 2,
-  Saturation = 3,
-  ScaleChannels = 4,
-  ShiftChannels = 5,
 }
 

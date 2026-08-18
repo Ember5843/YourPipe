@@ -8,9 +8,7 @@
 #include <filemanagement/file_uri/oh_file_uri.h>
 #include <hilog/log.h>
 #include <mpv/client.h>
-#include <mpv/stream_cb.h>
 #include <napi/native_api.h>
-#include <rawfile/raw_file_manager.h>
 #include <native_window/external_window.h>
 
 #include "global_napi.h"
@@ -31,8 +29,6 @@ extern "C" {
 #include <cstdint>
 #include <cstdlib>
 #include <dlfcn.h>
-#include <climits>
-#include <cstring>
 #include <iterator>
 #include <condition_variable>
 #include <deque>
@@ -40,7 +36,6 @@ extern "C" {
 #include <map>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <string>
 #include <thread>
 #include <type_traits>
@@ -66,10 +61,6 @@ constexpr int32_t kStatusSeeking = 1 << 7;
 constexpr int32_t kStatusPrepared = 1 << 8;
 constexpr int32_t kStatusInvalid = 1 << 31;
 
-constexpr int32_t kMediaTypeVideo = 0;
-constexpr int32_t kMediaTypeAudio = 1;
-constexpr int32_t kMediaTypeSubtitle = 3;
-
 struct MpvApi {
     void* library = nullptr;
     bool attempted = false;
@@ -92,7 +83,6 @@ struct MpvApi {
     int (*observe_property)(mpv_handle*, uint64_t, const char*, mpv_format) = nullptr;
     mpv_event* (*wait_event)(mpv_handle*, double) = nullptr;
     void (*wakeup)(mpv_handle*) = nullptr;
-    int (*stream_cb_add_ro)(mpv_handle*, const char*, void*, mpv_stream_cb_open_ro_fn) = nullptr;
 };
 
 MpvApi& Mpv()
@@ -149,7 +139,6 @@ bool LoadMpv()
     ok = LoadSymbol(api.library, api.observe_property, "mpv_observe_property") && ok;
     ok = LoadSymbol(api.library, api.wait_event, "mpv_wait_event") && ok;
     ok = LoadSymbol(api.library, api.wakeup, "mpv_wakeup") && ok;
-    ok = LoadSymbol(api.library, api.stream_cb_add_ro, "mpv_stream_cb_add_ro") && ok;
 
     api.available = ok;
     if (!ok) {
@@ -173,7 +162,6 @@ struct PlayerContext {
     atomic_int64_t lastBufferedMs {0};
     mutex cacheRangesMutex;
     string seekableRangesJson = "[]";
-    int32_t loopCount = 0;
     bool initialized = false;
     atomic_bool eventLoopRunning {false};
     thread eventThread;
@@ -281,102 +269,6 @@ void PostCommand(PlayerContext& ctx, function<void(PlayerContext&)> task)
         ctx.commandQueue.push_back(move(task));
     }
     ctx.commandCv.notify_one();
-}
-
-struct RawFileCookie {
-    RawFile* file = nullptr;
-};
-
-string StripRawFileScheme(const char* uri)
-{
-    string path = uri ? uri : "";
-    constexpr const char* scheme = "rawfile://";
-    if (path.rfind(scheme, 0) == 0) {
-        path.erase(0, strlen(scheme));
-    }
-    while (!path.empty() && path.front() == '/') {
-        path.erase(path.begin());
-    }
-    return path;
-}
-
-int64_t RawFileRead(void* cookie, char* buffer, uint64_t bytes)
-{
-    auto* raw = static_cast<RawFileCookie*>(cookie);
-    if (!raw || !raw->file) {
-        return -1;
-    }
-    return OH_ResourceManager_ReadRawFile(raw->file, buffer, static_cast<size_t>(bytes));
-}
-
-int64_t RawFileSeek(void* cookie, int64_t offset)
-{
-    auto* raw = static_cast<RawFileCookie*>(cookie);
-    if (!raw || !raw->file || offset < 0 || offset > LONG_MAX) {
-        return MPV_ERROR_GENERIC;
-    }
-    if (OH_ResourceManager_SeekRawFile(raw->file, static_cast<long>(offset), 0) != 0) {
-        return MPV_ERROR_GENERIC;
-    }
-    return OH_ResourceManager_GetRawFileOffset(raw->file);
-}
-
-int64_t RawFileSize(void* cookie)
-{
-    auto* raw = static_cast<RawFileCookie*>(cookie);
-    if (!raw || !raw->file) {
-        return MPV_ERROR_GENERIC;
-    }
-    return OH_ResourceManager_GetRawFileSize(raw->file);
-}
-
-void RawFileClose(void* cookie)
-{
-    auto* raw = static_cast<RawFileCookie*>(cookie);
-    if (!raw) {
-        return;
-    }
-    if (raw->file) {
-        OH_ResourceManager_CloseRawFile(raw->file);
-    }
-    delete raw;
-}
-
-int RawFileOpen(void* userData, char* uri, mpv_stream_cb_info* info)
-{
-    auto* resourceManager = static_cast<NativeResourceManager*>(userData);
-    const auto path = StripRawFileScheme(uri);
-    if (!resourceManager || path.empty()) {
-        return MPV_ERROR_LOADING_FAILED;
-    }
-
-    RawFile* file = OH_ResourceManager_OpenRawFile(resourceManager, path.c_str());
-    if (!file) {
-        OH_LOG_Print(LOG_APP, LOG_ERROR, 0xFF00, "mpv", "rawfile open failed: %{public}s", path.c_str());
-        return MPV_ERROR_LOADING_FAILED;
-    }
-
-    auto* cookie = new RawFileCookie { file };
-    info->cookie = cookie;
-    info->read_fn = RawFileRead;
-    info->seek_fn = RawFileSeek;
-    info->size_fn = RawFileSize;
-    info->close_fn = RawFileClose;
-    info->cancel_fn = nullptr;
-    return 0;
-}
-
-void RegisterRawFileProtocol(mpv_handle* mpv)
-{
-    if (!mpv || !Mpv().stream_cb_add_ro) {
-        return;
-    }
-    auto* resourceManager = GetResourceManager();
-    if (!resourceManager) {
-        OH_LOG_Print(LOG_APP, LOG_WARN, 0xFF00, "mpv", "rawfile protocol skipped: no resource manager");
-        return;
-    }
-    LogMpvError("register rawfile protocol", Mpv().stream_cb_add_ro(mpv, "rawfile", resourceManager, RawFileOpen));
 }
 
 void SetOptionString(mpv_handle* mpv, const char* name, const char* value)
@@ -762,38 +654,6 @@ void SetMpvStringProperty(PlayerContext& ctx, const char* property, const string
     LogMpvError(action, Mpv().set_property_string(ctx.mpv, property, value.c_str()));
 }
 
-// Runtime VO output color space override (see body for the full contract).
-// Values mirror the ColorSpace enum in enums.ets.
-void ApplyColorSpace(PlayerContext& ctx, int32_t colorSpace)
-{
-    if (!ctx.mpv) {
-        return;
-    }
-    // Runtime colorspace override via setColorSpace().
-    //
-    // By default (no call) target-trc/target-prim stay UNSET so the
-    // native-window HDR path in vo_ohos_set_color drives output (see EnsureMpv).
-    // Calling this pins an explicit target:
-    //  - mode 2 (BT2100_PQ) / 7 (BT2100_HLG): force an HDR target.
-    //  - any other value: force SDR (gamma2.2 / bt.709), e.g. to tone-map HDR
-    //    down to SDR on demand.
-    // Note: pinning target-trc here overrides the colorspace hint in
-    // vo_gpu-next, so forcing SDR will disengage the true-HDR native-window
-    // path until the player is recreated.
-    const char* trc = "gamma2.2";
-    const char* prim = "bt.709";
-    if (colorSpace == 2) {            // BT2100_PQ -> force HDR10 output
-        trc = "pq"; prim = "bt.2020";
-    } else if (colorSpace == 7) {     // BT2100_HLG -> force HLG output
-        trc = "hlg"; prim = "bt.2020";
-    }
-    SetOptionString(ctx.mpv, "target-trc", trc);
-    SetOptionString(ctx.mpv, "target-prim", prim);
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                 "colorspace mode=%{public}d trc=%{public}s prim=%{public}s",
-                 colorSpace, trc, prim);
-}
-
 // Push the current XComponent surface size to mpv's OHOS VO.
 //
 // The project's AVPlayer uses an inline XComponent (no libraryname, no
@@ -851,6 +711,10 @@ void ApplyWindowOption(PlayerContext& ctx)
     // be misrouted as surfaceIds by the mpv-side heuristic.
     string wid;
     const char* widSource = "surfaceId";
+    // DORMANT: 产品渲染走 entry 内联 XComponent + surfaceId；启用条件：entry 切换到 MpvPlayerView/libraryname 路径
+    // (ctx.window is only ever set by the libraryname-driven native surface
+    // callbacks below; on the product path it stays nullptr and widSource is
+    // always "surfaceId".)
     if (ctx.window != nullptr && !ctx.surfaceId.empty() && ctx.surfaceId != "0"
         && (uintptr_t)ctx.window < (1ULL << 40)) {
         uint64_t windowSurfaceId = 0;
@@ -895,7 +759,6 @@ bool EnsureMpv(PlayerContext& ctx)
             return false;
         }
 
-        RegisterRawFileProtocol(ctx.mpv);
         SetOptionString(ctx.mpv, "terminal", "no");
         SetOptionString(ctx.mpv, "config", "no");
         SetOptionString(ctx.mpv, "idle", "yes");
@@ -984,8 +847,9 @@ bool EnsureMpv(PlayerContext& ctx)
         //  - HDR source: hint = preferred_csp() = PQ/HLG -> set_color tags the
         //    native window HDR and returns true -> real HDR output.
         //  - SDR source / SDR display: libplacebo presents SDR normally.
-        // A runtime override is still available via setColorSpace()
-        // (ApplyColorSpace), e.g. to force SDR on HDR-broken hardware.
+        // (The former setColorSpace() runtime override — pinning target-trc /
+        // target-prim to force SDR on HDR-broken hardware — was removed as
+        // dead code; re-add it there if that escape hatch is ever needed.)
     }
 
     if (!ctx.initialized) {
@@ -1052,7 +916,7 @@ int32_t BuildMediaStatus(PlayerContext& ctx)
 // OHOS DocumentPicker / "open from other apps" hand back a "file://docs/..."
 // URI, not a real filesystem path. mpv's loadfile can't open that authority,
 // so resolve it to a real path first (the upstream libmdk bridge did the same
-// before the mpv migration). Non file:// inputs (http/https/rawfile/fd/...)
+// before the mpv migration). Non file:// inputs (http/https/fd/...)
 // pass through unchanged so mpv's own protocol handlers still apply.
 string ResolveMediaUri(const string& url)
 {
@@ -1157,33 +1021,6 @@ void lockFind(const string& id, auto&& f)
     }
 }
 
-template<class Container>
-Container FromArray(napi_env env, napi_value value)
-{
-    Container result;
-    bool isArray = false;
-    napi_is_array(env, value, &isArray);
-    if (!isArray) {
-        return result;
-    }
-
-    uint32_t length = 0;
-    napi_get_array_length(env, value, &length);
-    for (uint32_t index = 0; index < length; ++index) {
-        napi_value item = nullptr;
-        napi_get_element(env, value, index, &item);
-        if constexpr (is_same_v<typename Container::value_type, int>) {
-            int32_t v = 0;
-            napi_get_value_int32(env, item, &v);
-            result.insert(result.end(), v);
-        }
-        if constexpr (is_same_v<typename Container::value_type, string>) {
-            result.insert(result.end(), ToString(env, item));
-        }
-    }
-    return result;
-}
-
 string IdOf(OH_NativeXComponent* component)
 {
     char id[OH_XCOMPONENT_ID_LEN_MAX + 1] = {};
@@ -1192,6 +1029,11 @@ string IdOf(OH_NativeXComponent* component)
     return id;
 }
 
+// DORMANT: 产品渲染走 entry 内联 XComponent + surfaceId；启用条件：entry 切换到 MpvPlayerView/libraryname 路径
+// These three native surface callbacks only fire when an XComponent is
+// created with libraryname='mpv_napi' (i.e. via MpvPlayerView). The product
+// path (entry AVPlayer inline XComponent, no libraryname) never registers
+// them, so ctx.window stays nullptr and sizes arrive via SetVideoSurfaceSize.
 void OnSurfaceCreated(OH_NativeXComponent* component, void* window)
 {
     uint64_t width = 0;
@@ -1357,15 +1199,6 @@ napi_value SetMedia(napi_env env, napi_callback_info info)
     return Undefined(env);
 }
 
-napi_value SetMediaSource(napi_env env, napi_callback_info info)
-{
-    size_t argc = 3; napi_value args[3];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    const string url = ToString(env, args[1]);
-    lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) { LoadMedia(ctx, url); });
-    return Undefined(env);
-}
-
 napi_value Play(napi_env env, napi_callback_info info)
 {
     size_t argc = 1; napi_value args[1];
@@ -1494,25 +1327,6 @@ napi_value SetVolume(napi_env env, napi_callback_info info)
     return Undefined(env);
 }
 
-napi_value SetLoop(napi_env env, napi_callback_info info)
-{
-    size_t argc = 2; napi_value args[2];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    int32_t count = 0;
-    napi_get_value_int32(env, args[1], &count);
-    lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
-        ctx.loopCount = count;
-        if (count < 0) {
-            SetStringProperty(ctx, "loop-file", "inf");
-        } else if (count == 0) {
-            SetStringProperty(ctx, "loop-file", "no");
-        } else {
-            SetStringProperty(ctx, "loop-file", to_string(count));
-        }
-    });
-    return Undefined(env);
-}
-
 napi_value SetProperty(napi_env env, napi_callback_info info)
 {
     size_t argc = 3; napi_value args[3];
@@ -1568,103 +1382,6 @@ napi_value MpvCommand(napi_env env, napi_callback_info info)
     return Undefined(env);
 }
 
-napi_value SetColorSpace(napi_env env, napi_callback_info info)
-{
-    size_t argc = 2; napi_value args[2];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    int32_t colorSpace = 0;
-    napi_get_value_int32(env, args[1], &colorSpace);
-    lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
-        PostCommand(ctx, [colorSpace](PlayerContext& workerCtx) {
-            if (!EnsureMpv(workerCtx)) {
-                return;
-            }
-            ApplyColorSpace(workerCtx, colorSpace);
-        });
-    });
-    return Undefined(env);
-}
-
-napi_value SetVideoEffect(napi_env env, napi_callback_info info)
-{
-    size_t argc = 3; napi_value args[3];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    int32_t effect = 0;
-    double value = 0;
-    napi_get_value_int32(env, args[1], &effect);
-    napi_get_value_double(env, args[2], &value);
-
-    const char* property = nullptr;
-    switch (effect) {
-    case 0: property = "brightness"; break;
-    case 1: property = "contrast"; break;
-    case 2: property = "hue"; break;
-    case 3: property = "saturation"; break;
-    default: break;
-    }
-
-    if (property) {
-        lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
-            const string prop = property;
-            PostCommand(ctx, [prop, value](PlayerContext& workerCtx) {
-                if (!EnsureMpv(workerCtx)) {
-                    return;
-                }
-                SetMpvDoubleProperty(workerCtx, prop.c_str(), value, prop.c_str());
-            });
-        });
-    }
-    return Undefined(env);
-}
-
-napi_value SetDecoders(napi_env env, napi_callback_info info)
-{
-    size_t argc = 3; napi_value args[3];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    int32_t mediaType = 0;
-    napi_get_value_int32(env, args[1], &mediaType);
-    const auto decoders = FromArray<vector<string>>(env, args[2]);
-    if (mediaType == kMediaTypeVideo && !decoders.empty()) {
-        lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) { SetStringProperty(ctx, "vd-lavc-software-fallback", "yes"); });
-    }
-    return Undefined(env);
-}
-
-napi_value SetActiveTracks(napi_env env, napi_callback_info info)
-{
-    size_t argc = 3; napi_value args[3];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    int32_t mediaType = 0;
-    napi_get_value_int32(env, args[1], &mediaType);
-    const auto tracks = FromArray<set<int>>(env, args[2]);
-
-    const char* property = nullptr;
-    if (mediaType == kMediaTypeVideo) {
-        property = "vid";
-    } else if (mediaType == kMediaTypeAudio) {
-        property = "aid";
-    } else if (mediaType == kMediaTypeSubtitle) {
-        property = "sid";
-    }
-
-    if (property) {
-        const string value = tracks.empty() ? "no" : to_string(*tracks.begin() + 1);
-        lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) { SetStringProperty(ctx, property, value); });
-    }
-    return Undefined(env);
-}
-
-napi_value SetAudioBackends(napi_env env, napi_callback_info info)
-{
-    size_t argc = 2; napi_value args[2];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    const auto backends = FromArray<vector<string>>(env, args[1]);
-    if (!backends.empty()) {
-        lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) { SetStringProperty(ctx, "ao", backends.front()); });
-    }
-    return Undefined(env);
-}
-
 napi_value GetPosition(napi_env env, napi_callback_info info)
 {
     size_t argc = 1; napi_value args[1];
@@ -1674,18 +1391,6 @@ napi_value GetPosition(napi_env env, napi_callback_info info)
     });
     napi_value result = nullptr;
     napi_create_int64(env, pos, &result);
-    return result;
-}
-
-napi_value Buffered(napi_env env, napi_callback_info info)
-{
-    size_t argc = 1; napi_value args[1];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    const auto buf = lockFor(ToString(env, args[0]), [](PlayerContext& ctx) {
-        return ctx.lastBufferedMs.load();
-    });
-    napi_value result = nullptr;
-    napi_create_int64(env, buf, &result);
     return result;
 }
 
@@ -1735,8 +1440,12 @@ napi_value GetMediaInfo(napi_env env, napi_callback_info info)
     lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) {
         duration = ctx.lastDurationMs.load();
         mpv_handle* handle = ctx.mpv;
-        // Capture by value: the reader is used synchronously below, still under
-        // the player lock, so the handle stays valid.
+        // Capture the handle by value. NOTE: the reader is NOT used under the
+        // player lock — MediaInfoToNapi invokes it below, after lockFor has
+        // released gMutex. The handle can therefore race with ReleasePlayer's
+        // terminate_destroy; in practice the UI only queries info for a live
+        // player, and mpv_get_property_string on a dying handle is the
+        // accepted risk of reading properties off the command thread.
         reader = [handle](const char* name) -> std::string {
             if (!handle || !Mpv().get_property_string) return {};
             char* val = Mpv().get_property_string(handle, name);
@@ -1745,8 +1454,6 @@ napi_value GetMediaInfo(napi_env env, napi_callback_info info)
             Mpv().free(val);
             return out;
         };
-        // Build the info object while still holding the lock and the handle.
-        // (MediaInfoToNapi only reads; no mpv state is mutated.)
     });
     if (!reader) {
         reader = [](const char*) -> std::string { return {}; };
@@ -1865,7 +1572,6 @@ napi_value Init(napi_env env, napi_value exports)
         {"ensurePlayer", nullptr, EnsurePlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"releasePlayer", nullptr, ReleasePlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setMedia", nullptr, SetMedia, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setMediaSource", nullptr, SetMediaSource, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"play", nullptr, Play, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"pause", nullptr, Pause, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"stop", nullptr, Stop, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -1874,16 +1580,9 @@ napi_value Init(napi_env env, napi_value exports)
         {"seekWithFlags", nullptr, SeekWithFlags, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setPlaybackRate", nullptr, SetPlaybackRate, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVolume", nullptr, SetVolume, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setLoop", nullptr, SetLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setProperty", nullptr, SetProperty, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getProperty", nullptr, GetProperty, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setColorSpace", nullptr, SetColorSpace, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setVideoEffect", nullptr, SetVideoEffect, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setDecoders", nullptr, SetDecoders, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setActiveTracks", nullptr, SetActiveTracks, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setAudioBackends", nullptr, SetAudioBackends, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getPosition", nullptr, GetPosition, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"buffered", nullptr, Buffered, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getSeekableRangesJson", nullptr, GetSeekableRangesJson, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getState", nullptr, GetState, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getMediaStatus", nullptr, GetMediaStatus, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -1891,14 +1590,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"isPlaying", nullptr, IsPlaying, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceSize", nullptr, SetVideoSurfaceSize, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceId", nullptr, SetVideoSurfaceId, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"version", nullptr, Version, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"ffmpegVersion", nullptr, FfmpegVersion, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setGlobalOptionString", nullptr, SetGlobalOptionString, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"getGlobalOptionString", nullptr, GetGlobalOptionString, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setGlobalOptionInt", nullptr, SetGlobalOptionInt, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"getGlobalOptionInt", nullptr, GetGlobalOptionInt, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setGlobalOptionFloat", nullptr, SetGlobalOptionFloat, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setResourceManager", nullptr, SetResourceManager, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, SetEventCallback, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"command", nullptr, MpvCommand, nullptr, nullptr, nullptr, napi_default, nullptr},
