@@ -71,7 +71,7 @@ export struct OptionsLanguageAndRegionPage {
     return this.params.contentCountryItems.map(item => ({ value: item.localizedName } as SelectOption));
   }
 
-  /** 'default' + 应用支持的语言；default 项显示为「跟随应用语言」 */
+  /** 'default' + 应用支持的语言 + 额外翻译目标语言；default 项显示为「跟随应用语言」 */
   private getTranslationLangItems(): LanguagePickerItem[] {
     const followApp = getContext().resourceManager.getStringSync($r('app.string.yt_follow_app_language').id);
     const items: LanguagePickerItem[] = [new LanguagePickerItem('default', followApp, followApp)];
@@ -80,6 +80,8 @@ export struct OptionsLanguageAndRegionPage {
         items.push(item);
       }
     }
+    // Extra translation targets that are not app UI languages.
+    items.push(new LanguagePickerItem('it', 'Italiano', 'Italiano'));
     return items;
   }
 

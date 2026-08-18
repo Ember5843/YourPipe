@@ -42,32 +42,12 @@ export class TranslationService {
   }
 
   /**
-   * Cheap heuristic to avoid offering translation for text already in the
-   * target language. Only implemented for CJK targets; other targets always
-   * offer (a same-language request is harmless, Google echoes the text).
+   * Translation is offered for every non-empty comment. Local language
+   * heuristics proved unreliable (Japanese kanji, mixed scripts), and a
+   * same-language gtx request harmlessly echoes the original text.
    */
   static shouldOfferTranslation(text: string): boolean {
-    if (!text || text.trim().length === 0) {
-      return false;
-    }
-    const target = TranslationService.targetLanguage();
-    if (target.startsWith('zh')) {
-      // Skip when the comment is already predominantly CJK.
-      let cjk = 0;
-      let letters = 0;
-      for (const ch of text) {
-        const code = ch.codePointAt(0) ?? 0;
-        if ((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF)) {
-          cjk++;
-        } else if ((code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A)) {
-          letters++;
-        }
-      }
-      if (cjk > 0 && cjk >= letters) {
-        return false;
-      }
-    }
-    return true;
+    return !!text && text.trim().length > 0;
   }
 
   static getCached(text: string): string | undefined {
