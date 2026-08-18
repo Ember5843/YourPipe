@@ -8,6 +8,8 @@ const logger = AppLog.getInstance('CommentTranslate');
 export class CommentTranslateUiState {
   commentText: string = '';
   translated: string = '';
+  /** translated 对应的目标语言；App 语言切换后旧译文失效 */
+  language: string = '';
   translating: boolean = false;
   failed: boolean = false;
   showOriginal: boolean = false;
@@ -15,19 +17,44 @@ export class CommentTranslateUiState {
 
 export class CommentTranslateStateStore {
   private static states: Map<string, CommentTranslateUiState> = new Map();
+  /** 上限：浏览大量评论时状态对象不再无限累积（插入序近似 LRU 淘汰） */
+  private static readonly MAX_STATES: number = 500;
 
   static get(commentId: string, commentText: string): CommentTranslateUiState {
+    const lang = TranslationService.targetLanguage();
     let state = CommentTranslateStateStore.states.get(commentId);
     if (!state || state.commentText !== commentText) {
       state = new CommentTranslateUiState();
       state.commentText = commentText;
+      state.language = lang;
       const cached = TranslationService.getCached(commentText);
       if (cached !== undefined) {
         state.translated = cached;
       }
       CommentTranslateStateStore.states.set(commentId, state);
+      if (CommentTranslateStateStore.states.size > CommentTranslateStateStore.MAX_STATES) {
+        const oldest = CommentTranslateStateStore.states.keys().next();
+        if (!oldest.done) {
+          CommentTranslateStateStore.states.delete(oldest.value);
+        }
+      }
+    } else if (state.translated && state.language !== lang) {
+      // 目标语言已切换：旧译文失效，改用新语言缓存（没有则回到未翻译态）。
+      state.translated = '';
+      state.failed = false;
+      state.showOriginal = false;
+      const cached = TranslationService.getCached(commentText);
+      if (cached !== undefined) {
+        state.translated = cached;
+      }
+      state.language = lang;
     }
     return state;
+  }
+
+  /** 翻译完成后记录结果所用的目标语言（供语言切换失效判断）。 */
+  static markTranslated(state: CommentTranslateUiState): void {
+    state.language = TranslationService.targetLanguage();
   }
 }
 
@@ -70,6 +97,7 @@ export struct CommentTranslateButton {
       .then((result: string) => {
         this.state.translated = result;
         this.state.showOriginal = false;
+        CommentTranslateStateStore.markTranslated(this.state);
         logger.info(`comment translated id=${this.commentId} len=${this.state.commentText.length}`);
       })
       .catch((e: Error) => {
