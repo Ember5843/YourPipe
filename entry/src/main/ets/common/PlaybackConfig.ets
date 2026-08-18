@@ -50,6 +50,16 @@ export const DEMUXER_MAX_BYTES_LABELS: DemuxerMaxBytes[] = ['10', '20', '50', '1
 
 export const GPU_API_LABELS: GpuApi[] = ['auto', 'opengl', 'vulkan'];
 
+/** 长按加速可选倍速档 */
+export const HOLD_SPEED_VALUES: number[] = [1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
+
+/** 长按触发延迟可选档位（毫秒） */
+export const HOLD_SPEED_DELAYS: number[] = [300, 500, 800, 1000];
+
+export function getHoldSpeedDelayDisplay(value: number): string {
+  return value >= 1000 ? `${value / 1000}s` : `${value}ms`;
+}
+
 export function getBackgroundVideoOffDelayDisplay(value: BackgroundVideoOffDelay): ResourceStr {
   if (value === '0') {
     return $r('app.string.yt_setting_delay_immediate');
@@ -83,6 +93,12 @@ export class PlaybackConfig {
   gestureSeekEnabled: boolean = true;
   gestureBrightnessEnabled: boolean = true;
   gestureVolumeEnabled: boolean = true;
+  /** 长按屏幕临时加速（松手恢复原倍速） */
+  holdSpeedEnabled: boolean = true;
+  /** 长按加速的目标倍速 */
+  holdSpeedValue: number = 2.0;
+  /** 长按多久触发加速（毫秒） */
+  holdSpeedDelayMs: number = 500;
   /** 返回键/home 键时是否自动进入画中画（设备不支持时强制 false） */
   pipOnReturn: boolean = true;
   /**
@@ -116,6 +132,9 @@ export class PlaybackConfig {
     next.gestureSeekEnabled = this.gestureSeekEnabled;
     next.gestureBrightnessEnabled = this.gestureBrightnessEnabled;
     next.gestureVolumeEnabled = this.gestureVolumeEnabled;
+    next.holdSpeedEnabled = this.holdSpeedEnabled;
+    next.holdSpeedValue = this.holdSpeedValue;
+    next.holdSpeedDelayMs = this.holdSpeedDelayMs;
     next.pipOnReturn = this.pipOnReturn;
     next.backgroundAudioOnly = this.backgroundAudioOnly;
     next.backgroundVideoOffDelaySec = this.backgroundVideoOffDelaySec;
@@ -135,6 +154,11 @@ export class PlaybackConfig {
     cfg.gestureSeekEnabled = PreferencesStore.getString('cfg_pb_gestureSeekEnabled', 'true') === 'true';
     cfg.gestureBrightnessEnabled = PreferencesStore.getString('cfg_pb_gestureBrightnessEnabled', 'true') === 'true';
     cfg.gestureVolumeEnabled = PreferencesStore.getString('cfg_pb_gestureVolumeEnabled', 'true') === 'true';
+    cfg.holdSpeedEnabled = PreferencesStore.getString('cfg_pb_holdSpeedEnabled', 'true') === 'true';
+    const holdSpeedValue = Number(PreferencesStore.getString('cfg_pb_holdSpeedValue', '2'));
+    cfg.holdSpeedValue = HOLD_SPEED_VALUES.includes(holdSpeedValue) ? holdSpeedValue : 2.0;
+    const holdSpeedDelay = Number(PreferencesStore.getString('cfg_pb_holdSpeedDelayMs', '500'));
+    cfg.holdSpeedDelayMs = HOLD_SPEED_DELAYS.includes(holdSpeedDelay) ? holdSpeedDelay : 500;
     cfg.pipOnReturn = PreferencesStore.getString('cfg_pb_pipOnReturn', 'true') === 'true';
     cfg.backgroundAudioOnly = PreferencesStore.getString('cfg_pb_backgroundAudioOnly', 'true') === 'true';
     const delay = PreferencesStore.getString('cfg_pb_backgroundVideoOffDelaySec', '15');
@@ -163,6 +187,9 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_gestureSeekEnabled', cfg.gestureSeekEnabled ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_gestureBrightnessEnabled', cfg.gestureBrightnessEnabled ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_gestureVolumeEnabled', cfg.gestureVolumeEnabled ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_holdSpeedEnabled', cfg.holdSpeedEnabled ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_holdSpeedValue', String(cfg.holdSpeedValue));
+    PreferencesStore.setString('cfg_pb_holdSpeedDelayMs', String(cfg.holdSpeedDelayMs));
     PreferencesStore.setString('cfg_pb_pipOnReturn', cfg.pipOnReturn ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_backgroundAudioOnly', cfg.backgroundAudioOnly ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_backgroundVideoOffDelaySec', cfg.backgroundVideoOffDelaySec);

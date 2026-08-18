@@ -1357,6 +1357,22 @@
             "value": "Côté droit : volume"
         },
         {
+            "name": "yt_playback_hold_speed",
+            "value": "Appui long pour accélérer"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "Accélère la lecture pendant l'appui sur l'écran"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "Vitesse d'appui long"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "Délai de déclenchement"
+        },
+        {
             "name": "yt_playback_background_audio_only",
             "value": "Audio uniquement en arrière-plan"
         },

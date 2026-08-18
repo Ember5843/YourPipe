@@ -1357,6 +1357,22 @@
             "value": "اليمين: الصوت"
         },
         {
+            "name": "yt_playback_hold_speed",
+            "value": "اضغط مطولًا للتسريع"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "يسرّع التشغيل مؤقتًا أثناء الضغط على الشاشة"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "سرعة الضغط المطول"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "تأخير التفعيل"
+        },
+        {
             "name": "yt_playback_background_audio_only",
             "value": "صوت فقط في الخلفية"
         },

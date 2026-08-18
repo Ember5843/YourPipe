@@ -1357,6 +1357,22 @@
             "value": "Lado derecho: volumen"
         },
         {
+            "name": "yt_playback_hold_speed",
+            "value": "Mantener para acelerar"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "Acelera la reproducción mientras se mantiene pulsada la pantalla"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "Velocidad al mantener"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "Retraso de activación"
+        },
+        {
             "name": "yt_playback_background_audio_only",
             "value": "Solo audio en segundo plano"
         },

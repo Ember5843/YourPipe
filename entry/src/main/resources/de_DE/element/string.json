@@ -1705,6 +1705,22 @@
             "value": "Rechts wischen für Lautstärke"
         },
         {
+            "name": "yt_playback_hold_speed",
+            "value": "Gedrückt halten zum Beschleunigen"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "Beschleunigt die Wiedergabe, solange der Bildschirm gehalten wird"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "Halte-Geschwindigkeit"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "Halte-Verzögerung"
+        },
+        {
             "name": "yt_playback_background_audio_only",
             "value": "Nur Audio im Hintergrund"
         },

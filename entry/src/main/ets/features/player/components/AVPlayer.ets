@@ -284,6 +284,11 @@ export struct VideoPlayer {
   @State showBackwardHint: boolean = false;
   private forwardHintTimerId: number = -1;
   private backwardHintTimerId: number = -1;
+  // 长按倍速（hold-to-boost）：松手/取消时恢复加速前的倍速
+  @State showSpeedBoostHint: boolean = false;
+  private speedBoostActive: boolean = false;
+  private speedBoostPreviousSpeed: number = 1.0;
+  private speedBoostTarget: number = 2.0;
 
   
   // 播放页渲染用的 XComponentController。也作为 PiP 的 componentController：
@@ -575,6 +580,7 @@ export struct VideoPlayer {
 
   private resetTransientUi(reason: string): void {
     this.interactionEpoch++;
+    this.onHoldSpeedEnd('reset-ui');
     this.clearHideTimer();
     this.clearTransientHintTimers();
     this.gestureMode = PlayerGestureMode.IDLE;
@@ -774,6 +780,45 @@ export struct VideoPlayer {
     this.beginInteraction(PlayerInteractionKind.NONE);
     this.scheduleHideControls();
     return this.interactionEpoch;
+  }
+
+  /**
+   * 长按倍速激活（LongPressGesture.onAction）。Exclusive 手势组保证此刻
+   * 单击/双击/滑动都已失败，不会在同一个触摸序列里竞争。
+   */
+  private onHoldSpeedStart(): void {
+    if (this.speedBoostActive) {
+      return;
+    }
+    if (!this.playbackConfig.holdSpeedEnabled) {
+      Logger.debug(TAG, 'Hold speed boost ignored reason=disabled');
+      return;
+    }
+    if (this.curSource.isLive || !this.vm.isPlaying || this.isSliderDragging || this.hasError) {
+      Logger.debug(TAG, `Hold speed boost ignored live=${this.curSource.isLive} `
+        + `playing=${this.vm.isPlaying} slider=${this.isSliderDragging} error=${this.hasError}`);
+      return;
+    }
+    const target = this.playbackConfig.holdSpeedValue;
+    if (Math.abs(this.vm.playbackSpeed - target) < 0.001) {
+      return; // 已在目标倍速，无需加速也不用显示提示
+    }
+    this.speedBoostActive = true;
+    this.speedBoostPreviousSpeed = this.vm.playbackSpeed;
+    this.speedBoostTarget = target;
+    this.controller.setPlaybackSpeed(target);
+    this.showSpeedBoostHint = true;
+    Logger.debug(TAG, `Hold speed boost start ${this.speedBoostPreviousSpeed}x -> ${target}x`);
+  }
+
+  private onHoldSpeedEnd(reason: string): void {
+    if (!this.speedBoostActive) {
+      return;
+    }
+    this.speedBoostActive = false;
+    this.showSpeedBoostHint = false;
+    this.controller.setPlaybackSpeed(this.speedBoostPreviousSpeed);
+    Logger.debug(TAG, `Hold speed boost end reason=${reason} restored=${this.speedBoostPreviousSpeed}x`);
   }
 
   private registerControlActivity(): void {
@@ -1389,6 +1434,16 @@ export struct VideoPlayer {
           .alignItems(HorizontalAlign.Center)
           .alignRules({ top: { anchor: '__container__', align: VerticalAlign.Top }, end: { anchor: '__container__', align: HorizontalAlign.End } })
         }
+        if (this.showSpeedBoostHint) {
+          Text(`${this.speedBoostTarget}x`)
+            .fontColor(Color.White).fontSize(22).fontWeight(FontWeight.Medium)
+            .padding({ left: 16, right: 16, top: 6, bottom: 6 })
+            .backgroundColor('#80000000')
+            .borderRadius(16)
+            .margin({ top: 24 })
+            .alignRules({ middle: { anchor: '__container__', align: HorizontalAlign.Center },
+              top: { anchor: '__container__', align: VerticalAlign.Top } })
+        }
         if (this.showBrightnessHint) {
           Stack({ alignContent: Alignment.Bottom }) {
             Slider({ value: this.gestureBrightnessValue, max: 1, min: 0, reverse: true, style: SliderStyle.NONE, direction: Axis.Vertical })
@@ -1481,6 +1536,16 @@ export struct VideoPlayer {
           })
           .onActionCancel((_e: GestureEvent) => {
             this.onPlayerPanEnd(true);
+          }),
+        LongPressGesture({ fingers: 1, duration: this.playbackConfig.holdSpeedDelayMs, repeat: false })
+          .onAction((_e: GestureEvent) => {
+            this.onHoldSpeedStart();
+          })
+          .onActionEnd((_e: GestureEvent) => {
+            this.onHoldSpeedEnd('release');
+          })
+          .onActionCancel((_e: GestureEvent) => {
+            this.onHoldSpeedEnd('cancel');
           })
       )
     )

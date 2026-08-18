@@ -11,6 +11,7 @@ import {
   BACKGROUND_VIDEO_OFF_DELAY_LABELS, BackgroundVideoOffDelay,
   getGpuApiDisplay, getCacheSecsDisplay, getDemuxerReadaheadDisplay,
   getDemuxerMaxBytesDisplay, getBackgroundVideoOffDelayDisplay,
+  HOLD_SPEED_VALUES, HOLD_SPEED_DELAYS, getHoldSpeedDelayDisplay,
 } from '../../common/PlaybackConfig';
 import { PiPManager } from '../player/pip/PiPManager';
 
@@ -63,6 +64,14 @@ export struct OptionsPlaybackPage {
   private getBgVideoOffDelayOptions(): SelectOption[] {
     return BACKGROUND_VIDEO_OFF_DELAY_LABELS.map(
       s => ({ value: getBackgroundVideoOffDelayDisplay(s) } as SelectOption));
+  }
+
+  private getHoldSpeedOptions(): SelectOption[] {
+    return HOLD_SPEED_VALUES.map(v => ({ value: `${v}x` } as SelectOption));
+  }
+
+  private getHoldSpeedDelayOptions(): SelectOption[] {
+    return HOLD_SPEED_DELAYS.map(v => ({ value: getHoldSpeedDelayDisplay(v) } as SelectOption));
   }
 
   build() {
@@ -242,6 +251,49 @@ export struct OptionsPlaybackPage {
                 this.params.updatePlaybackConfig(cfg => cfg.gestureVolumeEnabled = val);
               }
             })
+          }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_playback_hold_speed'),
+              subtitle: $r('app.string.yt_playback_hold_speed_subtitle'),
+              isOn: this.playbackConfig.holdSpeedEnabled,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig(cfg => cfg.holdSpeedEnabled = val);
+              }
+            })
+          }
+
+          if (this.playbackConfig.holdSpeedEnabled) {
+            ListItem() {
+              PlaybackSelectRow({
+                title: $r('app.string.yt_playback_hold_speed_value'),
+                options: this.getHoldSpeedOptions(),
+                selectedIndex: HOLD_SPEED_VALUES.indexOf(this.playbackConfig.holdSpeedValue),
+                fontColor: this.params.themeColor,
+                transparentBackground: true,
+                onChange: (index: number) => {
+                  const v = HOLD_SPEED_VALUES[index];
+                  this.params.updatePlaybackConfig(cfg => cfg.holdSpeedValue = v);
+                }
+              })
+            }
+
+            ListItem() {
+              PlaybackSelectRow({
+                title: $r('app.string.yt_playback_hold_speed_delay'),
+                options: this.getHoldSpeedDelayOptions(),
+                selectedIndex: HOLD_SPEED_DELAYS.indexOf(this.playbackConfig.holdSpeedDelayMs),
+                fontColor: this.params.themeColor,
+                transparentBackground: true,
+                onChange: (index: number) => {
+                  const v = HOLD_SPEED_DELAYS[index];
+                  this.params.updatePlaybackConfig(cfg => cfg.holdSpeedDelayMs = v);
+                }
+              })
+            }
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))

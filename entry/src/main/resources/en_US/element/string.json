@@ -1429,6 +1429,22 @@
             "value": "Swipe right side for volume"
         },
         {
+            "name": "yt_playback_hold_speed",
+            "value": "Hold to speed up"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "Temporarily speeds up playback while holding the screen"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "Hold speed"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "Hold trigger delay"
+        },
+        {
             "name": "yt_playback_background_audio_only",
             "value": "Background audio only"
         },

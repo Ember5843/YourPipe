@@ -1705,6 +1705,22 @@
             "value": "畫面右側上下滑調音量"
         },
         {
+            "name": "yt_playback_hold_speed",
+            "value": "長按加速播放"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "按住畫面時暫時加速播放"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "長按倍速"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "長按觸發延遲"
+        },
+        {
             "name": "yt_playback_background_audio_only",
             "value": "背景僅音訊"
         },

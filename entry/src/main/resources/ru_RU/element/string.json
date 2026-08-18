@@ -1357,6 +1357,22 @@
             "value": "Справа — громкость"
         },
         {
+            "name": "yt_playback_hold_speed",
+            "value": "Удержание для ускорения"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "Ускоряет воспроизведение при удержании экрана"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "Скорость при удержании"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "Задержка срабатывания"
+        },
+        {
             "name": "yt_playback_background_audio_only",
             "value": "Только аудио в фоне"
         },
