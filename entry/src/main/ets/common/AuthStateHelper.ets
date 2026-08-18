@@ -1,4 +1,4 @@
-import { AuthSessionManager, AuthAccountStatus, YoutubeJavaScriptPlayerManager } from 'youtube_core';
+import { AuthSessionManager, AuthAccountStatus, YoutubeJavaScriptPlayerManager, YoutubePlayerClientConfig } from 'youtube_core';
 import { SabrWebViewPoTokenProvider } from '../features/player/SabrWebViewPoTokenProvider';
 import { AppLog } from './AppLog';
 
@@ -16,6 +16,17 @@ export class AuthStateHelper {
     const status = session ? session.getStatus() : new AuthAccountStatus();
     AppStorage.setOrCreate('authStatus', status);
     AuthStateHelper.resetIdentityIfCredentialChanged(session);
+  }
+
+  /**
+   * 登录态/鉴权开关变化后的统一后置动作：按当前有效播放鉴权重置 stream
+   * client 选择（PipePipe reconcileYoutubePlayerClient：登录 → tv_downgraded，
+   * 游客 → visionos；清除手动 pin）。启动、登录、登出、鉴权开关都必须走这里，
+   * 不要在调用点散落 resetToAuthDefault 及其参数推导。
+   */
+  static reconcilePlaybackClient(): void {
+    const usePlaybackAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
+    YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);
   }
 
   /**

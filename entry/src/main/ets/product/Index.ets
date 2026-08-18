@@ -8,7 +8,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import type { BusinessError } from '@kit.BasicServicesKit';
 import { ActionHub, ActionHubEvent } from '../common/ActionHub';
 import { AuthSessionManager, SearchChannelItem, SearchPlaylistItem,
-  YoutubeJavaScriptPlayerManager, YoutubePlayerClientConfig } from 'youtube_core';
+  YoutubeJavaScriptPlayerManager } from 'youtube_core';
 import { VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../common/SubscriptionModel';
 import { LocalStore } from '../common/LocalStore';
@@ -635,9 +635,7 @@ struct Index {
    */
   private handleLoginSuccess(): void {
     AuthStateHelper.refresh();
-    YoutubePlayerClientConfig.resetToAuthDefault(
-      AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true
-    );
+    AuthStateHelper.reconcilePlaybackClient();
     this.refreshHomeAfterAuthChange();
     this.syncUserLibraryAfterLogin();
   }

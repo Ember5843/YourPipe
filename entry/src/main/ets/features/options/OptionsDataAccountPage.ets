@@ -11,8 +11,7 @@ import {
   AuthAccountStatus,
   AuthSessionManager,
   AuthStage,
-  CookieAuthCredential,
-  YoutubePlayerClientConfig
+  CookieAuthCredential
 } from 'youtube_core';
 import { DataBackupManager, BackupError } from '../../common/DataBackupManager';
 import { BackupItemKey, AppBackupData, ALL_BACKUP_ITEM_KEYS } from '../../common/model/BackupModels';
@@ -280,7 +279,7 @@ export struct OptionsDataAccountPage {
 
     session.saveCookieCredential(credential);
     AuthStateHelper.refresh();
-    YoutubePlayerClientConfig.resetToAuthDefault(true);
+    AuthStateHelper.reconcilePlaybackClient();
 
     this.isVerifyingCookie = true;
     this.cookieImportMessage = this.tr($r('app.string.yt_cookie_local_validating'));
@@ -309,9 +308,7 @@ export struct OptionsDataAccountPage {
     }
     AuthSessionManager.getInstance()?.setAuthEnabled(enabled);
     AuthStateHelper.refresh();
-    const usePlaybackAuth = enabled
-      && AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
-    YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);
+    AuthStateHelper.reconcilePlaybackClient();
     this.params.onAuthChanged();
   }
 
@@ -332,15 +329,14 @@ export struct OptionsDataAccountPage {
   private onUseAuthForPlaybackToggle(enabled: boolean): void {
     AuthSessionManager.getInstance()?.setUseAuthForPlayback(enabled);
     AuthStateHelper.refresh();
-    const usePlaybackAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
-    YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);
+    AuthStateHelper.reconcilePlaybackClient();
     this.params.onAuthChanged();
   }
 
   private signOut(): void {
     AuthSessionManager.getInstance()?.signOut();
     AuthStateHelper.refresh();
-    YoutubePlayerClientConfig.resetToAuthDefault(false);
+    AuthStateHelper.reconcilePlaybackClient();
     this.params.onAuthChanged();
   }
 
