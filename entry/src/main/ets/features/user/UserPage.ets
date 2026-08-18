@@ -14,15 +14,29 @@ import { ChannelInfoService, ChannelProfile } from '../../features/user/ChannelI
 
 import { SubscriptionFeedService } from '../../features/subscription/SubscriptionFeedService';
 import { UIConfig } from '../../common/AppState';
-import { VideoCard } from '../../common/components/VideoCard';
 import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
-import { VideoCardGrid } from '../../common/components/VideoCardGrid';
 import { PlaylistCard } from '../../features/playlist/components/PlaylistCard';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
 import { SubTabBarItem } from '../../common/components/SubTabBar';
+import { ChannelVideoTab } from './components/ChannelVideoTab';
+import { KioskPageResult } from '../home/ChannelService';
 
 const logger = AppLog.getInstance('UserPage');
+
+/** Kiosk 类 Tab（Shorts/Live）的状态读写通道：泛型加载器经闭包适配各自的 @State 字段 */
+interface KioskFeedIO {
+  getList: () => VideoItem[];
+  setList: (v: VideoItem[]) => void;
+  getToken: () => string | null;
+  setToken: (v: string | null) => void;
+  getVisitor: () => string;
+  setVisitor: (v: string) => void;
+  isBusy: () => boolean;
+  setLoading: (v: boolean) => void;
+  setLoadingMore: (v: boolean) => void;
+  setError: (v: ResourceStr) => void;
+}
 
 
 @Component
@@ -81,24 +95,6 @@ export struct UserPage {
   private scrollerForScroll: Scroller = new Scroller();
   private scrollerForList: Scroller = new Scroller();
   private readonly SHARE_BUTTON_ID: string = 'shareButtonId';
-
-  private getVideoGridColumnCount(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    if (contentWidth >= 1440) {
-      return 5;
-    }
-    if (contentWidth >= 1080) {
-      return 4;
-    }
-    if (contentWidth >= 760) {
-      return 3;
-    }
-    if (contentWidth >= 520) {
-      return 2;
-    }
-    return 1;
-  }
 
   /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
   private getWideListColumns(): number {
@@ -325,104 +321,130 @@ export struct UserPage {
     }
   }
 
-  // Shorts Loading
-  private async loadShorts(): Promise<void> {
-    if (this.shortsList.length > 0) return;
-    this.isLoadingShorts = true;
-    this.errorMessageShorts = '';
+  private shortsFeedIO(): KioskFeedIO {
+    return {
+      getList: () => this.shortsList,
+      setList: (v: VideoItem[]) => { this.shortsList = v; },
+      getToken: () => this.shortsNextPageToken,
+      setToken: (v: string | null) => { this.shortsNextPageToken = v; },
+      getVisitor: () => this.shortsVisitorData,
+      setVisitor: (v: string) => { this.shortsVisitorData = v; },
+      isBusy: () => this.isLoadingShorts || this.isLoadingMoreShorts,
+      setLoading: (v: boolean) => { this.isLoadingShorts = v; },
+      setLoadingMore: (v: boolean) => { this.isLoadingMoreShorts = v; },
+      setError: (v: ResourceStr) => { this.errorMessageShorts = v; }
+    };
+  }
+
+  private liveFeedIO(): KioskFeedIO {
+    return {
+      getList: () => this.liveList,
+      setList: (v: VideoItem[]) => { this.liveList = v; },
+      getToken: () => this.liveNextPageToken,
+      setToken: (v: string | null) => { this.liveNextPageToken = v; },
+      getVisitor: () => this.liveVisitorData,
+      setVisitor: (v: string) => { this.liveVisitorData = v; },
+      isBusy: () => this.isLoadingLive || this.isLoadingMoreLive,
+      setLoading: (v: boolean) => { this.isLoadingLive = v; },
+      setLoadingMore: (v: boolean) => { this.isLoadingMoreLive = v; },
+      setError: (v: ResourceStr) => { this.errorMessageLive = v; }
+    };
+  }
+
+  /** Shorts/Live 共用的首屏加载（已有内容时跳过；Videos 有 RSS 兜底，走自己的 loadVideos） */
+  private async loadKioskFeedInitial(
+    tag: string,
+    feed: KioskFeedIO,
+    fetchInitial: (channelId: string, startId: number) => Promise<KioskPageResult>,
+    errorRes: Resource
+  ): Promise<void> {
+    if (feed.getList().length > 0) {
+      return;
+    }
+    feed.setLoading(true);
+    feed.setError('');
     try {
-      const channelId = (this.channel.channelId || '').trim();
+      const channelId = this.getChannelId();
       if (!channelId) {
-        this.shortsList = [];
-        this.shortsNextPageToken = null;
+        feed.setList([]);
+        feed.setToken(null);
         return;
       }
-      const service = FeedServiceProvider.getInstance().getChannelService();
-      const result = await service.fetchChannelShortsInitial(channelId, 1);
+      const result = await fetchInitial(channelId, 1);
       if (result.items && result.items.length > 0) {
-        this.shortsList = this.fillChannelInfoList(result.items);
-        this.shortsNextPageToken = result.nextPageToken;
-        if (result.visitorData) this.shortsVisitorData = result.visitorData;
+        feed.setList(this.fillChannelInfoList(result.items));
+        feed.setToken(result.nextPageToken);
+        if (result.visitorData) {
+          feed.setVisitor(result.visitorData);
+        }
       } else {
-        this.shortsList = [];
+        feed.setList([]);
       }
     } catch (err) {
-      logger.error('loadShorts failed:', JSON.stringify(err));
-      this.errorMessageShorts = $r('app.string.yt_error_load_shorts');
+      logger.error(`${tag} failed:`, JSON.stringify(err));
+      feed.setError(errorRes);
     } finally {
-      this.isLoadingShorts = false;
+      feed.setLoading(false);
     }
+  }
+
+  /** Shorts/Live 共用的翻页加载 */
+  private async loadKioskFeedMore(
+    tag: string,
+    feed: KioskFeedIO,
+    fetchNext: (token: string, visitorData: string, startId: number) => Promise<KioskPageResult>
+  ): Promise<void> {
+    if (feed.isBusy() || !feed.getToken()) {
+      return;
+    }
+    feed.setLoadingMore(true);
+    try {
+      const startId = feed.getList().length + 1;
+      const result = await fetchNext(feed.getToken() ?? '', feed.getVisitor(), startId);
+      if (result.items && result.items.length > 0) {
+        feed.setList(feed.getList().concat(this.fillChannelInfoList(result.items)));
+        feed.setToken(result.nextPageToken);
+        if (result.visitorData) {
+          feed.setVisitor(result.visitorData);
+        }
+      } else {
+        feed.setToken(null);
+      }
+    } catch (err) {
+      logger.error(`${tag} failed:`, JSON.stringify(err));
+    } finally {
+      feed.setLoadingMore(false);
+    }
+  }
+
+  // Shorts Loading
+  private async loadShorts(): Promise<void> {
+    await this.loadKioskFeedInitial('loadShorts', this.shortsFeedIO(),
+      (channelId: string, startId: number) =>
+        FeedServiceProvider.getInstance().getChannelService().fetchChannelShortsInitial(channelId, startId),
+      $r('app.string.yt_error_load_shorts'));
   }
 
   private async loadMoreShorts(): Promise<void> {
-    if (this.isLoadingShorts || this.isLoadingMoreShorts || !this.shortsNextPageToken) return;
-    this.isLoadingMoreShorts = true;
-    try {
-      const service = FeedServiceProvider.getInstance().getChannelService();
-      const startId = this.shortsList.length + 1;
-      const result = await service.fetchChannelShortsNext(this.shortsNextPageToken, this.shortsVisitorData, startId);
-      if (result.items && result.items.length > 0) {
-        this.shortsList = this.shortsList.concat(this.fillChannelInfoList(result.items));
-        this.shortsNextPageToken = result.nextPageToken;
-        if (result.visitorData) this.shortsVisitorData = result.visitorData;
-      } else {
-        this.shortsNextPageToken = null;
-      }
-    } catch (err) {
-      logger.error('loadMoreShorts failed:', JSON.stringify(err));
-    } finally {
-      this.isLoadingMoreShorts = false;
-    }
+    await this.loadKioskFeedMore('loadMoreShorts', this.shortsFeedIO(),
+      (token: string, visitorData: string, startId: number) =>
+        FeedServiceProvider.getInstance().getChannelService().fetchChannelShortsNext(token, visitorData, startId));
   }
 
+  // Live Loading
   private async loadLive(): Promise<void> {
-    if (this.liveList.length > 0) return;
-    this.isLoadingLive = true;
-    this.errorMessageLive = '';
-    try {
-      const channelId = (this.channel.channelId || '').trim();
-      if (!channelId) {
-        this.liveList = [];
-        this.liveNextPageToken = null;
-        return;
-      }
-      const service = FeedServiceProvider.getInstance().getChannelService();
-      const result = await service.fetchChannelLiveInitial(channelId, 1);
-      if (result.items && result.items.length > 0) {
-        this.liveList = this.fillChannelInfoList(result.items);
-        this.liveNextPageToken = result.nextPageToken;
-        if (result.visitorData) this.liveVisitorData = result.visitorData;
-      } else {
-        this.liveList = [];
-      }
-    } catch (err) {
-      logger.error('loadLive failed:', JSON.stringify(err));
-      this.errorMessageLive = $r('app.string.yt_error_load_live');
-    } finally {
-      this.isLoadingLive = false;
-    }
+    await this.loadKioskFeedInitial('loadLive', this.liveFeedIO(),
+      (channelId: string, startId: number) =>
+        FeedServiceProvider.getInstance().getChannelService().fetchChannelLiveInitial(channelId, startId),
+      $r('app.string.yt_error_load_live'));
   }
 
   private async loadMoreLive(): Promise<void> {
-    if (this.isLoadingLive || this.isLoadingMoreLive || !this.liveNextPageToken) return;
-    this.isLoadingMoreLive = true;
-    try {
-      const service = FeedServiceProvider.getInstance().getChannelService();
-      const startId = this.liveList.length + 1;
-      const result = await service.fetchChannelLiveNext(this.liveNextPageToken, this.liveVisitorData, startId);
-      if (result.items && result.items.length > 0) {
-        this.liveList = this.liveList.concat(this.fillChannelInfoList(result.items));
-        this.liveNextPageToken = result.nextPageToken;
-        if (result.visitorData) this.liveVisitorData = result.visitorData;
-      } else {
-        this.liveNextPageToken = null;
-      }
-    } catch (err) {
-      logger.error('loadMoreLive failed:', JSON.stringify(err));
-    } finally {
-      this.isLoadingMoreLive = false;
-    }
+    await this.loadKioskFeedMore('loadMoreLive', this.liveFeedIO(),
+      (token: string, visitorData: string, startId: number) =>
+        FeedServiceProvider.getInstance().getChannelService().fetchChannelLiveNext(token, visitorData, startId));
   }
+
 
   // Playlists Loading
   private async loadPlaylists(): Promise<void> {
@@ -563,493 +585,6 @@ export struct UserPage {
     SubTabBarItem({ label: label, selected: this.activeTabIndex === index, themePrimary: this.themePrimary })
   }
 
-  @Builder
-  VideosTab() {
-    Column() {
-      if (this.isLoading) {
-        Row() {
-          LoadingProgress()
-            .color(this.themePrimary)
-            .width(30)
-            .height(30)
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 20 })
-      } else if (typeof this.errorMessage === 'string' && this.errorMessage.length > 0) {
-        Text(this.errorMessage)
-          .fontSize(12)
-          .fontColor(this.themePrimary)
-          .margin({ left: 16, top: 12 })
-      } else if (this.videoList.length === 0) {
-        Text($r('app.string.yt_empty_no_videos'))
-          .fontSize(13)
-          .fontColor($r('app.color.yourtube_text_quaternary'))
-          .margin({ top: 20 })
-          .width('100%')
-          .textAlign(TextAlign.Center)
-      } else if (this.uiConfig.homeLayoutMode === 'grid') {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getVideoGridColumnCount(),
-              gutter: { x: 8, y: 8 }
-            }) {
-              ForEach(this.videoList, (item: VideoItem) => {
-                GridCol({ span: 1 }) {
-                  VideoCardGrid({
-                    video: item,
-                    actionLabel: $r('app.string.yt_action_favorite'),
-                    actionType: 'favorite',
-                    showAuthor: false,
-                    useFavoriteToggle: true
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-              }, (item: VideoItem) => item.videoId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMore) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreVideos();
-        })
-      } else if (this.getWideListColumns() > 1) {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getWideListColumns(),
-              gutter: { x: 8, y: 4 }
-            }) {
-              ForEach(this.videoList, (item: VideoItem) => {
-                GridCol({ span: 1 }) {
-                  VideoCard({
-                    video: item,
-                    actionLabel: $r('app.string.yt_action_favorite'),
-                    actionType: 'favorite',
-                    showAuthor: false,
-                    useFavoriteToggle: true
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-              }, (item: VideoItem) => item.videoId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMore) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreVideos();
-        })
-      } else {
-        List({ space: 4, scroller: this.scrollerForList }) {
-          ForEach(this.videoList, (item: VideoItem) => {
-            ListItem() {
-              VideoCard({
-                video: item,
-                actionLabel: $r('app.string.yt_action_favorite'),
-                actionType: 'favorite',
-                showAuthor: false,
-                useFavoriteToggle: true
-              })
-            }
-            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-          }, (item: VideoItem) => item.videoId || item.id.toString())
-
-          if (this.isLoadingMore) {
-            ListItem() {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreVideos();
-        })
-      }
-    }
-    .height('100%')
-    .backgroundColor($r('app.color.yourtube_bg_page'))
-  }
-
-  @Builder
-  ShortsTab() {
-    Column() {
-      if (this.isLoadingShorts) {
-        Row() {
-          LoadingProgress()
-            .color(this.themePrimary)
-            .width(30)
-            .height(30)
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 20 })
-      } else if (typeof this.errorMessageShorts === 'string' && this.errorMessageShorts.length > 0) {
-        Text(this.errorMessageShorts)
-          .fontSize(12)
-          .fontColor(this.themePrimary)
-          .margin({ left: 16, top: 12 })
-      } else if (this.shortsList.length === 0) {
-        Text($r('app.string.yt_empty_no_shorts'))
-          .fontSize(13)
-          .fontColor($r('app.color.yourtube_text_quaternary'))
-          .margin({ top: 20 })
-          .width('100%')
-          .textAlign(TextAlign.Center)
-      } else if (this.uiConfig.homeLayoutMode === 'grid') {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getVideoGridColumnCount(),
-              gutter: { x: 8, y: 8 }
-            }) {
-              ForEach(this.shortsList, (item: VideoItem) => {
-                GridCol({ span: 1 }) {
-                  VideoCardGrid({
-                    video: item,
-                    actionLabel: $r('app.string.yt_action_favorite'),
-                    actionType: 'favorite',
-                    showAuthor: false,
-                    useFavoriteToggle: true
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-              }, (item: VideoItem) => item.videoId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMoreShorts) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreShorts();
-        })
-      } else if (this.getWideListColumns() > 1) {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getWideListColumns(),
-              gutter: { x: 8, y: 4 }
-            }) {
-              ForEach(this.shortsList, (item: VideoItem) => {
-                GridCol({ span: 1 }) {
-                  VideoCard({
-                    video: item,
-                    actionLabel: $r('app.string.yt_action_favorite'),
-                    actionType: 'favorite',
-                    showAuthor: false,
-                    useFavoriteToggle: true
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-              }, (item: VideoItem) => item.videoId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMoreShorts) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreShorts();
-        })
-      } else {
-        List({ space: 4, scroller: this.scrollerForList }) {
-          ForEach(this.shortsList, (item: VideoItem) => {
-            ListItem() {
-              VideoCard({
-                video: item,
-                actionLabel: $r('app.string.yt_action_favorite'),
-                actionType: 'favorite',
-                showAuthor: false,
-                useFavoriteToggle: true
-              })
-            }
-            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-          }, (item: VideoItem) => item.videoId || item.id.toString())
-
-          if (this.isLoadingMoreShorts) {
-            ListItem() {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreShorts();
-        })
-      }
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.yourtube_bg_page'))
-  }
-
-  @Builder
-  LiveTab() {
-    Column() {
-      if (this.isLoadingLive) {
-        Row() {
-          LoadingProgress()
-            .color(this.themePrimary)
-            .width(30)
-            .height(30)
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 20 })
-      } else if (typeof this.errorMessageLive === 'string' && this.errorMessageLive.length > 0) {
-        Text(this.errorMessageLive)
-          .fontSize(12)
-          .fontColor(this.themePrimary)
-          .margin({ left: 16, top: 12 })
-      } else if (this.liveList.length === 0) {
-        Text($r('app.string.yt_empty_no_live'))
-          .fontSize(13)
-          .fontColor($r('app.color.yourtube_text_quaternary'))
-          .margin({ top: 20 })
-          .width('100%')
-          .textAlign(TextAlign.Center)
-      } else if (this.uiConfig.homeLayoutMode === 'grid') {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getVideoGridColumnCount(),
-              gutter: { x: 8, y: 8 }
-            }) {
-              ForEach(this.liveList, (item: VideoItem) => {
-                GridCol({ span: 1 }) {
-                  VideoCardGrid({
-                    video: item,
-                    actionLabel: $r('app.string.yt_action_favorite'),
-                    actionType: 'favorite',
-                    showAuthor: false,
-                    useFavoriteToggle: true
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-              }, (item: VideoItem) => item.videoId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMoreLive) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreLive();
-        })
-      } else if (this.getWideListColumns() > 1) {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getWideListColumns(),
-              gutter: { x: 8, y: 4 }
-            }) {
-              ForEach(this.liveList, (item: VideoItem) => {
-                GridCol({ span: 1 }) {
-                  VideoCard({
-                    video: item,
-                    actionLabel: $r('app.string.yt_action_favorite'),
-                    actionType: 'favorite',
-                    showAuthor: false,
-                    useFavoriteToggle: true
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-              }, (item: VideoItem) => item.videoId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMoreLive) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreLive();
-        })
-      } else {
-        List({ space: 4, scroller: this.scrollerForList }) {
-          ForEach(this.liveList, (item: VideoItem) => {
-            ListItem() {
-              VideoCard({
-                video: item,
-                actionLabel: $r('app.string.yt_action_favorite'),
-                actionType: 'favorite',
-                showAuthor: false,
-                useFavoriteToggle: true
-              })
-            }
-            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-          }, (item: VideoItem) => item.videoId || item.id.toString())
-
-          if (this.isLoadingMoreLive) {
-            ListItem() {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMoreLive();
-        })
-      }
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.yourtube_bg_page'))
-  }
 
   @Builder
   PlaylistsTab() {
@@ -1258,15 +793,39 @@ export struct UserPage {
               barPosition: BarPosition.Start
             }) {
               TabContent() {
-                this.VideosTab()
+                ChannelVideoTab({
+                  list: this.videoList,
+                  isLoading: this.isLoading,
+                  isLoadingMore: this.isLoadingMore,
+                  errorMessage: this.errorMessage,
+                  emptyText: $r('app.string.yt_empty_no_videos'),
+                  scroller: this.scrollerForList,
+                  onLoadMore: () => { this.loadMoreVideos(); }
+                })
               }
               .tabBar(this.UserTabBarBuilder($r('app.string.yt_tab_videos'), 0))
               TabContent() {
-                this.ShortsTab()
+                ChannelVideoTab({
+                  list: this.shortsList,
+                  isLoading: this.isLoadingShorts,
+                  isLoadingMore: this.isLoadingMoreShorts,
+                  errorMessage: this.errorMessageShorts,
+                  emptyText: $r('app.string.yt_empty_no_shorts'),
+                  scroller: this.scrollerForList,
+                  onLoadMore: () => { this.loadMoreShorts(); }
+                })
               }
               .tabBar(this.UserTabBarBuilder($r('app.string.yt_tab_shorts'), 1))
               TabContent() {
-                this.LiveTab()
+                ChannelVideoTab({
+                  list: this.liveList,
+                  isLoading: this.isLoadingLive,
+                  isLoadingMore: this.isLoadingMoreLive,
+                  errorMessage: this.errorMessageLive,
+                  emptyText: $r('app.string.yt_empty_no_live'),
+                  scroller: this.scrollerForList,
+                  onLoadMore: () => { this.loadMoreLive(); }
+                })
               }
               .tabBar(this.UserTabBarBuilder($r('app.string.yt_tab_live'), 2))
               TabContent() {
