@@ -1,61 +1,76 @@
-// Export extractor logic
-export * from './src/main/ets/extractor/YouTubeExtractor';
-export * from './src/main/ets/extractor/VideoInfo';
-export * from './src/main/ets/extractor/StreamInfo';
-export * from './src/main/ets/extractor/ItagInfo';
-export * from './src/main/ets/extractor/itag/ItagItem';
-export * from './src/main/ets/extractor/itag/MediaFormat';
+// youtube_core 公共出口：显式命名导出（不再 export *）。
+// 名单 = entry / mediaservice 的实际消费面；新增跨模块符号时请在此登记。
 
-export * from './src/main/ets/extractor/YouTubeExceptions';
-export * from './src/main/ets/extractor/PlayerResponseTypes';
-export * from './src/main/ets/extractor/CommentItem';
-export * from './src/main/ets/extractor/HlsManifestParser';
-export * from './src/main/ets/extractor/clients/ClientTypes';
-export * from './src/main/ets/extractor/clients/ConfiguredPlayerClient';
-export * from './src/main/ets/extractor/sabr/YoutubeSabrInfo';
-export * from './src/main/ets/extractor/sabr/YoutubeSabrSession';
-export * from './src/main/ets/extractor/sabr/YoutubeSabrStreamState';
-export * from './src/main/ets/extractor/sabr/SabrMediaSegment';
-export * from './src/main/ets/extractor/sabr/SabrInfoReloader';
-export * from './src/main/ets/extractor/sabr/SabrPoTokenProvider';
-export * from './src/main/ets/extractor/sabr/SabrProtocolException';
-export * from './src/main/ets/extractor/sabr/SabrServerEpoch';
-export * from './src/main/ets/extractor/sabr/policy/SabrSessionPolicy';
-export * from './src/main/ets/extractor/sabr/policy/BuiltinSabrSessionPolicy';
-export * from './src/main/ets/extractor/identity/SessionIdentity';
-export * from './src/main/ets/extractor/identity/SessionIdentityManager';
-export * from './src/main/ets/extractor/cipher/PipePipeApiDecoder';
-export * from './src/main/ets/extractor/cipher/YoutubeJavaScriptPlayerManager';
-export * from './src/main/ets/extractor/cipher/ApiConfig';
-export * from './src/main/ets/common/YoutubeParsingHelper';
-export * from './src/main/ets/common/WebClientVersionResolver';
-export * from './src/main/ets/model/YoutubePlayerClientConfig';
+// ── extractor ──
+export { YouTubeExtractor } from './src/main/ets/extractor/YouTubeExtractor';
+export { VideoInfo, ChapterInfo, SubtitleTrack } from './src/main/ets/extractor/VideoInfo';
+export { StreamInfo } from './src/main/ets/extractor/StreamInfo';
+export {
+  AccountTerminatedException,
+  AgeRestrictedContentException,
+  ContentNotAvailableException,
+  ContentNotSupportedException,
+  ExtractionException,
+  GeographicRestrictionException,
+  LiveStreamOfflineException,
+  LoginRequiredException,
+  PaidContentException,
+  PrivateContentException,
+  SignInConfirmNotBotException,
+  YoutubeMusicPremiumContentException
+} from './src/main/ets/extractor/YouTubeExceptions';
+export { CommentItem, CommentResponse } from './src/main/ets/extractor/CommentItem';
+export { parseHlsMasterManifest } from './src/main/ets/extractor/HlsManifestParser';
 
-// Export network logic
-export * from './src/main/ets/network/YouTubeHttpClient';
-export * from './src/main/ets/network/CookieJar';
-export * from './src/main/ets/auth/AuthModels';
-export * from './src/main/ets/auth/AuthSessionManager';
-export * from './src/main/ets/auth/CookieAuthCredential';
-export * from './src/main/ets/auth/SapisidHashUtil';
-export * from './src/main/ets/auth/DebugAuthConstants';
-export * from './src/main/ets/auth/SmartTubeAuthProbe';
+// ── sabr（opt-in/debug 路径） ──
+export { YoutubeSabrInfo, YoutubeSabrFormatMeta } from './src/main/ets/extractor/sabr/YoutubeSabrInfo';
+export { YoutubeSabrSession } from './src/main/ets/extractor/sabr/YoutubeSabrSession';
+export { YoutubeSabrStreamState } from './src/main/ets/extractor/sabr/YoutubeSabrStreamState';
+export { SabrMediaSegment, SabrSegmentRequest } from './src/main/ets/extractor/sabr/SabrMediaSegment';
+export { SabrInfoReloader } from './src/main/ets/extractor/sabr/SabrInfoReloader';
+export { SabrPoTokenProvider } from './src/main/ets/extractor/sabr/SabrPoTokenProvider';
+export { SabrProtocolException } from './src/main/ets/extractor/sabr/SabrProtocolException';
+export { SessionIdentityManager, SessionPoTokenHook } from './src/main/ets/extractor/identity/SessionIdentityManager';
 
-// Export service logic
-export * from './src/main/ets/service/YoutubeApi';
+// ── cipher ──
+export { YoutubeJavaScriptPlayerManager } from './src/main/ets/extractor/cipher/YoutubeJavaScriptPlayerManager';
 
-// Export newly moved base models and utils
-export * from './src/main/ets/model/Localization';
-export * from './src/main/ets/model/ContentCountry';
-export * from './src/main/ets/model/DeliveryType';
-export * from './src/main/ets/model/ClientsConstants';
-export * from './src/main/ets/model/SearchContentFilter';
-export * from './src/main/ets/common/VideoModel';
-export * from './src/main/ets/common/SearchResultModel';
-export * from './src/main/ets/common/Utils';
-export * from './src/main/ets/network/HttpDownloader';
-export * from './src/main/ets/network/HttpProxyOptions';
-export * from './src/main/ets/network/Socks5Bridge';
-export * from './src/main/ets/common/SearchQueryHandlerFactory';
-export * from './src/main/ets/common/YoutubeSearchQueryHanderFactory';
-export * from './src/main/ets/common/YTCoreLogger';
+// ── common / model ──
+export { pickHighestThumbnailUrl } from './src/main/ets/common/YoutubeParsingHelper';
+export { WebClientVersionResolver } from './src/main/ets/common/WebClientVersionResolver';
+export { YoutubePlayerClientConfig } from './src/main/ets/model/YoutubePlayerClientConfig';
+export { Localization } from './src/main/ets/model/Localization';
+export { ContentCountry } from './src/main/ets/model/ContentCountry';
+export { ClientsConstants } from './src/main/ets/model/ClientsConstants';
+export { SearchContentFilter } from './src/main/ets/model/SearchContentFilter';
+export { VideoItem } from './src/main/ets/common/VideoModel';
+export {
+  SearchChannelItem,
+  SearchInfoItem,
+  SearchInfoType,
+  SearchPageResult,
+  SearchPlaylistItem,
+  SearchStreamItem
+} from './src/main/ets/common/SearchResultModel';
+export { YTCoreLogger } from './src/main/ets/common/YTCoreLogger';
+
+// ── network / auth ──
+export { YouTubeHttpClient } from './src/main/ets/network/YouTubeHttpClient';
+export { HttpDownloader } from './src/main/ets/network/HttpDownloader';
+export { HttpProxyOptions, AppHttpProxySnapshot, AppProxyKind } from './src/main/ets/network/HttpProxyOptions';
+export { socks5Bridge } from './src/main/ets/network/Socks5Bridge';
+export { AuthAccountStatus, AuthStage } from './src/main/ets/auth/AuthModels';
+export { AuthSessionManager, AuthBackupState } from './src/main/ets/auth/AuthSessionManager';
+export { CookieAuthCredential } from './src/main/ets/auth/CookieAuthCredential';
+
+// ── service ──
+export {
+  fetchBrowseContinuation,
+  fetchBrowsePage,
+  fetchRssFeed,
+  fetchSearchContinuation,
+  fetchSearchPage,
+  fetchSearchSuggestions,
+  fetchTvBrowseContinuation,
+  fetchTvBrowsePage
+} from './src/main/ets/service/YoutubeApi';
