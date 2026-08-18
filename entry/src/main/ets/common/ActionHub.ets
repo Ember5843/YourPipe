@@ -8,7 +8,6 @@ export enum ActionHubEvent {
   EXIT_FULLSCREEN = 'exitFullScreen',
   EXIT_COMMENT_REPLIES = 'exitCommentReplies',
   IS_REPLIES_OPEN_CHANGE = 'isRepliesOpenChange',
-  EXIT_PIP = 'exitPiP',
 }
 
 export class ActionHub {
@@ -28,10 +27,6 @@ export class ActionHub {
   shareVideo: (video: VideoItem) => void = () => {};
   shareChannel: (channel: SearchChannelItem) => void = () => {};
   sharePlaylist: (playlist: SearchPlaylistItem) => void = () => {};
-  /** 进入画中画（返回键/home 键自动触发，预留显式入口） */
-  enterPiP: () => void = () => {};
-  /** 退出画中画（PiP 控制面板恢复由系统处理，预留接口） */
-  exitPiP: () => void = () => {};
 
   /** Save the current play queue as a local playlist. */
   saveCurrentQueueAsLocal: (name: string) => void = () => {};
