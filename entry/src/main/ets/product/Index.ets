@@ -503,13 +503,7 @@ struct Index {
       }
     });
 
-    this.homeMode = 'kiosk';
-    this.kioskNextPageToken = null;
-    this.kioskVisitorData = '';
-    this.homeFeedSource = 'kiosk';
-    this.homeErrorMessage = '';
-    this.homeModeNoticeMessage = '';
-    this.loadLiveVideos(true);
+    this.resetHomeFeed(false, true);
     this.consumePendingPlaybackContinuation();
     if (this.uiConfig.syncUserLibraryOnLaunch !== false) {
       this.syncUserLibraryAfterLogin();
@@ -570,14 +564,28 @@ struct Index {
   }
 
   private refreshHomeAfterAuthChange(): void {
+    this.resetHomeFeed(true, true);
+  }
+
+  /**
+   * 首页 feed 重置单一入口（启动 / 登录态变化 / 搜索地区语言切换共用）：
+   * 清空分页状态与（可选）列表后按需立即重载。
+   * 下拉刷新（refreshHomeFeed）刻意不走这里——它要保留当前 rail
+   * （homeFeedSource 可能是 recommended）和旧列表防白屏。
+   */
+  private resetHomeFeed(clearList: boolean, reload: boolean): void {
     this.homeMode = 'kiosk';
     this.kioskNextPageToken = null;
     this.kioskVisitorData = '';
     this.homeFeedSource = 'kiosk';
     this.homeErrorMessage = '';
     this.homeModeNoticeMessage = '';
-    this.videoList = [];
-    this.loadLiveVideos(true);
+    if (clearList) {
+      this.videoList = [];
+    }
+    if (reload) {
+      this.loadLiveVideos(true);
+    }
   }
 
   private onPendingContinuationChanged(): void {
@@ -924,16 +932,7 @@ struct Index {
 
   private reloadHomeForSearchLocaleChange(): void {
     FeedServiceProvider.getInstance().invalidate();
-    this.kioskNextPageToken = null;
-    this.kioskVisitorData = '';
-    this.homeFeedSource = 'kiosk';
-    this.homeMode = 'kiosk';
-    this.homeModeNoticeMessage = '';
-    this.homeErrorMessage = '';
-    this.videoList = [];
-    if (this.activeTabIndex === 0) {
-      this.loadLiveVideos(true);
-    }
+    this.resetHomeFeed(true, this.activeTabIndex === 0);
   }
 
   private async loadLiveVideos(reset: boolean = false) {
