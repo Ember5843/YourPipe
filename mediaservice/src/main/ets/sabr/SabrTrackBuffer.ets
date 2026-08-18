@@ -17,6 +17,24 @@ export class SabrTrackBuffer {
   private init?: SabrMediaSegment;
   private mediaBySeq: Map<number, SabrMediaSegment> = new Map();
   private orderedSeq: number[] = [];
+  /**
+   * 与 orderedSeq 平行的绝对字节偏移表。分段总是从 base 起按 seq 紧凑排列，
+   * 追加时 O(1) 记账，替代原来每次 O(n) 重算的 byteOffsetOf（读路径 O(n²)）。
+   */
+  private offsetOfSeq: number[] = [];
+  /** 播放头后窗淘汰水位：[init, evictedFrontEnd) 的媒体字节已被丢弃 */
+  private evictedFrontEnd: number = 0;
+  /** 小于该 seq 的分段禁止再入缓冲（防止 session cache 把已淘汰分段重新塞回前窗造成偏移错乱） */
+  private minLiveSeq: number = -1;
+  /** 当前持有的媒体分段字节总数（淘汰/日志用） */
+  private bufferedBytes: number = 0;
+  /** 已服务给读取方的最大偏移（播放头代理） */
+  private lastServedEnd: number = 0;
+  /**
+   * 播放头后方保留字节数。MPV 自身的 demuxer 后向缓存（默认 50MiB 量级）
+   * 覆盖常规回退seek；更深的后向读会落入淘汰空洞，走 cold-seek 重建窗口。
+   */
+  private static readonly KEEP_BEHIND_BYTES: number = 64 * 1024 * 1024;
   private totalKnownBytes: number = 0;
   private fullyBuffered: boolean = false;
   private pumpPromise?: Promise<void>;
@@ -174,24 +192,30 @@ export class SabrTrackBuffer {
     }
 
     // Media placed from mediaBaseByte using startMs relative to mediaBaseMs when possible.
-    for (const seq of this.orderedSeq) {
-      if (written >= outLen) {
-        break;
-      }
-      const seg = this.mediaBySeq.get(seq);
+    // 二分定位首个 segEnd > start 的分段，之后顺序扫描（原来全表扫 + 每段 O(n) 算偏移）。
+    let idx = this.lowerBoundByEnd(start);
+    while (idx < this.orderedSeq.length && written < outLen) {
+      const seg = this.mediaBySeq.get(this.orderedSeq[idx]);
       if (!seg) {
+        idx++;
         continue;
       }
-      const segStart = this.byteOffsetOf(seg);
+      const segStart = this.offsetOfSeq[idx];
+      if (segStart > end) {
+        break; // 偏移单调递增，之后不会再有重叠
+      }
       const segLen = seg.getLength();
       const segEnd = segStart + segLen;
-      if (end >= segStart && start < segEnd) {
-        const from = Math.max(start, segStart) - segStart;
-        const to = Math.min(end + 1, segEnd) - segStart;
-        out.set(seg.data.subarray(from, to), written);
-        written += to - from;
-      }
+      const from = Math.max(start, segStart) - segStart;
+      const to = Math.min(end + 1, segEnd) - segStart;
+      out.set(seg.data.subarray(from, to), written);
+      written += to - from;
+      idx++;
     }
+
+    // 播放头推进后淘汰深后方分段，防止长视频把 session 的 32MB 淘汰架空成无限累积。
+    this.lastServedEnd = Math.max(this.lastServedEnd, end);
+    this.evictBehindPlayhead();
 
     if (written < outLen) {
       return out.subarray(0, written);
@@ -209,6 +233,10 @@ export class SabrTrackBuffer {
     }
     if (this.durationMs <= 0) {
       return false;
+    }
+    // 后向读落入已淘汰的空洞：本地绝无数据，按冷跳转重建窗口（SABR 重新取流）。
+    if (this.evictedFrontEnd > 0 && start < this.evictedFrontEnd) {
+      return true;
     }
     const est = this.estimatedTotalBytes > initLen
       ? this.estimatedTotalBytes
@@ -274,22 +302,72 @@ export class SabrTrackBuffer {
     this.emptyPumpStreak = 0;
   }
 
-  private byteOffsetOf(seg: SabrMediaSegment): number {
+  /** 分段紧凑排列的基址：init 之后（mediaBaseByte 已设置时用它）。 */
+  private baseOffset(): number {
     const initLen = this.init ? this.init.getLength() : 0;
-    // A byte-range resource must be contiguous. Mapping each fragment from its timestamp and
-    // average bitrate creates holes; HTTP then returns a short body and lavf treats it as EOF.
-    // Seeking is handled by prepareSeek/resetForSeek, so pack the current playback window by seq.
-    let offset = this.mediaBaseByte > 0 ? this.mediaBaseByte : initLen;
-    for (const seq of this.orderedSeq) {
-      if (seq === seg.header.sequenceNumber) {
-        return offset;
-      }
-      const s = this.mediaBySeq.get(seq);
-      if (s) {
-        offset += s.getLength();
+    return this.mediaBaseByte > 0 ? this.mediaBaseByte : initLen;
+  }
+
+  /** 当前媒体窗口的末尾偏移（无媒体时为基址）。 */
+  private currentMediaEnd(): number {
+    if (this.orderedSeq.length === 0) {
+      return this.baseOffset();
+    }
+    const lastIdx = this.orderedSeq.length - 1;
+    const last = this.mediaBySeq.get(this.orderedSeq[lastIdx]);
+    return this.offsetOfSeq[lastIdx] + (last ? last.getLength() : 0);
+  }
+
+  /** 二分：首个 segEnd > start 的 orderedSeq 下标。 */
+  private lowerBoundByEnd(start: number): number {
+    let lo = 0;
+    let hi = this.orderedSeq.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const seg = this.mediaBySeq.get(this.orderedSeq[mid]);
+      const segEnd = this.offsetOfSeq[mid] + (seg ? seg.getLength() : 0);
+      if (segEnd <= start) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
       }
     }
-    return offset;
+    return lo;
+  }
+
+  /**
+   * 淘汰播放头 KEEP_BEHIND_BYTES 之前的分段（从最旧开始，至少保留最新一段）。
+   * 被淘汰区域记录为 evictedFrontEnd 空洞；之后的后向读由 shouldColdSeek 重建窗口。
+   */
+  private evictBehindPlayhead(): void {
+    const threshold = this.lastServedEnd - SabrTrackBuffer.KEEP_BEHIND_BYTES;
+    if (threshold <= 0 || this.orderedSeq.length < 2) {
+      return;
+    }
+    let dropCount = 0;
+    while (dropCount < this.orderedSeq.length - 1) {
+      const seg = this.mediaBySeq.get(this.orderedSeq[dropCount]);
+      if (!seg) {
+        dropCount++;
+        continue;
+      }
+      if (this.offsetOfSeq[dropCount] + seg.getLength() >= threshold) {
+        break;
+      }
+      this.bufferedBytes -= seg.getLength();
+      this.mediaBySeq.delete(this.orderedSeq[dropCount]);
+      dropCount++;
+    }
+    if (dropCount === 0) {
+      return;
+    }
+    const newFront = this.offsetOfSeq[dropCount];
+    this.orderedSeq.splice(0, dropCount);
+    this.offsetOfSeq.splice(0, dropCount);
+    this.evictedFrontEnd = Math.max(this.evictedFrontEnd, newFront);
+    this.minLiveSeq = this.orderedSeq[0];
+    Logger.info(TAG, `evict itag=${this.getItag()} dropped=${dropCount} `
+      + `frontEnd=${this.evictedFrontEnd} bufferedMB=${(this.bufferedBytes / 1048576).toFixed(1)}`);
   }
 
   private computeEstimatedTotal(): number {
@@ -334,14 +412,7 @@ export class SabrTrackBuffer {
 
   private extentEnd(): number {
     let end = this.init ? this.init.getLength() : 0;
-    for (const seq of this.orderedSeq) {
-      const seg = this.mediaBySeq.get(seq);
-      if (!seg) {
-        continue;
-      }
-      const s = this.byteOffsetOf(seg);
-      end = Math.max(end, s + seg.getLength());
-    }
+    end = Math.max(end, this.currentMediaEnd());
     return Math.max(end, this.totalKnownBytes, this.mediaBaseByte);
   }
 
@@ -451,10 +522,41 @@ export class SabrTrackBuffer {
     if (seq < 0 || this.mediaBySeq.has(seq)) {
       return;
     }
+    if (this.minLiveSeq >= 0 && seq < this.minLiveSeq) {
+      // 已淘汰到播放头后方的分段：塞回来会插到前窗、偏移对不上，直接忽略。
+      return;
+    }
+    // 二分插入保持 orderedSeq 有序（绝大多数是末尾追加，O(1) 记账）。
+    let lo = 0;
+    let hi = this.orderedSeq.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (this.orderedSeq[mid] < seq) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    const pos = lo;
+    let offset: number;
+    if (pos === 0) {
+      offset = this.baseOffset();
+    } else {
+      const prev = this.mediaBySeq.get(this.orderedSeq[pos - 1]);
+      offset = this.offsetOfSeq[pos - 1] + (prev ? prev.getLength() : 0);
+    }
+    this.orderedSeq.splice(pos, 0, seq);
+    this.offsetOfSeq.splice(pos, 0, offset);
     this.mediaBySeq.set(seq, seg);
-    this.orderedSeq.push(seq);
-    this.orderedSeq.sort((a, b) => a - b);
-    const end = this.byteOffsetOf(seg) + seg.getLength();
+    if (pos < this.orderedSeq.length - 1) {
+      // 乱序插入（罕见）：重算其后所有偏移，保持紧凑排列语义与旧实现一致。
+      for (let i = pos + 1; i < this.orderedSeq.length; i++) {
+        const prev = this.mediaBySeq.get(this.orderedSeq[i - 1]);
+        this.offsetOfSeq[i] = this.offsetOfSeq[i - 1] + (prev ? prev.getLength() : 0);
+      }
+    }
+    this.bufferedBytes += seg.getLength();
+    const end = offset + seg.getLength();
     if (end > this.totalKnownBytes) {
       this.totalKnownBytes = end;
     }
@@ -466,6 +568,11 @@ export class SabrTrackBuffer {
     sabrSessionStore.prepareSeek(this.lease.key, targetMs);
     this.mediaBySeq.clear();
     this.orderedSeq = [];
+    this.offsetOfSeq = [];
+    this.evictedFrontEnd = 0;
+    this.minLiveSeq = -1;
+    this.bufferedBytes = 0;
+    this.lastServedEnd = 0;
     this.totalKnownBytes = this.init ? this.init.getLength() : 0;
     this.fullyBuffered = false;
     this.stalledProtected = false;
