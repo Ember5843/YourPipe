@@ -243,6 +243,7 @@ export class HttpDownloader {
    * @param data 请求体（POST 时使用）
    * @param localization 本地化信息（用于 Accept-Language 头）
    * @param enableRetry 是否启用自动重试（默认 true）
+   * @param timeoutMs 连接/读取超时（默认 30s；UI 浏览类请求应传 8-10s 避免卡死感）
    */
   async request(
     method: string,
@@ -250,7 +251,8 @@ export class HttpDownloader {
     headers?: Record<string, string[] | string>,
     data?: string,
     localization?: Localization,
-    enableRetry: boolean = true
+    enableRetry: boolean = true,
+    timeoutMs: number = 30000
   ): Promise<http.HttpResponse> {
     let lastError: HttpError | null = null;
     let attempt = 0;
@@ -276,9 +278,9 @@ export class HttpDownloader {
           'method': method as http.RequestMethod,
           'header': requestHeaders,
           'extraData': data,
-          // 设置超时时间（30 秒）
-          'connectTimeout': 30000,
-          'readTimeout': 30000,
+          // 超时按调用方分级：播放/提取默认 30s，UI 浏览类传更短
+          'connectTimeout': timeoutMs,
+          'readTimeout': timeoutMs,
           'usingCache': false
         }
         HttpDownloader.applyProxyToOptions(httpOptions, url);
@@ -448,14 +450,15 @@ export class HttpDownloader {
     data?: string,
     headers?: Record<string, string[]>,
     localization?: Localization,
-    contentType?: string
+    contentType?: string,
+    timeoutMs: number = 30000
   ): Promise<http.HttpResponse> {
     // 处理 Content-Type
     const postHeaders: Record<string, string[] | string> = headers ? headers : {}
     if (contentType) {
       postHeaders['Content-Type'] = [contentType]
     }
-    return this.request('POST', url, postHeaders, data, localization)
+    return this.request('POST', url, postHeaders, data, localization, true, timeoutMs)
   }
 
   /**

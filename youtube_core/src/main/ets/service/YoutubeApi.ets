@@ -606,7 +606,8 @@ export async function fetchSearchSuggestions(
     "Origin": ["https://www.youtube.com"],
     "Referer": ["https://www.youtube.com"]
   };
-  const response: http.HttpResponse = await downloader.request('GET', url, headers, undefined, localization);
+  // 搜索建议跟随键盘输入，弱网下 30s 超时+重试会让建议框长时间假死；短超时不重试。
+  const response: http.HttpResponse = await downloader.request('GET', url, headers, undefined, localization, false, 8000);
   const body = response.result as string;
   return JSON.parse(body);
 }
@@ -616,7 +617,8 @@ export async function fetchSearchSuggestions(
  * 封装内部 HttpDownloader，供 entry 层订阅模块使用。
  */
 export async function fetchRssFeed(url: string): Promise<string> {
-  const response: http.HttpResponse = await downloader.request('GET', url);
+  // 订阅后台批量刷新：单个失效源不应拖累整轮（30s×3 重试 → 10s 单次）。
+  const response: http.HttpResponse = await downloader.request('GET', url, undefined, undefined, undefined, false, 10000);
   return String(response.result ?? '');
 }
 
