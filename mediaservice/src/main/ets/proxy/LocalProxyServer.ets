@@ -143,6 +143,10 @@ async function routeRequest(
     }
   }
 
+  // DORMANT: sabr-dual 的 progressive-range 端点（/session/{id}/video|audio/{idx}）
+  // 当前不可达——sabr-dual 的 playbackUrl 固定返回 manifest.mpd，DASH manifest 的
+  // BaseURL 为 sabr/{kind}/（走上方 sabr 分支），全仓无代码生成 /video/{idx} 形式 URL。
+  // 启用条件：若未来需要让 MPV 以 progressive 方式直连 SABR 轨道（绕过 DASH demuxer）。
   if (session.type === 'sabr-dual' && parts.length >= 4) {
     const idx = parseInt(parts[3], 10) || 0;
     if (segment === 'video' && session.sabrVideoBuffer) {

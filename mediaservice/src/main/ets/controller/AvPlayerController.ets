@@ -507,8 +507,10 @@ export class AvPlayerController {
     // 该属性必须等于 XComponent 布局像素（AVPlayer onAreaChange → resizeSurface）。
     // 用 stream WxH 会在小窗阶段把 VO 配成「片源分辨率」而非「窗口像素」，
     // 画面被软缩放/压小，全屏 onAreaChange 才纠正——表现为小窗糊、全屏立刻清晰。
-    // video chain 缺宽高时依赖：① 上次布局缓存 ② XComponent onAreaChange ③ native
-    // OnSurfaceChanged；切勿用片源尺寸顶替布局尺寸。
+    // video chain 缺宽高时依赖：① 上次布局缓存 ② XComponent onAreaChange →
+    // setVideoSurfaceSize（产品路径）。③ libmpv_napi 的 native OnSurfaceChanged 属
+    // MpvPlayerView/libraryname 备路，产品内联 XComponent（无 libraryname）不触发。
+    // 切勿用片源尺寸顶替布局尺寸。
     this.vm.subtitleTracks = newSource.subtitleTracks || [];
     // 优先从 newSource 的流信息中恢复 duration，避免后续 resolveDurationMs 取到 0
     if (newSource.streams && newSource.streams.length > 0) {
@@ -1721,7 +1723,6 @@ export class AvPlayerController {
     this.vm.isSeeking = state.isSeeking;
     this.vm.isEnded = state.isEnded;
     this.vm.currentTime = state.currentTime;
-    this.vm.duration = state.duration;
     this.vm.durationTime = state.duration;
     this.vm.playbackSpeed = state.playbackSpeed;
     this.vm.cachedPercent = state.bufferingPercent;

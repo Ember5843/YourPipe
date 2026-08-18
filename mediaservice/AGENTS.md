@@ -66,7 +66,7 @@ mediaservice/src/main/ets/
     PlaybackPreferences.ets      — UI/playback config (injected via setProvider)
     CommonConstants.ets
   utils/
-    Logger.ets, EnhancedLogger.ets, CommUtils.ets, fix_logger.js
+    Logger.ets, EnhancedLogger.ets, CommUtils.ets
 ```
 
 ## 3. Engine contract
@@ -78,10 +78,12 @@ mediaservice/src/main/ets/
   not via `AppStorage`.
 - `VideoHwCaps` / NAPI probe inform auto quality / codec preference;
   manual quality switches remain available to the user.
-- Render surface is wired through `MpvPlayerView` in `libmpv_napi/`. The view
-  holds the native-resolution XComponent; `MpvPlaybackEngine` writes the
-  native pixel size to the view, which applies a compositor `.scale()`
-  transform to fit the display area.
+- Render surface is wired through entry's inline XComponent (`id:
+  'PlayerXComponent'`, no `libraryname`) in `AVPlayer.ets`: on `onLoad` the
+  surfaceId is routed via `AvPlayerController.setSurfaceID` →
+  `MpvPlaybackEngine.bindSurface` → `controller.setVideoSurfaceId()` /
+  `setVideoSurfaceSize()`. `libmpv_napi`'s `MpvPlayerView` (libraryname-driven
+  native surface callbacks) is a DORMANT standby path, not used in production.
 - Background **audio-only** (disabling video tracks after a delay) is
   coordinated with entry’s `PlayerPresentation`; engine APIs apply
   property changes, they do not invent presentation policy.
@@ -124,9 +126,10 @@ prefetch was removed from the play path — its cache was only consumed by the
 non-product `youtube-dual` session, so it was dead traffic on the EDL path.
 
 **Pacing / lease rules**:
-- The SABR session owns the UMP server backoff: `pumpOnce` waits out the
-  deadline outside the serialized pump (the other track keeps serving
-  cache), and local recovery/seek never clears the server deadline.
+- The SABR session owns the UMP server backoff: `pumpOnceLocked` waits out
+  the remaining deadline **inside** the serialized pump lock
+  (`YoutubeSabrSession.ets`, capped by `MAX_BACKOFF_MS`), and local
+  recovery/seek never clears the server deadline.
 - A failed session build must release the lease so the store can retry.
 - entry injects both the `SabrPoTokenProvider` and the `SabrInfoReloader`
   into `sabrSessionStore` (`setPoTokenProvider` / `setInfoReloader`);

@@ -31,10 +31,6 @@ export class PlayerStateMachine {
     this.debugTag = tag;
   }
 
-  isAtLeast(state: PlayerState): boolean {
-    return this._currentState === state;
-  }
-
   isOneOf(...states: PlayerState[]): boolean {
     return states.includes(this._currentState);
   }

@@ -94,10 +94,6 @@ class SessionStore {
   ids(): string[] {
     return Array.from(this.sessions.keys());
   }
-
-  clear(): void {
-    this.sessions.clear();
-  }
 }
 
 export const sessionStore = new SessionStore();

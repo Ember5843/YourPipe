@@ -41,23 +41,6 @@ export interface PlaybackState {
 }
 
 export interface EngineConfig {
-  hwdecMode?: string;
-  decoderFallback?: boolean;
-  readaheadSecs?: number;
-  cachePauseWait?: number;
-  maxBackBytesKey?: string;
-  streamBufferSizeCap?: number;
-  seekKeyframeMode?: boolean;
-  msgLevel?: string;
-  minBufferMs?: number;
-  maxBufferMs?: number;
-  bufferForPlaybackMs?: number;
-  bufferForPlaybackAfterRebufferMs?: number;
-  backBufferDurationMs?: number;
-  retainBackBufferFromKeyframe?: boolean;
-  livePresentationDelayMs?: number;
-  liveDvrWindowSegments?: number;
-  liveEdgeThresholdSec?: number;
   // MPV 专用配置
   mpvHwdecEnabled?: boolean;
   mpvCacheSecs?: number;
@@ -86,8 +69,6 @@ export interface PlaybackEngine {
   getVolume(): number;
 
   switchQuality(source: string, resumePos: number): boolean;
-  prebufferTargetQuality(videoUrl: string, audioUrl: string): number;
-  switchToPrebuffered(videoHandle: number, audioHandle: number, resumePos: number): boolean;
 
   setSubtitle(url: string): void;
 

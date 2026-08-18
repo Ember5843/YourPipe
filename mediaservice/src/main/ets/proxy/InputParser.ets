@@ -83,6 +83,10 @@ export function parseInputJson(inputJson: string): DashSession {
     return session;
   }
 
+  // DORMANT: youtube-dual JSON 解析分支当前不可达——createSession(inputJson) 仅被
+  // createSingleUrlSession 以 type:'single' 调用，youtube-dual 会话全部经由
+  // addPreparedSession 直接构造（不经 JSON）。启用条件：若恢复以 JSON 描述
+  // youtube-dual 会话的入口（如静态 DASH rollback 路径）。
   session.type = 'youtube-dual';
   session.durationMs = raw.durationMs ?? 0;
 

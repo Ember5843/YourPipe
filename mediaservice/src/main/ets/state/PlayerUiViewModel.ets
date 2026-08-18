@@ -22,7 +22,6 @@ export class PlayerUiViewModel {
   @Track isSeeking: boolean = false;
   @Track isEnded: boolean = false;
   @Track currentTime: number = 0;
-  @Track duration: number = 0;
   @Track durationTime: number = 0;
   @Track errorMsg: string = '';
   /** Terminal error shown in player UI (transient recovery errors stay off this field). */
@@ -61,7 +60,6 @@ export class PlayerUiViewModel {
     this.isSeeking = false;
     this.isEnded = false;
     this.currentTime = 0;
-    this.duration = 0;
     this.durationTime = 0;
     this.errorMsg = '';
     this.userVisibleErrorMsg = '';

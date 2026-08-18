@@ -18,7 +18,6 @@ export class SabrTrackBuffer {
   private mediaBySeq: Map<number, SabrMediaSegment> = new Map();
   private orderedSeq: number[] = [];
   private totalKnownBytes: number = 0;
-  private nextExpectedSeq: number = 0;
   private fullyBuffered: boolean = false;
   private pumpPromise?: Promise<void>;
   /** Stop free-pump after protected no-media until session backoff clears. */
@@ -459,9 +458,6 @@ export class SabrTrackBuffer {
     if (end > this.totalKnownBytes) {
       this.totalKnownBytes = end;
     }
-    if (this.nextExpectedSeq <= seq) {
-      this.nextExpectedSeq = seq + 1;
-    }
     Logger.debug(TAG, `media itag=${this.getItag()} seq=${seq} startMs=${seg.header.startMs} `
       + `bytes=${seg.getLength()} total=${this.totalKnownBytes}`);
   }
@@ -471,7 +467,6 @@ export class SabrTrackBuffer {
     this.mediaBySeq.clear();
     this.orderedSeq = [];
     this.totalKnownBytes = this.init ? this.init.getLength() : 0;
-    this.nextExpectedSeq = 0;
     this.fullyBuffered = false;
     this.stalledProtected = false;
     this.emptyPumpStreak = 0;

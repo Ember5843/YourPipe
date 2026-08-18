@@ -4,8 +4,8 @@
  * 职责：
  *   1. 接收 MpvPlaybackEngine 推来的 PlaybackState
  *   2. 同步驱动 PlayerStateMachine 状态转换
- *   3. 推送给 AvSessionManager（节流）
- *   4. 向 UI 发布节流后的进度更新
+ *   3. 推送给 AvSessionManager（状态变化时同步直推，无节流）
+ *   4. 向 UI 发布去重后的进度更新（currentTime/duration 变化才发）
  *
  * 设计原则：
  *   - 不入库 @Track（不直接参与 ArkTS 响应式），由 AvPlayerController 担任 @Track 宿主
@@ -36,7 +36,7 @@ export class PlayerStateRelay {
   // Ended event subscribers
   private endedSubscribers: Set<() => void> = new Set();
 
-  // AVSession push throttling
+  // AVSession push change detection
   private hasAvSessionState: boolean = false;
   private lastAvSessionIsPlaying: boolean = false;
   private lastAvSessionIsBuffering: boolean = false;
@@ -44,14 +44,12 @@ export class PlayerStateRelay {
   private lastAvSessionIsEnded: boolean = false;
   private lastAvSessionErrorMsg: string = '';
   private lastAvSessionPlaybackSpeed: number = 1;
-  private avSessionPushScheduled: boolean = false;
 
   // Edge-detection cache for state machine
   private prevIsPlaying: boolean = false;
   private prevIsBuffering: boolean = false;
   private prevIsReady: boolean = false;
   private prevIsEnded: boolean = false;
-  private prevIsSeeking: boolean = false;
   private prevErrorMsg: string = '';
   private prevDuration: number = 0;
 
@@ -83,12 +81,12 @@ export class PlayerStateRelay {
       }
     }
 
-    // 3. AVSession 推送（有状态变化时才推 + 节流）
+    // 3. AVSession 推送（有状态变化时才推）
     if (this.shouldPushToAvSession(state)) {
       this.scheduleAvSessionPush(state);
     }
 
-    // 4. 进度发布（节流至下一帧）
+    // 4. 进度发布（值变化时同步发布）
     this.scheduleProgressPublish(state);
 
     // 5. 缓存当前值用于下一次 edge detection
@@ -134,12 +132,10 @@ export class PlayerStateRelay {
     this.lastAvSessionIsEnded = false;
     this.lastAvSessionErrorMsg = '';
     this.lastAvSessionPlaybackSpeed = 1;
-    this.avSessionPushScheduled = false;
     this.prevIsPlaying = false;
     this.prevIsBuffering = false;
     this.prevIsReady = false;
     this.prevIsEnded = false;
-    this.prevIsSeeking = false;
     this.prevErrorMsg = '';
     this.prevDuration = 0;
   }
@@ -227,34 +223,26 @@ export class PlayerStateRelay {
   }
 
   private scheduleAvSessionPush(state: PlaybackState): void {
-    if (this.avSessionPushScheduled) return;
-    this.avSessionPushScheduled = true;
-
-    const push = () => {
-      this.avSessionPushScheduled = false;
-      const session: AvSessionManager | null = this.avSession;
-      if (session === null) return;
-      session.setPlaybackState(
-        state.engineState,
-        state.isPlaying,
-        state.currentTime,
-        state.playbackSpeed,
-        state.isBuffering || state.isSeeking,
-        state.isEnded
-      );
-      // Cache values instead of retaining an engine-owned state object. This keeps
-      // edge detection reliable even if an engine later reuses/mutates snapshots.
-      this.hasAvSessionState = true;
-      this.lastAvSessionIsPlaying = state.isPlaying;
-      this.lastAvSessionIsBuffering = state.isBuffering;
-      this.lastAvSessionIsSeeking = state.isSeeking;
-      this.lastAvSessionIsEnded = state.isEnded;
-      this.lastAvSessionErrorMsg = state.errorMsg;
-      this.lastAvSessionPlaybackSpeed = state.playbackSpeed;
-    };
-
     // 立即推（非节流），状态变化需要第一时间同步到锁屏
-    push();
+    const session: AvSessionManager | null = this.avSession;
+    if (session === null) return;
+    session.setPlaybackState(
+      state.engineState,
+      state.isPlaying,
+      state.currentTime,
+      state.playbackSpeed,
+      state.isBuffering || state.isSeeking,
+      state.isEnded
+    );
+    // Cache values instead of retaining an engine-owned state object. This keeps
+    // edge detection reliable even if an engine later reuses/mutates snapshots.
+    this.hasAvSessionState = true;
+    this.lastAvSessionIsPlaying = state.isPlaying;
+    this.lastAvSessionIsBuffering = state.isBuffering;
+    this.lastAvSessionIsSeeking = state.isSeeking;
+    this.lastAvSessionIsEnded = state.isEnded;
+    this.lastAvSessionErrorMsg = state.errorMsg;
+    this.lastAvSessionPlaybackSpeed = state.playbackSpeed;
   }
 
   private scheduleProgressPublish(state: PlaybackState): void {
@@ -280,7 +268,6 @@ export class PlayerStateRelay {
     this.prevIsBuffering = state.isBuffering;
     this.prevIsReady = state.isReady;
     this.prevIsEnded = state.isEnded;
-    this.prevIsSeeking = state.isSeeking;
     this.prevErrorMsg = state.errorMsg;
     this.prevDuration = state.duration;
   }

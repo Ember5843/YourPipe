@@ -436,14 +436,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     return this.load(source, resumePos);
   }
 
-  prebufferTargetQuality(_videoUrl: string, _audioUrl: string): number {
-    return 0;
-  }
-
-  switchToPrebuffered(_videoHandle: number, _audioHandle: number, _resumePos: number): boolean {
-    return false;
-  }
-
   setSubtitle(url: string): void {
     this.pendingSubtitleUrl = url;
     const ctrl: MpvPlayerController | null = this.controller;
