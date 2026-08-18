@@ -64,8 +64,8 @@ export class PiPManager {
 
   /** PiP 恢复时回调（移植 0.4.0）：由 Index 注入，确保 PlayerPage 在栈顶以重建 */
   onPipRestore: (() => void) | null = null;
-  /** 正在从 PiP 恢复，避免 STOPPED 误触发 onPipStop 的释放 */
-  isRestoring: boolean = false;
+  /** 正在从 PiP 恢复：唯一真源为 PlayerSession.isPipRestoring（同步 AppStorage 镜像），
+   *  避免 STOPPED 误触发 onPipStop 的释放。 */
 
   /** 待初始化：init 时若 componentController 未就绪，缓存参数，待 setComponentController 后自动补 init。
    *  消除"流提取完成调 init"与"新页 XComponent.onLoad 注入 controller"的到达顺序竞争。 */
@@ -102,7 +102,7 @@ export class PiPManager {
    */
   setComponentController(controller: XComponentController): void {
     const session = PlayerSession.getInstance();
-    if (this.isRestoring || session.isPipRestoring) {
+    if (session.isPipRestoring) {
       // The restored page can expose its new XComponent before the old PiP
       // controller reports STOPPED. Keep the new surface pending until the
       // old system-owned surface is fully released.
@@ -271,7 +271,6 @@ export class PiPManager {
           // Closing the PiP window means closing playback altogether.  Release
           // MPV while the PiP surface is still valid so its Vulkan swapchain is
           // destroyed before WindowManager removes the surface.
-          this.isRestoring = false;
           this.restoreStopped = false;
           this.clearRestoreWatchdog();
           session.setPipRestoring(false);
@@ -294,7 +293,6 @@ export class PiPManager {
         break;
       case PiPWindow.PiPState.ABOUT_TO_RESTORE:
         // 点 PiP 恢复按钮：立刻清占位层，避免系统还原出的播放页先闪「画中画运行中」。
-        this.isRestoring = true;
         this.restoreStopped = false;
         session.setPiPActive(false);
         session.setPipRestoring(true);
@@ -320,7 +318,6 @@ export class PiPManager {
           // must win over possibly-stale restore flags.
           logger.info(`${TAG} STOPPED via ${reason}, release session + destroy pipController`);
           PlayerPresentation.onPipStopped(false);
-          this.isRestoring = false;
           this.restoreStopped = false;
           this.clearRestoreWatchdog();
           session.setPipRestoring(false);
@@ -334,7 +331,6 @@ export class PiPManager {
           this.destroy();
         } else if (this.isRestoreInProgress(session) || this.isRestoreReason(reason)) {
           logger.info(`${TAG} STOPPED restore path reason=${reason}; retain media/queue`);
-          this.isRestoring = true;
           session.setPipRestoring(true);
           PlayerPresentation.onPipStopped(true);
           this.restoreStopped = true;
@@ -359,12 +355,10 @@ export class PiPManager {
           // Keep media alive: restore UI may still rebind the existing session.
           // Only drop PiP controller bookkeeping; do not release()/clear queue.
           logger.error(`${TAG} PiP restore failed; keep media session for page rebind`);
-          this.isRestoring = false;
           this.restoreStopped = false;
           this.clearRestoreWatchdog();
           this.destroy(false);
         } else {
-          this.isRestoring = false;
           this.restoreStopped = false;
           session.setPipRestoring(false);
           this.clearRestoreWatchdog();
@@ -585,7 +579,6 @@ export class PiPManager {
     this.pipController = null;
     this.boundComponentController = null;
     this.isInitialized = false;
-    this.isRestoring = false;
     this.restoreStopped = false;
     if (clearSessionRestore) {
       PlayerSession.getInstance().setPipRestoring(false);
@@ -615,7 +608,6 @@ export class PiPManager {
       this.restoreStopped = true;
       this.finishRestoreRebind();
     }
-    this.isRestoring = false;
     this.restoreStopped = false;
     this.clearRestoreWatchdog();
     PlayerSession.getInstance().setPipRestoring(false);
@@ -636,7 +628,6 @@ export class PiPManager {
     this.isInitialized = false;
     this.componentController = restoredController;
     this.pendingRestoreComponentController = null;
-    this.isRestoring = true;
     this.restoreStopped = false;
     PlayerSession.getInstance().setPipRestoring(true);
     this.clearRestoreWatchdog();
@@ -656,7 +647,7 @@ export class PiPManager {
     this.restoreStopped = false;
     this.restoreWatchdogTimerId = setTimeout(() => {
       this.restoreWatchdogTimerId = -1;
-      if (!this.isRestoring && !PlayerSession.getInstance().isPipRestoring) {
+      if (!PlayerSession.getInstance().isPipRestoring) {
         return;
       }
       // Do not release media on timeout: user already restored into the player.
@@ -686,7 +677,7 @@ export class PiPManager {
   }
 
   private isRestoreInProgress(session: PlayerSession): boolean {
-    return this.isRestoring || session.isPipRestoring;
+    return session.isPipRestoring;
   }
 
   /** HarmonyOS / OEM variants for restore stop reason. */
