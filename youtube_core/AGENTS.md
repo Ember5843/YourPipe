@@ -8,26 +8,12 @@
 > architecture only — no changelogs.
 
 ## 1. Public surface (`youtube_core/Index.ets`)
-- Extractor: `YouTubeExtractor`, `VideoInfo`, `StreamInfo`, `ItagInfo`,
-  `ItagItem`, `MediaFormat`, `HlsManifestParser`, `YouTubeExceptions`,
-  `PlayerResponseTypes`, `CommentItem`.
-- Cipher: `PipePipeApiDecoder`, `YoutubeJavaScriptPlayerManager`, `ApiConfig`.
-- Player clients: `ConfiguredPlayerClient`, `ClientTypes` module
-  (`ClientFetchResult` / `ClientFetchContext`),
-  `YoutubePlayerClientConfig`.
-- SABR/UMP: `YoutubeSabrInfo`, `YoutubeSabrSession`, `YoutubeSabrStreamState`,
-  `SabrMediaSegment`, `SabrPoTokenProvider`, `SabrProtocolException`.
-- Auth: `AuthSessionManager`, `CookieAuthCredential`, `SapisidHashUtil`,
-  `DebugAuthConstants`, `SmartTubeAuthProbe`, `AuthModels` (`AuthRail`, status).
-- Network: `YouTubeHttpClient`, `CookieJar`, `HttpDownloader`,
-  `HttpProxyOptions` (+ snapshot/kind types), `Socks5Bridge`.
-- Models: `Localization`, `ContentCountry`, `DeliveryType`,
-  `ClientsConstants`, `SearchContentFilter`, `SearchResultModel`, `VideoModel`,
-  chapters/subtitles on `VideoInfo` as applicable.
-- Service: `YoutubeApi` (high-level façade).
-- Logger: `YTCoreLogger.setSink(...)`.
-- Utils: `Utils`, `YoutubeParsingHelper`, `WebClientVersionResolver`,
-  `SearchQueryHandlerFactory`, `YoutubeSearchQueryHanderFactory`.
+显式命名导出（无 `export *`），名单 = entry / mediaservice 的实际消费面；
+新增跨模块符号必须在 `Index.ets` 登记。按组分块，以文件内注释为准：
+extractor（模型 + 异常层次 + 评论 + HLS 解析）、sabr/identity（opt-in/debug
+路径）、cipher（`YoutubeJavaScriptPlayerManager`）、model/localization、
+network（含 `YOUTUBE_COOKIE_STORAGE_NAME`）、auth（含 `AUTH_STORAGE_NAME`）、
+service（`YoutubeApi` 的高层函数）、`YTCoreLogger`。
 
 ## 2. Layout
 ```
@@ -35,6 +21,8 @@ youtube_core/src/main/
   ets/
     extractor/
       YouTubeExtractor.ets             — main extraction flow
+      CommentsExtractor.ets            — comments/replies (CommentsBackend 窄接口)
+      PlayabilityChecker.ets           — playability 状态判定（无状态静态方法）
       VideoInfo.ets, StreamInfo.ets, ItagInfo.ets
       HlsManifestParser.ets            — HLS m3u8 parser
       PlayerResponseTypes.ets          — player_response JSON shapes
@@ -104,7 +92,8 @@ youtube_core/src/main/
    - allow-list: `mweb` | `web_safari` | `visionos` | `android_vr` | `tv_downgraded`
    - **product default follows PipePipe**: guest → `visionos` (pot-free,
      POSTs the GAPIS endpoint `youtubei.googleapis.com`, no sts/pot), signed-in →
-     `tv_downgraded` (entry calls `resetToAuthDefault`/`applyAuthDefault`);
+     `tv_downgraded` (entry 侧统一经 `AuthStateHelper.reconcilePlaybackClient`
+     调用 `resetToAuthDefault`);
      both resolve to direct adaptiveFormats URLs. The product is locked to
      these two defaults; `mweb` (SABR), `web_safari`, and `android_vr`
      (guest fallback, requires a session pot) are debug-only selections —
@@ -191,10 +180,12 @@ youtube_core/src/main/
   the request headers carry `X-Goog-Visitor-Id`, `X-YouTube-Client-Name(1)`,
   `X-YouTube-Client-Version`, `Origin`, `Referer`. A token minted without this
   binding is accepted initially but rejected at the ~1min protection boundary.
-  The BotGuard JS `vm.a(...)` call must pass the current 9-argument signature
-  (incl. the `loggerFunctions` array); a stale signature produces tokens the
-  server rejects mid-playback. A forced mint must discard the old minter
-  (invalidateGenerator semantics) before rebuilding.
+  The BotGuard JS `vm.a(...)` call must pass the current 6-argument signature
+  (`program`, callback, `true`, interaction element, no-op function, and the
+  `[[], []]` loggerFunctions array — see
+  `entry/src/main/resources/rawfile/sabr_po_token.js`); a stale signature
+  produces tokens the server rejects mid-playback. A forced mint must discard
+  the old minter (invalidateGenerator semantics) before rebuilding.
 - **Backoff is session-owned**: the UMP server deadline (epoch `backoffUntilMs`)
   is honored before every POST and is **not** cleared by seek, hole/policy
   recovery, or local stall resets; it clears only when media arrives, the

@@ -59,7 +59,8 @@ Persistent state and shared singletons:
 - `ThemeManager`, `ThemeColorUtil`, `ColorModeManager`, `LanguageManager`,
   `SearchLocaleManager` — UI prefs.
 - `DataBackupManager`, `AuthStateHelper`, `FeedServiceProvider`, `ActionHub`,
-  `LocaleBundle`, `Constants`, `AnimationUtil`, `AppLog`, `VibratorUtil` — misc.
+  `LocaleBundle`, `Constants`, `AnimationUtil`, `AppLog`, `VibratorUtil`,
+  `ShareUtil`（系统分享收口） — misc.
 
 Reusable components: `HdsTitleBar`, video cards / grids / thumbs, error / about /
 log / tab error panels, option rows, backup + language pickers, placeholders.
@@ -89,10 +90,11 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 - `AvPlayerController.setEngineConfigProvider(...)` — MPV engine knobs → `mediaservice`.
 - `AppLogStore.init(enabled, context.filesDir)`.
 - `AuthSessionManager.init(context)` (youtube_core) + `AuthStateHelper.refresh()`.
-- `YoutubePlayerClientConfig.resetToAuthDefault(...)` — product default is
-  `tv_downgraded` when signed in, `visionos` for guests (both resolve to
-  direct adaptiveFormats URLs; visionos is pot-free via the GAPIS endpoint).
-  **mweb** (SABR) is an opt-in/debug selection, not the default.
+- `AuthStateHelper.reconcilePlaybackClient()` — 登录态/鉴权开关变化后的唯一
+  入口（内部调用 `YoutubePlayerClientConfig.resetToAuthDefault`）。product
+  default is `tv_downgraded` when signed in, `visionos` for guests (both
+  resolve to direct adaptiveFormats URLs; visionos is pot-free via the GAPIS
+  endpoint). **mweb** (SABR) is an opt-in/debug selection, not the default.
 - SABR wiring in `YouTubePlayService.initialize()`:
   `sabrSessionStore.setPoTokenProvider(...)` (UMP per-video pot),
   `sabrSessionStore.setInfoReloader(...)` (mid-playback re-probe, serialized

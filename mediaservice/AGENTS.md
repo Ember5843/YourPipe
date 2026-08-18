@@ -20,7 +20,7 @@
   `StateChangeListener`, `PlayerUiViewModel`.
 - `PlaybackPreferences`, `PlaybackPreferencesSnapshot`, `PlaybackPreferencesProvider`.
 - `BackgroundTaskManager`.
-- `Logger`, `EnhancedLogger`, `DefaultLogger`, `LogSinkFn`, `LogSinkLevel`.
+- `Logger`（共享默认实例，tag `[Mediaservice]`）, `EnhancedLogger`, `LogSinkFn`, `LogSinkLevel`.
 - `PlayerModel`, `StreamCategories`, `CurrentStreams`, `VideoEntry`,
   `AudioTrackOption`, `VideoData`, `StreamInfo`, `SelectOption`,
   `AVPlayerState`, `CommonConstants`, `secondToTime`.
@@ -139,7 +139,8 @@ non-product `youtube-dual` session, so it was dead traffic on the EDL path.
   warmup on status>=2 media); protection recovery (rotate/reload) happens
   inside the session via youtube_core's policy layer.
 - Transient vs terminal SABR errors are distinguished by
-  `SabrProtocolException.kind` ('protection'/'no_media' are retryable;
+  `SabrProtocolException.kind` ('protection'/'no_media'/'segment_unavailable'
+  are retryable, 'beyond_end' signals end-of-stream to the caller;
   'attestation_required'/'reload_exhausted' are terminal) — never match on
   error message strings.
 - `SabrTrackBuffer` pumps on demand to satisfy each range request
