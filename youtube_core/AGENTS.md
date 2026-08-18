@@ -273,8 +273,7 @@ youtube_core/src/main/
 - Player request headers: `Content-Type: application/json`, `User-Agent`,
   `X-YouTube-Client-Name`, `X-YouTube-Client-Version` only — **no
   Origin/Referer** (PipePipe `getJsonPlayerResponseAsync` does not add
-  them), except `tv_downgraded` which adds
-  `Origin: https://www.youtube.com` + `Referer: https://www.youtube.com/tv`;
+  them, `tv_downgraded` included);
   Cookie/X-Origin/DNT/Authorization only when logged in.
 - WEB metadata `/player?$fields=...` and `/next` share the WEB desktop
   body (`buildDesktopWebPayload` = PipePipe `prepareDesktopJsonBuilder` +

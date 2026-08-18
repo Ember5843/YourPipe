@@ -1,4 +1,5 @@
 import { http } from '@kit.NetworkKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
@@ -78,7 +79,8 @@ export struct OptionsNetworkPage {
         this.testMessage = $r('app.string.yt_proxy_test_http_error');
       }
     } catch (e) {
-      logger.warn(`proxy test failed: ${e instanceof Error ? e.message : String(e)}`);
+      const err = e as BusinessError;
+      logger.warn(`proxy test failed: code=${err.code} msg=${err.message}`);
       this.testMessage = $r('app.string.yt_proxy_test_failed');
     } finally {
       req.destroy();

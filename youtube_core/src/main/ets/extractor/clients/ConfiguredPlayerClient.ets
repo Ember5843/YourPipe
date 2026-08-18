@@ -165,10 +165,6 @@ export class ConfiguredPlayerClient {
       'X-YouTube-Client-Name': id.clientId,
       'X-YouTube-Client-Version': id.clientVersion
     };
-    if (key === 'tv_downgraded') {
-      headers['Origin'] = 'https://www.youtube.com';
-      headers['Referer'] = 'https://www.youtube.com/tv';
-    }
 
     // PipePipe addLoggedInHeaders: Cookie+SAPISIDHASH attaches to any client
     // (TVHTML5 included) when a cookie credential exists. OAuth Bearer stays a

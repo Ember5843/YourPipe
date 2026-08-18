@@ -132,7 +132,10 @@ function openSocksTunnel(cfg: Socks5Config, target: Socks5Target): Promise<socke
       }
       resolve(tcp);
     }).catch((e: Error) => {
-      fail(e instanceof Error ? e : new Error(String(e)));
+      // Reject with the original object: netstack failures arrive as
+      // BusinessError-shaped objects (code/message); wrapping them in
+      // Error(String(e)) would destroy the code (logs show "[object Object]").
+      fail(e);
     });
   });
 }
@@ -404,7 +407,7 @@ export class Socks5Bridge {
       this.running = true;
       logger.info(TAG + ` started localPort=${this.localPort} socks5=${h}:${p} auth=${cfg.username.length > 0}`);
       server.on('connect', (conn: socket.TCPSocketConnection) => {
-        handleConnection(conn, cfg).catch((e: Error) => logger.warn(TAG + ` conn error: ${e.message}`));
+        handleConnection(conn, cfg).catch((e: Error) => logger.warn(TAG + ` conn error: ${describeErr(e)}`));
       });
       return true;
     } catch (e) {
