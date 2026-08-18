@@ -1889,7 +1889,10 @@ struct Index {
   @Builder
   OptionsPageMap(name: string) {
     if (name === 'help_page') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_option_help'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         HelpGuidePage({
           params: {
             mode: 'fromSettings',
@@ -1902,20 +1905,11 @@ struct Index {
           }
         })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_help'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'language') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_section_language_region'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
           OptionsLanguageAndRegionPage({
             params: {
               appLangItems: this.appLangItems,
@@ -1929,20 +1923,11 @@ struct Index {
             }
           })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_section_language_region'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'data_account') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_option_data_account'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         OptionsDataAccountPage({
           params: {
             onLoginClick: () => { this.pushOptionsPath('webview_login'); },
@@ -1954,20 +1939,11 @@ struct Index {
           }
         })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_data_account'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'device_qr_login') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_device_qr_sign_in'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         DeviceQrLoginPage({
           onSuccess: () => {
             this.handleLoginSuccess();
@@ -1987,20 +1963,18 @@ struct Index {
           }
         })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_device_qr_sign_in'),
+    } else if (name === 'webview_login') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_google_web_sign_in_title'),
         onBack: () => {
+          // WebView 内部可消费返回（页面栈回退）；消费不了才退出登录页
+          if (this.webViewLoginBackHandler && this.webViewLoginBackHandler()) {
+            return;
+          }
+          this.webViewLoginBackHandler = null;
           this.popOptionsPath();
         }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
-    } else if (name === 'webview_login') {
-      HdsNavDestination() {
+      }) {
         WebViewLoginPage({
           onSuccess: () => {
             this.handleLoginSuccess();
@@ -2021,28 +1995,11 @@ struct Index {
           }
         })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_google_web_sign_in_title'),
-        onBack: () => {
-          if (this.webViewLoginBackHandler && this.webViewLoginBackHandler()) {
-            return;
-          }
-          this.webViewLoginBackHandler = null;
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        if (this.webViewLoginBackHandler && this.webViewLoginBackHandler()) {
-          return true;
-        }
-        this.webViewLoginBackHandler = null;
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'appearance') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_option_appearance'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
           OptionsAppearancePage({
             params: {
               themeColor: this.themePrimary,
@@ -2051,20 +2008,11 @@ struct Index {
             }
           })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_appearance'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'network') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_option_network'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         OptionsNetworkPage({
           params: {
             themeColor: this.themePrimary,
@@ -2074,18 +2022,6 @@ struct Index {
           }
         })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_network'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'app_lang') {
       LanguagePickerPage({
         title: $r('app.string.yt_setting_ui_language'),
@@ -2117,91 +2053,49 @@ struct Index {
         onBack: () => { this.popOptionsPath(); }
       })
     } else if (name === 'log_page') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_log_title'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         LogPage({
           onBack: () => { this.popOptionsPath(); }
         })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_log_title'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'about_page') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_option_about'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         AboutPage({
           onNavigate: (subPage: string) => { this.pushOptionsPath(subPage); }
         })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_about'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'about_open_source') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_about_open_source'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         OpenSourcePage()
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_about_open_source'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'about_ai_models') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_about_ai_models'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         AiModelsPage()
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_about_ai_models'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'about_changelog') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_about_changelog'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
         ChangelogPage()
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_about_changelog'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'playback') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_section_playback'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
           OptionsPlaybackPage({
             params: {
               themeColor: this.themePrimary,
@@ -2211,20 +2105,11 @@ struct Index {
             }
           })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_section_playback'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     } else if (name === 'recovery') {
-      HdsNavDestination() {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_option_recovery'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
           OptionsRecoveryPage({
             params: {
               onResetSettingsClick: () => { this.showResetSettingsConfirmDialog(); },
@@ -2232,18 +2117,6 @@ struct Index {
             }
           })
       }
-      .titleMode(HdsNavDestinationTitleMode.MINI)
-      .titleBar(buildSheetTitleBar({
-        title: $r('app.string.yt_option_recovery'),
-        onBack: () => {
-          this.popOptionsPath();
-        }
-      }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-      .onBackPressed(() => {
-        this.popOptionsPath();
-        return true;
-      })
     }
   }
 
@@ -2438,4 +2311,38 @@ struct Index {
     });
   }
 
+}
+
+/**
+ * Options 子页通用脚手架：HdsNavDestination + MINI 标题栏 + 返回处理。
+ * OptionsPageMap 的各子页只提供标题、onBack 和正文（@BuilderParam content）。
+ */
+@Component
+struct OptionsNavScaffold {
+  @Prop title: Resource = $r('app.string.yt_option_title');
+  /** 标题栏返回键与系统返回手势共用此回调 */
+  onBack: () => void = () => {};
+  @BuilderParam content: () => void = this.defaultContent;
+
+  @Builder
+  defaultContent() {
+  }
+
+  build() {
+    HdsNavDestination() {
+      this.content()
+    }
+    .titleMode(HdsNavDestinationTitleMode.MINI)
+    .titleBar(buildSheetTitleBar({
+      title: this.title,
+      onBack: () => {
+        this.onBack();
+      }
+    }))
+    .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+    .onBackPressed(() => {
+      this.onBack();
+      return true;
+    })
+  }
 }
