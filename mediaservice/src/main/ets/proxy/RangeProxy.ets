@@ -15,6 +15,22 @@ const CONNECT_TIMEOUT_MS = 10000;
 // stream, so it stays generous to avoid aborting long media transfers.
 const TIMEOUT_MS = 30000;
 const requestNumberMap: Map<string, number> = new Map<string, number>();
+/** rn 计数表上限：超出时按插入序淘汰最旧条目，避免全局 Map 随会话数无限增长 */
+const REQUEST_NUMBER_MAP_CAP = 512;
+
+function nextRequestNumber(urlKey: string): number {
+  const rn = requestNumberMap.get(urlKey) || 0;
+  // 删后重插刷新插入序，让淘汰近似 LRU
+  requestNumberMap.delete(urlKey);
+  requestNumberMap.set(urlKey, rn + 1);
+  if (requestNumberMap.size > REQUEST_NUMBER_MAP_CAP) {
+    const oldest = requestNumberMap.keys().next();
+    if (!oldest.done) {
+      requestNumberMap.delete(oldest.value);
+    }
+  }
+  return rn;
+}
 
 class BufferWriter implements rcp.WriteStream {
   private chunks: Uint8Array[] = [];
@@ -56,8 +72,7 @@ function buildYoutubeRangeUrl(url: string, rangeSpec: string): string {
 
 function appendYoutubeRn(url: string, urlKey: string): string {
   let result = stripQueryParam(url, 'rn');
-  const rn = requestNumberMap.get(urlKey) || 0;
-  requestNumberMap.set(urlKey, rn + 1);
+  const rn = nextRequestNumber(urlKey);
   const sep = result.includes('?') ? '&' : '?';
   return `${result}${sep}rn=${rn}`;
 }
