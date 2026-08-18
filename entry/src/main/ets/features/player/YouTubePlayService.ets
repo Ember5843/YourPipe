@@ -1,7 +1,6 @@
 import { AppLog } from '../../common/AppLog';
 import { media } from '@kit.MediaKit';
 import { common } from '@kit.AbilityKit';
-import { util } from '@kit.ArkTS';
 import {
   YouTubeExtractor,
   WebClientVersionResolver,
@@ -394,19 +393,6 @@ export class YouTubePlayService {
       logger.error(`${TAG} play() extraction exception: errorCode=${errorCode} message=${(e as Error).message}`);
       return { success: false, error: this.getErrorMessage(errorCode, undefined, e as Error), errorCode: errorCode };
     }
-  }
-
-  /**
-   * 简单的字符串转 Base64 (ArkTS 环境)
-   */
-  private toBase64(str: string): string {
-    const helper = new util.Base64Helper();
-    const textEncoder = new util.TextEncoder();
-    // 为 UTF-8 编码分配足够的空间（最大 3 字节/字符）
-    const buffer = new Uint8Array(str.length * 3);
-    const result = textEncoder.encodeInto(str, buffer);
-    // 只转换实际写入的部分
-    return helper.encodeToStringSync(buffer.subarray(0, result.written));
   }
 
   /** youtube_core StreamInfo → mediaservice StreamInfo (shared by play() and

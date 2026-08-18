@@ -229,30 +229,6 @@
             "value": "Продолжать воспроизведение в фоновом режиме"
         },
         {
-            "name": "share",
-            "value": "Поделиться"
-        },
-        {
-            "name": "comment",
-            "value": "Комментарий"
-        },
-        {
-            "name": "recommends",
-            "value": "Рекомендации"
-        },
-        {
-            "name": "play_count",
-            "value": "120 тыс."
-        },
-        {
-            "name": "favor_count",
-            "value": "70 тыс."
-        },
-        {
-            "name": "send_barrage",
-            "value": "Баллон"
-        },
-        {
             "name": "video_name0",
             "value": "@Cat"
         },
@@ -817,10 +793,6 @@
             "value": "Добавляйте плейлисты в избранное на странице поиска"
         },
         {
-            "name": "yt_empty_playlists_hint",
-            "value": "Добавляйте плейлисты в избранное на странице поиска"
-        },
-        {
             "name": "yt_about_current_version",
             "value": "Текущая версия"
         },
@@ -933,10 +905,6 @@
             "value": "Рекомендуемое"
         },
         {
-            "name": "yt_home_search_empty",
-            "value": "Автопоиск не дал результатов, попробуйте вручную"
-        },
-        {
             "name": "yt_home_recommended_error",
             "value": "Не удалось загрузить рекомендации, переключение или повторите позже"
         },
@@ -995,54 +963,6 @@
         {
             "name": "yt_log_saved_to_downloads",
             "value": "Сохранено в папку загрузок"
-        },
-        {
-            "name": "yt_feed_popular",
-            "value": "Популярное"
-        },
-        {
-            "name": "yt_feed_recommended",
-            "value": "Рекомендуемое"
-        },
-        {
-            "name": "yt_feed_featured",
-            "value": "Избранное"
-        },
-        {
-            "name": "yt_feed_trending",
-            "value": "В тренде"
-        },
-        {
-            "name": "yt_feed_latest",
-            "value": "Новое"
-        },
-        {
-            "name": "yt_feed_topics",
-            "value": "Темы"
-        },
-        {
-            "name": "yt_suffix_videos",
-            "value": "видео"
-        },
-        {
-            "name": "yt_suffix_shorts",
-            "value": "Shorts"
-        },
-        {
-            "name": "yt_suffix_collections",
-            "value": "подборки"
-        },
-        {
-            "name": "yt_suffix_live",
-            "value": "трансляции"
-        },
-        {
-            "name": "yt_suffix_music",
-            "value": "музыка"
-        },
-        {
-            "name": "yt_suffix_movies",
-            "value": "фильмы"
         },
         {
             "name": "yt_error_no_playable_stream",

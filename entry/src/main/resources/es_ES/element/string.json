@@ -229,30 +229,6 @@
             "value": "Mantener el video en ejecucion en segundo plano"
         },
         {
-            "name": "share",
-            "value": "Compartir"
-        },
-        {
-            "name": "comment",
-            "value": "Comentario"
-        },
-        {
-            "name": "recommends",
-            "value": "Recomendaciones"
-        },
-        {
-            "name": "play_count",
-            "value": "120 mil"
-        },
-        {
-            "name": "favor_count",
-            "value": "70 mil"
-        },
-        {
-            "name": "send_barrage",
-            "value": "Danmaku"
-        },
-        {
             "name": "video_name0",
             "value": "@Cat"
         },
@@ -817,10 +793,6 @@
             "value": "Añade listas a favoritos desde la página de búsqueda"
         },
         {
-            "name": "yt_empty_playlists_hint",
-            "value": "Añade listas a favoritos desde la página de búsqueda"
-        },
-        {
             "name": "yt_about_current_version",
             "value": "Versión actual"
         },
@@ -933,10 +905,6 @@
             "value": "Recomendado"
         },
         {
-            "name": "yt_home_search_empty",
-            "value": "La búsqueda automática no arrojó resultados, busca manualmente"
-        },
-        {
             "name": "yt_home_recommended_error",
             "value": "Error al cargar recomendaciones; se usara alternativa o reintenta mas tarde"
         },
@@ -995,54 +963,6 @@
         {
             "name": "yt_log_saved_to_downloads",
             "value": "Guardado en la carpeta de descargas"
-        },
-        {
-            "name": "yt_feed_popular",
-            "value": "Popular"
-        },
-        {
-            "name": "yt_feed_recommended",
-            "value": "Recomendado"
-        },
-        {
-            "name": "yt_feed_featured",
-            "value": "Destacado"
-        },
-        {
-            "name": "yt_feed_trending",
-            "value": "Tendencias"
-        },
-        {
-            "name": "yt_feed_latest",
-            "value": "Más reciente"
-        },
-        {
-            "name": "yt_feed_topics",
-            "value": "Temas"
-        },
-        {
-            "name": "yt_suffix_videos",
-            "value": "videos"
-        },
-        {
-            "name": "yt_suffix_shorts",
-            "value": "Shorts"
-        },
-        {
-            "name": "yt_suffix_collections",
-            "value": "colecciones"
-        },
-        {
-            "name": "yt_suffix_live",
-            "value": "transmisiones"
-        },
-        {
-            "name": "yt_suffix_music",
-            "value": "música"
-        },
-        {
-            "name": "yt_suffix_movies",
-            "value": "películas"
         },
         {
             "name": "yt_error_no_playable_stream",

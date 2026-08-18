@@ -54,27 +54,6 @@ export class PreferencesStore {
     return result;
   }
 
-  /** 批量写入 PreferencesStore（恢复用），会先清空 */
-  static setAllEntries(entries: Record<string, string>): void {
-    if (!PreferencesStore.instance) {
-      return;
-    }
-    try {
-      PreferencesStore.instance.clearSync();
-      for (const key of Object.keys(entries)) {
-        PreferencesStore.instance.putSync(key, entries[key]);
-      }
-      PreferencesStore.instance.flush((err: BusinessError) => {
-        if (err) {
-          logger.error(`Preferences setAllEntries flush failed. Code:${err.code}, message:${err.message}`);
-        }
-      });
-      logger.info('PreferencesStore setAllEntries done');
-    } catch (e) {
-      logger.error('Failed to set all preferences entries:', JSON.stringify(e));
-    }
-  }
-
   /** 恢复设置用：只覆盖写入 cfg_ 前缀键，绝不清空历史/订阅等其他数据 */
   static restoreConfigEntries(entries: Record<string, string>): void {
     if (!PreferencesStore.instance) {

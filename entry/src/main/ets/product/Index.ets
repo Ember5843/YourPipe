@@ -19,7 +19,6 @@ import { WatchHistoryItem, WatchHistoryStore } from '../common/WatchHistoryStore
 import { DownloadManager, DownloadTask } from '../common/DownloadManager';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
 import { AppLogStore } from '../common/AppLogStore';
-import { VideoSearchResult } from '../features/home/SearchService';
 import { LocalMediaProxy, PlayerState } from 'mediaservice';
 import { KioskPageResult } from '../features/home/HomeFeedService';
 import { ChannelInfoService } from '../features/user/ChannelInfoService';
@@ -47,7 +46,6 @@ import { AuthStateHelper } from '../common/AuthStateHelper';
 import { customAnimationUtil } from '../common/AnimationUtil';
 import { ThemeColorUtil } from '../common/ThemeColorUtil';
 import { LanguageManager } from '../common/LanguageManager';
-import { SearchLocaleManager } from '../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../common/FeedServiceProvider';
 import { YoutubeData } from '../common/model/SupportedCountry';
 import { OptionItem } from '../common/components/OptionItem';
@@ -64,7 +62,7 @@ import { OptionsDataAccountPage } from '../features/options/OptionsDataAccountPa
 import { OptionsNetworkPage } from '../features/options/OptionsNetworkPage';
 import { HelpGuidePage, PREF_HELP_GUIDE_SEEN } from '../features/help/HelpGuidePage';
 import { NetworkProxyConfig } from '../common/NetworkProxyConfig';
-import { LanguagePickerDialog, LanguagePickerItem } from '../common/components/LanguagePickerDialog';
+import { LanguagePickerItem } from '../common/components/LanguagePickerDialog';
 import { LanguagePickerPage } from '../common/components/LanguagePickerPage';
 import {
   BlurStrategy,
@@ -142,13 +140,10 @@ struct Index {
   @State homeModeNoticeMessage: string = '';
   /** Bumps on each successful home reset so ForEach rebuilds cards (ids alone are positional). */
   @State homeFeedEpoch: number = 0;
-  @State nextPageToken: string | null = null;
   @State kioskNextPageToken: string | null = null;
   @State kioskVisitorData: string = '';
   @State homeFeedSource: string = 'kiosk';
   @State homeMode: string = 'kiosk';
-  @State currentQuery: string = "";
-  @State lastLoadedQuery: string = '';
   @State currentOptionPage: string = 'main';
   @State optionsNavStack: NavPathStack = new NavPathStack();
   @State optionsDepth: number = 0;
@@ -580,8 +575,6 @@ struct Index {
     this.kioskNextPageToken = null;
     this.kioskVisitorData = '';
     this.homeFeedSource = 'kiosk';
-    this.nextPageToken = null;
-    this.lastLoadedQuery = '';
     this.homeErrorMessage = '';
     this.homeModeNoticeMessage = '';
     this.videoList = [];
@@ -886,22 +879,6 @@ struct Index {
     this.actionHub.sharePlaylist = (playlist: SearchPlaylistItem) => {
       this.sharePlaylist(playlist);
     };
-    this.actionHub.setSearchLanguage = (languageCode: string) => {
-      SearchLocaleManager.setSearchLanguage(languageCode);
-      this.reloadHomeForSearchLocaleChange();
-    };
-    this.actionHub.setSearchCountry = (countryCode: string) => {
-      SearchLocaleManager.setSearchCountry(countryCode);
-      this.reloadHomeForSearchLocaleChange();
-    };
-    this.actionHub.setSearchLocale = (languageCode: string, countryCode: string) => {
-      SearchLocaleManager.setSearchLocale(languageCode, countryCode);
-      this.reloadHomeForSearchLocaleChange();
-    };
-    this.actionHub.resetSearchLocale = () => {
-      SearchLocaleManager.resetSearchLocale();
-      this.reloadHomeForSearchLocaleChange();
-    };
     this.actionHub.on(ActionHubEvent.IS_REPLIES_OPEN_CHANGE, (isOpen: boolean) => {
       this.isRepliesOpen = isOpen;
     });
@@ -946,65 +923,11 @@ struct Index {
     this.syncSubscriptionsToStorage();
   }
 
-  startNewQuery(query: string) {
-    this.homeMode = 'search';
-    this.homeModeNoticeMessage = '';
-    this.homeErrorMessage = '';
-    this.currentQuery = query;
-    this.nextPageToken = null;
-    this.lastLoadedQuery = '';
-    this.kioskNextPageToken = null;
-    this.kioskVisitorData = '';
-    this.homeFeedSource = 'kiosk';
-    this.videoList = [];
-    if (!this.currentQuery || this.currentQuery.trim().length === 0) {
-      this.currentQuery = this.getRefreshQuery();
-    }
-    this.loadLiveVideos(true);
-  }
-
-  private getRefreshQuery(): string {
-    const seeds: string[] = [
-      getContext().resourceManager.getStringSync($r('app.string.yt_feed_popular').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_feed_recommended').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_feed_featured').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_feed_trending').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_feed_latest').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_feed_topics').id),
-    ];
-    const suffixes: string[] = [
-      getContext().resourceManager.getStringSync($r('app.string.yt_suffix_videos').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_suffix_shorts').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_suffix_collections').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_suffix_live').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_suffix_music').id),
-      getContext().resourceManager.getStringSync($r('app.string.yt_suffix_movies').id),
-    ];
-    const seed = seeds[Math.floor(Math.random() * seeds.length)];
-    const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-    const stamp = new Date().getMinutes().toString();
-    return `${seed}${suffix} ${stamp}`;
-  }
-
-  private async fetchInitialWithTimeout(query: string, startId: number, timeoutMs: number): Promise<VideoSearchResult> {
-    const service = FeedServiceProvider.getInstance().getSearchService();
-    return await Promise.race([
-      service.fetchInitial(query, startId),
-      new Promise<VideoSearchResult>((_resolve: (value: VideoSearchResult) => void, reject: (reason: Error) => void) => {
-        setTimeout(() => {
-          reject(new Error('fetchInitial timeout'));
-        }, timeoutMs);
-      })
-    ]);
-  }
-
   private reloadHomeForSearchLocaleChange(): void {
     FeedServiceProvider.getInstance().invalidate();
     this.kioskNextPageToken = null;
     this.kioskVisitorData = '';
     this.homeFeedSource = 'kiosk';
-    this.nextPageToken = null;
-    this.lastLoadedQuery = '';
     this.homeMode = 'kiosk';
     this.homeModeNoticeMessage = '';
     this.homeErrorMessage = '';
@@ -1068,41 +991,6 @@ struct Index {
           + `elapsed=${Date.now() - loadStartedAt}ms`);
         return;
       }
-
-      const refreshToken = reset ? this.nextPageToken : null;
-      const canUseContinuation = reset && !!refreshToken && this.currentQuery === this.lastLoadedQuery;
-      if (!reset) {
-        if (!this.nextPageToken) {
-          return;
-        }
-        this.isLoadingMore = true;
-      }
-      if (!this.currentQuery || this.currentQuery.trim().length === 0) {
-        this.currentQuery = this.getRefreshQuery();
-      }
-      const searchService = FeedServiceProvider.getInstance().getSearchService();
-      let pageResult = reset
-        ? (canUseContinuation
-          ? await searchService.fetchNext(refreshToken ?? '', startId)
-          : await this.fetchInitialWithTimeout(this.currentQuery, startId, 12000))
-        : await searchService.fetchNext(this.nextPageToken ?? '', startId);
-      if (reset && canUseContinuation && pageResult.items.length === 0) {
-        pageResult = await this.fetchInitialWithTimeout(this.currentQuery, startId, 12000);
-      }
-      if (reset) {
-        this.videoList = pageResult.items;
-        this.homeFeedEpoch += 1;
-        this.scrollHomeFeedToTop();
-      } else {
-        this.videoList = this.videoList.concat(pageResult.items);
-      }
-      this.nextPageToken = pageResult.nextPageToken;
-      this.lastLoadedQuery = this.currentQuery;
-      if (reset && this.homeModeNoticeMessage.length > 0 && pageResult.items.length === 0) {
-        this.homeErrorMessage = '[SEARCH_EMPTY] ' + getContext().resourceManager.getStringSync($r('app.string.yt_home_search_empty').id);
-      } else {
-        this.homeErrorMessage = '';
-      }
     } catch (err) {
       // Never JSON.stringify(Error) alone — enumerable fields are empty → "{}" in user logs.
       logger.error(`[HomeFeed] stage=failed reset=${reset} mode=${this.homeMode} `
@@ -1144,8 +1032,6 @@ struct Index {
     try {
       this.kioskNextPageToken = null;
       this.kioskVisitorData = '';
-      this.nextPageToken = null;
-      this.lastLoadedQuery = '';
       await this.loadLiveVideos(true);
       const nextHead = this.videoList.length > 0
         ? (this.videoList[0].videoId || this.videoList[0].id.toString())

@@ -229,30 +229,6 @@
             "value": "إبقاء تشغيل الفيديو في الخلفية"
         },
         {
-            "name": "share",
-            "value": "مشاركة"
-        },
-        {
-            "name": "comment",
-            "value": "تعليق"
-        },
-        {
-            "name": "recommends",
-            "value": "التوصيات"
-        },
-        {
-            "name": "play_count",
-            "value": "120 ألف"
-        },
-        {
-            "name": "favor_count",
-            "value": "70 ألف"
-        },
-        {
-            "name": "send_barrage",
-            "value": "دانماكو"
-        },
-        {
             "name": "video_name0",
             "value": "@Cat"
         },
@@ -817,10 +793,6 @@
             "value": "أضف قوائم إلى المفضلة من صفحة البحث"
         },
         {
-            "name": "yt_empty_playlists_hint",
-            "value": "أضف قوائم إلى المفضلة من صفحة البحث"
-        },
-        {
             "name": "yt_about_current_version",
             "value": "الإصدار الحالي"
         },
@@ -933,10 +905,6 @@
             "value": "موصى به"
         },
         {
-            "name": "yt_home_search_empty",
-            "value": "البحث التلقائي لم ينتج نتائج، يرجى البحث يدويًا"
-        },
-        {
             "name": "yt_home_recommended_error",
             "value": "فشل تحميل الخلاصة الموصى بها، تم التراجع أو حاول لاحقًا"
         },
@@ -995,54 +963,6 @@
         {
             "name": "yt_log_saved_to_downloads",
             "value": "تم الحفظ في مجلد التنزيلات"
-        },
-        {
-            "name": "yt_feed_popular",
-            "value": "شائع"
-        },
-        {
-            "name": "yt_feed_recommended",
-            "value": "موصى به"
-        },
-        {
-            "name": "yt_feed_featured",
-            "value": "مميز"
-        },
-        {
-            "name": "yt_feed_trending",
-            "value": "الأكثر تداولًا"
-        },
-        {
-            "name": "yt_feed_latest",
-            "value": "الأحدث"
-        },
-        {
-            "name": "yt_feed_topics",
-            "value": "المواضيع"
-        },
-        {
-            "name": "yt_suffix_videos",
-            "value": "فيديوهات"
-        },
-        {
-            "name": "yt_suffix_shorts",
-            "value": "Shorts"
-        },
-        {
-            "name": "yt_suffix_collections",
-            "value": "مجموعات"
-        },
-        {
-            "name": "yt_suffix_live",
-            "value": "بثوث مباشرة"
-        },
-        {
-            "name": "yt_suffix_music",
-            "value": "موسيقى"
-        },
-        {
-            "name": "yt_suffix_movies",
-            "value": "أفلام"
         },
         {
             "name": "yt_error_no_playable_stream",

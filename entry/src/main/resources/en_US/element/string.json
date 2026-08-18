@@ -229,30 +229,6 @@
             "value": "Keep video running in background"
         },
         {
-            "name": "share",
-            "value": "Share"
-        },
-        {
-            "name": "comment",
-            "value": "Comment"
-        },
-        {
-            "name": "recommends",
-            "value": "Recommends"
-        },
-        {
-            "name": "play_count",
-            "value": "120k"
-        },
-        {
-            "name": "favor_count",
-            "value": "70k"
-        },
-        {
-            "name": "send_barrage",
-            "value": "Barrage"
-        },
-        {
             "name": "video_name0",
             "value": "@Cat"
         },
@@ -817,10 +793,6 @@
             "value": "Favorite playlists of interest on the search page"
         },
         {
-            "name": "yt_empty_playlists_hint",
-            "value": "Favorite playlists of interest on the search page"
-        },
-        {
             "name": "yt_about_current_version",
             "value": "Current Version"
         },
@@ -933,10 +905,6 @@
             "value": "Recommended"
         },
         {
-            "name": "yt_home_search_empty",
-            "value": "Auto search returned no results, please search manually"
-        },
-        {
             "name": "yt_home_recommended_error",
             "value": "Failed to load recommended feed, falling back or try again later"
         },
@@ -995,54 +963,6 @@
         {
             "name": "yt_log_saved_to_downloads",
             "value": "Saved to Downloads"
-        },
-        {
-            "name": "yt_feed_popular",
-            "value": "Popular"
-        },
-        {
-            "name": "yt_feed_recommended",
-            "value": "Recommended"
-        },
-        {
-            "name": "yt_feed_featured",
-            "value": "Featured"
-        },
-        {
-            "name": "yt_feed_trending",
-            "value": "Trending"
-        },
-        {
-            "name": "yt_feed_latest",
-            "value": "Latest"
-        },
-        {
-            "name": "yt_feed_topics",
-            "value": "Topics"
-        },
-        {
-            "name": "yt_suffix_videos",
-            "value": "Videos"
-        },
-        {
-            "name": "yt_suffix_shorts",
-            "value": "Shorts"
-        },
-        {
-            "name": "yt_suffix_collections",
-            "value": "Collections"
-        },
-        {
-            "name": "yt_suffix_live",
-            "value": "Live"
-        },
-        {
-            "name": "yt_suffix_music",
-            "value": "Music"
-        },
-        {
-            "name": "yt_suffix_movies",
-            "value": "Movies"
         },
         {
             "name": "yt_error_no_playable_stream",

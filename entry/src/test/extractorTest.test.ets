@@ -1,8 +1,6 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
 import { i18n } from '@kit.LocalizationKit';
-import { fetchSearchPage } from '../main/ets/feature/YoutubeApi';
-import { Localization } from '../main/ets/model/Localization';
-import { ContentCountry } from '../main/ets/model/ContentCountry';
+import { fetchSearchPage, Localization, ContentCountry } from 'youtube_core';
 
 export default function extractTest() {
   describe('extractTest', () => {

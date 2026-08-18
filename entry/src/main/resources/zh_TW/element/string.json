@@ -229,30 +229,6 @@
             "value": "保持視頻在背景執行"
         },
         {
-            "name": "share",
-            "value": "分享"
-        },
-        {
-            "name": "comment",
-            "value": "留言"
-        },
-        {
-            "name": "recommends",
-            "value": "推薦"
-        },
-        {
-            "name": "play_count",
-            "value": "120k"
-        },
-        {
-            "name": "favor_count",
-            "value": "70k"
-        },
-        {
-            "name": "send_barrage",
-            "value": "發送彈幕"
-        },
-        {
             "name": "video_name0",
             "value": "@Cat"
         },
@@ -817,10 +793,6 @@
             "value": "在搜尋頁收藏感興趣的播放清單"
         },
         {
-            "name": "yt_empty_playlists_hint",
-            "value": "在搜尋頁收藏感興趣的播放清單"
-        },
-        {
             "name": "yt_about_current_version",
             "value": "目前版本"
         },
@@ -933,10 +905,6 @@
             "value": "推薦"
         },
         {
-            "name": "yt_home_search_empty",
-            "value": "自動搜尋無結果，請手動搜尋"
-        },
-        {
             "name": "yt_home_recommended_error",
             "value": "推薦來源載入失敗，已回退或請稍後再試"
         },
@@ -995,54 +963,6 @@
         {
             "name": "yt_log_saved_to_downloads",
             "value": "已儲存至下載目錄"
-        },
-        {
-            "name": "yt_feed_popular",
-            "value": "熱門"
-        },
-        {
-            "name": "yt_feed_recommended",
-            "value": "推薦"
-        },
-        {
-            "name": "yt_feed_featured",
-            "value": "精選"
-        },
-        {
-            "name": "yt_feed_trending",
-            "value": "趨勢"
-        },
-        {
-            "name": "yt_feed_latest",
-            "value": "最新"
-        },
-        {
-            "name": "yt_feed_topics",
-            "value": "話題"
-        },
-        {
-            "name": "yt_suffix_videos",
-            "value": "影片"
-        },
-        {
-            "name": "yt_suffix_shorts",
-            "value": "短片"
-        },
-        {
-            "name": "yt_suffix_collections",
-            "value": "合集"
-        },
-        {
-            "name": "yt_suffix_live",
-            "value": "直播"
-        },
-        {
-            "name": "yt_suffix_music",
-            "value": "音樂"
-        },
-        {
-            "name": "yt_suffix_movies",
-            "value": "電影"
         },
         {
             "name": "yt_error_no_playable_stream",

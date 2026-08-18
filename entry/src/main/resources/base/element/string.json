@@ -241,30 +241,6 @@
             "value": "保持视频后台运行"
         },
         {
-            "name": "share",
-            "value": "分享"
-        },
-        {
-            "name": "comment",
-            "value": "评论"
-        },
-        {
-            "name": "recommends",
-            "value": "推荐"
-        },
-        {
-            "name": "play_count",
-            "value": "12万"
-        },
-        {
-            "name": "favor_count",
-            "value": "7万"
-        },
-        {
-            "name": "send_barrage",
-            "value": "发弹幕"
-        },
-        {
             "name": "video_name0",
             "value": "@Cat"
         },
@@ -845,10 +821,6 @@
             "value": "在搜索页收藏感兴趣的播放列表"
         },
         {
-            "name": "yt_empty_playlists_hint",
-            "value": "在搜索页收藏感兴趣的播放列表"
-        },
-        {
             "name": "yt_about_current_version",
             "value": "当前版本"
         },
@@ -965,10 +937,6 @@
             "value": "推荐"
         },
         {
-            "name": "yt_home_search_empty",
-            "value": "自动搜索无结果，请手动搜索"
-        },
-        {
             "name": "yt_home_recommended_error",
             "value": "推荐源加载失败，已回退或请稍后重试"
         },
@@ -1027,54 +995,6 @@
         {
             "name": "yt_log_saved_to_downloads",
             "value": "已保存至下载目录"
-        },
-        {
-            "name": "yt_feed_popular",
-            "value": "热门"
-        },
-        {
-            "name": "yt_feed_recommended",
-            "value": "推荐"
-        },
-        {
-            "name": "yt_feed_featured",
-            "value": "精选"
-        },
-        {
-            "name": "yt_feed_trending",
-            "value": "趋势"
-        },
-        {
-            "name": "yt_feed_latest",
-            "value": "最新"
-        },
-        {
-            "name": "yt_feed_topics",
-            "value": "话题"
-        },
-        {
-            "name": "yt_suffix_videos",
-            "value": "视频"
-        },
-        {
-            "name": "yt_suffix_shorts",
-            "value": "短片"
-        },
-        {
-            "name": "yt_suffix_collections",
-            "value": "合集"
-        },
-        {
-            "name": "yt_suffix_live",
-            "value": "直播"
-        },
-        {
-            "name": "yt_suffix_music",
-            "value": "音乐"
-        },
-        {
-            "name": "yt_suffix_movies",
-            "value": "电影"
         },
         {
             "name": "yt_error_no_playable_stream",

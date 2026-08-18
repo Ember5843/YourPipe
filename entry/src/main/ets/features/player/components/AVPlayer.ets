@@ -16,7 +16,6 @@
 import { componentUtils, LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { ConfigurationConstant } from '@kit.AbilityKit';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
-import { commonEventManager } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
 import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
 import {
@@ -78,13 +77,6 @@ enum PlayerInteractionKind {
   MENU = 'menu'
 }
 
-interface MySurfaceRect {
-  offsetX: number;
-  offsetY: number;
-  surfaceWidth: number;
-  surfaceHeight: number;
-}
-
 @Preview
 @Component
 export struct VideoPlayer {
@@ -118,10 +110,7 @@ export struct VideoPlayer {
   @State surfaceHeight: number = CommonConstants.SURFACE_HEIGHT;
   @State containerWidthPX: number = 0;
   @State containerHeightPX: number = 0;
-  // 预计算的渲染矩形缓存，用于调试和性能优化
-  @State portraitRect: MySurfaceRect = { offsetX: 0, offsetY: 0, surfaceWidth: 0, surfaceHeight: 0 };
-  @State landscapeRect: MySurfaceRect = { offsetX: 0, offsetY: 0, surfaceWidth: 0, surfaceHeight: 0 };
-  
+
   @State trackThicknessSize: number = CommonConstants.TRACK_SIZE_MIN;
   @Link @Watch('onControllerChanged') controller: AvPlayerController;
   // ArkUI V1 的 @Track 不会穿透到嵌套 @Observed，因此 vm 必须由组件自己 @Link，
@@ -258,7 +247,6 @@ export struct VideoPlayer {
   @State isSliderDragging: boolean = false;
   @State sliderDragValue: number = 0;   // 拖动时的本地同步值，避免依赖异步的 currentTime
   private sliderTouchCanceled: boolean = false;
-  private sliderChangeDebounceTimer: number = -1; // Seek防抖定时器
   // UI auto-hide
   @State showControls: boolean = true;
   private controlsHideTimerId: number = -1;
@@ -292,8 +280,6 @@ export struct VideoPlayer {
   private cacheCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private cacheCanvasCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cacheCanvasSettings);
   private seekableRangesListener = () => { this.drawCacheRanges(); };
-  // 屏幕实件订阅者：监听 SCREEN_OFF / SCREEN_ON 以关闭/恢复视频输出
-  private screenEventSubscriber: commonEventManager.CommonEventSubscriber | null = null;
   @State showForwardHint: boolean = false;
   @State showBackwardHint: boolean = false;
   private forwardHintTimerId: number = -1;
@@ -313,56 +299,6 @@ export struct VideoPlayer {
   onRetry: () => void = () => {};
   onSurfaceReady?: (xc: XComponentController) => void;
 
-  /**
-   * 核心预计算逻辑：提前算出竖屏和横屏下的 Surface 渲染区域
-   */
-  private preCalculateRects(): void {
-    if (!this.curSource.width || !this.curSource.height) {
-      Logger.warn(TAG, 'Cannot pre-calculate: video dimensions missing');
-      return;
-    }
-    
-    const videoRatio = this.curSource.width / this.curSource.height;
-    const dw = AppStorage.get<number>('deviceWidth') || 0;
-    const dh = AppStorage.get<number>('deviceHeight') || 0;
-    
-    if (dw <= 0 || dh <= 0) {
-      Logger.warn(TAG, 'Cannot pre-calculate: device dimensions missing');
-      return;
-    }
-
-    // 1. 预计算竖屏 (假设当前宽度为短边)
-    const pW = Math.min(dw, dh);
-    const pH = pW / videoRatio; 
-    this.portraitRect = this.getFitRect(pW, pH, videoRatio);
-
-    // 2. 预计算横屏 (全屏，假设宽度为长边)
-    const lW = Math.max(dw, dh);
-    const lH = Math.min(dw, dh);
-    this.landscapeRect = this.getFitRect(lW, lH, videoRatio);
-    
-    Logger.debug(TAG, `DEBUG - Pre-calculated Portrait: ${JSON.stringify(this.portraitRect)}`);
-    Logger.debug(TAG, `DEBUG - Pre-calculated Landscape: ${JSON.stringify(this.landscapeRect)}`);
-  }
-
-  private getFitRect(cw: number, ch: number, vr: number): MySurfaceRect {
-    let sw = 0;
-    let sh = 0;
-    if (vr > (cw / ch)) {
-      sw = cw;
-      sh = cw / vr;
-    } else {
-      sh = ch;
-      sw = ch * vr;
-    }
-    return {
-      offsetX: Math.round((cw - sw) / 2),
-      offsetY: Math.round((ch - sh) / 2),
-      surfaceWidth: Math.round(sw),
-      surfaceHeight: Math.round(sh)
-    };
-  }
-
   onSourceChange(): void {
     this.resetTransientUi('source-change');
     // Source submission is owned exclusively by PlayerSession.play() ->
@@ -372,7 +308,6 @@ export struct VideoPlayer {
 
     this.syncPlaybackStateFromController();
 
-    this.preCalculateRects();
     this.calculateSurfaceSize();
   }
 
@@ -498,7 +433,6 @@ export struct VideoPlayer {
     // 初始化流状态
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
 
-    this.preCalculateRects();
     this.calculateSurfaceSize();
 
     // 确保播放引擎已初始化（不再需要传递 XComponentController）
@@ -643,10 +577,6 @@ export struct VideoPlayer {
     this.interactionEpoch++;
     this.clearHideTimer();
     this.clearTransientHintTimers();
-    if (this.sliderChangeDebounceTimer >= 0) {
-      clearTimeout(this.sliderChangeDebounceTimer);
-      this.sliderChangeDebounceTimer = -1;
-    }
     this.gestureMode = PlayerGestureMode.IDLE;
     this.activeInteraction = PlayerInteractionKind.NONE;
     this.isGestureSeek = false;
@@ -1871,11 +1801,6 @@ export struct VideoPlayer {
         // Moving期间仅更新UI，不发送seek命令
         break;
       case SliderChangeMode.End:
-        // 清除防抖定时器，立即发送最终seek
-        if (this.sliderChangeDebounceTimer >= 0) {
-          clearTimeout(this.sliderChangeDebounceTimer);
-          this.sliderChangeDebounceTimer = -1;
-        }
         // 使用快速seek模式（keyframe）提升响应速度
         if (!this.sliderTouchCanceled) {
           this.controller.syncSeekFast(value * 1000);
