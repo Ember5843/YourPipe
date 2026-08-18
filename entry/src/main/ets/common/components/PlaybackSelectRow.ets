@@ -53,7 +53,7 @@ export struct PlaybackSelectRow {
         .selectedOptionFont({ size: 14 })
         .selectedOptionFontColor(this.themePrimary)
         .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
-        .optionBgColor($r('app.color.yourtube_bg_surface'))
+        .optionBgColor(Color.Transparent)
         .optionFont({ size: 14 })
         .backgroundColor(Color.Transparent)
         .onSelect((index: number) => {
