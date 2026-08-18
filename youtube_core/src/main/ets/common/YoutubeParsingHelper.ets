@@ -117,24 +117,6 @@ export function getTextFromObject(obj: Record<string, Object> | undefined, retur
 }
 
 /**
- * Parse duration string in HH:MM:SS or MM:SS format.
- * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.parseDurationString
- */
-export function parseDurationString(text: string): number {
-  if (!text) {
-    return 0;
-  }
-  const parts = text.split(':').map(p => parseInt(p.trim(), 10) || 0);
-  if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  }
-  if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
-  }
-  return parts[0] || 0;
-}
-
-/**
  * Generate a Content Playback Nonce (CPN).
  * YouTube uses a 16-character base64url-like string.
  * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.generateContentPlaybackNonce

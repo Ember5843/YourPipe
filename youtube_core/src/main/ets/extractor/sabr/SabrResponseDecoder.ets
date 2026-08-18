@@ -1,4 +1,5 @@
 import { SabrProtocolException } from './SabrProtocolException';
+import { YTCoreLogger } from '../../common/YTCoreLogger';
 import {
   SabrContextSendingPolicy,
   SabrContextUpdate,
@@ -24,6 +25,8 @@ export const PART_RELOAD_PLAYER_RESPONSE = 46;
 export const PART_STREAM_PROTECTION_STATUS = 58;
 export const PART_SABR_CONTEXT_UPDATE = 57;
 export const PART_SABR_CONTEXT_SENDING_POLICY = 59;
+
+const logger = YTCoreLogger.getInstance('SabrResponseDecoder');
 
 class OpenMediaAssembly {
   header: SabrMediaHeader;
@@ -74,8 +77,6 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
             if (entry) {
               entry.chunks.push(media);
             }
-            const prev = decoded.mediaBytesByHeaderId.get(headerId) ?? 0;
-            decoded.mediaBytesByHeaderId.set(headerId, prev + media.length);
           }
           break;
         }
@@ -150,7 +151,7 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      decoded.integrityIssues.push(`part=${part.type} decode-failed: ${msg}`);
+      logger.warn(`[SABR-DECODE] part=${part.type} decode-failed: ${msg}`);
     }
   }
   return decoded;

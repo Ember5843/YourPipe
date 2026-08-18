@@ -23,11 +23,6 @@ const REGEX_PATTERNS: Record<string, Array<string>> = {
     'INNERTUBE_CONTEXT_CLIENT_VERSION":"([0-9\\.]+?)"',
     'innertube_context_client_version":"([0-9\\.]+?)"',
     'client.version=([0-9\\.]+)'
-  ],
-  "INNERTUBE_API_KEY_REGEXES": [
-    'INNERTUBE_API_KEY":"([^"]+)"',
-    'innertube_api_key":"([^"]+)"',
-    'INNERTUBE_API_KEY=\\\\\"([^\\\\\"]+)\\\\\"'
   ]
 };
 

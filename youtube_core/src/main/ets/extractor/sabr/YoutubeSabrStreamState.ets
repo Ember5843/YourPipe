@@ -341,10 +341,6 @@ export class YoutubeSabrStreamState {
     this.playerTimeMsOverride = ms;
   }
 
-  clearPlayerTimeMsOverride(): void {
-    this.playerTimeMsOverride = -1;
-  }
-
   getMinBufferedEndMs(): number {
     if (!this.isVideoEnabled()) {
       return this.audio.getBufferedEndMs();
@@ -422,32 +418,12 @@ export class YoutubeSabrStreamState {
     return this.enabledTrackTypesBitfield;
   }
 
-  setEnabledTrackTypesBitfield(value: number): void {
-    this.enabledTrackTypesBitfield = value;
-  }
-
-  setTrackModeAudioOnly(): void {
-    this.enabledTrackTypesBitfield = SABR_TRACK_AUDIO_ONLY;
-    this.selectAudioFormat = true;
-    this.selectVideoFormat = false;
-  }
-
-  setTrackModeVideoOnly(): void {
-    this.enabledTrackTypesBitfield = SABR_TRACK_VIDEO_ONLY;
-    this.selectAudioFormat = false;
-    this.selectVideoFormat = true;
-  }
-
-  setTrackModeBoth(): void {
-    this.enabledTrackTypesBitfield = SABR_TRACK_BOTH;
-    this.selectAudioFormat = true;
-    this.selectVideoFormat = true;
-  }
-
   getPlaybackRate(): number {
     return this.playbackRate;
   }
 
+  // DORMANT: 全仓零调用——倍速不下发到 UMP 请求（builder 读到的恒为 1.0）；
+  // 启用条件：对齐 PipePipe 倍速行为后由播放引擎接线调用。
   setPlaybackRate(rate: number): void {
     this.playbackRate = rate > 0 ? rate : 1.0;
   }

@@ -56,11 +56,7 @@ export class HttpError extends Error {
       return result;
     }
 
-    // 3xx - 重定向
-    if (responseCode >= 300 && responseCode < 400) {
-      const result: ErrorAnalysisResult = { errorType: HttpErrorType.REDIRECT, isRecoverable: true };
-      return result;
-    }
+    // 3xx 响应不会进入此分析（两处调用点都只在 responseCode >= 400 时构造 HttpError）。
 
     // 4xx - 客户端错误
     if (responseCode >= 400 && responseCode < 500) {
@@ -126,7 +122,6 @@ export class HttpError extends Error {
     const messages: Record<HttpErrorType, string> = {
       [HttpErrorType.NETWORK_ERROR]: 'Network connection failed, please check your network settings',
       [HttpErrorType.INFORMATIONAL]: 'Server response abnormal',
-      [HttpErrorType.REDIRECT]: 'Request was redirected',
       [HttpErrorType.BAD_REQUEST]: 'Bad request format',
       [HttpErrorType.FORBIDDEN]: 'Access denied (403), IP may be blocked or link expired',
       [HttpErrorType.NOT_FOUND]: 'Resource not found (404)',
@@ -151,10 +146,7 @@ export enum HttpErrorType {
   
   // 1xx - 信息性响应
   INFORMATIONAL = 'INFORMATIONAL',
-  
-  // 3xx - 重定向
-  REDIRECT = 'REDIRECT',
-  
+
   // 4xx - 客户端错误
   BAD_REQUEST = 'BAD_REQUEST',           // 400
   FORBIDDEN = 'FORBIDDEN',               // 401, 403

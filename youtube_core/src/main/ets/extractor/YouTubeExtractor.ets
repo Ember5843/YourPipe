@@ -3,9 +3,6 @@ import {
   fixThumbnailUrl,
   pickHighestThumbnailUrl,
   getTextFromObject,
-  parseDurationString,
-  generateContentPlaybackNonce,
-  generateTParameter,
   getNestedValue,
   parseMixedNumber,
   parseSubscriberCount,
@@ -16,9 +13,9 @@ import { AuthSessionManager } from '../auth/AuthSessionManager';
 import { http } from '@kit.NetworkKit';
 
 import { VideoInfo, ThumbnailInfo, ChapterInfo, SubtitleTrack, RelatedVideoInfo } from './VideoInfo';
-import { PlayerResponse, VideoDetails, PlayerMicroformatRenderer, ThumbnailItem, Chapter, TextRuns, StreamingData, Format, MimeTypeParseResult, AudioTrackInfo, Range, PlayabilityStatus, CaptionTrack, NextResponse, CompactVideoRenderer, VideoSecondaryInfoRenderer, VideoPrimaryInfoRenderer, LockupViewModel, NextResponseText } from './PlayerResponseTypes';
+import { PlayerResponse, VideoDetails, PlayerMicroformatRenderer, ThumbnailItem, Chapter, TextRuns, StreamingData, Format, AudioTrackInfo, PlayabilityStatus, CaptionTrack, NextResponse, CompactVideoRenderer, VideoSecondaryInfoRenderer, VideoPrimaryInfoRenderer, LockupViewModel, NextResponseText } from './PlayerResponseTypes';
 import { ClientsConstants } from '../model/ClientsConstants';
-import { StreamInfo, StreamRange, containSimilarStream } from './StreamInfo';
+import { StreamInfo, containSimilarStream } from './StreamInfo';
 import { DeliveryMethod } from '../model/DeliveryType';
 import { common } from '@kit.AbilityKit';
 import { ClientFetchContext, ClientFetchResult } from './clients/ClientTypes';
@@ -83,12 +80,6 @@ export interface InnertubePlayerResult {
   player: PlayerResponse | undefined;
   cpn: string | undefined;
   sourceClient: string | undefined;
-  /** @deprecated use player — kept for transitional call sites */
-  android: PlayerResponse | undefined;
-  /** @deprecated use player */
-  safari: PlayerResponse | undefined;
-  androidCpn: string | undefined;
-  safariCpn: string | undefined;
 }
 
 /** One failed InnerTube client fetch (for aggregated error reporting). */
@@ -254,9 +245,6 @@ export class YouTubeExtractor {
   // Process-level STS cache (watch HTML or remote latest-player).
   private static cachedSignatureTimestamp: number | undefined = undefined;
   private static cachedPlayerId: string | undefined = undefined;
-
-  // WEB desktop client version for metadata / next (PipePipe getClientVersion fallback).
-  private static cachedWebClientVersion: string | undefined = undefined;
 
   // Live HLS recovered via extra MWEB player (PipePipe mwebHlsManifestUrl).
   private mwebHlsManifestUrl: string = '';
@@ -750,7 +738,6 @@ export class YouTubeExtractor {
   private cachedAudioStreams: StreamInfo[] = [];
   private cachedVideoStreams: StreamInfo[] = [];
   private cachedVideoOnlyStreams: StreamInfo[] = [];
-  private streamsCachedVideoId: string = '';
   private cachedManifestNResult: ManifestNDecodeResult | null = null;
   private decoderPlayerId: string | null = null;
   private decoderPlayerJsUrl: string | null = null;
@@ -761,11 +748,6 @@ export class YouTubeExtractor {
   private configuredCpn: string | undefined;
   private configuredSourceClient: string | undefined;
   private cachedInnertubePlayers: InnertubePlayerResult | undefined;
-  // Transitional aliases used by older helpers
-  private safariStreamingData: StreamingData | undefined;
-  private androidStreamingData: StreamingData | undefined;
-  private safariCpn: string | undefined;
-  private androidCpn: string | undefined;
 
   // Aggregated errors across fetch stages (对齐 PipePipe YoutubeStreamExtractor.errors[]).
   // In allow surfacing root cause when all clients fail; otherwise final exception loses details.
@@ -785,27 +767,15 @@ export class YouTubeExtractor {
     this.cachedVideoStreams = [];
     this.cachedVideoOnlyStreams = [];
 
-    const primaryPr = innertubePlayers.player
-      ?? innertubePlayers.safari
-      ?? innertubePlayers.android;
+    const primaryPr = innertubePlayers.player;
     if (primaryPr?.playabilityStatus) {
       this.checkPlayabilityStatus(primaryPr.playabilityStatus);
     }
 
-    this.configuredStreamingData = primaryPr?.streamingData
-      ?? innertubePlayers.player?.streamingData
-      ?? innertubePlayers.safari?.streamingData
-      ?? innertubePlayers.android?.streamingData;
-    this.configuredCpn = innertubePlayers.cpn
-      ?? innertubePlayers.safariCpn
-      ?? innertubePlayers.androidCpn
-      ?? '';
+    this.configuredStreamingData = primaryPr?.streamingData;
+    this.configuredCpn = innertubePlayers.cpn ?? '';
     this.configuredSourceClient = innertubePlayers.sourceClient
       ?? YoutubePlayerClientConfig.getYoutubePlayerClient();
-    this.safariStreamingData = this.configuredStreamingData;
-    this.androidStreamingData = this.configuredStreamingData;
-    this.safariCpn = this.configuredCpn;
-    this.androidCpn = this.configuredCpn;
 
     const selectedClient = YoutubePlayerClientConfig.getYoutubePlayerClient();
     const isLive = this.resolveIsLive(metaPlayerResponse, primaryPr);
@@ -822,7 +792,6 @@ export class YouTubeExtractor {
       && hasSabrUrl) {
       const sabrBuilt = await this.buildSabrStreams(videoId, primaryPr, this.configuredCpn || '', selectedClient);
       if (sabrBuilt) {
-        this.streamsCachedVideoId = videoId;
         return;
       }
       logger.warn('[SABR] bootstrap build failed; falling through to adaptive/HLS');
@@ -854,8 +823,6 @@ export class YouTubeExtractor {
         + `serverAbr=${hasSabrUrl})`
       );
     }
-
-    this.streamsCachedVideoId = videoId;
   }
 
   /**
@@ -933,9 +900,11 @@ export class YouTubeExtractor {
   }
 
   /**
-   * PipePipe buildSabrStreams — reserved entry.
-   * Produces StreamInfo with DeliveryMethod.SABR + sabrInfo bootstrap.
-   * Full UMP session playback is not implemented yet; mediaservice will reject SABR until then.
+   * PipePipe buildSabrStreams.
+   * Produces StreamInfo with DeliveryMethod.SABR + sabrInfo bootstrap; the UMP
+   * session itself runs in mediaservice (YoutubeSabrSession lease + loopback
+   * DASH/range serve to MPV). Reached only when the selected client is mweb —
+   * an opt-in/debug selection (see YoutubePlayerClientConfig).
    */
   private async buildSabrStreams(
     videoId: string,
@@ -1209,7 +1178,7 @@ export class YouTubeExtractor {
   }
 
   private checkAggregatedErrors(players: InnertubePlayerResult): void {
-    const hasAnyPlayer = !!(players.player || players.android || players.safari);
+    const hasAnyPlayer = !!players.player;
     const hasAnyStream = this.cachedAudioStreams.length > 0
       || this.cachedVideoOnlyStreams.length > 0
       || this.cachedVideoStreams.length > 0;
@@ -1224,42 +1193,6 @@ export class YouTubeExtractor {
     throw new ContentNotSupportedException(
       `Stream player failed to return streams. ${parts.join(' | ')}`
     );
-  }
-
-  /** True when adaptiveFormats exist but none have progressive url/cipher (SABR-shaped). */
-  private isSabrOnlyResponse(players: InnertubePlayerResult): boolean {
-    const primarySd = players.player?.streamingData
-      ?? this.configuredStreamingData
-      ?? players.safari?.streamingData
-      ?? players.android?.streamingData;
-    if (!primarySd) {
-      return false;
-    }
-    if (primarySd.serverAbrStreamingUrl && primarySd.serverAbrStreamingUrl.length > 0) {
-      const adaptive = primarySd.adaptiveFormats;
-      if (!adaptive || adaptive.length === 0) {
-        return true;
-      }
-      for (const fmt of adaptive) {
-        if (fmt.url || fmt.signatureCipher || fmt.cipher) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return false;
-  }
-
-  getAudioStreams(): StreamInfo[] {
-    return this.cachedAudioStreams;
-  }
-
-  getVideoStreams(): StreamInfo[] {
-    return this.cachedVideoStreams;
-  }
-
-  getVideoOnlyStreams(): StreamInfo[] {
-    return this.cachedVideoOnlyStreams;
   }
 
   /**
@@ -1293,7 +1226,6 @@ export class YouTubeExtractor {
       + `oauthOnly=${hasOauth}`);
 
     // Stream process cache disabled: always re-hit stream /player (align with fresh extract).
-    this.streamsCachedVideoId = '';
     this.cachedAudioStreams = [];
     this.cachedVideoStreams = [];
     this.cachedVideoOnlyStreams = [];
@@ -1610,18 +1542,6 @@ export class YouTubeExtractor {
       || message.indexOf('player version') >= 0;
   }
 
-  private emptyInnertubeResult(selectedClient: YoutubePlayerClientKey): InnertubePlayerResult {
-    return {
-      player: undefined,
-      cpn: undefined,
-      sourceClient: selectedClient,
-      android: undefined,
-      safari: undefined,
-      androidCpn: undefined,
-      safariCpn: undefined
-    };
-  }
-
   async fetchPlaybackExtras(videoId: string, playerResponse?: PlayerResponse): Promise<VideoInfo> {
     logger.info(`Fetching playback extras for: ${videoId}`);
     const startedAt = Date.now();
@@ -1656,39 +1576,6 @@ export class YouTubeExtractor {
     logger.info(`[TIMING] video=${videoId} stage=backgroundEnrichment elapsed=${Date.now() - startedAt}ms totalSinceStart=${task ? Date.now() - task.startedAt : -1}ms`);
 
     return baseInfo;
-  }
-
-  private parseRange(range: Range | undefined): StreamRange | undefined {
-    if (!range || !range.start || !range.end) return undefined;
-    const start = parseInt(range.start, 10);
-    const end = parseInt(range.end, 10);
-    if (isNaN(start) || isNaN(end)) return undefined;
-    return { start, end };
-  }
-
-  private splitMimeType(mimeType: string | undefined): MimeTypeParseResult {
-    const result: MimeTypeParseResult = { container: undefined, codecs: undefined };
-    if (!mimeType) return result;
-    const parts = mimeType.split(';');
-    result.container = parts[0]?.trim();
-    for (let i = 1; i < parts.length; i++) {
-      const part = parts[i].trim();
-      if (part.startsWith('codecs=')) {
-        result.codecs = part.substring(7).replace(/"/g, '');
-        break;
-      }
-    }
-    return result;
-  }
-
-  private extractCodecFromMimeType(mimeType: string | undefined): string | undefined {
-    if (!mimeType) return undefined;
-    const parts = mimeType.split(';');
-    for (let i = 1; i < parts.length; i++) {
-      const part = parts[i].trim();
-      if (part.startsWith('codecs=')) return part.substring(7).replace(/"/g, '');
-    }
-    return undefined;
   }
 
   /**
@@ -1791,14 +1678,7 @@ export class YouTubeExtractor {
       return undefined;
     }
     const value = raw.trim().toLowerCase();
-    if (value.length === 0) {
-      return undefined;
-    }
-    if (value === 'original' || value === 'dubbed' || value === 'dubbed-auto'
-      || value === 'descriptive' || value === 'secondary') {
-      return value;
-    }
-    return value;
+    return value.length > 0 ? value : undefined;
   }
 
   /** Base64 / base64url decode (same approach as SabrProto.decodeBase64ToBytes). */
@@ -1934,11 +1814,6 @@ export class YouTubeExtractor {
     return undefined;
   }
 
-  private appendQueryParam(url: string, key: string, value: string): string {
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}${key}=${encodeURIComponent(value)}`;
-  }
-
   private parseCipherParams(cipherText: string): Map<string, string> {
     const normalized = cipherText.replace(/\\u0026/g, '&');
     const params = new Map<string, string>();
@@ -1965,7 +1840,6 @@ export class YouTubeExtractor {
   }
 
   clearCache(): void {
-    this.streamsCachedVideoId = '';
     this.cachedAudioStreams = [];
     this.cachedVideoStreams = [];
     this.cachedVideoOnlyStreams = [];
@@ -1977,10 +1851,6 @@ export class YouTubeExtractor {
     this.configuredStreamingData = undefined;
     this.configuredCpn = undefined;
     this.configuredSourceClient = undefined;
-    this.safariStreamingData = undefined;
-    this.androidStreamingData = undefined;
-    this.safariCpn = undefined;
-    this.androidCpn = undefined;
     this.mwebHlsManifestUrl = '';
     this.playbackEnrichmentTasks.clear();
     // 注意：cachedSignatureTimestamp 是进程级 STS 缓存，不在此清空，复用提速
@@ -2067,14 +1937,6 @@ export class YouTubeExtractor {
     return normalized;
   }
 
-  private randomCpn(): string {
-    return generateContentPlaybackNonce();
-  }
-
-  private randomTParameter(): string {
-    return generateTParameter();
-  }
-
   /**
    * Extract player metadata (STS / playerId) from the watch HTML ytcfg, update the
    * process-level cache, and feed the decoder. Synchronous — no network.
@@ -2145,11 +2007,7 @@ export class YouTubeExtractor {
     const empty: InnertubePlayerResult = {
       player: undefined,
       cpn: undefined,
-      sourceClient: selectedClient,
-      android: undefined,
-      safari: undefined,
-      androidCpn: undefined,
-      safariCpn: undefined
+      sourceClient: selectedClient
     };
     logger.info(`[STREAM] fetchSelectedStreamPlayer client=${selectedClient} sts=${sts ?? '(none)'} `
       + `webAuth=${useWebAuth} tvAuth=${useTvAuth}`);
@@ -2172,16 +2030,10 @@ export class YouTubeExtractor {
           new Error('stream player returned no playerResponse')));
         return empty;
       }
-      // Keep legacy aliases pointing at the same response for caption scoring helpers.
-      const isSafariLike = selectedClient === 'web_safari' || selectedClient === 'mweb';
       return {
         player: fetched.playerResponse,
         cpn: fetched.cpn,
-        sourceClient: selectedClient,
-        android: isSafariLike ? undefined : fetched.playerResponse,
-        safari: isSafariLike ? fetched.playerResponse : undefined,
-        androidCpn: isSafariLike ? undefined : fetched.cpn,
-        safariCpn: isSafariLike ? fetched.cpn : undefined
+        sourceClient: selectedClient
       };
     } catch (e) {
       this.errors.push(new ExtractorStageError(selectedClient, e as Error));
@@ -2195,16 +2047,12 @@ export class YouTubeExtractor {
    * Process cache via WebClientVersionResolver; sync fallback is hardcoded only.
    */
   private getWebClientVersion(): string {
-    const resolved = WebClientVersionResolver.getCachedOrHardcoded();
-    YouTubeExtractor.cachedWebClientVersion = resolved;
-    return resolved;
+    return WebClientVersionResolver.getCachedOrHardcoded();
   }
 
   /** Resolve dynamic WEB version once per process (sw.js → results → hardcoded). */
   private async ensureWebClientVersion(): Promise<string> {
-    const version = await WebClientVersionResolver.getClientVersion(this.client);
-    YouTubeExtractor.cachedWebClientVersion = version;
-    return version;
+    return await WebClientVersionResolver.getClientVersion(this.client);
   }
 
   /**
@@ -2255,14 +2103,6 @@ export class YouTubeExtractor {
       'Origin': 'https://www.youtube.com',
       'Referer': 'https://www.youtube.com/'
     };
-  }
-
-  /**
-   * Stream player / SABR may attach Cookie (web) or Bearer (tv).
-   * Prefer hasAuthForPlaybackRequests for stream path only.
-   */
-  private hasCookieAuthForRequests(): boolean {
-    return this.hasAuthForPlaybackRequests();
   }
 
   /** Any playback rail (Cookie/WEB or OAuth/TV) with toggles on. */
@@ -2316,8 +2156,6 @@ export class YouTubeExtractor {
         return undefined;
       }
       const pr = JSON.parse(resp.result as string) as PlayerResponse;
-      // Cache client version if response tracking carries a fresher one (best-effort).
-      YouTubeExtractor.cachedWebClientVersion = this.getWebClientVersion();
       logger.info(`[META] WEB metadata player ok status=${pr.playabilityStatus?.status || '(none)'} `
         + `hasMicro=${!!pr.microformat} hasDetails=${!!pr.videoDetails}`);
       return pr;
@@ -2728,8 +2566,6 @@ export class YouTubeExtractor {
         pr: innertubePlayers.player
       });
     }
-    if (innertubePlayers.safari) candidates.push({ source: 'safari', pr: innertubePlayers.safari });
-    if (innertubePlayers.android) candidates.push({ source: 'android', pr: innertubePlayers.android });
     candidates.push({ source: 'watch', pr: watchPlayerResponse });
 
     const sourceWeight: Record<string, number> = {
@@ -2739,8 +2575,6 @@ export class YouTubeExtractor {
       'visionos': 6,
       'android_vr': 6,
       'tv_downgraded': 6,
-      'safari': 4,
-      'android': 4,
       'watch': 1
     };
 
@@ -3528,12 +3362,11 @@ export class YouTubeExtractor {
   }
 
   private getHlsManifestUrlFromStreamingData(): string {
-    for (const sd of [this.configuredStreamingData, this.safariStreamingData, this.androidStreamingData]) {
-      if (sd && sd.hlsManifestUrl) {
-        return sd.hlsManifestUrl.includes('?')
-          ? sd.hlsManifestUrl + '&mpd_version=7'
-          : sd.hlsManifestUrl + '?mpd_version=7';
-      }
+    const sd = this.configuredStreamingData;
+    if (sd && sd.hlsManifestUrl) {
+      return sd.hlsManifestUrl.includes('?')
+        ? sd.hlsManifestUrl + '&mpd_version=7'
+        : sd.hlsManifestUrl + '?mpd_version=7';
     }
     if (this.mwebHlsManifestUrl && this.mwebHlsManifestUrl.length > 0) {
       return this.mwebHlsManifestUrl.includes('?')

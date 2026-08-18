@@ -610,6 +610,8 @@ export class YoutubeSabrSession {
       headers['Origin'] = 'https://www.youtube.com';
       headers['Referer'] = 'https://www.youtube.com/';
     } else {
+      // DORMANT: 当前不可达——SabrClientProfileKey 只有 'mweb' | 'web'，webLike 恒为 true；
+      // 启用条件：为将来非 web profile（PipePipe 非 web UMP 头形状）预留，新增 profile 时生效。
       headers['Accept'] = 'application/vnd.yt-ump';
       headers['Accept-Encoding'] = 'identity';
       if (this.info.visitorData) {

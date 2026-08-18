@@ -180,5 +180,4 @@ export class ClientsConstants {
   static readonly YOUTUBEI_V1_URL: string = "https://www.youtube.com/youtubei/v1/";
   /** PipePipe YOUTUBEI_V1_GAPIS_URL — non-web clients (e.g. VISIONOS) player endpoint. */
   static readonly YOUTUBEI_V1_GAPIS_URL: string = "https://youtubei.googleapis.com/youtubei/v1/";
-  static readonly INNERTUBE_API_KEY: string = "AIzaSyBw-K-P3oV_O6m13v7C-C0p8n5v9m6o7p4";
 }

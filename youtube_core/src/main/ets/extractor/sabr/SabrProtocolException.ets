@@ -14,10 +14,3 @@ export class SabrProtocolException extends Error {
     this.kind = kind;
   }
 }
-
-export class SabrRecoverableException extends SabrProtocolException {
-  constructor(message: string, kind: SabrErrorKind = 'protocol') {
-    super(message, kind);
-    this.name = 'SabrRecoverableException';
-  }
-}

@@ -110,12 +110,6 @@ export class SabrMediaHeader {
     }
     return header;
   }
-
-  summarize(): string {
-    return `headerId=${this.headerId} itag=${this.itag} init=${this.initSegment} `
-      + `seq=${this.sequenceNumber} startMs=${this.startMs} durMs=${this.durationMs} `
-      + `len=${this.contentLength}`;
-  }
 }
 
 class FormatId {

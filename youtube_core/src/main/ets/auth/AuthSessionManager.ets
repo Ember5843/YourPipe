@@ -404,21 +404,6 @@ export class AuthSessionManager {
     return this.hasCredential();
   }
 
-  /**
-   * Legacy mixed header: WEB SAPISIDHASH preferred, else Bearer.
-   * Prefer getWebAuthorizationHeader / getTvAuthorizationHeader at call sites.
-   */
-  async getAuthorizationHeader(): Promise<string | undefined> {
-    if (!this.authEnabled) {
-      return undefined;
-    }
-    const web = await this.getWebAuthorizationHeader();
-    if (web) {
-      return web;
-    }
-    return await this.getTvAuthorizationHeader();
-  }
-
   /** Cookie rail only: SAPISIDHASH … */
   async getWebAuthorizationHeader(): Promise<string | undefined> {
     if (!this.authEnabled) {
@@ -536,27 +521,6 @@ export class AuthSessionManager {
     }
     if (this.cookieCredential && this.cookieCredential.cookies.length > 0) {
       return this.cookieCredential.cookies;
-    }
-    return undefined;
-  }
-
-  getPotToken(): string | undefined {
-    if (!this.authEnabled) {
-      return undefined;
-    }
-    if (this.cookieCredential && this.cookieCredential.potToken.length > 0) {
-      return this.cookieCredential.potToken;
-    }
-    return undefined;
-  }
-
-  /** PoToken for playback extraction; respects fine-grained toggle. */
-  getPotTokenForPlayback(): string | undefined {
-    if (!this.isAuthEnabledForPlayback()) {
-      return undefined;
-    }
-    if (this.cookieCredential && this.cookieCredential.potToken.length > 0) {
-      return this.cookieCredential.potToken;
     }
     return undefined;
   }

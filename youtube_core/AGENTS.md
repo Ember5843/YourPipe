@@ -105,9 +105,13 @@ youtube_core/src/main/
    - **product default follows PipePipe**: guest → `visionos` (pot-free,
      POSTs the GAPIS endpoint `youtubei.googleapis.com`, no sts/pot), signed-in →
      `tv_downgraded` (entry calls `resetToAuthDefault`/`applyAuthDefault`);
-     both resolve to direct adaptiveFormats URLs. `android_vr` is a guest
-     fallback that requires a session pot. `mweb` (SABR) is an
-     opt-in/debug selection only
+     both resolve to direct adaptiveFormats URLs. The product is locked to
+     these two defaults; `mweb` (SABR), `web_safari`, and `android_vr`
+     (guest fallback, requires a session pot) are debug-only selections —
+     `setYoutubePlayerClient` / `allowedClients` are DORMANT (zero callers,
+     no selection UI). An explicit pin survives per-extraction
+     `applyAuthDefault` (no-op once set); `resetToAuthDefault` clears the pin
+     on auth-state changes.
    - `tv_downgraded` + Bearer doubles as the **restricted / OAuth recovery**
      path (skipped when the selected client already is tv_downgraded)
 3. **Critical path only** (`extractVideoStreams`):

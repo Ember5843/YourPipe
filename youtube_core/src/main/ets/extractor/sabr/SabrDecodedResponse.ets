@@ -18,10 +18,6 @@ export class SabrNextRequestPolicy {
 
 export class SabrRedirectInfo {
   url?: string;
-
-  summarize(): string {
-    return `urlLen=${this.url?.length ?? 0}`;
-  }
 }
 
 export class SabrContextUpdate {
@@ -34,10 +30,6 @@ export class SabrContextUpdate {
   toStreamerContextProtoBytes(writeMessage: (type: number, value: Uint8Array) => Uint8Array): Uint8Array {
     return writeMessage(this.type, this.value);
   }
-
-  summarize(): string {
-    return `type=${this.type} scope=${this.scope} valueLen=${this.value.length} send=${this.sendByDefault}`;
-  }
 }
 
 export class SabrContextSendingPolicy {
@@ -45,10 +37,6 @@ export class SabrContextSendingPolicy {
   durationMs: number = -1;
   types: number[] = [];
   disposeTypes: number[] = [];
-
-  summarize(): string {
-    return `types=${this.types.join(',')} dispose=${this.disposeTypes.join(',')}`;
-  }
 }
 
 export class SabrFormatInitMeta {
@@ -66,17 +54,11 @@ export class SabrFormatInitMeta {
   field8: number = -1;
   durationUnits: number = -1;
   durationTimescale: number = -1;
-
-  summarize(): string {
-    return `itag=${this.itag} endMs=${this.endTimeMs} endSeq=${this.endSegmentNumber} `
-      + `duration=${this.durationUnits}/${this.durationTimescale}`;
-  }
 }
 
 export class SabrDecodedResponse {
   mediaHeaders: SabrMediaHeader[] = [];
   mediaEndHeaderIds: number[] = [];
-  mediaBytesByHeaderId: Map<number, number> = new Map();
   nextRequestPolicy?: SabrNextRequestPolicy;
   redirectUrl?: string;
   sabrError?: string;
@@ -90,12 +72,10 @@ export class SabrDecodedResponse {
   formatInitializationMetadata: SabrFormatInitMeta[] = [];
   backoffTimeMs: number = -1;
   unknownPartTypes: number[] = [];
-  integrityIssues: string[] = [];
   segments: SabrMediaSegment[] = [];
 
   hasMedia(): boolean {
-    return this.mediaHeaders.length > 0 || this.mediaBytesByHeaderId.size > 0
-      || this.segments.length > 0;
+    return this.mediaHeaders.length > 0 || this.segments.length > 0;
   }
 
   isNoMediaResponse(): boolean {
@@ -110,10 +90,6 @@ export class SabrDecodedResponse {
     return this.isNoMediaResponse() && this.streamProtectionStatus >= 2;
   }
 
-  isProtectedNoMediaResponse(): boolean {
-    return this.isNoMediaResponse() && this.streamProtectionStatus >= 3;
-  }
-
   /** Stream protection pending (status==2): server asks for attestation progress. */
   isAttestationPending(): boolean {
     return this.streamProtectionStatus === 2;
@@ -122,21 +98,6 @@ export class SabrDecodedResponse {
   /** Stream protection required (status>=3): hard boundary, no local retry helps. */
   isAttestationRequired(): boolean {
     return this.streamProtectionStatus >= 3;
-  }
-
-  getIntegrityIssues(): string[] {
-    const issues: string[] = [];
-    for (const header of this.mediaHeaders) {
-      const bytes = this.mediaBytesByHeaderId.get(header.headerId) ?? 0;
-      if (bytes <= 0 && !this.mediaEndHeaderIds.includes(header.headerId)) {
-        // header observed without media end is ok if segment assembled separately
-        continue;
-      }
-      if (header.contentLength > 0 && bytes > 0 && bytes < header.contentLength) {
-        issues.push(`incomplete-media headerId=${header.headerId} got=${bytes} want=${header.contentLength}`);
-      }
-    }
-    return issues.concat(this.integrityIssues);
   }
 
   summarizeNoMediaResponse(): string {
