@@ -38,6 +38,12 @@ export interface VideoEntry {
   stream: StreamInfo;
 }
 
+/** classifyStreamList 的返回：分类结果 + 播放路径用的合并视频列表。 */
+export interface StreamClassification {
+  categories: StreamCategories;
+  mergedVideoList: VideoEntry[];
+}
+
 export interface AudioTrackOption {
   trackId: string;
   label: string;
@@ -149,18 +155,19 @@ export class PlayerModel {
   constructor() {}
 
   /**
-   * 获取流的友好质量显示名称
+   * 获取流的友好质量显示名称。
+   * 权威来源是 extractor 填充的 quality（youtube_core ItagItem.qualityLabel，
+   * 经 YouTubePlayService.mapToPlayerStreams 映射）；ITAG_MAP 仅作为
+   * 未携带 quality 字段的流的兜底，不再参与正常路径。
    */
   public static getFriendlyQuality(stream: StreamInfo): string {
-    const itagMeta = stream.itag ? ITAG_MAP[stream.itag] : undefined;
-    let baseQuality = 'Unknown';
-    
-    if (itagMeta) {
-      baseQuality = itagMeta.quality;
-    } else if (stream.audioQuality) {
+    let baseQuality = stream.quality || stream.videoQuality || '';
+    if (!baseQuality && stream.audioQuality) {
       baseQuality = stream.audioQuality.replace('AUDIO_QUALITY_', '').toLowerCase();
-    } else {
-      baseQuality = stream.videoQuality || stream.quality || 'Unknown';
+    }
+    if (!baseQuality) {
+      const itagMeta = stream.itag ? ITAG_MAP[stream.itag] : undefined;
+      baseQuality = itagMeta ? itagMeta.quality : 'Unknown';
     }
 
     let result = baseQuality;
@@ -175,16 +182,36 @@ export class PlayerModel {
     return stream.itag ? `${result} [${stream.itag}]` : result;
   }
 
-  public classifyStreams(streams: StreamInfo[], preferredLanguage?: string, audioMaxBitrate?: number): void {
-    this.categorizedStreams = {
+  /** SABR 流判定唯一实现（播放 / 下载 / 离线共用）。 */
+  public static isSabrStream(stream?: StreamInfo | null): boolean {
+    if (!stream) {
+      return false;
+    }
+    const delivery = (stream.deliveryMethod || '').toUpperCase();
+    const kind = (stream.kind || '').toLowerCase();
+    return delivery === 'SABR' || kind === 'sabr' || !!stream.sabrInfo?.serverAbrStreamingUrl;
+  }
+
+  /**
+   * 流分类的唯一实现：播放路径（classifyStreams）与下载路径（entry
+   * VideoDetails / DownloadDialog）共用。规则：
+   * - manifest（kind=manifest_hls/manifest_dash，或 HLS delivery 且无视频）是
+   *   控制资源，不进媒体列表；
+   * - 无 sabrInfo 引导的 SABR 残桩直接丢弃；
+   * - requirePlayableUrl=true（下载路径）时，既非 SABR 又无媒体 URL 的流不可
+   *   下载，丢弃；
+   * - 其余按 extractor 显式字段 hasVideo/hasAudio 分类，老响应回退到 kind。
+   * 保持响应顺序；需要排序的调用方自行排序。
+   */
+  public static classifyStreamList(streams: StreamInfo[], requirePlayableUrl: boolean = false): StreamClassification {
+    const categories: StreamCategories = {
       audio: [],
       video: [],
       dashManifest: [],
       hlsManifest: [],
       progressive: []
     };
-
-    this.mergedVideoList = [];
+    const mergedVideoList: VideoEntry[] = [];
 
     streams.forEach((stream: StreamInfo) => {
       const kind = stream.kind?.toLowerCase() || '';
@@ -192,47 +219,57 @@ export class PlayerModel {
 
       // Manifests are control resources, not selectable media entries.
       if (kind === 'manifest_hls' || (delivery === 'HLS' && !stream.hasVideo)) {
-        this.categorizedStreams.hlsManifest.push(stream);
+        categories.hlsManifest.push(stream);
         return;
       }
       if (kind === 'manifest_dash') {
-        this.categorizedStreams.dashManifest.push(stream);
+        categories.dashManifest.push(stream);
         return;
       }
 
       // SABR stubs without bootstrap cannot be played.
-      if (kind === 'sabr' || delivery === 'SABR') {
+      if (PlayerModel.isSabrStream(stream)) {
         if (!stream.sabrInfo || !stream.sabrInfo.serverAbrStreamingUrl) {
           return;
         }
+      } else if (requirePlayableUrl && !stream.url) {
+        return;
       }
 
       // Classify only with fields explicitly returned by the extractor.
       if (stream.hasVideo === true) {
         if (stream.hasAudio === true) {
-          this.categorizedStreams.progressive.push(stream);
+          categories.progressive.push(stream);
         } else {
-          this.categorizedStreams.video.push(stream);
+          categories.video.push(stream);
         }
-        this.mergedVideoList.push({ stream } as VideoEntry);
+        mergedVideoList.push({ stream } as VideoEntry);
         return;
       }
       if (stream.hasAudio === true) {
-        this.categorizedStreams.audio.push(stream);
+        categories.audio.push(stream);
         return;
       }
 
       // Older responses may omit hasVideo/hasAudio but still provide an explicit kind.
       if (kind === 'progressive') {
-        this.categorizedStreams.progressive.push(stream);
-        this.mergedVideoList.push({ stream } as VideoEntry);
+        categories.progressive.push(stream);
+        mergedVideoList.push({ stream } as VideoEntry);
       } else if (kind === 'video_only') {
-        this.categorizedStreams.video.push(stream);
-        this.mergedVideoList.push({ stream } as VideoEntry);
+        categories.video.push(stream);
+        mergedVideoList.push({ stream } as VideoEntry);
       } else if (kind === 'audio_only') {
-        this.categorizedStreams.audio.push(stream);
+        categories.audio.push(stream);
       }
     });
+
+    return { categories, mergedVideoList };
+  }
+
+  public classifyStreams(streams: StreamInfo[], preferredLanguage?: string, audioMaxBitrate?: number): void {
+    const classification = PlayerModel.classifyStreamList(streams);
+    this.categorizedStreams = classification.categories;
+    this.mergedVideoList = classification.mergedVideoList;
 
 // UI lists intentionally preserve response order.
     // The user's preferred audio language is honoured in

@@ -12,7 +12,7 @@ export {
 } from './src/main/ets/sabr/SabrOfflineDownloader';
 export { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './src/main/ets/engine/PlaybackEngine';
 export { VideoHwCaps } from './src/main/ets/engine/VideoHwCaps';
-export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry, AudioTrackOption } from './src/main/ets/model/PlayerModel';
+export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry, AudioTrackOption, StreamClassification } from './src/main/ets/model/PlayerModel';
 // AudioTrackOption kept for compatibility; UI now lists StreamInfo via getAudioStreamList.
 export { VideoData, StreamInfo, SelectOption } from './src/main/ets/model/VideoData';
 export { ChapterInfo, SubtitleTrack } from 'youtube_core';

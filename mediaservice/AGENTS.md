@@ -14,7 +14,8 @@
   — offline SABR download (used by entry `DownloadManager`).
 - `PlaybackEngine` (interface), `PlaybackEngineState`, `PlaybackState`,
   `PlaybackErrorCategory`, `EngineConfig` — engine contract types.
-- `VideoHwCaps` — device HW decoder capability snapshot.
+- `VideoHwCaps` — device HW decoder capability snapshot + hwdec-codecs
+  whitelist passthrough (value owned by native `getHwdecCodecsWhitelist`).
 - `PlayerState`, `isValidTransition`, `describeState`, `PlayerStateMachine`,
   `StateChangeListener`, `PlayerUiViewModel`.
 - `PlaybackPreferences`, `PlaybackPreferencesSnapshot`, `PlaybackPreferencesProvider`.

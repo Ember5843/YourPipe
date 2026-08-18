@@ -5,6 +5,7 @@ import {
 } from 'youtube_core';
 import Logger from '../utils/Logger';
 import { StreamInfo } from '../model/VideoData';
+import { PlayerModel } from '../model/PlayerModel';
 import { SabrLease, sabrSessionStore } from './SabrSessionStore';
 import { SabrTrackBuffer } from './SabrTrackBuffer';
 
@@ -42,10 +43,7 @@ export interface SabrOfflineDownloadOptions {
  */
 export class SabrOfflineDownloader {
   static isSabrStream(stream?: StreamInfo | null): boolean {
-    if (!stream) return false;
-    const delivery = (stream.deliveryMethod || '').toUpperCase();
-    const kind = (stream.kind || '').toLowerCase();
-    return delivery === 'SABR' || kind === 'sabr' || !!stream.sabrInfo?.serverAbrStreamingUrl;
+    return PlayerModel.isSabrStream(stream);
   }
 
   static async downloadTracks(options: SabrOfflineDownloadOptions): Promise<void> {

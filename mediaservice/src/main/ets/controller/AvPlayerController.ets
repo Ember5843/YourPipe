@@ -21,17 +21,11 @@ import { PlayerUiViewModel } from '../state/PlayerUiViewModel';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
-import { HttpDownloader } from 'youtube_core';
+import { HttpDownloader, parseHlsMasterManifest } from 'youtube_core';
 
 export interface NativeLogBridgeFns {
   start: () => void;
   stop: () => void;
-}
-
-interface HlsVariant {
-  url: string;
-  height: number;
-  bandwidth: number;
 }
 
 const TAG: string = '[PlayerLog][AvPlayerController]';
@@ -995,17 +989,8 @@ export class AvPlayerController {
   }
 
   private resolveMaxHeight(targetQuality: string): number {
-    const cap: Record<string, number> = {
-      'best': 9999,
-      '1080p': 1080,
-      '720p': 720,
-      '480p': 480,
-      '360p': 360,
-      '240p': 240,
-      '144p': 144
-    };
-    const requested = cap[targetQuality] ?? 9999;
-    return requested;
+    const m = /^(\d+)p/.exec(targetQuality);
+    return m ? parseInt(m[1], 10) : 9999;
   }
 
   /**
@@ -1397,17 +1382,19 @@ export class AvPlayerController {
       if (!text.includes('#EXT-X-STREAM-INF')) {
         return url;
       }
-      const variants = this.parseHlsVariants(text, url);
+      // HLS 解析统一走 youtube_core HlsManifestParser（本类只保留 HTTP 拉取，
+      // 网络层归收到 youtube_core 属后续 P4 项）。
+      const variants = parseHlsMasterManifest(text, this.curSource?.videoId || '')
+        .videoStreams.filter((s) => !!s.url);
       if (variants.length === 0) {
         return url;
       }
       const prefs = PlaybackPreferences.snapshot();
       const maxHeight = this.resolveMaxHeight(prefs.mobileQuality || '480p');
       const selected = variants
-        .filter(v => (v.height || 0) <= maxHeight)
-        .sort((a: HlsVariant, b: HlsVariant): number => (b.height || 0) - (a.height || 0) ||
-          (b.bandwidth || 0) - (a.bandwidth || 0))[0]
-        || variants.sort((a: HlsVariant, b: HlsVariant): number => (a.height || 0) - (b.height || 0))[0];
+        .filter((s) => (s.height || 0) <= maxHeight)
+        .sort((a, b) => (b.height || 0) - (a.height || 0))[0]
+        || variants.sort((a, b) => (a.height || 0) - (b.height || 0))[0];
       Logger.info(TAG, `Selected HLS live variant: ${selected.height || 0}p ${this.describePlaybackUrl(selected.url)}`);
       return selected.url;
     } catch (e) {
@@ -1439,54 +1426,6 @@ export class AvPlayerController {
     } finally {
       request.destroy();
     }
-  }
-
-  private parseHlsVariants(text: string, baseUrl: string): HlsVariant[] {
-    const lines = text.split(/\r?\n/);
-    const variants: HlsVariant[] = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line.startsWith('#EXT-X-STREAM-INF')) continue;
-      const next = this.nextHlsUri(lines, i + 1);
-      if (!next) continue;
-      variants.push({
-        url: this.resolveUrl(baseUrl, next),
-        height: this.extractHlsHeight(line),
-        bandwidth: this.extractHlsNumber(line, 'BANDWIDTH')
-      });
-    }
-    return variants;
-  }
-
-  private nextHlsUri(lines: string[], start: number): string {
-    for (let i = start; i < lines.length; i++) {
-      const value = lines[i].trim();
-      if (!value || value.startsWith('#')) continue;
-      return value;
-    }
-    return '';
-  }
-
-  private extractHlsHeight(line: string): number {
-    const match = line.match(/RESOLUTION=\d+x(\d+)/i);
-    return match ? Number(match[1]) : 0;
-  }
-
-  private extractHlsNumber(line: string, key: string): number {
-    const match = line.match(new RegExp(`${key}=(\\d+)`, 'i'));
-    return match ? Number(match[1]) : 0;
-  }
-
-  private resolveUrl(baseUrl: string, uri: string): string {
-    if (/^https?:\/\//i.test(uri)) return uri;
-    const queryIndex = baseUrl.indexOf('?');
-    const cleanBase = queryIndex >= 0 ? baseUrl.substring(0, queryIndex) : baseUrl;
-    if (uri.startsWith('/')) {
-      const origin = cleanBase.match(/^(https?:\/\/[^/]+)/i);
-      return origin ? origin[1] + uri : uri;
-    }
-    const slash = cleanBase.lastIndexOf('/');
-    return slash >= 0 ? cleanBase.substring(0, slash + 1) + uri : uri;
   }
 
   private isSeparatedDash(videoStream: StreamInfo, audioStream?: StreamInfo): boolean {

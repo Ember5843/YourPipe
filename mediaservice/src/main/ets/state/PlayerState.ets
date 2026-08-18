@@ -21,7 +21,7 @@ export enum PlayerState {
   ERROR = 'error'
 }
 
-const VALID_TRANSITIONS: Map<PlayerState, PlayerState[]> = new Map([
+export const VALID_TRANSITIONS: Map<PlayerState, PlayerState[]> = new Map([
   [PlayerState.IDLE,           [PlayerState.INITIALIZING, PlayerState.RELEASED]],
   [PlayerState.INITIALIZING,   [PlayerState.LOADING, PlayerState.READY, PlayerState.IDLE, PlayerState.ERROR, PlayerState.RELEASED]],
   [PlayerState.LOADING,        [PlayerState.READY, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED]],

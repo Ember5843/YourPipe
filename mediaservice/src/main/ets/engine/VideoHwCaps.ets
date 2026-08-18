@@ -1,4 +1,4 @@
-import { probeVideoHwDecoders, VideoHwDecoderCaps } from '@yourpipe/libmpv-napi';
+import { probeVideoHwDecoders, getHwdecCodecsWhitelist, VideoHwDecoderCaps } from '@yourpipe/libmpv-napi';
 import Logger from '../utils/Logger';
 
 const TAG: string = '[PlayerLog][VideoHwCaps]';
@@ -9,6 +9,7 @@ const TAG: string = '[PlayerLog][VideoHwCaps]';
  */
 export class VideoHwCaps {
   private static cached: VideoHwDecoderCaps | null = null;
+  private static cachedWhitelist: string | null = null;
 
   static get(): VideoHwDecoderCaps {
     if (VideoHwCaps.cached !== null) {
@@ -33,6 +34,30 @@ export class VideoHwCaps {
       };
       VideoHwCaps.cached = fallback;
       return fallback;
+    }
+  }
+
+  /**
+   * hwdec-codecs whitelist for mpv, passthrough of the native probe-derived
+   * value (native is the single source of truth and applies the same string in
+   * EnsureMpv). Probe failure keeps the legacy full list rather than disabling
+   * hwdec; the same legacy string is the last-ditch guard if the NAPI call
+   * itself throws (e.g. stale native library).
+   */
+  static hwdecCodecsWhitelist(): string {
+    if (VideoHwCaps.cachedWhitelist !== null) {
+      return VideoHwCaps.cachedWhitelist;
+    }
+    try {
+      const whitelist = getHwdecCodecsWhitelist();
+      VideoHwCaps.cachedWhitelist = whitelist;
+      Logger.info(TAG, `hwdec-codecs whitelist: ${whitelist}`);
+      return whitelist;
+    } catch (e) {
+      Logger.warn(TAG, `whitelist query failed: ${e}`);
+      const legacy = 'h264,hevc,vp8,vp9,av1';
+      VideoHwCaps.cachedWhitelist = legacy;
+      return legacy;
     }
   }
 

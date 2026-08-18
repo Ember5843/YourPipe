@@ -11,7 +11,7 @@
  * 不再由上层手动编排操作顺序。
  */
 
-import { PlayerState, isValidTransition, describeState } from './PlayerState';
+import { PlayerState, isValidTransition, describeState, VALID_TRANSITIONS } from './PlayerState';
 import Logger from '../utils/Logger';
 
 export interface StateChangeListener {
@@ -96,19 +96,7 @@ export class PlayerStateMachine {
   }
 
   private getAllowedTransitions(from: PlayerState): PlayerState[] {
-    switch (from) {
-      case PlayerState.IDLE:           return [PlayerState.INITIALIZING, PlayerState.RELEASED];
-      case PlayerState.INITIALIZING:   return [PlayerState.LOADING, PlayerState.READY, PlayerState.IDLE, PlayerState.ERROR, PlayerState.RELEASED];
-      case PlayerState.LOADING:        return [PlayerState.READY, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.READY:          return [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.PLAYING:        return [PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.LOADING, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.PAUSED:         return [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.BUFFERING, PlayerState.ERROR, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.BUFFERING:      return [PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.LOADING, PlayerState.COMPLETED, PlayerState.ERROR, PlayerState.RELEASED];
-      case PlayerState.COMPLETED:      return [PlayerState.PLAYING, PlayerState.LOADING, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.ERROR:          return [PlayerState.LOADING, PlayerState.IDLE, PlayerState.RELEASED];
-      case PlayerState.RELEASED:       return [PlayerState.IDLE];
-      default: return [];
-    }
+    return VALID_TRANSITIONS.get(from) ?? [];
   }
 
   private notifyListeners(from: PlayerState, to: PlayerState): void {

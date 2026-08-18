@@ -2,7 +2,7 @@ import { StreamResource } from './SessionStore';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { http, socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
-import { HttpDownloader, HttpProxyOptions } from 'youtube_core';
+import { ClientsConstants, HttpDownloader, HttpProxyOptions } from 'youtube_core';
 import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][RangeProxy]';
@@ -170,9 +170,9 @@ function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
 
   if (isAndroid) {
     // PipePipe getAndroidUserAgent — also used for ANDROID_VR streaming URLs
-    h['User-Agent'] = 'com.google.android.youtube/21.03.36 (Linux; U; Android 16; GB) gzip';
+    h['User-Agent'] = ClientsConstants.ANDROID_USER_AGENT;
   } else if (isIos) {
-    h['User-Agent'] = 'com.google.ios.youtube/20.03.02(iPhone16,2; U; CPU iOS 18_2_1 like Mac OS X; GB)';
+    h['User-Agent'] = ClientsConstants.IOS_USER_AGENT;
   } else if (resource.userAgent) {
     h['User-Agent'] = resource.userAgent;
   }
