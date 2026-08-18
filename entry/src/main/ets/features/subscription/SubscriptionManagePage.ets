@@ -165,6 +165,8 @@ export struct SubscriptionManagePage {
 
   private async loadProfiles(): Promise<void> {
     const nextMap: Record<string, SearchChannelItem> = {};
+    const profiles: Record<string, ChannelProfile> = {};
+    const names: Record<string, string> = {};
     const tasks = this.subscriptions.map(async (item, index) => {
       const channelId = (item.channelId || '').trim();
       if (!channelId) {
@@ -173,7 +175,8 @@ export struct SubscriptionManagePage {
       try {
         const profile = await this.channelInfoService.fetchChannelProfile(channelId);
         nextMap[channelId] = this.buildFromProfile(item, index, profile);
-        this.updateSubscriptionProfile(channelId, item.displayName, profile);
+        profiles[channelId] = profile;
+        names[channelId] = item.displayName;
       } catch (err) {
         logger.error('loadProfile failed:', JSON.stringify(err));
         nextMap[channelId] = this.buildPlaceholder(item, index);
@@ -182,6 +185,8 @@ export struct SubscriptionManagePage {
     await Promise.all(tasks);
     this.channelMap = nextMap;
     this.profileEpoch += 1;
+    // 批量合并 + 单次持久化；原先每个频道一次全量 map + JSON 序列化 + 写盘。
+    this.applyProfilesToSubscriptions(profiles, names);
   }
 
   private async onPullRefresh(): Promise<void> {
@@ -203,19 +208,24 @@ export struct SubscriptionManagePage {
     }
   }
 
-  private updateSubscriptionProfile(channelId: string, displayName: string, profile: ChannelProfile): void {
-    if (!channelId) {
+  private applyProfilesToSubscriptions(
+    profiles: Record<string, ChannelProfile>,
+    names: Record<string, string>
+  ): void {
+    if (Object.keys(profiles).length === 0) {
       return;
     }
+    let changed = false;
     const next = this.subscriptions.map((item) => {
-      if (item.channelId !== channelId) {
+      const profile = profiles[item.channelId];
+      if (!profile) {
         return item;
       }
-      const name = displayName || item.displayName || channelId;
+      const name = names[item.channelId] || item.displayName || item.channelId;
       const subscriberText = this.resolveSubscriberText(item.subscriberText || '', profile.subscriberText || '');
       const videoCountText = this.resolveVideoCountText(item.videoCountText || '', profile.videoCountText || '');
-      return new SubscriptionUser(
-        channelId,
+      const merged = new SubscriptionUser(
+        item.channelId,
         name,
         profile.avatarUrl || item.avatarUrl || '',
         subscriberText,
@@ -223,8 +233,18 @@ export struct SubscriptionManagePage {
         item.description || profile.description || '',
         item.thumbnailColor || ''
       );
+      if (!changed
+        && (merged.displayName !== item.displayName || merged.avatarUrl !== item.avatarUrl
+          || merged.subscriberText !== item.subscriberText || merged.videoCountText !== item.videoCountText
+          || merged.description !== item.description)) {
+        changed = true;
+      }
+      return merged;
     });
-    this.persistSubscriptions(next);
+    // 无实际变化时不触发全量持久化和 @StorageLink 刷新
+    if (changed) {
+      this.persistSubscriptions(next);
+    }
   }
 
   build() {
