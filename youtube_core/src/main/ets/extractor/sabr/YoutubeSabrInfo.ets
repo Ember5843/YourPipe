@@ -39,6 +39,9 @@ export class YoutubeSabrInfo {
   serverAbrStreamingUrl?: string;
   videoPlaybackUstreamerConfig?: string;
   formats: YoutubeSabrFormatMeta[];
+  /** SABR clientInfo locale (PipePipe uses the app localization, not a fixed en-US). */
+  hl: string = 'en-US';
+  gl: string = 'US';
 
   constructor(
     profile: SabrClientProfileKey,

@@ -62,6 +62,8 @@ export function pickHighestThumbnailUrl(
         score = 70000;
       } else if (lower.indexOf('mqdefault') >= 0) {
         score = 60000;
+      } else if (lower.indexOf('default.jpg') >= 0 || lower.indexOf('/default.') >= 0) {
+        score = 50000;
       } else {
         score = i;
       }
@@ -153,7 +155,11 @@ export interface JsonResponse {
   result: string | ArrayBuffer;
 }
 
-function arrayBufferToString(buffer: ArrayBuffer): string {
+/**
+ * Decode an ArrayBuffer to a JS string byte-by-byte (latin1 semantics).
+ * Shared by the cipher decoder and JSON body validation.
+ */
+export function arrayBufferToString(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let result = '';
   for (let i = 0; i < bytes.length; i++) {
@@ -234,6 +240,44 @@ export function getNestedValue(obj: Object, path: string): Object | null {
     }
   }
   return current;
+}
+
+/**
+ * Brace-matching extraction of a complete JSON object starting at `start`
+ * (which must point at '{'). String/escape aware. Returns '' when no
+ * matching closing brace exists. Shared by the watch-page player response
+ * extractor and WebClientVersionResolver.
+ */
+export function braceMatchJsonObject(source: string, start: number): string {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < source.length; i++) {
+    const ch = source.charAt(i);
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return source.substring(start, i + 1);
+      }
+    }
+  }
+  return '';
 }
 
 /**

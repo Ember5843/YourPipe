@@ -28,12 +28,6 @@ export class ClientsConstants {
    */
   static readonly WEB_HARDCODED_CLIENT_VERSION: string = "2.20250122.04.00";
 
-  /**
-   * Static calendar hint only. Prefer WebClientVersionResolver.getClientVersion()
-   * for mweb / WEB meta / next at runtime.
-   */
-  static readonly WEB_CLIENT_VERSION: string = "2.20260114.08.00";
-
   // =====================
   // WEB_REMIX (YouTube Music)
   // =====================
@@ -70,11 +64,6 @@ export class ClientsConstants {
   // =====================
   static readonly MWEB_CLIENT_ID: string = "2";
   static readonly MWEB_CLIENT_NAME: string = "MWEB";
-  /**
-   * @deprecated Prefer WebClientVersionResolver — mweb uses dynamic getClientVersion().
-   * Kept as static hint equal to WEB_CLIENT_VERSION.
-   */
-  static readonly MWEB_CLIENT_VERSION: string = "2.20260114.08.00";
   static readonly MWEB_USER_AGENT: string =
     "Mozilla/5.0 (iPad; CPU OS 16_7_10 like Mac OS X) AppleWebKit/605.1.15 " +
     "(KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1,gzip(gfe)";

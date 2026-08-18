@@ -170,8 +170,8 @@ export class YoutubeSabrRequestBuilder {
     const clientId = info.profile === 'web' ? 1 : 2;
     client.writeInt32(16, clientId);
     client.writeStringIfNotEmpty(17, info.clientVersion);
-    client.writeStringIfNotEmpty(21, 'en-US');
-    client.writeStringIfNotEmpty(22, 'US');
+    client.writeStringIfNotEmpty(21, info.hl);
+    client.writeStringIfNotEmpty(22, info.gl);
     return client.toUint8Array();
   }
 

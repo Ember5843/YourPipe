@@ -5,9 +5,10 @@ import { Localization } from "../model/Localization";
 import { YoutubeSearchQueryHandlerFactory } from "../common/YoutubeSearchQueryHanderFactory";
 import { SearchContentFilter } from "../model/SearchContentFilter";
 import { Utils } from "../common/Utils";
-import { WebClientVersionResolver } from "../common/WebClientVersionResolver";
+import { WebClientVersionResolver, ClientVersionGet } from "../common/WebClientVersionResolver";
 import { HttpDownloader } from "../network/HttpDownloader";
 import { AuthSessionManager } from "../auth/AuthSessionManager";
+import { buildWebRailHeaders, SOCS_CONSENT_COOKIE } from "../auth/WebRailHeaders";
 import { http } from "@kit.NetworkKit";
 import { JSON } from "@kit.ArkTS";
 
@@ -18,52 +19,28 @@ const YOUTUBE_MUSICI_V1_URL = "https://music.youtube.com/youtubei/v1/";
 const DISABLE_PRETTY_PRINT_PARAMETER = "prettyPrint=false";
 const YOUTUBE_SUGGEST_URL = "https://suggestqueries-clients6.youtube.com/complete/search?client=youtube&ds=yt&xhr=t";
 
-const REGEX_PATTERNS: Record<string, Array<string>> = {
-  "INNERTUBE_CONTEXT_CLIENT_VERSION_REGEXES": [
-    'INNERTUBE_CONTEXT_CLIENT_VERSION":"([0-9\\.]+?)"',
-    'innertube_context_client_version":"([0-9\\.]+?)"',
-    'client.version=([0-9\\.]+)'
-  ]
-};
-
 const downloader: HttpDownloader = new HttpDownloader();
 
-function getStringResultFromRegexArray(input: string, regexArray: string[], group: number = 1): string {
-  for (let pattern of regexArray) {
-    if (!pattern) continue;
-    const regex = new RegExp(pattern, "s");
-    const match = regex.exec(input);
-    if (match && match[group] !== undefined) {
-      return match[group];
-    }
+/** Adapts this module's HttpDownloader + localization to the resolver's GET surface. */
+class DownloaderClientVersionGet implements ClientVersionGet {
+  private readonly downloader: HttpDownloader;
+  private readonly localization: Localization;
+
+  constructor(downloader: HttpDownloader, localization: Localization) {
+    this.downloader = downloader;
+    this.localization = localization;
   }
-  return '';
+
+  get(url: string, headers?: Record<string, string | string[]>): Promise<http.HttpResponse> {
+    return this.downloader.request('GET', url, headers, undefined, this.localization);
+  }
 }
 
 async function getClientVersion(localization: Localization): Promise<string> {
-  // Prefer shared process cache (stream path may already have resolved via sw.js).
-  const cached = WebClientVersionResolver.peekCached();
-  if (cached.length > 0) {
-    return cached;
-  }
-  const url: string = "https://www.youtube.com/sw.js";
-  const urlList = ["https://www.youtube.com"];
-  const referrerHeaders = {
-    "Origin": urlList,
-    "Referer": urlList
-  } as Record<string, string[]>;
-  const headers: Record<string, string | string[]> = downloader.processHeaders(referrerHeaders, localization);
-  const body: http.HttpResponse = await downloader.request('GET', url, headers, undefined, localization);
-  const clientVersion = getStringResultFromRegexArray(
-    body.result as string,
-    REGEX_PATTERNS['INNERTUBE_CONTEXT_CLIENT_VERSION_REGEXES'],
-    1
-  );
-  const resolved = clientVersion === ''
-    ? ClientsConstants.WEB_HARDCODED_CLIENT_VERSION
-    : clientVersion;
-  WebClientVersionResolver.setCached(resolved);
-  return resolved;
+  // Shared resolver: process cache → sw.js → results HTML → hardcoded fallback,
+  // with in-flight dedup. The adapter keeps this module's HttpDownloader +
+  // localization (Accept-Language) on the wire.
+  return WebClientVersionResolver.getClientVersion(new DownloaderClientVersionGet(downloader, localization));
 }
 
 async function getClientInfoHeaders(localization: Localization): Promise<Record<string, string[]>> {
@@ -110,7 +87,7 @@ async function getYoutubeHeaders(
     const value = entry[1];
     headers[key] = value;
   });
-  headers['Cookie'] = ["SOCS=CAISAiAD"];
+  headers['Cookie'] = [SOCS_CONSENT_COOKIE];
   if (withAuth) {
     await applyAuthHeaders(headers);
   }
@@ -132,17 +109,16 @@ async function applyAuthHeaders(headers: Record<string, string[]>): Promise<void
   if (!cookieStr || cookieStr.length === 0) {
     return;
   }
-  // Keep consent cookie; overwriting with account cookies alone can trip consent redirects.
-  let cookie = cookieStr;
-  if (cookie.indexOf('SOCS=') < 0) {
-    cookie = `${cookie}; SOCS=CAISAiAD`;
-  }
-  headers['Cookie'] = [cookie];
-  headers['X-Origin'] = ['https://www.youtube.com'];
-  headers['DNT'] = ['1'];
-  const authorization = await authSession.getWebAuthorizationHeader();
-  if (authorization && authorization.length > 0) {
-    headers['Authorization'] = [authorization];
+  // Header shape shared with the playback rail via buildWebRailHeaders; the browse
+  // rail keeps the consent cookie (append SOCS when missing) instead of overwriting.
+  const authorization = await authSession.getWebAuthorizationHeader() || '';
+  const built = buildWebRailHeaders(cookieStr, authorization, true);
+  headers['Cookie'] = [built['Cookie']];
+  headers['X-Origin'] = [built['X-Origin']];
+  headers['DNT'] = [built['DNT']];
+  const builtAuthorization = built['Authorization'];
+  if (builtAuthorization !== undefined) {
+    headers['Authorization'] = [builtAuthorization];
   } else {
     logger.warn('[browse-auth] SAPISIDHASH missing after cookie inject');
   }
@@ -233,7 +209,7 @@ async function getYoutubeMusicHeaders(localization: Localization): Promise<Recor
     const value = entry[1];
     headers[key] = value;
   });
-  headers['Cookie'] = ["SOCS=CAISAiAD"];
+  headers['Cookie'] = [SOCS_CONSENT_COOKIE];
   return headers;
 }
 

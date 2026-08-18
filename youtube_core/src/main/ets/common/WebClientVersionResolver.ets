@@ -1,8 +1,17 @@
 import { ClientsConstants } from '../model/ClientsConstants';
-import { YouTubeHttpClient } from '../network/YouTubeHttpClient';
 import { YTCoreLogger } from './YTCoreLogger';
+import { braceMatchJsonObject } from './YoutubeParsingHelper';
+import { http } from '@kit.NetworkKit';
 
 const logger = YTCoreLogger.getInstance('WebClientVersionResolver');
+
+/**
+ * Minimal GET surface for version resolution. YouTubeHttpClient satisfies it
+ * structurally; other callers (e.g. YoutubeApi) adapt a plain HttpDownloader.
+ */
+export interface ClientVersionGet {
+  get(url: string, headers?: Record<string, string | string[]>): Promise<http.HttpResponse>;
+}
 
 /**
  * PipePipe YoutubeParsingHelper.getClientVersion():
@@ -53,7 +62,7 @@ export class WebClientVersionResolver {
    * Ensure process-level WEB client version is available.
    * Concurrent callers share one in-flight resolve.
    */
-  static async getClientVersion(httpClient: YouTubeHttpClient): Promise<string> {
+  static async getClientVersion(client: ClientVersionGet): Promise<string> {
     if (WebClientVersionResolver.cachedVersion.length > 0) {
       return WebClientVersionResolver.cachedVersion;
     }
@@ -61,7 +70,7 @@ export class WebClientVersionResolver {
       return WebClientVersionResolver.resolvePromise;
     }
     WebClientVersionResolver.resolvePromise =
-      WebClientVersionResolver.resolveFromNetwork(httpClient);
+      WebClientVersionResolver.resolveFromNetwork(client);
     try {
       const version = await WebClientVersionResolver.resolvePromise;
       return version;
@@ -70,9 +79,9 @@ export class WebClientVersionResolver {
     }
   }
 
-  private static async resolveFromNetwork(httpClient: YouTubeHttpClient): Promise<string> {
+  private static async resolveFromNetwork(client: ClientVersionGet): Promise<string> {
     try {
-      const fromSw = await WebClientVersionResolver.extractFromSwJs(httpClient);
+      const fromSw = await WebClientVersionResolver.extractFromSwJs(client);
       if (fromSw) {
         WebClientVersionResolver.cachedVersion = fromSw;
         logger.info(`[WEB_VER] from sw.js: ${fromSw}`);
@@ -83,7 +92,7 @@ export class WebClientVersionResolver {
     }
 
     try {
-      const fromHtml = await WebClientVersionResolver.extractFromResultsHtml(httpClient);
+      const fromHtml = await WebClientVersionResolver.extractFromResultsHtml(client);
       if (fromHtml) {
         WebClientVersionResolver.cachedVersion = fromHtml;
         logger.info(`[WEB_VER] from results HTML: ${fromHtml}`);
@@ -99,22 +108,22 @@ export class WebClientVersionResolver {
     return fallback;
   }
 
-  private static async extractFromSwJs(httpClient: YouTubeHttpClient): Promise<string> {
+  private static async extractFromSwJs(client: ClientVersionGet): Promise<string> {
     const headers: Record<string, string> = {
       'Origin': 'https://www.youtube.com',
       'Referer': 'https://www.youtube.com/'
     };
-    const response = await httpClient.get('https://www.youtube.com/sw.js', headers, false);
+    const response = await client.get('https://www.youtube.com/sw.js', headers);
     if (response.responseCode !== 200 || !response.result) {
       return '';
     }
     return WebClientVersionResolver.matchVersion(response.result as string);
   }
 
-  private static async extractFromResultsHtml(httpClient: YouTubeHttpClient): Promise<string> {
+  private static async extractFromResultsHtml(client: ClientVersionGet): Promise<string> {
     // Empty query keeps payload smaller (PipePipe extractClientVersionFromHtmlSearchResultsPage).
     const url = 'https://www.youtube.com/results?search_query=&ucbcb=1';
-    const response = await httpClient.get(url, undefined, false);
+    const response = await client.get(url, undefined);
     if (response.responseCode !== 200 || !response.result) {
       return '';
     }
@@ -158,7 +167,7 @@ export class WebClientVersionResolver {
     if (braceStart < 0) {
       return '';
     }
-    const jsonText = WebClientVersionResolver.braceMatchObject(html, braceStart);
+    const jsonText = braceMatchJsonObject(html, braceStart);
     if (!jsonText) {
       return '';
     }
@@ -190,38 +199,6 @@ export class WebClientVersionResolver {
       }
     } catch (_e) {
       return '';
-    }
-    return '';
-  }
-
-  private static braceMatchObject(source: string, start: number): string {
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (let i = start; i < source.length; i++) {
-      const ch = source.charAt(i);
-      if (inString) {
-        if (escaped) {
-          escaped = false;
-        } else if (ch === '\\') {
-          escaped = true;
-        } else if (ch === '"') {
-          inString = false;
-        }
-        continue;
-      }
-      if (ch === '"') {
-        inString = true;
-        continue;
-      }
-      if (ch === '{') {
-        depth++;
-      } else if (ch === '}') {
-        depth--;
-        if (depth === 0) {
-          return source.substring(start, i + 1);
-        }
-      }
     }
     return '';
   }

@@ -1,5 +1,6 @@
 import { SabrProtocolException } from './SabrProtocolException';
 import { YoutubeSabrFormatMeta } from './YoutubeSabrInfo';
+import { readProtoVarint, decodeBase64ToBytes as protoDecodeBase64 } from '../../common/ProtoUtil';
 
 export const WIRE_VARINT = 0;
 export const WIRE_FIXED64 = 1;
@@ -119,20 +120,17 @@ class Cursor {
   }
 
   readVarint(): number {
-    let result = 0;
-    let shift = 0;
-    while (shift < 53) {
-      if (this.offset >= this.data.length) {
-        throw new SabrProtocolException('Unexpected EOF in protobuf varint');
-      }
-      const current = this.data[this.offset++];
-      result += (current & 0x7f) * Math.pow(2, shift);
-      if ((current & 0x80) === 0) {
-        return result;
-      }
-      shift += 7;
+    // Shared non-throwing core (common/ProtoUtil); SABR wraps failure as a
+    // protocol exception, preserving the EOF / too-long distinction.
+    const start = this.offset;
+    const result = readProtoVarint(this.data, this.offset);
+    if (!result) {
+      throw new SabrProtocolException(start >= this.data.length
+        ? 'Unexpected EOF in protobuf varint'
+        : 'Protobuf varint is too long');
     }
-    throw new SabrProtocolException('Protobuf varint is too long');
+    this.offset = result.next;
+    return result.value;
   }
 
   readBytes(length: number): Uint8Array {
@@ -257,37 +255,11 @@ export function bytesToUtf8(data: Uint8Array): string {
 }
 
 export function decodeBase64ToBytes(value: string): Uint8Array {
-  const padded = padBase64(value);
-  // Manual base64 decode (standard + url-safe)
-  const table =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const normalized = padded.replace(/-/g, '+').replace(/_/g, '/');
-  const bytes: number[] = [];
-  let buffer = 0;
-  let bits = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    const ch = normalized.charAt(i);
-    if (ch === '=') {
-      break;
-    }
-    const val = table.indexOf(ch);
-    if (val < 0) {
-      continue;
-    }
-    buffer = (buffer << 6) | val;
-    bits += 6;
-    if (bits >= 8) {
-      bits -= 8;
-      bytes.push((buffer >> bits) & 0xff);
-    }
-  }
-  if (bytes.length === 0) {
+  // Shared non-throwing core (common/ProtoUtil); SABR wraps failure as a
+  // protocol exception.
+  const bytes = protoDecodeBase64(value);
+  if (!bytes) {
     throw new SabrProtocolException('Could not decode base64 ustreamer config');
   }
-  return new Uint8Array(bytes);
-}
-
-function padBase64(value: string): string {
-  const padding = (4 - (value.length % 4)) % 4;
-  return value + '='.repeat(padding);
+  return bytes;
 }

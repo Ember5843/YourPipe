@@ -6,7 +6,8 @@ import {
   getNestedValue,
   parseMixedNumber,
   parseSubscriberCount,
-  parseDurationText
+  parseDurationText,
+  braceMatchJsonObject
 } from '../common/YoutubeParsingHelper';
 import { YouTubeHttpClient } from '../network/YouTubeHttpClient';
 import { AuthSessionManager } from '../auth/AuthSessionManager';
@@ -21,6 +22,7 @@ import { common } from '@kit.AbilityKit';
 import { ClientFetchContext, ClientFetchResult } from './clients/ClientTypes';
 import { ConfiguredPlayerClient } from './clients/ConfiguredPlayerClient';
 import { WebClientVersionResolver } from '../common/WebClientVersionResolver';
+import { readProtoVarint, decodeBase64ToBytes } from '../common/ProtoUtil';
 import {
   YoutubePlayerClientConfig,
   YoutubePlayerClientKey
@@ -59,16 +61,6 @@ class XtagsKeyValue {
   constructor(key: string, value: string) {
     this.key = key;
     this.value = value;
-  }
-}
-
-class ProtoVarintResult {
-  value: number = 0;
-  next: number = 0;
-
-  constructor(value: number, next: number) {
-    this.value = value;
-    this.next = next;
   }
 }
 
@@ -379,29 +371,13 @@ export class YouTubeExtractor {
       throw new ExtractError('Could not find opening brace for ytInitialPlayerResponse');
     }
 
-    // Use brace-matching to extract the complete JSON object
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    let endPos = -1;
-    for (let i = braceStart; i < html.length; i++) {
-      const ch = html[i];
-      if (escaped) { escaped = false; continue; }
-      if (ch === '\\' && inString) { escaped = true; continue; }
-      if (ch === '"' && !escaped) { inString = !inString; continue; }
-      if (inString) continue;
-      if (ch === '{') depth++;
-      else if (ch === '}') {
-        depth--;
-        if (depth === 0) { endPos = i; break; }
-      }
-    }
-
-    if (endPos === -1) {
+    // Use brace-matching to extract the complete JSON object (shared with
+    // WebClientVersionResolver via braceMatchJsonObject)
+    const jsonStr = braceMatchJsonObject(html, braceStart);
+    if (jsonStr.length === 0) {
       throw new ExtractError('Could not find matching brace for ytInitialPlayerResponse');
     }
 
-    const jsonStr = html.substring(braceStart, endPos + 1);
     try {
       const playerResponse = JSON.parse(jsonStr) as PlayerResponse;
       logger.debug('Successfully parsed player response');
@@ -1053,6 +1029,8 @@ export class YouTubeExtractor {
       ? ClientsConstants.SAFARI_CLIENT_VERSION
       : WebClientVersionResolver.getCachedOrHardcoded();
     const sabrInfo = new YoutubeSabrInfo(profile, videoId, cpn, clientVersion, formats);
+    sabrInfo.hl = this.hl;
+    sabrInfo.gl = this.gl;
     sabrInfo.serverAbrStreamingUrl = serverAbr;
     // Pin visitorData per app session (matches web behavior): the PoToken mint
     // and the SABR X-Goog-Visitor-Id header stay on one value, so BotGuard
@@ -1618,7 +1596,7 @@ export class YouTubeExtractor {
       return undefined;
     }
     try {
-      const bytes = this.decodeBase64UrlToBytes(xtags);
+      const bytes = decodeBase64ToBytes(xtags);
       if (!bytes || bytes.length === 0) {
         return undefined;
       }
@@ -1681,40 +1659,6 @@ export class YouTubeExtractor {
     return value.length > 0 ? value : undefined;
   }
 
-  /** Base64 / base64url decode (same approach as SabrProto.decodeBase64ToBytes). */
-  private decodeBase64UrlToBytes(input: string): Uint8Array | undefined {
-    const raw = (input || '').trim();
-    if (raw.length === 0) {
-      return undefined;
-    }
-    const padLen = (4 - (raw.length % 4)) % 4;
-    const normalized = (raw + '='.repeat(padLen)).replace(/-/g, '+').replace(/_/g, '/');
-    const table = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const bytes: number[] = [];
-    let buffer = 0;
-    let bits = 0;
-    for (let i = 0; i < normalized.length; i++) {
-      const ch = normalized.charAt(i);
-      if (ch === '=') {
-        break;
-      }
-      const val = table.indexOf(ch);
-      if (val < 0) {
-        continue;
-      }
-      buffer = (buffer << 6) | val;
-      bits += 6;
-      if (bits >= 8) {
-        bits -= 8;
-        bytes.push((buffer >> bits) & 0xff);
-      }
-    }
-    if (bytes.length === 0) {
-      return undefined;
-    }
-    return new Uint8Array(bytes);
-  }
-
   /** Walk XTags protobuf bytes and return value for key "acont". */
   private readXtagsAcont(bytes: Uint8Array): string | undefined {
     let offset = 0;
@@ -1723,7 +1667,7 @@ export class YouTubeExtractor {
       const fieldNumber = tag >> 3;
       const wireType = tag & 0x7;
       if (wireType === 2) {
-        const lenResult = this.readProtoVarint(bytes, offset);
+        const lenResult = readProtoVarint(bytes, offset);
         if (!lenResult) {
           return undefined;
         }
@@ -1741,7 +1685,7 @@ export class YouTubeExtractor {
         }
         offset += len;
       } else if (wireType === 0) {
-        const skip = this.readProtoVarint(bytes, offset);
+        const skip = readProtoVarint(bytes, offset);
         if (!skip) {
           return undefined;
         }
@@ -1764,7 +1708,7 @@ export class YouTubeExtractor {
       if (wireType !== 2) {
         // Only string fields expected.
         if (wireType === 0) {
-          const skip = this.readProtoVarint(bytes, offset);
+          const skip = readProtoVarint(bytes, offset);
           if (!skip) {
             return undefined;
           }
@@ -1773,7 +1717,7 @@ export class YouTubeExtractor {
         }
         return undefined;
       }
-      const lenResult = this.readProtoVarint(bytes, offset);
+      const lenResult = readProtoVarint(bytes, offset);
       if (!lenResult) {
         return undefined;
       }
@@ -1797,21 +1741,6 @@ export class YouTubeExtractor {
       return undefined;
     }
     return new XtagsKeyValue(key, value);
-  }
-
-  private readProtoVarint(bytes: Uint8Array, offset: number): ProtoVarintResult | undefined {
-    let result = 0;
-    let shift = 0;
-    let pos = offset;
-    while (pos < bytes.length && shift < 35) {
-      const b = bytes[pos++];
-      result |= (b & 0x7f) << shift;
-      if ((b & 0x80) === 0) {
-        return new ProtoVarintResult(result >>> 0, pos);
-      }
-      shift += 7;
-    }
-    return undefined;
   }
 
   private parseCipherParams(cipherText: string): Map<string, string> {

@@ -1,18 +1,10 @@
 import { http } from '@kit.NetworkKit';
 import { YTCoreLogger } from '../../common/YTCoreLogger';
+import { arrayBufferToString } from '../../common/YoutubeParsingHelper';
 import { ApiConfig } from './ApiConfig';
 import { HttpDownloader } from '../../network/HttpDownloader';
 
 const logger = YTCoreLogger.getInstance('PipePipeApiDecoder');
-
-function arrayBufferToString(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let result = '';
-  for (let i = 0; i < bytes.length; i++) {
-    result += String.fromCharCode(bytes[i]);
-  }
-  return result;
-}
 
 export interface PlayerMetadata {
   playerId: string;

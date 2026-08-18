@@ -4,6 +4,7 @@ import { ClientsConstants } from '../../model/ClientsConstants';
 import { YoutubePlayerClientKey } from '../../model/YoutubePlayerClientConfig';
 import { WebClientVersionResolver } from '../../common/WebClientVersionResolver';
 import { YTCoreLogger } from '../../common/YTCoreLogger';
+import { generateContentPlaybackNonce, generateTParameter } from '../../common/YoutubeParsingHelper';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 import { SessionIdentityManager } from '../identity/SessionIdentityManager';
 
@@ -92,7 +93,7 @@ export class ConfiguredPlayerClient {
     }
 
     const id = ConfiguredPlayerClient.identity(key);
-    const cpn = randomCpn();
+    const cpn = generateContentPlaybackNonce();
     const client: Record<string, Object> = {
       'utcOffsetMinutes': 0,
       'timeZone': 'UTC',
@@ -218,7 +219,7 @@ export class ConfiguredPlayerClient {
     httpClient: YouTubeHttpClient,
     useWebAuth: boolean = false
   ): Promise<ClientFetchResult | undefined> {
-    const cpn = randomCpn();
+    const cpn = generateContentPlaybackNonce();
     const client: Record<string, Object> = {
       'clientName': ClientsConstants.VISIONOS_CLIENT_NAME,
       'clientVersion': ClientsConstants.VISIONOS_CLIENT_VERSION,
@@ -262,7 +263,7 @@ export class ConfiguredPlayerClient {
     };
 
     const url = `${ClientsConstants.YOUTUBEI_V1_GAPIS_URL}player?prettyPrint=false`
-      + `&t=${randomCpn().substring(0, 12)}&id=${ctx.videoId}`;
+      + `&t=${generateTParameter()}&id=${ctx.videoId}`;
     try {
       const response = await httpClient.postJson(url, payload, headers, useWebAuth, false);
       if (!response || response.responseCode !== 200 || !response.result) {
@@ -302,15 +303,6 @@ export class ConfiguredPlayerClient {
     const result = await ConfiguredPlayerClient.fetch('mweb', ctx, httpClient, useWebAuth, false);
     return result?.streamingData?.hlsManifestUrl;
   }
-}
-
-function randomCpn(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  let result = '';
-  for (let i = 0; i < 16; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
 }
 
 /** Rejects with 'player PoToken timeout' after ms so extraction never stalls. */

@@ -13,6 +13,47 @@ export interface HlsManifestResult {
   audioStreams: StreamInfo[];
 }
 
+/** Single constructor for HLS audio StreamInfo (was two drifted copies). */
+function buildHlsAudioStream(
+  url: string,
+  language: string | undefined,
+  trackId: string | undefined,
+  trackName: string | undefined
+): StreamInfo {
+  return {
+    url: url,
+    itag: undefined,
+    mimeType: 'audio/mp4',
+    qualityLabel: undefined,
+    audioQuality: undefined,
+    bitrate: undefined,
+    contentLength: undefined,
+    hasVideo: false,
+    hasAudio: true,
+    deliveryMethod: DeliveryMethod.HLS,
+    kind: 'audio_only',
+    sourceClient: 'hls',
+    container: 'm4a',
+    codecs: undefined,
+    initRange: undefined,
+    indexRange: undefined,
+    approxDurationMs: undefined,
+    durationMs: undefined,
+    isLive: undefined,
+    isOtf: undefined,
+    audioLanguage: language,
+    audioTrackId: trackId,
+    audioTrackName: trackName,
+    audioTrackType: undefined,
+    audioChannels: undefined,
+    audioSampleRate: undefined,
+    videoFps: undefined,
+    codec: undefined,
+    width: undefined,
+    height: undefined,
+  };
+}
+
 export function parseHlsMasterManifest(manifestContent: string, videoId: string): HlsManifestResult {
   const lines = manifestContent.split('\n');
   const videoStreams: StreamInfo[] = [];
@@ -133,40 +174,7 @@ export function parseHlsMasterManifest(manifestContent: string, videoId: string)
     const name = extractHlsStringAttribute(line, 'NAME');
     const language = extractHlsStringAttribute(line, 'LANGUAGE');
 
-    const stream: StreamInfo = {
-      url: uri,
-      itag: undefined,
-      mimeType: 'audio/mp4',
-      qualityLabel: undefined,
-      audioQuality: undefined,
-      bitrate: undefined,
-      contentLength: undefined,
-      hasVideo: false,
-      hasAudio: true,
-      deliveryMethod: DeliveryMethod.HLS,
-      kind: 'audio_only',
-      sourceClient: 'hls',
-      container: 'm4a',
-      codecs: undefined,
-      initRange: undefined,
-      indexRange: undefined,
-      approxDurationMs: undefined,
-      durationMs: undefined,
-      isLive: undefined,
-      isOtf: undefined,
-      audioLanguage: language,
-      audioTrackId: groupId || language,
-      audioTrackName: name,
-      audioTrackType: undefined,
-      audioChannels: undefined,
-      audioSampleRate: undefined,
-      videoFps: undefined,
-      codec: undefined,
-      width: undefined,
-      height: undefined,
-    };
-
-    audioStreams.push(stream);
+    audioStreams.push(buildHlsAudioStream(uri, language, groupId || language, name));
   }
 
   if (audioStreams.length === 0 && audioTrackUrls.size > 0) {
@@ -178,40 +186,7 @@ export function parseHlsMasterManifest(manifestContent: string, videoId: string)
       const trackName = audioTrackNames.get(trackId);
       const locale = audioTrackLocales.get(trackId);
 
-      const stream: StreamInfo = {
-        url: url,
-        itag: undefined,
-        mimeType: 'audio/mp4',
-        qualityLabel: undefined,
-        audioQuality: undefined,
-        bitrate: undefined,
-        contentLength: undefined,
-        hasVideo: false,
-        hasAudio: true,
-        deliveryMethod: DeliveryMethod.HLS,
-        kind: 'audio_only',
-        sourceClient: 'hls',
-        container: 'm4a',
-        codecs: undefined,
-        initRange: undefined,
-        indexRange: undefined,
-        approxDurationMs: undefined,
-        durationMs: undefined,
-        isLive: undefined,
-        isOtf: undefined,
-        audioLanguage: locale,
-        audioTrackId: trackId,
-        audioTrackName: trackName,
-        audioTrackType: undefined,
-        audioChannels: undefined,
-        audioSampleRate: undefined,
-        videoFps: undefined,
-        codec: undefined,
-        width: undefined,
-        height: undefined,
-      };
-
-      audioStreams.push(stream);
+      audioStreams.push(buildHlsAudioStream(url, locale, trackId, trackName));
       trackNext = trackEntries.next();
     }
   }

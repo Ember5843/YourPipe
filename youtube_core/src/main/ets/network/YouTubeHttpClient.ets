@@ -6,6 +6,8 @@ import { Localization } from '../model/Localization';
 import { ContentCountry } from '../model/ContentCountry';
 import { ClientsConstants } from '../model/ClientsConstants';
 import { AuthSessionManager } from '../auth/AuthSessionManager';
+import { buildWebRailHeaders, SOCS_CONSENT_COOKIE } from '../auth/WebRailHeaders';
+import { ClientVersionGet } from '../common/WebClientVersionResolver';
 
 const logger = YTCoreLogger.getInstance('YouTubeHttpClient');
 
@@ -13,7 +15,7 @@ const logger = YTCoreLogger.getInstance('YouTubeHttpClient');
  * YouTube HTTP 客户端
  * 封装 HttpDownloader 和 CookieJar，提供自动 Cookie 管理和 YouTube 专用请求头
  */
-export class YouTubeHttpClient {
+export class YouTubeHttpClient implements ClientVersionGet {
   private static requestSequence: number = 0;
   private downloader: HttpDownloader = new HttpDownloader();
   private cookieJar: CookieJar;
@@ -197,6 +199,8 @@ export class YouTubeHttpClient {
   /**
    * WEB rail only: Cookie + SAPISIDHASH. Never injects OAuth Bearer.
    * No-op when cookie playback auth is unavailable.
+   * Header shape shared with the browse rail via buildWebRailHeaders;
+   * playback overwrites the cookie header with the account cookie (no SOCS append).
    */
   private async injectWebAuthHeaders(
     headers: Record<string, string | string[]>
@@ -205,15 +209,12 @@ export class YouTubeHttpClient {
     if (!activeAuthSession || !activeAuthSession.hasWebAuthForPlayback()) {
       return;
     }
-    const cookieStr = activeAuthSession.getCookieStringForPlayback();
-    if (cookieStr) {
-      headers['Cookie'] = cookieStr;
-      headers['X-Origin'] = 'https://www.youtube.com';
-      headers['DNT'] = '1';
-    }
-    const authorization = await activeAuthSession.getWebAuthorizationHeader();
-    if (authorization && authorization.length > 0) {
-      headers['Authorization'] = authorization;
+    const cookieStr = activeAuthSession.getCookieStringForPlayback() || '';
+    const authorization = await activeAuthSession.getWebAuthorizationHeader() || '';
+    const built = buildWebRailHeaders(cookieStr, authorization, false);
+    const builtKeys = Object.keys(built);
+    for (let i = 0; i < builtKeys.length; i++) {
+      headers[builtKeys[i]] = built[builtKeys[i]];
     }
     logger.info('[NET] authRail=web cookie inject');
   }
@@ -283,7 +284,7 @@ export class YouTubeHttpClient {
       if (!isApiRequest) {
         if (!headers['Cookie'] || !(headers['Cookie'] as string).includes('SOCS=')) {
           const existingCookie = headers['Cookie'] ? headers['Cookie'] + '; ' : '';
-          headers['Cookie'] = existingCookie + 'SOCS=CAISAiAD';
+          headers['Cookie'] = existingCookie + SOCS_CONSENT_COOKIE;
         }
       }
 

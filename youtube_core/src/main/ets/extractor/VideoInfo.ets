@@ -149,8 +149,8 @@ export class VideoInfo {
     if (this.thumbnails.length === 0) {
       return undefined;
     }
-    // 按分辨率排序，返回最高的
-    return this.thumbnails.sort((a, b) => {
+    // 按分辨率排序，返回最高的（拷贝后排序，getter 不得修改原数组）
+    return this.thumbnails.slice().sort((a, b) => {
       const areaA = (a.width || 0) * (a.height || 0);
       const areaB = (b.width || 0) * (b.height || 0);
       return areaB - areaA;
