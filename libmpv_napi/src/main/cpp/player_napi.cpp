@@ -26,6 +26,7 @@ extern "C" {
 
 #include <cmath>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <dlfcn.h>
@@ -179,6 +180,8 @@ struct PlayerContext {
     int32_t surfaceWidth = 0;
     int32_t surfaceHeight = 0;
     napi_threadsafe_function tsfn = nullptr;
+    /** Native-side throttle for time-pos events (type 1); 0 = push immediately. */
+    atomic_int64_t lastTimePosPushMs {0};
 };
 
 mutex gMutex;
@@ -495,8 +498,22 @@ struct TsfnEvent { int type; int64_t value; };
 void PushEvent(PlayerContext& ctx, int type, int64_t value)
 {
     if (!ctx.tsfn) return;
+    // time-pos fires per mpv property update (far above UI needs); throttle to
+    // 100ms on the native side so a busy JS thread cannot grow the TSFN queue.
+    if (type == 1) {
+        const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        const int64_t last = ctx.lastTimePosPushMs.load();
+        if (now - last < 100) {
+            return;
+        }
+        ctx.lastTimePosPushMs.store(now);
+    }
     auto* evt = new TsfnEvent{type, value};
-    napi_call_threadsafe_function(ctx.tsfn, evt, napi_tsfn_nonblocking);
+    if (napi_call_threadsafe_function(ctx.tsfn, evt, napi_tsfn_nonblocking) != napi_ok) {
+        // Queue full / tsfn released: drop the event, never leak the allocation.
+        delete evt;
+    }
 }
 
 void StartEventLoop(PlayerContext& ctx)
@@ -1175,11 +1192,13 @@ napi_value ReleasePlayer(napi_env env, napi_callback_info info)
         }
     }
     if (player) {
+        // Stop the event/command threads first so no PushEvent can race the
+        // tsfn release (a call after release would leak the event payload).
+        DestroyMpv(*player);
         if (player->tsfn) {
             napi_release_threadsafe_function(player->tsfn, napi_tsfn_release);
             player->tsfn = nullptr;
         }
-        DestroyMpv(*player);
     }
     return Undefined(env);
 }
@@ -1484,7 +1503,9 @@ napi_value SetEventCallback(napi_env env, napi_callback_info info)
             napi_release_threadsafe_function(ctx.tsfn, napi_tsfn_release);
             ctx.tsfn = nullptr;
         }
-        napi_create_threadsafe_function(env, args[1], nullptr, resourceName, 0, 1,
+        // Bounded queue (128): a wedged JS thread must not grow memory without
+        // limit; PushEvent drops and frees payloads when the queue is full.
+        napi_create_threadsafe_function(env, args[1], nullptr, resourceName, 128, 1,
             nullptr, nullptr, nullptr,
             [](napi_env tEnv, napi_value jsCb, void*, void* data) {
                 auto* evt = static_cast<TsfnEvent*>(data);
