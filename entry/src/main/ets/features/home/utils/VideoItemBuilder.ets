@@ -7,7 +7,20 @@ import {
   getShortsLockupThumbnailUrl,
   getThumbnailUrl as getThumbFromRenderer
 } from './ThumbnailUtils';
-import { getLockupUploaderName, getLockupChannelId, getLockupViewCount, getLockupRequiresMembership } from './LockupViewModelParser';
+import {
+  containsWatchingIndicator,
+  getLockupChannelAvatarUrl,
+  getLockupChannelId,
+  getLockupIsLive,
+  getLockupIsPremium,
+  getLockupRequiresMembership,
+  getLockupTitle,
+  getLockupUploaderName,
+  getLockupVideoId,
+  getLockupVideoThumbnailUrl,
+  getLockupViewCount,
+  isLiveLabelText
+} from './LockupViewModelParser';
 
 export function buildVideoItemFromRenderer(
   renderer: Record<string, Object>,
@@ -230,8 +243,7 @@ export function buildVideoItemFromTileRenderer(tile: Record<string, Object>, id:
   );
 }
 
-export function buildVideoItemFromShortsLockupViewModel(lockup: Record<string, Object>, id: number): VideoItem | null {
-  const onTap = lockup["onTap"] as Record<string, Object>;
+export function buildVideoItemFromShortsLockupViewModel(lockup: Record<string, Object>, id: number): VideoItem | null {const onTap = lockup["onTap"] as Record<string, Object>;
   const innertubeCommand = onTap ? (onTap["innertubeCommand"] as Record<string, Object>) : undefined;
   const reelWatchEndpoint = innertubeCommand ? (innertubeCommand["reelWatchEndpoint"] as Record<string, Object>) : undefined;
   let videoId = reelWatchEndpoint ? (reelWatchEndpoint["videoId"] as string) : "";
@@ -324,23 +336,6 @@ export function hasLiveBadge(video: Record<string, Object>, liveLabel: string): 
   }
 
   return false;
-}
-
-function isLiveLabelText(text: string, liveLabel: string): boolean {
-  const raw = (text || "").trim();
-  if (raw.length === 0) {
-    return false;
-  }
-  if (liveLabel && liveLabel.length > 0 && raw === liveLabel) {
-    return true;
-  }
-  const lower = raw.toLowerCase();
-  return lower === "live"
-    || lower === "live now"
-    || lower.indexOf("live") >= 0
-    || lower.indexOf("bukhoma") >= 0
-    || raw.indexOf("直播") >= 0
-    || raw.indexOf("直播中") >= 0;
 }
 
 function isLiveBadgeViewModel(bvm: Record<string, Object>, liveLabel: string): boolean {
@@ -469,23 +464,6 @@ function hasWatchingMetadata(video: Record<string, Object>): boolean {
     }
   }
   return false;
-}
-
-function containsWatchingIndicator(text: string): boolean {
-  if (!text || text.trim().length === 0) {
-    return false;
-  }
-  const lower = text.toLowerCase();
-  return lower.indexOf("watching") >= 0
-    || lower.indexOf("viewer") >= 0
-    || lower.indexOf("ababukele") >= 0
-    || lower.indexOf("babukele") >= 0
-    || lower.indexOf("bukele") >= 0
-    || text.indexOf("正在观看") >= 0
-    || text.indexOf("人在看") >= 0
-    || text.indexOf("观看中") >= 0
-    || text.indexOf("位观众") >= 0
-    || text.indexOf("名观众") >= 0;
 }
 
 function getLockupOverlays(video: Record<string, Object>): Array<Record<string, Object>> | null {

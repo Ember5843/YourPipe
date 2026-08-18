@@ -7,11 +7,10 @@ import { AuthAccountStatus, AuthStage } from 'youtube_core';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 import { common } from '@kit.AbilityKit';
 import { AppLog } from '../../common/AppLog';
+import { getAppVersion } from '../../common/AppVersion';
 import { APPGALLERY_TEST_URL, UpdateChecker, UpdateCheckResult } from '../../common/UpdateChecker';
 
 const logger = AppLog.getInstance('OptionsMainPage');
-
-const APP_VERSION: string = '0.5.8';
 
 interface OptionsMainPageParams {
   clickEffectEnabled: ClickEffect | null;
@@ -299,7 +298,7 @@ export struct OptionsMainPage {
           OptionItem({
             icon: $r('sys.symbol.info_circle_fill'),
             title: $r('app.string.yt_option_about'),
-            subtitle: 'v' + APP_VERSION,
+            subtitle: 'v' + getAppVersion().versionName,
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onAboutClick

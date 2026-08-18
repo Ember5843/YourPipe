@@ -382,8 +382,9 @@ function isViewCountPart(part: Record<string, Object>): boolean {
 
 /**
  * Live detection for lockupViewModel (PipePipe YoutubeLockupStreamInfoItemExtractor).
+ * Shared by every list parser; liveLabel is the localized "live" badge text when known.
  */
-export function getLockupIsLive(lockup: Record<string, Object>): boolean {
+export function getLockupIsLive(lockup: Record<string, Object>, liveLabel: string = ""): boolean {
   const ci = lockup["contentImage"] as Record<string, Object>;
   const tvm = ci ? (ci["thumbnailViewModel"] as Record<string, Object>) : undefined;
   const overlays = tvm ? (tvm["overlays"] as Array<Record<string, Object>>) : undefined;
@@ -400,7 +401,7 @@ export function getLockupIsLive(lockup: Record<string, Object>): boolean {
             const bvm = badges[b]
               ? (badges[b]["thumbnailBadgeViewModel"] as Record<string, Object>)
               : undefined;
-            if (bvm && isLockupLiveBadge(bvm)) {
+            if (bvm && isLiveBadgeViewModel(bvm, liveLabel)) {
               return true;
             }
           }
@@ -416,7 +417,7 @@ export function getLockupIsLive(lockup: Record<string, Object>): boolean {
             const bvm = badges[b]
               ? (badges[b]["thumbnailBadgeViewModel"] as Record<string, Object>)
               : undefined;
-            if (bvm && isLockupLiveBadge(bvm)) {
+            if (bvm && isLiveBadgeViewModel(bvm, liveLabel)) {
               return true;
             }
           }
@@ -440,7 +441,7 @@ export function getLockupIsLive(lockup: Record<string, Object>): boolean {
       for (let j = 0; j < parts.length; j++) {
         const text = parts[j] ? (parts[j]["text"] as Record<string, Object>) : undefined;
         const content = text ? ((text["content"] as string) || "") : "";
-        if (containsLockupWatchingIndicator(content)) {
+        if (containsWatchingIndicator(content)) {
           return true;
         }
       }
@@ -449,33 +450,51 @@ export function getLockupIsLive(lockup: Record<string, Object>): boolean {
   return false;
 }
 
-function isLockupLiveBadge(bvm: Record<string, Object>): boolean {
-  const style = ((bvm["badgeStyle"] as string) || "").toUpperCase();
-  if (style.indexOf("LIVE") >= 0) {
+/** Localized "live" label match shared by classic badges and badge view models. */
+export function isLiveLabelText(text: string, liveLabel: string): boolean {
+  const raw = (text || "").trim();
+  if (raw.length === 0) {
+    return false;
+  }
+  if (liveLabel && liveLabel.length > 0 && raw === liveLabel) {
     return true;
   }
-  const text = ((bvm["text"] as string) || "").toLowerCase();
-  if (text.indexOf("live") >= 0 || text.indexOf("bukhoma") >= 0
-    || ((bvm["text"] as string) || "").indexOf("直播") >= 0) {
+  const lower = raw.toLowerCase();
+  return lower === "live"
+    || lower === "live now"
+    || lower.indexOf("live") >= 0
+    || lower.indexOf("bukhoma") >= 0
+    || raw.indexOf("直播") >= 0
+    || raw.indexOf("直播中") >= 0;
+}
+
+/** Live detection for a single thumbnailBadgeViewModel (PipePipe lockup extractor). */
+export function isLiveBadgeViewModel(bvm: Record<string, Object>, liveLabel: string): boolean {
+  const badgeStyle = ((bvm["badgeStyle"] as string) || "").toUpperCase();
+  if (badgeStyle.indexOf("LIVE") >= 0) {
     return true;
   }
-  // PipePipe treats animatedText as string; also accept {content}.
+  const badgeText = (bvm["text"] as string) || "";
+  if (isLiveLabelText(badgeText, liveLabel)) {
+    return true;
+  }
+  // PipePipe: animatedText may be a plain string.
   const animatedRaw = bvm["animatedText"];
-  if (typeof animatedRaw === "string") {
-    const a = (animatedRaw as string).toLowerCase();
-    if (a.indexOf("live") >= 0 || (animatedRaw as string).indexOf("直播") >= 0) {
-      return true;
-    }
-  } else if (animatedRaw && typeof animatedRaw === "object") {
-    const content = (((animatedRaw as Record<string, Object>)["content"] as string) || "");
-    if (content.toLowerCase().indexOf("live") >= 0 || content.indexOf("直播") >= 0) {
-      return true;
-    }
-  }
-  const imageName = ((bvm["imageName"] as string) || "").toUpperCase();
-  if (imageName === "LIVE") {
+  if (typeof animatedRaw === "string" && isLiveLabelText(animatedRaw as string, liveLabel)) {
     return true;
   }
+  if (animatedRaw && typeof animatedRaw === "object") {
+    const animatedObj = animatedRaw as Record<string, Object>;
+    const animatedContent = (animatedObj["content"] as string) || "";
+    if (isLiveLabelText(animatedContent, liveLabel)) {
+      return true;
+    }
+  }
+  const imageName = (bvm["imageName"] as string) || "";
+  if (imageName.toUpperCase() === "LIVE") {
+    return true;
+  }
+  // PipePipe: icon.sources[].clientResource.imageName === "LIVE"
   const icon = bvm["icon"] as Record<string, Object>;
   const sources = icon ? (icon["sources"] as Array<Record<string, Object>>) : undefined;
   if (sources) {
@@ -483,8 +502,8 @@ function isLockupLiveBadge(bvm: Record<string, Object>): boolean {
       const client = sources[s]
         ? (sources[s]["clientResource"] as Record<string, Object>)
         : undefined;
-      const name = client ? (((client["imageName"] as string) || "").toUpperCase()) : "";
-      if (name === "LIVE") {
+      const name = client ? ((client["imageName"] as string) || "") : "";
+      if (name.toUpperCase() === "LIVE") {
         return true;
       }
     }
@@ -492,7 +511,8 @@ function isLockupLiveBadge(bvm: Record<string, Object>): boolean {
   return false;
 }
 
-function containsLockupWatchingIndicator(text: string): boolean {
+/** Localized "watching" indicators in view-count / metadata text. */
+export function containsWatchingIndicator(text: string): boolean {
   if (!text || text.trim().length === 0) {
     return false;
   }

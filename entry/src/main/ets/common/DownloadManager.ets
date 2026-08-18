@@ -12,7 +12,8 @@ import { notificationManager } from '@kit.NotificationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { taskpool } from '@kit.ArkTS';
 import { UIConfig } from './AppState';
-import { AuthSessionManager, HttpDownloader } from 'youtube_core';
+import { formatBytes } from './utils/FormatUtils';
+import { AuthSessionManager, HttpDownloader, parseHlsMasterManifest } from 'youtube_core';
 
 const logger = AppLog.getInstance('DownloadManager');
 const DOWNLOAD_ROOT: string = 'downloads';
@@ -46,12 +47,6 @@ export enum DownloadStatus {
 interface StreamChunkResult {
   responseCode: number;
   bytesWritten: number;
-}
-
-interface HlsVariant {
-  url: string;
-  bandwidth: number;
-  height: number;
 }
 
 interface HlsMediaPlaylist {
@@ -153,11 +148,7 @@ export class DownloadTask {
   }
 
   getFriendlySize(size: number): string {
-    if (size <= 0) return '';
-    if (size < 1024) return `${size} B`;
-    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-    if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    return formatBytes(size);
   }
 
   getProgressText(): string {
@@ -830,18 +821,14 @@ export class DownloadManager {
     if (!this.isHlsMasterPlaylist(text)) {
       return manifestUrl;
     }
-    const variants = this.parseHlsMasterVariants(text, manifestUrl);
+    // Master 解析统一走 youtube_core HlsManifestParser（不含 BANDWIDTH，按高度选最高清晰度）。
+    const variants = parseHlsMasterManifest(text, '')
+      .videoStreams.filter((s) => !!s.url);
     if (variants.length === 0) {
       throw new Error('HLS master playlist has no variants');
     }
-    // Prefer highest bandwidth / resolution.
-    variants.sort((a: HlsVariant, b: HlsVariant): number => {
-      if (b.bandwidth !== a.bandwidth) {
-        return b.bandwidth - a.bandwidth;
-      }
-      return b.height - a.height;
-    });
-    logger.info(`HLS master: picked bandwidth=${variants[0].bandwidth} height=${variants[0].height} url=${variants[0].url}`);
+    variants.sort((a, b) => (b.height || 0) - (a.height || 0));
+    logger.info(`HLS master: picked height=${variants[0].height || 0} url=${variants[0].url}`);
     return variants[0].url;
   }
 
@@ -879,37 +866,6 @@ export class DownloadManager {
 
   private isHlsMasterPlaylist(text: string): boolean {
     return text.indexOf('#EXT-X-STREAM-INF') >= 0;
-  }
-
-  private parseHlsMasterVariants(manifestText: string, baseUrl: string): HlsVariant[] {
-    const lines = manifestText.split(/\r?\n/);
-    const variants: HlsVariant[] = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line.startsWith('#EXT-X-STREAM-INF')) {
-        continue;
-      }
-      const bandwidthMatch = line.match(/BANDWIDTH=(\d+)/i);
-      const resMatch = line.match(/RESOLUTION=(\d+)x(\d+)/i);
-      let j = i + 1;
-      while (j < lines.length && !lines[j].trim()) {
-        j++;
-      }
-      if (j >= lines.length) {
-        break;
-      }
-      const uriLine = lines[j].trim();
-      if (!uriLine || uriLine.startsWith('#')) {
-        continue;
-      }
-      variants.push({
-        url: this.resolveHlsUrl(uriLine, baseUrl),
-        bandwidth: bandwidthMatch ? parseInt(bandwidthMatch[1], 10) : 0,
-        height: resMatch ? parseInt(resMatch[2], 10) : 0
-      });
-      i = j;
-    }
-    return variants;
   }
 
   private parseHlsMediaPlaylist(manifestText: string, baseUrl: string): HlsMediaPlaylist {

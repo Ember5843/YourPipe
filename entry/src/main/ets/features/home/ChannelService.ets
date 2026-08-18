@@ -4,6 +4,7 @@ import { ContentCountry, Localization, fetchBrowseContinuation, fetchBrowsePage 
 import { getPlaylistContinuationToken } from './utils/ContinuationUtils';
 import { buildHomeKioskVideoItems, getHomeKioskItemsFromTabContent } from './utils/HomeFeedUtils';
 import { pickBestThumbUrl } from './utils/ThumbnailUtils';
+import { getTextFromRuns } from './utils/TextUtils';
 import { buildVideoItemFromReelRenderer, buildVideoItemFromRenderer } from './utils/VideoItemBuilder';
 import { getLockupPlaylistCoverUrl, getLockupPlaylistId, getLockupTitle, getLockupUploaderName } from './utils/LockupViewModelParser';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
@@ -235,12 +236,12 @@ export class ChannelService {
       const gridPlaylist = content["gridPlaylistRenderer"] as Record<string, Object>;
       if (gridPlaylist) {
         const playlistId = (gridPlaylist["playlistId"] as string) || "";
-        const title = this.getTextFromRuns(gridPlaylist["title"]) || "Untitled";
-        const videoCount = this.getTextFromRuns(gridPlaylist["videoCountText"]) || "";
+        const title = getTextFromRuns(gridPlaylist["title"]) || "Untitled";
+        const videoCount = getTextFromRuns(gridPlaylist["videoCountText"]) || "";
         const thumbnail = gridPlaylist["thumbnail"] as Record<string, Object>;
         const coverUrl = this.getThumbnailUrlFromThumbnailObject(thumbnail);
         const shortBylineText = gridPlaylist["shortBylineText"] as Record<string, Object>;
-        const uploaderName = this.getTextFromRuns(shortBylineText) || "Unknown";
+        const uploaderName = getTextFromRuns(shortBylineText) || "Unknown";
         const placeholderColor = ThumbnailPlaceholder.pickColor(playlistId || title, idCounter);
         items.push(new SearchPlaylistItem(
           idCounter,
@@ -279,16 +280,6 @@ export class ChannelService {
     });
 
     return { items, nextPageToken, visitorData: "" };
-  }
-
-  private getTextFromRuns(source: Object | undefined): string {
-    if (!source) return "";
-    const anySource = source as Record<string, Object>;
-    const simpleText = anySource["simpleText"] as string;
-    if (simpleText) return simpleText;
-    const runs = anySource["runs"] as Array<Record<string, Object>>;
-    if (!runs || runs.length === 0) return "";
-    return runs.map((run) => (run["text"] as string) || "").join("");
   }
 
   private getThumbnailUrlFromThumbnailObject(thumbnail: Record<string, Object> | undefined): string {

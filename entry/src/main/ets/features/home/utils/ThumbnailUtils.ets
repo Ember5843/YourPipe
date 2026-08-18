@@ -1,3 +1,5 @@
+import { pickHighestThumbnailUrl } from 'youtube_core';
+
 export function normalizeUrl(input: string): string {
   if (!input) return "";
   const url = input.trim();
@@ -30,60 +32,11 @@ export function upgradeYoutubeStillToMaxRes(url: string): string {
 
 /**
  * Always pick the highest-resolution thumbnail from candidates.
- * Primary key: width * height (PipePipe/NewPipe style: largest listed source).
- * If dimensions missing: known YouTube name order (maxres > hq720 > sd > hq > mq > default).
- * Equal scores: prefer later array index (YouTube arrays are usually low → high).
- * After selection, upgrade standard /vi/ stills to maxresdefault.
+ * Single implementation lives in youtube_core (pickHighestThumbnailUrl);
+ * this wrapper keeps the entry-side name and call sites unchanged.
  */
 export function pickBestThumbUrl(candidates: Array<Record<string, Object>>): string {
-  if (!candidates || candidates.length === 0) {
-    return "";
-  }
-  let bestUrl = "";
-  let bestScore = -1;
-  for (let i = 0; i < candidates.length; i++) {
-    const item = candidates[i];
-    if (!item) {
-      continue;
-    }
-    const url = normalizeUrl((item["url"] as string) || "");
-    if (url.length === 0) {
-      continue;
-    }
-    const width = Number(item["width"] ?? 0);
-    const height = Number(item["height"] ?? 0);
-    let score = 0;
-    if (width > 0 && height > 0) {
-      score = width * height;
-    } else if (width > 0) {
-      score = width * 1000;
-    } else if (height > 0) {
-      score = height * 1000;
-    } else {
-      const lower = url.toLowerCase();
-      if (lower.indexOf('maxresdefault') >= 0) {
-        score = 100000;
-      } else if (lower.indexOf('hq720') >= 0) {
-        score = 90000;
-      } else if (lower.indexOf('sddefault') >= 0) {
-        score = 80000;
-      } else if (lower.indexOf('hqdefault') >= 0) {
-        score = 70000;
-      } else if (lower.indexOf('mqdefault') >= 0) {
-        score = 60000;
-      } else if (lower.indexOf('default.jpg') >= 0 || lower.indexOf('/default.') >= 0) {
-        score = 50000;
-      } else {
-        // Prefer later unnamed entries slightly so size-less arrays still pick last
-        score = i;
-      }
-    }
-    if (score >= bestScore) {
-      bestScore = score;
-      bestUrl = url;
-    }
-  }
-  return upgradeYoutubeStillToMaxRes(bestUrl);
+  return pickHighestThumbnailUrl(candidates);
 }
 
 export function getThumbnailUrlFromThumbnailObject(thumbnail: Record<string, Object> | undefined): string {

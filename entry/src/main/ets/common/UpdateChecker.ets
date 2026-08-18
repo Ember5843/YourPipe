@@ -1,8 +1,8 @@
 import { http } from '@kit.NetworkKit';
-import { bundleManager } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { HttpDownloader } from 'youtube_core';
 import { AppLog } from './AppLog';
+import { getAppVersion } from './AppVersion';
 
 const logger = AppLog.getInstance('UpdateChecker');
 
@@ -54,7 +54,7 @@ const MAX_NOTES_CHARS = 400;
 
 export class UpdateChecker {
   static async check(): Promise<UpdateCheckResult> {
-    const local = await UpdateChecker.readLocalVersion();
+    const local = UpdateChecker.readLocalVersion();
     const result: UpdateCheckResult = {
       status: 'failed',
       localVersionName: local.versionName,
@@ -88,17 +88,10 @@ export class UpdateChecker {
     }
   }
 
-  private static async readLocalVersion(): Promise<LocalVersion> {
-    try {
-      const info = await bundleManager.getBundleInfoForSelf(
-        bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
-      const local: LocalVersion = { versionName: info.versionName, versionCode: info.versionCode };
-      return local;
-    } catch (e) {
-      logger.warn(`readLocalVersion failed, fallback constants: ${String(e)}`);
-      const fallback: LocalVersion = { versionName: '0.5.8', versionCode: 1000020 };
-      return fallback;
-    }
+  private static readLocalVersion(): LocalVersion {
+    const version = getAppVersion();
+    const local: LocalVersion = { versionName: version.versionName, versionCode: version.versionCode };
+    return local;
   }
 
   private static async resolveRemoteVersion(release: GithubRelease): Promise<LocalVersion> {

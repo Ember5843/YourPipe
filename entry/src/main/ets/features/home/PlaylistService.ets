@@ -2,6 +2,7 @@ import { SearchPlaylistItem, VideoItem } from 'youtube_core';
 import { VideoBuildResult } from './model/FeedResult';
 import { ContentCountry, Localization, fetchBrowseContinuation, fetchBrowsePage } from 'youtube_core';
 import { pickBestThumbUrl } from './utils/ThumbnailUtils';
+import { getTextFromRuns } from './utils/TextUtils';
 import { getPlaylistContinuationToken } from './utils/ContinuationUtils';
 import {
   getLockupChannelAvatarUrl,
@@ -93,14 +94,14 @@ export class PlaylistService {
     // Prefer sidebar primary info (PipePipe getPlaylistInfo) when list header is missing.
     const sidebarPrimary = this.getSidebarPrimaryInfo(root);
 
-    const title = this.getTextFromRuns(playlistHeader ? playlistHeader["title"] : undefined)
-      || this.getTextFromRuns(sidebarPrimary ? sidebarPrimary["title"] : undefined)
+    const title = getTextFromRuns(playlistHeader ? playlistHeader["title"] : undefined)
+      || getTextFromRuns(sidebarPrimary ? sidebarPrimary["title"] : undefined)
       || this.getMicroformatTitle(root)
       || "Untitled";
     const shortBylineText = playlistHeader
       ? playlistHeader["shortBylineText"] as Record<string, Object>
       : undefined;
-    const uploaderName = this.getTextFromRuns(shortBylineText) || "Unknown";
+    const uploaderName = getTextFromRuns(shortBylineText) || "Unknown";
     let countText = this.getPlaylistTotalCountText(playlistHeader);
     if (!countText) {
       countText = this.getPlaylistTotalCountText(sidebarPrimary);
@@ -350,7 +351,7 @@ export class PlaylistService {
     if (!playlistHeader) return "";
     const stats = playlistHeader["stats"] as Array<Record<string, Object>>;
     if (!stats || stats.length === 0) return "";
-    return this.getTextFromRuns(stats[0]) || "";
+    return getTextFromRuns(stats[0]) || "";
   }
 
   private getPlaylistTotalCountFromSidebar(root: Record<string, Object>): string {
@@ -464,15 +465,5 @@ export class PlaylistService {
       }
     }
     return undefined;
-  }
-
-  private getTextFromRuns(source: Object | undefined): string {
-    if (!source) return "";
-    const anySource = source as Record<string, Object>;
-    const simpleText = anySource["simpleText"] as string;
-    if (simpleText) return simpleText;
-    const runs = anySource["runs"] as Array<Record<string, Object>>;
-    if (!runs || runs.length === 0) return "";
-    return runs.map((run) => (run["text"] as string) || "").join("");
   }
 }

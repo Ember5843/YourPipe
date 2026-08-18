@@ -12,7 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CommonConstants as Const, Logger, StreamInfo, StreamCategories } from 'mediaservice';
+import { CommonConstants as Const, Logger, StreamInfo, StreamCategories, PlayerModel } from 'mediaservice';
+import { formatBytes } from '../../../common/utils/FormatUtils';
 import { LengthMetrics } from '@kit.ArkUI';
 import { ErrorPage } from '../../../common/components/ErrorPage';
 import { TabErrorPanel } from '../../../common/components/TabErrorPanel';
@@ -353,59 +354,14 @@ export struct VideoDetails {
   }
 
   private classifyStreamsForDownload(): void {
-    const categories: StreamCategories = {
-      audio: [],
-      video: [],
-      dashManifest: [],
-      hlsManifest: [],
-      progressive: []
-    };
-
     if (!this.streams || this.streams.length === 0) {
-      this.streamCategories = categories;
+      this.streamCategories = PlayerModel.classifyStreamList([], true).categories;
       return;
     }
 
-    this.streams.forEach((stream: StreamInfo) => {
-      const kind = (stream.kind || '').toLowerCase();
-      const delivery = (stream.deliveryMethod || '').toUpperCase();
-      const isSabr = delivery === 'SABR' || kind === 'sabr' || !!stream.sabrInfo?.serverAbrStreamingUrl;
-      // Progressive/HLS need a media URL; SABR uses sabrInfo bootstrap (isUrl=false).
-      if (!isSabr && !stream.url) {
-        return;
-      }
-      if (isSabr && (!stream.sabrInfo || !stream.sabrInfo.serverAbrStreamingUrl)) {
-        return;
-      }
-
-      const mimeType = (stream.mimeType || '').toLowerCase();
-      const codecs = (stream.codecs || '').toLowerCase();
-      const hasVideo = stream.hasVideo === true
-        || !!stream.width
-        || !!stream.height
-        || !!stream.videoQuality
-        || mimeType.startsWith('video/');
-      const hasAudio = stream.hasAudio === true
-        || !!stream.audioQuality
-        || !!stream.audioLanguage
-        || !!stream.audioTrackName
-        || mimeType.startsWith('audio/')
-        || codecs.includes('mp4a')
-        || codecs.includes('opus');
-
-      if (kind === 'manifest_hls' || delivery === 'HLS') {
-        categories.hlsManifest.push(stream);
-      } else if (kind === 'manifest_dash') {
-        categories.dashManifest.push(stream);
-      } else if (!isSabr && (kind === 'progressive' || delivery === 'PROGRESSIVE_HTTP' || (hasVideo && hasAudio))) {
-        categories.progressive.push(stream);
-      } else if (kind === 'video_only' || hasVideo) {
-        categories.video.push(stream);
-      } else if (kind === 'audio_only' || hasAudio) {
-        categories.audio.push(stream);
-      }
-    });
-
+    // 分类规则与播放路径共用 PlayerModel.classifyStreamList（下载要求可拉取的
+    // 媒体 URL，SABR 用 sabrInfo 引导）；下载 UI 需要排序，这里在结果上排序。
+    const categories = PlayerModel.classifyStreamList(this.streams, true).categories;
     categories.video.sort((a: StreamInfo, b: StreamInfo): number => (b.height || 0) - (a.height || 0));
     categories.audio.sort((a: StreamInfo, b: StreamInfo): number => (b.bitrate || 0) - (a.bitrate || 0));
     categories.progressive.sort((a: StreamInfo, b: StreamInfo): number => (b.height || 0) - (a.height || 0));
@@ -550,10 +506,7 @@ export struct VideoDetails {
   }
 
   private formatFileSize(bytes: number): string {
-    if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(2)} GB`;
-    if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
-    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${bytes} B`;
+    return formatBytes(bytes);
   }
 
   private formatChannels(ch: number): string {

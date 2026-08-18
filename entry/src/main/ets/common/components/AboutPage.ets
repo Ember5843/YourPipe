@@ -5,11 +5,10 @@ import { PlaybackSectionTitle } from './PlaybackSectionTitle';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
 import { AppLog } from '../AppLog';
+import { getAppVersion } from '../AppVersion';
 import { ThemeColorUtil } from '../ThemeColorUtil';
 import { SECTION_CARD_RADIUS } from './MediaCardTokens';
 
-const APP_VERSION = '0.5.8';
-const APP_BUILD = '1000020';
 const GITHUB_REPO_URL = 'https://github.com/Ember5843/YourPipe';
 const logger = AppLog.getInstance('AboutPage');
 
@@ -486,7 +485,7 @@ export struct AboutPage {
               Text('YourPipe')
                 .fontSize(26).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.yourtube_text_primary'))
-              Text(`${getContext().resourceManager.getStringSync($r('app.string.yt_label_version_format').id)} ${APP_VERSION}`)
+              Text(`${getContext().resourceManager.getStringSync($r('app.string.yt_label_version_format').id)} ${getAppVersion().versionName}`)
                 .fontSize(13).fontColor($r('app.color.yourtube_text_hint'))
             }
             .alignItems(HorizontalAlign.Center)
@@ -581,7 +580,7 @@ export struct AboutPage {
 
           // ── 底部版权 ──
           Column() {
-            Text(`YourPipe v${APP_VERSION}  ·  GPL-3.0`)
+            Text(`YourPipe v${getAppVersion().versionName}  ·  GPL-3.0`)
               .fontSize(11).fontColor($r('app.color.yourtube_text_disabled'))
             Text('© 2025 Talon')
               .fontSize(11).fontColor($r('app.color.yourtube_text_disabled'))

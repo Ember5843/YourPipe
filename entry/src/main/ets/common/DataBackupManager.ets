@@ -2,6 +2,7 @@ import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import common from '@ohos.app.ability.common';
 import { AuthSessionManager, AuthBackupState } from 'youtube_core';
 import { AppLog } from './AppLog';
+import { getAppVersion } from './AppVersion';
 import { PreferencesStore } from './PreferencesStore';
 import { NetworkProxyConfig } from './NetworkProxyConfig';
 import { ThemeManager } from './ThemeManager';
@@ -27,7 +28,6 @@ import {
 const logger = AppLog.getInstance('DataBackupManager');
 const BACKUP_APP_ID: string = 'net.yourpipe';
 const BACKUP_VERSION: number = 1;
-const APP_VERSION: string = '0.5.8';
 
 export type BackupErrorCode =
   | 'no_context'
@@ -101,7 +101,7 @@ export class DataBackupManager {
 
     return {
       appId: BACKUP_APP_ID,
-      appVersion: APP_VERSION,
+      appVersion: getAppVersion().versionName,
       backupVersion: BACKUP_VERSION,
       exportedAt: Date.now(),
       items

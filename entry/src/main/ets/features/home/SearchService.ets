@@ -358,9 +358,9 @@ export class SearchService {
   private buildChannelItem(channelRenderer: Record<string, Object>, idCounter: number): SearchChannelItem | null {
     const channelId = (channelRenderer["channelId"] as string) || "";
     const title = getTextFromRuns(channelRenderer["title"]) || "Untitled";
-    const subscriberCount = this.getTextFromRuns(channelRenderer["subscriberCountText"]) || "";
-    const videoCountText = this.getTextFromRuns(channelRenderer["videoCountText"]) || "";
-    const descriptionSnippet = this.getTextFromRuns(channelRenderer["descriptionSnippet"]) || "";
+    const subscriberCount = getTextFromRuns(channelRenderer["subscriberCountText"]) || "";
+    const videoCountText = getTextFromRuns(channelRenderer["videoCountText"]) || "";
+    const descriptionSnippet = getTextFromRuns(channelRenderer["descriptionSnippet"]) || "";
     const thumbnail = channelRenderer["thumbnail"] as Record<string, Object>;
     const thumbnailUrl = getThumbnailUrlFromThumbnailObject(thumbnail);
     const placeholderColor = ThumbnailPlaceholder.pickColor(channelId || title, idCounter);
@@ -504,15 +504,5 @@ export class SearchService {
       }
     }
     return "";
-  }
-
-  private getTextFromRuns(source: Object | undefined): string {
-    if (!source) return "";
-    const anySource = source as Record<string, Object>;
-    const simpleText = anySource["simpleText"] as string;
-    if (simpleText) return simpleText;
-    const runs = anySource["runs"] as Array<Record<string, Object>>;
-    if (!runs || runs.length === 0) return "";
-    return runs.map((run) => (run["text"] as string) || "").join("");
   }
 }
