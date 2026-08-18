@@ -301,7 +301,13 @@ export class LocalProxyServer {
   }
 
   destroyAll(): void {
-    sessionStore.clear();
+    // Snapshot ids first: destroySession mutates the store while we iterate.
+    const ids = sessionStore.ids();
+    Logger.info(TAG, `destroyAll: tearing down ${ids.length} session(s)`);
+    for (const id of ids) {
+      // Reuses destroySession teardown: cancel + SABR lease release + removal.
+      this.destroySession(id);
+    }
   }
 
   playbackUrl(sessionId: string): string {

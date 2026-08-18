@@ -109,6 +109,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       const hwdecEnabled = _config.mpvHwdecEnabled ?? true;
       const cacheSecs = _config.mpvCacheSecs ?? 10;
       const demuxerReadaheadSecs = _config.mpvDemuxerReadaheadSecs ?? 8;
+      // Injected in MB by entry (PlaybackConfig.demuxerMaxBytes labels).
+      const demuxerMaxBytesMb = _config.mpvDemuxerMaxBytes ?? 20;
       const gpuApi = _config.mpvGpuApi ?? 'auto';
 
       // Product path: ohcodec-copy + gpu-next (native EnsureMpv also sets these).
@@ -133,7 +135,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       Logger.info(TAG, `Memory cache configured: ${cacheSecs}s`);
 
       ctrl.setProperty('demuxer-readahead-secs', `${demuxerReadaheadSecs}`);
-      Logger.info(TAG, `Demuxer readahead=${demuxerReadaheadSecs}s`);
+      ctrl.setProperty('demuxer-max-bytes', `${demuxerMaxBytesMb * 1024 * 1024}`);
+      Logger.info(TAG, `Demuxer readahead=${demuxerReadaheadSecs}s max-bytes=${demuxerMaxBytesMb}MiB`);
 
       ctrl.setProperty('hr-seek', 'yes');
       ctrl.setProperty('hr-seek-framedrop', 'yes');

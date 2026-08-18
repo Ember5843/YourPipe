@@ -91,6 +91,10 @@ class SessionStore {
     return this.sessions.delete(id);
   }
 
+  ids(): string[] {
+    return Array.from(this.sessions.keys());
+  }
+
   clear(): void {
     this.sessions.clear();
   }
