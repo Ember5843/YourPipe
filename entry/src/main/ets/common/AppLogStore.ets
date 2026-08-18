@@ -124,6 +124,18 @@ export class AppLogStore {
   private static currentFile: fs.File | null = null;
   /** 当前活跃 Session 的 ID */
   private static currentSessionId: string = '';
+  /** 历史日志是否已从磁盘加载（延迟到日志页首次打开） */
+  private static historyLoaded: boolean = false;
+  /** 待落盘的序列化日志行（批量写盘缓冲） */
+  private static pendingLines: string[] = [];
+  /** 是否已有批量刷新定时器在跑（UI 引用替换 + 写盘合并） */
+  private static flushScheduled: boolean = false;
+  /** 批量刷新间隔：UI 引用替换与写盘都按此合并 */
+  private static readonly FLUSH_INTERVAL_MS: number = 500;
+  /** 缓冲达到该条数时立即刷新，不等定时器 */
+  private static readonly FLUSH_IMMEDIATE_COUNT: number = 64;
+  /** push 后是否有未触发 UI 刷新的内存变更 */
+  private static pendingUiDirty: boolean = false;
 
   /**
    * 注入 native 日志桥接回调。
@@ -146,12 +158,12 @@ export class AppLogStore {
       AppLogStore.initialized = true;
     }
 
-    // 初始化文件系统：应用重启后加载历史日志
+    // 初始化文件系统：只记录目录；历史日志延迟到日志页首次打开时再读盘，
+    // 避免启动时无条件全量解析历史文件。
     if (filesDir) {
       try {
         AppLogStore.logsDir = filesDir + '/' + LOGS_DIR;
         AppLogStore.ensureLogsDir();
-        AppLogStore.loadHistorySessions();
       } catch (e) {
         hilog.error(0xFF00, 'AppLogStore', 'init filesystem failed: %{public}s', JSON.stringify(e));
       }
@@ -232,18 +244,69 @@ export class AppLogStore {
     }
 
     const entry: LogData = { level, tag, message, time: Date.now() };
-    // 替换 logs 数组引用 → @Track logs 变化 → @ObjectLink SessionCard 刷新计数
-    const updated = [entry, ...active.logs];
-    if (updated.length > MAX_LOG_COUNT) {
-      updated.length = MAX_LOG_COUNT;
+    // 原地写入内存与写盘缓冲；@ObjectLink/@StorageLink 的引用替换和磁盘写入
+    // 由 flushPending 按 FLUSH_INTERVAL_MS 合并执行，避免每条日志 O(n) 拷贝 +
+    // 一次同步写盘。
+    active.logs.unshift(entry);
+    if (active.logs.length > MAX_LOG_COUNT) {
+      active.logs.length = MAX_LOG_COUNT;
     }
-    active.logs = updated;
+    AppLogStore.pendingLines.push(JSON.stringify(entry) + '\n');
+    AppLogStore.pendingUiDirty = true;
+    if (AppLogStore.pendingLines.length >= AppLogStore.FLUSH_IMMEDIATE_COUNT) {
+      AppLogStore.flushPending();
+    } else {
+      AppLogStore.scheduleFlush();
+    }
+  }
 
-    // 替换 sessions 数组引用 → @StorageLink LogPage 感知列表更新
-    AppStorage.setOrCreate<LogSession[]>(SESSIONS_KEY, [...sessions]);
+  /** 日志页首次打开时调用：从磁盘加载历史 Session（幂等）。 */
+  static ensureHistoryLoaded(): void {
+    if (AppLogStore.historyLoaded || !AppLogStore.logsDir) {
+      return;
+    }
+    AppLogStore.historyLoaded = true;
+    AppLogStore.loadHistorySessions();
+  }
 
-    // 追加到磁盘日志文件
-    AppLogStore.appendToFile(entry);
+  private static scheduleFlush(): void {
+    if (AppLogStore.flushScheduled) {
+      return;
+    }
+    AppLogStore.flushScheduled = true;
+    setTimeout(() => {
+      AppLogStore.flushScheduled = false;
+      AppLogStore.flushPending();
+    }, AppLogStore.FLUSH_INTERVAL_MS);
+  }
+
+  /** 合并刷新：替换引用触发 UI 更新 + 批量写盘。 */
+  private static flushPending(): void {
+    const sessions = AppStorage.get<LogSession[]>(SESSIONS_KEY);
+    if (sessions) {
+      const active = sessions.find(s => s.endTime === null);
+      if (active && AppLogStore.pendingUiDirty) {
+        // 替换 logs 引用 → @Track logs 变化 → @ObjectLink SessionCard 刷新计数
+        active.logs = [...active.logs];
+      }
+      if (AppLogStore.pendingUiDirty) {
+        // 替换 sessions 数组引用 → @StorageLink LogPage 感知列表更新
+        AppStorage.setOrCreate<LogSession[]>(SESSIONS_KEY, [...sessions]);
+      }
+    }
+    AppLogStore.pendingUiDirty = false;
+
+    if (AppLogStore.pendingLines.length > 0 && AppLogStore.currentFile) {
+      const chunk = AppLogStore.pendingLines.join('');
+      AppLogStore.pendingLines = [];
+      try {
+        fs.writeSync(AppLogStore.currentFile.fd, chunk);
+      } catch (e) {
+        hilog.error(0xFF00, 'AppLogStore', 'flushPending write failed: %{public}s', JSON.stringify(e));
+      }
+    } else {
+      AppLogStore.pendingLines = [];
+    }
   }
 
   /**
@@ -324,6 +387,10 @@ export class AppLogStore {
       for (const fileName of logFiles) {
         const filePath = AppLogStore.logsDir + '/' + fileName;
         const session = AppLogStore.parseLogFile(filePath, fileName);
+        // 延迟加载时当前活跃 Session 的文件已在磁盘上，按 id 去重避免重复会话
+        if (session && sessions.some(s => s.id === session.id)) {
+          continue;
+        }
         if (session && session.logs.length > 0) {
           sessions.push(session);
           hilog.info(0xFF00, 'AppLogStore', 'loadHistorySessions: loaded session %{public}s with %{public}d logs', session.id, session.logs.length);
@@ -418,6 +485,8 @@ export class AppLogStore {
     if (changed) {
       AppStorage.setOrCreate<LogSession[]>(SESSIONS_KEY, [...sessions]);
     }
+    // 先把缓冲中的日志批量落盘，再关闭文件，避免停录丢尾部。
+    AppLogStore.flushPending();
     AppLogStore.closeCurrentFile();
   }
 
@@ -481,19 +550,6 @@ export class AppLogStore {
       }
       AppLogStore.currentFile = null;
       AppLogStore.currentSessionId = '';
-    }
-  }
-
-  /** 追加单条日志到当前文件，并强制刷盘 */
-  private static appendToFile(entry: LogData): void {
-    if (!AppLogStore.currentFile) {
-      return;
-    }
-    try {
-      const line = JSON.stringify(entry) + '\n';
-      fs.writeSync(AppLogStore.currentFile.fd, line);
-    } catch (e) {
-      hilog.error(0xFF00, 'AppLogStore', 'appendToFile failed: %{public}s', JSON.stringify(e));
     }
   }
 

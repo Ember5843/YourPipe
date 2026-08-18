@@ -167,6 +167,11 @@ export struct LogPage {
   @State logFilterPattern: string = '';
   @State logFilterError: string = '';
 
+  aboutToAppear(): void {
+    // 历史 Session 改为首次进入日志页时才从磁盘加载（替代启动时全量加载）。
+    AppLogStore.ensureHistoryLoaded();
+  }
+
 
   // ── 导出单个 Session ──────────────────────────────────────────────────────
   private async exportSession(sessionId: string): Promise<void> {
