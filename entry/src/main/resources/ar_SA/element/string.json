@@ -121,6 +121,10 @@
             "value": "عرض السجلات الأخيرة"
         },
         {
+            "name": "yt_action_close",
+            "value": "إغلاق"
+        },
+        {
             "name": "yt_log_title",
             "value": "السجلات"
         },
@@ -1527,10 +1531,6 @@
         {
             "name": "yt_date_years_ago",
             "value": "منذ %d سنة"
-        },
-        {
-            "name": "yt_views_count_format",
-            "value": "%s مشاهدة"
         },
         {
             "name": "yt_download_status_waiting",

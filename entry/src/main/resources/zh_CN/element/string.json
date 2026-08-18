@@ -133,6 +133,10 @@
             "value": "查看运行记录"
         },
         {
+            "name": "yt_action_close",
+            "value": "关闭"
+        },
+        {
             "name": "yt_log_title",
             "value": "日志"
         },
@@ -1875,10 +1879,6 @@
         {
             "name": "yt_date_years_ago",
             "value": "%d 年前"
-        },
-        {
-            "name": "yt_views_count_format",
-            "value": "%s 次观看"
         },
         {
             "name": "yt_download_status_waiting",

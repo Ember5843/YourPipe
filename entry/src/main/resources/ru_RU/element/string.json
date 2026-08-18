@@ -121,6 +121,10 @@
             "value": "Смотреть недавние логи"
         },
         {
+            "name": "yt_action_close",
+            "value": "Закрыть"
+        },
+        {
             "name": "yt_log_title",
             "value": "Журналы"
         },
@@ -1527,10 +1531,6 @@
         {
             "name": "yt_date_years_ago",
             "value": "%d г. назад"
-        },
-        {
-            "name": "yt_views_count_format",
-            "value": "%s просмотров"
         },
         {
             "name": "yt_download_status_waiting",

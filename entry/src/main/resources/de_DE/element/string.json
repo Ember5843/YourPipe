@@ -121,6 +121,10 @@
             "value": "Letzte Protokolle anzeigen"
         },
         {
+            "name": "yt_action_close",
+            "value": "Schließen"
+        },
+        {
             "name": "yt_log_title",
             "value": "Protokolle"
         },
@@ -1875,10 +1879,6 @@
         {
             "name": "yt_date_years_ago",
             "value": "Vor %d Jahren"
-        },
-        {
-            "name": "yt_views_count_format",
-            "value": "%s Aufrufe"
         },
         {
             "name": "yt_download_status_waiting",

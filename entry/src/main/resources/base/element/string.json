@@ -1881,10 +1881,6 @@
             "value": "%d 年前"
         },
         {
-            "name": "yt_views_count_format",
-            "value": "%s 次观看"
-        },
-        {
             "name": "yt_download_status_waiting",
             "value": "等待中"
         },

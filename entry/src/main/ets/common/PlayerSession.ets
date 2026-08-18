@@ -863,7 +863,7 @@ export class PlayerSession {
         ? this.formatStatCount(extras.dislikeCount)
         : '';
       this._defaultSource.likeCount = likeText.length > 0 ? likeText : this._defaultSource.likeCount;
-      this._defaultSource.dislikeCount = dislikeText.length > 0 ? dislikeText : (this._defaultSource.dislikeCount || '0');
+      this._defaultSource.dislikeCount = dislikeText.length > 0 ? dislikeText : (this._defaultSource.dislikeCount || '');
       if (extras.title) this._defaultSource.description = extras.title;
       if (extras.author) this._defaultSource.author = extras.author;
       if (extras.description) this._defaultSource.videoDescription = extras.description;

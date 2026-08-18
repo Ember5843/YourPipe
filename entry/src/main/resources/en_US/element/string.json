@@ -1605,10 +1605,6 @@
             "value": "%d years ago"
         },
         {
-            "name": "yt_views_count_format",
-            "value": "%s views"
-        },
-        {
             "name": "yt_download_status_waiting",
             "value": "Waiting"
         },

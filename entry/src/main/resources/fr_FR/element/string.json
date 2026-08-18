@@ -121,6 +121,10 @@
             "value": "Voir les journaux récents"
         },
         {
+            "name": "yt_action_close",
+            "value": "Fermer"
+        },
+        {
             "name": "yt_log_title",
             "value": "Journaux"
         },
@@ -1527,10 +1531,6 @@
         {
             "name": "yt_date_years_ago",
             "value": "Il y a %d ans"
-        },
-        {
-            "name": "yt_views_count_format",
-            "value": "%s vues"
         },
         {
             "name": "yt_download_status_waiting",

@@ -121,6 +121,10 @@
             "value": "Ver registros recientes"
         },
         {
+            "name": "yt_action_close",
+            "value": "Cerrar"
+        },
+        {
             "name": "yt_log_title",
             "value": "Registros"
         },
@@ -1527,10 +1531,6 @@
         {
             "name": "yt_date_years_ago",
             "value": "Hace %d años"
-        },
-        {
-            "name": "yt_views_count_format",
-            "value": "%s visualizaciones"
         },
         {
             "name": "yt_download_status_waiting",

@@ -69,7 +69,7 @@ export struct VideoDetails {
   @Prop isLiveNow: boolean = false;
   @Prop viewCount: number = 0;
   @Prop likeCount: string = '0';
-  @Prop dislikeCount: string = '0';
+  @Prop dislikeCount: string = '';
   @Prop publishDate: string = '';
   @Prop tags: string[] = [];
   @Prop @Watch('onChannelIdentityChanged') channelId: string = '';
@@ -79,8 +79,8 @@ export struct VideoDetails {
           0,
           this.item.channelId || '',
           this.item.author || '',
-          '0 subscribers',
-          '0 videos',
+          '',
+          '',
           this.item.channelAvatarUrl || '',
           '',
           '#CCCCCC'
@@ -317,8 +317,8 @@ export struct VideoDetails {
       0,
       effectiveChannelId,
       this.item?.author || '',
-      '0 subscribers',
-      '0 videos',
+      '',
+      '',
       effectiveAvatarUrl,
       '',
       '#CCCCCC'
@@ -335,8 +335,8 @@ export struct VideoDetails {
         0,
         channelId,
         cached.name || this.item.author || '',
-        cached.subscriberText || '0 subscribers',
-        cached.videoCountText || '0 videos',
+        cached.subscriberText || '',
+        cached.videoCountText || '',
         cached.avatarUrl || effectiveAvatarUrl,
         cached.description || '',
         '#CCCCCC'
@@ -502,8 +502,8 @@ export struct VideoDetails {
           0,
           channelId,
           profile.name || this.item.author || '',
-          profile.subscriberText || '0 subscribers',
-          profile.videoCountText || '0 videos',
+          profile.subscriberText || '',
+          profile.videoCountText || '',
           profile.avatarUrl || avatarUrl,
           profile.description || '',
           '#CCCCCC'
@@ -531,7 +531,9 @@ export struct VideoDetails {
   }
 
   private hasDislikeCount(): boolean {
-    return !!(this.dislikeCount && this.dislikeCount !== '0' && this.dislikeCount.length > 0);
+    // PipePipe parity: RYD returned a real count (including 0) → show; only
+    // an empty value (RYD failed / no data) hides the item.
+    return !!(this.dislikeCount && this.dislikeCount.length > 0);
   }
 
   private hasStatsRow(): boolean {
@@ -573,34 +575,27 @@ export struct VideoDetails {
 
   @Builder
   StatsMetaRow() {
-    // Title-adjacent stats: views / date / like / dislike as one compact strip.
-    Row({ space: 0 }) {
+    // Title-adjacent stats: views / date / like / dislike. Items size to their
+    // content; SpaceBetween pins the first/last item to the strip edges with
+    // equal gaps in between. The per-item width cap keeps gaps alive when a
+    // label runs long.
+    Row() {
       if (this.viewCount > 0) {
-        this.StatItem($r('sys.symbol.play_round_rectangle'),
-          $r('app.string.yt_views_count_format', this.formatViewCount(this.viewCount)), false)
+        this.StatItem($r('sys.symbol.play_round_rectangle'), this.formatViewCount(this.viewCount))
       }
       if (this.publishDate && this.publishDate.length > 0) {
-        this.StatItem($r('sys.symbol.calendar'), this.formatRelativeDate(this.publishDate), this.viewCount > 0)
+        this.StatItem($r('sys.symbol.calendar'), this.formatRelativeDate(this.publishDate))
       }
       if (this.hasLikeCount()) {
-        this.StatItem(
-          $r('sys.symbol.hand_thumbsup'),
-          this.formatStatCount(this.likeCount),
-          this.viewCount > 0 || !!(this.publishDate && this.publishDate.length > 0)
-        )
+        this.StatItem($r('sys.symbol.hand_thumbsup'), this.formatStatCount(this.likeCount))
       }
       if (this.hasDislikeCount()) {
-        this.StatItem(
-          $r('sys.symbol.hand_thumbsdown'),
-          this.formatStatCount(this.dislikeCount),
-          this.viewCount > 0
-            || !!(this.publishDate && this.publishDate.length > 0)
-            || this.hasLikeCount()
-        )
+        this.StatItem($r('sys.symbol.hand_thumbsdown'), this.formatStatCount(this.dislikeCount))
       }
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
+    .justifyContent(FlexAlign.SpaceBetween)
     .padding({ left: 10, right: 10, top: 8, bottom: 8 })
     .borderRadius(12)
     .backgroundColor($r('app.color.yourtube_player_info_bg'))
@@ -608,13 +603,7 @@ export struct VideoDetails {
   }
 
   @Builder
-  StatItem(icon: Resource, label: ResourceStr, showDivider: boolean) {
-    if (showDivider) {
-      Text('·')
-        .fontSize(12)
-        .fontColor($r('app.color.yourtube_text_hint'))
-        .margin({ left: 8, right: 8 })
-    }
+  StatItem(icon: Resource, label: ResourceStr) {
     Row({ space: 4 }) {
       SymbolGlyph(icon)
         .fontSize(13)
@@ -627,7 +616,7 @@ export struct VideoDetails {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .alignItems(VerticalAlign.Center)
-    .constraintSize({ maxWidth: '42%' })
+    .constraintSize({ maxWidth: '30%' })
   }
 
   @Builder

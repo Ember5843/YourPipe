@@ -49,6 +49,10 @@
             "value": "查看執行記錄"
         },
         {
+            "name": "yt_action_close",
+            "value": "關閉"
+        },
+        {
             "name": "yt_option_about",
             "value": "關於"
         },
@@ -1527,10 +1531,6 @@
         {
             "name": "yt_date_years_ago",
             "value": "%d 年前"
-        },
-        {
-            "name": "yt_views_count_format",
-            "value": "%s 次觀看"
         },
         {
             "name": "yt_download_status_waiting",

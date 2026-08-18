@@ -90,7 +90,7 @@ export struct VideoPlayerPage {
   @State videoDescriptionError: string | null = null;
   @State errorInfo: ErrorInfo | null = null;
   @State detailLikeCount: string = '0';
-  @State detailDislikeCount: string = '0';
+  @State detailDislikeCount: string = '';
   @State detailChannelId: string = '';
   @State detailChannelAvatarUrl: string = '';
   @State chapters: ChapterInfo[] = [];
@@ -257,7 +257,7 @@ export struct VideoPlayerPage {
 
   private syncDetailStateFromSource(source: VideoData): void {
     this.detailLikeCount = source.likeCount || '0';
-    this.detailDislikeCount = source.dislikeCount || '0';
+    this.detailDislikeCount = source.dislikeCount || '';
     this.detailChannelId = source.channelId || this.video?.channelId || '';
     this.detailChannelAvatarUrl = this.video?.channelAvatarUrl || '';
     this.chapters = (source.chapters || []).slice();
@@ -311,7 +311,7 @@ export struct VideoPlayerPage {
       auto: true,
       head: this.videoSource.head,
       likeCount: '0',
-      dislikeCount: '0',
+      dislikeCount: '',
       commentCount: '0',
       shareCount: '0',
       play: false,
