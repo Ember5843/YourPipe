@@ -362,13 +362,13 @@ export class SabrOfflineDownloader {
     } catch (e) {
       const msg = String(e);
       // Transient / not-available: caller may retry other track or wait.
-      if (msg.indexOf('beyond end') >= 0) {
+      if (e instanceof SabrProtocolException && e.kind === 'beyond_end') {
         onEmpty();
         return false;
       }
       const transient = e instanceof SabrProtocolException
-        && (e.kind === 'protection' || e.kind === 'no_media');
-      if (transient || msg.indexOf('segment not available') >= 0) {
+        && (e.kind === 'protection' || e.kind === 'no_media' || e.kind === 'segment_unavailable');
+      if (transient) {
         Logger.warn(TAG, `tryWriteNext itag=${buf.getItag()} seq=${sequence}: ${msg}`);
         return false;
       }

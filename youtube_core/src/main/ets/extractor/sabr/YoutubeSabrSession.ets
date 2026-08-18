@@ -180,7 +180,7 @@ export class YoutubeSabrSession {
       return cached;
     }
     if (this.isBeyondEnd(request)) {
-      throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`);
+      throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`, 'beyond_end');
     }
 
     // A DASH reader requests the target segment directly on seek. Move SABR's reported
@@ -214,7 +214,7 @@ export class YoutubeSabrSession {
         return hit;
       }
       if (this.isBeyondEnd(request)) {
-        throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`);
+        throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`, 'beyond_end');
       }
       // Track the attestation-pending streak before the policy sees the response.
       if (decoded.isNoMediaResponse() && decoded.isAttestationPending()) {
@@ -316,7 +316,7 @@ export class YoutubeSabrSession {
         break;
       }
     }
-    throw new SabrProtocolException(`SABR segment not available: ${request.cacheKey()}`);
+    throw new SabrProtocolException(`SABR segment not available: ${request.cacheKey()}`, 'segment_unavailable');
   }
 
   /**

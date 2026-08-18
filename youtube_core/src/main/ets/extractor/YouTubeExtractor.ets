@@ -36,6 +36,8 @@ import {
   AgeRestrictedContentException,
   SignInConfirmNotBotException,
   ContentNotSupportedException,
+  NoPlayableStreamsException,
+  StreamDeobfuscationException,
   ExtractionException
 } from './YouTubeExceptions';
 
@@ -645,7 +647,7 @@ export class YouTubeExtractor implements CommentsBackend {
       || this.cachedVideoOnlyStreams.length > 0
       || this.cachedVideoStreams.length > 0;
     if (!hasAnyStream && !this.getHlsManifestUrlFromStreamingData()) {
-      throw new ContentNotSupportedException(
+      throw new NoPlayableStreamsException(
         `No playable streams from client=${selectedClient} `
         + `(adaptive=${this.configuredStreamingData?.adaptiveFormats?.length ?? 0}, `
         + `serverAbr=${hasSabrUrl})`
@@ -1365,11 +1367,8 @@ export class YouTubeExtractor implements CommentsBackend {
   }
 
   private shouldRetryWithFreshPlayerMetadata(error: Error): boolean {
-    const message = (error?.message || String(error)).toLowerCase();
-    return message.indexOf('deobfuscation failed') >= 0
-      || message.indexOf('no playable streams') >= 0
-      || message.indexOf('client version') >= 0
-      || message.indexOf('player version') >= 0;
+    return error instanceof StreamDeobfuscationException
+      || error instanceof NoPlayableStreamsException;
   }
 
   async fetchPlaybackExtras(videoId: string, playerResponse?: PlayerResponse): Promise<VideoInfo> {
@@ -2684,7 +2683,7 @@ export class YouTubeExtractor implements CommentsBackend {
       }
     } catch (e) {
       logger.warn('batchDeobfuscateItagUrls failed:', e);
-      throw new Error('Stream URL deobfuscation failed');
+      throw new StreamDeobfuscationException('Stream URL deobfuscation failed');
     }
   }
 

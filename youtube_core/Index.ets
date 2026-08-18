@@ -14,9 +14,11 @@ export {
   GeographicRestrictionException,
   LiveStreamOfflineException,
   LoginRequiredException,
+  NoPlayableStreamsException,
   PaidContentException,
   PrivateContentException,
   SignInConfirmNotBotException,
+  StreamDeobfuscationException,
   YoutubeMusicPremiumContentException
 } from './src/main/ets/extractor/YouTubeExceptions';
 export { CommentItem, CommentResponse } from './src/main/ets/extractor/CommentItem';

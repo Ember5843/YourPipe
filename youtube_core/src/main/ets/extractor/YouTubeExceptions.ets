@@ -133,11 +133,33 @@ export class ContentNotSupportedException extends ExtractorException {
 }
 
 /**
+ * 所选客户端无任何可用流。可能是 player 元数据（STS/cipher）过期导致全部
+ * URL 解密失败后被过滤，上层可刷新 player 元数据后重试一次。
+ */
+export class NoPlayableStreamsException extends ContentNotSupportedException {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoPlayableStreamsException';
+  }
+}
+
+/**
  * 提取失败异常（通用）
  */
 export class ExtractionException extends ExtractorException {
   constructor(message: string) {
     super(message);
     this.name = 'ExtractionException';
+  }
+}
+
+/**
+ * 流 URL 解密（签名 / n 参数）失败——通常是 player 元数据过期，
+ * 上层可刷新 player 元数据后重试一次。
+ */
+export class StreamDeobfuscationException extends ExtractionException {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StreamDeobfuscationException';
   }
 }
