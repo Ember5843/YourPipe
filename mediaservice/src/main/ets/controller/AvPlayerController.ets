@@ -931,7 +931,7 @@ export class AvPlayerController {
     const prefs = PlaybackPreferences.snapshot();
     const targetQuality = live ? prefs.mobileQuality : prefs.defaultQuality;
     const maxHeight = this.resolveMaxHeight(targetQuality);
-    const underCap = streams.filter(s => (s.height || 0) <= maxHeight);
+    const underCap = streams.filter(s => this.resolutionLabelHeight(s) <= maxHeight);
     // Prefer hardware-decodable codecs when the device reports capability.
     // Avoid auto-picking 4K VP9 on devices without VP9 hardware (soft-decode heat).
     const hwFriendly = underCap.filter(s => VideoHwCaps.isCodecHardwareFriendly(s.codecs));
@@ -939,7 +939,7 @@ export class AvPlayerController {
       ? hwFriendly
       : (underCap.length > 0 ? underCap : streams);
     return pool.slice().sort((a: StreamInfo, b: StreamInfo): number => {
-      const h = (b.height || 0) - (a.height || 0);
+      const h = this.resolutionLabelHeight(b) - this.resolutionLabelHeight(a);
       if (h !== 0) return h;
       const codec = this.codecPriority(b) - this.codecPriority(a);
       if (codec !== 0) return codec;
@@ -964,15 +964,15 @@ export class AvPlayerController {
     }
     const prefs = PlaybackPreferences.snapshot();
     const maxHeight = this.resolveMaxHeight(prefs.defaultQuality);
-    // Prefer hard-decode-friendly codecs at the target height.
+    // Prefer hard-decode-friendly codecs at the target quality label.
     // Skip VP9/AV1 when OHOS reports no hardware capability for that MIME.
-    const underCap = entries.filter(e => (e.stream.height || 0) <= maxHeight);
+    const underCap = entries.filter(e => this.resolutionLabelHeight(e.stream) <= maxHeight);
     const hwFriendly = underCap.filter(e => VideoHwCaps.isCodecHardwareFriendly(e.stream.codecs));
     const pool = hwFriendly.length > 0
       ? hwFriendly
       : (underCap.length > 0 ? underCap : entries);
     const selected = pool.slice().sort((a: VideoEntry, b: VideoEntry): number => {
-      const h = (b.stream.height || 0) - (a.stream.height || 0);
+      const h = this.resolutionLabelHeight(b.stream) - this.resolutionLabelHeight(a.stream);
       if (h !== 0) {
         return h;
       }
@@ -1004,6 +1004,24 @@ export class AvPlayerController {
     };
     const requested = cap[targetQuality] ?? 9999;
     return requested;
+  }
+
+  /**
+   * Numeric resolution for quality matching, PipePipe parity: the itag-table
+   * label (`stream.quality` = youtube_core `qualityLabel`, e.g. '1080p',
+   * '720p60', '1080p HFR') is authoritative — fps/HFR/HDR suffixes are
+   * ignored. The real coded height (e.g. 1080x1920 portrait) must NOT drive
+   * selection, or a '1080p' cap would exclude a portrait video's own 1080p
+   * itag and fall through to 480p. Falls back to the coded height only when
+   * no label exists (HLS variants already carry '1080p' labels).
+   */
+  private resolutionLabelHeight(stream: StreamInfo): number {
+    const label = stream.quality || '';
+    const m = label.match(/^(\d+)p/i);
+    if (m) {
+      return parseInt(m[1], 10);
+    }
+    return stream.height || 0;
   }
 
   private requiresSeparateAudio(stream: StreamInfo): boolean {
