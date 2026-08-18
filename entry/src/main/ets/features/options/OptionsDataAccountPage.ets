@@ -36,6 +36,8 @@ interface OptionsDataAccountPageParams {
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
   onHomeFeedStyleChanged: () => void;
   onAuthChanged: () => void;
+  /** Cookie 导入登录成功后的统一后置动作（与 WebView/QR 登录一致）。 */
+  onLoginSuccess: () => void;
 }
 
 @Component
@@ -49,7 +51,8 @@ export struct OptionsDataAccountPage {
     onDeviceQrLoginClick: () => {},
     updateUiConfig: () => {},
     onHomeFeedStyleChanged: () => {},
-    onAuthChanged: () => {}
+    onAuthChanged: () => {},
+    onLoginSuccess: () => {}
   };
 
   @State isBusy: boolean = false;
@@ -288,7 +291,7 @@ export struct OptionsDataAccountPage {
         this.showCookieImport = false;
         this.cookieImportMessage = result.detail;
         this.cookieImportSuccess = true;
-        this.params.onAuthChanged();
+        this.params.onLoginSuccess();
       } else {
         session.signOut();
         AuthStateHelper.refresh();

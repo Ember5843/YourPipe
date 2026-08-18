@@ -7,6 +7,7 @@ import { UIConfig } from '../../../common/AppState';
 import { Callback } from '@ohos.base';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { MediaThumb } from '../../../common/components/MediaThumb';
+import { resolveResourceStr } from '../../../common/utils/ResourceStrUtil';
 
 interface ContextMenuItem {
   symbolStartIcon?: SymbolGlyphModifier;
@@ -153,15 +154,8 @@ export struct PlaylistCard {
   }
 
   private getTypeLabelText(): string {
-    if (typeof this.typeLabel === 'string') {
-      return this.typeLabel;
-    }
     // Resource 形式的标签（如搜索页传入的 $r）需解析成字符串，否则角标为空
-    try {
-      return getContext().resourceManager.getStringSync((this.typeLabel as Resource).id);
-    } catch (_e) {
-      return '';
-    }
+    return resolveResourceStr(this.typeLabel);
   }
 
   build() {

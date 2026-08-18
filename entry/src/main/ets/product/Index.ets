@@ -42,6 +42,7 @@ import { PlayerPresentation } from '../common/PlayerPresentation';
 import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
 import { DeviceQrLoginPage } from '../features/auth/DeviceQrLoginPage';
 import { SabrPoTokenWebRuntime } from '../features/player/SabrPoTokenWebRuntime';
+import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { customAnimationUtil } from '../common/AnimationUtil';
 import { ThemeColorUtil } from '../common/ThemeColorUtil';
@@ -341,6 +342,8 @@ struct Index {
       } catch (e) {
         logger.warn('Failed to clear cookie preferences:', JSON.stringify(e));
       }
+      // prefs 清除够不到 extractor 持有的内存 cookie jar，同步清内存网络状态
+      YouTubePlayService.getInstance(hostContext).resetNetworkState();
       try {
         const authPrefs = preferences.getPreferencesSync(hostContext, { name: 'yourpipe_auth_poc' });
         authPrefs.clearSync();
@@ -624,6 +627,19 @@ struct Index {
     PreferencesStore.setString('subscriptionsJson', LocalStore.saveSubscriptions(this.subscriptions));
     // 订阅列表变化（增/删/云端合并）→ 动态缓存清零，下次进入动态页重新拉取
     SubscriptionFeedStore.clear();
+  }
+
+  /**
+   * 登录成功统一后置动作（WebView / QR / Cookie 导入三条路径共用）：
+   * 刷新会话状态、按播放鉴权重置 stream client、刷新首页、同步云端历史与订阅。
+   */
+  private handleLoginSuccess(): void {
+    AuthStateHelper.refresh();
+    YoutubePlayerClientConfig.resetToAuthDefault(
+      AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true
+    );
+    this.refreshHomeAfterAuthChange();
+    this.syncUserLibraryAfterLogin();
   }
 
   /** 登录后用 cookie 同步云端历史 + 订阅频道列表（不阻塞首页）。 */
@@ -2048,7 +2064,8 @@ struct Index {
             onDeviceQrLoginClick: () => { this.pushOptionsPath('device_qr_login'); },
             updateUiConfig: this.updateUiConfig.bind(this),
             onHomeFeedStyleChanged: () => { this.refreshHomeAfterAuthChange(); },
-            onAuthChanged: () => { this.refreshHomeAfterAuthChange(); }
+            onAuthChanged: () => { this.refreshHomeAfterAuthChange(); },
+            onLoginSuccess: () => { this.handleLoginSuccess(); }
           }
         })
       }
@@ -2068,11 +2085,7 @@ struct Index {
       HdsNavDestination() {
         DeviceQrLoginPage({
           onSuccess: () => {
-            AuthStateHelper.refresh();
-            YoutubePlayerClientConfig.resetToAuthDefault(
-              AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true
-            );
-            this.refreshHomeAfterAuthChange();
+            this.handleLoginSuccess();
             this.webViewLoginBackHandler = null;
             this.popOptionsPath();
             try {
@@ -2105,9 +2118,7 @@ struct Index {
       HdsNavDestination() {
         WebViewLoginPage({
           onSuccess: () => {
-            AuthStateHelper.refresh();
-            this.refreshHomeAfterAuthChange();
-            this.syncUserLibraryAfterLogin();
+            this.handleLoginSuccess();
             this.popOptionsPath();
             try {
               this.getUIContext().getPromptAction().showToast({

@@ -3,6 +3,11 @@ import common from '@ohos.app.ability.common';
 import { AuthSessionManager, AuthBackupState } from 'youtube_core';
 import { AppLog } from './AppLog';
 import { PreferencesStore } from './PreferencesStore';
+import { NetworkProxyConfig } from './NetworkProxyConfig';
+import { ThemeManager } from './ThemeManager';
+import { ColorModeManager } from './ColorModeManager';
+import { LanguageManager } from './LanguageManager';
+import { AuthStateHelper } from './AuthStateHelper';
 import { LocalStore } from './LocalStore';
 import { WatchHistoryStore, WatchHistoryItem } from './WatchHistoryStore';
 import { SubscriptionFeedStore, SubscriptionFeedItem } from './SubscriptionFeedStore';
@@ -275,12 +280,24 @@ export class DataBackupManager {
         validEntries[key] = entries[key];
       }
     }
-    PreferencesStore.setAllEntries(validEntries);
+    // 只覆盖 cfg_ 设置键；观看历史/搜索历史/订阅/收藏等其余数据不得清空
+    PreferencesStore.restoreConfigEntries(validEntries);
     const uiConfig = UIConfig.loadFromPreferences();
     const playbackConfig = PlaybackConfig.loadFromPreferences();
     AppStorage.setOrCreate('uiConfig', uiConfig);
     AppStorage.setOrCreate('playbackConfig', playbackConfig);
     AppStorage.setOrCreate('autoPlayQueue', playbackConfig.autoPlayNext);
+    // 恢复后重应用，复用 EntryAbility.onCreate / AppState.init 的同一套函数
+    const networkProxyConfig = NetworkProxyConfig.load();
+    AppStorage.setOrCreate('networkProxyConfig', networkProxyConfig);
+    NetworkProxyConfig.applySystemAndProviders(networkProxyConfig);
+    ThemeManager.initFromConfig(uiConfig.colorPreset);
+    LanguageManager.applyPersistedLanguage();
+    const context = AppStorage.get<common.UIAbilityContext>('context');
+    if (context) {
+      ColorModeManager.applyPersistedMode(context);
+    }
+    AuthStateHelper.refresh();
   }
 
   private static restoreSubscriptions(items: SubscriptionUser[]): void {

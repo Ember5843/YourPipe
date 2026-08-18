@@ -247,16 +247,7 @@ export struct LogPage {
   }
 
   private toggleLogger(): void {
-    const next = new UIConfig();
-    next.darkMode = this.uiConfig.darkMode;
-    next.userLanguage = this.uiConfig.userLanguage;
-    next.systemLanguage = this.uiConfig.systemLanguage;
-    next.searchLanguage = this.uiConfig.searchLanguage;
-    next.searchCountry = this.uiConfig.searchCountry;
-    next.colorPreset = this.uiConfig.colorPreset;
-    next.isVibrate = this.uiConfig.isVibrate;
-    next.isAnimation = this.uiConfig.isAnimation;
-    next.animationSpeed = this.uiConfig.animationSpeed;
+    const next = this.uiConfig.clone();
     next.enableLogger = !this.uiConfig.enableLogger;
     this.uiConfig = next;
     UIConfig.saveToPreferences(next);

@@ -581,7 +581,7 @@ export class PlayerSession {
       this._pendingResumeSec = resumePosSec;
       this._pendingAutoPlay = true;
       try {
-        await this.play(video);
+        await this.play(video, true);
       } catch (e) {
         logger.warn(`${TAG} fresh-stream retry play() failed: ${(e as Error).message || e}`);
       } finally {
@@ -624,7 +624,7 @@ export class PlayerSession {
     return video !== null;
   }
 
-  async play(video: VideoItem): Promise<VideoData | null> {
+  async play(video: VideoItem, force: boolean = false): Promise<VideoData | null> {
     if (this._controller.playerState === PlayerState.RELEASED) {
       this.recreateReleasedController(true);
     }
@@ -645,7 +645,9 @@ export class PlayerSession {
       this.resetSession(true, false, this._isPiPActive);
     }
 
-    if (this._currentVideo?.videoId === video.videoId
+    // force=true（失败原地重试）必须绕过同视频去重：假结束时 vm.isReady 仍为 true，
+    // 仅靠清 _submittedVideoId 不足以让重试通过这里的检查。
+    if (!force && this._currentVideo?.videoId === video.videoId
       && (this._controller.vm.isReady || this._submittedVideoId === videoId)) {
       logger.info(`${TAG} play() skipped: same video ${videoId} already submitted/ready`);
       return this._defaultSource;

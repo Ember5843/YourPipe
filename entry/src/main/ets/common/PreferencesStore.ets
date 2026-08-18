@@ -75,6 +75,29 @@ export class PreferencesStore {
     }
   }
 
+  /** 恢复设置用：只覆盖写入 cfg_ 前缀键，绝不清空历史/订阅等其他数据 */
+  static restoreConfigEntries(entries: Record<string, string>): void {
+    if (!PreferencesStore.instance) {
+      return;
+    }
+    try {
+      for (const key of Object.keys(entries)) {
+        if (!key.startsWith('cfg_')) {
+          continue;
+        }
+        PreferencesStore.instance.putSync(key, entries[key]);
+      }
+      PreferencesStore.instance.flush((err: BusinessError) => {
+        if (err) {
+          logger.error(`Preferences restoreConfigEntries flush failed. Code:${err.code}, message:${err.message}`);
+        }
+      });
+      logger.info('PreferencesStore restoreConfigEntries done');
+    } catch (e) {
+      logger.error('Failed to restore config entries:', JSON.stringify(e));
+    }
+  }
+
   /** 清除 PreferencesStore 中的所有数据 */
   static clearAll(): void {
     if (!PreferencesStore.instance) {

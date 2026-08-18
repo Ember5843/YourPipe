@@ -265,6 +265,13 @@ export class YouTubePlayService {
     logger.info(`${TAG} WEB client version prewarmed version=${version}`);
   }
 
+  /** Clear-all-app-data hook: drop the extractor's in-memory network state (cookie jar). */
+  resetNetworkState(): void {
+    if (!this.extractor) return;
+    this.extractor.resetNetworkState();
+    logger.info(`${TAG} extractor network state reset`);
+  }
+
   /** Playback-only: sync stream extract hl/gl from content language/region settings. */
   private syncExtractorLocale(): void {
     if (!this.extractor) {

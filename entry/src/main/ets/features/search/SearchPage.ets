@@ -14,6 +14,7 @@ import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { resolveResourceStr } from '../../common/utils/ResourceStrUtil';
 import { UIConfig } from '../../common/AppState';
 import { SearchHistoryStore, SearchHistoryItem } from '../../common/SearchHistoryStore';
 import type { BusinessError } from '@kit.BasicServicesKit';
@@ -598,7 +599,7 @@ export struct SearchPage {
         .width('100%')
         .justifyContent(FlexAlign.Center)
         .margin({ top: this.safeAreaTop + TITLE_BAR_HEIGHT + 20 })
-      } else if (typeof this.errorMessage === 'string' && this.errorMessage.length > 0 && this.results.length === 0) {
+      } else if (resolveResourceStr(this.errorMessage).length > 0 && this.results.length === 0) {
         // 显示错误页面（有错误且无结果时）
         ErrorPage({
           errorMessage: this.errorMessage,
