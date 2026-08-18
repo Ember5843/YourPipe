@@ -9,6 +9,10 @@ export class SapisidHashUtil {
     const timestamp = Math.floor(Date.now() / 1000);
     const input = `${timestamp} ${sapisid} ${origin}`;
     const hash = await SapisidHashUtil.sha1(input);
+    if (hash.length === 0) {
+      // sha1 失败时不拼畸形头（'SAPISIDHASH ts_'），调用方按空值跳过注入
+      return '';
+    }
     return `SAPISIDHASH ${timestamp}_${hash}`;
   }
 

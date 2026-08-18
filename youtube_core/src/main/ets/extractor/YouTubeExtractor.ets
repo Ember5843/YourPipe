@@ -298,6 +298,19 @@ export class YouTubeExtractor {
   }
 
   /**
+   * Clear in-memory network state (cookie jar) and persist the empty jar.
+   * Called by entry on "clear all app data" — the preferences store alone
+   * does not reach this in-memory map.
+   */
+  resetNetworkState(): void {
+    this.client.clearCookies();
+    this.client.saveCookies().catch((e: Error) => {
+      logger.warn(`resetNetworkState persist failed: ${e.message || e}`);
+    });
+    logger.info('Network state reset (cookie jar cleared)');
+  }
+
+  /**
    * Extract video info (metadata only — tests / non-playback callers).
    * Aligned with PipePipe WEB metadata player ($fields, no streamingData).
    */
@@ -3517,12 +3530,14 @@ export class YouTubeExtractor {
   private getHlsManifestUrlFromStreamingData(): string {
     for (const sd of [this.configuredStreamingData, this.safariStreamingData, this.androidStreamingData]) {
       if (sd && sd.hlsManifestUrl) {
-        return sd.hlsManifestUrl + '?mpd_version=7';
+        return sd.hlsManifestUrl.includes('?')
+          ? sd.hlsManifestUrl + '&mpd_version=7'
+          : sd.hlsManifestUrl + '?mpd_version=7';
       }
     }
     if (this.mwebHlsManifestUrl && this.mwebHlsManifestUrl.length > 0) {
       return this.mwebHlsManifestUrl.includes('?')
-        ? this.mwebHlsManifestUrl
+        ? this.mwebHlsManifestUrl + '&mpd_version=7'
         : this.mwebHlsManifestUrl + '?mpd_version=7';
     }
     return '';

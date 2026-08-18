@@ -265,6 +265,7 @@ export class HttpDownloader {
 
     while (attempt < (enableRetry ? HttpDownloader.MAX_RETRIES : 1)) {
       attempt++;
+      let httpRequest: http.HttpRequest | null = null;
       try {
         logger.debug(`${method} ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES})`);
 
@@ -275,7 +276,8 @@ export class HttpDownloader {
         requestHeaders['Accept-Encoding'] = 'identity'
 
         // 2. 创建 HTTP 请求
-        const httpRequest = http.createHttp()
+        const request = http.createHttp()
+        httpRequest = request
 
         // 3. 转换请求参数为 HTTP 模块所需格式
         const httpOptions: http.HttpRequestOptions = {
@@ -291,7 +293,7 @@ export class HttpDownloader {
 
         // 4. 发送请求并获取响应
         const response = await new Promise<http.HttpResponse>((resolve, reject) => {
-          httpRequest.request(
+          request.request(
             url,
             httpOptions,
             (err: BusinessError, data: http.HttpResponse) => {
@@ -352,7 +354,6 @@ export class HttpDownloader {
 
         // 6. 成功响应
         logger.debug(`Success: ${method} ${url}`);
-        httpRequest.destroy();
         return response;
 
       } catch (err) {
@@ -384,11 +385,13 @@ export class HttpDownloader {
         // 不再重试，抛出错误
         throw lastError;
       } finally {
-        // 清理资源
-        try {
-          // httpRequest.destroy() 已在成功时调用，这里防止重复
-        } catch (e) {
-          // 忽略清理错误
+        // 统一清理：成功、重试 continue、抛错路径都销毁本次创建的 request
+        if (httpRequest) {
+          try {
+            httpRequest.destroy();
+          } catch (e) {
+            // 忽略清理错误
+          }
         }
       }
     }

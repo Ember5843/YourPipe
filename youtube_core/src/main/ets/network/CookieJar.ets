@@ -93,10 +93,13 @@ export class Cookie {
         const host = urlObj.hostname.toLowerCase();
         const domain = this.domain.toLowerCase();
         // Domain 匹配：完全匹配或以 .domain 结尾
-        if (host !== domain && !host.endsWith('.' + domain) && !domain.startsWith('.')) {
-          return false;
-        }
-        if (domain.startsWith('.') && !host.endsWith(domain.substring(1)) && host !== domain.substring(1)) {
+        if (domain.startsWith('.')) {
+          // 点前缀域：host 必须等于裸域或是其子域，防止后缀撞名（如 notyoutube.com 命中 .youtube.com）
+          const bareDomain = domain.substring(1);
+          if (host !== bareDomain && !host.endsWith('.' + bareDomain)) {
+            return false;
+          }
+        } else if (host !== domain && !host.endsWith('.' + domain)) {
           return false;
         }
       }

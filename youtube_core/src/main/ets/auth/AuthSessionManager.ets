@@ -37,6 +37,10 @@ export class AuthSessionManager {
   /** Fine-grained: attach auth to playback extraction (player API + stream URL cookies). */
   private useAuthForPlayback: boolean = true;
 
+  /** In-flight TV access-token refresh; concurrent callers share one refresh
+   * so refresh-token rotation cannot invalidate a later concurrent request. */
+  private refreshPromise: Promise<AuthAccountStatus> | undefined = undefined;
+
   /** Device / QR OAuth (SmartTube-style) in-flight state. */
   private deviceFlowActive: boolean = false;
   private deviceCode: string = '';
@@ -435,9 +439,22 @@ export class AuthSessionManager {
       return undefined;
     }
     if (!this.accessToken || Date.now() + AuthSessionManager.REFRESH_MARGIN_MS >= this.accessTokenExpiresAt) {
-      await this.refreshAccessToken();
+      await this.refreshAccessTokenShared();
     }
     return this.accessToken ? `Bearer ${this.accessToken}` : undefined;
+  }
+
+  /** Merge concurrent refreshes into one in-flight call (WebClientVersionResolver pattern). */
+  private async refreshAccessTokenShared(): Promise<AuthAccountStatus> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+    this.refreshPromise = this.refreshAccessToken();
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.refreshPromise = undefined;
+    }
   }
 
   async refreshAccessToken(): Promise<AuthAccountStatus> {
