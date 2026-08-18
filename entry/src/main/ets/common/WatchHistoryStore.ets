@@ -30,6 +30,14 @@ export class WatchHistoryStore {
   static readonly PLAYLIST_KEY_PREFIX: string = 'playlist:';
   /** 进度超过这个比例时视为完播，下次从头播放 */
   private static readonly FINISHED_THRESHOLD: number = 0.9;
+  /** 内存缓存：避免每次操作都 JSON.parse 全量历史 */
+  private static cache: WatchHistoryItem[] | null = null;
+  /** 有未落盘修改 */
+  private static dirty: boolean = false;
+  /** 延迟刷盘定时器（仅 record() 的进度tick 走延迟路径） */
+  private static flushTimerId: number = -1;
+  /** 进度 tick 的落盘延迟：10s 一次的 record 合并到 3s 后单次写盘 */
+  private static readonly FLUSH_DELAY_MS: number = 3000;
 
   /** 从历史条目 key 解析播放列表 id；非播放列表条目返回 '' */
   static playlistIdOf(videoId: string): string {
@@ -101,7 +109,8 @@ export class WatchHistoryStore {
     };
     filtered.unshift(item);
 
-    WatchHistoryStore.save(filtered.slice(0, WatchHistoryStore.MAX_COUNT));
+    // 进度 tick（10s 一次）走延迟落盘；新条目置顶已通过 cache+AppStorage 即时可见
+    WatchHistoryStore.save(filtered.slice(0, WatchHistoryStore.MAX_COUNT), false);
     WatchHistoryStore.syncToAppStorage();
   }
 
@@ -124,15 +133,9 @@ export class WatchHistoryStore {
     return item.progressSec;
   }
 
-  /** 获取全部历史，按最近观看时间降序 */
+  /** 获取全部历史，按最近观看时间降序。返回内部缓存，调用方请勿原地修改。 */
   static getAll(): WatchHistoryItem[] {
-    const json = PreferencesStore.getString(WatchHistoryStore.KEY, '[]');
-    try {
-      return JSON.parse(json) as WatchHistoryItem[];
-    } catch (err) {
-      logger.error('Failed to parse watch history:', JSON.stringify(err));
-      return [];
-    }
+    return WatchHistoryStore.getItems();
   }
 
   /** 删除单条记录 */
@@ -328,11 +331,58 @@ export class WatchHistoryStore {
   }
 
   private static syncToAppStorage(): void {
-    const all = WatchHistoryStore.getAll();
-    AppStorage.setOrCreate(APP_STORAGE_KEY, [...all]);
+    AppStorage.setOrCreate(APP_STORAGE_KEY, [...WatchHistoryStore.getItems()]);
   }
 
-  private static save(history: WatchHistoryItem[]): void {
-    PreferencesStore.setString(WatchHistoryStore.KEY, JSON.stringify(history));
+  private static getItems(): WatchHistoryItem[] {
+    if (WatchHistoryStore.cache === null) {
+      const json = PreferencesStore.getString(WatchHistoryStore.KEY, '[]');
+      try {
+        WatchHistoryStore.cache = JSON.parse(json) as WatchHistoryItem[];
+      } catch (err) {
+        logger.error('Failed to parse watch history:', JSON.stringify(err));
+        WatchHistoryStore.cache = [];
+      }
+    }
+    return WatchHistoryStore.cache;
+  }
+
+  /**
+   * 更新内存缓存并落盘。
+   * immediate=false 时延迟 FLUSH_DELAY_MS 合并写盘（10s 进度 tick 用）；
+   * 结构性操作（增删/清空/恢复）必须 immediate，避免与 clearAllAppData 等
+   * 外部清数据动作产生时序竞争。
+   */
+  private static save(history: WatchHistoryItem[], immediate: boolean = true): void {
+    WatchHistoryStore.cache = history;
+    WatchHistoryStore.dirty = true;
+    if (immediate) {
+      WatchHistoryStore.flushIfDirty();
+    } else {
+      WatchHistoryStore.scheduleFlush();
+    }
+  }
+
+  private static scheduleFlush(): void {
+    if (WatchHistoryStore.flushTimerId >= 0) {
+      return;
+    }
+    WatchHistoryStore.flushTimerId = setTimeout(() => {
+      WatchHistoryStore.flushTimerId = -1;
+      WatchHistoryStore.flushIfDirty();
+    }, WatchHistoryStore.FLUSH_DELAY_MS);
+  }
+
+  /** 有未落盘修改时立即写盘；退后台（EntryAbility.onBackground）时兜底调用。 */
+  static flushIfDirty(): void {
+    if (WatchHistoryStore.flushTimerId >= 0) {
+      clearTimeout(WatchHistoryStore.flushTimerId);
+      WatchHistoryStore.flushTimerId = -1;
+    }
+    if (!WatchHistoryStore.dirty) {
+      return;
+    }
+    WatchHistoryStore.dirty = false;
+    PreferencesStore.setString(WatchHistoryStore.KEY, JSON.stringify(WatchHistoryStore.getItems()));
   }
 }

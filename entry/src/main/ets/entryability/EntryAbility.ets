@@ -17,6 +17,7 @@ import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
 import { PlayerSession } from '../common/PlayerSession';
+import { WatchHistoryStore } from '../common/WatchHistoryStore';
 import { PlayerPresentation } from '../common/PlayerPresentation';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { SabrWebViewPoTokenProvider } from '../features/player/SabrWebViewPoTokenProvider';
@@ -200,6 +201,8 @@ export default class EntryAbility extends UIAbility {
 
   onBackground(): void {
     logger.info('Ability onBackground');
+    // 观看历史进度 tick 是延迟落盘的，退后台先把脏数据刷掉，防止被杀后丢进度。
+    WatchHistoryStore.flushIfDirty();
     // 后台长时任务由 PlayerStateMachine 统一管理；此处保留兜底注册以应对极端时序
     // （重复注册返回 9800005 会被静默忽略，详见 BackgroundTaskManager）。
     BackgroundTaskManager.startContinuousTask(this.context);
