@@ -169,6 +169,12 @@ export interface NativeMpvPlayerModule {
     av1: boolean;
     vp8: boolean;
   };
+  /**
+   * hwdec-codecs whitelist derived from the probed caps (single source of
+   * truth; EnsureMpv applies the same value natively). Probe failure keeps the
+   * legacy full list rather than disabling hwdec.
+   */
+  getHwdecCodecsWhitelist: () => string;
   command: (playerId: string, args: string[]) => void;
 }
 

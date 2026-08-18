@@ -206,6 +206,13 @@ napi_value ProbeVideoHwDecoders(napi_env env, napi_callback_info /*info*/)
     return obj;
 }
 
+// Mirrors the arm64 probe-failure semantics: the stub reports no hardware, so
+// the whitelist is the legacy full list (probe failure must not disable hwdec).
+napi_value GetHwdecCodecsWhitelist(napi_env env, napi_callback_info /*info*/)
+{
+    return MakeString(env, "h264,hevc,vp8,vp9,av1");
+}
+
 napi_value Init(napi_env env, napi_value exports)
 {
     OH_LOG_Print(LOG_APP, LOG_WARN, 0xFF00, "mpv",
@@ -244,6 +251,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"command", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"muxAudioVideo", nullptr, MuxAudioVideo, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"probeVideoHwDecoders", nullptr, ProbeVideoHwDecoders, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"getHwdecCodecsWhitelist", nullptr, GetHwdecCodecsWhitelist, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
 
     napi_define_properties(env, exports, sizeof(descriptors) / sizeof(descriptors[0]), descriptors);

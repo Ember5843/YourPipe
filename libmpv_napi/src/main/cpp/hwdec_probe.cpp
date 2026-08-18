@@ -85,6 +85,13 @@ napi_value ProbeVideoHwDecoders(napi_env env, napi_callback_info /*info*/)
     return result;
 }
 
+napi_value GetHwdecCodecsWhitelistNapi(napi_env env, napi_callback_info /*info*/)
+{
+    napi_value result = nullptr;
+    napi_create_string_utf8(env, HwDecCodecsWhitelist(), NAPI_AUTO_LENGTH, &result);
+    return result;
+}
+
 } // namespace
 
 HwDecVideoCaps GetHwDecVideoCaps()
@@ -130,6 +137,8 @@ void RegisterHwdecProbeModule(napi_env env, napi_value exports)
 {
     napi_property_descriptor desc[] = {
         {"probeVideoHwDecoders", nullptr, ProbeVideoHwDecoders, nullptr, nullptr, nullptr,
+         napi_default, nullptr},
+        {"getHwdecCodecsWhitelist", nullptr, GetHwdecCodecsWhitelistNapi, nullptr, nullptr, nullptr,
          napi_default, nullptr},
     };
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);

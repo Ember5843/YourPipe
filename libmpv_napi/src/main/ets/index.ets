@@ -8,6 +8,7 @@ export {
 export {
   muxAudioVideo,
   probeVideoHwDecoders,
+  getHwdecCodecsWhitelist,
 } from './global';
 export {
 	MediaInfo,

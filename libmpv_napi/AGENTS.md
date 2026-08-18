@@ -29,7 +29,9 @@
 - `MediaInfo` + codec parameter / stream info types.
 - `muxAudioVideo` — local-file remux (re-exported via `mediaservice`).
 - HW probe: `probeVideoHwDecoders` + `VideoHwDecoderCaps` (OHOS decoder
-  capability query for upper layers).
+  capability query for upper layers) and `getHwdecCodecsWhitelist` (the
+  probe-derived hwdec-codecs whitelist string; native is the single source of
+  truth, EnsureMpv applies the same value).
 
 ## 2. Layout
 ```

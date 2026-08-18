@@ -25,3 +25,12 @@ export interface VideoHwDecoderCaps {
 export function probeVideoHwDecoders(): VideoHwDecoderCaps {
   return nativeModule.probeVideoHwDecoders() as VideoHwDecoderCaps;
 }
+
+/**
+ * hwdec-codecs whitelist derived from the probed hardware decoder caps
+ * (native is the single source of truth; EnsureMpv applies the same value).
+ * Probe failure keeps the legacy full list rather than disabling hwdec.
+ */
+export function getHwdecCodecsWhitelist(): string {
+  return nativeModule.getHwdecCodecsWhitelist();
+}
