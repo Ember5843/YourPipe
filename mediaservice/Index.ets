@@ -1,5 +1,5 @@
 export { default as Logger } from './src/main/ets/utils/Logger';
-export { EnhancedLogger, DefaultLogger, LogSinkFn, LogSinkLevel } from './src/main/ets/utils/EnhancedLogger';
+export { EnhancedLogger, LogSinkFn, LogSinkLevel } from './src/main/ets/utils/EnhancedLogger';
 export { AVPlayerState, CommonConstants } from './src/main/ets/common/CommonConstants';
 export { secondToTime } from './src/main/ets/utils/CommUtils';
 export { AvPlayerController, NativeLogBridgeFns } from './src/main/ets/controller/AvPlayerController';

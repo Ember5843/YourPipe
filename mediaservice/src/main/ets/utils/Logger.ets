@@ -13,57 +13,10 @@
  * limitations under the License.
  */
 
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { EnhancedLogger } from './EnhancedLogger';
 
-export class Logger {
-  private domain: number;
-  private prefix: string;
-  private format: string = '%{public}s, %{public}s';
-
-  constructor(prefix: string) {
-    this.prefix = prefix;
-    this.domain = 0xFF00;
-  }
-
-  debug(...args: string[]): void {
-    hilog.debug(this.domain, this.prefix, this.format, args);
-    EnhancedLogger.dispatchToSink('DEBUG', this.prefix, args.join(', '));
-  }
-
-  info(...args: string[]): void {
-    hilog.info(this.domain, this.prefix, this.format, args);
-    EnhancedLogger.dispatchToSink('INFO', this.prefix, args.join(', '));
-  }
-
-  longInfo(tag: string, message: string): void {
-    const maxLength = 1000;
-    if (message.length <= maxLength) {
-      this.info(tag, message);
-      return;
-    }
-
-    let offset = 0;
-    let part = 1;
-    const totalParts = Math.ceil(message.length / maxLength);
-    
-    while (offset < message.length) {
-      const chunk = message.substring(offset, offset + maxLength);
-      this.info(tag, `[Part ${part}/${totalParts}] ${chunk}`);
-      offset += maxLength;
-      part++;
-    }
-  }
-
-  warn(...args: string[]): void {
-    hilog.warn(this.domain, this.prefix, this.format, args);
-    EnhancedLogger.dispatchToSink('WARN', this.prefix, args.join(', '));
-  }
-
-  error(...args: string[]): void {
-    hilog.error(this.domain, this.prefix, this.format, args);
-    EnhancedLogger.dispatchToSink('ERROR', this.prefix, args.join(', '));
-  }
-}
-
-export default new Logger('[VideoPlayerSample]');
+/**
+ * mediaservice 共享模块日志实例（EnhancedLogger 的默认入口）。
+ * 需要独立标签的组件请用 EnhancedLogger.getInstance(prefix, ...tags)。
+ */
+export default EnhancedLogger.getInstance('[Mediaservice]');
