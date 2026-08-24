@@ -1,6 +1,7 @@
 # AGENTS.md — YourPipe
 
-> AI agent context file. Read this first. Tracked project documentation.
+> AI agent context file. Read this first. Tracked in git — keep it free of
+> machine-specific absolute paths and secrets.
 > This file is the **project-level overview**: what the app is, how
 > modules wire, and which tools/conventions agents must follow.
 > For per-module deep context (file maps, internal conventions, do-nots),
@@ -159,10 +160,12 @@ Defaults when omitted: product `default`, build mode `debug`, ability from
 Build outputs (`.cxx/`, `build/`, `.hvigor/`, `oh_modules/`, `Crash_*.dmp`)
 are git-ignored.
 
-If `PackageHap` fails with `spawn java ENOENT`: point User-level `JAVA_HOME`
-at DevEco's JBR (`<DevEco>\jbr`) and put `%JAVA_HOME%\bin` on the User `PATH`
-— per-command env tweaks don't reach devecocli's child processes, and only
-new shells see the change.
+If `PackageHap` fails with `spawn java ENOENT`: point the user-level
+`JAVA_HOME` at DevEco Studio's bundled JBR (the `jbr` directory inside the
+DevEco install) and add its `bin` directory to the user `PATH`
+(Windows: `%JAVA_HOME%\bin`; macOS/Linux: `$JAVA_HOME/bin`, e.g. in
+`~/.zshrc`) — per-command env tweaks don't reach devecocli's child
+processes, and only new shells see the change.
 
 - **Lint**: `code-linter.json5` (root) — `@performance/recommended` +
   `@typescript-eslint/recommended` + `@security/*` blocking unsafe crypto.
@@ -248,7 +251,8 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `mediaservice` from `youtube_core`.
 - **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, or build
   trees. `AGENTS.md` files are tracked project docs — keep them in sync
-  with the code they describe.
+  with the code they describe, and never put machine-specific absolute
+  paths or credentials in them.
 - **Persistence and recovery**: every new persistent preference, database,
   file, or cache must define how it participates in both "restore default
   settings" and "clear all app data". Wire disposable state into the relevant

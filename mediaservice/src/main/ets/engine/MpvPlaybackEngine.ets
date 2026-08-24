@@ -265,7 +265,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     }
   }
 
-  load(source: string, startPos: number): boolean {
+  load(source: string, startPos: number, audioUrl: string = ''): boolean {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return false;
 
@@ -333,6 +333,18 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // before setMedia so every direct open (incl. later sub-add fetches, which
     // share the process env) sees the proxy.
     this.applyNetworkProxy(this.sourceUrl);
+
+    // External audio track for split HLS (live/post-live): the audio rendition
+    // playlist rides mpv audio-files, which mpv opens as part of the load, so
+    // audio is ready together with the first frame instead of joining seconds
+    // later (yt-dlp+mpv pattern). Use change-list: 'append' takes one raw item
+    // with NO separator parsing — plain set shreds these URLs on their literal
+    // ',' and ':' — and 'clr' drops leftovers from a previous live source.
+    ctrl.command(['change-list', 'audio-files', 'clr', '']);
+    if (audioUrl.length > 0) {
+      ctrl.command(['change-list', 'audio-files', 'append', audioUrl]);
+      Logger.info(TAG, `load: external audio=${audioUrl.substring(0, 60)}`);
+    }
 
     try {
       const isEdl = this.sourceUrl.startsWith('edl://');

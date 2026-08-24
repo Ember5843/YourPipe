@@ -29,6 +29,12 @@ export interface NativeLogBridgeFns {
   stop: () => void;
 }
 
+/** Live/post-live HLS track pair: video variant playlist + audio rendition playlist. */
+interface HlsTrackPair {
+  videoUrl: string;
+  audioUrl: string;
+}
+
 const TAG: string = '[PlayerLog][AvPlayerController]';
 
 @Observed
@@ -49,6 +55,8 @@ export class AvPlayerController {
 
   private curIndex: number = 0;
   private curSource: VideoData;
+  /** External audio (HLS audio rendition playlist) for the current source, '' when none. */
+  private currentHlsAudioUrl: string = '';
   private playbackEngine: PlaybackEngine = new MpvPlaybackEngine();
   private avSessionManager: AvSessionManager = AvSessionManager.getInstance();
   private stateMachine: PlayerStateMachine = new PlayerStateMachine();
@@ -559,18 +567,20 @@ export class AvPlayerController {
       this.stateMachine.forceTransition(PlayerState.LOADING);
     }
 
-    // Live streams: use HLS manifest URL directly, skip local proxy
+    // Live streams: resolve one video variant + its audio rendition from the HLS
+    // master and play them as variant playlist + mpv external audio (audio-files).
+    // The master itself cannot go to MPV: FFmpeg probes every variant playlist
+    // serially (multi-10s TTFF) and the audio rendition goes stale → audio=eof.
     if (newSource.isLive && newSource.hlsUrl) {
-      Logger.info(TAG, `Live stream detected, using HLS manifest directly: ${this.describePlaybackUrl(newSource.hlsUrl)}`);
-      const playbackUrl = await this.resolveManifestPlaybackUrl(newSource.hlsUrl, true);
+      const maxHeight = this.resolveMaxHeight(prefs.mobileQuality || '480p');
+      const hls = await this.resolveLiveHlsStreams(maxHeight);
       if (!this.isMediaSessionCurrent(generation)) return;
-      if (!playbackUrl) {
-        this.setError('[PLAYER] LOCAL_PROXY_FAILED');
-        return;
-      }
+      const liveUrl = hls?.videoUrl || newSource.hlsUrl;
+      this.currentHlsAudioUrl = hls?.audioUrl || '';
+      Logger.info(TAG, `Live stream: variant=${this.describePlaybackUrl(liveUrl)} audio=${this.currentHlsAudioUrl ? 'external' : (hls ? 'muxed/none' : 'master-fallback')}`);
       this.updateAvSessionMetadata(false);
       this.vm.isBuffering = true;
-      this.loadPlaybackSource(playbackUrl, 0, generation);
+      this.loadPlaybackSource(liveUrl, 0, generation);
       if (newSource.play || newSource.auto) {
         this.avSessionManager.activateForPlayback();
         this.playbackEngine.play();
@@ -579,10 +589,7 @@ export class AvPlayerController {
     }
 
     const current = this.vm.playerModel.getCurrentStreams();
-    const playbackUrl = await this.resolveManifestPlaybackUrl(
-      await this.createPlaybackUrl(current.video, current.audio, generation),
-      newSource.isLive === true
-    );
+    const playbackUrl = await this.createPlaybackUrl(current.video, current.audio, generation);
     if (!this.isMediaSessionCurrent(generation)) return;
     if (!playbackUrl) {
       this.setError('[PLAYER] LOCAL_PROXY_FAILED');
@@ -621,7 +628,28 @@ export class AvPlayerController {
       this.vm.isBuffering = true;
     }
 
-    const playbackUrl = await this.createPlaybackUrl(videoStream, effectiveAudio, generation);
+    // Live HLS variants (and the Auto master entry) start at the live edge:
+    // a resumed offset can fall outside the DVR window of the new playlist.
+    const isHlsSwitch = ((videoStream.deliveryMethod || '').toUpperCase() === 'HLS')
+      || ((videoStream.kind || '').toLowerCase() === 'manifest_hls');
+    const isLiveHlsSwitch = isHlsSwitch && this.curSource?.isLive === true;
+
+    let playbackUrl = '';
+    if (isLiveHlsSwitch) {
+      // 直播切档：重解析 master（音频 rendition 只存在于 master），选中的
+      // variant playlist + 外挂音频 rendition 在直播边缘重启。Auto 走默认选档。
+      const isAutoEntry = (videoStream.kind || '').toLowerCase() === 'manifest_hls';
+      const maxHeight = this.resolveMaxHeight(PlaybackPreferences.snapshot().mobileQuality || '480p');
+      const hls = await this.resolveLiveHlsStreams(maxHeight, isAutoEntry ? undefined : videoStream.url);
+      if (!this.isMediaSessionCurrent(generation)) {
+        this.endSourceSwitchUi(false);
+        return;
+      }
+      this.currentHlsAudioUrl = hls?.audioUrl || '';
+      playbackUrl = hls?.videoUrl || videoStream.url;
+    } else {
+      playbackUrl = await this.createPlaybackUrl(videoStream, effectiveAudio, generation);
+    }
     if (!this.isMediaSessionCurrent(generation)) {
       this.endSourceSwitchUi(false);
       return;
@@ -639,10 +667,6 @@ export class AvPlayerController {
     this.qualitySwitchLoadStarted = true;
     this.vm.isSourceSwitching = true;
     this.vm.isBuffering = true;
-    // Live HLS variants (and the Auto master entry) start at the live edge:
-    // a resumed offset can fall outside the DVR window of the new playlist.
-    const isHlsSwitch = ((videoStream.deliveryMethod || '').toUpperCase() === 'HLS')
-      || ((videoStream.kind || '').toLowerCase() === 'manifest_hls');
     const loaded = this.loadPlaybackSource(playbackUrl, isHlsSwitch ? 0 : resumePos, generation);
     if (!loaded) {
       this.endSourceSwitchUi(false);
@@ -1072,12 +1096,75 @@ export class AvPlayerController {
     return 'null';
   }
 
+  /**
+   * Live HLS resolution: one master GET, pick a video variant (by explicit
+   * variantUrl, else highest ≤ targetHeight) and pair it with the master's
+   * audio rendition playlist (EXT-X-MEDIA), played as mpv external audio.
+   * YouTube live masters are split A/V (video-only variants); muxed masters
+   * have no renditions and the variant alone already carries audio.
+   * Returns null when the master cannot be fetched/parsed (caller falls back).
+   */
+  private async resolveLiveHlsStreams(targetHeight: number, variantUrl?: string): Promise<HlsTrackPair | null> {
+    const masterUrl = this.curSource?.hlsUrl || '';
+    if (!masterUrl) return null;
+    const text = await this.fetchText(masterUrl);
+    if (!text.includes('#EXT-X-STREAM-INF')) return null;
+    // HLS 解析统一走 youtube_core HlsManifestParser（本类只保留 HTTP 拉取，
+    // 网络层归收到 youtube_core 属后续 P4 项）。
+    const parsed = parseHlsMasterManifest(text, this.curSource?.videoId || '');
+    const variants = parsed.videoStreams.filter((s) => !!s.url);
+    if (variants.length === 0) return null;
+    let selected = variantUrl ? variants.find((s) => s.url === variantUrl) : undefined;
+    if (!selected) {
+      selected = variants
+        .filter((s) => (s.height || 0) <= targetHeight)
+        .sort((a, b) => (b.height || 0) - (a.height || 0))[0]
+        || variants.slice().sort((a, b) => (a.height || 0) - (b.height || 0))[0];
+    }
+    // Audio pick: highest-bandwidth rendition (audio-only variants carry
+    // BANDWIDTH; EXT-X-MEDIA renditions have none and keep manifest order,
+    // where YouTube lists the default/original first).
+    const audio = parsed.audioStreams.slice()
+      .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+    Logger.info(TAG, `resolveLiveHlsStreams: ${selected.height || 0}p variants=${variants.length} audioRenditions=${parsed.audioStreams.length}`);
+    const pair: HlsTrackPair = { videoUrl: selected.url, audioUrl: audio?.url || '' };
+    return pair;
+  }
+
+  private async fetchText(url: string): Promise<string> {
+    const request = http.createHttp();
+    try {
+      const options: http.HttpRequestOptions = {
+        method: http.RequestMethod.GET,
+        expectDataType: http.HttpDataType.STRING,
+        header: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36',
+          'Referer': 'https://www.youtube.com/',
+        },
+        connectTimeout: 8000,
+        readTimeout: 10000,
+      };
+      HttpDownloader.applyProxyToOptions(options, url);
+      const response = await request.request(url, options);
+      Logger.info(TAG, `manifest fetchText: code=${response.responseCode} len=${typeof response.result === 'string' ? response.result.length : 0}`);
+      return typeof response.result === 'string' ? response.result : '';
+    } catch (e) {
+      Logger.warn(TAG, `manifest fetchText error: ${e}`);
+      return '';
+    } finally {
+      request.destroy();
+    }
+  }
+
   private async createPlaybackUrl(video?: StreamInfo, audio?: StreamInfo,
     generation: number = this.mediaSessionGeneration): Promise<string> {
     if (!video || !this.isMediaSessionCurrent(generation)) return '';
 
     // Defer old session destroy: mark stale, save for cleanup after new source is READY
     this.deferCurrentSessionDestroy();
+    // HLS branches below re-arm this; every other playback path carries no
+    // external audio.
+    this.currentHlsAudioUrl = '';
 
     const delivery = (video.deliveryMethod || '').toUpperCase();
     const kind = (video.kind || '').toLowerCase();
@@ -1091,16 +1178,21 @@ export class AvPlayerController {
 
     if (!video.url) return '';
 
+    if (delivery === 'HLS' || kind === 'manifest_hls') {
+      // Post-live DVR / non-live HLS: variant playlist direct; the paired audio
+      // rendition playlist (when the master is split A/V) rides as mpv external
+      // audio via currentHlsAudioUrl. Muxed variants carry audio already.
+      this.currentHlsAudioUrl = audio?.url || '';
+      Logger.info(TAG, `createPlaybackUrl: HLS variant url=${this.describePlaybackUrl(video.url)} extAudio=${this.currentHlsAudioUrl.length > 0}`);
+      return video.url;
+    }
+
     if (this.isRemoteManifestUrl(video.url)) {
       Logger.debug(TAG, `createPlaybackUrl: using remote manifest directly`);
       return video.url;
     }
 
     switch (delivery) {
-      case 'HLS':
-        Logger.info(TAG, `createPlaybackUrl: HLS variant direct url=${this.describePlaybackUrl(video.url)}`);
-        return video.url;
-
       case 'DASH':
         if (audio && this.isSeparatedDash(video, audio)) {
           return await this.buildDualEdlUrl(video, audio, generation);
@@ -1318,7 +1410,7 @@ export class AvPlayerController {
       Logger.info(TAG, `local timeline armed session=${this.currentLocalMediaSessionId} ` +
         `startMs=${expectedStartMs}`);
     }
-    const loaded = this.playbackEngine.load(playbackUrl, startPosSec);
+    const loaded = this.playbackEngine.load(playbackUrl, startPosSec, this.currentHlsAudioUrl);
     if (!loaded) {
       this.localTimelineAwaitingReady = false;
       Logger.warn(TAG, `local timeline disarmed: engine rejected load startMs=${expectedStartMs}`);
@@ -1394,61 +1486,6 @@ export class AvPlayerController {
 
   private isRemoteManifestUrl(url: string): boolean {
     return /\.mpd($|[?#])/i.test(url) || /\.m3u8($|[?#])/i.test(url);
-  }
-
-  private async resolveManifestPlaybackUrl(url: string, isLive: boolean): Promise<string> {
-    if (!url || !isLive || !/\.m3u8($|[?#])/i.test(url)) {
-      return url;
-    }
-    try {
-      const text = await this.fetchText(url);
-      if (!text.includes('#EXT-X-STREAM-INF')) {
-        return url;
-      }
-      // HLS 解析统一走 youtube_core HlsManifestParser（本类只保留 HTTP 拉取，
-      // 网络层归收到 youtube_core 属后续 P4 项）。
-      const variants = parseHlsMasterManifest(text, this.curSource?.videoId || '')
-        .videoStreams.filter((s) => !!s.url);
-      if (variants.length === 0) {
-        return url;
-      }
-      const prefs = PlaybackPreferences.snapshot();
-      const maxHeight = this.resolveMaxHeight(prefs.mobileQuality || '480p');
-      const selected = variants
-        .filter((s) => (s.height || 0) <= maxHeight)
-        .sort((a, b) => (b.height || 0) - (a.height || 0))[0]
-        || variants.sort((a, b) => (a.height || 0) - (b.height || 0))[0];
-      Logger.info(TAG, `Selected HLS live variant: ${selected.height || 0}p ${this.describePlaybackUrl(selected.url)}`);
-      return selected.url;
-    } catch (e) {
-      Logger.warn(TAG, `resolveManifestPlaybackUrl failed, using original manifest: ${e}`);
-      return url;
-    }
-  }
-
-  private async fetchText(url: string): Promise<string> {
-    const request = http.createHttp();
-    try {
-      const options: http.HttpRequestOptions = {
-        method: http.RequestMethod.GET,
-        expectDataType: http.HttpDataType.STRING,
-        header: {
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36',
-          'Referer': 'https://www.youtube.com/',
-        },
-        connectTimeout: 8000,
-        readTimeout: 10000,
-      };
-      HttpDownloader.applyProxyToOptions(options, url);
-      const response = await request.request(url, options);
-      Logger.info(TAG, `manifest fetchText: code=${response.responseCode} resultType=${typeof response.result} len=${typeof response.result === 'string' ? response.result.length : 0}`);
-      return typeof response.result === 'string' ? response.result : '';
-    } catch (e) {
-      Logger.warn(TAG, `manifest fetchText error: ${e}`);
-      return '';
-    } finally {
-      request.destroy();
-    }
   }
 
   private isSeparatedDash(videoStream: StreamInfo, audioStream?: StreamInfo): boolean {

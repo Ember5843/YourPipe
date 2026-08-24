@@ -170,6 +170,22 @@ non-product `youtube-dual` session, so it was dead traffic on the EDL path.
 
 Do not teach MPV remote SABR URLs directly; always go through the local proxy.
 
+**Live HLS** (demuxed YouTube master, `?mpd_version=7`): one master GET in
+`AvPlayerController.resolveLiveHlsStreams` picks the variant ≤ the quality
+cap **and** the top-bitrate audio rendition (EXT-X-MEDIA / audio-only
+STREAM-INF, itag 233/234). The video variant URL goes to MPV directly — no
+proxy; the audio rendition is registered as an mpv external file before
+loadfile (`change-list audio-files append/clr` in `MpvPlaybackEngine.load`),
+so mpv opens audio together with the video and the first frame has sound.
+Never feed mpv a bare variant URL without the external audio — variants are
+video-only. Two mpv traps this avoids: list `-set` parsing splits on literal
+`,` and `:` inside these URLs (change-list `append` takes one raw item), and
+`audio-add` before the file is playing silently no-ops. Master-direct +
+`hls-bitrate` is also rejected: FFmpeg probes every variant serially
+(measured 57 s TTFF) and the audio renditions expire mid-probe. A quality
+switch re-runs the same helper and restarts at the live edge with the new
+variant + audio pair.
+
 ## 5. Config injection
 - `PlaybackPreferences.setProvider(...)` is the **only** way
   `mediaservice` reads UI/playback prefs. `entry` wires this in

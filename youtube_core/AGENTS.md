@@ -122,8 +122,11 @@ youtube_core/src/main/
        deferred: fired only when the primary path is empty, not per extraction)
       - HLS only when: post-live | live+`tv_downgraded` | `web_safari`;
         live HLS masters are background-parsed into per-variant quality
-        streams (quality menu fills in when ready; a switch restarts at the
-        live edge)
+        streams (variant `bitrate` carries BANDWIDTH/AVERAGE-BANDWIDTH; audio-only
+        STREAM-INF entries without RESOLUTION/VIDEO are classified into
+        `audioStreams` with their bitrate — mediaservice attaches the top one
+        as an mpv external audio file; the quality menu fills in when ready and a switch
+        restarts at the live edge on the new variant URL)
      - `dashMpdUrl` always empty
    - n/sig decode via local JSVM (`yourpipe_cipher` / manager READY), else PipePipe remote API
 4. **Deferred enrichment** (`fetchPlaybackExtras`, after source commit):

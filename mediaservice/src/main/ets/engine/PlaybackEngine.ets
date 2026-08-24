@@ -79,7 +79,12 @@ export interface PlaybackEngine {
   resizeSurface(widthPx: number, heightPx: number): void;
   updateVideoRect(x: number, y: number, w: number, h: number): void;
 
-  load(source: string, startPos: number): boolean;
+  /**
+   * Load a source. audioUrl (optional) is an external audio track for split
+   * HLS live/post-live playback (audio rendition playlist), mapped to mpv
+   * audio-files; empty/omitted clears any previous external audio.
+   */
+  load(source: string, startPos: number, audioUrl?: string): boolean;
   play(): void;
   pause(): void;
   stop(): void;

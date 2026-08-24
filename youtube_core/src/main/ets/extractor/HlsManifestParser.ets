@@ -18,7 +18,8 @@ function buildHlsAudioStream(
   url: string,
   language: string | undefined,
   trackId: string | undefined,
-  trackName: string | undefined
+  trackName: string | undefined,
+  bitrate: number | undefined = undefined
 ): StreamInfo {
   return {
     url: url,
@@ -26,7 +27,7 @@ function buildHlsAudioStream(
     mimeType: 'audio/mp4',
     qualityLabel: undefined,
     audioQuality: undefined,
-    bitrate: undefined,
+    bitrate: bitrate,
     contentLength: undefined,
     hasVideo: false,
     hasAudio: true,
@@ -81,6 +82,11 @@ export function parseHlsMasterManifest(manifestContent: string, videoId: string)
     const codecs = extractHlsStringAttribute(line, 'CODECS');
     const frameRate = extractHlsAttribute(line, 'FRAME-RATE');
     const audioContentId = extractHlsStringAttribute(line, 'YT-EXT-AUDIO-CONTENT-ID');
+    // Bandwidth feeds mpv hls-bitrate variant selection (highest ≤ value).
+    // Newer FFmpeg compares AVERAGE-BANDWIDTH when present; prefer it.
+    const avgBandwidth = extractHlsAttribute(line, 'AVERAGE-BANDWIDTH');
+    const peakBandwidth = extractHlsAttribute(line, 'BANDWIDTH');
+    const bandwidth = avgBandwidth > 0 ? avgBandwidth : peakBandwidth;
 
     let videoCodec: string | undefined;
     if (codecs) {
@@ -129,7 +135,7 @@ export function parseHlsMasterManifest(manifestContent: string, videoId: string)
         mimeType: 'video/mp2t',
         qualityLabel: resString,
         audioQuality: undefined,
-        bitrate: undefined,
+        bitrate: bandwidth > 0 ? bandwidth : undefined,
         contentLength: undefined,
         hasVideo: true,
         hasAudio: audioTrackId !== undefined,
@@ -157,6 +163,15 @@ export function parseHlsMasterManifest(manifestContent: string, videoId: string)
       };
 
       videoStreams.push(stream);
+    } else if (!videoCodec) {
+      // Audio-only variant playlist: split A/V live masters expose audio as
+      // resolution-less STREAM-INF entries (itag 233/234 style) instead of
+      // EXT-X-MEDIA renditions. A missing video codec guards against
+      // classifying malformed video variants as audio.
+      const langPart = audioContentId ? audioContentId.split('.')[0] : undefined;
+      const audioLocale = langPart ? langPart.split('-')[0] : undefined;
+      audioStreams.push(buildHlsAudioStream(streamUrl, audioLocale,
+        audioContentId, audioContentId, bandwidth > 0 ? bandwidth : undefined));
     }
   }
 
