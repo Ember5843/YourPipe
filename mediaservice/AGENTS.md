@@ -13,7 +13,9 @@
 - `SabrOfflineDownloader`, `SabrOfflineProgress`, `SabrOfflineDownloadOptions`
   — offline SABR download (used by entry `DownloadManager`).
 - `PlaybackEngine` (interface), `PlaybackEngineState`, `PlaybackState`,
-  `PlaybackErrorCategory`, `EngineConfig` — engine contract types.
+  `PlaybackErrorCategory`, `EngineConfig`, `PlaybackStats` — engine contract
+  types (`PlaybackStats` = on-demand MPV cache-speed / demuxer-cache-duration /
+  dropped-frame snapshot for the entry stats UI).
 - `VideoHwCaps` — device HW decoder capability snapshot + hwdec-codecs
   whitelist passthrough (value owned by native `getHwdecCodecsWhitelist`).
 - `PlayerState`, `isValidTransition`, `describeState`, `PlayerStateMachine`,

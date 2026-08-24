@@ -32,7 +32,7 @@ padding: `buildSheetTitleBar` handles in-sheet insets).
 |---|---|
 | `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI |
 | `search` | `SearchPage` (NavDestination) |
-| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`) |
+| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open) |
 | `playlist` | Playlist list + detail |
 | `subscription` | Subscription manage + feed service (bottom tab) |
 | `favorites` | `FavoritesPage` |
