@@ -1113,6 +1113,26 @@
             "value": "معلومات التدفق"
         },
         {
+            "name": "yt_stream_stats_title",
+            "value": "إحصائيات التشغيل"
+        },
+        {
+            "name": "yt_stats_video_id",
+            "value": "معرّف الفيديو"
+        },
+        {
+            "name": "yt_stats_conn_speed",
+            "value": "سرعة الاتصال"
+        },
+        {
+            "name": "yt_stats_buffer",
+            "value": "طول المخزن المؤقت"
+        },
+        {
+            "name": "yt_stats_dropped",
+            "value": "الإطارات المسقطة"
+        },
+        {
             "name": "yt_stream_container",
             "value": "الحاوية"
         },

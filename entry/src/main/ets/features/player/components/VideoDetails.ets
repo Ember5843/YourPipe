@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CommonConstants as Const, Logger, StreamInfo, StreamCategories, PlayerModel } from 'mediaservice';
+import { CommonConstants as Const, Logger, StreamInfo, StreamCategories, PlayerModel, PlaybackStats } from 'mediaservice';
 import { formatBytes } from '../../../common/utils/FormatUtils';
 import { LengthMetrics } from '@kit.ArkUI';
 import { ErrorPage } from '../../../common/components/ErrorPage';
@@ -24,6 +24,7 @@ import { SubscriptionUser } from '../../../common/SubscriptionModel';
 import { ChannelCard } from '../../user/components/ChannelCard';
 import { DownloadDialog, DownloadSelection } from './DownloadDialog';
 import { SavePlaylistSheet } from './SavePlaylistSheet';
+import { StatsBarGraph } from './StatsBarGraph';
 import { DownloadManager, DownloadTask } from '../../../common/DownloadManager';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
@@ -97,6 +98,11 @@ export struct VideoDetails {
   private downloadDialogController: CustomDialogController | null = null;
   private descSkeletonTimer: number = -1;
   private sleepTimerUiInterval: number = -1;
+  private statsTimer: number = -1;
+  @State statsSpeedSamples: number[] = [];
+  @State statsBufferSamples: number[] = [];
+  @State statsDropped: number = 0;
+  @State statsDecoderDropped: number = 0;
   @State descSkeletonOpacity: number = 0.3;
   @State sleepTimerRemainingMinutes: number = 0;
   @State showSavePlaylistSheet: boolean = false;
@@ -280,6 +286,7 @@ export struct VideoDetails {
       clearInterval(this.sleepTimerUiInterval);
       this.sleepTimerUiInterval = -1;
     }
+    this.stopStreamStatsPolling();
   }
 
   private startSleepTimerUiUpdates(): void {
@@ -292,6 +299,60 @@ export struct VideoDetails {
 
   private syncSleepTimerUi(): void {
     this.sleepTimerRemainingMinutes = PlayerSession.getInstance().sleepTimerRemainingMinutes;
+  }
+
+  private startStreamStatsPolling(): void {
+    this.stopStreamStatsPolling();
+    this.statsSpeedSamples = [];
+    this.statsBufferSamples = [];
+    this.statsDropped = 0;
+    this.statsDecoderDropped = 0;
+    logger.debug(`stream stats polling started videoId=${this.item.videoId}`);
+    this.pollStreamStats();
+    this.statsTimer = setInterval(() => { this.pollStreamStats(); }, 500);
+  }
+
+  private stopStreamStatsPolling(): void {
+    if (this.statsTimer >= 0) {
+      clearInterval(this.statsTimer);
+      this.statsTimer = -1;
+      logger.debug(`stream stats polling stopped videoId=${this.item.videoId}`);
+    }
+  }
+
+  private pollStreamStats(): void {
+    const stats: PlaybackStats = PlayerSession.getInstance().controller.getPlaybackStats();
+    const speedSamples: number[] = [...this.statsSpeedSamples, stats.cacheSpeedBps];
+    if (speedSamples.length > 60) {
+      speedSamples.shift();
+    }
+    this.statsSpeedSamples = speedSamples;
+    const bufferSamples: number[] = [...this.statsBufferSamples, stats.demuxerCacheDurationSec];
+    if (bufferSamples.length > 60) {
+      bufferSamples.shift();
+    }
+    this.statsBufferSamples = bufferSamples;
+    this.statsDropped = stats.droppedFrames;
+    this.statsDecoderDropped = stats.decoderDroppedFrames;
+  }
+
+  private currentStatsSpeed(): number {
+    return this.statsSpeedSamples.length > 0 ? this.statsSpeedSamples[this.statsSpeedSamples.length - 1] : 0;
+  }
+
+  private currentStatsBuffer(): number {
+    return this.statsBufferSamples.length > 0 ? this.statsBufferSamples[this.statsBufferSamples.length - 1] : 0;
+  }
+
+  private formatSpeed(bps: number): string {
+    if (bps >= 1024 * 1024) {
+      return `${(bps / (1024 * 1024)).toFixed(2)} MB/s`;
+    }
+    return `${(bps / 1024).toFixed(2)} KB/s`;
+  }
+
+  private formatBufferSec(sec: number): string {
+    return `${sec.toFixed(1)} s`;
   }
 
   private formatSleepTimerRemaining(): string {
@@ -757,6 +818,7 @@ export struct VideoDetails {
         this.showSavePlaylistSheet = false;
         this.showStreamInfoSheet = false;
         this.showSleepTimerSheet = false;
+        this.stopStreamStatsPolling();
       }
     })
   }
@@ -860,6 +922,9 @@ export struct VideoDetails {
       .margin({ bottom: 10 })
 
       // ── 容器信息 ──
+      if (this.item.videoId.length > 0) {
+        this.StreamInfoRow($r('app.string.yt_stats_video_id'), this.item.videoId)
+      }
       if (this.mpvContainerFormat.length > 0) {
         this.StreamInfoRow($r('app.string.yt_stream_container'), this.mpvContainerFormat.toUpperCase())
       }
@@ -914,6 +979,31 @@ export struct VideoDetails {
           this.StreamInfoRow($r('app.string.yt_stream_sample_rate'), `${(this.mpvAudioSampleRate / 1000).toFixed(1)} kHz`)
         }
       }
+
+      // ── 播放统计（Stats for Nerds 风格实时数据）──
+      Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
+      Text($r('app.string.yt_stream_stats_title'))
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.yourtube_text_secondary'))
+        .margin({ bottom: 6 })
+      this.StreamInfoRow($r('app.string.yt_stats_conn_speed'), this.formatSpeed(this.currentStatsSpeed()))
+      StatsBarGraph({
+        samples: this.statsSpeedSamples,
+        kind: 'speed',
+        referenceBps: this.mpvVideoBitRate + this.mpvAudioBitRate
+      })
+        .margin({ top: 4, bottom: 8 })
+      this.StreamInfoRow($r('app.string.yt_stats_buffer'), this.formatBufferSec(this.currentStatsBuffer()))
+      StatsBarGraph({
+        samples: this.statsBufferSamples,
+        kind: 'buffer'
+      })
+        .margin({ top: 4, bottom: 8 })
+      this.StreamInfoRow($r('app.string.yt_stats_dropped'),
+        this.statsDropped === 0 && this.statsDecoderDropped === 0
+          ? '0'
+          : `${this.statsDropped} / ${this.statsDecoderDropped}`)
 
       // ── 无数据占位 ──
       if (this.mpvVideoWidth === 0 && this.mpvAudioCodec.length === 0 && this.mpvContainerFormat.length === 0) {
@@ -1046,6 +1136,9 @@ export struct VideoDetails {
   private openSheet(id: number): void {
     this.activeSheet = id;
     this.sheetVisible = true;
+    if (id === 2) {
+      this.startStreamStatsPolling();
+    }
   }
 
   private closeSheet(): void {

@@ -1,7 +1,8 @@
 import { MpvPlayerController, MediaStatus, MediaType, SeekFlag, PlaybackState as NativePlaybackState,
   setHttpProxyEnv } from '@yourpipe/libmpv-napi';
 import type { MediaInfo } from '@yourpipe/libmpv-napi';
-import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
+import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, PlaybackStats,
+  EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
 import { VideoHwCaps } from './VideoHwCaps';
 import { HttpProxyOptions } from 'youtube_core';
@@ -493,6 +494,30 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   getBandwidthEstimateBps(): number {
     return 1_000_000;
+  }
+
+  getPlaybackStats(): PlaybackStats {
+    const empty: PlaybackStats = {
+      cacheSpeedBps: 0,
+      demuxerCacheDurationSec: 0,
+      droppedFrames: 0,
+      decoderDroppedFrames: 0
+    };
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl === null || this.destroyed) {
+      return empty;
+    }
+    return {
+      cacheSpeedBps: this.parseStatsNumber(ctrl.getProperty('cache-speed')),
+      demuxerCacheDurationSec: this.parseStatsNumber(ctrl.getProperty('demuxer-cache-duration')),
+      droppedFrames: this.parseStatsNumber(ctrl.getProperty('dropped-frame-count')),
+      decoderDroppedFrames: this.parseStatsNumber(ctrl.getProperty('decoder-dropped-frame-count'))
+    };
+  }
+
+  private parseStatsNumber(raw: string): number {
+    const value: number = Number(raw);
+    return isNaN(value) ? 0 : value;
   }
 
   setStateCallback(cb: (state: PlaybackState) => void): void {

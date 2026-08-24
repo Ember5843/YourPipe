@@ -1113,6 +1113,26 @@
             "value": "串流資訊"
         },
         {
+            "name": "yt_stream_stats_title",
+            "value": "播放統計"
+        },
+        {
+            "name": "yt_stats_video_id",
+            "value": "影片 ID"
+        },
+        {
+            "name": "yt_stats_conn_speed",
+            "value": "連線速度"
+        },
+        {
+            "name": "yt_stats_buffer",
+            "value": "緩衝長度"
+        },
+        {
+            "name": "yt_stats_dropped",
+            "value": "掉幀"
+        },
+        {
             "name": "yt_stream_container",
             "value": "容器格式"
         },

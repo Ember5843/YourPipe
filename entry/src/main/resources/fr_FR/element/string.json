@@ -1113,6 +1113,26 @@
             "value": "Informations sur le flux"
         },
         {
+            "name": "yt_stream_stats_title",
+            "value": "Statistiques de lecture"
+        },
+        {
+            "name": "yt_stats_video_id",
+            "value": "ID de la vidéo"
+        },
+        {
+            "name": "yt_stats_conn_speed",
+            "value": "Vitesse de connexion"
+        },
+        {
+            "name": "yt_stats_buffer",
+            "value": "Longueur du tampon"
+        },
+        {
+            "name": "yt_stats_dropped",
+            "value": "Images perdues"
+        },
+        {
             "name": "yt_stream_container",
             "value": "Conteneur"
         },

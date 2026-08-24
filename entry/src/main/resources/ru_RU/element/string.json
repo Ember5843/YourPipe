@@ -1113,6 +1113,26 @@
             "value": "Информация о потоке"
         },
         {
+            "name": "yt_stream_stats_title",
+            "value": "Статистика воспроизведения"
+        },
+        {
+            "name": "yt_stats_video_id",
+            "value": "ID видео"
+        },
+        {
+            "name": "yt_stats_conn_speed",
+            "value": "Скорость соединения"
+        },
+        {
+            "name": "yt_stats_buffer",
+            "value": "Длина буфера"
+        },
+        {
+            "name": "yt_stats_dropped",
+            "value": "Пропущенные кадры"
+        },
+        {
             "name": "yt_stream_container",
             "value": "Контейнер"
         },

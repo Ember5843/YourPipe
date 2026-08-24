@@ -1113,6 +1113,26 @@
             "value": "Información de la transmisión"
         },
         {
+            "name": "yt_stream_stats_title",
+            "value": "Estadísticas de reproducción"
+        },
+        {
+            "name": "yt_stats_video_id",
+            "value": "ID del vídeo"
+        },
+        {
+            "name": "yt_stats_conn_speed",
+            "value": "Velocidad de conexión"
+        },
+        {
+            "name": "yt_stats_buffer",
+            "value": "Longitud del búfer"
+        },
+        {
+            "name": "yt_stats_dropped",
+            "value": "Fotogramas perdidos"
+        },
+        {
             "name": "yt_stream_container",
             "value": "Contenedor"
         },

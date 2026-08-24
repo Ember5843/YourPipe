@@ -40,6 +40,18 @@ export interface PlaybackState {
   errorCode?: number;
 }
 
+/** Live playback statistics snapshot (Stats-for-Nerds style), read from MPV properties. */
+export interface PlaybackStats {
+  /** Demuxer cache fill speed in bytes/sec (~network connection speed). */
+  cacheSpeedBps: number;
+  /** Buffered media duration ahead of the play position, in seconds. */
+  demuxerCacheDurationSec: number;
+  /** Frames dropped by the video output. */
+  droppedFrames: number;
+  /** Frames dropped by the decoder. */
+  decoderDroppedFrames: number;
+}
+
 export interface EngineConfig {
   // MPV 专用配置
   mpvHwdecEnabled?: boolean;
@@ -77,6 +89,7 @@ export interface PlaybackEngine {
 
   getState(): PlaybackState;
   getBandwidthEstimateBps(): number;
+  getPlaybackStats(): PlaybackStats;
 
   setStateCallback(cb: (state: PlaybackState) => void): void;
   setSubtitleCallback(cb: (text: string, startTime: number, duration: number) => void): void;

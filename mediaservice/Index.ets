@@ -10,7 +10,8 @@ export {
   SabrOfflineProgress,
   SabrOfflineDownloadOptions
 } from './src/main/ets/sabr/SabrOfflineDownloader';
-export { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './src/main/ets/engine/PlaybackEngine';
+export { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, PlaybackStats,
+  EngineConfig } from './src/main/ets/engine/PlaybackEngine';
 export { VideoHwCaps } from './src/main/ets/engine/VideoHwCaps';
 export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry, AudioTrackOption, StreamClassification } from './src/main/ets/model/PlayerModel';
 // AudioTrackOption kept for compatibility; UI now lists StreamInfo via getAudioStreamList.

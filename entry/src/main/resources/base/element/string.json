@@ -1461,6 +1461,26 @@
             "value": "流媒体信息"
         },
         {
+            "name": "yt_stream_stats_title",
+            "value": "播放统计"
+        },
+        {
+            "name": "yt_stats_video_id",
+            "value": "视频 ID"
+        },
+        {
+            "name": "yt_stats_conn_speed",
+            "value": "连接速度"
+        },
+        {
+            "name": "yt_stats_buffer",
+            "value": "缓冲长度"
+        },
+        {
+            "name": "yt_stats_dropped",
+            "value": "丢帧"
+        },
+        {
             "name": "yt_stream_container",
             "value": "容器格式"
         },

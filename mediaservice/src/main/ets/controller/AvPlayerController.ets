@@ -5,7 +5,7 @@
 
 import { VideoData, StreamInfo } from '../model/VideoData';
 import { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from '../model/PlayerModel';
-import { PlaybackEngine, PlaybackState, EngineConfig } from '../engine/PlaybackEngine';
+import { PlaybackEngine, PlaybackState, PlaybackStats, EngineConfig } from '../engine/PlaybackEngine';
 import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
 import { VideoHwCaps } from '../engine/VideoHwCaps';
 import { LocalMediaProxy } from './LocalMediaProxy';
@@ -137,6 +137,19 @@ export class AvPlayerController {
 
   getPlaybackState(): PlaybackState {
     return this.playbackEngine.getState();
+  }
+
+  /** Live playback statistics (Stats-for-Nerds style); all zeros until the engine is initialized. */
+  getPlaybackStats(): PlaybackStats {
+    if (!this.playbackEngine.isInitialized()) {
+      return {
+        cacheSpeedBps: 0,
+        demuxerCacheDurationSec: 0,
+        droppedFrames: 0,
+        decoderDroppedFrames: 0
+      };
+    }
+    return this.playbackEngine.getPlaybackStats();
   }
 
   refreshPlaybackState(): void {

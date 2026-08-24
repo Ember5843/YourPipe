@@ -1,0 +1,105 @@
+/*
+ * Copyright (c) 2024 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+const MAX_BARS: number = 60;
+const GRAPH_HEIGHT_VP: number = 56;
+const BAR_MAX_HEIGHT_VP: number = 54;
+const BAR_PLACEHOLDER_HEIGHT_VP: number = 2;
+const FALLBACK_SPEED_REFERENCE_BPS: number = 5 * 1000 * 1000;
+const COLOR_GOOD: string = '#34A853';
+const COLOR_WARN: string = '#F9AB00';
+const COLOR_BAD: string = '#E53935';
+
+/**
+ * Stats-for-Nerds style live bar graph. Pure ArkUI (no Canvas): a bottom-aligned
+ * row of equal-weight bars, latest sample at the right edge.
+ * kind 'speed': samples in bytes/sec, colored against referenceBps (stream bitrate);
+ * kind 'buffer': samples in seconds, colored by absolute buffered duration.
+ */
+@Component
+export struct StatsBarGraph {
+  /** Oldest first, latest last. At most the last 60 samples are rendered. */
+  @Prop samples: number[] = [];
+  /** 'speed' | 'buffer' */
+  @Prop kind: string = 'speed';
+  /** Speed reference (video+audio bitrate, bps). <=0 falls back to 5 Mbps. */
+  @Prop referenceBps: number = 0;
+
+  private visibleSamples(): number[] {
+    if (this.samples.length <= MAX_BARS) {
+      return this.samples;
+    }
+    return this.samples.slice(this.samples.length - MAX_BARS);
+  }
+
+  private maxScale(): number {
+    let maxSample: number = 0;
+    this.samples.forEach((value: number) => {
+      if (value > maxSample) {
+        maxSample = value;
+      }
+    });
+    if (this.kind === 'speed') {
+      const reference: number = this.referenceBps > 0 ? this.referenceBps : FALLBACK_SPEED_REFERENCE_BPS;
+      return Math.max(maxSample, reference * 2, 1);
+    }
+    return Math.max(maxSample, 10);
+  }
+
+  private barHeight(sample: number): number {
+    if (sample <= 0) {
+      return BAR_PLACEHOLDER_HEIGHT_VP;
+    }
+    return Math.min(1, sample / this.maxScale()) * BAR_MAX_HEIGHT_VP;
+  }
+
+  private barColor(sample: number): ResourceColor {
+    if (sample <= 0) {
+      return $r('app.color.yourtube_divider');
+    }
+    if (this.kind === 'speed') {
+      const reference: number = this.referenceBps > 0 ? this.referenceBps : FALLBACK_SPEED_REFERENCE_BPS;
+      const ratio: number = sample / reference;
+      if (ratio >= 1.2) {
+        return COLOR_GOOD;
+      }
+      if (ratio >= 0.8) {
+        return COLOR_WARN;
+      }
+      return COLOR_BAD;
+    }
+    if (sample >= 8) {
+      return COLOR_GOOD;
+    }
+    if (sample >= 3) {
+      return COLOR_WARN;
+    }
+    return COLOR_BAD;
+  }
+
+  build() {
+    Row({ space: 1 }) {
+      ForEach(this.visibleSamples(), (sample: number) => {
+        Column()
+          .layoutWeight(1)
+          .height(this.barHeight(sample))
+          .backgroundColor(this.barColor(sample))
+      }, (sample: number, index: number) => `${index}_${sample.toFixed(0)}`)
+    }
+    .width('100%')
+    .height(GRAPH_HEIGHT_VP)
+    .alignItems(VerticalAlign.Bottom)
+  }
+}
