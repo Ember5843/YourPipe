@@ -91,6 +91,13 @@ mediaservice/src/main/ets/
 - Source submission has a **single writer** — entry `PlayerSession.play()`;
   duplicate suppression lives there, so a controller submission always
   means a real load.
+- MPV direct network fetches (HLS masters/segments, `sub-add` subtitle
+  URLs) follow the app proxy through the process environment:
+  `MpvPlaybackEngine.applyNetworkProxy` (on `load()`) calls libmpv_napi
+  `setHttpProxyEnv`, which sets `http_proxy` (+ `no_proxy` =
+  `127.0.0.1,localhost` so the loopback proxy stays direct). The vendored
+  libmpv has **no** `network-proxy` property — do not reintroduce that
+  `setProperty` call.
 
 ## 4. Local proxy architecture
 `LocalProxyServer` exposes a loopback HTTP endpoint so MPV always consumes a
@@ -112,7 +119,10 @@ Upstream transports in `RangeProxy`: VISIONOS (and TVHTML5) googlevideo
 requests stream over RCP (visionos = body-less GET) so MPV's first byte never
 waits for a full buffered chunk; other clients use buffered `@ohos.net.http`
 GET. Connect timeout is 10s (PipePipe OkHttp parity); transfer/read stays 30s
-(RCP `transferMs` covers the whole stream).
+(RCP `transferMs` covers the whole stream). Every RCP session — YouTube and
+non-YouTube alike — resolves the app proxy through the shared
+`resolveRcpProxy` (http → upstream URL with auth, socks5 → loopback bridge
+URL with `createTunnel:'always'`, otherwise `'no-proxy'`).
 
 **SABR dual path (mweb opt-in)**:
 1. Extractor returns SABR bootstrap (`YoutubeSabrInfo` / streams with SABR delivery).

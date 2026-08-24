@@ -28,6 +28,11 @@
 - Enums: `MediaStatus`, `MediaType`, `PlaybackState`, `SeekFlag`, `VideoFit`.
 - `MediaInfo` + codec parameter / stream info types.
 - `muxAudioVideo` — local-file remux (re-exported via `mediaservice`).
+- `setHttpProxyEnv(url)` — sets/clears the process-level `http_proxy` +
+  `no_proxy=127.0.0.1,localhost` env so vendored FFmpeg routes its direct
+  fetches (HLS, subtitles) through the app proxy while loopback stays
+  direct. Called by `mediaservice` `MpvPlaybackEngine`; no-op on the
+  x86_64 stub.
 - HW probe: `probeVideoHwDecoders` + `VideoHwDecoderCaps` (OHOS decoder
   capability query for upper layers) and `getHwdecCodecsWhitelist` (the
   probe-derived hwdec-codecs whitelist string; native is the single source of

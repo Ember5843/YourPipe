@@ -15,12 +15,14 @@
   versionCode 1000020).
 - **What it is**: YouTube client for OpenHarmony / HarmonyOS. Plays YouTube
   content through a native **MPV** pipeline (vendored `libmpv.so` + static
-  `libav*` for mux/remux). Product VOD path is **direct-link DASH** (guest:
-  `visionos` /player via the GAPIS endpoint, pot-free — PipePipe parity →
-  adaptiveFormats direct URLs → dual-track local proxy → MPV; signed-in:
-  `tv_downgraded`, token-free). `android_vr` remains as a fallback selection
-  (requires a session pot). The mweb
-  **SABR/UMP** path is kept as an opt-in/debug selection. The `libmpv_napi` module
+  `libav*` for mux/remux). Product VOD path is **direct-link DASH** for guest
+  (`visionos` /player via the GAPIS endpoint, pot-free — PipePipe parity →
+  adaptiveFormats direct URLs → dual-track local proxy → MPV); signed-in
+  playback defaults to **mweb SABR/UMP**. Both states are user-selectable
+  (Options → 播放端点: guest `visionos|mweb`, signed-in
+  `tv_downgraded|mweb`). `android_vr` remains as an unused fallback selection
+  (requires a session pot; dropped upstream by PipePipe v5.3.0).
+  The `libmpv_napi` module
   (`MpvPlayerView` / `MpvPlayerController`) is the NAPI bridge to MPV,
   originally derived from the upstream `wang-bin/libmdk-napi` package
   (historical `mdk` names exist only in old commits) — there is no MDK
@@ -202,10 +204,11 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `AppLogStore`; do not scatter raw `console.log` / `hilog` in library code.
 - **Player stack**: product backend is MPV only (`libmpv_napi` +
   `MpvPlaybackEngine`). Do not reintroduce a second decoder/player path.
-- **Playback media path**: product VOD is direct-link-first (guest
-  `visionos` / signed-in `tv_downgraded` → adaptiveFormats direct URLs →
-  local range/DASH proxy). `android_vr` is a fallback guest selection that
-  requires a session pot. The mweb **SABR** path is an opt-in/debug selection:
+- **Playback media path**: guest VOD is direct-link-first (`visionos` →
+  adaptiveFormats direct URLs → local range/DASH proxy); signed-in VOD
+  defaults to the mweb **SABR** path, with `tv_downgraded` direct links
+  still selectable. `android_vr` is an unused fallback selection that
+  requires a session pot. SABR ownership:
   extractor bootstraps SABR; `youtube_core` owns UMP session fetch;
   `mediaservice` owns lease/store/serve + MPV load URL; `entry` owns PoToken
   WebView mint.
@@ -225,6 +228,22 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   budget 2); status>=3 fails fast. Visitor identity is pinned/invalidated only
   through `SessionIdentityManager`; a PoToken must never be reused across a
   visitorData change.
+- **Login data expiry**: `youtube_core` browse APIs raise a typed
+  `AuthExpiredError` on 401 / Innertube error 16 (`UNAUTHENTICATED`) when
+  auth was attached; the signed-in home feed then falls back to the guest
+  kiosk and surfaces a re-login notice (`noteAuthRejection` /
+  `consumeAuthRejectionNotice`). Account-cookie rotations in youtube.com
+  `Set-Cookie` are merged back into the stored credential
+  (`AuthSessionManager.mergeAccountSetCookies`, hooked into every
+  `HttpDownloader` response); a server-cleared SID/SAPISID marks the web
+  rail rejected, and OAuth `invalid_grant` clears the refresh token.
+- **Proxy coverage**: one app proxy config (HTTP, or SOCKS5 via the
+  self-healing loopback CONNECT bridge `Socks5Bridge`) drives netstack
+  `http` requests, RCP sessions, ArkWeb (`ProxyController` — no
+  direct-fallback rules; a failing proxy must fail, not silently go
+  direct) and MPV's direct fetches (HLS/subtitles) through the
+  `http_proxy`/`no_proxy` process env (`setHttpProxyEnv`; the vendored
+  libmpv has no `network-proxy` property). Loopback stays direct.
 - **Dependency direction**: never import `entry` from HARs; never import
   `mediaservice` from `youtube_core`.
 - **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, build

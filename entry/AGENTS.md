@@ -37,7 +37,7 @@ padding: `buildSheetTitleBar` handles in-sheet insets).
 | `subscription` | Subscription manage + feed service (bottom tab) |
 | `favorites` | `FavoritesPage` |
 | `local` | Local library + downloads |
-| `options` | Main / appearance / playback / language-region / **network** / data-account / recovery / about-update (GitHub Releases check + AppGallery test link; about/update is inline in `OptionsMainPage` — there is no `OptionsAboutPage`; the About UI is `common/components/AboutPage.ets`) |
+| `options` | Main / appearance / playback (incl. per-state 播放端点: guest `visionos|mweb`, signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network** / data-account / recovery / about-update (GitHub Releases check + AppGallery test link; about/update is inline in `OptionsMainPage` — there is no `OptionsAboutPage`; the About UI is `common/components/AboutPage.ets`) |
 | `help` | `HelpGuidePage` — 6-page onboarding/help swiper (welcome + sign-in, account data, network proxy, quality/cache, downloads). Two entries: first-launch full-screen overlay on `Index` (an `if`-mounted layer in the root Stack, shown while `PreferencesStore` key `cfg_help_seen` != `'true'` with a 500 ms delay; bindSheet/bindContentCover on Navigation-hosted nodes do NOT present at app-start timing — do not revert to them) and Options main page "帮助" item (`help_page` destination in the options sheet). `resetAllConfigs` resets the flag; `clearAllAppData` clears it via `PreferencesStore.clearAll()`. Illustrations are `resources/base/media/guide_*.png` (welcome page uses `app_icon.png`). |
 | `user` | User / channel info; Library saved playlists (WEB classic renderers + TV lockup view models) |
 | `auth` | WebView cookie login (`WebViewLoginPage`) + device/QR OAuth (`DeviceQrLoginPage`) |
@@ -49,7 +49,12 @@ Persistent state and shared singletons:
   (playback quality/cache/GPU, background video-off delay, etc.).
 - `NetworkProxyConfig` — HTTP/SOCKS proxy prefs; applies system
   `setAppHttpProxy` and injects `HttpProxyOptions.setProvider` into
-  `youtube_core`.
+  `youtube_core`. `applySystemAndProviders` is async: SOCKS5 first starts
+  the loopback CONNECT bridge, then points both the app-level proxy and
+  the ArkWeb `ProxyController` override at it; `awaitReady()` lets the
+  first network work (home load in `Index.aboutToAppear`, the Options
+  proxy test) wait for the bridge instead of leaking direct. The WebView
+  override has **no** direct-fallback rules — a dead proxy fails visibly.
 - `PlayerSession` — singleton player state for the active `AvPlayerController`.
 - `PlayerPresentation` — foreground / background / share / cast / PiP presentation
   mode; drives when video may be disabled for background audio-only.
@@ -91,10 +96,14 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 - `AppLogStore.init(enabled, context.filesDir)`.
 - `AuthSessionManager.init(context)` (youtube_core) + `AuthStateHelper.refresh()`.
 - `AuthStateHelper.reconcilePlaybackClient()` — 登录态/鉴权开关变化后的唯一
-  入口（内部调用 `YoutubePlayerClientConfig.resetToAuthDefault`）。product
-  default is `tv_downgraded` when signed in, `visionos` for guests (both
-  resolve to direct adaptiveFormats URLs; visionos is pot-free via the GAPIS
-  endpoint). **mweb** (SABR) is an opt-in/debug selection, not the default.
+  入口（内部调用 `YoutubePlayerClientConfig.resetToAuthDefault`，落到
+  per-state configured 值）。Configured defaults: `mweb` (SABR) signed-in,
+  `visionos` guest (pot-free via the GAPIS endpoint, direct adaptiveFormats
+  URLs); **tv_downgraded** (token-free direct URLs) stays selectable in
+  Options → 播放端点 for the signed-in state. Endpoint changes go through
+  `AuthStateHelper.applyPlayerClientConfig` (config + identity/pot reset);
+  `EntryAbility.onCreate` pushes the persisted values via
+  `YoutubePlayerClientConfig.setConfiguredClients` before reconcile.
 - SABR wiring in `YouTubePlayService.initialize()`:
   `sabrSessionStore.setPoTokenProvider(...)` (UMP per-video pot),
   `sabrSessionStore.setInfoReloader(...)` (mid-playback re-probe, serialized
@@ -110,7 +119,7 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
      the cipher JS cache); the prewarmed visitorData pre-initializes the
      BotGuard WebView runtime (`SabrWebViewPoTokenProvider.warmRuntime`,
      queued until the WebView attaches) so the first real mint skips the
-     att/get + interpreter dance mid-playback
+     home page bootstrap + interpreter dance mid-playback
   2. `PlayerSession.prewarmPlaybackEngine()` (MPV)
   3. `LocalMediaProxy.warmup()` + `LocalMediaProxy.setStartupUrlGate(...)`
      — demand-side SIDX/segment fetches wait for the pending PoToken
@@ -129,12 +138,15 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 - Entry owns the **WebView mint** stack under `features/player/`:
   - `SabrWebViewPoTokenProvider` — provider facade, wired into
     `sabrSessionStore.setPoTokenProvider` via `YouTubePlayService`; also
-    implements `SessionPoTokenHook` (player-request session pot) and
+    implements `SessionPoTokenHook` (player-request pot) and
     `invalidatePoTokenIdentity` (attestation rotation: clears every
-    visitor-bound cache + resets the breaker, then youtube_core re-pins a
-    fresh visitorData and the generator re-initializes BotGuard)
-  - `SabrPoTokenWebRuntime` — hidden WebView BotGuard runtime
-  - `SabrLocalDomPoTokenGenerator` — local-DOM mint path
+    visitor-bound cache + resets the breaker + invalidates the generator
+    bootstrap, then youtube_core re-pins a fresh visitorData and the next
+    mint re-bootstraps from the home page)
+  - `SabrPoTokenWebRuntime` — hidden WebView BotGuard runtime (desktop UA
+    pinned via `setCustomUserAgent`)
+  - `SabrLocalDomPoTokenGenerator` — local-DOM mint path (home page
+    attestation bootstrap + EVENT_ID-bound BotGuard)
 - Do not move PoToken WebView policy into `mediaservice` or `youtube_core`;
   those modules only consume the `SabrPoTokenProvider` interface.
 - Mint is **bounded**: a timeout + circuit breaker so a wedged ArkWeb can
@@ -143,23 +155,29 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   and mediaservice gates demand-side SIDX on the pending injection via the
   startup URL gate.
 - Only the player-token cache is **visitor-bound** (it stores the visitorData
-  it was minted against and re-mints on mismatch); the per-video and DASH
-  caches key on `videoId` only — a visitor change takes effect through the
-  generator's minter re-initialization plus the invalidate-time cache clear.
+  + videoId it was minted against and re-mints on mismatch); the per-video and
+  DASH caches key on `videoId` only — a visitor change takes effect through
+  the generator's bootstrap invalidation plus the invalidate-time cache clear.
   Player/per-video pot cache TTL is 6h (inline literal).
-- **Two pot kinds**: the **session pot** (only for the /player request, served
-  via the `SessionPoTokenHook`, minted under the fixed `'__player__'`
-  identifier — visitorData only decides minter initialization and cache
-  ownership, not the content binding) and the **per-video pot** (content
-  binding = `videoId`, for UMP `getPoToken`); DASH `pot=` has its own
-  short-TTL cache. All are cleared together on identity invalidation.
-- The att/get attestation request body is only
-  `{context: {client: {clientName: 'WEB', clientVersion}}, engagementType}`;
-  headers are `User-Agent` (desktop UA), `Accept`, `Content-Type`,
-  `x-goog-api-key`, `x-user-agent: grpc-web-javascript/0.1` — no visitorData,
-  no hl/gl, no `X-Goog-*`/`X-YouTube-*`/`Origin`/`Referer`. The BotGuard
-  `vm.a(...)` bootstrap uses the 6-argument signature and the callback only
-  consumes `asyncSnapshotFunction` (no `loggerFunctions`).
+- **Binding follows the home page experiment flags** (PipePipe 5.3.0):
+  content binding mints per identifier (videoId for /player + UMP pots),
+  session binding mints once against the DataSync ID (signed-in) or the
+  bootstrap visitorData (anonymous) and every mint returns that session token.
+  DASH `pot=` has its own short-TTL cache. All are cleared together on
+  identity invalidation.
+- **Attestation bootstrap** (PipePipe 5.3.0 `YoutubePageAttestationBootstrap`,
+  issue #2820): the BotGuard challenge is parsed from the
+  `https://www.youtube.com` home page (`ytcfg.set` + `window.ytAtN`) —
+  `/att/get` is no longer used. The home fetch sends `Accept-Language: en-US`,
+  the login cookie when signed in (else `PREF=hl=en&gl=US`) and the desktop
+  `SABR_POTOKEN_USER_AGENT` (also pinned on the WebView via
+  `setCustomUserAgent`); GenerateIT keeps `x-goog-api-key` +
+  `x-user-agent: grpc-web-javascript/0.1`. The WebView helper injects
+  `window.yt.config_.EVENT_ID` before BotGuard and calls `vm.a(...)` with the
+  9-argument signature (program, callback, true, interaction element, no-op,
+  `[[], []]`, undefined, false, loggerFunctions[5]). After a successful
+  bootstrap the generator pins the bootstrap visitorData into
+  `SessionIdentityManager`.
 - `warmRuntime(visitorData): void` is fire-and-forget BotGuard pre-init
   (queued until the WebView attaches, re-triggered by `setMinter`);
   `invalidatePoTokenIdentity(...)` clears the caches and resets warm/breaker
@@ -201,6 +219,11 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   `AuthStateHelper` + youtube_core dual-rail session APIs — do not scrape
   cookies or Bearer tokens ad hoc. Credential modes and
   `useAuthForUserData` / `useAuthForPlayback` live in Options Data & Account.
+  A failed signed-in home rail (`AuthExpiredError` or otherwise) falls back
+  to the guest kiosk in `HomeFeedService` — the feed is never dead-ended;
+  an auth rejection additionally raises the
+  `yt_home_auth_expired_notice` banner via `homeModeNoticeMessage` in
+  `product/Index.ets`.
 
 ## 9. Player navigation and UI regression checks
 - Before adding a navigation path from `PlayerPage`, trace the comparable
