@@ -151,6 +151,14 @@ export interface NativeMpvPlayerModule {
   setVideoSurfaceId: (playerId: string, surfaceId: string) => void;
   ffmpegVersion: () => string;
   /**
+   * Set/clear the process-level HTTP proxy env (http_proxy / no_proxy) honored
+   * by the vendored FFmpeg for MPV-direct fetches (HLS masters/segments,
+   * sub-add subtitles). A non-empty URL may embed user:pass; an empty string
+   * clears both variables. no_proxy pins 127.0.0.1,localhost so loopback
+   * endpoints (LocalMediaProxy, SOCKS5 bridge) always stay direct.
+   */
+  setHttpProxyEnv: (url: string) => void;
+  /**
    * Mux one video file + one audio file into a single output file (remux, no
    * re-encode). Output container is inferred from outPath's extension.
    * Runs synchronously — call it inside an ArkTS TaskPool task to run in the

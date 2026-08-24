@@ -1,4 +1,5 @@
-import { MpvPlayerController, MediaStatus, MediaType, SeekFlag, PlaybackState as NativePlaybackState } from '@yourpipe/libmpv-napi';
+import { MpvPlayerController, MediaStatus, MediaType, SeekFlag, PlaybackState as NativePlaybackState,
+  setHttpProxyEnv } from '@yourpipe/libmpv-napi';
 import type { MediaInfo } from '@yourpipe/libmpv-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
@@ -227,12 +228,17 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   }
 
   /**
-   * Apply mpv network-proxy for direct MPV fetches (HLS masters/segments).
-   * http kind talks to the upstream proxy directly; socks5 routes through the
-   * loopback HTTP CONNECT bridge (127.0.0.1) which owns the native SOCKS5
-   * tunnel. Loopback / exclusion targets stay direct (empty proxy URL).
+   * Apply the app proxy to MPV-direct network fetches (HLS master/segment
+   * playlists, sub-add subtitle downloads). There is no libmpv `network-proxy`
+   * property; the vendored FFmpeg http protocol honors the process-level
+   * http_proxy env, so this installs it natively via setHttpProxyEnv. http kind
+   * talks to the upstream proxy directly (URL may carry user:pass auth); socks5
+   * routes through the loopback HTTP CONNECT bridge (127.0.0.1) which owns the
+   * native SOCKS5 tunnel. Loopback / exclusion targets stay direct (empty
+   * proxy URL); the native side also pins 127.0.0.1,localhost into no_proxy so
+   * the LocalProxyServer path is never affected.
    */
-  private applyNetworkProxy(ctrl: MpvPlayerController, url: string): void {
+  private applyNetworkProxy(url: string): void {
     try {
       const snap = HttpProxyOptions.getSnapshot();
       let proxyUrl = '';
@@ -249,9 +255,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
           }
         }
       }
-      ctrl.setProperty('network-proxy', proxyUrl);
+      setHttpProxyEnv(proxyUrl);
       if (proxyUrl.length > 0) {
-        Logger.info(TAG, `network-proxy on kind=${snap.kind} url=${proxyUrl.length > 8 ? proxyUrl.substring(0, 8) + '***' : proxyUrl}`);
+        Logger.info(TAG, `http_proxy env on kind=${snap.kind} url=${proxyUrl.length > 8 ? proxyUrl.substring(0, 8) + '***' : proxyUrl}`);
       }
     } catch (e) {
       Logger.warn(TAG, `applyNetworkProxy failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -321,9 +327,11 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     }
 
     // HLS / any direct MPV network fetch must honor the app proxy. Local loopback
-    // (edl / local DASH sessions) is bypassed by shouldBypass, so this never
-    // affects the LocalProxyServer path.
-    this.applyNetworkProxy(ctrl, this.sourceUrl);
+    // (edl / local DASH sessions) is bypassed by shouldBypass and by the native
+    // no_proxy pin, so this never affects the LocalProxyServer path. Called
+    // before setMedia so every direct open (incl. later sub-add fetches, which
+    // share the process env) sees the proxy.
+    this.applyNetworkProxy(this.sourceUrl);
 
     try {
       const isEdl = this.sourceUrl.startsWith('edl://');

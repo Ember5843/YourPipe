@@ -12,6 +12,18 @@ export function muxAudioVideo(videoPath: string, audioPath: string, outPath: str
   nativeModule.muxAudioVideo(videoPath, audioPath, outPath);
 }
 
+/**
+ * Set the process-level HTTP proxy env (http_proxy / no_proxy) for MPV-direct
+ * fetches (HLS master/segment playlists, sub-add subtitle downloads) via the
+ * vendored FFmpeg. Non-empty url may embed user:pass for an authenticated
+ * upstream proxy; empty string clears both variables (direct). Loopback
+ * (127.0.0.1 / localhost — LocalMediaProxy, SOCKS5 bridge) is pinned to
+ * no_proxy and always stays direct.
+ */
+export function setHttpProxyEnv(url: string): void {
+  nativeModule.setHttpProxyEnv(url);
+}
+
 export interface VideoHwDecoderCaps {
   probed: boolean;
   avc: boolean;

@@ -290,7 +290,8 @@ export class DataBackupManager {
     // 恢复后重应用，复用 EntryAbility.onCreate / AppState.init 的同一套函数
     const networkProxyConfig = NetworkProxyConfig.load();
     AppStorage.setOrCreate('networkProxyConfig', networkProxyConfig);
-    NetworkProxyConfig.applySystemAndProviders(networkProxyConfig);
+    NetworkProxyConfig.applySystemAndProviders(networkProxyConfig)
+      .catch((e: Error) => logger.warn(`apply proxy after restore failed: ${e.message}`));
     ThemeManager.initFromConfig(uiConfig.colorPreset);
     LanguageManager.applyPersistedLanguage();
     const context = AppStorage.get<common.UIAbilityContext>('context');

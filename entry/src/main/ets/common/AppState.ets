@@ -118,7 +118,10 @@ export class AppState {
     AppStorage.setOrCreate('autoPlayQueue', playbackConfig.autoPlayNext);
     const networkProxyConfig = NetworkProxyConfig.load();
     AppStorage.setOrCreate('networkProxyConfig', networkProxyConfig);
-    NetworkProxyConfig.applySystemAndProviders(networkProxyConfig);
+    // socks5 模式需等 loopback 桥异步 listen 完成；promise 由 NetworkProxyConfig 内部保存，
+    // 首页加载等首个网络动作经 NetworkProxyConfig.awaitReady() 等待，避免启动窗口内静默直连。
+    NetworkProxyConfig.applySystemAndProviders(networkProxyConfig)
+      .catch((e: Error) => logger.warn(`apply proxy at init failed: ${e.message}`));
     ThemeManager.initFromConfig(config.colorPreset);
   }
 }

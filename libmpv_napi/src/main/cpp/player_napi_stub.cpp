@@ -188,6 +188,12 @@ napi_value FfmpegVersion(napi_env env, napi_callback_info /*info*/)
     return MakeString(env, "stub-x86_64");
 }
 
+// No-op on the stub: keeps the TS binding resolvable on x86_64 emulators.
+napi_value SetHttpProxyEnv(napi_env env, napi_callback_info /*info*/)
+{
+    return Undefined(env);
+}
+
 napi_value MuxAudioVideo(napi_env env, napi_callback_info /*info*/)
 {
     napi_throw_error(env, nullptr, "muxAudioVideo is unavailable on x86_64 stub (emulator UI only)");
@@ -246,6 +252,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"setVideoSurfaceSize", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceId", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"ffmpegVersion", nullptr, FfmpegVersion, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"setHttpProxyEnv", nullptr, SetHttpProxyEnv, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"command", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},

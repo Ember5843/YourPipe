@@ -197,20 +197,14 @@ function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
 }
 
 /**
- * RCP session for streamed YouTube videoplayback fetches.
- * Android/iOS: empty-body POST — @ohos.net.http rejects zero-length bodies at
- * parameter validation (NETSTACK error 401) whether extraData is '' or
- * ArrayBuffer(0), and sending no body gets HTTP 411 from googlevideo; RCP
- * accepts an empty-string body and sends Content-Length: 0 — the shape
- * PipePipe's OkHttp path uses. VISIONOS: body-less GET on the same RCP
- * streaming path (first byte must not wait for the whole capped chunk).
- * Other clients' GET stays on @ohos.net.http (RCP streaming was 403-prone
- * for TVHTML5 range probes).
+ * Resolve the app proxy onto an rcp.Configuration. Shared by the YouTube
+ * streaming session and the generic (non-YouTube) range session:
+ * socks5 → loopback bridge URL with createTunnel:'always' (the bridge owns the
+ * native SOCKS5 tunnel; without a listening bridge, 'no-proxy'), http → user
+ * proxy URL (with user:pass auth when configured) + exclusions, otherwise
+ * 'no-proxy'. Bypassed/loopback URLs always resolve to 'no-proxy'.
  */
-function createYoutubePostSession(url: string): rcp.Session {
-  const config: rcp.Configuration = {
-    transfer: { timeout: { connectMs: CONNECT_TIMEOUT_MS, transferMs: TIMEOUT_MS } }
-  };
+function resolveRcpProxy(config: rcp.Configuration, url: string): void {
   const snap = HttpProxyOptions.getSnapshot();
   if (snap.kind === 'socks5' && HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
     const localPort = snap.socks5LocalPort;
@@ -235,6 +229,24 @@ function createYoutubePostSession(url: string): rcp.Session {
   } else {
     config.proxy = 'no-proxy';
   }
+}
+
+/**
+ * RCP session for streamed YouTube videoplayback fetches.
+ * Android/iOS: empty-body POST — @ohos.net.http rejects zero-length bodies at
+ * parameter validation (NETSTACK error 401) whether extraData is '' or
+ * ArrayBuffer(0), and sending no body gets HTTP 411 from googlevideo; RCP
+ * accepts an empty-string body and sends Content-Length: 0 — the shape
+ * PipePipe's OkHttp path uses. VISIONOS: body-less GET on the same RCP
+ * streaming path (first byte must not wait for the whole capped chunk).
+ * Other clients' GET stays on @ohos.net.http (RCP streaming was 403-prone
+ * for TVHTML5 range probes).
+ */
+function createYoutubePostSession(url: string): rcp.Session {
+  const config: rcp.Configuration = {
+    transfer: { timeout: { connectMs: CONNECT_TIMEOUT_MS, transferMs: TIMEOUT_MS } }
+  };
+  resolveRcpProxy(config, url);
   return rcp.createSession({ requestConfiguration: config });
 }
 
@@ -626,9 +638,14 @@ export async function serveRange(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const sessionHeaders = makeHeaders(resource);
+    // 非 YouTube 资源（字幕等）同样要走应用代理；与 createYoutubePostSession 共用代理解析。
+    const config: rcp.Configuration = {
+      transfer: { timeout: { connectMs: CONNECT_TIMEOUT_MS, transferMs: TIMEOUT_MS } }
+    };
+    resolveRcpProxy(config, resource.url);
     const rcpSession = rcp.createSession({
       headers: sessionHeaders,
-      requestConfiguration: { transfer: { timeout: { connectMs: CONNECT_TIMEOUT_MS, transferMs: TIMEOUT_MS } } }
+      requestConfiguration: config
     });
     try {
       const dest: rcp.DownloadToStream = { kind: 'stream', stream: writer };

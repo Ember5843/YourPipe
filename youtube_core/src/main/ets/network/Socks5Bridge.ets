@@ -37,6 +37,28 @@ function describeErr(e: Object): string {
   return String(e);
 }
 
+/** Numeric BusinessError code, or 0 when the error carries none. */
+function errorCodeOf(e: Object): number {
+  const rec = e as Record<string, Object>;
+  if (rec && typeof rec === 'object') {
+    const code = rec['code'];
+    if (typeof code === 'number') {
+      return code;
+    }
+  }
+  return 0;
+}
+
+/**
+ * SOCKS5 authentication errors (2301207 invalid username/password,
+ * 2301209 negotiated auth failure): retrying is pointless — the credentials
+ * will fail again.
+ */
+function isSocks5AuthError(e: Object): boolean {
+  const code = errorCodeOf(e);
+  return code === 2301207 || code === 2301209;
+}
+
 /** NetAddress.family: 1=IPv4, 2=IPv6, 3=Domain (API 18+). */
 function familyForHost(host: string): number {
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
@@ -82,8 +104,8 @@ function parseAuthority(authority: string): Socks5Target | undefined {
   return { host, port, isDomain };
 }
 
-/** Open a native SOCKS5 tunnel to the target through the configured server. */
-function openSocksTunnel(cfg: Socks5Config, target: Socks5Target): Promise<socket.TCPSocket> {
+/** Open a native SOCKS5 tunnel to the target through the configured server (single attempt). */
+function openSocksTunnelOnce(cfg: Socks5Config, target: Socks5Target): Promise<socket.TCPSocket> {
   return new Promise<socket.TCPSocket>((resolve, reject) => {
     const tcp = socket.constructTCPSocketInstance();
     let settled = false;
@@ -138,6 +160,26 @@ function openSocksTunnel(cfg: Socks5Config, target: Socks5Target): Promise<socke
       fail(e);
     });
   });
+}
+
+/**
+ * Open a native SOCKS5 tunnel, retrying once after 300ms on transient failure
+ * (the upstream proxy or the network can flap briefly). Authentication errors
+ * (isSocks5AuthError) are rejected immediately — a retry would fail again.
+ */
+async function openSocksTunnel(cfg: Socks5Config, target: Socks5Target): Promise<socket.TCPSocket> {
+  try {
+    return await openSocksTunnelOnce(cfg, target);
+  } catch (e) {
+    if (isSocks5AuthError(e)) {
+      // Re-throw the original object (cast for arkts-limited-throw): wrapping it
+      // in a new Error would destroy the netstack BusinessError code.
+      throw e as Error;
+    }
+    logger.warn(TAG, `tunnel to ${target.host}:${target.port} failed, retry once in 300ms: ${describeErr(e)}`);
+    await new Promise<void>((r) => setTimeout(r, 300));
+    return openSocksTunnelOnce(cfg, target);
+  }
 }
 
 /** Bidirectional byte pipe between the proxy client and the SOCKS tunnel. */
@@ -358,6 +400,13 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
  * SOCKS5 we expose a tiny HTTP proxy on 127.0.0.1 that opens the real tunnel
  * through socket.ProxyTypes.SOCKS5 (API 18+). HttpDownloader / RangeProxy point
  * their per-request proxy at 127.0.0.1:{port}; credentials stay on the bridge.
+ *
+ * Self-heal: a listening server that reports an 'error' event is torn down and
+ * re-listened with the same config, up to MAX_SELF_HEAL_RESTARTS times with a
+ * 1s/2s/4s backoff. `stop()` (and any new `start()`) bumps `generation`, so a
+ * restart scheduled by a superseded generation is a no-op.
+ * (TCPSocketServer has no 'close' event in the current SDK — 'error' is the
+ * only async failure signal, so self-heal hooks it.)
  */
 export class Socks5Bridge {
   private server: socket.TCPSocketServer | null = null;
@@ -365,6 +414,8 @@ export class Socks5Bridge {
   private localPort: number = 0;
   private running: boolean = false;
   private generation: number = 0;
+  private selfHealAttempts: number = 0;
+  private static readonly MAX_SELF_HEAL_RESTARTS: number = 3;
 
   async start(host: string, port: number, username: string, password: string): Promise<boolean> {
     const h = (host || '').trim();
@@ -382,7 +433,17 @@ export class Socks5Bridge {
     }
     this.stop();
     const cfg: Socks5Config = { host: h, port: p, username: username || '', password: password || '' };
+    this.selfHealAttempts = 0;
     const gen = this.generation;
+    return this.listenOnce(cfg, gen);
+  }
+
+  /**
+   * Listen on a fresh TCPSocketServer and wire handlers. On failure closes the
+   * half-open server and stops the bridge (which bumps the generation, ending
+   * any self-heal chain in flight).
+   */
+  private async listenOnce(cfg: Socks5Config, gen: number): Promise<boolean> {
     const server = socket.constructTCPSocketServerInstance();
     try {
       await server.listen({ address: '127.0.0.1', port: 0, family: 1 });
@@ -405,13 +466,16 @@ export class Socks5Bridge {
       this.config = cfg;
       this.localPort = addr.port ?? 0;
       this.running = true;
-      logger.info(TAG + ` started localPort=${this.localPort} socks5=${h}:${p} auth=${cfg.username.length > 0}`);
+      logger.info(TAG + ` started localPort=${this.localPort} socks5=${cfg.host}:${cfg.port} auth=${cfg.username.length > 0}`);
       server.on('connect', (conn: socket.TCPSocketConnection) => {
         handleConnection(conn, cfg).catch((e: Error) => logger.warn(TAG + ` conn error: ${describeErr(e)}`));
       });
+      server.on('error', (e: Error) => {
+        this.handleServerError(server, cfg, gen, e);
+      });
       return true;
     } catch (e) {
-      logger.error(TAG + ` start failed: ${describeErr(e)}`);
+      logger.error(TAG + ` listen failed: ${describeErr(e)}`);
       try {
         server.close();
       } catch (_e) {
@@ -419,6 +483,49 @@ export class Socks5Bridge {
       this.stop();
       return false;
     }
+  }
+
+  /**
+   * A listening server errored (e.g. netstack killed the fd): tear it down and
+   * schedule a bounded self-heal re-listen. Stale servers (superseded by
+   * stop()/start()) are ignored via the generation guard.
+   */
+  private handleServerError(server: socket.TCPSocketServer, cfg: Socks5Config, gen: number, e: Error): void {
+    if (gen !== this.generation || this.server !== server) {
+      return;
+    }
+    logger.error(TAG + ` server error, resetting: ${describeErr(e)}`);
+    try {
+      server.off('connect');
+      server.off('error');
+      server.close();
+    } catch (_e) {
+    }
+    this.server = null;
+    this.localPort = 0;
+    this.running = false;
+    if (this.selfHealAttempts >= Socks5Bridge.MAX_SELF_HEAL_RESTARTS) {
+      logger.error(TAG + ' self-heal budget exhausted, bridge stays down');
+      return;
+    }
+    this.selfHealAttempts++;
+    const delayMs = 1000 * (1 << (this.selfHealAttempts - 1)); // 1s, 2s, 4s
+    logger.warn(TAG + ` scheduling self-heal restart attempt=${this.selfHealAttempts} delay=${delayMs}ms`);
+    setTimeout(() => {
+      if (gen !== this.generation) {
+        return; // stop() or a newer start() superseded this restart.
+      }
+      this.listenOnce(cfg, gen).then((ok: boolean) => {
+        if (ok) {
+          this.selfHealAttempts = 0;
+          logger.info(TAG + ' self-heal restart succeeded');
+        } else {
+          logger.error(TAG + ' self-heal restart failed to listen');
+        }
+      }).catch((err: Error) => {
+        logger.error(TAG + ` self-heal restart error: ${describeErr(err)}`);
+      });
+    }, delayMs);
   }
 
   stop(): void {

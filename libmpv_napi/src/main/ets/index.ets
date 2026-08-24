@@ -7,6 +7,7 @@ export {
 } from './enums';
 export {
   muxAudioVideo,
+  setHttpProxyEnv,
   probeVideoHwDecoders,
   getHwdecCodecsWhitelist,
 } from './global';

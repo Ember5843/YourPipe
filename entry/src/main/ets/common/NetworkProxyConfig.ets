@@ -52,7 +52,8 @@ export class NetworkProxyConfig {
   static resetToDefault(): NetworkProxyConfig {
     const cfg = new NetworkProxyConfig();
     NetworkProxyConfig.save(cfg);
-    NetworkProxyConfig.applySystemAndProviders(cfg);
+    NetworkProxyConfig.applySystemAndProviders(cfg)
+      .catch((e: Error) => logger.warn(`resetToDefault apply proxy failed: ${e.message}`));
     return cfg;
   }
 
@@ -113,15 +114,17 @@ export class NetworkProxyConfig {
    * Route all WebView traffic through the app proxy (ProxyController, API 15+).
    * Chromium honors neither setAppHttpProxy nor the http module's usingProxy, so
    * the login page / PoToken runtime were going direct while app HTTP requests
-   * used the proxy — inconsistent egress IP. Default implicit rules keep
-   * localhost / local-IP hosts direct, so the PoToken local DOM is unaffected.
+   * used the proxy — inconsistent egress IP. No direct fallback rules are
+   * installed for HTTP/HTTPS: insertDirectRule(MATCH_HTTP/HTTPS) would make
+   * Chromium silently fall back to a direct connection whenever the proxy is
+   * unavailable, which is exactly the leak a proxy user wants to avoid. The
+   * implicit rules stay — localhost / local-IP hosts remain direct, so the
+   * PoToken local DOM is unaffected.
    */
   private static applyWebViewProxy(proxyUrl: string): void {
     try {
       const config = new webview.ProxyConfig();
       config.insertProxyRule(proxyUrl, webview.ProxySchemeFilter.MATCH_ALL_SCHEMES);
-      config.insertDirectRule(webview.ProxySchemeFilter.MATCH_HTTP);
-      config.insertDirectRule(webview.ProxySchemeFilter.MATCH_HTTPS);
       webview.ProxyController.applyProxyOverride(config, () => {
         logger.info('webview proxy override applied');
       });
@@ -140,62 +143,100 @@ export class NetworkProxyConfig {
     }
   }
 
+  private static setAppProxy(proxy: connection.HttpProxy, logMessage: string): void {
+    try {
+      connection.setAppHttpProxy(proxy);
+      logger.info(logMessage);
+    } catch (e) {
+      logger.warn(`setAppHttpProxy failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  private static clearAppProxy(): void {
+    NetworkProxyConfig.setAppProxy({
+      host: '',
+      port: 0,
+      exclusionList: HttpProxyOptions.defaultExclusions()
+    } as connection.HttpProxy, 'app http proxy cleared');
+  }
+
+  /** Promise of the latest applySystemAndProviders run (never rejects). */
+  private static applyPromise: Promise<void> = Promise.resolve();
+
   /**
-   * Wire HttpProxyOptions provider + optional app-level HTTP proxy + WebView
-   * proxy override. Call after load and after every settings change.
-   * SOCKS5 starts a loopback HTTP CONNECT bridge (youtube_core Socks5Bridge);
-   * the app-level system proxy stays HTTP-only and is used for kind==='http'.
+   * Resolves when the latest applySystemAndProviders has fully settled —
+   * for socks5 that includes the loopback bridge listen. Startup network work
+   * (home feed, proxy test) should await this so it never runs in the bridge's
+   * async startup window (which would go direct).
    */
-  static applySystemAndProviders(cfg: NetworkProxyConfig): void {
+  static awaitReady(): Promise<void> {
+    return NetworkProxyConfig.applyPromise;
+  }
+
+  /**
+   * Wire HttpProxyOptions provider + app-level HTTP proxy + WebView proxy
+   * override. Call after load and after every settings change. The returned
+   * promise never rejects; it settles once the configuration is fully applied
+   * (for socks5: after the bridge started or failed).
+   *
+   * SOCKS5 starts a loopback HTTP CONNECT bridge (youtube_core Socks5Bridge);
+   * only after the bridge is listening do we point the WebView override and the
+   * app-level proxy at 127.0.0.1:{bridgePort} — the app-level proxy lets paths
+   * that share the netstack default (notably ArkUI Image thumbnails) ride the
+   * bridge too. Official docs do not state explicitly that Image honors the
+   * app proxy; the setting is applied best-effort. On bridge failure/stop the
+   * app proxy is cleared (no silent direct half-configured state).
+   * The app-level system proxy stays HTTP-only and carries the user proxy
+   * directly for kind==='http'.
+   */
+  static applySystemAndProviders(cfg: NetworkProxyConfig): Promise<void> {
+    const p: Promise<void> = NetworkProxyConfig.applyInternal(cfg);
+    NetworkProxyConfig.applyPromise = p;
+    return p;
+  }
+
+  private static async applyInternal(cfg: NetworkProxyConfig): Promise<void> {
     if (cfg.isReady() && cfg.kind === 'socks5') {
       NetworkProxyConfig.removeWebViewProxy();
-      socks5Bridge.start(cfg.host.trim(), cfg.port, cfg.username || '', cfg.password || '')
-        .then((ok: boolean) => {
-          const port = socks5Bridge.getPort();
-          logger.info(`socks5 bridge start ok=${ok} localPort=${port}`);
-          if (ok && port > 0) {
-            NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
-          }
-        })
+      const ok: boolean = await socks5Bridge.start(cfg.host.trim(), cfg.port, cfg.username || '', cfg.password || '')
         .catch((e: Error) => {
           logger.warn(`socks5 bridge start failed: ${e.message}`);
+          return false;
         });
+      const port = socks5Bridge.getPort();
+      logger.info(`socks5 bridge start ok=${ok} localPort=${port}`);
+      if (ok && port > 0) {
+        NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
+        NetworkProxyConfig.setAppProxy({
+          host: '127.0.0.1',
+          port: port,
+          exclusionList: HttpProxyOptions.defaultExclusions()
+        } as connection.HttpProxy, `app http proxy on socks5 bridge port=${port}`);
+      } else {
+        NetworkProxyConfig.clearAppProxy();
+      }
     } else if (cfg.isReady() && cfg.kind === 'http') {
       socks5Bridge.stop();
       const auth = cfg.username && cfg.username.length > 0
         ? `${encodeURIComponent(cfg.username)}:${encodeURIComponent(cfg.password || '')}@`
         : '';
       NetworkProxyConfig.applyWebViewProxy(`http://${auth}${cfg.host.trim()}:${cfg.port}`);
+      const proxy: connection.HttpProxy = {
+        host: cfg.host.trim(),
+        port: cfg.port,
+        exclusionList: HttpProxyOptions.defaultExclusions()
+      };
+      if (cfg.username && cfg.username.length > 0) {
+        proxy.username = cfg.username;
+        proxy.password = cfg.password || '';
+      }
+      NetworkProxyConfig.setAppProxy(proxy, `app http proxy on host=${cfg.host.trim()} port=${cfg.port}`);
     } else {
       socks5Bridge.stop();
       NetworkProxyConfig.removeWebViewProxy();
+      NetworkProxyConfig.clearAppProxy();
     }
 
     HttpProxyOptions.setProvider((): AppHttpProxySnapshot => cfg.toSnapshot());
-
-    try {
-      if (cfg.isReady() && cfg.kind === 'http') {
-        const proxy: connection.HttpProxy = {
-          host: cfg.host.trim(),
-          port: cfg.port,
-          exclusionList: HttpProxyOptions.defaultExclusions()
-        };
-        if (cfg.username && cfg.username.length > 0) {
-          proxy.username = cfg.username;
-          proxy.password = cfg.password || '';
-        }
-        connection.setAppHttpProxy(proxy);
-        logger.info(`app http proxy on host=${cfg.host.trim()} port=${cfg.port}`);
-      } else {
-        connection.setAppHttpProxy({
-          host: '',
-          port: 0,
-          exclusionList: HttpProxyOptions.defaultExclusions()
-        } as connection.HttpProxy);
-        logger.info('app http proxy cleared');
-      }
-    } catch (e) {
-      logger.warn(`setAppHttpProxy failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
   }
 }

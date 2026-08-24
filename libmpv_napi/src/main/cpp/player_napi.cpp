@@ -1548,6 +1548,37 @@ napi_value FfmpegVersion(napi_env env, napi_callback_info /*info*/)
     return result;
 }
 
+// Process-level proxy env for the vendored FFmpeg: MPV's direct fetches (HLS
+// master/segment playlists, sub-add subtitle downloads) bypass libmpv options
+// but FFmpeg's http protocol honors http_proxy / no_proxy. A non-empty URL is
+// installed as http_proxy (may embed user:pass for an authenticated upstream);
+// no_proxy pins the local loopback endpoints (LocalMediaProxy, SOCKS5 bridge)
+// so they always stay direct. An empty string clears both. Never log the full
+// URL — it may carry credentials; only the host:port tail is logged.
+napi_value SetHttpProxyEnv(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value argv[1] = { nullptr };
+    napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+    std::string url;
+    if (argc >= 1 && argv[0] != nullptr) {
+        url = ToString(env, argv[0]);
+    }
+    if (url.empty()) {
+        unsetenv("http_proxy");
+        unsetenv("no_proxy");
+        OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "http_proxy env cleared");
+    } else {
+        setenv("http_proxy", url.c_str(), 1);
+        setenv("no_proxy", "127.0.0.1,localhost", 1);
+        // Redact userinfo: log only the part after the last '@'.
+        const std::string::size_type at = url.rfind('@');
+        const std::string safe = (at == std::string::npos) ? url : url.substr(at + 1);
+        OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "http_proxy env set: %{public}s", safe.c_str());
+    }
+    return Undefined(env);
+}
+
 napi_value Init(napi_env env, napi_value exports)
 {
     RegisterLogHandlerOnce();
@@ -1612,6 +1643,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"setVideoSurfaceSize", nullptr, SetVideoSurfaceSize, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceId", nullptr, SetVideoSurfaceId, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"ffmpegVersion", nullptr, FfmpegVersion, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"setHttpProxyEnv", nullptr, SetHttpProxyEnv, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, SetEventCallback, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"command", nullptr, MpvCommand, nullptr, nullptr, nullptr, napi_default, nullptr},

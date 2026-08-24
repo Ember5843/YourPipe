@@ -33,7 +33,8 @@ export struct OptionsNetworkPage {
 
   private persist(): void {
     NetworkProxyConfig.save(this.networkProxyConfig);
-    NetworkProxyConfig.applySystemAndProviders(this.networkProxyConfig);
+    NetworkProxyConfig.applySystemAndProviders(this.networkProxyConfig)
+      .catch((e: Error) => logger.warn(`apply proxy on persist failed: ${e.message}`));
     this.params.onConfigChanged(this.networkProxyConfig);
   }
 
@@ -59,6 +60,8 @@ export struct OptionsNetworkPage {
     this.testing = true;
     this.testMessage = $r('app.string.yt_proxy_testing');
     this.persist();
+    // 等代理配置完全落地（socks5 时等桥 listen 完成）再测，保证测的是新配置。
+    await NetworkProxyConfig.awaitReady();
     const testUrl = 'https://www.youtube.com/generate_204';
     const req = http.createHttp();
     const startedAt = Date.now();
