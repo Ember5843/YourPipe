@@ -909,6 +909,10 @@
             "value": "推薦來源載入失敗，已回退或請稍後再試"
         },
         {
+            "name": "yt_home_auth_expired_notice",
+            "value": "登入狀態已失效，正在顯示訪客推薦內容，請重新登入"
+        },
+        {
             "name": "yt_home_kiosk_error",
             "value": "Kiosk 請求失敗，請稍後重試"
         },
@@ -1403,6 +1407,30 @@
         {
             "name": "yt_playback_gpu_rendering",
             "value": "GPU 渲染"
+        },
+        {
+            "name": "yt_playback_stream_endpoint",
+            "value": "播放端點"
+        },
+        {
+            "name": "yt_playback_guest_player_client",
+            "value": "遊客播放端點"
+        },
+        {
+            "name": "yt_playback_auth_player_client",
+            "value": "登入播放端點"
+        },
+        {
+            "name": "yt_setting_client_visionos",
+            "value": "VisionOS"
+        },
+        {
+            "name": "yt_setting_client_tv_downgraded",
+            "value": "TV Downgraded"
+        },
+        {
+            "name": "yt_setting_client_mweb",
+            "value": "MWEB (SABR)"
         },
         {
             "name": "yt_playback_buffer_network",

@@ -909,6 +909,10 @@
             "value": "Error al cargar recomendaciones; se usara alternativa o reintenta mas tarde"
         },
         {
+            "name": "yt_home_auth_expired_notice",
+            "value": "Sesion expirada - mostrando recomendaciones de invitado. Inicia sesion de nuevo."
+        },
+        {
             "name": "yt_home_kiosk_error",
             "value": "Error en la solicitud Kiosk, inténtalo más tarde"
         },
@@ -1403,6 +1407,30 @@
         {
             "name": "yt_playback_gpu_rendering",
             "value": "Renderizado por GPU"
+        },
+        {
+            "name": "yt_playback_stream_endpoint",
+            "value": "Endpoint de reproducción"
+        },
+        {
+            "name": "yt_playback_guest_player_client",
+            "value": "Endpoint para invitados"
+        },
+        {
+            "name": "yt_playback_auth_player_client",
+            "value": "Endpoint con sesión iniciada"
+        },
+        {
+            "name": "yt_setting_client_visionos",
+            "value": "VisionOS"
+        },
+        {
+            "name": "yt_setting_client_tv_downgraded",
+            "value": "TV Downgraded"
+        },
+        {
+            "name": "yt_setting_client_mweb",
+            "value": "MWEB (SABR)"
         },
         {
             "name": "yt_playback_buffer_network",

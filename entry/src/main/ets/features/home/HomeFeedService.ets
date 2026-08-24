@@ -1,4 +1,4 @@
-import { AuthSessionManager, VideoItem } from 'youtube_core';
+import { AuthExpiredError, AuthSessionManager, VideoItem } from 'youtube_core';
 import {
   ContentCountry,
   Localization,
@@ -37,7 +37,8 @@ export class HomeFeedService {
   /**
    * @param style 'recommended' | 'kiosk' — only applies when signed in.
    *              Signed-out always uses live kiosk.
-   *              recommended failure does NOT fall back to kiosk.
+   *              recommended failure falls back to the guest kiosk; an
+   *              AuthExpiredError is reported via AuthSessionManager.noteAuthRejection.
    * Rails: WEB Cookie → FEwhat_to_watch; OAuth-only → TV browseId=default; else kiosk.
    */
   async fetchHomeKioskInitial(startId: number, style: string = 'recommended'): Promise<KioskPageResult> {
@@ -63,9 +64,11 @@ export class HomeFeedService {
         return recommended;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        logger.error(`[HomeFeed] stage=initial_failed source=recommended-web `
-          + `elapsed=${Date.now() - startedAt}ms message=${msg}`);
-        throw e instanceof Error ? e : new Error(msg);
+        if (e instanceof AuthExpiredError) {
+          session?.noteAuthRejection('web', 'browse-rejected');
+        }
+        logger.warn(`[HomeFeed] stage=initial_failed source=recommended-web `
+          + `elapsed=${Date.now() - startedAt}ms message=${msg} — falling back to kiosk`);
       }
     }
 
@@ -80,9 +83,11 @@ export class HomeFeedService {
         return tvHome;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        logger.error(`[HomeFeed] stage=initial_failed source=recommended-tv `
-          + `elapsed=${Date.now() - startedAt}ms message=${msg}`);
-        throw e instanceof Error ? e : new Error(msg);
+        if (e instanceof AuthExpiredError) {
+          session?.noteAuthRejection('tv', 'browse-rejected');
+        }
+        logger.warn(`[HomeFeed] stage=initial_failed source=recommended-tv `
+          + `elapsed=${Date.now() - startedAt}ms message=${msg} — falling back to kiosk`);
       }
     }
 

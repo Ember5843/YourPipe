@@ -4,6 +4,7 @@ import { AuthAccountStatus, AuthStage, AuthTokenResponse } from './AuthModels';
 import { SmartTubeAuthProbe } from './SmartTubeAuthProbe';
 import { CookieAuthCredential } from './CookieAuthCredential';
 import { SapisidHashUtil } from './SapisidHashUtil';
+import { HttpDownloader } from '../network/HttpDownloader';
 
 const logger = YTCoreLogger.getInstance('AuthSessionManager');
 
@@ -56,6 +57,22 @@ export class AuthSessionManager {
   private deviceLastErrorCode: string = '';
   private deviceStage: AuthStage = AuthStage.SIGNED_OUT;
 
+  /** 账号 cookie 白名单：仅这些 Set-Cookie 会合并进 cookieCredential。 */
+  private static readonly ACCOUNT_COOKIE_NAMES: string[] = [
+    'SID', 'HSID', 'SSID', 'APISID', 'SAPISID',
+    '__Secure-1PAPISID', '__Secure-3PAPISID',
+    '__Secure-1PSID', '__Secure-3PSID',
+    'LOGIN_INFO',
+    'SIDCC', '__Secure-1PSIDCC', '__Secure-3PSIDCC'
+  ];
+  /** 服务端清除这些 cookie 视为登录态失效。 */
+  private static readonly AUTH_CLEAR_COOKIE_NAMES: string[] = [
+    'SID', 'SAPISID', '__Secure-1PAPISID', '__Secure-3PAPISID', 'LOGIN_INFO'
+  ];
+
+  /** 登录态被拒的一次性提示标记（由 entry 首页消费并清除）。 */
+  private authRejectionNoticePending: boolean = false;
+
   private constructor(context: Context) {
     this.context = context;
   }
@@ -66,11 +83,175 @@ export class AuthSessionManager {
     }
     AuthSessionManager.instance.context = context;
     AuthSessionManager.instance.load();
+    HttpDownloader.setSetCookieObserver((sc: string | string[], url: string) => {
+      const mgr = AuthSessionManager.instance;
+      if (!mgr) {
+        return;
+      }
+      try {
+        mgr.mergeAccountSetCookies(sc, url);
+      } catch (e) {
+        logger.error('Set-Cookie merge failed');
+      }
+    });
     return AuthSessionManager.instance;
   }
 
   static getInstance(): AuthSessionManager | null {
     return AuthSessionManager.instance;
+  }
+
+  /** 记录一次登录态被拒（不携带任何凭据值），供 UI 层提示重新登录。 */
+  noteAuthRejection(rail: string, reason: string): void {
+    logger.warn(`Auth rejection noticed rail=${rail} reason=${reason}`);
+    this.authRejectionNoticePending = true;
+  }
+
+  /** 读取并清除登录态被拒提示标记。 */
+  consumeAuthRejectionNotice(): boolean {
+    const pending = this.authRejectionNoticePending;
+    this.authRejectionNoticePending = false;
+    return pending;
+  }
+
+  /**
+   * 合并 youtube.com 响应里的账号 Set-Cookie：
+   * 白名单内的正常设置 → 替换/追加进 credential.cookies 并重算 sapiSid；
+   * 关键 cookie 被服务端删除（空值 / Max-Age=0 / Expires 过去时间）→ 移除并标记登录态失效。
+   * 日志只记录 cookie 名称，绝不记录值。
+   */
+  mergeAccountSetCookies(setCookie: string | string[], requestUrl: string): void {
+    if (!this.authEnabled || !this.cookieCredential) {
+      return;
+    }
+    if (!AuthSessionManager.isYoutubeHost(requestUrl)) {
+      return;
+    }
+    const lines: string[] = Array.isArray(setCookie) ? setCookie : [setCookie];
+    const appliedNames: string[] = [];
+    let touched = false;
+    let cleared = false;
+    for (const line of lines) {
+      const semi = line.indexOf(';');
+      const pair = semi >= 0 ? line.substring(0, semi) : line;
+      const attrs = semi >= 0 ? line.substring(semi + 1) : '';
+      const eq = pair.indexOf('=');
+      if (eq < 0) {
+        continue;
+      }
+      const name = pair.substring(0, eq).trim();
+      const value = pair.substring(eq + 1).trim();
+      const isDelete = value.length === 0
+        || attrs.indexOf('Max-Age=0') >= 0
+        || AuthSessionManager.hasPastExpiresAttr(attrs);
+      if (isDelete) {
+        if (AuthSessionManager.AUTH_CLEAR_COOKIE_NAMES.indexOf(name) >= 0) {
+          this.cookieCredential.cookies =
+            AuthSessionManager.removeCookiePair(this.cookieCredential.cookies, name);
+          cleared = true;
+          appliedNames.push(name);
+        }
+        continue;
+      }
+      if (AuthSessionManager.ACCOUNT_COOKIE_NAMES.indexOf(name) < 0) {
+        continue;
+      }
+      this.cookieCredential.cookies =
+        AuthSessionManager.upsertCookiePair(this.cookieCredential.cookies, name, value);
+      touched = true;
+      appliedNames.push(name);
+    }
+    if (!touched && !cleared) {
+      return;
+    }
+    this.cookieCredential.sapiSid = CookieAuthCredential.parseSapiSid(this.cookieCredential.cookies);
+    this.persistCookieCredential();
+    if (cleared) {
+      logger.warn(`Account cookies cleared by server names=[${appliedNames.join(',')}]`);
+      this.noteAuthRejection('web', 'server-cleared');
+    } else {
+      logger.info(`Account cookies updated names=[${appliedNames.join(',')}]`);
+    }
+  }
+
+  /** requestUrl 的 host 必须是 youtube.com 或其子域（小写比较）。 */
+  private static isYoutubeHost(requestUrl: string): boolean {
+    if (!requestUrl) {
+      return false;
+    }
+    let rest = requestUrl.toLowerCase();
+    const schemeIdx = rest.indexOf('://');
+    if (schemeIdx >= 0) {
+      rest = rest.substring(schemeIdx + 3);
+    }
+    let end = rest.length;
+    const slashIdx = rest.indexOf('/');
+    if (slashIdx >= 0 && slashIdx < end) {
+      end = slashIdx;
+    }
+    const portIdx = rest.indexOf(':');
+    if (portIdx >= 0 && portIdx < end) {
+      end = portIdx;
+    }
+    const host = rest.substring(0, end);
+    return host === 'youtube.com' || host.endsWith('.youtube.com');
+  }
+
+  private static hasPastExpiresAttr(attrs: string): boolean {
+    const lower = attrs.toLowerCase();
+    const idx = lower.indexOf('expires=');
+    if (idx < 0) {
+      return false;
+    }
+    const valueStart = idx + 'expires='.length;
+    const semiIdx = attrs.indexOf(';', valueStart);
+    const dateStr = attrs.substring(valueStart, semiIdx >= 0 ? semiIdx : attrs.length).trim();
+    const time = Date.parse(dateStr);
+    return !isNaN(time) && time <= Date.now();
+  }
+
+  private static removeCookiePair(cookies: string, name: string): string {
+    const parts = cookies.split(';');
+    const out: string[] = [];
+    for (const raw of parts) {
+      const p = raw.trim();
+      if (p.length === 0) {
+        continue;
+      }
+      const eq = p.indexOf('=');
+      const n = eq >= 0 ? p.substring(0, eq).trim() : p;
+      if (n !== name) {
+        out.push(p);
+      }
+    }
+    return out.join('; ');
+  }
+
+  private static upsertCookiePair(cookies: string, name: string, value: string): string {
+    const pair = `${name}=${value}`;
+    const parts = cookies.split(';');
+    const out: string[] = [];
+    let replaced = false;
+    for (const raw of parts) {
+      const p = raw.trim();
+      if (p.length === 0) {
+        continue;
+      }
+      const eq = p.indexOf('=');
+      const n = eq >= 0 ? p.substring(0, eq).trim() : p;
+      if (n === name) {
+        if (!replaced) {
+          out.push(pair);
+          replaced = true;
+        }
+        continue;
+      }
+      out.push(p);
+    }
+    if (!replaced) {
+      out.push(pair);
+    }
+    return out.join('; ');
   }
 
   getStatus(): AuthAccountStatus {
@@ -454,6 +635,15 @@ export class AuthSessionManager {
       const token = await this.probe.refreshAccessToken(this.refreshToken);
       if (token.error.length > 0) {
         logger.warn(`Refresh failed with code: ${token.error}`);
+        if (token.error === 'invalid_grant') {
+          // 服务端判定 refresh token 失效：清空 OAuth 凭据并标记登录态失效。
+          logger.warn('Refresh token rejected (invalid_grant) — clearing OAuth credential');
+          this.refreshToken = '';
+          this.accessToken = '';
+          this.accessTokenExpiresAt = 0;
+          this.persistRefreshToken();
+          this.noteAuthRejection('tv', 'invalid_grant');
+        }
         const status = this.getStatus();
         status.stage = AuthStage.FAILED;
         status.lastErrorCode = token.error;

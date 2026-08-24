@@ -6,6 +6,9 @@ import { AppHttpProxySnapshot, HttpProxyOptions } from './HttpProxyOptions';
 
 const logger = YTCoreLogger.getInstance('HttpDownloader');
 
+/** 响应 Set-Cookie 观察者（AuthSessionManager 用于跟踪账号 cookie 被服务端清除/轮换）。 */
+export type SetCookieObserver = (setCookie: string | string[], url: string) => void;
+
 // 错误分析结果接口
 export interface ErrorAnalysisResult {
   errorType: HttpErrorType;
@@ -194,6 +197,37 @@ export class HttpDownloader {
   // 重试延迟（毫秒）
   private static readonly RETRY_DELAY = 1000;
 
+  private static setCookieObserver: SetCookieObserver | undefined = undefined;
+
+  static setSetCookieObserver(obs?: SetCookieObserver): void {
+    HttpDownloader.setCookieObserver = obs;
+  }
+
+  /** 拿到响应即通知（不看状态码）；观察者抛错只记日志，不影响请求链路。 */
+  private static notifySetCookie(response: http.HttpResponse, url: string): void {
+    const obs = HttpDownloader.setCookieObserver;
+    if (!obs || !response || !response.header) {
+      return;
+    }
+    const header = response.header as Record<string, Object>;
+    let value: Object | undefined = header['Set-Cookie'];
+    if (!value) {
+      value = header['set-cookie'];
+    }
+    if (!value) {
+      return;
+    }
+    try {
+      if (Array.isArray(value)) {
+        obs(value as string[], url);
+      } else if (typeof value === 'string') {
+        obs(value, url);
+      }
+    } catch (e) {
+      logger.error('Set-Cookie observer threw');
+    }
+  }
+
   /** Inject app proxy into request options. Loopback / exclusion always bypass. */
   static applyProxyToOptions(options: http.HttpRequestOptions, url: string): void {
     const snap: AppHttpProxySnapshot = HttpProxyOptions.getSnapshot();
@@ -301,6 +335,8 @@ export class HttpDownloader {
             }
           )
         });
+
+        HttpDownloader.notifySetCookie(response, url);
 
         // 5. 检查响应码
         if (response.responseCode && response.responseCode >= 400) {
@@ -609,6 +645,7 @@ export class HttpDownloader {
           cookies: '',
           resultType: http.HttpDataType.ARRAY_BUFFER
         } as http.HttpResponse;
+        HttpDownloader.notifySetCookie(resp, url);
         resolve(resp);
       };
 

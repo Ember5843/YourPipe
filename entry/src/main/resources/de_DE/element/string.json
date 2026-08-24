@@ -893,6 +893,10 @@
             "value": "Empfohlener Feed konnte nicht geladen werden, Fallback oder spaeter erneut versuchen"
         },
         {
+            "name": "yt_home_auth_expired_notice",
+            "value": "Anmeldung abgelaufen - Gaeste-Empfehlungen werden angezeigt. Bitte erneut anmelden."
+        },
+        {
             "name": "yt_home_kiosk_error",
             "value": "Kiosk-Anfrage fehlgeschlagen, bitte später erneut versuchen"
         },
@@ -1751,6 +1755,30 @@
         {
             "name": "yt_playback_gpu_rendering",
             "value": "GPU-Rendering"
+        },
+        {
+            "name": "yt_playback_stream_endpoint",
+            "value": "Stream-Endpunkt"
+        },
+        {
+            "name": "yt_playback_guest_player_client",
+            "value": "Wiedergabe-Endpunkt (Gast)"
+        },
+        {
+            "name": "yt_playback_auth_player_client",
+            "value": "Wiedergabe-Endpunkt (angemeldet)"
+        },
+        {
+            "name": "yt_setting_client_visionos",
+            "value": "VisionOS"
+        },
+        {
+            "name": "yt_setting_client_tv_downgraded",
+            "value": "TV Downgraded"
+        },
+        {
+            "name": "yt_setting_client_mweb",
+            "value": "MWEB (SABR)"
         },
         {
             "name": "yt_playback_buffer_network",

@@ -263,6 +263,15 @@ struct Index {
     this.savePlaybackConfig(next);
   }
 
+  /** 播放端点变更：应用 per-state 配置、重置身份/pot 缓存、清 prefetch（旧端点抓的流 URL 不可复用）。 */
+  private onPlayerClientChanged(guest: string, auth: string): void {
+    AuthStateHelper.applyPlayerClientConfig(guest, auth);
+    const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (hostContext) {
+      YouTubePlayService.getInstance(hostContext).clearPrefetchCache();
+    }
+  }
+
   /** 赋值新配置并持久化到 Preferences */
   private applyAndSaveConfig(next: UIConfig): void {
     this.uiConfig = next;
@@ -284,6 +293,9 @@ struct Index {
     PlaybackConfig.saveToPreferences(defaultPlaybackConfig);
     AppStorage.setOrCreate('autoPlayQueue', defaultPlaybackConfig.autoPlayNext);
     DownloadManager.getInstance().refreshTaskPool();
+
+    // 播放端点恢复默认（visionos/tv_downgraded）并使身份/pot 缓存失效
+    AuthStateHelper.applyPlayerClientConfig(defaultPlaybackConfig.guestPlayerClient, defaultPlaybackConfig.authPlayerClient);
 
     // 3. 重置网络代理
     const defaultProxy = NetworkProxyConfig.resetToDefault();
@@ -396,6 +408,8 @@ struct Index {
     const defaultProxy = NetworkProxyConfig.resetToDefault();
     AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
 
+    AuthStateHelper.applyPlayerClientConfig(defaultPlaybackConfig.guestPlayerClient, defaultPlaybackConfig.authPlayerClient);
+
     // 6. 清空各业务数据
     this.subscriptions = [];
     AppStorage.setOrCreate('subscriptions', []);
@@ -503,11 +517,15 @@ struct Index {
       }
     });
 
-    this.resetHomeFeed(false, true);
-    this.consumePendingPlaybackContinuation();
-    if (this.uiConfig.syncUserLibraryOnLaunch !== false) {
-      this.syncUserLibraryAfterLogin();
-    }
+    // 首个网络工作（首页加载 / 续播恢复 / 云端同步）前先等代理就绪：socks5 模式下
+    // loopback 桥是异步 listen 的，不等会让启动窗口内的请求静默直连。
+    NetworkProxyConfig.awaitReady().then(() => {
+      this.resetHomeFeed(false, true);
+      this.consumePendingPlaybackContinuation();
+      if (this.uiConfig.syncUserLibraryOnLaunch !== false) {
+        this.syncUserLibraryAfterLogin();
+      }
+    });
     // 首帧后再弹：CustomDialog 依赖 UI 就绪
     setTimeout(() => {
       this.maybeShowSecureShieldDialog();
@@ -982,6 +1000,14 @@ struct Index {
         }
         this.homeErrorMessage = '';
         this.homeModeNoticeMessage = '';
+        if (reset
+          && kioskResult.source === 'kiosk'
+          && feedStyle === 'recommended'
+          && AuthSessionManager.getInstance()?.consumeAuthRejectionNotice() === true) {
+          // 登录态被拒后已回落到游客 kiosk，提示用户重新登录。
+          this.homeModeNoticeMessage = getContext().resourceManager.getStringSync(
+            $r('app.string.yt_home_auth_expired_notice').id);
+        }
         logger.info(`[HomeFeed] stage=load_done reset=${reset} mode=kiosk source=${this.homeFeedSource} `
           + `items=${kioskResult.items.length} listLen=${this.videoList.length} `
           + `elapsed=${Date.now() - loadStartedAt}ms`);
@@ -2056,7 +2082,8 @@ struct Index {
               themeColor: this.themePrimary,
               updatePlaybackConfig: this.updatePlaybackConfig.bind(this),
               updateUiConfig: this.updateUiConfig.bind(this),
-              getQualityDisplay: this.getQualityDisplay.bind(this)
+              getQualityDisplay: this.getQualityDisplay.bind(this),
+              onPlayerClientChanged: this.onPlayerClientChanged.bind(this)
             }
           })
       }

@@ -941,6 +941,10 @@
             "value": "推荐源加载失败，已回退或请稍后重试"
         },
         {
+            "name": "yt_home_auth_expired_notice",
+            "value": "登录状态已失效，正在显示游客推荐内容，请重新登录"
+        },
+        {
             "name": "yt_home_kiosk_error",
             "value": "Kiosk 请求失败，请稍后重试"
         },
@@ -1751,6 +1755,30 @@
         {
             "name": "yt_playback_gpu_rendering",
             "value": "GPU 渲染"
+        },
+        {
+            "name": "yt_playback_stream_endpoint",
+            "value": "播放端点"
+        },
+        {
+            "name": "yt_playback_guest_player_client",
+            "value": "游客播放端点"
+        },
+        {
+            "name": "yt_playback_auth_player_client",
+            "value": "登录播放端点"
+        },
+        {
+            "name": "yt_setting_client_visionos",
+            "value": "VisionOS"
+        },
+        {
+            "name": "yt_setting_client_tv_downgraded",
+            "value": "TV Downgraded"
+        },
+        {
+            "name": "yt_setting_client_mweb",
+            "value": "MWEB (SABR)"
         },
         {
             "name": "yt_playback_buffer_network",

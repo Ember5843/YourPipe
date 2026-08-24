@@ -8,6 +8,7 @@ import { Utils } from "../common/Utils";
 import { WebClientVersionResolver, ClientVersionGet } from "../common/WebClientVersionResolver";
 import { HttpDownloader } from "../network/HttpDownloader";
 import { AuthSessionManager } from "../auth/AuthSessionManager";
+import { AuthExpiredError, isAuthRejectionResponse } from "../auth/AuthExpiredError";
 import { buildWebRailHeaders, SOCS_CONSENT_COOKIE } from "../auth/WebRailHeaders";
 import { http } from "@kit.NetworkKit";
 import { JSON } from "@kit.ArkTS";
@@ -292,7 +293,21 @@ async function getJsonPostResponse(
     localization,
     "application/json"
   );
-  const responseObject = JSON.parse(response.result as string);
+  const raw = typeof response.result === 'string'
+    ? response.result as string
+    : JSON.stringify(response.result);
+  if (withAuth && response.responseCode === 401) {
+    logger.warn(`[WEB-api] HTTP 401 with auth endpoint=${endpoint}`);
+    throw new AuthExpiredError(`WEB api 401 endpoint=${endpoint}`, response.responseCode);
+  }
+  const responseObject = JSON.parse(raw) as Object;
+  if (withAuth) {
+    const errObj = (responseObject as Record<string, Object>)['error'];
+    if (errObj && isAuthRejectionResponse(response.responseCode, errObj as Record<string, Object>)) {
+      logger.warn(`[WEB-api] auth rejection in body endpoint=${endpoint} code=${response.responseCode}`);
+      throw new AuthExpiredError(`WEB api auth rejection endpoint=${endpoint}`, response.responseCode);
+    }
+  }
   return responseObject;
 }
 
@@ -318,6 +333,9 @@ async function getJsonPostResponseTv(
   if (code !== 200) {
     const snippet = raw.substring(0, 240).replace(/\s+/g, ' ');
     logger.error(`[TV-browse] HTTP ${code} endpoint=${endpoint} body=${snippet}`);
+    if (withAuth && code === 401) {
+      throw new AuthExpiredError(`TV api 401 endpoint=${endpoint}`, code);
+    }
     return null;
   }
   try {
@@ -325,9 +343,15 @@ async function getJsonPostResponseTv(
     const asRec = responseObject as Record<string, Object>;
     if (asRec['error']) {
       logger.error(`[TV-browse] api error endpoint=${endpoint} ${JSON.stringify(asRec['error']).substring(0, 240)}`);
+      if (withAuth && isAuthRejectionResponse(200, asRec['error'] as Record<string, Object>)) {
+        throw new AuthExpiredError(`TV api auth rejection endpoint=${endpoint}`, 200);
+      }
     }
     return responseObject;
   } catch (e) {
+    if (e instanceof AuthExpiredError) {
+      throw e;
+    }
     logger.error(`[TV-browse] JSON parse failed endpoint=${endpoint}`);
     return null;
   }

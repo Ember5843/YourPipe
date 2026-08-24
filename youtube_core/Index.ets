@@ -65,6 +65,7 @@ export { socks5Bridge } from './src/main/ets/network/Socks5Bridge';
 export { AuthAccountStatus, AuthStage } from './src/main/ets/auth/AuthModels';
 export { AuthSessionManager, AuthBackupState, AUTH_STORAGE_NAME } from './src/main/ets/auth/AuthSessionManager';
 export { CookieAuthCredential } from './src/main/ets/auth/CookieAuthCredential';
+export { AuthExpiredError, isAuthRejectionResponse } from './src/main/ets/auth/AuthExpiredError';
 
 // ── service ──
 export {

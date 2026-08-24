@@ -909,6 +909,10 @@
             "value": "Failed to load recommended feed, falling back or try again later"
         },
         {
+            "name": "yt_home_auth_expired_notice",
+            "value": "Sign-in expired — showing guest recommendations. Please sign in again."
+        },
+        {
             "name": "yt_home_kiosk_error",
             "value": "Kiosk request failed, please try again later"
         },
@@ -1475,6 +1479,30 @@
         {
             "name": "yt_playback_gpu_rendering",
             "value": "GPU rendering"
+        },
+        {
+            "name": "yt_playback_stream_endpoint",
+            "value": "Stream endpoint"
+        },
+        {
+            "name": "yt_playback_guest_player_client",
+            "value": "Guest playback endpoint"
+        },
+        {
+            "name": "yt_playback_auth_player_client",
+            "value": "Signed-in playback endpoint"
+        },
+        {
+            "name": "yt_setting_client_visionos",
+            "value": "VisionOS"
+        },
+        {
+            "name": "yt_setting_client_tv_downgraded",
+            "value": "TV Downgraded"
+        },
+        {
+            "name": "yt_setting_client_mweb",
+            "value": "MWEB (SABR)"
         },
         {
             "name": "yt_playback_buffer_network",
