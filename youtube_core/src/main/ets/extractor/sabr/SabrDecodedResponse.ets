@@ -33,9 +33,11 @@ export class SabrContextUpdate {
 }
 
 export class SabrContextSendingPolicy {
-  startTimeMs: number = -1;
-  durationMs: number = -1;
-  types: number[] = [];
+  /** field 1: context types to add to the active set. */
+  activateTypes: number[] = [];
+  /** field 2: context types to remove from the active set. */
+  deactivateTypes: number[] = [];
+  /** field 3: context types to dispose (drop from active set and stored contexts). */
   disposeTypes: number[] = [];
 }
 
@@ -73,6 +75,8 @@ export class SabrDecodedResponse {
   backoffTimeMs: number = -1;
   unknownPartTypes: number[] = [];
   segments: SabrMediaSegment[] = [];
+  /** PipePipe YoutubeSabrResponse.getIntegrityIssues — empty means media-complete. */
+  integrityIssues: string[] = [];
 
   hasMedia(): boolean {
     return this.mediaHeaders.length > 0 || this.segments.length > 0;

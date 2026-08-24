@@ -184,11 +184,21 @@ export class YoutubeSabrRequestBuilder {
     if (url.indexOf('alr=') < 0) {
       url += (url.indexOf('?') >= 0 ? '&' : '?') + 'alr=yes';
     }
-    // Replace or append cpn / rn
-    url = replaceOrAppendQuery(url, 'cpn', cpn);
-    url = replaceOrAppendQuery(url, 'rn', String(requestNumber + 1));
+    // PipePipe withSessionParameters: cpn is append-if-missing (an existing
+    // cpn in the serverAbr URL wins); rn is replace-or-append, 0-based
+    // (first POST is rn=0).
+    url = appendQueryIfMissing(url, 'cpn', cpn);
+    url = replaceOrAppendQuery(url, 'rn', String(requestNumber));
     return url;
   }
+}
+
+function appendQueryIfMissing(url: string, key: string, value: string): string {
+  const re = new RegExp(`[?&]${key}=`);
+  if (re.test(url)) {
+    return url;
+  }
+  return url + (url.indexOf('?') >= 0 ? '&' : '?') + `${key}=${value}`;
 }
 
 function replaceOrAppendQuery(url: string, key: string, value: string): string {

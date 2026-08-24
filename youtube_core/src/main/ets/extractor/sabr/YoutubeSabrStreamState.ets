@@ -299,8 +299,11 @@ export class YoutubeSabrStreamState {
   }
 
   private ingestContextSendingPolicy(policy: SabrContextSendingPolicy): void {
-    for (const type of policy.types) {
+    for (const type of policy.activateTypes) {
       this.epoch.activeSabrContextTypes.add(type);
+    }
+    for (const type of policy.deactivateTypes) {
+      this.epoch.activeSabrContextTypes.delete(type);
     }
     for (const type of policy.disposeTypes) {
       this.epoch.activeSabrContextTypes.delete(type);

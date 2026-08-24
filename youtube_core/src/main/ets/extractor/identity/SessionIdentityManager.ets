@@ -5,17 +5,20 @@ const logger = YTCoreLogger.getInstance('SessionIdentityManager');
 
 /**
  * Player-request PoToken source (stage 2), injected from entry at startup.
- * The minted token is visitor-bound (a session token), not video-bound, and
- * must be fast: extraction cold start never waits for BotGuard init — an
- * unavailable/slow hook returns undefined and the /player request goes out
- * without serviceIntegrityDimensions.
+ * Binding follows the YouTube home page experiment flags (PipePipe 5.3.0):
+ * content binding mints per videoId, session binding returns the pre-minted
+ * session token (DataSync ID when signed in, bootstrap visitorData when
+ * anonymous). Must be fast: extraction cold start never waits for BotGuard
+ * init — an unavailable/slow hook returns undefined and the /player request
+ * goes out without serviceIntegrityDimensions.
  */
 export interface SessionPoTokenHook {
   getPlayerPoToken(
     clientName: string,
     clientVersion: string,
     userAgent: string,
-    visitorData: string
+    visitorData: string,
+    videoId: string
   ): Promise<string | undefined>;
 }
 
@@ -71,13 +74,14 @@ export class SessionIdentityManager {
   }
 
   /**
-   * Mint a visitor-bound player PoToken via the injected hook against the
-   * currently pinned identity. undefined when no hook/identity is available.
+   * Mint a player PoToken via the injected hook against the currently pinned
+   * identity. undefined when no hook/identity is available.
    */
   static async getPlayerPoToken(
     clientName: string,
     clientVersion: string,
-    userAgent: string
+    userAgent: string,
+    videoId: string
   ): Promise<string | undefined> {
     const hook = SessionIdentityManager.playerPoTokenHook;
     const identity = SessionIdentityManager.identity;
@@ -85,7 +89,7 @@ export class SessionIdentityManager {
       return undefined;
     }
     const token = await hook.getPlayerPoToken(
-      clientName, clientVersion, userAgent, identity.visitorData);
+      clientName, clientVersion, userAgent, identity.visitorData, videoId);
     if (token) {
       identity.playerPoToken = token;
     }

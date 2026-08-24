@@ -21,10 +21,11 @@ interface CachedDashPoToken {
   mintedAtMs: number;
 }
 
-/** Visitor-bound player-request PoToken (session token, not video-bound). */
+/** Player-request PoToken (content binding: per videoId; session binding: shared). */
 interface CachedPlayerPoToken {
   tokenStr: string;
   visitorData: string;
+  videoId: string;
   mintedAtMs: number;
 }
 
@@ -34,12 +35,16 @@ export type LocalDomMintFn = (
   forceRefresh: boolean
 ) => Promise<Uint8Array | undefined>;
 
+/** Drops the generator's bootstrap/minter so the next mint re-bootstraps. */
+export type LocalDomInvalidateFn = () => void;
+
 export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionPoTokenHook {
   private static instance: SabrWebViewPoTokenProvider = new SabrWebViewPoTokenProvider();
   private cache: Map<string, CachedPoToken> = new Map();
   private dashCache: Map<string, CachedDashPoToken> = new Map();
   private playerTokenCache?: CachedPlayerPoToken;
   private mint?: LocalDomMintFn;
+  private invalidateMinter?: LocalDomInvalidateFn;
   private mintPromise?: Promise<Uint8Array | undefined>;
   /** Consecutive mint timeouts — the wedged ArkWeb-bridge signature. */
   private mintTimeoutStreak: number = 0;
@@ -59,8 +64,9 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     return SabrWebViewPoTokenProvider.instance;
   }
 
-  setMinter(mint?: LocalDomMintFn): void {
+  setMinter(mint?: LocalDomMintFn, invalidate?: LocalDomInvalidateFn): void {
     this.mint = mint;
+    this.invalidateMinter = invalidate;
     if (mint && this.pendingWarmVisitorData) {
       const visitorData = this.pendingWarmVisitorData;
       this.pendingWarmVisitorData = '';
@@ -111,16 +117,18 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     this.pendingWarmVisitorData = '';
     this.mintTimeoutStreak = 0;
     this.mintBrokenUntilMs = 0;
+    this.invalidateMinter?.();
     logger.info('resetForAuthChange: token caches + BotGuard warm state cleared');
   }
 
   /**
    * ROTATE_IDENTITY: drop the pinned session identity so the session re-probe
    * pins a fresh visitorData, then clear every token minted against the old
-   * identity for this video. The next mint re-initializes BotGuard because
-   * SabrLocalDomPoTokenGenerator sees a different visitorData. The breaker
-   * state resets too — a wedged WebView on the old identity must not fail
-   * fast against the new one.
+   * identity for this video. The generator's bootstrap/minter is invalidated
+   * too, so the next mint re-fetches the home page and starts a fresh
+   * attestation session (PipePipe LocalDomPoTokenProvider.invalidate). The
+   * breaker state resets too — a wedged WebView on the old identity must not
+   * fail fast against the new one.
    */
   async invalidatePoTokenIdentity(info: YoutubeSabrInfo): Promise<boolean> {
     YoutubeJavaScriptPlayerManager.resetSessionVisitorData();
@@ -131,32 +139,35 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     this.pendingWarmVisitorData = '';
     this.mintTimeoutStreak = 0;
     this.mintBrokenUntilMs = 0;
+    this.invalidateMinter?.();
     logger.info(`invalidatePoTokenIdentity video=${info.videoId}: identity pin + token caches cleared`);
     return true;
   }
 
   /**
-   * Visitor-bound player-request PoToken (SessionPoTokenHook; session token,
-   * not video-bound — minted under the fixed '__player__' identifier).
-   * PipePipe parity: pot-requiring clients (android_vr) send the session pot
-   * on /player, so a cold BotGuard runtime must NOT silently skip — unpotted
-   * direct URLs 403 on googlevideo. When cold we attempt one bounded cold
-   * mint (BotGuard init runs inline inside SabrLocalDomPoTokenGenerator);
-   * PLAYER_MINT_TIMEOUT_MS below plus the caller-side race in
-   * ConfiguredPlayerClient (PLAYER_PO_TOKEN_TIMEOUT_MS) bound the delay, and
-   * a timeout falls back to the old skip behavior.
+   * Player-request PoToken (SessionPoTokenHook). PipePipe 5.3.0 binding:
+   * content binding mints per videoId, session binding reuses the pre-minted
+   * session token (the generator resolves the binding from the home page
+   * experiment flags). Pot-requiring paths send the pot on /player, so a cold
+   * BotGuard runtime must NOT silently skip — unpotted direct URLs 403 on
+   * googlevideo. When cold we attempt one bounded cold mint (BotGuard init
+   * runs inline inside SabrLocalDomPoTokenGenerator); PLAYER_MINT_TIMEOUT_MS
+   * below plus the caller-side race in ConfiguredPlayerClient
+   * (PLAYER_PO_TOKEN_TIMEOUT_MS) bound the delay, and a timeout falls back to
+   * the old skip behavior.
    */
   async getPlayerPoToken(
     clientName: string,
     clientVersion: string,
     _userAgent: string,
-    visitorData: string
+    visitorData: string,
+    videoId: string
   ): Promise<string | undefined> {
     if (!visitorData) {
       return undefined;
     }
     const cached = this.playerTokenCache;
-    if (cached && cached.visitorData === visitorData
+    if (cached && cached.visitorData === visitorData && cached.videoId === videoId
       && Date.now() - cached.mintedAtMs < 6 * 60 * 60 * 1000) {
       return cached.tokenStr;
     }
@@ -180,7 +191,7 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
         timerId = setTimeout(() => reject(new Error('mint timeout')),
           SabrWebViewPoTokenProvider.PLAYER_MINT_TIMEOUT_MS);
       });
-      raw = await Promise.race([this.mint(visitorData, '__player__', false), timeout]);
+      raw = await Promise.race([this.mint(visitorData, videoId, false), timeout]);
     } catch (e) {
       if (coldStart) {
         this.runtimeWarmed = false;
@@ -198,6 +209,7 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     this.playerTokenCache = {
       tokenStr: tokenStr,
       visitorData: visitorData,
+      videoId: videoId,
       mintedAtMs: Date.now()
     };
     logger.info(`getPlayerPoToken: success client=${clientName} len=${tokenStr.length}`);

@@ -1,5 +1,5 @@
 import web_webview from '@ohos.web.webview';
-import { SabrLocalDomPoTokenGenerator } from './SabrLocalDomPoTokenGenerator';
+import { SabrLocalDomPoTokenGenerator, SABR_POTOKEN_USER_AGENT } from './SabrLocalDomPoTokenGenerator';
 import { SabrWebViewPoTokenProvider } from './SabrWebViewPoTokenProvider';
 
 @Component
@@ -24,7 +24,9 @@ export struct SabrPoTokenWebRuntime {
       .hitTestBehavior(HitTestMode.None)
       .onControllerAttached(() => {
         // BotGuard changes its signal output for opaque/about:blank origins. Match PipePipe's
-        // first-party blank runtime without loading the actual YouTube site.
+        // first-party blank runtime without loading the actual YouTube site. PipePipe also
+        // pins the WebView UA to the same desktop UA used for the home/GenerateIT fetches.
+        this.controller.setCustomUserAgent(SABR_POTOKEN_USER_AGENT);
         this.controller.loadData(
           '<!doctype html><html><head><title></title></head><body><div id="interaction"></div></body></html>',
           'text/html', 'UTF-8', 'https://www.youtube.com/', 'about:blank');
@@ -42,6 +44,8 @@ export struct SabrPoTokenWebRuntime {
           forceRefresh: boolean
         ): Promise<Uint8Array | undefined> => {
           return await this.generator?.mint(visitorData, videoId, forceRefresh);
+        }, () => {
+          this.generator?.invalidate();
         });
       })
   }

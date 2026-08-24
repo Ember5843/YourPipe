@@ -50,6 +50,24 @@ export const DEMUXER_MAX_BYTES_LABELS: DemuxerMaxBytes[] = ['10', '20', '50', '1
 
 export const GPU_API_LABELS: GpuApi[] = ['auto', 'opengl', 'vulkan'];
 
+/** 游客态播放端点（PipePipe per-state allow-list: visionos | mweb） */
+export type GuestPlayerClient = 'visionos' | 'mweb';
+/** 登录态播放端点（PipePipe per-state allow-list: tv_downgraded | mweb） */
+export type AuthPlayerClient = 'tv_downgraded' | 'mweb';
+
+export const GUEST_PLAYER_CLIENT_LABELS: GuestPlayerClient[] = ['visionos', 'mweb'];
+export const AUTH_PLAYER_CLIENT_LABELS: AuthPlayerClient[] = ['tv_downgraded', 'mweb'];
+
+export function getPlayerClientDisplay(value: string): Resource {
+  if (value === 'tv_downgraded') {
+    return $r('app.string.yt_setting_client_tv_downgraded');
+  }
+  if (value === 'mweb') {
+    return $r('app.string.yt_setting_client_mweb');
+  }
+  return $r('app.string.yt_setting_client_visionos');
+}
+
 /** 长按加速可选倍速档 */
 export const HOLD_SPEED_VALUES: number[] = [1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
 
@@ -122,6 +140,10 @@ export class PlaybackConfig {
   demuxerMaxBytes: DemuxerMaxBytes = '20';
   /** GPU 渲染 API */
   gpuApi: GpuApi = 'auto';
+  /** 游客（未登录/未启用播放鉴权）时的 YouTube 播放端点 */
+  guestPlayerClient: GuestPlayerClient = 'visionos';
+  /** 登录（且启用播放鉴权）时的 YouTube 播放端点 */
+  authPlayerClient: AuthPlayerClient = 'mweb';
 
   constructor() {}
 
@@ -144,6 +166,8 @@ export class PlaybackConfig {
     next.demuxerReadaheadSecs = this.demuxerReadaheadSecs;
     next.demuxerMaxBytes = this.demuxerMaxBytes;
     next.gpuApi = this.gpuApi;
+    next.guestPlayerClient = this.guestPlayerClient;
+    next.authPlayerClient = this.authPlayerClient;
     return next;
   }
 
@@ -176,6 +200,12 @@ export class PlaybackConfig {
     cfg.demuxerMaxBytes = DEMUXER_MAX_BYTES_LABELS.includes(maxBytes as DemuxerMaxBytes) ? maxBytes as DemuxerMaxBytes : '20';
     const gpuApi = PreferencesStore.getString('cfg_pb_gpuApi', 'auto');
     cfg.gpuApi = GPU_API_LABELS.includes(gpuApi as GpuApi) ? gpuApi as GpuApi : 'auto';
+    const guestClient = PreferencesStore.getString('cfg_pb_guestPlayerClient', 'visionos');
+    cfg.guestPlayerClient = GUEST_PLAYER_CLIENT_LABELS.includes(guestClient as GuestPlayerClient)
+      ? guestClient as GuestPlayerClient : 'visionos';
+    const authClient = PreferencesStore.getString('cfg_pb_authPlayerClient', 'mweb');
+    cfg.authPlayerClient = AUTH_PLAYER_CLIENT_LABELS.includes(authClient as AuthPlayerClient)
+      ? authClient as AuthPlayerClient : 'mweb';
 
     logger.info(`Loaded PlaybackConfig: ${JSON.stringify(cfg)}`);
     return cfg;
@@ -201,6 +231,8 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_demuxerReadaheadSecs', cfg.demuxerReadaheadSecs);
     PreferencesStore.setString('cfg_pb_demuxerMaxBytes', cfg.demuxerMaxBytes);
     PreferencesStore.setString('cfg_pb_gpuApi', cfg.gpuApi);
+    PreferencesStore.setString('cfg_pb_guestPlayerClient', cfg.guestPlayerClient);
+    PreferencesStore.setString('cfg_pb_authPlayerClient', cfg.authPlayerClient);
 
     logger.info('Saved PlaybackConfig');
   }

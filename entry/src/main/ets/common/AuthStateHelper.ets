@@ -30,6 +30,20 @@ export class AuthStateHelper {
   }
 
   /**
+   * 播放端点设置变更（Options → 播放端点）的统一后置动作：更新 per-state
+   * 配置并按当前鉴权态重选端点；身份 pin 与全部 pot 缓存随端点失效（visitor
+   * 绑定缓存不跨端点复用）。恢复默认设置也走这里。调用点负责清 prefetch 缓存
+   * 与处理进行中的播放。
+   */
+  static applyPlayerClientConfig(guestClient: string, authClient: string): void {
+    YoutubePlayerClientConfig.setConfiguredClients(guestClient, authClient);
+    AuthStateHelper.reconcilePlaybackClient();
+    YoutubeJavaScriptPlayerManager.resetSessionVisitorData();
+    SabrWebViewPoTokenProvider.getInstance().resetForAuthChange();
+    logger.info(`player client config applied guest=${guestClient} auth=${authClient}`);
+  }
+
+  /**
    * PipePipe LocalDomPoTokenProvider credential-bound cache isolation: tokens
    * and the pinned visitor identity belong to the credential state they were
    * minted under. On login/logout/rail change, drop the identity pin and all

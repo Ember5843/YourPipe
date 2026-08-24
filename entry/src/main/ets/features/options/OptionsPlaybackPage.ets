@@ -12,6 +12,7 @@ import {
   getGpuApiDisplay, getCacheSecsDisplay, getDemuxerReadaheadDisplay,
   getDemuxerMaxBytesDisplay, getBackgroundVideoOffDelayDisplay,
   HOLD_SPEED_VALUES, HOLD_SPEED_DELAYS, getHoldSpeedDelayDisplay,
+  GUEST_PLAYER_CLIENT_LABELS, AUTH_PLAYER_CLIENT_LABELS, getPlayerClientDisplay,
 } from '../../common/PlaybackConfig';
 import { PiPManager } from '../player/pip/PiPManager';
 
@@ -22,6 +23,8 @@ interface OptionsPlaybackPageParams {
   updatePlaybackConfig: (updater: (cfg: PlaybackConfig) => void) => void;
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
   getQualityDisplay: (quality: VideoQualityCap) => ResourceStr;
+  /** 播放端点变更后的副作用（应用配置 + 重置身份/pot/prefetch），在写盘后调用 */
+  onPlayerClientChanged: (guest: string, auth: string) => void;
 }
 
 @Component
@@ -34,7 +37,8 @@ export struct OptionsPlaybackPage {
     themeColor: '#E53935',
     updatePlaybackConfig: () => {},
     updateUiConfig: () => {},
-    getQualityDisplay: (quality) => quality
+    getQualityDisplay: (quality) => quality,
+    onPlayerClientChanged: () => {}
   };
 
   private getQualityOptions(): SelectOption[] {
@@ -43,6 +47,14 @@ export struct OptionsPlaybackPage {
 
   private getGpuApiOptions(): SelectOption[] {
     return GPU_API_LABELS.map(s => ({ value: getGpuApiDisplay(s) } as SelectOption));
+  }
+
+  private getGuestPlayerClientOptions(): SelectOption[] {
+    return GUEST_PLAYER_CLIENT_LABELS.map(s => ({ value: getPlayerClientDisplay(s) } as SelectOption));
+  }
+
+  private getAuthPlayerClientOptions(): SelectOption[] {
+    return AUTH_PLAYER_CLIENT_LABELS.map(s => ({ value: getPlayerClientDisplay(s) } as SelectOption));
   }
 
   private getCacheSecsOptions(): SelectOption[] {
@@ -106,6 +118,47 @@ export struct OptionsPlaybackPage {
               transparentBackground: true,
               onChange: (val: boolean) => {
                 this.params.updatePlaybackConfig(cfg => cfg.autoPlayNext = val);
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_playback_stream_endpoint') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_playback_guest_player_client'),
+              options: this.getGuestPlayerClientOptions(),
+              selectedIndex: GUEST_PLAYER_CLIENT_LABELS.indexOf(this.playbackConfig.guestPlayerClient),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const client = GUEST_PLAYER_CLIENT_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.guestPlayerClient = client);
+                this.params.onPlayerClientChanged(client, this.playbackConfig.authPlayerClient);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_playback_auth_player_client'),
+              options: this.getAuthPlayerClientOptions(),
+              selectedIndex: AUTH_PLAYER_CLIENT_LABELS.indexOf(this.playbackConfig.authPlayerClient),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const client = AUTH_PLAYER_CLIENT_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.authPlayerClient = client);
+                this.params.onPlayerClientChanged(this.playbackConfig.guestPlayerClient, client);
               }
             })
           }

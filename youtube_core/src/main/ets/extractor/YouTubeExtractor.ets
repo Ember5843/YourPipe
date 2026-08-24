@@ -641,6 +641,17 @@ export class YouTubeExtractor implements CommentsBackend {
       await this.tryExtractHlsStreams(videoId);
     }
 
+    // visionos muxed fallback (PipePipe androidReelMuxedFormats): PipePipe
+    // fetches ANDROID reel/reel_item_watch eagerly but only consumes it when
+    // the primary extraction failed; we defer the request itself to that case.
+    const noStreamsYet = this.cachedAudioStreams.length === 0
+      && this.cachedVideoOnlyStreams.length === 0
+      && this.cachedVideoStreams.length === 0;
+    if (selectedClient === 'visionos' && noStreamsYet
+      && !this.getHlsManifestUrlFromStreamingData()) {
+      await this.extractAndroidReelMuxedFormats(videoId);
+    }
+
     this.checkAggregatedErrors(innertubePlayers);
 
     const hasAnyStream = this.cachedAudioStreams.length > 0
@@ -688,6 +699,41 @@ export class YouTubeExtractor implements CommentsBackend {
       || meta.videoDetails?.isLiveContent === true;
     return isLiveContent && !this.resolveIsLive(meta, pr)
       && !!(pr.streamingData?.hlsManifestUrl || this.mwebHlsManifestUrl);
+  }
+
+  /**
+   * PipePipe extractAndroidReelMuxedFormats: muxed `formats[]` from the ANDROID
+   * reel/reel_item_watch endpoint, parsed into progressive video streams.
+   * Fallback only — fires when the visionos primary path yielded no streams.
+   * Errors are swallowed (logged) so the reel never breaks the primary result.
+   */
+  private async extractAndroidReelMuxedFormats(videoId: string): Promise<void> {
+    try {
+      logger.info(`[STREAM] visionos primary empty; trying android reel muxed fallback video=${videoId}`);
+      const ctx: ClientFetchContext = {
+        videoId: videoId,
+        hl: this.hl,
+        gl: this.gl,
+        visitorData: YoutubeJavaScriptPlayerManager.getSessionVisitorData() || undefined,
+        signatureTimestamp: undefined
+      };
+      const fetched = await ConfiguredPlayerClient.fetchAndroidReelMuxedFormats(ctx, this.client);
+      if (!fetched?.streamingData) {
+        return;
+      }
+      const itagInfos = this.getStreamsFromStreamingDataKey(
+        videoId, fetched.streamingData, 'formats', ItagType.VIDEO, fetched.cpn);
+      await this.batchDeobfuscateItagUrls(videoId, itagInfos);
+      for (const itagInfo of itagInfos) {
+        const stream = this.buildVideoStreamInfo(itagInfo, false, 'android_reel');
+        if (!containSimilarStream(stream, this.cachedVideoStreams)) {
+          this.cachedVideoStreams.push(stream);
+        }
+      }
+      logger.info(`[STREAM] android reel fallback muxed=${this.cachedVideoStreams.length} video=${videoId}`);
+    } catch (e) {
+      logger.warn('[STREAM] android reel fallback failed:', e);
+    }
   }
 
   /**

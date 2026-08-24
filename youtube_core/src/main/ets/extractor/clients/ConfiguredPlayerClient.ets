@@ -132,8 +132,9 @@ export class ConfiguredPlayerClient {
 
     // Stage 2 identity pass: non-TV clients carry the pinned session
     // visitorData and, when the injected hook can mint one fast enough, a
-    // visitor-bound player PoToken (PipePipe prepareSessionPoTokenPlayerRequest
-    // skips only TVHTML5). tv_downgraded stays token-free (PipePipe 7673caed).
+    // player PoToken bound per the home page experiment flags (PipePipe 5.3.0:
+    // content binding mints per videoId, session binding reuses the session
+    // token). tv_downgraded stays token-free (PipePipe 7673caed).
     // A missing/slow/failed hook never blocks extraction.
     if (key !== 'tv_downgraded') {
       const identityVisitorData = SessionIdentityManager.current()?.visitorData || '';
@@ -143,7 +144,8 @@ export class ConfiguredPlayerClient {
       let playerPoToken: string | undefined = undefined;
       try {
         playerPoToken = await withTimeoutMs(
-          SessionIdentityManager.getPlayerPoToken(id.clientName, id.clientVersion, id.userAgent),
+          SessionIdentityManager.getPlayerPoToken(
+            id.clientName, id.clientVersion, id.userAgent, ctx.videoId),
           PLAYER_PO_TOKEN_TIMEOUT_MS);
       } catch (e) {
         logger.warn(`[${key}] player PoToken hook failed: ${String(e)}`);
@@ -298,6 +300,95 @@ export class ConfiguredPlayerClient {
     // Live HLS helper stays anonymous by default (PipePipe); Cookie only if caller opts in.
     const result = await ConfiguredPlayerClient.fetch('mweb', ctx, httpClient, useWebAuth, false);
     return result?.streamingData?.hlsManifestUrl;
+  }
+
+  /**
+   * PipePipe fetchAndroidReelMuxedFormats (ANDROID reel/reel_item_watch on the
+   * GAPIS endpoint) — muxed `formats[]` fallback for the visionos path.
+   * PipePipe fires this eagerly on every visionos extraction but only consumes
+   * it when the primary result has no streams; we defer the request itself
+   * until that fallback is actually needed (one less RTT per extraction).
+   * Never authed, never throws into the caller's primary path.
+   */
+  static async fetchAndroidReelMuxedFormats(
+    ctx: ClientFetchContext,
+    httpClient: YouTubeHttpClient
+  ): Promise<ClientFetchResult | undefined> {
+    const cpn = generateContentPlaybackNonce();
+    const client: Record<string, Object> = {
+      'clientName': ClientsConstants.ANDROID_CLIENT_NAME,
+      'clientVersion': ClientsConstants.ANDROID_CLIENT_VERSION,
+      'clientScreen': ClientsConstants.WATCH_CLIENT_SCREEN,
+      'platform': ClientsConstants.MOBILE_CLIENT_PLATFORM,
+      'osName': 'Android',
+      'osVersion': ClientsConstants.ANDROID_OS_VERSION,
+      'androidSdkVersion': parseInt(ClientsConstants.ANDROID_SDK_VERSION, 10),
+      'hl': ctx.hl,
+      'gl': ctx.gl,
+      'utcOffsetMinutes': 0
+    };
+    // Same pinned-identity policy as fetchVisionOs: reuse the session value
+    // when present, omit the field otherwise (no visitor_id RTT).
+    const visitorData = SessionIdentityManager.current()?.visitorData
+      || ctx.visitorData || '';
+    if (visitorData.length > 0) {
+      client['visitorData'] = visitorData;
+    }
+
+    const payload: Record<string, Object> = {
+      'context': {
+        'client': client,
+        'request': {
+          'internalExperimentFlags': [] as Object[],
+          'useSsl': true
+        } as Record<string, Object>,
+        'user': {
+          'lockedSafetyMode': false
+        } as Record<string, Object>
+      } as Record<string, Object>,
+      'playerRequest': {
+        'videoId': ctx.videoId,
+        'cpn': cpn,
+        'contentCheckOk': true,
+        'racyCheckOk': true
+      } as Record<string, Object>,
+      'disablePlayerResponse': false
+    };
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': ClientsConstants.androidUserAgent(ctx.gl),
+      'X-Goog-Api-Format-Version': '2'
+    };
+
+    const url = `${ClientsConstants.YOUTUBEI_V1_GAPIS_URL}reel/reel_item_watch?prettyPrint=false`
+      + `&t=${generateTParameter()}&id=${ctx.videoId}&$fields=playerResponse`;
+    try {
+      const response = await httpClient.postJson(url, payload, headers, false, false);
+      if (!response || response.responseCode !== 200 || !response.result) {
+        logger.warn(`[android_reel] HTTP ${response?.responseCode} video=${ctx.videoId}`);
+        return undefined;
+      }
+      const parsed = JSON.parse(response.result as string) as Record<string, Object>;
+      const pr = parsed?.['playerResponse'] as PlayerResponse | undefined;
+      const sd = pr?.streamingData;
+      if (!sd || !sd.formats || sd.formats.length === 0) {
+        logger.info(`[android_reel] no muxed formats video=${ctx.videoId}`);
+        return undefined;
+      }
+      logger.info(`[android_reel] muxed formats=${sd.formats.length} video=${ctx.videoId}`);
+      const result: ClientFetchResult = {
+        streamingData: sd,
+        cpn: cpn,
+        sourceClient: 'android_reel',
+        playerResponse: pr
+      };
+      return result;
+    } catch (e) {
+      // Reel errors must not affect the primary player result.
+      logger.warn('[android_reel] fetch failed:', e);
+      return undefined;
+    }
   }
 }
 

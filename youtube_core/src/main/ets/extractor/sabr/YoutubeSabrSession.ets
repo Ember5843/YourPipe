@@ -4,7 +4,7 @@ import { ClientsConstants } from '../../model/ClientsConstants';
 import { SabrDecodedResponse } from './SabrDecodedResponse';
 import { SabrMediaSegment, SabrSegmentRequest } from './SabrMediaSegment';
 import { SabrProtocolException } from './SabrProtocolException';
-import { requireUmpContentType, sabrDecodeBody } from './SabrResponseDecoder';
+import { isRecoverableIntegrityIssues, requireUmpContentType, sabrDecodeBody } from './SabrResponseDecoder';
 import { SabrInfoReloader } from './SabrInfoReloader';
 import { SabrPoTokenProvider } from './SabrPoTokenProvider';
 import { SabrServerEpoch } from './SabrServerEpoch';
@@ -24,6 +24,7 @@ const logger = YTCoreLogger.getInstance('YoutubeSabrSession');
 
 const MAX_REQUESTS_PER_SEGMENT = 16;
 const MAX_BACKOFF_MS = 30000;
+const MAX_INCOMPLETE_MEDIA_RESPONSES = 3;
 const MAX_CACHE_BYTES = 32 * 1024 * 1024;
 const SEEK_KEEP_WINDOW_MS = 8000;
 const EVICT_BEHIND_MS = 10000;
@@ -54,6 +55,7 @@ export class YoutubeSabrSession {
   private pumpBusy: boolean = false;
   private pumpWaiters: Array<() => void> = [];
   private consecutiveNoMedia: number = 0;
+  private consecutiveIntegrityFailures: number = 0;
   /** ROTATE_IDENTITY attempts (session-scoped, survives an epoch reset). */
   private attestationRotations: number = 0;
   private consecutiveAttestationPending: number = 0;
@@ -352,41 +354,64 @@ export class YoutubeSabrSession {
     // keeps returning the remaining cooldown anyway.
     const waitMs = this.getBackoffRemainingMs();
     if (waitMs > 0) {
-      logger.info(`[SABR] honor backoff ${waitMs}ms before rn=${this.epoch.requestNumber + 1}`);
+      logger.info(`[SABR] honor backoff ${waitMs}ms before rn=${this.epoch.requestNumber}`);
       await sleepMs(Math.min(waitMs, MAX_BACKOFF_MS));
     }
 
-    const isFirst = this.epoch.requestNumber === 0
-      && !this.streamState.isInitialized(this.audioFormat)
-      && !this.streamState.isInitialized(this.videoFormat);
-    const body = isFirst
-      ? YoutubeSabrRequestBuilder.buildFirstMediaRequest(
-        this.info, this.audioFormat, this.videoFormat, this.streamState)
-      : YoutubeSabrRequestBuilder.buildFollowUpMediaRequest(
-        this.info, this.audioFormat, this.videoFormat, this.streamState);
+    // PipePipe fetchAndProcessResponse: a media-incomplete response is never
+    // ingested — recoverable issues retry the POST (budget
+    // MAX_INCOMPLETE_MEDIA_RESPONSES), anything else is fatal.
+    let decoded: SabrDecodedResponse | undefined = undefined;
+    while (true) {
+      const isFirst = this.epoch.requestNumber === 0
+        && !this.streamState.isInitialized(this.audioFormat)
+        && !this.streamState.isInitialized(this.videoFormat);
+      const body = isFirst
+        ? YoutubeSabrRequestBuilder.buildFirstMediaRequest(
+          this.info, this.audioFormat, this.videoFormat, this.streamState)
+        : YoutubeSabrRequestBuilder.buildFollowUpMediaRequest(
+          this.info, this.audioFormat, this.videoFormat, this.streamState);
 
-    const url = YoutubeSabrRequestBuilder.withSabrSessionParameters(
-      this.epoch.serverAbrStreamingUrl, this.info.cpn, this.epoch.requestNumber);
+      const url = YoutubeSabrRequestBuilder.withSabrSessionParameters(
+        this.epoch.serverAbrStreamingUrl, this.info.cpn, this.epoch.requestNumber);
 
-    const headers = this.buildSabrHeaders();
-    const hasUstreamer = !!(this.info.videoPlaybackUstreamerConfig
-      && this.info.videoPlaybackUstreamerConfig.length > 0);
-    logger.info(`[SABR] POST rn=${this.epoch.requestNumber + 1} body=${body.length} `
-      + `urlLen=${url.length} `
-      + `profile=${this.info.profile} ustreamer=${hasUstreamer} `
-      + `a=${this.audioFormat.itag} v=${this.videoFormat.itag} `
-      + `lmA=${this.audioFormat.lastModified || 0} lmV=${this.videoFormat.lastModified || 0}`);
+      const headers = this.buildSabrHeaders();
+      const hasUstreamer = !!(this.info.videoPlaybackUstreamerConfig
+        && this.info.videoPlaybackUstreamerConfig.length > 0);
+      logger.info(`[SABR] POST rn=${this.epoch.requestNumber} body=${body.length} `
+        + `urlLen=${url.length} `
+        + `profile=${this.info.profile} ustreamer=${hasUstreamer} `
+        + `a=${this.audioFormat.itag} v=${this.videoFormat.itag} `
+        + `lmA=${this.audioFormat.lastModified || 0} lmV=${this.videoFormat.lastModified || 0}`);
 
-    const response = await this.httpClient.postBinary(url, body, headers, this.useAuth);
-    const status = response.responseCode;
-    const contentType = extractContentType(response.header);
-    requireUmpContentType(contentType, status);
+      const response = await this.httpClient.postBinary(url, body, headers, this.useAuth);
+      const status = response.responseCode;
+      const contentType = extractContentType(response.header);
+      requireUmpContentType(contentType, status);
 
-    const bodyBytes = toUint8Array(response.result);
-    logger.info(`[SABR] response status=${status} bytes=${bodyBytes.length} ct=${contentType}`);
+      const bodyBytes = toUint8Array(response.result);
+      logger.info(`[SABR] response status=${status} bytes=${bodyBytes.length} ct=${contentType}`);
 
-    const decoded = sabrDecodeBody(bodyBytes);
-    this.epoch.requestNumber++;
+      const attemptDecoded = sabrDecodeBody(bodyBytes);
+      this.epoch.requestNumber++;
+
+      const issues = attemptDecoded.integrityIssues;
+      if (issues.length === 0) {
+        this.consecutiveIntegrityFailures = 0;
+        decoded = attemptDecoded;
+        break;
+      }
+      if (!isRecoverableIntegrityIssues(issues)) {
+        throw new SabrProtocolException(`SABR media integrity issue: ${issues.join(',')}`);
+      }
+      this.consecutiveIntegrityFailures++;
+      if (this.consecutiveIntegrityFailures >= MAX_INCOMPLETE_MEDIA_RESPONSES) {
+        throw new SabrProtocolException(`SABR media integrity issue: ${issues.join(',')}`);
+      }
+      logger.warn(`[SABR] incomplete media response `
+        + `#${this.consecutiveIntegrityFailures}/${MAX_INCOMPLETE_MEDIA_RESPONSES}: `
+        + `${issues.join(',')} — retrying`);
+    }
 
     const pumpCtx: SabrPolicyContext = {
       phase: 'pump',
@@ -421,6 +446,10 @@ export class YoutubeSabrSession {
     }
 
     this.streamState.ingest(decoded);
+    // PipePipe updateBackoff applies to EVERY response (media or not) and a
+    // server backoff above the limit is fatal — media must not silently
+    // discard a cooldown the server attached to it.
+    this.applyServerBackoff(decoded.backoffTimeMs);
     for (const segment of decoded.segments) {
       this.ingestAndCacheSegment(segment);
     }
@@ -431,7 +460,6 @@ export class YoutubeSabrSession {
       this.epoch.poTokenRefreshes = 0;
       this.consecutiveNoMedia = 0;
       this.consecutiveAttestationPending = 0;
-      this.epoch.backoffUntilMs = 0;
       if (decoded.streamProtectionStatus >= 2 && !this.streamState.getRawPoToken()) {
         this.startPoTokenWarmup();
       }
@@ -464,6 +492,17 @@ export class YoutubeSabrSession {
       + `reload=${decoded.reloadRequested} seek=${decoded.sabrSeekReason} `
       + `noMedia=${this.consecutiveNoMedia}`);
     return decoded;
+  }
+
+  /**
+   * PipePipe updateBackoff: the server backoff applies to every response and
+   * overwrites the deadline (cleared when absent); above the limit is fatal.
+   */
+  private applyServerBackoff(backoffTimeMs: number): void {
+    if (backoffTimeMs > MAX_BACKOFF_MS) {
+      throw new SabrProtocolException(`SABR backoff exceeds limit: ${backoffTimeMs}ms`);
+    }
+    this.epoch.backoffUntilMs = backoffTimeMs > 0 ? Date.now() + backoffTimeMs : 0;
   }
 
   private scheduleBackoff(serverMs: number): void {
@@ -593,31 +632,20 @@ export class YoutubeSabrSession {
     this.cacheOrder = keep;
   }
 
-  // PipePipe buildSabrHeaders (web-like mweb/web omit visitor).
+  // PipePipe buildRequestHeaders: one constant header shape for every profile —
+  // Content-Type x-protobuf, Accept vnd.yt-ump, Accept-Encoding identity, MWEB UA.
+  // No Origin/Referer/Accept-Language, no X-Goog-Visitor-Id on the UMP rail.
   // OHOS net.http needs Content-Type for binary POST body delivery; PipePipe omits it on
   // OkHttp (MediaType null). Keep protobuf CT so the body is actually sent.
   private buildSabrHeaders(): Record<string, string> {
-    const webLike = this.info.profile === 'mweb' || this.info.profile === 'web';
     const ua = this.info.profile === 'web'
       ? ClientsConstants.WEB_USER_AGENT
       : ClientsConstants.MWEB_USER_AGENT;
     const headers: Record<string, string> = {};
     headers['Content-Type'] = 'application/x-protobuf';
+    headers['Accept'] = 'application/vnd.yt-ump';
+    headers['Accept-Encoding'] = 'identity';
     headers['User-Agent'] = ua;
-    if (webLike) {
-      headers['Accept'] = '*/*';
-      headers['Accept-Language'] = 'en-US,en;q=0.9';
-      headers['Origin'] = 'https://www.youtube.com';
-      headers['Referer'] = 'https://www.youtube.com/';
-    } else {
-      // DORMANT: 当前不可达——SabrClientProfileKey 只有 'mweb' | 'web'，webLike 恒为 true；
-      // 启用条件：为将来非 web profile（PipePipe 非 web UMP 头形状）预留，新增 profile 时生效。
-      headers['Accept'] = 'application/vnd.yt-ump';
-      headers['Accept-Encoding'] = 'identity';
-      if (this.info.visitorData) {
-        headers['X-Goog-Visitor-Id'] = this.info.visitorData;
-      }
-    }
     return headers;
   }
 

@@ -229,6 +229,19 @@ export class YouTubePlayService {
     return undefined;
   }
 
+  /**
+   * Drop every cached/in-flight prefetch. Required on playback-endpoint
+   * changes: prefetched stream URLs were extracted with the old client and
+   * must not be served by takePrefetched under the new one.
+   */
+  clearPrefetchCache(): void {
+    if (this.prefetchedResults.size > 0 || this.prefetchInFlight.size > 0) {
+      logger.info(`${TAG} prefetch cache cleared results=${this.prefetchedResults.size} inFlight=${this.prefetchInFlight.size}`);
+    }
+    this.prefetchedResults.clear();
+    this.prefetchInFlight.clear();
+  }
+
   async initialize(): Promise<void> {
     if (this.extractor) return;
     if (this.isInitializing) {

@@ -11,6 +11,7 @@ import {
 import { SabrMediaHeader } from './SabrMediaHeader';
 import { SabrMediaSegment } from './SabrMediaSegment';
 import { sabrReadFields, WIRE_LENGTH_DELIMITED, WIRE_VARINT } from './SabrProto';
+import { readProtoVarint } from '../../common/ProtoUtil';
 import { UmpPart, umpReadAll } from './UmpReader';
 
 export const PART_MEDIA_HEADER = 20;
@@ -59,6 +60,8 @@ export function sabrDecodeBody(data: Uint8Array): SabrDecodedResponse {
 export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
   const decoded = new SabrDecodedResponse();
   const open = new Map<number, OpenMediaAssembly>();
+  /** Bytes per headerId across ALL media parts (PipePipe mediaBytesByHeaderId). */
+  const mediaBytesByHeaderId = new Map<number, number>();
 
   for (const part of parts) {
     try {
@@ -73,6 +76,8 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
           if (part.data.length > 0) {
             const headerId = part.data[0];
             const media = part.data.subarray(1);
+            mediaBytesByHeaderId.set(headerId,
+              (mediaBytesByHeaderId.get(headerId) ?? 0) + media.length);
             const entry = open.get(headerId);
             if (entry) {
               entry.chunks.push(media);
@@ -154,7 +159,62 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
       logger.warn(`[SABR-DECODE] part=${part.type} decode-failed: ${msg}`);
     }
   }
+  decoded.integrityIssues = computeIntegrityIssues(
+    decoded.mediaHeaders, mediaBytesByHeaderId, decoded.mediaEndHeaderIds);
   return decoded;
+}
+
+/** PipePipe YoutubeSabrResponse.getIntegrityIssues. */
+function computeIntegrityIssues(
+  mediaHeaders: SabrMediaHeader[],
+  mediaBytesByHeaderId: Map<number, number>,
+  mediaEndHeaderIds: number[]
+): string[] {
+  const issues: string[] = [];
+  const headerIds: number[] = [];
+  for (const header of mediaHeaders) {
+    if (headerIds.indexOf(header.headerId) >= 0) {
+      issues.push(`duplicate-media-header:${header.headerId}`);
+    }
+    headerIds.push(header.headerId);
+    const bytes = mediaBytesByHeaderId.get(header.headerId);
+    if (bytes === undefined) {
+      issues.push(`missing-media:${header.headerId}`);
+    } else if (header.contentLength >= 0 && bytes !== header.contentLength) {
+      issues.push(`length-mismatch:${header.headerId}:expected=${header.contentLength}:actual=${bytes}`);
+    }
+    if (mediaEndHeaderIds.indexOf(header.headerId) < 0) {
+      issues.push(`missing-media-end:${header.headerId}`);
+    }
+  }
+  for (const id of mediaBytesByHeaderId.keys()) {
+    if (headerIds.indexOf(id) < 0) {
+      issues.push(`media-without-header:${id}`);
+    }
+  }
+  for (const id of mediaEndHeaderIds) {
+    if (headerIds.indexOf(id) < 0) {
+      issues.push(`media-end-without-header:${id}`);
+    }
+  }
+  return issues;
+}
+
+/** PipePipe isRecoverableIncompleteMediaResponse. */
+export function isRecoverableIntegrityIssues(issues: string[]): boolean {
+  if (issues.length === 0) {
+    return false;
+  }
+  for (const issue of issues) {
+    if (!issue.startsWith('length-mismatch:')
+      && !issue.startsWith('missing-media-end:')
+      && !issue.startsWith('missing-media:')
+      && !issue.startsWith('media-without-header:')
+      && !issue.startsWith('media-end-without-header:')) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function concatChunks(chunks: Uint8Array[]): Uint8Array {
@@ -270,17 +330,37 @@ function decodeContextUpdate(data: Uint8Array): SabrContextUpdate {
   return update;
 }
 
+/**
+ * PipePipe YoutubeSabrSession.ingestContextSendingPolicy: field 1 = activate,
+ * field 2 = deactivate, field 3 = dispose. Values may be single varints or
+ * packed varint lists (length-delimited).
+ */
 function decodeContextSendingPolicy(data: Uint8Array): SabrContextSendingPolicy {
   const policy = new SabrContextSendingPolicy();
   for (const field of sabrReadFields(data)) {
-    if (field.number === 1) {
-      policy.startTimeMs = field.varint;
-    } else if (field.number === 2) {
-      policy.durationMs = field.varint;
-    } else if (field.number === 3) {
-      policy.types.push(field.varint | 0);
-    } else if (field.number === 4) {
-      policy.disposeTypes.push(field.varint | 0);
+    let values: number[] = [];
+    if (field.wireType === WIRE_VARINT) {
+      values = [field.varint | 0];
+    } else if (field.wireType === WIRE_LENGTH_DELIMITED) {
+      const bytes = field.getBytes();
+      let offset = 0;
+      while (offset < bytes.length) {
+        const parsed = readProtoVarint(bytes, offset);
+        if (!parsed) {
+          break;
+        }
+        values.push(parsed.value | 0);
+        offset = parsed.next;
+      }
+    }
+    for (const value of values) {
+      if (field.number === 1) {
+        policy.activateTypes.push(value);
+      } else if (field.number === 2) {
+        policy.deactivateTypes.push(value);
+      } else if (field.number === 3) {
+        policy.disposeTypes.push(value);
+      }
     }
   }
   return policy;

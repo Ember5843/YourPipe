@@ -11,7 +11,8 @@ import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
 import { BackgroundTaskManager, AvPlayerController, LocalMediaProxy } from 'mediaservice';
 import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
-import { AuthSessionManager, YTCoreLogger, YoutubeJavaScriptPlayerManager } from 'youtube_core';
+import { AuthSessionManager, YTCoreLogger, YoutubeJavaScriptPlayerManager,
+  YoutubePlayerClientConfig } from 'youtube_core';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
@@ -75,8 +76,11 @@ export default class EntryAbility extends UIAbility {
       AppLogStore.init(logEnabled, this.context.filesDir);
       AuthSessionManager.init(this.context);
       AuthStateHelper.refresh();
-      // Stream client default (PipePipe reconcileYoutubePlayerClient): guest →
-      // visionos (token-free direct URLs), signed-in → tv_downgraded.
+      // Stream client per-state settings (Options → 播放端点): guest default
+      // visionos, signed-in default tv_downgraded; reconcile picks the
+      // configured client for the current auth state.
+      const pbConfig = AppStorage.get<PlaybackConfig>('playbackConfig') ?? new PlaybackConfig();
+      YoutubePlayerClientConfig.setConfiguredClients(pbConfig.guestPlayerClient, pbConfig.authPlayerClient);
       AuthStateHelper.reconcilePlaybackClient();
       // 注入 EnhancedLogger sink，覆盖所有 mediaservice 调用
       EnhancedLogger.setSink((level, tag, message) => {

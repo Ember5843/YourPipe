@@ -110,6 +110,12 @@ export class ClientsConstants {
   static readonly ANDROID_USER_AGENT: string =
     "com.google.android.youtube/21.03.36 (Linux; U; Android 16; GB) gzip";
 
+  /** PipePipe getAndroidUserAgent — country code is the request localization's. */
+  static androidUserAgent(countryCode: string = 'US'): string {
+    return "com.google.android.youtube/" + ClientsConstants.ANDROID_CLIENT_VERSION
+      + " (Linux; U; Android 15; " + countryCode + ") gzip";
+  }
+
   // =====================
   // VISIONOS (Apple Vision Pro) — PipePipe guest default stream client
   // =====================

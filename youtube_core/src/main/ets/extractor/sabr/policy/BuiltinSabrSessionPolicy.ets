@@ -31,6 +31,13 @@ export class BuiltinSabrSessionPolicy implements SabrSessionPolicy {
   /** Decisions for one POST response inside pumpOnceLocked. */
   private evaluatePump(decoded: SabrDecodedResponse, ctx: SabrPolicyContext): SabrControlAction[] {
     const actions: SabrControlAction[] = [];
+    // PipePipe handleControlResponse throws on SABR_ERROR unconditionally —
+    // a background free-pump must not swallow it into silent backoff.
+    // (reloadRequested stays fetch-phase only: our RELOAD_PLAYER recovery is
+    // in-session, and the pump policy runs on every fetch-path response too.)
+    if (decoded.sabrError) {
+      return [SabrControlAction.fail('protocol', `SABR error: ${decoded.sabrError}`)];
+    }
     if (decoded.redirectUrl && decoded.redirectUrl.length > 0) {
       if (ctx.redirectCount >= MAX_REDIRECTS) {
         actions.push(SabrControlAction.fail('redirect',
