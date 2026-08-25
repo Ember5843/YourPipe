@@ -131,7 +131,12 @@ export struct UserPage {
   }
 
   private fillChannelInfoList(videos: VideoItem[]): VideoItem[] {
-    return videos.map(video => this.fillChannelInfo(video));
+    // fillChannelInfo 重建 VideoItem 会丢构造参数之外的字段，补回发布时间。
+    return videos.map(video => {
+      const filled = this.fillChannelInfo(video);
+      filled.publishedTimeText = video.publishedTimeText;
+      return filled;
+    });
   }
 
   private isSubscribed(): boolean {

@@ -216,24 +216,67 @@ export struct VideoMediaCard {
   @Builder
   contextMenuBuilder() {
     Scroll() {
-      Menu() {
-        ForEach(this.getContextMenus(), (item: ContextMenuItem) => {
-          MenuItem({
-            symbolStartIcon: item.symbolStartIcon,
-            content: item.content
-          })
-            .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
-            .contentFontColor(item.contentColor ?? $r('sys.color.font_primary'))
-            .onClick(() => {
-              item.callback();
-            });
-        });
+      Column() {
+        // 条目信息区（不可点击）：作者 / 播放次数 / 发布时间，有则显示。
+        if (this.hasContextMenuInfo()) {
+          Column() {
+            if (this.video.author && this.video.author.length > 0) {
+              Text(this.video.author)
+                .fontSize(12)
+                .fontColor($r('app.color.yourtube_text_quaternary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .width('100%')
+            }
+            if (this.video.viewCount && this.video.viewCount.length > 0) {
+              Text(this.video.viewCount)
+                .fontSize(12)
+                .fontColor($r('app.color.yourtube_text_hint'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .width('100%')
+                .margin({ top: 2 })
+            }
+            if (this.getPublishTimeText().length > 0) {
+              Text(this.getPublishTimeText())
+                .fontSize(12)
+                .fontColor($r('app.color.yourtube_text_hint'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .width('100%')
+                .margin({ top: 2 })
+            }
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Start)
+          .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+
+          Divider()
+            .strokeWidth(0.5)
+            .color($r('sys.color.comp_divider'))
+        }
+
+        Menu() {
+          ForEach(this.getContextMenus(), (item: ContextMenuItem) => {
+            MenuItem({
+              symbolStartIcon: item.symbolStartIcon,
+              content: item.content
+            })
+              .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+              .contentFontColor(item.contentColor ?? $r('sys.color.font_primary'))
+              .onClick(() => {
+                item.callback();
+              });
+          });
+        }
+        .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+        .width('100%')
+        .height('auto')
       }
       .backgroundColor($r('app.color.yourtube_bg_surface'))
       .borderRadius(MEDIA_CARD_RADIUS)
-      .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+      .clip(true)
       .width(180)
-      .height('auto')
     }
     .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
     .edgeEffect(EdgeEffect.Spring);
@@ -274,16 +317,16 @@ export struct VideoMediaCard {
       .margin({ right: MEDIA_LIST_THUMB_GAP })
   }
 
-  /** Meta line: "观看次数 · 发布时间"，缺哪段显示哪段。 */
-  private getMetaInfoText(): string {
-    const parts: string[] = [];
-    if (this.video.viewCount && this.video.viewCount.length > 0) {
-      parts.push(this.video.viewCount);
-    }
-    if (this.video.publishedTimeText && this.video.publishedTimeText.length > 0) {
-      parts.push(this.video.publishedTimeText);
-    }
-    return parts.join(' · ');
+  /** 发布时间（有则非空）。仅在长按菜单信息区展示，卡片 meta 行保持只显示播放次数。 */
+  private getPublishTimeText(): string {
+    return this.video.publishedTimeText || '';
+  }
+
+  /** 长按菜单信息区是否有可显示内容。 */
+  private hasContextMenuInfo(): boolean {
+    return (this.video.author && this.video.author.length > 0)
+      || (this.video.viewCount && this.video.viewCount.length > 0)
+      || this.getPublishTimeText().length > 0;
   }
 
   /** Title / author / viewCount stacked — shared by list and grid. */
@@ -310,8 +353,8 @@ export struct VideoMediaCard {
           .margin({ bottom: 2 })
       }
 
-      if (this.showViewCount && this.getMetaInfoText().length > 0) {
-        Text(this.getMetaInfoText())
+      if (this.showViewCount && this.video.viewCount && this.video.viewCount.length > 0) {
+        Text(this.video.viewCount)
           .fontSize(MEDIA_META_SIZE)
           .fontColor($r('app.color.yourtube_text_hint'))
           .maxLines(1)
