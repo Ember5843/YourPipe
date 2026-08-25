@@ -152,9 +152,13 @@ export class AvPlayerController {
       };
     }
     // MPV's cache-speed is meaningless behind the loopback proxy (it reads
-    // locally); connection speed comes from proxy-metered inbound traffic.
+    // locally); there the connection speed comes from proxy-metered inbound
+    // traffic. Direct network sources (live HLS) never pass the proxy, so
+    // cache-speed is the real fetch speed and is used instead.
     const stats = this.playbackEngine.getPlaybackStats();
-    stats.networkSpeedBps = proxyTrafficMeter.getRateBps();
+    stats.networkSpeedBps = this.playbackEngine.isDirectNetworkSource()
+      ? stats.cacheSpeedBps
+      : proxyTrafficMeter.getRateBps();
     return stats;
   }
 

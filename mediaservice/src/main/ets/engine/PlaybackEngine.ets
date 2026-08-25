@@ -45,9 +45,11 @@ export interface PlaybackStats {
   /** Demuxer cache fill speed in bytes/sec; collapses to 0 once the loopback-fed cache is full. */
   cacheSpeedBps: number;
   /**
-   * Real network throughput in bytes/sec, metered at the local proxy's inbound
-   * side (`proxyTrafficMeter`). Optional because engine-level snapshots don't
-   * know proxy traffic; `AvPlayerController.getPlaybackStats()` always fills it.
+   * Real network throughput in bytes/sec. For proxy-fed sources it is metered
+   * at the local proxy's inbound side (`proxyTrafficMeter`); for direct network
+   * sources (live HLS handed straight to MPV) it mirrors mpv's `cache-speed`.
+   * Optional because engine-level snapshots don't know proxy traffic;
+   * `AvPlayerController.getPlaybackStats()` always fills it.
    */
   networkSpeedBps?: number;
   /** Buffered media duration ahead of the play position, in seconds. */
@@ -96,6 +98,13 @@ export interface PlaybackEngine {
   getState(): PlaybackState;
   getBandwidthEstimateBps(): number;
   getPlaybackStats(): PlaybackStats;
+  /**
+   * True when the loaded source is fetched directly from the network by the
+   * engine (e.g. live HLS) instead of through the loopback proxy. Stats
+   * consumers use this to pick the meaningful speed source: mpv `cache-speed`
+   * for direct sources, the proxy traffic meter for proxy-fed ones.
+   */
+  isDirectNetworkSource(): boolean;
 
   setStateCallback(cb: (state: PlaybackState) => void): void;
   setSubtitleCallback(cb: (text: string, startTime: number, duration: number) => void): void;

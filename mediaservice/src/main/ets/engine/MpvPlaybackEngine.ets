@@ -515,6 +515,15 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     };
   }
 
+  isDirectNetworkSource(): boolean {
+    // Loopback proxy sessions (single/dual/SABR: http://127.0.0.1:..., legacy
+    // EDL: edl://) are fed by the local proxy; everything else (live HLS
+    // manifests) is fetched by FFmpeg directly from the network.
+    if (this.sourceUrl.length === 0) return false;
+    return !this.sourceUrl.startsWith('http://127.0.0.1:')
+      && !this.sourceUrl.startsWith('edl://');
+  }
+
   private parseStatsNumber(raw: string): number {
     const value: number = Number(raw);
     return isNaN(value) ? 0 : value;
