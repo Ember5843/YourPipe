@@ -767,6 +767,8 @@ export interface CompactVideoRenderer {
   thumbnail?: ThumbnailDataWrapper;
   lengthText?: NextResponseText;
   viewCountText?: NextResponseText;
+  shortViewCountText?: NextResponseText;
+  publishedTimeText?: NextResponseText;
   badges?: Array<BadgeItem>;
   channelId?: string;
   ownerText?: NextResponseText;

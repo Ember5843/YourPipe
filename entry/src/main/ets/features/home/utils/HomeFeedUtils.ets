@@ -5,15 +5,18 @@ import { getContinuationToken } from './ContinuationUtils';
 import {
   getLockupChannelAvatarUrl,
   getLockupChannelId,
+  getLockupDurationText,
   getLockupIsLive,
   getLockupIsPremium,
   getLockupPublishedTimeText,
   getLockupRequiresMembership,
   getLockupTitle,
   getLockupUploaderName,
+  getLockupUploaderVerified,
   getLockupVideoId,
   getLockupVideoThumbnailUrl,
-  getLockupViewCount
+  getLockupViewCount,
+  getLockupViewCountExact
 } from './LockupViewModelParser';
 import {
   buildVideoItemFromReelRenderer,
@@ -246,6 +249,9 @@ export function buildHomeKioskVideoItems(
             channelId, channelAvatarUrl, "", "", null, isPremium, requiresMembership
           );
           item.publishedTimeText = getLockupPublishedTimeText(lockupInRich);
+          item.durationText = getLockupDurationText(lockupInRich);
+          item.viewCountExact = getLockupViewCountExact(lockupInRich);
+          item.uploaderVerified = getLockupUploaderVerified(lockupInRich);
           items.push(item);
           idCounter += 1;
           return;
@@ -351,6 +357,9 @@ export function buildHomeKioskVideoItems(
           channelId, channelAvatarUrl, "", "", null, isPremium, requiresMembership
         );
         item.publishedTimeText = getLockupPublishedTimeText(lockup);
+        item.durationText = getLockupDurationText(lockup);
+        item.viewCountExact = getLockupViewCountExact(lockup);
+        item.uploaderVerified = getLockupUploaderVerified(lockup);
         items.push(item);
         idCounter += 1;
         return;

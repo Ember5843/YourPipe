@@ -16,6 +16,10 @@ interface FeedEntry {
   author: string;
   thumbnailUrl: string;
   publishedMs: number;
+  /** ISO 日期文本（YYYY-MM-DD），RSS 的 published 是精确日期（PipePipe YoutubeFeedInfoItemExtractor） */
+  publishedText: string;
+  /** media:statistics 的精确播放数（千分位文本），无则空串 */
+  viewCountExact: string;
 }
 
 export type FeedRefreshSource = 'official' | 'channels' | 'none';
@@ -95,7 +99,10 @@ export class SubscriptionFeedService {
           thumbnailUrl: v.thumbnailUrl || '',
           viewCountText: v.viewCount || '',
           isLive: v.isLive,
-          uploadDateMs: 0,
+          publishedTimeText: v.publishedTimeText || '',
+          durationText: v.durationText || '',
+          viewCountExact: v.viewCountExact || '',
+          uploadDateMs: RelativeTimeParser.parse(v.publishedTimeText, now),
           firstSeenMs: now
         };
         const bucket = byChannel[channelId] ?? [];
@@ -177,12 +184,15 @@ export class SubscriptionFeedService {
         thumbnailUrl: v.thumbnailUrl || '',
         viewCountText: v.viewCount || '',
         isLive: v.isLive,
+        publishedTimeText: v.publishedTimeText || '',
+        durationText: v.durationText || '',
+        viewCountExact: v.viewCountExact || '',
         uploadDateMs: RelativeTimeParser.parse(v.publishedTimeText, now),
         firstSeenMs: now
       }));
   }
 
-  /** RSS（快速模式）：轻量，带精确 published 日期，但无时长/观看数 */
+  /** RSS（快速模式）：轻量，带精确 published 日期与 media:statistics 精确播放数，但无时长 */
   private async fetchChannelItemsViaRss(sub: SubscriptionUser): Promise<SubscriptionFeedItem[]> {
     const entries = await this.fetchChannelFeed(sub);
     const now = Date.now();
@@ -197,6 +207,9 @@ export class SubscriptionFeedService {
         thumbnailUrl: entry.thumbnailUrl,
         viewCountText: '',
         isLive: false,
+        publishedTimeText: entry.publishedText,
+        durationText: '',
+        viewCountExact: entry.viewCountExact,
         uploadDateMs: entry.publishedMs,
         firstSeenMs: now
       }));
@@ -228,6 +241,8 @@ export class SubscriptionFeedService {
             '',
             ''
           );
+          item.publishedTimeText = entry.publishedText;
+          item.viewCountExact = entry.viewCountExact;
           return item;
         });
       } catch (err) {
@@ -253,7 +268,7 @@ export class SubscriptionFeedService {
     let idCounter = 1;
     return entries.map((entry) => {
       const itemId = idCounter++;
-      return new VideoItem(
+      const item = new VideoItem(
         itemId,
         entry.videoId,
         entry.title,
@@ -267,6 +282,9 @@ export class SubscriptionFeedService {
         '',
         ''
       );
+      item.publishedTimeText = entry.publishedText;
+      item.viewCountExact = entry.viewCountExact;
+      return item;
     });
   }
 
@@ -279,7 +297,7 @@ export class SubscriptionFeedService {
     let idCounter = 1;
     return entries.map((entry) => {
       const itemId = idCounter++;
-      return new VideoItem(
+      const item = new VideoItem(
         itemId,
         entry.videoId,
         entry.title,
@@ -293,6 +311,9 @@ export class SubscriptionFeedService {
         '',
         ''
       );
+      item.publishedTimeText = entry.publishedText;
+      item.viewCountExact = entry.viewCountExact;
+      return item;
     });
   }
 
@@ -321,8 +342,12 @@ export class SubscriptionFeedService {
       const title = this.decodeXml(this.matchTag(entryText, 'title') || 'Untitled');
       const author = this.decodeXml(this.matchTag(entryText, 'name') || fallbackAuthor);
       const thumbnailUrl = this.matchThumbnail(entryText);
-      const publishedMs = this.matchPublishedMs(entryText);
-      entries.push({ videoId, title, author, thumbnailUrl, publishedMs });
+      const publishedRaw = this.matchTag(entryText, 'published') || this.matchTag(entryText, 'updated');
+      const parsedMs = Date.parse(publishedRaw);
+      const publishedMs = Number.isFinite(parsedMs) ? parsedMs : 0;
+      const publishedText = publishedRaw.length >= 10 ? publishedRaw.substring(0, 10) : '';
+      const viewCountExact = this.matchViewCount(entryText);
+      entries.push({ videoId, title, author, thumbnailUrl, publishedMs, publishedText, viewCountExact });
     }
     return entries;
   }
@@ -333,13 +358,13 @@ export class SubscriptionFeedService {
     return match ? match[1] : '';
   }
 
-  private matchPublishedMs(text: string): number {
-    const raw = this.matchTag(text, 'published') || this.matchTag(text, 'updated');
-    if (!raw) {
-      return 0;
+  /** media:statistics 的精确播放数 → 千分位文本（PipePipe YoutubeFeedInfoItemExtractor.getViewCount）。 */
+  private matchViewCount(text: string): string {
+    const match = /<media:statistics[^>]*views="(\d+)"/i.exec(text);
+    if (!match) {
+      return '';
     }
-    const ms = Date.parse(raw);
-    return Number.isFinite(ms) ? ms : 0;
+    return match[1].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
   private matchThumbnail(text: string): string {

@@ -10,6 +10,9 @@ import {
   getLockupIsLive,
   getLockupIsPremium,
   getLockupPublishedTimeText,
+  getLockupDurationText,
+  getLockupUploaderVerified,
+  getLockupViewCountExact,
   getLockupRequiresMembership,
   getLockupTitle,
   getLockupUploaderName,
@@ -347,6 +350,9 @@ export class PlaylistService {
       requiresMembership
     );
     item.publishedTimeText = getLockupPublishedTimeText(lockup);
+    item.durationText = getLockupDurationText(lockup);
+    item.viewCountExact = getLockupViewCountExact(lockup);
+    item.uploaderVerified = getLockupUploaderVerified(lockup);
     return item;
   }
 

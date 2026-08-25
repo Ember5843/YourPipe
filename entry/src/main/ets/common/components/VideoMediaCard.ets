@@ -217,19 +217,37 @@ export struct VideoMediaCard {
   contextMenuBuilder() {
     Scroll() {
       Column() {
-        // 条目信息区（不可点击）：作者 / 播放次数 / 发布时间，有则显示。
+        // 条目信息区（不可点击）：标题/作者(+认证)/播放数(精确优先)/发布时间/时长/视频ID/标记。
         if (this.hasContextMenuInfo()) {
           Column() {
+            Text(this.video.title)
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.yourtube_text_primary'))
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+
             if (this.video.author && this.video.author.length > 0) {
-              Text(this.video.author)
-                .fontSize(12)
-                .fontColor($r('app.color.yourtube_text_quaternary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .width('100%')
+              Row({ space: 4 }) {
+                Text(this.video.author)
+                  .fontSize(12)
+                  .fontColor($r('app.color.yourtube_text_quaternary'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .flexShrink(1)
+                if (this.video.uploaderVerified) {
+                  SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+                    .fontSize(12)
+                    .fontColor([$r('app.color.yourtube_text_quaternary')])
+                }
+              }
+              .width('100%')
+              .margin({ top: 4 })
             }
-            if (this.video.viewCount && this.video.viewCount.length > 0) {
-              Text(this.video.viewCount)
+
+            if (this.getDisplayViewCount().length > 0) {
+              Text(this.getDisplayViewCount())
                 .fontSize(12)
                 .fontColor($r('app.color.yourtube_text_hint'))
                 .maxLines(1)
@@ -245,6 +263,39 @@ export struct VideoMediaCard {
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .width('100%')
                 .margin({ top: 2 })
+            }
+            if (this.video.durationText && this.video.durationText.length > 0) {
+              Text(this.video.durationText)
+                .fontSize(12)
+                .fontColor($r('app.color.yourtube_text_hint'))
+                .maxLines(1)
+                .width('100%')
+                .margin({ top: 2 })
+            }
+            if (this.getVideoId().length > 0) {
+              Text(`ID: ${this.getVideoId()}`)
+                .fontSize(11)
+                .fontColor($r('app.color.yourtube_text_hint'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .width('100%')
+                .margin({ top: 2 })
+            }
+
+            if (this.hasTypeBadges()) {
+              Row({ space: 6 }) {
+                if (this.video.isLive) {
+                  this.InfoBadge($r('app.string.yt_label_live'))
+                }
+                if (this.video.isPremium) {
+                  this.InfoBadge($r('app.string.yt_label_premium'))
+                }
+                if (this.video.requiresMembership) {
+                  this.InfoBadge($r('app.string.yt_label_members_only'))
+                }
+              }
+              .width('100%')
+              .margin({ top: 6 })
             }
           }
           .width('100%')
@@ -276,7 +327,7 @@ export struct VideoMediaCard {
       .backgroundColor($r('app.color.yourtube_bg_surface'))
       .borderRadius(MEDIA_CARD_RADIUS)
       .clip(true)
-      .width(180)
+      .width(220)
     }
     .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
     .edgeEffect(EdgeEffect.Spring);
@@ -324,9 +375,34 @@ export struct VideoMediaCard {
 
   /** 长按菜单信息区是否有可显示内容。 */
   private hasContextMenuInfo(): boolean {
-    return (this.video.author && this.video.author.length > 0)
-      || (this.video.viewCount && this.video.viewCount.length > 0)
-      || this.getPublishTimeText().length > 0;
+    return (this.video.title && this.video.title.length > 0)
+      || (this.video.author && this.video.author.length > 0)
+      || this.getDisplayViewCount().length > 0
+      || this.getPublishTimeText().length > 0
+      || (this.video.durationText && this.video.durationText.length > 0)
+      || this.getVideoId().length > 0;
+  }
+
+  /** 播放数展示：精确文本（accessibilityLabel / RSS）优先，其次缩写文本。 */
+  private getDisplayViewCount(): string {
+    if (this.video.viewCountExact && this.video.viewCountExact.length > 0) {
+      return this.video.viewCountExact;
+    }
+    return this.video.viewCount || '';
+  }
+
+  private hasTypeBadges(): boolean {
+    return this.video.isLive || this.video.isPremium || this.video.requiresMembership;
+  }
+
+  /** 信息区小标记 chip（直播/付费/会员）。 */
+  @Builder
+  InfoBadge(label: Resource) {
+    Text(label)
+      .fontSize(10)
+      .fontColor(this.themePrimary)
+      .padding({ left: 6, right: 6, top: 1, bottom: 1 })
+      .border({ width: 1, color: this.themePrimary, radius: 4 })
   }
 
   /** Title / author / viewCount stacked — shared by list and grid. */

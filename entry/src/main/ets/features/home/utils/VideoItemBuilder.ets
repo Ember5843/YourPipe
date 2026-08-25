@@ -48,7 +48,86 @@ export function buildVideoItemFromRenderer(
   const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, id);
   const item = new VideoItem(id, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor, channelId, "", "", "", null, isPremium, requiresMembership);
   item.publishedTimeText = getPublishedTimeText(renderer);
+  item.durationText = getDurationTextFromRenderer(renderer);
+  item.viewCountExact = getViewCountExactFromRenderer(renderer);
+  item.uploaderVerified = getUploaderVerifiedFromRenderer(renderer);
+  item.channelHandle = getChannelHandleFromRenderer(renderer);
   return item;
+}
+
+/** lengthText 直取；退化到 thumbnailOverlayTimeStatusRenderer.text（gridVideoRenderer 等无 lengthText 的变体）。 */
+function getDurationTextFromRenderer(renderer: Record<string, Object>): string {
+  const direct = getTextFromRuns(renderer["lengthText"]);
+  if (direct) {
+    return direct;
+  }
+  const overlays = renderer["thumbnailOverlays"] as Array<Record<string, Object>>;
+  if (!overlays) {
+    return "";
+  }
+  for (let i = 0; i < overlays.length; i++) {
+    const status = overlays[i]
+      ? (overlays[i]["thumbnailOverlayTimeStatusRenderer"] as Record<string, Object>)
+      : undefined;
+    const text = status ? getTextFromRuns(status["text"] as Record<string, Object>) : "";
+    if (text.indexOf(":") >= 0) {
+      return text;
+    }
+  }
+  return "";
+}
+
+/** viewCountText 的 accessibility label 常带精确数字（如 "10,493,211 views"）。 */
+function getViewCountExactFromRenderer(renderer: Record<string, Object>): string {
+  const vct = renderer["viewCountText"] as Record<string, Object>;
+  const acc = vct ? (vct["accessibility"] as Record<string, Object>) : undefined;
+  const data = acc ? (acc["accessibilityData"] as Record<string, Object>) : undefined;
+  const label = data ? ((data["label"] as string) || "") : "";
+  return /\d/.test(label) ? label : "";
+}
+
+/** ownerBadges 的官方认证/音乐人徽章（PipePipe isVerified 同款判定）。 */
+function getUploaderVerifiedFromRenderer(renderer: Record<string, Object>): boolean {
+  const badges = renderer["ownerBadges"] as Array<Record<string, Object>>;
+  if (!badges) {
+    return false;
+  }
+  for (let i = 0; i < badges.length; i++) {
+    const mbr = badges[i] ? (badges[i]["metadataBadgeRenderer"] as Record<string, Object>) : undefined;
+    const style = mbr ? (((mbr["style"] as string) || "").toUpperCase()) : "";
+    if (style === "BADGE_STYLE_TYPE_VERIFIED" || style === "BADGE_STYLE_TYPE_VERIFIED_ARTIST") {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** byline runs 的 canonicalBaseUrl（"/@handle"）→ "@handle"。 */
+function getChannelHandleFromRenderer(renderer: Record<string, Object>): string {
+  const candidates: Array<Record<string, Object> | undefined> = [
+    renderer["ownerText"] as Record<string, Object>,
+    renderer["longBylineText"] as Record<string, Object>,
+    renderer["shortBylineText"] as Record<string, Object>
+  ];
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    if (!candidate) {
+      continue;
+    }
+    const runs = candidate["runs"] as Array<Record<string, Object>>;
+    if (!runs) {
+      continue;
+    }
+    for (let j = 0; j < runs.length; j++) {
+      const nav = runs[j] ? (runs[j]["navigationEndpoint"] as Record<string, Object>) : undefined;
+      const browse = nav ? (nav["browseEndpoint"] as Record<string, Object>) : undefined;
+      const canonical = browse ? ((browse["canonicalBaseUrl"] as string) || "") : "";
+      if (canonical.startsWith("/@")) {
+        return canonical.substring(1);
+      }
+    }
+  }
+  return "";
 }
 
 /** publishedTimeText 直取；lockup 布局退化为在 metadata 行里找能解析为相对时间的文本。 */

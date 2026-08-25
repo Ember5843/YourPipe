@@ -32,6 +32,17 @@ function getFallbackThumbnailUrl(videoId: string): string {
   return videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : '';
 }
 
+/** 秒 → "h:mm:ss" / "m:ss" 时长文本（播放队列卡片角标/信息区用） */
+function formatSecondsAsDuration(sec: number): string {
+  const total = Math.max(0, Math.floor(sec));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = m.toString().padStart(2, '0');
+  const ss = s.toString().padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
 export class PlayerSession {
   private static instance: PlayerSession | null = null;
 
@@ -897,11 +908,18 @@ export class PlayerSession {
 
       const relatedItems = extras.relatedItems;
       if (relatedItems && relatedItems.length > 0) {
-        const videoItems: VideoItem[] = relatedItems.map((r) => new VideoItem(
-          0, r.videoId, r.title, r.author, '',
-          normalizeUrl(r.thumbnailUrl || getFallbackThumbnailUrl(r.videoId)), !!r.isLive, '#CCCCCC',
-          r.channelId || '', '', '', '', null
-        ));
+        const videoItems: VideoItem[] = relatedItems.map((r) => {
+          const v = new VideoItem(
+            0, r.videoId, r.title, r.author, r.viewCountText || '',
+            normalizeUrl(r.thumbnailUrl || getFallbackThumbnailUrl(r.videoId)), !!r.isLive, '#CCCCCC',
+            r.channelId || '', '', '', '', null
+          );
+          v.publishedTimeText = r.publishedTimeText || '';
+          v.durationText = r.lengthSeconds && r.lengthSeconds > 0
+            ? formatSecondsAsDuration(r.lengthSeconds)
+            : '';
+          return v;
+        });
         PlayQueueManager.getInstance().setAutoQueueCandidates(videoItems);
       }
     }).catch((e: Error) => {

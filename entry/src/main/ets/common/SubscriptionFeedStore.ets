@@ -15,6 +15,12 @@ export interface SubscriptionFeedItem {
   thumbnailUrl: string;
   viewCountText: string;
   isLive: boolean;
+  /** 发布时间的本地化相对文本（browse 路径）或 ISO 日期（RSS 路径）；无则空串 */
+  publishedTimeText: string;
+  /** 时长文本（browse 路径的 overlay badge）；RSS 无，空串 */
+  durationText: string;
+  /** 精确播放数文本（lockup accessibilityLabel / RSS media:statistics）；无则空串 */
+  viewCountExact: string;
   /** 精确发布时间（ms），0 = 未知（browse/官方 feed 路径无时间戳） */
   uploadDateMs: number;
   /** 首次进入缓存的时间（ms），未知发布时间的排序兜底 */
@@ -113,7 +119,7 @@ export class SubscriptionFeedStore {
   }
 
   static toVideoItem(item: SubscriptionFeedItem): VideoItem {
-    return new VideoItem(
+    const video = new VideoItem(
       SubscriptionFeedStore.stableId(item.videoId),
       item.videoId,
       item.title,
@@ -127,6 +133,10 @@ export class SubscriptionFeedStore {
       '',
       ''
     );
+    video.publishedTimeText = item.publishedTimeText || '';
+    video.durationText = item.durationText || '';
+    video.viewCountExact = item.viewCountExact || '';
+    return video;
   }
 
   /** 已排序条目直接转 VideoItem 列表（卡片渲染用） */

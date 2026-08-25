@@ -251,13 +251,13 @@ export function getLockupChannelAvatarUrl(lockup: Record<string, Object>): strin
   return "";
 }
 
-/** Duration seconds from thumbnail overlay badges (e.g. "12:34"). */
-export function getLockupDurationSec(lockup: Record<string, Object>): number {
+/** Duration text from thumbnail overlay badges (e.g. "12:34"); "" for live/upcoming. */
+export function getLockupDurationText(lockup: Record<string, Object>): string {
   const ci = lockup["contentImage"] as Record<string, Object>;
   const tvm = ci ? (ci["thumbnailViewModel"] as Record<string, Object>) : undefined;
   const overlays = tvm ? (tvm["overlays"] as Array<Record<string, Object>>) : undefined;
   if (!overlays) {
-    return 0;
+    return "";
   }
   for (let i = 0; i < overlays.length; i++) {
     const overlay = overlays[i];
@@ -269,13 +269,79 @@ export function getLockupDurationSec(lockup: Record<string, Object>): number {
     for (let b = 0; b < badges.length; b++) {
       const bvm = badges[b] ? (badges[b]["thumbnailBadgeViewModel"] as Record<string, Object>) : undefined;
       const text = bvm ? ((bvm["text"] as string) || "") : "";
-      const sec = parseDurationBadge(text);
-      if (sec > 0) {
-        return sec;
+      if (parseDurationBadge(text) > 0) {
+        return text;
       }
     }
   }
-  return 0;
+  return "";
+}
+
+/** Duration seconds from thumbnail overlay badges (e.g. "12:34"). */
+export function getLockupDurationSec(lockup: Record<string, Object>): number {
+  return parseDurationBadge(getLockupDurationText(lockup));
+}
+
+/**
+ * Exact view count text (e.g. "10,493,211 views") from the view-count part's
+ * accessibilityLabel — the visible text is abbreviated, the a11y label is not
+ * (PipePipe YoutubeLockupStreamInfoItemExtractor.parseViewCountText).
+ */
+export function getLockupViewCountExact(lockup: Record<string, Object>): string {
+  const rows = getLockupMetadataRows(lockup);
+  if (!rows) {
+    return "";
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const parts = rows[i] ? (rows[i]["metadataParts"] as Array<Record<string, Object>>) : undefined;
+    if (!parts) {
+      continue;
+    }
+    for (let j = 0; j < parts.length; j++) {
+      const part = parts[j];
+      const label = part ? ((part["accessibilityLabel"] as string) || "") : "";
+      if (label.length > 0 && /\d/.test(label) && isViewCountText(label)) {
+        return label;
+      }
+    }
+  }
+  return "";
+}
+
+/**
+ * Verified / official-artist badge on the uploader metadata part, carried by
+ * text.attachmentRuns icon names (PipePipe hasArtistOrVerifiedIconBadgeAttachment).
+ */
+export function getLockupUploaderVerified(lockup: Record<string, Object>): boolean {
+  const rows = getLockupMetadataRows(lockup);
+  if (!rows) {
+    return false;
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const parts = rows[i] ? (rows[i]["metadataParts"] as Array<Record<string, Object>>) : undefined;
+    if (!parts) {
+      continue;
+    }
+    for (let j = 0; j < parts.length; j++) {
+      const part = parts[j];
+      if (!part || !isUploaderCandidateText(getPartTextContent(part))) {
+        continue;
+      }
+      const text = part["text"] as Record<string, Object>;
+      const attachmentRuns = text
+        ? (text["attachmentRuns"] as Array<Record<string, Object>>)
+        : undefined;
+      if (!attachmentRuns || attachmentRuns.length === 0) {
+        continue;
+      }
+      // attachmentRuns 结构较深且版本漂移大，序列化后按图标名匹配最稳。
+      const blob = JSON.stringify(attachmentRuns).toUpperCase();
+      if (blob.indexOf("CHECK") >= 0 || blob.indexOf("MUSIC_NOTE") >= 0 || blob.indexOf("VERIFIED") >= 0) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function parseDurationBadge(text: string): number {

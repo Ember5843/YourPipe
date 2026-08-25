@@ -12,6 +12,10 @@ export class RelatedVideoInfo {
   thumbnailUrl?: string;
   lengthSeconds?: number;
   viewCount?: number;
+  /** 播放数原始文本（如 "1,234,567 views" / 缩写），卡片展示用 */
+  viewCountText?: string;
+  /** 相对发布时间文本（compactVideoRenderer.publishedTimeText） */
+  publishedTimeText?: string;
   isLive?: boolean;
 
   constructor(videoId: string, title: string, author: string) {

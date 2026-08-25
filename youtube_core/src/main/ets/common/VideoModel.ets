@@ -16,6 +16,12 @@ export class VideoItem {
   videoDescriptionError: string | null;
   /** 发布时间的本地化相对文本（如 "3 days ago" / "3 天前"），由 entry 侧解析；无则空串 */
   publishedTimeText: string = '';
+  /** 时长文本（如 "12:34"），列表条目解析；直播/未知为空串 */
+  durationText: string = '';
+  /** 精确播放次数文本（如 "10,493,211 views"），来自 accessibilityLabel 等；无则空串 */
+  viewCountExact: string = '';
+  /** 频道是否带官方认证徽章 */
+  uploaderVerified: boolean = false;
 
   constructor(
     id: number,

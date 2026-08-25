@@ -2351,6 +2351,21 @@ export class YouTubeExtractor implements CommentsBackend {
     if (lenText) {
       item.lengthSeconds = parseDurationText(lenText);
     }
+    const viewText = this.extractNextText(r.viewCountText) || this.extractNextText(r.shortViewCountText);
+    if (viewText) {
+      item.viewCountText = viewText;
+      // 精确文本（含千分位）直接取数字；缩写（1.2M / 1049万）只作近似，不强转
+      if (!/[kmbKMB万亿億]/.test(viewText)) {
+        const digits = viewText.replace(/[^\d]/g, '');
+        if (digits) {
+          item.viewCount = Number(digits);
+        }
+      }
+    }
+    const published = this.extractNextText(r.publishedTimeText);
+    if (published) {
+      item.publishedTimeText = published;
+    }
     const badges = r.badges || [];
     item.isLive = badges.some(b => b.metadataBadgeRenderer?.label?.toLowerCase() === 'live');
     return item;

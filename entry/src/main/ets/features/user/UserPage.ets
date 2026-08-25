@@ -135,6 +135,9 @@ export struct UserPage {
     return videos.map(video => {
       const filled = this.fillChannelInfo(video);
       filled.publishedTimeText = video.publishedTimeText;
+      filled.durationText = video.durationText;
+      filled.viewCountExact = video.viewCountExact;
+      filled.uploaderVerified = video.uploaderVerified;
       return filled;
     });
   }

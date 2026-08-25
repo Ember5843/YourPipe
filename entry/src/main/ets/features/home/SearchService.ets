@@ -1,6 +1,6 @@
 import { SearchChannelItem, SearchInfoItem, SearchPageResult, SearchPlaylistItem, SearchStreamItem, VideoItem } from 'youtube_core';
 import { ContentCountry, Localization, fetchSearchContinuation, fetchSearchPage } from 'youtube_core';
-import { getLockupChannelId, getLockupPlaylistCoverUrl, getLockupPlaylistId, getLockupPublishedTimeText, getLockupTitle, getLockupUploaderName, getLockupVideoId, getLockupVideoThumbnailUrl } from './utils/LockupViewModelParser';
+import { getLockupChannelId, getLockupDurationText, getLockupPlaylistCoverUrl, getLockupPlaylistId, getLockupPublishedTimeText, getLockupTitle, getLockupUploaderName, getLockupUploaderVerified, getLockupVideoId, getLockupVideoThumbnailUrl, getLockupViewCount, getLockupViewCountExact } from './utils/LockupViewModelParser';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
 import { getTextFromRuns } from './utils/TextUtils';
 import { getThumbnailUrlFromThumbnailObject, pickBestThumbUrl } from './utils/ThumbnailUtils';
@@ -215,19 +215,12 @@ export class SearchService {
 
       const video = entry["videoRenderer"] as Record<string, Object>;
       if (video) {
-        const videoId = (video["videoId"] as string) || "";
-        const title = getTextFromRuns(video["title"]) || "Untitled";
-        const author = getTextFromRuns(video["ownerText"]) ||
-          getTextFromRuns(video["longBylineText"]) ||
-          "Unknown";
-        const viewCount = getTextFromRuns(video["viewCountText"]) || "";
-        const isLive = this.hasLiveBadge(video);
-        const thumbnailUrl = getThumbnailUrlFromThumbnailObject(video["thumbnail"] as Record<string, Object>);
-        const channelId = this.getChannelId(video);
-        const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, idCounter);
-        items.push(new VideoItem(idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive,
-          placeholderColor, channelId, "", "", ""));
-        idCounter += 1;
+        // 与混合搜索同走 builder，补齐 publishedTimeText/时长/精确播放数/认证等字段。
+        const videoItem = buildVideoItemFromRenderer(video, idCounter, '');
+        if (videoItem) {
+          items.push(videoItem);
+          idCounter += 1;
+        }
       }
     });
     return items;
@@ -303,8 +296,11 @@ export class SearchService {
           const thumbnailUrl = getLockupVideoThumbnailUrl(lockup);
           const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, idCounter);
           const channelId = getLockupChannelId(lockup);
-          const videoItem = new VideoItem(idCounter, videoId, title, author, "", thumbnailUrl, false, placeholderColor, channelId, "", "", "");
+          const videoItem = new VideoItem(idCounter, videoId, title, author, getLockupViewCount(lockup), thumbnailUrl, false, placeholderColor, channelId, "", "", "");
           videoItem.publishedTimeText = getLockupPublishedTimeText(lockup);
+          videoItem.durationText = getLockupDurationText(lockup);
+          videoItem.viewCountExact = getLockupViewCountExact(lockup);
+          videoItem.uploaderVerified = getLockupUploaderVerified(lockup);
           items.push(new SearchStreamItem(videoItem.id, videoItem));
           idCounter += 1;
           return;
