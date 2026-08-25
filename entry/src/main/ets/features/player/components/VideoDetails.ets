@@ -367,6 +367,11 @@ export struct VideoDetails {
     this.isTitleExpanded = false;
     this.resetForCurrentItem();
     this.classifyStreamsForDownload();
+    // 自动连播切到下一集时清掉旧视频的统计曲线，避免新旧样本混在同一图表里。
+    this.statsSpeedSamples = [];
+    this.statsBufferSamples = [];
+    this.statsDropped = 0;
+    this.statsDecoderDropped = 0;
   }
 
   private onChannelIdentityChanged(): void {
