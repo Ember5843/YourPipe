@@ -3,17 +3,13 @@ import { util } from '@kit.ArkTS';
 import { sessionStore, DashSession } from './SessionStore';
 import { parseInputJson } from './InputParser';
 import { serveRange } from './RangeProxy';
-import { serveSabrRange } from '../sabr/SabrProxyServe';
+import { encodeUtf8 } from './ProxyEncoding';
 import { buildSabrDashManifest, serveSabrDashSegment } from '../sabr/SabrDashProxy';
 import { buildYoutubeDashManifest } from './YoutubeDashManifest';
 import { sabrSessionStore } from '../sabr/SabrSessionStore';
 import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][Server]';
-
-function encodeText(s: string): ArrayBuffer {
-  return new util.TextEncoder().encode(s).buffer as ArrayBuffer;
-}
 
 interface ParsedRequest {
   method: string;
@@ -46,7 +42,7 @@ function splitPath(path: string): string[] {
 
 async function sendText(conn: socket.TCPSocketConnection, status: number, statusText: string, contentType: string, body: string): Promise<void> {
   const hdr = `HTTP/1.1 ${status} ${statusText}\r\nContent-Type: ${contentType}\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`;
-  await conn.send({ data: encodeText(hdr + body) });
+  await conn.send({ data: encodeUtf8(hdr + body) });
 }
 
 async function handleConnection(conn: socket.TCPSocketConnection): Promise<void> {
@@ -139,24 +135,6 @@ async function routeRequest(
     if (track === 'audio' && session.sabrAudioBuffer) {
       await serveSabrDashSegment(conn, session.sabrAudioBuffer, segmentName,
         session.audio.mimeType || 'audio/mp4', method === 'HEAD');
-      return;
-    }
-  }
-
-  // DORMANT: sabr-dual 的 progressive-range 端点（/session/{id}/video|audio/{idx}）
-  // 当前不可达——sabr-dual 的 playbackUrl 固定返回 manifest.mpd，DASH manifest 的
-  // BaseURL 为 sabr/{kind}/（走上方 sabr 分支），全仓无代码生成 /video/{idx} 形式 URL。
-  // 启用条件：若未来需要让 MPV 以 progressive 方式直连 SABR 轨道（绕过 DASH demuxer）。
-  if (session.type === 'sabr-dual' && parts.length >= 4) {
-    const idx = parseInt(parts[3], 10) || 0;
-    if (segment === 'video' && session.sabrVideoBuffer) {
-      const mime = session.videos[idx]?.mimeType || session.video.mimeType || 'video/mp4';
-      await serveSabrRange(conn, session.sabrVideoBuffer, rangeHeader, mime);
-      return;
-    }
-    if (segment === 'audio' && session.sabrAudioBuffer) {
-      const mime = session.audios[idx]?.mimeType || session.audio.mimeType || 'audio/mp4';
-      await serveSabrRange(conn, session.sabrAudioBuffer, rangeHeader, mime);
       return;
     }
   }

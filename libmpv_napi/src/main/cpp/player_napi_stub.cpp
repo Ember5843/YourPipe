@@ -95,25 +95,7 @@ void SetNamedBool(napi_env env, napi_value obj, const char* name, bool v)
     napi_set_named_property(env, obj, name, val);
 }
 
-void EnsurePlayerId(const string& id)
-{
-    if (id.empty()) {
-        return;
-    }
-    const scoped_lock lock(gMutex);
-    gPlayers[id] = 1;
-}
-
 // ---- NAPI stubs ----
-
-napi_value EnsurePlayer(napi_env env, napi_callback_info info)
-{
-    size_t argc = 1;
-    napi_value args[1];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    EnsurePlayerId(ToString(env, args[0]));
-    return Undefined(env);
-}
 
 napi_value ReleasePlayer(napi_env env, napi_callback_info info)
 {
@@ -183,11 +165,6 @@ napi_value GetMediaInfo(napi_env env, napi_callback_info /*info*/)
     return info;
 }
 
-napi_value FfmpegVersion(napi_env env, napi_callback_info /*info*/)
-{
-    return MakeString(env, "stub-x86_64");
-}
-
 // No-op on the stub: keeps the TS binding resolvable on x86_64 emulators.
 napi_value SetHttpProxyEnv(napi_env env, napi_callback_info /*info*/)
 {
@@ -230,14 +207,12 @@ napi_value Init(napi_env env, napi_value exports)
     }
 
     napi_property_descriptor descriptors[] = {
-        {"ensurePlayer", nullptr, EnsurePlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"releasePlayer", nullptr, ReleasePlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setMedia", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"play", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"pause", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"stop", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"prepare", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"seek", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"seekWithFlags", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setPlaybackRate", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVolume", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -251,7 +226,6 @@ napi_value Init(napi_env env, napi_value exports)
         {"isPlaying", nullptr, IsPlaying, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceSize", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceId", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"ffmpegVersion", nullptr, FfmpegVersion, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setHttpProxyEnv", nullptr, SetHttpProxyEnv, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},

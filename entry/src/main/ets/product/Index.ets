@@ -6,6 +6,7 @@ import { i18n } from '@kit.LocalizationKit';
 import { preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import type { BusinessError } from '@kit.BasicServicesKit';
+import { util } from '@kit.ArkTS';
 import { ActionHub, ActionHubEvent } from '../common/ActionHub';
 import { AuthSessionManager, SearchChannelItem, SearchPlaylistItem,
   YoutubeJavaScriptPlayerManager, YOUTUBE_COOKIE_STORAGE_NAME, AUTH_STORAGE_NAME } from 'youtube_core';
@@ -19,12 +20,6 @@ import { DownloadManager, DownloadTask } from '../common/DownloadManager';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
 import { AppLogStore } from '../common/AppLogStore';
 import { LocalMediaProxy, PlayerState } from 'mediaservice';
-import { KioskPageResult } from '../features/home/HomeFeedService';
-import { ChannelInfoService } from '../features/user/ChannelInfoService';
-import { VideoCard } from '../common/components/VideoCard';
-import { VideoCardGrid } from '../common/components/VideoCardGrid';
-import { HomeRecommendSwiper } from '../features/home/components/HomeRecommendSwiper';
-import { ErrorPage } from '../common/components/ErrorPage';
 import { SearchPage, SearchPageLaunchParams } from '../features/search/SearchPage';
 import { SubscriptionManagePage } from '../features/subscription/SubscriptionManagePage';
 import { SubscriptionFeedPage } from '../features/subscription/SubscriptionFeedPage';
@@ -34,41 +29,27 @@ import { FavoritesPage } from '../features/favorites/FavoritesPage';
 import { LocalPage } from '../features/local/LocalPage';
 import { UserPage } from '../features/user/UserPage';
 import { PlaylistDetailPage } from '../features/playlist/PlaylistDetailPage';
-import { VideoDetailPage } from '../features/player/VideoDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
 import { PlayerPresentation } from '../common/PlayerPresentation';
-import { WebViewLoginPage } from '../features/auth/WebViewLoginPage';
-import { DeviceQrLoginPage } from '../features/auth/DeviceQrLoginPage';
 import { SabrPoTokenWebRuntime } from '../features/player/SabrPoTokenWebRuntime';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { AuthStateHelper } from '../common/AuthStateHelper';
-import { customAnimationUtil } from '../common/AnimationUtil';
+import { customAnimationUtil } from '../common/AnimationUtil';
 import { sharePlainText } from '../common/utils/ShareUtil';
 import { ThemeColorUtil } from '../common/ThemeColorUtil';
 import { LanguageManager } from '../common/LanguageManager';
 import { FeedServiceProvider } from '../common/FeedServiceProvider';
 import { YoutubeData } from '../common/model/SupportedCountry';
-import { OptionItem } from '../common/components/OptionItem';
-import { PlaybackSelectRow } from '../common/components/PlaybackSelectRow';
-import { PlaybackToggleRow } from '../common/components/PlaybackToggleRow';
-import { PlaybackSectionTitle } from '../common/components/PlaybackSectionTitle';
-import { OptionsMainPage } from '../features/options/OptionsMainPage';
-import { OptionsAppearancePage } from '../features/options/OptionsAppearancePage';
+import { HomeTabContent, HomeTabController } from '../features/home/HomeTabContent';
+import { OptionsSheetActions, OptionsSheetHost } from '../features/options/OptionsSheetHost';
 import { COLOR_PRESETS, ThemeManager } from '../common/ThemeManager';
-import { OptionsPlaybackPage } from '../features/options/OptionsPlaybackPage';
-import { OptionsLanguageAndRegionPage } from '../features/options/OptionsLanguageAndRegionPage';
-import { OptionsRecoveryPage } from '../features/options/OptionsRecoveryPage';
-import { OptionsDataAccountPage } from '../features/options/OptionsDataAccountPage';
-import { OptionsNetworkPage } from '../features/options/OptionsNetworkPage';
 import { HelpGuidePage, PREF_HELP_GUIDE_SEEN } from '../features/help/HelpGuidePage';
 import { NetworkProxyConfig } from '../common/NetworkProxyConfig';
 import { LanguagePickerItem } from '../common/components/LanguagePickerDialog';
-import { LanguagePickerPage } from '../common/components/LanguagePickerPage';
 import {
   BlurStrategy,
   HdsNavigation,
   HdsNavDestination,
-  HdsNavDestinationTitleMode,
   HdsTabs,
   HdsTabsController,
   HdsTabsFloatingStyle,
@@ -79,14 +60,9 @@ import {
 import { TipsDialog, curves } from '@kit.ArkUI';
 import { UIConfig, YourtubeDarkMode } from '../common/AppState';
 import { ColorModeManager } from '../common/ColorModeManager';
-import { LogPage } from '../common/components/LogPage';
-import { AboutPage, OpenSourcePage, AiModelsPage, ChangelogPage } from '../common/components/AboutPage';
-import { buildTitleMenu, buildYourTubeTitleBar, buildSheetTitleBar } from '../common/components/HdsTitleBar';
+import { buildTitleMenu, buildYourTubeTitleBar } from '../common/components/HdsTitleBar';
 import { MaterialUtil } from '../common/utils/MaterialUtil';
-import {
-  PlaybackConfig,
-  VideoQualityCap, VIDEO_QUALITY_CAP_LABELS, VIDEO_QUALITY_CAP_DISPLAY,
-} from '../common/PlaybackConfig';
+import { PlaybackConfig } from '../common/PlaybackConfig';
 import { PlayerSession } from '../common/PlayerSession';
 import { PiPManager } from '../features/player/pip/PiPManager';
 import { PlayQueueManager, QueueSourceType, PlayQueueSourceHint } from '../features/player/PlayQueueManager';
@@ -105,7 +81,6 @@ const PREF_SECURE_SHIELD_DONT_SHOW: string = 'cfg_secureShieldDontShow';
 @Component
 @Preview
 struct Index {
-  @State videoList: VideoItem[] = [];
   @Provide('safeAreaTop') safeAreaTop: number = 0;
   @Provide('safeAreaBottom') safeAreaBottom: number = 0;
   @State topSafeHeight: number = 0;
@@ -114,11 +89,7 @@ struct Index {
   @State activeTabIndex: number = 0;
   @State navPathStack: NavPathStack = new NavPathStack();
   private tabsController: HdsTabsController = new HdsTabsController();
-  private homeGridScroller: Scroller = new Scroller();
-  private homeListScroller: Scroller = new Scroller();
   @State selectedVideo: VideoItem | null = null;
-  @State selectedChannel: SearchChannelItem | null = null;
-  @State selectedPlaylist: SearchPlaylistItem | null = null;
   @StorageLink('favorites') favorites: VideoItem[] = [];
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
   @StorageLink('playlists') playlists: PlaylistItem[] = [];
@@ -132,30 +103,18 @@ struct Index {
   @State showOptions: boolean = false;
   /** 首次启动帮助引导全屏覆盖层（cfg_help_seen 未读时显示） */
   @State showHelpGuide: boolean = false;
-  @State isLoadingMore: boolean = false;
-  @State isInitialLoading: boolean = false;
-  @State isHomeRefreshing: boolean = false;
-  @State homeErrorMessage: string = '';
-  @State homeModeNoticeMessage: string = '';
-  /** Bumps on each successful home reset so ForEach rebuilds cards (ids alone are positional). */
-  @State homeFeedEpoch: number = 0;
-  @State kioskNextPageToken: string | null = null;
-  @State kioskVisitorData: string = '';
-  @State homeFeedSource: string = 'kiosk';
-  @State homeMode: string = 'kiosk';
-  @State currentOptionPage: string = 'main';
-  @State optionsNavStack: NavPathStack = new NavPathStack();
-  @State optionsDepth: number = 0;
   @State selectedLanguageCode: string = LanguageManager.DEFAULT_LANGUAGE;
   @State systemLanguageCode: string = LanguageManager.LANGUAGE_EN_LATN;
-  private webViewLoginBackHandler: (() => boolean) | null = null;
+  /** 首页 tab 的 feed 重置/滚动句柄宿主（实现由 HomeTabContent 挂载时注册） */
+  private homeTabController: HomeTabController = new HomeTabController();
+  /** Options sheet 栈清理动作（实现由 OptionsSheetHost 挂载时注册） */
+  private optionsSheetActions: OptionsSheetActions = new OptionsSheetActions();
 
   @StorageProp('themePrimaryColor') themePrimary: string = COLOR_PRESETS[0].primary;
   // 沉浸光感材质效果（首页标题栏 + HdsTabs 底栏共用）。
   // 在 aboutToAppear 里通过 MaterialUtil 检测设备能力后注入；
   // 不支持的设备为 undefined，调用方走降级路径。
   @State immersiveMaterialEffect: SystemMaterialParams | undefined = undefined;
-  private readonly GRID_SIDE_PADDING: number = 12;
   // 视频播放器状态
   @State isPlayerFullLandscapeScreen: boolean = false;
   @State isRepliesOpen: boolean = false;
@@ -241,15 +200,6 @@ struct Index {
     this.contentCountryItems = [defaultCountryItem].concat(countryMapped);
   }
 
-  private getItemDisplay(items: LanguagePickerItem[], code: string): string {
-    const found = items.find((it: LanguagePickerItem): boolean => it.code === code);
-    return found ? found.localizedName : getContext().resourceManager.getStringSync($r('app.string.yt_lang_follow_system').id);
-  }
-
-  private getAppLanguageSubtitle(): string {
-    return this.getItemDisplay(this.appLangItems, this.uiConfig.userLanguage);
-  }
-
   /** 克隆 UIConfig 并直接赋值给 @StorageLink 属性，确保响应式重绘和持久化同时生效 */
   private updateUiConfig(mutator: (cfg: UIConfig) => void): void {
     const next = this.uiConfig.clone();
@@ -303,6 +253,9 @@ struct Index {
 
     // 4. 下次启动重新显示引导
     PreferencesStore.setString(PREF_HELP_GUIDE_SEEN, 'false');
+    // 订阅信息流快速模式与安全提示弹窗也是独立 Preferences 键，一并复位
+    PreferencesStore.setString('cfg_feed_fast_mode', 'false');
+    PreferencesStore.setString(PREF_SECURE_SHIELD_DONT_SHOW, 'false');
 
     // 5. 应用深色模式
     Promise.resolve().then(() => {
@@ -420,6 +373,7 @@ struct Index {
     AppStorage.setOrCreate('playlists', []);
     WatchHistoryStore.clear();
     this.watchHistory = [];
+    DownloadManager.getInstance().clearAllTasks();
     AppStorage.setOrCreate('downloadTasks', []);
     SearchHistoryStore.clearSearchHistory();
     AppLogStore.clear();
@@ -520,7 +474,7 @@ struct Index {
     // 首个网络工作（首页加载 / 续播恢复 / 云端同步）前先等代理就绪：socks5 模式下
     // loopback 桥是异步 listen 的，不等会让启动窗口内的请求静默直连。
     NetworkProxyConfig.awaitReady().then(() => {
-      this.resetHomeFeed(false, true);
+      this.homeTabController.resetFeed(false, true);
       this.consumePendingPlaybackContinuation();
       if (this.uiConfig.syncUserLibraryOnLaunch !== false) {
         this.syncUserLibraryAfterLogin();
@@ -582,28 +536,7 @@ struct Index {
   }
 
   private refreshHomeAfterAuthChange(): void {
-    this.resetHomeFeed(true, true);
-  }
-
-  /**
-   * 首页 feed 重置单一入口（启动 / 登录态变化 / 搜索地区语言切换共用）：
-   * 清空分页状态与（可选）列表后按需立即重载。
-   * 下拉刷新（refreshHomeFeed）刻意不走这里——它要保留当前 rail
-   * （homeFeedSource 可能是 recommended）和旧列表防白屏。
-   */
-  private resetHomeFeed(clearList: boolean, reload: boolean): void {
-    this.homeMode = 'kiosk';
-    this.kioskNextPageToken = null;
-    this.kioskVisitorData = '';
-    this.homeFeedSource = 'kiosk';
-    this.homeErrorMessage = '';
-    this.homeModeNoticeMessage = '';
-    if (clearList) {
-      this.videoList = [];
-    }
-    if (reload) {
-      this.loadLiveVideos(true);
-    }
+    this.homeTabController.resetFeed(true, true);
   }
 
   private onPendingContinuationChanged(): void {
@@ -629,22 +562,11 @@ struct Index {
     if (!AppStorage.get<StoredLocalQueue[]>('localQueues')) {
       AppStorage.setOrCreate('localQueues', []);
     }
-    this.loadSubscriptionsFromStorage();
-    this.loadFavoritesFromStorage();
-    this.loadPlaylistsFromStorage();
-    this.loadLocalQueuesFromStorage();
-    this.loadWatchHistoryFromStorage();
-  }
-
-  private loadSubscriptionsFromStorage(): void {
-    const stored = PreferencesStore.getString('subscriptionsJson', '[]');
-    this.subscriptions = LocalStore.loadSubscriptions(stored);
-  }
-
-  private syncSubscriptionsToStorage(): void {
-    PreferencesStore.setString('subscriptionsJson', LocalStore.saveSubscriptions(this.subscriptions));
-    // 订阅列表变化（增/删/云端合并）→ 动态缓存清零，下次进入动态页重新拉取
-    SubscriptionFeedStore.clear();
+    LocalStore.loadSubscriptionsToAppStorage();
+    LocalStore.loadFavoritesToAppStorage();
+    LocalStore.loadPlaylistsToAppStorage();
+    LocalStore.loadLocalQueuesToAppStorage();
+    this.watchHistory = WatchHistoryStore.loadToAppStorage();
   }
 
   /**
@@ -706,7 +628,7 @@ struct Index {
             merged.push(map[key]);
           });
           this.subscriptions = merged;
-          this.syncSubscriptionsToStorage();
+          LocalStore.persistSubscriptions();
         }
       } catch (channelErr) {
         logger.error('syncUserLibrary channels failed:', JSON.stringify(channelErr));
@@ -716,55 +638,23 @@ struct Index {
     }
   }
 
-  private loadFavoritesFromStorage(): void {
-    const stored = PreferencesStore.getString('favoritesJson', '[]');
-    this.favorites = LocalStore.loadFavorites(stored);
-  }
-
-  private syncFavoritesToStorage(): void {
-    PreferencesStore.setString('favoritesJson', LocalStore.saveFavorites(this.favorites));
-  }
-
-  private loadPlaylistsFromStorage(): void {
-    const stored = PreferencesStore.getString('playlistsJson', '[]');
-    this.playlists = LocalStore.loadPlaylists(stored);
-  }
-
-  private syncPlaylistsToStorage(): void {
-    PreferencesStore.setString('playlistsJson', LocalStore.savePlaylists(this.playlists));
-  }
-
-  private loadLocalQueuesFromStorage(): void {
-    const stored = PreferencesStore.getString('localQueuesJson', '[]');
-    this.localQueues = LocalStore.loadLocalQueues(stored);
-  }
-
-  private syncLocalQueuesToStorage(): void {
-    PreferencesStore.setString('localQueuesJson', LocalStore.saveLocalQueues(this.localQueues));
-  }
-
   /** Save the current play queue as a local playlist */
   private saveCurrentQueueAsLocal(name: string): void {
     const qm = PlayQueueManager.getInstance();
     const entry = qm.saveAsLocal(name);
     this.localQueues = [...this.localQueues, entry];
-    this.syncLocalQueuesToStorage();
+    LocalStore.persistLocalQueues();
   }
 
   /** Delete a locally saved queue by id */
   private deleteLocalQueue(id: string): void {
     this.localQueues = this.localQueues.filter(q => q.id !== id);
-    this.syncLocalQueuesToStorage();
+    LocalStore.persistLocalQueues();
   }
 
   /** Generate a local queue id with the `local_` prefix used to distinguish local lists. */
   private generateLocalQueueId(): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let id = 'local_';
-    for (let i = 0; i < 16; i++) {
-      id += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return id;
+    return `local_${util.generateRandomUUID(true)}`;
   }
 
   /** Create a new local playlist seeded with a single video. */
@@ -776,7 +666,7 @@ struct Index {
       createdAt: Date.now(),
     };
     this.localQueues = [...this.localQueues, entry];
-    this.syncLocalQueuesToStorage();
+    LocalStore.persistLocalQueues();
   }
 
   /** Add a video to an existing local playlist (deduplicated by videoId). */
@@ -796,7 +686,7 @@ struct Index {
       };
       return updated;
     });
-    this.syncLocalQueuesToStorage();
+    LocalStore.persistLocalQueues();
   }
 
   /** Remove a video from a local playlist by videoId. */
@@ -813,12 +703,7 @@ struct Index {
       };
       return updated;
     });
-    this.syncLocalQueuesToStorage();
-  }
-
-  private loadWatchHistoryFromStorage(): void {
-    WatchHistoryStore.loadToAppStorage();
-    this.watchHistory = WatchHistoryStore.getAll();
+    LocalStore.persistLocalQueues();
   }
 
   private bindActionHub(): void {
@@ -934,7 +819,7 @@ struct Index {
       channel.description || '',
       channel.thumbnailColor || ''
     )];
-    this.syncSubscriptionsToStorage();
+    LocalStore.persistSubscriptions();
   }
 
   private removeSubscription(channelId: string): void {
@@ -943,233 +828,12 @@ struct Index {
       return;
     }
     this.subscriptions = this.subscriptions.filter((item) => item.channelId !== trimmed);
-    this.syncSubscriptionsToStorage();
+    LocalStore.persistSubscriptions();
   }
 
   private reloadHomeForSearchLocaleChange(): void {
     FeedServiceProvider.getInstance().invalidate();
-    this.resetHomeFeed(true, this.activeTabIndex === 0);
-  }
-
-  private async loadLiveVideos(reset: boolean = false) {
-    if (reset) {
-      this.isLoadingMore = false;
-      this.isInitialLoading = this.videoList.length === 0;
-      this.homeErrorMessage = '';
-    } else {
-      if (this.isLoadingMore) {
-        return;
-      }
-    }
-
-    const startId = reset ? 1 : (this.videoList.length + 1);
-    const loadStartedAt = Date.now();
-    logger.info(`[HomeFeed] stage=load_start reset=${reset} mode=${this.homeMode} `
-      + `source=${this.homeFeedSource} startId=${startId} listLen=${this.videoList.length}`);
-    try {
-      if (this.homeMode === 'kiosk') {
-        if (!reset) {
-          if (!this.kioskNextPageToken) {
-            return;
-          }
-          this.isLoadingMore = true;
-        }
-        const homeService = FeedServiceProvider.getInstance().getHomeFeedService();
-        const useAuthContinuation = this.homeFeedSource.indexOf('recommended') === 0;
-        const feedStyle = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle);
-        const kioskResult = reset
-          ? await homeService.fetchHomeKioskInitial(startId, feedStyle)
-          : await homeService.fetchHomeKioskNext(
-            this.kioskNextPageToken ?? '',
-            this.kioskVisitorData,
-            startId,
-            useAuthContinuation,
-            this.homeFeedSource
-          );
-        if (reset) {
-          this.videoList = kioskResult.items;
-          this.homeFeedSource = kioskResult.source || 'kiosk';
-          this.homeFeedEpoch += 1;
-          this.scrollHomeFeedToTop();
-        } else {
-          this.videoList = this.videoList.concat(kioskResult.items);
-        }
-        this.kioskNextPageToken = kioskResult.nextPageToken;
-        if (kioskResult.visitorData && kioskResult.visitorData.length > 0) {
-          this.kioskVisitorData = kioskResult.visitorData;
-        }
-        this.homeErrorMessage = '';
-        this.homeModeNoticeMessage = '';
-        if (reset
-          && kioskResult.source === 'kiosk'
-          && feedStyle === 'recommended'
-          && AuthSessionManager.getInstance()?.consumeAuthRejectionNotice() === true) {
-          // 登录态被拒后已回落到游客 kiosk，提示用户重新登录。
-          this.homeModeNoticeMessage = getContext().resourceManager.getStringSync(
-            $r('app.string.yt_home_auth_expired_notice').id);
-        }
-        logger.info(`[HomeFeed] stage=load_done reset=${reset} mode=kiosk source=${this.homeFeedSource} `
-          + `items=${kioskResult.items.length} listLen=${this.videoList.length} `
-          + `elapsed=${Date.now() - loadStartedAt}ms`);
-        return;
-      }
-    } catch (err) {
-      // Never JSON.stringify(Error) alone — enumerable fields are empty → "{}" in user logs.
-      logger.error(`[HomeFeed] stage=failed reset=${reset} mode=${this.homeMode} `
-        + `source=${this.homeFeedSource} ${this.describeThrowable(err)}`);
-      if (reset && this.homeMode === 'kiosk') {
-        const wantedRecommended = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle) === 'recommended'
-          && AuthSessionManager.getInstance()?.hasAuthForUserData() === true;
-        const fallbackRes = wantedRecommended
-          ? $r('app.string.yt_home_recommended_error')
-          : $r('app.string.yt_home_kiosk_error');
-        this.homeErrorMessage = this.formatHomeRequestError(
-          err as Object,
-          getContext().resourceManager.getStringSync(fallbackRes.id)
-        );
-        if (wantedRecommended) {
-          // Keep dual-rail prefix so banner gating (indexOf recommended) still works after error.
-          this.homeFeedSource = 'recommended';
-        }
-      } else {
-        this.homeErrorMessage = this.formatHomeRequestError(err as Object, getContext().resourceManager.getStringSync($r('app.string.yt_home_load_error').id));
-      }
-      // 保留已有列表，避免加载失败时清空
-    } finally {
-      this.isLoadingMore = false;
-      if (reset) {
-        this.isInitialLoading = false;
-      }
-    }
-  }
-
-  private async refreshHomeFeed(): Promise<void> {
-    // Refresh sets the two-way bound value before invoking onRefreshing.
-    // Always perform the work and clear it in finally.
-    logger.info(`[HomeRefresh] stage=start mode=${this.homeMode} source=${this.homeFeedSource}`);
-    const startedAt = Date.now();
-    const prevHead = this.videoList.length > 0
-      ? (this.videoList[0].videoId || this.videoList[0].id.toString())
-      : '';
-    try {
-      this.kioskNextPageToken = null;
-      this.kioskVisitorData = '';
-      await this.loadLiveVideos(true);
-      const nextHead = this.videoList.length > 0
-        ? (this.videoList[0].videoId || this.videoList[0].id.toString())
-        : '';
-      logger.info(`[HomeRefresh] stage=complete mode=${this.homeMode} source=${this.homeFeedSource} `
-        + `elapsed=${Date.now() - startedAt}ms items=${this.videoList.length} head=${nextHead} `
-        + `changed=${prevHead !== nextHead} error=${this.homeErrorMessage.length > 0 ? 'yes' : 'no'}`);
-    } catch (e) {
-      logger.error(`[HomeRefresh] stage=failed elapsed=${Date.now() - startedAt}ms ${this.describeThrowable(e)}`);
-    } finally {
-      this.isHomeRefreshing = false;
-    }
-  }
-
-  private scrollHomeFeedToTop(): void {
-    try {
-      if (this.uiConfig.homeLayoutMode === 'grid') {
-        this.homeGridScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
-      } else {
-        this.homeListScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
-      }
-    } catch (e) {
-      logger.warn(`[HomeRefresh] scrollToTop failed: ${JSON.stringify(e)}`);
-    }
-  }
-
-  private homeListItemKey(item: VideoItem): string {
-    const videoId = (item.videoId || '').trim();
-    // Epoch forces full card rebuild after pull-to-refresh; videoId is stable identity.
-    return `${this.homeFeedEpoch}_${videoId.length > 0 ? videoId : item.id.toString()}`;
-  }
-
-  /** Safe one-line error for hilog / exported app logs (Error → not "{}"). */
-  private describeThrowable(err: Object | Error | string | undefined | null): string {
-    if (err === undefined || err === null) {
-      return 'error=null';
-    }
-    if (typeof err === 'string') {
-      return `error=${err}`;
-    }
-    if (err instanceof Error) {
-      const name = err.name || 'Error';
-      const msg = err.message || '';
-      return `name=${name} message=${msg}`;
-    }
-    if (typeof err === 'object') {
-      const anyErr = err as Record<string, Object>;
-      const parts: string[] = [];
-      const name = anyErr['name'];
-      const message = anyErr['message'];
-      const code = anyErr['code'];
-      const errorType = anyErr['errorType'];
-      const url = anyErr['url'];
-      const method = anyErr['method'];
-      if (typeof name === 'string' && name.length > 0) {
-        parts.push(`name=${name}`);
-      }
-      if (typeof message === 'string' && message.length > 0) {
-        parts.push(`message=${message}`);
-      }
-      if (typeof code === 'number' || typeof code === 'string') {
-        parts.push(`code=${String(code)}`);
-      }
-      if (typeof errorType === 'string' && errorType.length > 0) {
-        parts.push(`errorType=${errorType}`);
-      }
-      if (typeof method === 'string' && method.length > 0) {
-        parts.push(`method=${method}`);
-      }
-      if (typeof url === 'string' && url.length > 0) {
-        // Host+path only — no query/cookies.
-        const m = /^(https?:\/\/[^/?#]+)([^?#]*)/.exec(url);
-        parts.push(`target=${m ? `${m[1]}${m[2] || '/'}` : '(url)'}`);
-      }
-      if (parts.length > 0) {
-        return parts.join(' ');
-      }
-      try {
-        const raw = JSON.stringify(err);
-        if (raw && raw !== '{}' && raw !== 'null') {
-          return `error=${raw}`;
-        }
-      } catch (_e) {
-        // ignore
-      }
-    }
-    return `error=${String(err)}`;
-  }
-
-  private formatHomeRequestError(err: Object, fallback: string): string {
-    let code = '';
-    let message = '';
-    if (err instanceof Error) {
-      message = err.message || '';
-      const name = err.name || '';
-      if (name.length > 0 && name !== 'Error') {
-        code = name;
-      }
-    } else if (err && typeof err === 'object') {
-      const anyErr = err as Record<string, Object>;
-      const errorCode = anyErr['code'];
-      const errorMessage = anyErr['message'];
-      const errorType = anyErr['errorType'];
-      if (typeof errorCode === 'number' || typeof errorCode === 'string') {
-        code = String(errorCode);
-      } else if (typeof errorType === 'string' && errorType.length > 0) {
-        code = errorType;
-      }
-      if (typeof errorMessage === 'string') {
-        message = errorMessage;
-      }
-    }
-    if (!message || message.length === 0) {
-      message = fallback;
-    }
-    return code.length > 0 ? `[${code}] ${message}` : message;
+    this.homeTabController.resetFeed(true, this.activeTabIndex === 0);
   }
 
   private openSearchPage(initialQuery: string = ''): void {
@@ -1311,8 +975,7 @@ struct Index {
 
   private async openUserPage(channel: SearchChannelItem): Promise<void> {
     this.showOptions = false;
-    this.selectedChannel = channel;
-    this.navPathStack.pushPath({ name: 'UserPage' });
+    this.navPathStack.pushPath({ name: 'UserPage', param: channel });
   }
 
   private async openChannelById(channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string): Promise<void> {
@@ -1320,51 +983,16 @@ struct Index {
     // 只创建基本的频道对象，只填写ID和名称，其他信息由UserPage后期填充
     const channel = new SearchChannelItem(0, channelId, channelName, '', '', channelAvatarUrl, '', '#CCCCCC', channelHandle);
 
-    this.selectedChannel = channel;
-    this.navPathStack.pushPath({ name: 'UserPage' });
+    this.navPathStack.pushPath({ name: 'UserPage', param: channel });
   }
 
   private openPlaylistPage(playlist: SearchPlaylistItem): void {
     this.showOptions = false;
-    this.selectedPlaylist = playlist;
-    this.navPathStack.pushPath({ name: 'PlaylistDetailPage' });
+    this.navPathStack.pushPath({ name: 'PlaylistDetailPage', param: playlist });
   }
 
   private closeCurrentPage(): void {
     this.navPathStack.pop();
-  }
-
-  private getVideoGridColumnCount(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    if (contentWidth >= 1440) {
-      return 5;
-    }
-    if (contentWidth >= 1080) {
-      return 4;
-    }
-    if (contentWidth >= 760) {
-      return 3;
-    }
-    if (contentWidth >= 520) {
-      return 2;
-    }
-    return 1;
-  }
-
-  private pushOptionsPath(name: string): void {
-    this.optionsNavStack.pushPathByName(name, null);
-    this.optionsDepth = this.optionsNavStack.size();
-  }
-
-  private popOptionsPath(): void {
-    this.optionsNavStack.pop();
-    this.optionsDepth = Math.max(0, this.optionsDepth - 1);
-  }
-
-  private clearOptionsPath(): void {
-    this.optionsNavStack.clear();
-    this.optionsDepth = 0;
   }
 
   private addFavorite(video: VideoItem): void {
@@ -1373,12 +1001,12 @@ struct Index {
       return;
     }
     this.favorites = [...this.favorites, video];
-    this.syncFavoritesToStorage();
+    LocalStore.persistFavorites();
   }
 
   private removeFavorite(videoId: string): void {
     this.favorites = this.favorites.filter((item) => item.videoId !== videoId);
-    this.syncFavoritesToStorage();
+    LocalStore.persistFavorites();
   }
 
   private addPlaylist(playlist: SearchPlaylistItem): void {
@@ -1396,7 +1024,7 @@ struct Index {
       playlist.coverUrl || ''
     );
     this.playlists = [...this.playlists, next];
-    this.syncPlaylistsToStorage();
+    LocalStore.persistPlaylists();
   }
 
   private removePlaylist(playlistId: string): void {
@@ -1405,7 +1033,7 @@ struct Index {
       return;
     }
     this.playlists = this.playlists.filter((item) => item.playlistId !== trimmed);
-    this.syncPlaylistsToStorage();
+    LocalStore.persistPlaylists();
   }
 
   private shareVideo(video: VideoItem): void {
@@ -1569,9 +1197,9 @@ struct Index {
         })
       ]
     }))
-    .bindToScrollable([this.homeGridScroller, this.homeListScroller,
+    .bindToScrollable([this.homeTabController.gridScroller, this.homeTabController.listScroller,
       SubscriptionScrollCoordinator.scroller])
-    .bindSheet($$this.showOptions, this.OptionsPanel(this.optionsDepth), {
+    .bindSheet($$this.showOptions, this.OptionsSheet(), {
       detents: [SheetSize.LARGE],
       dragBar: true,
       backgroundColor: $r('sys.color.ohos_id_color_dialog_bg'),
@@ -1580,7 +1208,7 @@ struct Index {
       scrollSizeMode: ScrollSizeMode.CONTINUOUS,
       radiusRenderStrategy: RenderStrategy.OFFSCREEN,
       onDisappear: () => {
-        this.clearOptionsPath();
+        this.optionsSheetActions.clearPath();
       }
     })
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
@@ -1591,10 +1219,6 @@ struct Index {
     if (name === 'SearchPage') {
       SearchPage({
         initialQuery: (param as SearchPageLaunchParams)?.initialQuery ?? ''
-      })
-    } else if (name === 'VideoDetailPage') {
-      VideoDetailPage({
-        video: this.selectedVideo
       })
     } else if (name === 'PlayerPage') {
       HdsNavDestination() {
@@ -1668,11 +1292,11 @@ struct Index {
       })
     } else if (name === 'UserPage') {
       UserPage({
-        channel: this.selectedChannel ?? new SearchChannelItem(0, '', 'Unknown', '', '', '', '', '#CCCCCC')
+        channel: (param as SearchChannelItem) ?? new SearchChannelItem(0, '', 'Unknown', '', '', '', '', '#CCCCCC')
       })
     } else if (name === 'PlaylistDetailPage') {
       PlaylistDetailPage({
-        playlist: this.selectedPlaylist ?? new SearchPlaylistItem(0, '', 'Untitled', '', '', '', '', '#CCCCCC')
+        playlist: (param as SearchPlaylistItem) ?? new SearchPlaylistItem(0, '', 'Untitled', '', '', '', '', '#CCCCCC')
       })
     } else if (name === 'SubscriptionFeedPage') {
       SubscriptionFeedPage()
@@ -1681,136 +1305,9 @@ struct Index {
 
   @Builder TabContentSection(index: number) {
     if (index === 0) {
-      Stack() {
-        if (this.homeErrorMessage.length > 0 && this.videoList.length === 0) {
-          // 显示完整页面的错误页面
-          ErrorPage({
-            errorMessage: this.homeErrorMessage,
-            onRetry: () => {
-              this.loadLiveVideos(true);
-            }
-          })
-        } else {
-          Refresh({ refreshing: $$this.isHomeRefreshing }) {
-            Column() {
-            if (this.homeModeNoticeMessage.length > 0) {
-              Text(this.homeModeNoticeMessage)
-                .fontSize(12)
-                .fontColor(this.themePrimary)
-                .margin({ top: 8, left: 16, right: 16 })
-            }
-
-            if (this.uiConfig.homeLayoutMode === 'grid') {
-              Scroll(this.homeGridScroller) {
-                Column({ space: 12 }) {
-                  if (this.shouldShowHomeRecommendBanner()) {
-                    // Banner manages its own side inset so wide peek can use more of the row.
-                    HomeRecommendSwiper({
-                      videos: this.getHomeBannerVideos(),
-                      feedEpoch: this.homeFeedEpoch
-                    })
-                      .transition(customAnimationUtil.isScaleTran(`home_recommend_banner_${this.homeFeedEpoch}`, this.uiConfig))
-                  }
-                  GridRow({
-                    columns: this.getVideoGridColumnCount(),
-                    gutter: { x: 8, y: 8 }
-                  }) {
-                    ForEach(this.getHomeListVideos(), (item: VideoItem) => {
-                      GridCol({ span: 1 }) {
-                        VideoCardGrid({
-                          video: item,
-                          actionLabel: $r('app.string.yt_action_favorite'),
-                          actionType: 'favorite',
-                          useFavoriteToggle: true
-                        })
-                      }
-                      .transition(customAnimationUtil.isScaleTran(this.homeListItemKey(item), this.uiConfig))
-                    }, (item: VideoItem) => this.homeListItemKey(item))
-                  }
-                  .width('100%')
-                  .padding({ left: 12, right: 12 })
-                  Column().width('100%').height(this.bottomSafeHeight + 72)
-                }
-                .width('100%')
-              }
-              .width('100%')
-              .layoutWeight(1)
-              .clip(false)
-              .backgroundColor($r('app.color.yourtube_bg_page'))
-              .edgeEffect(EdgeEffect.Spring)
-              .onReachEnd(() => {
-                this.loadLiveVideos(false);
-              })
-            } else {
-              List({ scroller: this.homeListScroller, space: 4 }) {
-                if (this.shouldShowHomeRecommendBanner()) {
-                  ListItem() {
-                    HomeRecommendSwiper({
-                      videos: this.getHomeBannerVideos(),
-                      feedEpoch: this.homeFeedEpoch
-                    })
-                  }
-                  // Side inset owned by HomeRecommendSwiper (wide: smaller pad + larger peeks).
-                  .padding({ bottom: 8 })
-                  .transition(customAnimationUtil.isScaleTran(`home_recommend_banner_${this.homeFeedEpoch}`, this.uiConfig))
-                }
-                ForEach(this.getHomeListVideos(), (item: VideoItem) => {
-                  ListItem() {
-                    VideoCard({
-                      video: item,
-                      actionLabel: $r('app.string.yt_action_favorite'),
-                      actionType: 'favorite',
-                      useFavoriteToggle: true
-                    })
-                  }
-                  .padding({ left: 12, right: 12 })
-                  .transition(customAnimationUtil.isScaleTran(this.homeListItemKey(item), this.uiConfig))
-                }, (item: VideoItem) => this.homeListItemKey(item))
-                if (this.isLoadingMore) {
-                  ListItem() {
-                    Row() {
-                      this.LoadingBuilder()
-                    }
-                    .width('100%')
-                    .justifyContent(FlexAlign.Center)
-                  }
-                }
-              }
-              .width('100%')
-              .layoutWeight(1)
-              .clip(false)
-              .backgroundColor($r('app.color.yourtube_bg_page'))
-              .contentEndOffset(this.bottomSafeHeight + 72)
-              .edgeEffect(EdgeEffect.Spring)
-              .onReachEnd(() => {
-                this.loadLiveVideos(false);
-              })
-            }
-            }
-            .width('100%')
-            .height('100%')
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .padding({ top: this.topSafeHeight + 56 })
-          .pullToRefresh(true)
-          .refreshOffset(64)
-          .onRefreshing(() => {
-            this.refreshHomeFeed();
-          })
-        }
-
-        if (this.isInitialLoading) {
-          Column() {
-            this.LoadingBuilder()
-          }
-          .width('100%')
-          .height('100%')
-          .justifyContent(FlexAlign.Center)
-          .alignItems(HorizontalAlign.Center)
-          .backgroundColor($r('app.color.yourtube_bg_overlay'))
-        }
-      }
+      HomeTabContent({
+        controller: this.homeTabController
+      })
     }
     else if (index === 1) {
       SubscriptionManagePage()
@@ -1825,282 +1322,52 @@ struct Index {
     }
   }
 
-
-  @Builder OptionsPanel(depth: number) {
-    HdsNavigation(this.optionsNavStack) {
-      OptionsMainPage({
-          params: {
-            clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
-            appLangItems: this.appLangItems,
-            contentLangItems: this.contentLangItems,
-            contentCountryItems: this.contentCountryItems,
-            onDataAccountClick: () => { this.pushOptionsPath('data_account'); },
-            onLanguageClick: () => { this.pushOptionsPath('language'); },
-            onPlaybackClick: () => { this.pushOptionsPath('playback'); },
-            onNetworkClick: () => { this.pushOptionsPath('network'); },
-            onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
-            onLogClick: () => { this.pushOptionsPath('log_page'); },
-            onHelpClick: () => { this.pushOptionsPath('help_page'); },
-            onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
-            onAboutClick: () => { this.pushOptionsPath('about_page'); }
-          }
-        })
-        .width('100%')
-        .height('100%')
-    }
-    .mode(NavigationMode.Stack)
-    .navDestination(this.OptionsPageMap)
-    .titleMode(HdsNavigationTitleMode.MINI)
-    .titleBar(buildSheetTitleBar({
-      title: $r('app.string.yt_option_title'),
-      onBack: depth > 0 ? () => {
-        this.popOptionsPath();
-      } : undefined,
-      menus: [
-        buildTitleMenu($r('sys.symbol.xmark'), $r('app.string.yt_action_close'), () => {
-          this.showOptions = false;
-        })
-      ]
-    }))
-    .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-    .clip(true)
-  }
-
-
+  /** Options sheet 内容宿主（原 OptionsPanel）：导航栈与各子页 destination 归 OptionsSheetHost */
   @Builder
-  OptionsPageMap(name: string) {
-    if (name === 'help_page') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_option_help'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        HelpGuidePage({
-          params: {
-            mode: 'fromSettings',
-            onResetSettings: () => {
-              this.showResetSettingsConfirmDialog();
-            },
-            onFinish: () => {
-              this.popOptionsPath();
-            }
-          }
-        })
-      }
-    } else if (name === 'language') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_section_language_region'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-          OptionsLanguageAndRegionPage({
-            params: {
-              appLangItems: this.appLangItems,
-              contentLangItems: this.contentLangItems,
-              contentCountryItems: this.contentCountryItems,
-              themeColor: this.themePrimary,
-              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
-              updateUiConfig: this.updateUiConfig.bind(this),
-              reloadHomeForSearchLocaleChange: this.reloadHomeForSearchLocaleChange.bind(this),
-              applyLanguageSelection: this.applyLanguageSelection.bind(this)
-            }
-          })
-      }
-    } else if (name === 'data_account') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_option_data_account'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        OptionsDataAccountPage({
-          params: {
-            onLoginClick: () => { this.pushOptionsPath('webview_login'); },
-            onDeviceQrLoginClick: () => { this.pushOptionsPath('device_qr_login'); },
-            updateUiConfig: this.updateUiConfig.bind(this),
-            onHomeFeedStyleChanged: () => { this.refreshHomeAfterAuthChange(); },
-            onAuthChanged: () => { this.refreshHomeAfterAuthChange(); },
-            onLoginSuccess: () => { this.handleLoginSuccess(); }
-          }
-        })
-      }
-    } else if (name === 'device_qr_login') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_device_qr_sign_in'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        DeviceQrLoginPage({
-          onSuccess: () => {
-            this.handleLoginSuccess();
-            this.webViewLoginBackHandler = null;
-            this.popOptionsPath();
-            try {
-              this.getUIContext().getPromptAction().showToast({
-                message: $r('app.string.yt_toast_login_success'),
-                duration: 2000
-              });
-            } catch (_e) {
-              // ignore
-            }
-          },
-          onCancel: () => {
-            this.popOptionsPath();
-          }
-        })
-      }
-    } else if (name === 'webview_login') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_google_web_sign_in_title'),
-        onBack: () => {
-          // WebView 内部可消费返回（页面栈回退）；消费不了才退出登录页
-          if (this.webViewLoginBackHandler && this.webViewLoginBackHandler()) {
-            return;
-          }
-          this.webViewLoginBackHandler = null;
-          this.popOptionsPath();
+  OptionsSheet() {
+    OptionsSheetHost({
+      params: {
+        actions: this.optionsSheetActions,
+        appLangItems: this.appLangItems,
+        contentLangItems: this.contentLangItems,
+        contentCountryItems: this.contentCountryItems,
+        onClose: () => {
+          this.showOptions = false;
+        },
+        updateUiConfig: (mutator: (cfg: UIConfig) => void) => {
+          this.updateUiConfig(mutator);
+        },
+        updatePlaybackConfig: (mutator: (cfg: PlaybackConfig) => void) => {
+          this.updatePlaybackConfig(mutator);
+        },
+        applyLanguageSelection: (languageCode: string) => {
+          this.applyLanguageSelection(languageCode);
+        },
+        applyDarkModeSelection: (mode: YourtubeDarkMode) => {
+          this.applyDarkModeSelection(mode);
+        },
+        reloadHomeForSearchLocaleChange: () => {
+          this.reloadHomeForSearchLocaleChange();
+        },
+        refreshHomeAfterAuthChange: () => {
+          this.refreshHomeAfterAuthChange();
+        },
+        handleLoginSuccess: () => {
+          this.handleLoginSuccess();
+        },
+        onPlayerClientChanged: (guest: string, auth: string) => {
+          this.onPlayerClientChanged(guest, auth);
+        },
+        onResetSettings: () => {
+          this.showResetSettingsConfirmDialog();
+        },
+        onClearAllData: () => {
+          this.showClearAllDataConfirmDialog();
         }
-      }) {
-        WebViewLoginPage({
-          onSuccess: () => {
-            this.handleLoginSuccess();
-            this.popOptionsPath();
-            try {
-              this.getUIContext().getPromptAction().showToast({
-                message: $r('app.string.yt_toast_login_success'),
-                duration: 2000
-              });
-              logger.info('Login success toast shown');
-            } catch (error) {
-              logger.warn(`Login success toast failed: ${JSON.stringify(error)}`);
-            }
-          },
-          onCancel: () => { this.popOptionsPath(); },
-          onRegisterBackHandler: (handler: () => boolean) => {
-            this.webViewLoginBackHandler = handler;
-          }
-        })
       }
-    } else if (name === 'appearance') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_option_appearance'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-          OptionsAppearancePage({
-            params: {
-              themeColor: this.themePrimary,
-              applyDarkModeSelection: this.applyDarkModeSelection.bind(this),
-              updateUiConfig: this.updateUiConfig.bind(this)
-            }
-          })
-      }
-    } else if (name === 'network') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_option_network'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        OptionsNetworkPage({
-          params: {
-            themeColor: this.themePrimary,
-            onConfigChanged: (cfg: NetworkProxyConfig) => {
-              AppStorage.setOrCreate('networkProxyConfig', cfg);
-            }
-          }
-        })
-      }
-    } else if (name === 'app_lang') {
-      LanguagePickerPage({
-        title: $r('app.string.yt_setting_ui_language'),
-        items: this.appLangItems,
-        selectedCode: this.uiConfig.userLanguage,
-        onSelect: (code: string) => { this.applyLanguageSelection(code); },
-        onBack: () => { this.popOptionsPath(); }
-      })
-    } else if (name === 'content_lang') {
-      LanguagePickerPage({
-        title: $r('app.string.yt_setting_content_language'),
-        items: this.contentLangItems,
-        selectedCode: this.uiConfig.searchLanguage,
-        onSelect: (code: string) => {
-          this.updateUiConfig(cfg => cfg.searchLanguage = code === 'default' ? 'default' : code);
-          this.reloadHomeForSearchLocaleChange();
-        },
-        onBack: () => { this.popOptionsPath(); }
-      })
-    } else if (name === 'content_country') {
-      LanguagePickerPage({
-        title: $r('app.string.yt_setting_content_region'),
-        items: this.contentCountryItems,
-        selectedCode: this.uiConfig.searchCountry,
-        onSelect: (code: string) => {
-          this.updateUiConfig(cfg => cfg.searchCountry = code === 'default' ? 'default' : code.toUpperCase());
-          this.reloadHomeForSearchLocaleChange();
-        },
-        onBack: () => { this.popOptionsPath(); }
-      })
-    } else if (name === 'log_page') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_log_title'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        LogPage({
-          onBack: () => { this.popOptionsPath(); }
-        })
-      }
-    } else if (name === 'about_page') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_option_about'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        AboutPage({
-          onNavigate: (subPage: string) => { this.pushOptionsPath(subPage); }
-        })
-      }
-    } else if (name === 'about_open_source') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_about_open_source'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        OpenSourcePage()
-      }
-    } else if (name === 'about_ai_models') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_about_ai_models'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        AiModelsPage()
-      }
-    } else if (name === 'about_changelog') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_about_changelog'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        ChangelogPage()
-      }
-    } else if (name === 'playback') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_section_playback'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-          OptionsPlaybackPage({
-            params: {
-              themeColor: this.themePrimary,
-              updatePlaybackConfig: this.updatePlaybackConfig.bind(this),
-              updateUiConfig: this.updateUiConfig.bind(this),
-              getQualityDisplay: this.getQualityDisplay.bind(this),
-              onPlayerClientChanged: this.onPlayerClientChanged.bind(this)
-            }
-          })
-      }
-    } else if (name === 'recovery') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_option_recovery'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-          OptionsRecoveryPage({
-            params: {
-              onResetSettingsClick: () => { this.showResetSettingsConfirmDialog(); },
-              onClearAllDataClick: () => { this.showClearAllDataConfirmDialog(); }
-            }
-          })
-      }
-    }
+    })
   }
+
 
   private applyDarkModeSelection(mode: YourtubeDarkMode): void {
     this.updateUiConfig(cfg => cfg.darkMode = mode);
@@ -2144,71 +1411,6 @@ struct Index {
     .translate({ x: 0, y: this.activeTabIndex === index ? -5 : -2 })
     .animation({ duration: 220, curve: Curve.EaseOut })
   }
-
-  @Builder LoadingBuilder() {
-    LoadingProgress()
-      .color(this.themePrimary)
-      .width(40)
-      .height(40)
-      .margin({ bottom: 15 })
-  }
-
-  private homeBannerMax: number = 6;
-
-  private shouldShowHomeRecommendBanner(): boolean {
-    // Dual-rail sources: recommended | recommended-web | recommended-tv
-    return this.homeMode === 'kiosk'
-      && this.homeFeedSource.indexOf('recommended') === 0
-      && this.videoList.length > 0;
-  }
-
-  private getHomeBannerVideos(): VideoItem[] {
-    if (!this.shouldShowHomeRecommendBanner()) {
-      return [];
-    }
-    const limit = Math.min(this.homeBannerMax, this.videoList.length);
-    return this.videoList.slice(0, limit);
-  }
-
-  private getHomeListVideos(): VideoItem[] {
-    if (!this.shouldShowHomeRecommendBanner()) {
-      return this.videoList;
-    }
-    const bannerIds: string[] = [];
-    const banners = this.getHomeBannerVideos();
-    for (let i = 0; i < banners.length; i++) {
-      const id = (banners[i].videoId || banners[i].id.toString()).trim();
-      if (id.length > 0) {
-        bannerIds.push(id);
-      }
-    }
-    return this.videoList.filter((item: VideoItem) => {
-      const id = (item.videoId || item.id.toString()).trim();
-      return bannerIds.indexOf(id) < 0;
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 播放设置页面辅助方法
-  // ─────────────────────────────────────────────────────────────────────────
-
-  private resourceToString(res: ResourceStr): string {
-    if (typeof res === 'string') return res;
-    try {
-      return getContext().resourceManager.getStringSync(res.id);
-    } catch (e) {
-      return '';
-    }
-  }
-
-  private getQualityDisplay(quality: VideoQualityCap): ResourceStr {
-    switch (quality) {
-      case 'best': return $r('app.string.yt_quality_best');
-      default: return quality;
-    }
-  }
-
-
 
   private savePlaybackConfig(next: PlaybackConfig): void {
     this.playbackConfig = next;
@@ -2266,7 +1468,7 @@ struct Index {
         },
         {
           value: $r('app.string.yt_action_clear'),
-          fontColor: $r('app.color.yourtube_text_warning'),
+          fontColor: this.themePrimary,
           action: () => {
             this.clearAllAppData();
             try {
@@ -2293,38 +1495,4 @@ struct Index {
     });
   }
 
-}
-
-/**
- * Options 子页通用脚手架：HdsNavDestination + MINI 标题栏 + 返回处理。
- * OptionsPageMap 的各子页只提供标题、onBack 和正文（@BuilderParam content）。
- */
-@Component
-struct OptionsNavScaffold {
-  @Prop title: Resource = $r('app.string.yt_option_title');
-  /** 标题栏返回键与系统返回手势共用此回调 */
-  onBack: () => void = () => {};
-  @BuilderParam content: () => void = this.defaultContent;
-
-  @Builder
-  defaultContent() {
-  }
-
-  build() {
-    HdsNavDestination() {
-      this.content()
-    }
-    .titleMode(HdsNavDestinationTitleMode.MINI)
-    .titleBar(buildSheetTitleBar({
-      title: this.title,
-      onBack: () => {
-        this.onBack();
-      }
-    }))
-    .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-    .onBackPressed(() => {
-      this.onBack();
-      return true;
-    })
-  }
 }

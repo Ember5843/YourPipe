@@ -2,11 +2,11 @@ import { YTCoreLogger } from '../common/YTCoreLogger';
 import { ContentCountry } from "../model/ContentCountry";
 import { ClientsConstants } from "../model/ClientsConstants";
 import { Localization } from "../model/Localization";
-import { YoutubeSearchQueryHandlerFactory } from "../common/YoutubeSearchQueryHanderFactory";
+import { YoutubeSearchQueryHandlerFactory } from "../common/YoutubeSearchQueryHandlerFactory";
 import { SearchContentFilter } from "../model/SearchContentFilter";
 import { Utils } from "../common/Utils";
 import { WebClientVersionResolver, ClientVersionGet } from "../common/WebClientVersionResolver";
-import { HttpDownloader } from "../network/HttpDownloader";
+import { HttpDownloader, HttpError } from "../network/HttpDownloader";
 import { AuthSessionManager } from "../auth/AuthSessionManager";
 import { AuthExpiredError, isAuthRejectionResponse } from "../auth/AuthExpiredError";
 import { buildWebRailHeaders, SOCS_CONSENT_COOKIE } from "../auth/WebRailHeaders";
@@ -286,13 +286,27 @@ async function getJsonPostResponse(
   if (apiKey && apiKey.length > 0) {
     params.unshift(`key=${apiKey}`);
   }
-  const response: http.HttpResponse = await downloader.post(
-    YOUTUBEI_V1_URL + endpoint + '?' + params.join('&'),
-    body,
-    headers,
-    localization,
-    "application/json"
-  );
+  let response: http.HttpResponse;
+  try {
+    response = await downloader.post(
+      YOUTUBEI_V1_URL + endpoint + '?' + params.join('&'),
+      body,
+      headers,
+      localization,
+      "application/json"
+    );
+  } catch (e) {
+    // HttpDownloader throws HttpError on >= 400; keep the typed 401 so auth
+    // expiry surfaces as AuthExpiredError instead of a flattened Error.
+    if (e instanceof HttpError) {
+      if (withAuth && e.responseCode === 401) {
+        logger.warn(`[WEB-api] HTTP 401 with auth endpoint=${endpoint}`);
+        throw new AuthExpiredError(`WEB api 401 endpoint=${endpoint}`, e.responseCode);
+      }
+      throw e;
+    }
+    throw new Error(String(e));
+  }
   const raw = typeof response.result === 'string'
     ? response.result as string
     : JSON.stringify(response.result);
@@ -319,13 +333,29 @@ async function getJsonPostResponseTv(
 ): Promise<Object | null> {
   const headers = await getTvYoutubeHeaders(localization, withAuth);
   headers['Content-Type'] = ['application/json'];
-  const response: http.HttpResponse = await downloader.post(
-    YOUTUBEI_V1_URL + endpoint + '?' + DISABLE_PRETTY_PRINT_PARAMETER,
-    body,
-    headers,
-    localization,
-    "application/json"
-  );
+  let response: http.HttpResponse;
+  try {
+    response = await downloader.post(
+      YOUTUBEI_V1_URL + endpoint + '?' + DISABLE_PRETTY_PRINT_PARAMETER,
+      body,
+      headers,
+      localization,
+      "application/json"
+    );
+  } catch (e) {
+    // HttpDownloader throws HttpError on >= 400; align with the legacy
+    // code !== 200 degradation (log + null), except 401+auth → AuthExpiredError.
+    if (e instanceof HttpError) {
+      const code = e.responseCode ?? 0;
+      const snippet = (e.responseBody || '').substring(0, 240).replace(/\s+/g, ' ');
+      logger.error(`[TV-browse] HTTP ${code} endpoint=${endpoint} body=${snippet}`);
+      if (withAuth && code === 401) {
+        throw new AuthExpiredError(`TV api 401 endpoint=${endpoint}`, code);
+      }
+      return null;
+    }
+    throw new Error(String(e));
+  }
   const code = response.responseCode;
   const raw = typeof response.result === 'string'
     ? response.result as string

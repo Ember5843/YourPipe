@@ -18,6 +18,9 @@ export interface AuthBackupState {
 /** 鉴权持久化 preferences 存储名（"清除所有数据"需要按此名擦除，entry 侧经 Index 导出引用）。 */
 export const AUTH_STORAGE_NAME = 'yourpipe_auth_poc';
 
+/** 登录态/凭据变更监听（单槽；entry 在 init 后接线到 AuthStateHelper.refresh）。 */
+export type AuthStateChangeListener = () => void;
+
 export class AuthSessionManager {
   private static instance: AuthSessionManager | null = null;
   private static readonly STORAGE_NAME: string = AUTH_STORAGE_NAME;
@@ -101,6 +104,26 @@ export class AuthSessionManager {
     return AuthSessionManager.instance;
   }
 
+  private static authStateChangeListener?: AuthStateChangeListener;
+
+  /** 注册/清除登录态变更监听（单槽，后注册覆盖先注册；同 HttpDownloader.setSetCookieObserver 风格）。 */
+  static setAuthStateChangeListener(listener?: AuthStateChangeListener): void {
+    AuthSessionManager.authStateChangeListener = listener;
+  }
+
+  /** 凭据状态变更 + 持久化完成后通知监听者；监听器异常不外抛。 */
+  private static emitAuthStateChange(): void {
+    const listener = AuthSessionManager.authStateChangeListener;
+    if (!listener) {
+      return;
+    }
+    try {
+      listener();
+    } catch (e) {
+      logger.error('AuthStateChangeListener threw');
+    }
+  }
+
   /** 记录一次登录态被拒（不携带任何凭据值），供 UI 层提示重新登录。 */
   noteAuthRejection(rail: string, reason: string): void {
     logger.warn(`Auth rejection noticed rail=${rail} reason=${reason}`);
@@ -169,6 +192,7 @@ export class AuthSessionManager {
     if (cleared) {
       logger.warn(`Account cookies cleared by server names=[${appliedNames.join(',')}]`);
       this.noteAuthRejection('web', 'server-cleared');
+      AuthSessionManager.emitAuthStateChange();
     } else {
       logger.info(`Account cookies updated names=[${appliedNames.join(',')}]`);
     }
@@ -643,6 +667,7 @@ export class AuthSessionManager {
           this.accessTokenExpiresAt = 0;
           this.persistRefreshToken();
           this.noteAuthRejection('tv', 'invalid_grant');
+          AuthSessionManager.emitAuthStateChange();
         }
         const status = this.getStatus();
         status.stage = AuthStage.FAILED;
@@ -666,6 +691,7 @@ export class AuthSessionManager {
     this.applyToken(token);
     this.persistRefreshToken();
     logger.info('POC token saved');
+    AuthSessionManager.emitAuthStateChange();
     return this.getStatus();
   }
 
@@ -683,6 +709,7 @@ export class AuthSessionManager {
     this.persistUseAuthForUserData();
     this.persistUseAuthForPlayback();
     logger.info('Signed out');
+    AuthSessionManager.emitAuthStateChange();
     return this.getStatus();
   }
 
@@ -724,6 +751,7 @@ export class AuthSessionManager {
     this.persistCookieCredential();
     this.persistAuthEnabled();
     logger.info('Cookie credential saved');
+    AuthSessionManager.emitAuthStateChange();
     return this.getStatus();
   }
 

@@ -14,6 +14,7 @@
  */
 
 import { StreamInfo } from './VideoData';
+import { ItagItem } from 'youtube_core';
 import Logger from '../utils/Logger';
 
 const TAG: string = '[PlayerLog][PlayerModel]';
@@ -44,95 +45,6 @@ export interface StreamClassification {
   mergedVideoList: VideoEntry[];
 }
 
-export interface AudioTrackOption {
-  trackId: string;
-  label: string;
-}
-
-// YouTube itag 映射表 (2024-2026 完整版)
-export interface ItagMetadata {
-  quality: string;
-  type: 'video' | 'audio' | 'muxed';
-  height?: number;
-  bitrate?: number; // 约等于的码率，用于排序
-}
-
-export const ITAG_MAP: Record<number, ItagMetadata> = {
-  // --- Muxed (Video + Audio) (Progressive) ---
-  17: { quality: '144p', type: 'muxed', height: 144 },
-  36: { quality: '240p', type: 'muxed', height: 240 },
-  18: { quality: '360p', type: 'muxed', height: 360 },
-  34: { quality: '360p', type: 'muxed', height: 360 },
-  35: { quality: '480p', type: 'muxed', height: 480 },
-  59: { quality: '480p', type: 'muxed', height: 480 },
-  78: { quality: '480p', type: 'muxed', height: 480 },
-  22: { quality: '720p', type: 'muxed', height: 720 },
-  37: { quality: '1080p', type: 'muxed', height: 1080 },
-  38: { quality: '1080p', type: 'muxed', height: 1080 },
-  43: { quality: '360p', type: 'muxed', height: 360 },
-  44: { quality: '480p', type: 'muxed', height: 480 },
-  45: { quality: '720p', type: 'muxed', height: 720 },
-  46: { quality: '1080p', type: 'muxed', height: 1080 },
-
-  // --- DASH Audio Only ---
-  171: { quality: 'Medium', type: 'audio', bitrate: 128 },
-  172: { quality: 'High', type: 'audio', bitrate: 256 },
-  599: { quality: 'UltraLow', type: 'audio', bitrate: 32 },
-  139: { quality: 'Low', type: 'audio', bitrate: 48 },
-  140: { quality: 'Medium', type: 'audio', bitrate: 128 },
-  141: { quality: 'High', type: 'audio', bitrate: 256 },
-  600: { quality: 'UltraLow', type: 'audio', bitrate: 35 },
-  249: { quality: 'Low', type: 'audio', bitrate: 50 },
-  250: { quality: 'Medium', type: 'audio', bitrate: 70 },
-  251: { quality: 'High', type: 'audio', bitrate: 160 },
-  256: { quality: 'High', type: 'audio', bitrate: 192 },
-  258: { quality: 'High', type: 'audio', bitrate: 384 },
-
-  // --- DASH Video Only (MPEG-4, VP9, AV1) ---
-  160: { quality: '144p', type: 'video', height: 144 },
-  394: { quality: '144p', type: 'video', height: 144 },
-  278: { quality: '144p', type: 'video', height: 144 },
-  
-  133: { quality: '240p', type: 'video', height: 240 },
-  395: { quality: '240p', type: 'video', height: 240 },
-  242: { quality: '240p', type: 'video', height: 240 },
-
-  134: { quality: '360p', type: 'video', height: 360 },
-  396: { quality: '360p', type: 'video', height: 360 },
-  243: { quality: '360p', type: 'video', height: 360 },
-
-  135: { quality: '480p', type: 'video', height: 480 },
-  212: { quality: '480p', type: 'video', height: 480 },
-  397: { quality: '480p', type: 'video', height: 480 },
-  244: { quality: '480p', type: 'video', height: 480 },
-  245: { quality: '480p', type: 'video', height: 480 },
-  246: { quality: '480p', type: 'video', height: 480 },
-
-  136: { quality: '720p', type: 'video', height: 720 },
-  398: { quality: '720p', type: 'video', height: 720 },
-  247: { quality: '720p', type: 'video', height: 720 },
-  298: { quality: '720p60', type: 'video', height: 720 },
-  302: { quality: '720p60', type: 'video', height: 720 },
-
-  137: { quality: '1080p', type: 'video', height: 1080 },
-  399: { quality: '1080p', type: 'video', height: 1080 },
-  248: { quality: '1080p', type: 'video', height: 1080 },
-  299: { quality: '1080p60', type: 'video', height: 1080 },
-  303: { quality: '1080p60', type: 'video', height: 1080 },
-
-  400: { quality: '1440p', type: 'video', height: 1440 },
-  271: { quality: '1440p', type: 'video', height: 1440 },
-  308: { quality: '1440p60', type: 'video', height: 1440 },
-
-  266: { quality: '2160p', type: 'video', height: 2160 },
-  401: { quality: '2160p', type: 'video', height: 2160 },
-  272: { quality: '2160p', type: 'video', height: 2160 },
-  313: { quality: '2160p', type: 'video', height: 2160 },
-  315: { quality: '2160p60', type: 'video', height: 2160 },
-
-  402: { quality: '4320p', type: 'video', height: 4320 }
-};
-
 @Observed
 export class PlayerModel {
   @Track public categorizedStreams: StreamCategories = {
@@ -156,8 +68,8 @@ export class PlayerModel {
 
   /**
    * 获取流的友好质量显示名称。
-   * 权威来源是 extractor 填充的 quality（youtube_core ItagItem.qualityLabel，
-   * 经 YouTubePlayService.mapToPlayerStreams 映射）；ITAG_MAP 仅作为
+   * 权威来源是 extractor 填充的 quality（youtube_core ItagItem，
+   * 经 YouTubePlayService.mapToPlayerStreams 映射）；ItagItem 表仅作为
    * 未携带 quality 字段的流的兜底，不再参与正常路径。
    */
   public static getFriendlyQuality(stream: StreamInfo): string {
@@ -166,8 +78,7 @@ export class PlayerModel {
       baseQuality = stream.audioQuality.replace('AUDIO_QUALITY_', '').toLowerCase();
     }
     if (!baseQuality) {
-      const itagMeta = stream.itag ? ITAG_MAP[stream.itag] : undefined;
-      baseQuality = itagMeta ? itagMeta.quality : 'Unknown';
+      baseQuality = PlayerModel.itagFallbackQuality(stream.itag);
     }
 
     let result = baseQuality;
@@ -180,6 +91,23 @@ export class PlayerModel {
 
     // 在末尾加上方括号带上 itag
     return stream.itag ? `${result} [${stream.itag}]` : result;
+  }
+
+  /**
+   * itag 兜底质量标签：查 youtube_core ItagItem 表（视频取 resolutionString，
+   * 音频取平均码率）。ItagItem 表之外或未带 itag 的流返回 'Unknown'。
+   */
+  private static itagFallbackQuality(itag?: number): string {
+    if (itag === undefined || !ItagItem.isSupported(itag)) {
+      return 'Unknown';
+    }
+    const item = ItagItem.getItag(itag);
+    const resolution = item.getResolutionString();
+    if (resolution) {
+      return resolution;
+    }
+    const avgBitrate = item.getAverageBitrate();
+    return avgBitrate > 0 ? `${avgBitrate}kbps` : 'Unknown';
   }
 
   /** SABR 流判定唯一实现（播放 / 下载 / 离线共用）。 */

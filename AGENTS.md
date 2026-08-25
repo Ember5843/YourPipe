@@ -12,8 +12,8 @@
 > write changelogs, commit history, or “recent change” bullet lists.
 
 ## 1. Project
-- **Name / package**: YourPipe (`com.talon.yourpipe`, vendor `talon`, v0.5.8,
-  versionCode 1000020).
+- **Name / package**: YourPipe (`com.talon.yourpipe`, vendor `talon`, v0.5.9,
+  versionCode 1000022).
 - **What it is**: YouTube client for OpenHarmony / HarmonyOS. Plays YouTube
   content through a native **MPV** pipeline (vendored `libmpv.so` + static
   `libav*` for mux/remux). Product VOD path is **direct-link DASH** for guest
@@ -21,8 +21,9 @@
   adaptiveFormats direct URLs → dual-track local proxy → MPV); signed-in
   playback defaults to **mweb SABR/UMP**. Both states are user-selectable
   (Options → 播放端点: guest `visionos|mweb`, signed-in
-  `tv_downgraded|mweb`). `android_vr` remains as an unused fallback selection
-  (requires a session pot; dropped upstream by PipePipe v5.3.0).
+  `tv_downgraded|mweb`). `android_vr` and `web_safari` are unused endpoints,
+  unreachable in product (no UI, kept for reference only); `android_vr`
+  requires a session pot and was dropped upstream by PipePipe v5.3.0.
   The `libmpv_napi` module
   (`MpvPlayerView` / `MpvPlayerController`) is the NAPI bridge to MPV,
   originally derived from the upstream `wang-bin/libmdk-napi` package
@@ -210,7 +211,8 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
 - **Playback media path**: guest VOD is direct-link-first (`visionos` →
   adaptiveFormats direct URLs → local range/DASH proxy); signed-in VOD
   defaults to the mweb **SABR** path, with `tv_downgraded` direct links
-  still selectable. `android_vr` is an unused fallback selection that
+  still selectable. `android_vr` and `web_safari` are unused endpoints,
+  unreachable in product (no UI, kept for reference only); `android_vr`
   requires a session pot. SABR ownership:
   extractor bootstraps SABR; `youtube_core` owns UMP session fetch;
   `mediaservice` owns lease/store/serve + MPV load URL; `entry` owns PoToken

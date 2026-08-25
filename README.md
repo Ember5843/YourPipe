@@ -25,7 +25,7 @@ YourPipe is a YouTube client for **OpenHarmony / HarmonyOS**. It extracts stream
 | | |
 |---|---|
 | **Package** | `com.talon.yourpipe` |
-| **Version** | `0.5.8` |
+| **Version** | `0.5.9` |
 | **Target SDK** | `6.1.0(23)` · HarmonyOS · stage model |
 | **Devices** | phone · tablet · 2in1 · tv · car |
 

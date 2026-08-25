@@ -1,5 +1,5 @@
 import nativeModule from 'libmpv_napi.so';
-import { MediaStatus, PlaybackState, SeekFlag } from '../enums';
+import { PlaybackState } from '../enums';
 import type { MediaInfo } from '../media-info';
 
 function createPlayerId(): string {
@@ -35,8 +35,8 @@ export class MpvPlayerController {
     nativeModule.prepare(this.playerId, startPosition);
   }
 
-  seek(positionMs: number, flags: SeekFlag = SeekFlag.Default): void {
-    nativeModule.seekWithFlags(this.playerId, positionMs, flags);
+  seek(positionMs: number): void {
+    nativeModule.seekWithFlags(this.playerId, positionMs);
   }
 
   setPlaybackRate(rate: number): void {
@@ -71,16 +71,8 @@ export class MpvPlayerController {
     return nativeModule.getState(this.playerId);
   }
 
-  getMediaStatus(): MediaStatus {
-    return nativeModule.getMediaStatus(this.playerId);
-  }
-
   getMediaInfo(): MediaInfo {
     return nativeModule.getMediaInfo(this.playerId);
-  }
-
-  isPlaying(): boolean {
-    return nativeModule.isPlaying(this.playerId);
   }
 
   setVideoSurfaceSize(width: number, height: number): void {

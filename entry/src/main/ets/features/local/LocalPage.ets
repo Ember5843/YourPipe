@@ -24,20 +24,10 @@ import {
 } from '../../common/components/MediaCardTokens';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { formatDurationHms } from '../../common/utils/FormatUtils';
 import { AppLog } from '../../common/AppLog';
 
 const logger = AppLog.getInstance('LocalPage');
-
-/** 将秒数格式化为 mm:ss 或 hh:mm:ss */
-function formatDuration(sec: number): string {
-  if (sec <= 0) return '';
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  const mm = m.toString().padStart(2, '0');
-  const ss = s.toString().padStart(2, '0');
-  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
-}
 
 /** 格式化相对时间：刚刚 / N 分钟前 / N 小时前 / N 天前 */
 function formatRelativeTime(ts: number): ResourceStr {
@@ -162,7 +152,7 @@ struct HistoryCard {
 
           if (this.item.durationSec > 0) {
             Row() {
-              Text(formatDuration(this.item.durationSec))
+              Text(formatDurationHms(this.item.durationSec))
                 .fontSize(10)
                 .fontColor(Color.White)
                 .backgroundColor('rgba(0,0,0,0.75)')

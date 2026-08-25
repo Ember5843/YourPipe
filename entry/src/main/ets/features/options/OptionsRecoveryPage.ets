@@ -44,7 +44,7 @@ export struct OptionsRecoveryPage {
               icon: $r('sys.symbol.trash'),
               title: $r('app.string.yt_option_clear_all_data'),
               subtitle: $r('app.string.yt_option_clear_all_data_subtitle'),
-              iconColor: $r('app.color.yourtube_text_warning'),
+              iconColor: this.themePrimary,
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               transparentBackground: true,
               onClickAction: this.params.onClearAllDataClick

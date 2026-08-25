@@ -541,16 +541,8 @@
             "value": "Kein Inhalt"
         },
         {
-            "name": "yt_video_details",
-            "value": "Videodetails"
-        },
-        {
             "name": "yt_error_invalid_video",
             "value": "Keine gültigen Video-Informationen"
-        },
-        {
-            "name": "yt_notice_direct_link_removed",
-            "value": "Direktlink-Funktion entfernt, zukünftig einheitliche Verarbeitung."
         },
         {
             "name": "yt_dialog_select_quality",
@@ -2687,6 +2679,34 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "Mehr Diagnosen für Wiedergabe, Anmeldung, Token, Aktualisierung und Fallbacks ohne sensible Cookies oder signierte URLs im Protokoll"
+        },
+        {
+            "name": "yt_changelog_0_5_9_1",
+            "value": "Feed-Seiten nutzen jetzt lazy geladene Grids/Listen: flüssigeres Scrollen in Start, Suche, Playlist, Kanal und Abos"
+        },
+        {
+            "name": "yt_changelog_0_5_9_2",
+            "value": "Absturz beim Kaltstart auf einigen Geräten behoben (@BuilderParam-Bindung)"
+        },
+        {
+            "name": "yt_changelog_0_5_9_3",
+            "value": "Abgelaufene Anmeldung wird jetzt korrekt behandelt: Fehler werden durchgereicht und ein Hinweis angezeigt"
+        },
+        {
+            "name": "yt_changelog_0_5_9_4",
+            "value": "Options-Icons und Buttons für kritische Aktionen folgen jetzt der Themenfarbe (festes Warnrot entfernt)"
+        },
+        {
+            "name": "yt_changelog_0_5_9_5",
+            "value": "Textkodierung, Base64 und URL-Parsing nutzen jetzt offizielle System-Implementierungen"
+        },
+        {
+            "name": "yt_changelog_0_5_9_6",
+            "value": "Toter Code wie Cast-Links und Status-Polling entfernt, Paketgröße reduziert"
+        },
+        {
+            "name": "yt_changelog_0_5_9_7",
+            "value": "Stabilitätsfixes für Prefetch-Zuordnung und Hintergrund-Guards"
         },
         {
             "name": "yt_changelog_0_5_8_1",

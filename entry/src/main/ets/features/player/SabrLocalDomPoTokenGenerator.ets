@@ -259,22 +259,21 @@ function decodeJsString(value: string): string {
 }
 
 function decodeBase64Url(value: string): Uint8Array {
+  // Normalize base64url (RFC 4648 §5, '.' as padding) to standard base64 and
+  // decode via the platform API. The previous hand-rolled decoder stopped at
+  // the first non-alphabet character and never required '=' padding; keep that
+  // tolerance by decoding only the valid alphabet prefix, padded to a full
+  // quantum (a lone leftover char carries 6 bits and decodes to nothing).
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
-  const table = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const out: number[] = [];
-  let buffer = 0;
-  let bits = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    const digit = table.indexOf(normalized.charAt(i));
-    if (digit < 0) break;
-    buffer = (buffer << 6) | digit;
-    bits += 6;
-    if (bits >= 8) {
-      bits -= 8;
-      out.push((buffer >> bits) & 0xff);
-    }
+  const match = normalized.match(/^[A-Za-z0-9+/]*/);
+  let prefix = match ? match[0] : '';
+  if (prefix.length % 4 === 1) {
+    prefix = prefix.substring(0, prefix.length - 1);
   }
-  return new Uint8Array(out);
+  while (prefix.length % 4 !== 0) {
+    prefix += '=';
+  }
+  return new util.Base64Helper().decodeSync(prefix);
 }
 
 function bytesToCsv(bytes: Uint8Array): string {

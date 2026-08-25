@@ -42,45 +42,6 @@ export class Utils {
   }
 
   /**
-   * Convert a mixed number word to a number (long).
-   * 1.23K -> 1230
-   */
-  public static mixedNumberWordToLong(numberWord: string): number {
-    // 模拟原 Java 代码中的 Parser 逻辑
-    // 匹配数字部分和单位部分 (K, M, B)
-    const multiplierRegex = /[\d]+([.,][\d]+)?([KMBkmb])+/;
-    const match = numberWord.match(multiplierRegex);
-
-    let multiplier = "";
-    if (match && match[2]) {
-      multiplier = match[2];
-    }
-
-    // 提取数字部分
-    const numberRegex = /([\d]+([.,][\d]+)?)/;
-    const numberMatch = numberWord.match(numberRegex);
-
-    if (!numberMatch) {
-      throw new ParsingException("Could not parse number from: " + numberWord);
-    }
-
-    // 将逗号替换为点，以便 parseFloat 识别
-    const countStr = numberMatch[1].replace(",", ".");
-    const count = parseFloat(countStr);
-
-    switch (multiplier.toUpperCase()) {
-      case "K":
-        return Math.floor(count * 1e3);
-      case "M":
-        return Math.floor(count * 1e6);
-      case "B":
-        return Math.floor(count * 1e9);
-      default:
-        return Math.floor(count);
-    }
-  }
-
-  /**
    * Check if the url matches the pattern.
    */
   public static checkUrl(pattern: string, url: string): void {

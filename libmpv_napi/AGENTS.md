@@ -23,9 +23,9 @@
   the product player renders through entry's inline XComponent + `surfaceId`
   (see §5); this component is retained for a possible switch back to the
   libraryname-driven path.
-- `MpvPlayerController` — TS controller over the native player (load,
-  play, pause, seek, set/get properties, register event callback).
-- Enums: `MediaStatus`, `MediaType`, `PlaybackState`, `SeekFlag`, `VideoFit`.
+- `MpvPlayerController` — TS controller over the native player (setMedia,
+  prepare, play, pause, seek, set/get properties, register event callback).
+- Enums: `MediaStatus`, `MediaType`, `PlaybackState`, `VideoFit`.
 - `MediaInfo` + codec parameter / stream info types.
 - `muxAudioVideo` — local-file remux (re-exported via `mediaservice`).
 - `setHttpProxyEnv(url)` — sets/clears the process-level `http_proxy` +
@@ -60,7 +60,6 @@ libmpv_napi/src/main/
     hwdec_probe.cpp / .h               — OHOS HW decoder capability probe;
                                          also derives the hwdec-codecs whitelist
                                          (probe-filtered, legacy full list on probe failure)
-    vpe_probe.cpp / .h                 — VPE (Video Processing Engine) capability probe
     mpv_ohcodec_shim.cpp               — OHOS hardware codec adapter for MPV
     ffmpeg-sdk/                        — vendored static libs (read-only; arm64)
     mpv-sdk/                           — vendored libmpv.so.2 (read-only; arm64)
@@ -74,7 +73,7 @@ libmpv_napi/src/main/
 - **arm64-v8a** product libraries:
   - `mpv_napi` (MODULE) — the NAPI bridge `.so` consumed by ArkTS.
   - `mpv_ohcodec_shim` (SHARED) — the OHOS hardware codec adapter for MPV,
-    copied next to `libmpv_napi.so` at install time.
+    copied next to `libmpv_napi.so` via a POST_BUILD copy.
 - Product links:
   - `ace_napi.z`, `ace_ndk.z`, `hilog_ndk.z`, `ohfileuri`,
     `native_window` (surface / XComponent correlation)
@@ -86,7 +85,7 @@ libmpv_napi/src/main/
   - `-Wl,--start-group` / `--end-group` to resolve the avformat/avcodec/
     avutil circular references.
   - `native_media_core`, `native_media_codecbase`, `native_media_vdec`
-    (for the ohdec codec shim), `video_processing` (for the VPE probe).
+    (for the ohdec codec shim).
   - `z` for `libxml2`.
 - POST_BUILD copies `libmpv.so.2` from `mpv-sdk/lib/${OHOS_ARCH}/` next to
   `libmpv_napi.so` (arm64 only).
@@ -153,6 +152,5 @@ are built in WSL and then vendored here:
 - Embed app audio-focus or presentation policy in native code.
 - Add top-level mutable state in `src/main/ets/index.ets`; export
   factories or `getInstance()` accessors instead.
-- Commit `Crash_*.dmp`, `.cxx/`, `build/`, `.hvigor/` artifacts or any
-  `AGENTS.md`.
+- Commit `Crash_*.dmp`, `.cxx/`, `build/`, `.hvigor/` artifacts.
 - Put changelogs or commit-specific notes into this file.

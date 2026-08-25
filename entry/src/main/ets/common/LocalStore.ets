@@ -2,6 +2,8 @@ import { AppLog } from './AppLog';
 import { SubscriptionUser } from './SubscriptionModel';
 import { VideoItem } from 'youtube_core';
 import { PlaylistItem, StoredLocalQueue } from './PlaylistModel';
+import { PreferencesStore } from './PreferencesStore';
+import { SubscriptionFeedStore } from './SubscriptionFeedStore';
 
 const logger = AppLog.getInstance('LocalStore');
 
@@ -119,6 +121,56 @@ export class LocalStore {
 
   static saveLocalQueues(queues: StoredLocalQueue[]): string {
     return JSON.stringify(queues);
+  }
+
+  /** Preferences → AppStorage('subscriptions')；@StorageLink 消费方随 AppStorage 写入自动刷新 */
+  static loadSubscriptionsToAppStorage(): void {
+    const stored = PreferencesStore.getString('subscriptionsJson', '[]');
+    AppStorage.setOrCreate('subscriptions', LocalStore.loadSubscriptions(stored));
+  }
+
+  /** AppStorage('subscriptions') → Preferences；调用前需已通过 @StorageLink 写入新值 */
+  static persistSubscriptions(): void {
+    const subscriptions = AppStorage.get<SubscriptionUser[]>('subscriptions') ?? [];
+    PreferencesStore.setString('subscriptionsJson', LocalStore.saveSubscriptions(subscriptions));
+    // 订阅列表变化（增/删/云端合并）→ 动态缓存清零，下次进入动态页重新拉取
+    SubscriptionFeedStore.clear();
+  }
+
+  /** Preferences → AppStorage('favorites') */
+  static loadFavoritesToAppStorage(): void {
+    const stored = PreferencesStore.getString('favoritesJson', '[]');
+    AppStorage.setOrCreate('favorites', LocalStore.loadFavorites(stored));
+  }
+
+  /** AppStorage('favorites') → Preferences */
+  static persistFavorites(): void {
+    const favorites = AppStorage.get<VideoItem[]>('favorites') ?? [];
+    PreferencesStore.setString('favoritesJson', LocalStore.saveFavorites(favorites));
+  }
+
+  /** Preferences → AppStorage('playlists') */
+  static loadPlaylistsToAppStorage(): void {
+    const stored = PreferencesStore.getString('playlistsJson', '[]');
+    AppStorage.setOrCreate('playlists', LocalStore.loadPlaylists(stored));
+  }
+
+  /** AppStorage('playlists') → Preferences */
+  static persistPlaylists(): void {
+    const playlists = AppStorage.get<PlaylistItem[]>('playlists') ?? [];
+    PreferencesStore.setString('playlistsJson', LocalStore.savePlaylists(playlists));
+  }
+
+  /** Preferences → AppStorage('localQueues') */
+  static loadLocalQueuesToAppStorage(): void {
+    const stored = PreferencesStore.getString('localQueuesJson', '[]');
+    AppStorage.setOrCreate('localQueues', LocalStore.loadLocalQueues(stored));
+  }
+
+  /** AppStorage('localQueues') → Preferences */
+  static persistLocalQueues(): void {
+    const queues = AppStorage.get<StoredLocalQueue[]>('localQueues') ?? [];
+    PreferencesStore.setString('localQueuesJson', LocalStore.saveLocalQueues(queues));
   }
 
   private static asString(value: Object | undefined): string {

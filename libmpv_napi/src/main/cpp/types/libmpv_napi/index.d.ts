@@ -26,87 +26,44 @@ export const enum MediaStatus {
   Invalid = 1 << 31,
 }
 
-export const enum SeekFlag {
-  From0 = 1,
-  FromStart = 1 << 1,
-  FromNow = 1 << 2,
-  Frame = 1 << 6,
-  KeyFrame = 1 << 8,
-  Fast = KeyFrame,
-  AnyFrame = 1 << 9,
-  InCache = 1 << 10,
-  Backward = 1 << 16,
-  Default = KeyFrame | FromStart | InCache,
-}
-
 // Note: these enums are defined as ArkTS enums in the HAR package.
 // Import enums from ETS files when writing app code.
+// Field sets mirror exactly what media_info_napi.cpp produces from live mpv
+// properties.
 export interface AudioCodecParameters {
   codec: string;
-  codecTag: number;
-  extraDataSize: number;
-  bitRate: number;
-  profile: number;
-  level: number;
-  frameRate: number;
-  isFloat: boolean;
-  isUnsigned: boolean;
-  isPlanar: boolean;
-  rawSampleSize: number;
   channels: number;
   sampleRate: number;
-  blockAlign: number;
-  frameSize: number;
+  bitRate: number;
+  format: string;
+  channelLayout: string;
 }
 
 export interface VideoCodecParameters {
   codec: string;
-  codecTag: number;
-  extraDataSize: number;
-  bitRate: number;
-  profile: number;
-  level: number;
-  frameRate: number;
-  format: number;
   formatName: string;
   width: number;
   height: number;
-  bFrames: number;
-  par: number;
-  colorSpace: number;
-  doviProfile: number;
+  frameRate: number;
+  bitRate: number;
+  pixelFormat: string;
+  colorSpace: string;
+  primaries: string;
+  gamma: string;
+  hwdec: string;
 }
 
-export interface SubtitleCodecParameters {
-  codec: string;
-  codecTag: number;
-  extraDataSize: number;
-  width: number;
-  height: number;
-}
-
-export interface MediaStreamInfo {
+export interface AudioStreamInfo {
   index: number;
-  startTime: number;
-  duration: number;
-  metadata: Record<string, string>;
-}
-
-export interface AudioStreamInfo extends MediaStreamInfo {
-  frames: number;
   codec: AudioCodecParameters;
 }
 
-export interface VideoStreamInfo extends MediaStreamInfo {
-  frames: number;
+export interface VideoStreamInfo {
+  index: number;
   rotation: number;
   width: number;
   height: number;
   codec: VideoCodecParameters;
-}
-
-export interface SubtitleStreamInfo extends MediaStreamInfo {
-  codec: SubtitleCodecParameters;
 }
 
 export interface MediaInfo {
@@ -115,26 +72,26 @@ export interface MediaInfo {
   bitRate: number;
   format: string;
   streams: number;
-  metadata: Record<string, string>;
   audio: AudioStreamInfo[];
   video: VideoStreamInfo[];
-  subtitle: SubtitleStreamInfo[];
+  // Extra live fields read from mpv (best-effort; may be empty/0 when unknown).
+  title?: string;
+  fileSize?: string;
+  frameRate?: number;
 }
 
-// Note: MediaType, PlaybackState, MediaStatus, SeekFlag are defined as ArkTS
-// enums in enums.ets and should be imported from the HAR package, not from
-// this native module.
+// Note: MediaType, PlaybackState, MediaStatus are defined as ArkTS enums in
+// enums.ets and should be imported from the HAR package, not from this native
+// module.
 
 export interface NativeMpvPlayerModule {
-  ensurePlayer: (playerId: string) => void;
   releasePlayer: (playerId: string) => void;
   setMedia: (playerId: string, url: string, startPositionMs?: number) => void;
   play: (playerId: string) => void;
   pause: (playerId: string) => void;
   stop: (playerId: string) => void;
   prepare: (playerId: string, startPosition?: number) => void;
-  seek: (playerId: string, positionMs: number) => void;
-  seekWithFlags: (playerId: string, positionMs: number, flags: number) => void;
+  seekWithFlags: (playerId: string, positionMs: number) => void;
   setPlaybackRate: (playerId: string, rate: number) => void;
   setVolume: (playerId: string, volume: number) => void;
   setProperty: (playerId: string, key: string, value: string) => void;
@@ -149,7 +106,6 @@ export interface NativeMpvPlayerModule {
   isPlaying: (playerId: string) => boolean;
   setVideoSurfaceSize: (playerId: string, width: number, height: number) => void;
   setVideoSurfaceId: (playerId: string, surfaceId: string) => void;
-  ffmpegVersion: () => string;
   /**
    * Set/clear the process-level HTTP proxy env (http_proxy / no_proxy) honored
    * by the vendored FFmpeg for MPV-direct fetches (HLS masters/segments,

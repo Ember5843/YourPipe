@@ -23,6 +23,7 @@ export {
 } from './src/main/ets/extractor/YouTubeExceptions';
 export { CommentItem, CommentResponse } from './src/main/ets/extractor/CommentItem';
 export { parseHlsMasterManifest } from './src/main/ets/extractor/HlsManifestParser';
+export { ItagItem } from './src/main/ets/extractor/itag/ItagItem';
 
 // ── sabr（opt-in/debug 路径） ──
 export { YoutubeSabrInfo, YoutubeSabrFormatMeta } from './src/main/ets/extractor/sabr/YoutubeSabrInfo';

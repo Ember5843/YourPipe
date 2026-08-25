@@ -2,7 +2,6 @@ import { AppLog } from '../../common/AppLog';
 import { sharePlainText } from '../../common/utils/ShareUtil';
 import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 import { ActionHub } from '../../common/ActionHub';
-import { customAnimationUtil } from '../../common/AnimationUtil';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { SearchPlaylistItem } from 'youtube_core';
@@ -14,10 +13,12 @@ import { SubscriptionFeedService } from '../../features/subscription/Subscriptio
 import { VideoCard } from '../../common/components/VideoCard';
 import { VideoCardGrid } from '../../common/components/VideoCardGrid';
 import { MediaThumb } from '../../common/components/MediaThumb';
+import { MediaFeedItemSlot, MediaVideoFeed } from '../../common/components/MediaVideoFeed';
+import { FeedDataSource } from '../../common/model/FeedDataSource';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
 import { PlayQueueSourceHint } from '../player/PlayQueueManager';
-import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { getFeedContentWidthVp, getVideoGridColumnCount, getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 
 const logger = AppLog.getInstance('PlaylistDetailPage');
 
@@ -31,7 +32,7 @@ export struct PlaylistDetailPage {
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
 
-  @State videoList: VideoItem[] = [];
+  @State @Watch('syncFeedSource') videoList: VideoItem[] = [];
   @State nextPageToken: string | null = null;
   @State visitorData: string = '';
   @State isLoading: boolean = true;
@@ -39,12 +40,12 @@ export struct PlaylistDetailPage {
   @State errorMessage: string = '';
   @State totalCountText: string = '';
 
-  private readonly GRID_SIDE_PADDING: number = 12;
-
   private rssFallbackService: SubscriptionFeedService = new SubscriptionFeedService();
   private scrollerForScroll: Scroller = new Scroller();
   private scrollerForList: Scroller = new Scroller();
   private readonly SHARE_BUTTON_ID: string = 'playlistShareButtonId';
+  /** 视频列表的 LazyForEach 数据源（videoList 重赋值经 @Watch 同步） */
+  private feedSource: FeedDataSource = new FeedDataSource();
 
   aboutToAppear() {
     this.loadPlaylistVideos();
@@ -72,29 +73,22 @@ export struct PlaylistDetailPage {
     this.actionHub.openVideo(video, hint);
   }
 
-  private getVideoGridColumnCount(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    if (contentWidth >= 1440) {
-      return 5;
-    }
-    if (contentWidth >= 1080) {
-      return 4;
-    }
-    if (contentWidth >= 760) {
-      return 3;
-    }
-    if (contentWidth >= 520) {
-      return 2;
-    }
-    return 1;
+  private syncFeedSource(): void {
+    this.feedSource.setData(this.videoList, PlaylistDetailPage.keyOfVideo);
+  }
+
+  private static keyOfVideo(item: Object): string {
+    const video = item as VideoItem;
+    return video.videoId || video.id.toString();
+  }
+
+  private gridColumns(): number {
+    return getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth));
   }
 
   /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
   private getWideListColumns(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    return getWideListColumnCount(contentWidth);
+    return getWideListColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth));
   }
 
   private async loadPlaylistVideos(): Promise<void> {
@@ -266,184 +260,77 @@ export struct PlaylistDetailPage {
     .backgroundColor($r('app.color.yourtube_bg_surface'))
   }
 
+  @LocalBuilder
+  PlaylistVideoGridCard(slot: MediaFeedItemSlot) {
+    VideoCardGrid({
+      video: slot.item as VideoItem,
+      actionLabel: $r('app.string.yt_action_favorite'),
+      actionType: 'favorite',
+      useFavoriteToggle: true,
+      onOpenVideo: () => {
+        this.openPlaylistVideo(slot.item as VideoItem, slot.index);
+      }
+    })
+  }
+
+  @LocalBuilder
+  PlaylistVideoListCard(slot: MediaFeedItemSlot) {
+    VideoCard({
+      video: slot.item as VideoItem,
+      actionLabel: $r('app.string.yt_action_favorite'),
+      actionType: 'favorite',
+      useFavoriteToggle: true,
+      onOpenVideo: () => {
+        this.openPlaylistVideo(slot.item as VideoItem, slot.index);
+      }
+    })
+  }
+
+  /**
+   * 骨架收敛进 MediaVideoFeed（Grid / 宽列 / 单列 List + LazyForEach）。
+   * 单列 List 保留 onScrollIndex 提前预加载（倒数第 2 项触发 loadMoreVideos）。
+   */
   @Builder
   PlaylistVideos() {
-    Column() {
-      if (this.isLoading) {
-        Row() {
-          LoadingProgress()
-            .color(this.themePrimary)
-            .width(30)
-            .height(30)
+    MediaVideoFeed({
+      dataSource: this.feedSource,
+      gridScroller: this.scrollerForList,
+      listScroller: this.scrollerForList,
+      nestedScrollParentFirst: true,
+      itemKey: PlaylistDetailPage.keyOfVideo,
+      gridItemBuilder: this.PlaylistVideoGridCard,
+      itemBuilder: this.PlaylistVideoListCard,
+      onReachEnd: () => {
+        this.loadMoreVideos();
+      },
+      onScrollIndex: (_first: number, last: number) => {
+        if (this.isLoading || this.isLoadingMore) {
+          return;
         }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 20 })
-      } else if (this.errorMessage.length > 0) {
-        Text(this.errorMessage)
-          .fontSize(12)
-          .fontColor(this.themePrimary)
-          .margin({ left: 16, top: 12 })
-      } else if (this.videoList.length === 0) {
-        Text($r('app.string.yt_empty_no_videos'))
-          .fontSize(13)
-          .fontColor($r('app.color.yourtube_text_quaternary'))
-          .margin({ top: 20 })
-          .width('100%')
-          .textAlign(TextAlign.Center)
-      } else if (this.uiConfig.homeLayoutMode === 'grid') {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getVideoGridColumnCount(),
-              gutter: { x: 8, y: 8 }
-            }) {
-              ForEach(this.videoList, (item: VideoItem, index: number) => {
-                GridCol({ span: 1 }) {
-                  VideoCardGrid({
-                    video: item,
-                    actionLabel: $r('app.string.yt_action_favorite'),
-                    actionType: 'favorite',
-                    useFavoriteToggle: true,
-                    onOpenVideo: () => {
-                      this.openPlaylistVideo(item, index);
-                    }
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-              }, (item: VideoItem) => item.videoId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMore) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
+        if (!this.nextPageToken) {
+          return;
         }
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .height('100%')
-        .align(Alignment.Top)
-        .onReachEnd(() => {
-          if (!this.isLoading && !this.isLoadingMore && this.nextPageToken) {
-            this.loadMoreVideos();
-          }
-        })
-      } else if (this.getWideListColumns() > 1) {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getWideListColumns(),
-              gutter: { x: 8, y: 4 }
-            }) {
-              ForEach(this.videoList, (item: VideoItem, index: number) => {
-                GridCol({ span: 1 }) {
-                  VideoCard({
-                    video: item,
-                    actionLabel: $r('app.string.yt_action_favorite'),
-                    actionType: 'favorite',
-                    useFavoriteToggle: true,
-                    onOpenVideo: () => {
-                      this.openPlaylistVideo(item, index);
-                    }
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-              }, (item: VideoItem) => item.videoId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMore) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .height('100%')
-        .onReachEnd(() => {
+        if (last >= this.videoList.length - 2) {
           this.loadMoreVideos();
-        })
-      } else {
-        List({ space: 4, scroller: this.scrollerForList }) {
-          ForEach(this.videoList, (item: VideoItem, index: number) => {
-            ListItem() {
-              VideoCard({
-                video: item,
-                actionLabel: $r('app.string.yt_action_favorite'),
-                actionType: 'favorite',
-                useFavoriteToggle: true,
-                onOpenVideo: () => {
-                  this.openPlaylistVideo(item, index);
-                }
-              })
-            }
-            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
-          }, (item: VideoItem) => item.videoId || item.id.toString())
-
-          if (this.isLoadingMore) {
-            ListItem() {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
         }
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .height('100%')
-        .onScrollIndex((firstIndex: number, lastIndex: number) => {
-          if (this.isLoading || this.isLoadingMore) {
-            return;
-          }
-          if (!this.nextPageToken) {
-            return;
-          }
-          if (lastIndex >= this.videoList.length - 2) {
-            this.loadMoreVideos();
-          }
-        })
-        .onReachEnd(() => {
-          this.loadMoreVideos();
-        })
+      },
+      params: {
+        layoutPreference: this.uiConfig.homeLayoutMode,
+        gridColumns: this.gridColumns(),
+        listColumns: this.getWideListColumns(),
+        isLoading: this.isLoading,
+        isLoadingMore: this.isLoadingMore,
+        errorMessage: this.errorMessage,
+        emptyText: $r('app.string.yt_empty_no_videos'),
+        hasHeader: false,
+        headerHorizontalBleed: 0,
+        gridContentPadding: { left: 12, right: 12, top: 8, bottom: 12 },
+        listContentPadding: { left: 12, right: 12, top: 8, bottom: 12 },
+        listContentEndOffset: 0,
+        stateScrollable: false,
+        useLayoutWeight: false
       }
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.yourtube_bg_page'))
+    })
   }
 
   build() {

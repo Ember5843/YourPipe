@@ -541,16 +541,8 @@
             "value": "No content"
         },
         {
-            "name": "yt_video_details",
-            "value": "Video Details"
-        },
-        {
             "name": "yt_error_invalid_video",
             "value": "No valid video info"
-        },
-        {
-            "name": "yt_notice_direct_link_removed",
-            "value": "Direct link feature removed, will be handled uniformly later."
         },
         {
             "name": "yt_dialog_select_quality",
@@ -2687,6 +2679,34 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs"
+        },
+        {
+            "name": "yt_changelog_0_5_9_1",
+            "value": "Feed pages switch to lazy-loaded grids/lists: smoother scrolling on Home, Search, Playlist, Channel and Subscriptions"
+        },
+        {
+            "name": "yt_changelog_0_5_9_2",
+            "value": "Fix cold-start crash on some devices (@BuilderParam binding)"
+        },
+        {
+            "name": "yt_changelog_0_5_9_3",
+            "value": "Fix expired sign-in not propagating errors and the home feed falling back silently without a notice"
+        },
+        {
+            "name": "yt_changelog_0_5_9_4",
+            "value": "Option icons and destructive action buttons now follow the theme color; fixed warning red removed"
+        },
+        {
+            "name": "yt_changelog_0_5_9_5",
+            "value": "Text encoding, Base64 and URL parsing now use official system implementations"
+        },
+        {
+            "name": "yt_changelog_0_5_9_6",
+            "value": "Remove dead code such as cast links and status polling to slim the bundle"
+        },
+        {
+            "name": "yt_changelog_0_5_9_7",
+            "value": "Stability fixes for playback prefetch association and background-task guards"
         },
         {
             "name": "yt_changelog_0_5_8_1",

@@ -15,7 +15,6 @@
 #include "hwdec_probe.h"
 #include "media_info_napi.h"
 #include "mux_napi.h"
-#include "vpe_probe.h"
 
 // FFmpeg (n8.0) for direct libav* use — e.g. muxing an audio + video file into
 // one output. These are C headers, so they need C linkage from C++.
@@ -1167,16 +1166,6 @@ napi_value SetVideoSurfaceId(napi_env env, napi_callback_info info)
     return Undefined(env);
 }
 
-napi_value EnsurePlayer(napi_env env, napi_callback_info info)
-{
-    size_t argc = 1; napi_value args[1];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    lockFor(ToString(env, args[0]), [](PlayerContext& ctx) {
-        PostCommand(ctx, [](PlayerContext& workerCtx) { EnsureMpv(workerCtx); });
-    });
-    return Undefined(env);
-}
-
 napi_value ReleasePlayer(napi_env env, napi_callback_info info)
 {
     size_t argc = 1; napi_value args[1];
@@ -1273,28 +1262,9 @@ napi_value Prepare(napi_env env, napi_callback_info info)
     return Undefined(env);
 }
 
-napi_value Seek(napi_env env, napi_callback_info info)
-{
-    size_t argc = 2; napi_value args[2];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    int64_t ms = 0;
-    napi_get_value_int64(env, args[1], &ms);
-    lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
-        const string seconds = to_string(static_cast<double>(ms) / 1000.0);
-        SetTransientBuffering(ctx, true, "seek-command-start");
-        PostCommand(ctx, [seconds](PlayerContext& workerCtx) {
-            if (!EnsureMpv(workerCtx)) {
-                return;
-            }
-            RunMpvCommand(workerCtx, {"seek", seconds, "absolute+exact"}, "seek");
-        });
-    });
-    return Undefined(env);
-}
-
 napi_value SeekWithFlags(napi_env env, napi_callback_info info)
 {
-    size_t argc = 3; napi_value args[3];
+    size_t argc = 2; napi_value args[2];
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     int64_t ms = 0;
     napi_get_value_int64(env, args[1], &ms);
@@ -1533,21 +1503,6 @@ napi_value IsPlaying(napi_env env, napi_callback_info info)
     return result;
 }
 
-// Link probe: returns the FFmpeg build/version string. Confirms the libav*
-// static libs link and call correctly before we build the real mux feature.
-napi_value FfmpegVersion(napi_env env, napi_callback_info /*info*/)
-{
-    const char* info = av_version_info();
-    unsigned int v = avformat_version();
-    char buf[256];
-    snprintf(buf, sizeof(buf), "ffmpeg %s (avformat %u.%u.%u)",
-             info ? info : "?", v >> 16, (v >> 8) & 0xff, v & 0xff);
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "ffmpeg probe: %{public}s", buf);
-    napi_value result = nullptr;
-    napi_create_string_utf8(env, buf, NAPI_AUTO_LENGTH, &result);
-    return result;
-}
-
 // Process-level proxy env for the vendored FFmpeg: MPV's direct fetches (HLS
 // master/segment playlists, sub-add subtitle downloads) bypass libmpv options
 // but FFmpeg's http protocol honors http_proxy / no_proxy. A non-empty URL is
@@ -1592,11 +1547,6 @@ napi_value Init(napi_env env, napi_value exports)
                      "ffmpeg probe: %{public}s (avformat %u.%u.%u)",
                      ver ? ver : "?", v >> 16, (v >> 8) & 0xff, v & 0xff);
     }
-    // One-shot VPE capability probe: logs whether this device's Video
-    // Processing Engine supports HDR color-space conversion / metadata
-    // generation, deciding whether true-HDR output via VPE is achievable.
-    // Look for "vpe probe:" in the log right after app start.
-    ProbeVpeCapabilities();
     bool hasXComponent = false;
     if (napi_has_named_property(env, exports, OH_NATIVE_XCOMPONENT_OBJ, &hasXComponent) == napi_ok && hasXComponent) {
         napi_value xcompInstance = nullptr;
@@ -1621,14 +1571,12 @@ napi_value Init(napi_env env, napi_value exports)
     }
 
     napi_property_descriptor descriptors[] = {
-        {"ensurePlayer", nullptr, EnsurePlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"releasePlayer", nullptr, ReleasePlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setMedia", nullptr, SetMedia, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"play", nullptr, Play, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"pause", nullptr, Pause, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"stop", nullptr, Stop, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"prepare", nullptr, Prepare, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"seek", nullptr, Seek, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"seekWithFlags", nullptr, SeekWithFlags, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setPlaybackRate", nullptr, SetPlaybackRate, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVolume", nullptr, SetVolume, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -1642,7 +1590,6 @@ napi_value Init(napi_env env, napi_value exports)
         {"isPlaying", nullptr, IsPlaying, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceSize", nullptr, SetVideoSurfaceSize, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setVideoSurfaceId", nullptr, SetVideoSurfaceId, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"ffmpegVersion", nullptr, FfmpegVersion, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setHttpProxyEnv", nullptr, SetHttpProxyEnv, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, SetEventCallback, nullptr, nullptr, nullptr, napi_default, nullptr},

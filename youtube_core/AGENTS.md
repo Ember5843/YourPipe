@@ -10,7 +10,7 @@
 ## 1. Public surface (`youtube_core/Index.ets`)
 显式命名导出（无 `export *`），名单 = entry / mediaservice 的实际消费面；
 新增跨模块符号必须在 `Index.ets` 登记。按组分块，以文件内注释为准：
-extractor（模型 + 异常层次 + 评论 + HLS 解析）、sabr/identity（opt-in/debug
+extractor（模型 + 异常层次 + 评论 + HLS 解析 + `ItagItem`）、sabr/identity（opt-in/debug
 路径）、cipher（`YoutubeJavaScriptPlayerManager`）、model/localization、
 network（含 `YOUTUBE_COOKIE_STORAGE_NAME`）、auth（含 `AUTH_STORAGE_NAME`
 与 `AuthExpiredError` / `isAuthRejectionResponse`）、
@@ -62,6 +62,8 @@ youtube_core/src/main/
       AuthSessionManager.ets           — dual-rail session lifecycle
       CookieAuthCredential.ets
       SapisidHashUtil.ets              — SAPISIDHASH for WEB rail
+      WebRailHeaders.ets               — shared WEB-rail header assembly
+                                         (Cookie/X-Origin/DNT/Authorization)
       SmartTubeAuthProbe.ets           — OAuth device-code (TV rail)
       DebugAuthConstants.ets           — OAuth client/device constants
       AuthModels.ets                   — AuthRail, status, token types
@@ -79,8 +81,8 @@ youtube_core/src/main/
       SearchContentFilter, YoutubePlayerClientConfig
     common/
       VideoModel, SearchResultModel, Utils, YoutubeParsingHelper,
-      WebClientVersionResolver, SearchQueryHandlerFactory,
-      YoutubeSearchQueryHanderFactory, YTCoreLogger
+      WebClientVersionResolver, YoutubeSearchQueryHandlerFactory,
+      YTCoreLogger, ProtoUtil
   cpp/
     CMakeLists.txt                     — native module `yourpipe_cipher`
     cipher_jsvm_napi.cpp               — JSVM n/sig decode NAPI
@@ -123,8 +125,8 @@ youtube_core/src/main/
       - HLS only when: post-live | live+`tv_downgraded` | `web_safari`;
         live HLS masters are background-parsed into per-variant quality
         streams (variant `bitrate` carries BANDWIDTH/AVERAGE-BANDWIDTH; audio-only
-        STREAM-INF entries without RESOLUTION/VIDEO are classified into
-        `audioStreams` with their bitrate — mediaservice attaches the top one
+        STREAM-INF entries without RESOLUTION whose CODECS resolves to no
+        video codec are classified into `audioStreams` with their bitrate — mediaservice attaches the top one
         as an mpv external audio file; the quality menu fills in when ready and a switch
         restarts at the live edge on the new variant URL)
      - `dashMpdUrl` always empty
@@ -182,8 +184,11 @@ youtube_core/src/main/
   first **with or without media** (PipePipe 60462a13 — a pending response can
   carry the demanded segment): `ROTATE_IDENTITY` (budget 3: invalidate
   identity → re-probe via `reprobeSabrInfo` → visitorData must change → epoch
-  reset, local progress kept via `YoutubeSabrStreamState.ingestLocalProgress`
-  so the fresh epoch advertises the cached range); with media a successful
+  reset; local progress (FormatProgress + segment cache) lives in
+  `YoutubeSabrStreamState` outside the epoch, and `executeRotateIdentity`
+  only calls `epoch.resetServerState()` (cookie/contexts/poToken cleared),
+  so progress survives untouched and the fresh epoch still advertises the
+  cached range); with media a successful
   rotation retries the fetch loop and the preserved segmentCache delivers.
   No-media pending falls through `APPLY_PO_TOKEN` (force-refresh budget 2,
   resets when media arrives) → `RELOAD_PLAYER` (only once the refresh budget
@@ -251,8 +256,8 @@ youtube_core/src/main/
   skips only TVHTML5; `visionos` hits the GAPIS endpoint and is pot-free by
   design) carries `context.client.visitorData` in the body
   (identity-layer value; the request headers stay Content-Type / UA /
-  Client-Name / Client-Version only — `X-Goog-Visitor-Id` appears only on
-  non-web UMP POSTs) and, when the BotGuard runtime is already warm,
+  Client-Name / Client-Version only) and, when the BotGuard runtime is
+  already warm,
   `serviceIntegrityDimensions.poToken` — sourced through
   `SessionIdentityManager.setPlayerPoTokenHook` (entry provider, 5s cap; the
   binding follows the home page experiment flags: content binding mints per
@@ -286,9 +291,12 @@ youtube_core/src/main/
   misclassified as post-live and sent down the DASH path → infinite buffer).
   The anonymous MWEB HLS helper only fires when the selected client's
   response lacks `hlsManifestUrl`.
-- Auth attachment is **rail-aware**: mweb uses Cookie/SAPISIDHASH only;
-  TV client uses Bearer only. Never stuff Bearer into Cookie fields or
-  Cookie into TV headers.
+- Auth attachment is **rail-aware** (PipePipe `addLoggedInHeaders`):
+  when a cookie credential exists, Cookie/SAPISIDHASH attaches to any client
+  (TVHTML5/`tv_downgraded` included); OAuth Bearer is only the TV fallback
+  for cookie-less OAuth-only sessions. The two rails never mix on the same
+  request — never stuff Bearer into Cookie fields or Cookie into Bearer
+  headers.
 - **Player request body must mirror PipePipe's NORMAL path exactly**
   (`createJsonPlayerBody` / `fetchConfiguredJsonPlayer` +
   `prepareSessionPoTokenPlayerRequest`): `context.client{utcOffsetMinutes,
@@ -324,6 +332,12 @@ Priority when both present:
 Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
 ```
 - `AuthSessionManager.init(context)` — bootstraps storage; called from entry.
+- `setAuthStateChangeListener` — single-slot static hook fired after any
+  credential-state change is persisted (`signOut` / `saveToken` /
+  `saveCookieCredential` / OAuth `invalid_grant` clear / server-cleared
+  SID-family cookies). Entry wires it to `AuthStateHelper.refresh()` right
+  after `init`, so internal invalidation paths also refresh `authStatus`,
+  run credential-fingerprint detection, and reset visitorData/PoToken caches.
 - Prefer `getWebAuthorizationHeader` / `getTvAuthorizationHeader` at call sites.
 - Credential-state changes (login/logout/rail switch) must reset the pinned
   session identity + PoToken caches (PipePipe LocalDomPoTokenProvider
@@ -359,7 +373,12 @@ Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
 - `Socks5Bridge` — SOCKS5 proxies are supported through a loopback HTTP
   CONNECT bridge. Self-heals: a server `error` event schedules bounded
   re-listens (1s/2s/4s, generation-guarded); tunnel connects retry once
-  except for SOCKS5 auth errors (2301207/2301209).
+  except for SOCKS5 auth errors (2301207/2301209). `getPort()` reports a
+  last-known-good port: it is NOT cleared during the self-heal re-listen
+  window, so proxy consumers keep routing at the dead loopback port and fail
+  fast (connect-refused) instead of silently going direct; only a real
+  `stop()` (user disabled/changed the proxy, or initial listen failed)
+  clears it to 0.
 
 ## 8. Native cipher (`yourpipe_cipher`)
 - Built from `youtube_core/src/main/cpp` as NAPI module `yourpipe_cipher`.
@@ -395,8 +414,7 @@ Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
 - Claim SABR is “bootstrap only” or reintroduce a parallel UMP client.
 - Mix WEB Cookie rail with TV Bearer rail on the same request.
 - Scatter OAuth client secrets outside `DebugAuthConstants` / session manager.
-- Commit `Crash_*.dmp`, `.cxx/`, `build/`, `.hvigor/` artifacts or any
-  `AGENTS.md`.
+- Commit `Crash_*.dmp`, `.cxx/`, `build/`, `.hvigor/` artifacts.
 - Add top-level mutable state in `Index.ets`; export factories or
   `getInstance()` accessors instead.
 - Put changelogs or commit-specific notes into this file.

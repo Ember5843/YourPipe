@@ -1,6 +1,6 @@
 import { YTCoreLogger } from '../common/YTCoreLogger';
 import { http } from '@kit.NetworkKit';
-import { HttpDownloader } from './HttpDownloader';
+import { HttpDownloader, HttpError } from './HttpDownloader';
 import { CookieJar, Cookie } from './CookieJar';
 import { Localization } from '../model/Localization';
 import { ContentCountry } from '../model/ContentCountry';
@@ -97,6 +97,9 @@ export class YouTubeHttpClient implements ClientVersionGet {
       return response;
     } catch (e) {
       logger.error(`[NET] id=${requestId} phase=failed method=GET target=${target} elapsed=${Date.now() - startedAt}ms error=${String(e)}`);
+      if (e instanceof HttpError) {
+        throw e;
+      }
       throw new Error(String(e));
     }
   }
@@ -139,6 +142,9 @@ export class YouTubeHttpClient implements ClientVersionGet {
       return response;
     } catch (e) {
       logger.error(`[NET] id=${requestId} phase=failed method=POST target=${target} elapsed=${Date.now() - startedAt}ms error=${String(e)}`);
+      if (e instanceof HttpError) {
+        throw e;
+      }
       throw new Error(String(e));
     }
   }
@@ -194,6 +200,9 @@ export class YouTubeHttpClient implements ClientVersionGet {
       return response;
     } catch (e) {
       logger.error(`[NET] id=${requestId} phase=failed method=POST_BINARY target=${target} elapsed=${Date.now() - startedAt}ms error=${String(e)}`);
+      if (e instanceof HttpError) {
+        throw e;
+      }
       throw new Error(String(e));
     }
   }

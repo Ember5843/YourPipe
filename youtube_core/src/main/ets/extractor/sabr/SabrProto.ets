@@ -1,3 +1,4 @@
+import { util } from '@kit.ArkTS';
 import { SabrProtocolException } from './SabrProtocolException';
 import { YoutubeSabrFormatMeta } from './YoutubeSabrInfo';
 import { readProtoVarint, decodeBase64ToBytes as protoDecodeBase64 } from '../../common/ProtoUtil';
@@ -37,7 +38,7 @@ export class SabrProtoField {
   }
 
   getString(): string {
-    return bytesToUtf8(this.getBytes());
+    return new util.TextDecoder().decode(this.getBytes());
   }
 }
 
@@ -77,7 +78,7 @@ export class SabrProtoWriter {
 
   writeStringIfNotEmpty(fieldNumber: number, value?: string): void {
     if (value && value.length > 0) {
-      this.writeBytes(fieldNumber, utf8ToBytes(value));
+      this.writeBytes(fieldNumber, new util.TextEncoder().encode(value));
     }
   }
 
@@ -195,63 +196,6 @@ export function parseLastModified(value?: string | number): number {
   }
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-export function utf8ToBytes(value: string): Uint8Array {
-  const out: number[] = [];
-  for (let i = 0; i < value.length; i++) {
-    let code = value.charCodeAt(i);
-    if (code < 0x80) {
-      out.push(code);
-    } else if (code < 0x800) {
-      out.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
-    } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < value.length) {
-      const next = value.charCodeAt(i + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        code = 0x10000 + ((code - 0xd800) << 10) + (next - 0xdc00);
-        i++;
-        out.push(
-          0xf0 | (code >> 18),
-          0x80 | ((code >> 12) & 0x3f),
-          0x80 | ((code >> 6) & 0x3f),
-          0x80 | (code & 0x3f)
-        );
-        continue;
-      }
-      out.push(0xef, 0xbf, 0xbd);
-    } else {
-      out.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
-    }
-  }
-  return new Uint8Array(out);
-}
-
-export function bytesToUtf8(data: Uint8Array): string {
-  let result = '';
-  let i = 0;
-  while (i < data.length) {
-    const b0 = data[i++];
-    if (b0 < 0x80) {
-      result += String.fromCharCode(b0);
-    } else if ((b0 & 0xe0) === 0xc0 && i < data.length) {
-      const b1 = data[i++];
-      result += String.fromCharCode(((b0 & 0x1f) << 6) | (b1 & 0x3f));
-    } else if ((b0 & 0xf0) === 0xe0 && i + 1 < data.length) {
-      const b1 = data[i++];
-      const b2 = data[i++];
-      result += String.fromCharCode(((b0 & 0x0f) << 12) | ((b1 & 0x3f) << 6) | (b2 & 0x3f));
-    } else if ((b0 & 0xf8) === 0xf0 && i + 2 < data.length) {
-      const b1 = data[i++];
-      const b2 = data[i++];
-      const b3 = data[i++];
-      let code = ((b0 & 0x07) << 18) | ((b1 & 0x3f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f);
-      code -= 0x10000;
-      result += String.fromCharCode(0xd800 + (code >> 10), 0xdc00 + (code & 0x3ff));
-    } else {
-      result += '\uFFFD';
-    }
-  }
-  return result;
 }
 
 export function decodeBase64ToBytes(value: string): Uint8Array {

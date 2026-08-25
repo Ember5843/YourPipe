@@ -4,6 +4,7 @@
  * SabrProtocolException) and by YouTubeExtractor's xtags/audio-track parsing
  * (undefined on malformed input).
  */
+import { util } from '@kit.ArkTS';
 
 export interface ProtoVarintResult {
   value: number;
@@ -34,7 +35,7 @@ export function readProtoVarint(bytes: Uint8Array, offset: number): ProtoVarintR
 
 /**
  * Base64 / base64url decode (padding optional, whitespace-tolerant at edges).
- * Returns undefined for empty input or when no bytes decode.
+ * Returns undefined for empty input or when decoding fails — never throws.
  */
 export function decodeBase64ToBytes(value: string): Uint8Array | undefined {
   const raw = (value || '').trim();
@@ -43,28 +44,10 @@ export function decodeBase64ToBytes(value: string): Uint8Array | undefined {
   }
   const padLen = (4 - (raw.length % 4)) % 4;
   const normalized = (raw + '='.repeat(padLen)).replace(/-/g, '+').replace(/_/g, '/');
-  const table = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const bytes: number[] = [];
-  let buffer = 0;
-  let bits = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    const ch = normalized.charAt(i);
-    if (ch === '=') {
-      break;
-    }
-    const val = table.indexOf(ch);
-    if (val < 0) {
-      continue;
-    }
-    buffer = (buffer << 6) | val;
-    bits += 6;
-    if (bits >= 8) {
-      bits -= 8;
-      bytes.push((buffer >> bits) & 0xff);
-    }
-  }
-  if (bytes.length === 0) {
+  try {
+    const bytes = new util.Base64Helper().decodeSync(normalized);
+    return bytes.length === 0 ? undefined : bytes;
+  } catch (ignored) {
     return undefined;
   }
-  return new Uint8Array(bytes);
 }

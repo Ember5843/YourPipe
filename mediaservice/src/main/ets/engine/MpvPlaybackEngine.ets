@@ -1,4 +1,4 @@
-import { MpvPlayerController, MediaStatus, MediaType, SeekFlag, PlaybackState as NativePlaybackState,
+import { MpvPlayerController, MediaStatus, PlaybackState as NativePlaybackState,
   setHttpProxyEnv } from '@yourpipe/libmpv-napi';
 import type { MediaInfo } from '@yourpipe/libmpv-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, PlaybackStats,
@@ -69,9 +69,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
    * setMedia(). Do not expose that timeline as the newly loaded source until MPV reports Prepared.
    */
   private acceptsNativeTimeline: boolean = false;
-  /** Reconciles native pause changes made directly by the OHAudio bridge. */
-  private nativeStatePollTimerId: number = -1;
-  private lastReportedIsPlaying: boolean = false;
 
   // 保存配置供 load() 方法使用
   private engineConfig: EngineConfig = {};
@@ -161,7 +158,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
       this.controller = ctrl;
       this.initialized = true;
-      this.startNativeStateReconciliation();
       if (this.surfaceId.length > 0) {
         this.bindSurface(ctrl, this.surfaceId);
       }
@@ -175,7 +171,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   }
 
   destroy(): void {
-    this.stopNativeStateReconciliation();
     this.destroyed = true;
     this.initialized = false;
     this.acceptsNativeTimeline = false;
@@ -222,10 +217,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (ctrl === null || this.destroyed) return;
     ctrl.setVideoSurfaceSize(widthPx, heightPx);
     Logger.debug(TAG, `resizeSurface: ${widthPx}x${heightPx}px`);
-  }
-
-  updateVideoRect(_x: number, _y: number, _w: number, _h: number): void {
-    // Surface sizing is handled through setVideoSurfaceSize.
   }
 
   /**
@@ -460,10 +451,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     return isNaN(vol) ? 100 : vol;
   }
 
-  switchQuality(source: string, resumePos: number): boolean {
-    return this.load(source, resumePos);
-  }
-
   setSubtitle(url: string): void {
     this.pendingSubtitleUrl = url;
     const ctrl: MpvPlayerController | null = this.controller;
@@ -498,14 +485,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     }
   }
 
-  setHwdecMode(_mode: string): void {}
-
   getState(): PlaybackState {
     return this.buildState();
-  }
-
-  getBandwidthEstimateBps(): number {
-    return 1_000_000;
   }
 
   getPlaybackStats(): PlaybackStats {
@@ -549,8 +530,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.subtitleCallback = cb;
   }
 
-  registerLogCallback(_cb: (level: string, tag: string, message: string) => void): void {}
-
   private bindSurface(ctrl: MpvPlayerController, surfaceId: string): void {
     if (surfaceId.length === 0) return;
     ctrl.setVideoSurfaceId(surfaceId);
@@ -575,10 +554,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private seekInternal(targetMs: number, keyframe: boolean): void {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed || this.isLive) return;
-    const flags: number = keyframe
-      ? (SeekFlag.KeyFrame | SeekFlag.FromStart)
-      : SeekFlag.FromStart;
-    ctrl.seek(targetMs, flags);
+    ctrl.seek(targetMs);
     Logger.debug(TAG, `seek: target=${(targetMs / 1000).toFixed(2)}s keyframe=${keyframe}`);
     this.emitCurrentState();
   }
@@ -786,26 +762,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.stateCallback?.(this.buildState());
   }
 
-  private startNativeStateReconciliation(): void {
-    this.stopNativeStateReconciliation();
-    this.nativeStatePollTimerId = setInterval(() => {
-      const ctrl = this.controller;
-      if (!this.destroyed && this.sourceUrl.length > 0 && ctrl !== null) {
-        const nativeIsPlaying = ctrl.getState() === NativePlaybackState.Playing;
-        if (nativeIsPlaying === this.lastReportedIsPlaying) return;
-        Logger.info(TAG, `native state reconciled playing=${nativeIsPlaying}`);
-        this.emitCurrentState();
-      }
-    }, 500) as number;
-  }
-
-  private stopNativeStateReconciliation(): void {
-    if (this.nativeStatePollTimerId >= 0) {
-      clearInterval(this.nativeStatePollTimerId);
-      this.nativeStatePollTimerId = -1;
-    }
-  }
-
   /** Refresh the cached MediaInfo snapshot (throttled by buildState). */
   private refreshMediaInfoSnapshot(ctrl: MpvPlayerController): void {
     const snap = this.mediaSnapshot;
@@ -838,7 +794,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       }
       snap.videoStreamCount = info.video.length;
       snap.audioStreamCount = info.audio.length;
-      snap.subtitleStreamCount = info.subtitle.length;
+      // Native never reports subtitle tracks; keep the count at 0.
+      snap.subtitleStreamCount = 0;
       const fsStr = info.fileSize ?? '';
       const parsed = parseInt(fsStr, 10);
       snap.fileSize = (fsStr.length > 0 && !isNaN(parsed)) ? parsed : 0;
@@ -853,12 +810,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // 仅从 native 读取位置和时长（事件已更新，这里做兜底补偿）
     let posMs: number = this.lastPositionMs;
     let durMs: number = this.lastDurationMs;
-    // ★ isPlaying 改为从 native getState() 读取真实 mpv pause 状态。
-    // 旧实现用 this.mpvPlaybackState 当做 true，但以下路径都会绕过本地变量：
-    //   - OHAudio 焦点桥接：player_napi 跳过 ets 直接 set mpv pause 属性
-    //   - 外部 mpv 命令 / lua 脚本等
-    // Native 侧的 ctx.state 在每次 mpv pause 属性变化后由
-    // UpdateStatusFromObservedProperties 自动镜像维护，是唯一真相。
+    // isPlaying 从 native getState() 读取真实 mpv pause 状态：native 侧的
+    // ctx.state 在每次 mpv pause 属性变化后由 HandleObservedProperty 自动镜像
+    // 维护（type-2 事件推送同步触发本地状态刷新），是唯一真相。
     let isPlaying: boolean = false;
     if (ctrl !== null && !this.destroyed && this.acceptsNativeTimeline) {
       const nativePos: number = ctrl.getPosition();
@@ -875,7 +829,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       // 无源时 native 返回 Stopped，避免误判为"正在播放"
       isPlaying = this.sourceUrl.length > 0 && ctrl.getState() === NativePlaybackState.Playing;
     }
-    this.lastReportedIsPlaying = isPlaying;
 
     // pendingSeekMs >= 0 时优先使用跳转目标位置（直到位置事件确认追上了目标，见 onMpvEvent type=1）
     const currentMs: number = (this.pendingSeekMs >= 0) ? this.pendingSeekMs : posMs;

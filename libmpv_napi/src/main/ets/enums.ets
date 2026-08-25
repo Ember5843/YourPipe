@@ -26,16 +26,3 @@ export enum MediaStatus {
   Invalid = 1 << 31,
 }
 
-export enum SeekFlag {
-  From0 = 1,
-  FromStart = 1 << 1,
-  FromNow = 1 << 2,
-  Frame = 1 << 6,
-  KeyFrame = 1 << 8,
-  Fast = KeyFrame,
-  AnyFrame = 1 << 9,
-  InCache = 1 << 10,
-  Backward = 1 << 16,
-  Default = KeyFrame | FromStart | InCache,
-}
-

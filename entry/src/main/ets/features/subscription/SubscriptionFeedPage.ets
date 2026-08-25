@@ -7,8 +7,9 @@ import { ActionHub } from '../../common/ActionHub';
 import { VideoCard } from '../../common/components/VideoCard';
 import { VideoCardGrid } from '../../common/components/VideoCardGrid';
 import { UIConfig } from '../../common/AppState';
-import { customAnimationUtil } from '../../common/AnimationUtil';
-import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { MediaFeedItemSlot, MediaVideoFeed } from '../../common/components/MediaVideoFeed';
+import { FeedDataSource } from '../../common/model/FeedDataSource';
+import { getFeedContentWidthVp, getVideoGridColumnCount, getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
 
@@ -21,7 +22,7 @@ export struct SubscriptionFeedPage {
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
-  @StorageLink('subscriptionFeed') feedItems: SubscriptionFeedItem[] = [];
+  @StorageLink('subscriptionFeed') @Watch('syncFeedSource') feedItems: SubscriptionFeedItem[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   @State isRefreshing: boolean = false;
@@ -30,9 +31,11 @@ export struct SubscriptionFeedPage {
   private refreshRunning: boolean = false;
   private feedService: SubscriptionFeedService = new SubscriptionFeedService();
   private scrollerForScroll: Scroller = new Scroller();
-  private readonly GRID_SIDE_PADDING: number = 12;
+  /** 订阅流的 LazyForEach 数据源（feedItems 重赋值经 @Watch 同步） */
+  private feedSource: FeedDataSource = new FeedDataSource();
 
   aboutToAppear(): void {
+    this.syncFeedSource();
     this.computeNewItemsCount();
     if (this.feedService.isStale()) {
       this.refreshFeed(false);
@@ -67,119 +70,84 @@ export struct SubscriptionFeedPage {
     }
   }
 
-  private getVideoGridColumnCount(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    if (contentWidth >= 1440) {
-      return 5;
-    }
-    if (contentWidth >= 1080) {
-      return 4;
-    }
-    if (contentWidth >= 760) {
-      return 3;
-    }
-    if (contentWidth >= 520) {
-      return 2;
-    }
-    return 1;
+  private syncFeedSource(): void {
+    this.feedSource.setData(this.feedItems, SubscriptionFeedPage.keyOfFeedItem);
+  }
+
+  private static keyOfFeedItem(item: Object): string {
+    return (item as SubscriptionFeedItem).videoId;
+  }
+
+  private gridColumns(): number {
+    return getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth));
   }
 
   /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
   private getWideListColumns(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    return getWideListColumnCount(contentWidth);
+    return getWideListColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth));
   }
 
+  @LocalBuilder
+  private FeedGridCard(slot: MediaFeedItemSlot) {
+    VideoCardGrid({
+      video: SubscriptionFeedStore.toVideoItem(slot.item as SubscriptionFeedItem),
+      actionLabel: $r('app.string.yt_action_favorite'),
+      actionType: 'favorite',
+      useFavoriteToggle: true
+    })
+  }
+
+  @LocalBuilder
+  private FeedListCard(slot: MediaFeedItemSlot) {
+    VideoCard({
+      video: SubscriptionFeedStore.toVideoItem(slot.item as SubscriptionFeedItem),
+      actionLabel: $r('app.string.yt_action_favorite'),
+      actionType: 'favorite',
+      useFavoriteToggle: true
+    })
+  }
+
+  @LocalBuilder
+  private FeedEmpty() {
+    Text(this.subscriptions.length === 0
+      ? $r('app.string.yt_empty_no_subs')
+      : $r('app.string.yt_sub_feed_empty_hint'))
+      .fontSize(14)
+      .fontColor($r('app.color.yourtube_text_secondary'))
+      .margin({ top: 80 })
+  }
+
+  /**
+   * 骨架收敛进 MediaVideoFeed（Grid / 宽列 / 单列 List + LazyForEach）。
+   * 订阅流无分页（无 onReachEnd / 加载更多）；空态保持可滚动以支持下拉刷新。
+   */
   @Builder
   private FeedContent() {
-    if (this.feedItems.length === 0) {
-      Scroll(this.scrollerForScroll) {
-        Column() {
-          Text(this.subscriptions.length === 0
-            ? $r('app.string.yt_empty_no_subs')
-            : $r('app.string.yt_sub_feed_empty_hint'))
-            .fontSize(14)
-            .fontColor($r('app.color.yourtube_text_secondary'))
-            .margin({ top: 80 })
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Center)
+    MediaVideoFeed({
+      dataSource: this.feedSource,
+      gridScroller: this.scrollerForScroll,
+      listScroller: this.scrollerForScroll,
+      itemKey: SubscriptionFeedPage.keyOfFeedItem,
+      gridItemBuilder: this.FeedGridCard,
+      itemBuilder: this.FeedListCard,
+      emptyBuilder: this.FeedEmpty,
+      params: {
+        layoutPreference: this.uiConfig.homeLayoutMode,
+        gridColumns: this.gridColumns(),
+        listColumns: this.getWideListColumns(),
+        isLoading: false,
+        isLoadingMore: false,
+        errorMessage: '',
+        emptyText: '',
+        hasHeader: false,
+        headerHorizontalBleed: 0,
+        gridContentPadding: { left: 12, right: 12, top: 4, bottom: 4 },
+        listContentPadding: { left: 12, right: 12, top: 4, bottom: 4 },
+        listContentEndOffset: 0,
+        stateScrollable: true,
+        useLayoutWeight: false
       }
-      .width('100%')
-      .height('100%')
-      .align(Alignment.Top)
-      .scrollBar(BarState.Off)
-    } else if (this.uiConfig.homeLayoutMode === 'grid') {
-      Scroll(this.scrollerForScroll) {
-        GridRow({
-          columns: this.getVideoGridColumnCount(),
-          gutter: { x: 8, y: 8 }
-        }) {
-          ForEach(this.feedItems, (item: SubscriptionFeedItem) => {
-            GridCol({ span: 1 }) {
-              VideoCardGrid({
-                video: SubscriptionFeedStore.toVideoItem(item),
-                actionLabel: $r('app.string.yt_action_favorite'),
-                actionType: 'favorite',
-                useFavoriteToggle: true
-              })
-            }
-            .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
-          }, (item: SubscriptionFeedItem) => item.videoId)
-        }
-        .width('100%')
-      }
-      .width('100%')
-      .height('100%')
-      .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-      .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
-    } else if (this.getWideListColumns() > 1) {
-      Scroll(this.scrollerForScroll) {
-        GridRow({
-          columns: this.getWideListColumns(),
-          gutter: { x: 8, y: 4 }
-        }) {
-          ForEach(this.feedItems, (item: SubscriptionFeedItem) => {
-            GridCol({ span: 1 }) {
-              VideoCard({
-                video: SubscriptionFeedStore.toVideoItem(item),
-                actionLabel: $r('app.string.yt_action_favorite'),
-                actionType: 'favorite',
-                useFavoriteToggle: true
-              })
-            }
-            .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
-          }, (item: SubscriptionFeedItem) => item.videoId)
-        }
-        .width('100%')
-      }
-      .width('100%')
-      .height('100%')
-      .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-      .edgeEffect(EdgeEffect.Spring)
-      .align(Alignment.Top)
-    } else {
-      List({ space: 4, scroller: this.scrollerForScroll }) {
-        ForEach(this.feedItems, (item: SubscriptionFeedItem) => {
-          ListItem() {
-            VideoCard({
-              video: SubscriptionFeedStore.toVideoItem(item),
-              actionLabel: $r('app.string.yt_action_favorite'),
-              actionType: 'favorite',
-              useFavoriteToggle: true
-            })
-          }
-          .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
-        }, (item: SubscriptionFeedItem) => item.videoId)
-      }
-      .width('100%')
-      .height('100%')
-      .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-      .edgeEffect(EdgeEffect.Spring)
-    }
+    })
   }
 
   build() {

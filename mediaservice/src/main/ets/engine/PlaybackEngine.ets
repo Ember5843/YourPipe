@@ -77,7 +77,6 @@ export interface PlaybackEngine {
   attachSurface(surfaceId: string): void;
   detachSurface(): void;
   resizeSurface(widthPx: number, heightPx: number): void;
-  updateVideoRect(x: number, y: number, w: number, h: number): void;
 
   /**
    * Load a source. audioUrl (optional) is an external audio track for split
@@ -93,15 +92,11 @@ export interface PlaybackEngine {
   setVolume(volume: number): void;
   getVolume(): number;
 
-  switchQuality(source: string, resumePos: number): boolean;
-
   setSubtitle(url: string): void;
 
   setVideoOutputEnabled(enabled: boolean): void;
-  setHwdecMode(mode: string): void;
 
   getState(): PlaybackState;
-  getBandwidthEstimateBps(): number;
   getPlaybackStats(): PlaybackStats;
   /**
    * True when the loaded source is fetched directly from the network by the
@@ -113,5 +108,4 @@ export interface PlaybackEngine {
 
   setStateCallback(cb: (state: PlaybackState) => void): void;
   setSubtitleCallback(cb: (text: string, startTime: number, duration: number) => void): void;
-  registerLogCallback(cb: (level: string, tag: string, message: string) => void): void;
 }

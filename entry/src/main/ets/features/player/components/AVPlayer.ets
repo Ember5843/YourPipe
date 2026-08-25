@@ -125,10 +125,6 @@ export struct VideoPlayer {
   @State currentTime: number = 0;
   @State durationTime: number = 0;
 
-  // 投屏状态
-  @State isCasting: boolean = false;
-  @State castDeviceName: string = '';
-
   /**
    * 状态机监听器：在 PLAYING/BUFFERING/READY 时保持屏幕常亮，
    * 其余状态（PAUSED/COMPLETED/ERROR/IDLE/RELEASED）释放常亮，让系统正常息屏。
@@ -347,8 +343,6 @@ export struct VideoPlayer {
       this.hasStreams = pm ? (pm.categorizedStreams.audio.length + pm.categorizedStreams.video.length +
                               pm.categorizedStreams.dashManifest.length + pm.categorizedStreams.hlsManifest.length +
                               pm.categorizedStreams.progressive.length) > 0 : false;
-      this.isCasting = this.vm.isCasting;
-      this.castDeviceName = this.vm.castDeviceName;
       this.syncPlaybackStateFromController();
       this.playbackStateListener(this.controller.getPlaybackState());
 
@@ -430,10 +424,6 @@ export struct VideoPlayer {
     this.envService.setKeepScreenOn(this.vm.isPlaying || this.vm.isBuffering);
     // 立即同步一次 PiP 播放/暂停按钮状态（页面恢复/复用时按钮即时对齐）
     PiPManager.getInstance().updatePlayPauseStatus(this.vm.isPlaying);
-
-    // 同步投屏状态
-    this.isCasting = this.vm.isCasting;
-    this.castDeviceName = this.vm.castDeviceName;
 
     // 初始化流状态
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);

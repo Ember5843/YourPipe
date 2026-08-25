@@ -41,7 +41,8 @@ export class BackgroundTaskManager {
         Logger.info(TAG, 'startBackgroundRunning succeeded');
       }).catch((err: BusinessError) => {
         if (err.code === 9800005) {
-          // 9800005: 宸叉湁鍚岀被浠诲姟鍦ㄨ繍琛岋紝閲嶅娉ㄥ唽灞炰簬姝ｅ父鎯呭喌锛堝厹搴曡皟鐢ㄤ笌棣栨娉ㄥ唽閲嶅彔锛?          Logger.info(TAG, 'startBackgroundRunning: task already registered, skipping');
+          // 9800005: 已有同类任务在运行，重复注册属于正常情况（兜底调用与首次注册重叠）。
+          Logger.info(TAG, 'startBackgroundRunning: task already registered, skipping');
         } else {
           Logger.error(TAG, `startBackgroundRunning failed, code=${err.code}, message=${err.message}`);
         }

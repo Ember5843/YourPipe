@@ -1,7 +1,6 @@
-import { SearchQueryHandlerFactory } from "./SearchQueryHandlerFactory";
 import { SearchContentFilter } from "../model/SearchContentFilter";
 
-export class YoutubeSearchQueryHandlerFactory extends SearchQueryHandlerFactory {
+export class YoutubeSearchQueryHandlerFactory {
   private static readonly INSTANCE: YoutubeSearchQueryHandlerFactory = new YoutubeSearchQueryHandlerFactory();
 
   static readonly ALL = SearchContentFilter.ALL;
@@ -15,11 +14,10 @@ export class YoutubeSearchQueryHandlerFactory extends SearchQueryHandlerFactory 
   static readonly MUSIC_PLAYLISTS = SearchContentFilter.MUSIC_PLAYLISTS;
   static readonly MUSIC_ARTISTS = SearchContentFilter.MUSIC_ARTISTS;
 
-  // private static readonly SEARCH_URL = "https://www.youtube.com/results?search_query=";
-  // private static readonly MUSIC_SEARCH_URL = "https://music.youtube.com/search?q=";
+  static readonly SEARCH_URL: string = "https://www.youtube.com/results?search_query=";
+  static readonly MUSIC_SEARCH_URL: string = "https://music.youtube.com/search?q=";
 
   private constructor() {
-    super();
   }
 
   static getInstance(): YoutubeSearchQueryHandlerFactory {

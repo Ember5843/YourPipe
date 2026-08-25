@@ -12,8 +12,8 @@ import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
 import { BackgroundTaskManager } from '../common/BackgroundTaskManager';
 import { PlaybackPreferences } from '../common/PlaybackPreferences';
+import { ContextProvider } from '../common/ContextProvider';
 import { proxyTrafficMeter } from '../proxy/ProxyTrafficMeter';
-import { common } from '@kit.AbilityKit';
 import { audio } from '@kit.AudioKit';
 import { PlayerStateRelay, ProgressSubscriber, PlaybackStateSubscriber } from '../state/PlayerStateRelay';
 import { PlayerStateMachine, StateChangeListener } from '../state/PlayerStateMachine';
@@ -23,11 +23,6 @@ import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { HttpDownloader, parseHlsMasterManifest } from 'youtube_core';
-
-export interface NativeLogBridgeFns {
-  start: () => void;
-  stop: () => void;
-}
 
 /** Live/post-live HLS track pair: video variant playlist + audio rendition playlist. */
 interface HlsTrackPair {
@@ -42,7 +37,6 @@ export class AvPlayerController {
   @Track public vm: PlayerUiViewModel = new PlayerUiViewModel();
   /** Surface 句柄；由 UI 在 XComponent.onLoad 写入，非响应式状态。 */
   public surfaceID: string = '';
-  public onCastStateChange: ((isCasting: boolean, deviceName: string) => void) | undefined = undefined;
   public onNextCommand: (() => void) | undefined = undefined;
   public onPreviousCommand: (() => void) | undefined = undefined;
 
@@ -469,11 +463,6 @@ export class AvPlayerController {
     this.avSessionManager.onStopCommand = () => {
       this.syncStop();
     };
-    this.avSessionManager.onCastStateChange = (isCasting: boolean, deviceName: string) => {
-      this.vm.isCasting = isCasting;
-      this.vm.castDeviceName = deviceName;
-      this.onCastStateChange?.(isCasting, deviceName);
-    };
 
     // Scheme A: single player entry for all system audio-focus hints.
     this.avSessionManager.onAudioFocusHint = (hint) => {
@@ -804,7 +793,7 @@ export class AvPlayerController {
   }
 
   public syncSeek(seekTime: number): void {
-    if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, false);
+    this.syncSeekExact(seekTime);
   }
 
   public syncSeekFast(seekTime: number): void {
@@ -843,10 +832,6 @@ export class AvPlayerController {
     this.playbackEngine.setVideoOutputEnabled(this.videoOutputEnabled);
   }
 
-
-  public async checkCastState(): Promise<void> {
-    await this.avSessionManager.checkCastState();
-  }
 
   /**
    * Close one media session while retaining the initialized MPV controller.
@@ -914,10 +899,6 @@ export class AvPlayerController {
       this.vm.subtitleText = '';
     }
     this.playbackEngine.setSubtitle(url);
-  }
-
-  public getNativeLogBridgeFns(_onLog: (level: string, tag: string, message: string) => void): NativeLogBridgeFns {
-    return { start: () => {}, stop: () => {} };
   }
 
   private selectInitialStreams(isLive: boolean): boolean {
@@ -1480,7 +1461,6 @@ export class AvPlayerController {
     this.avSessionManager.onNextCommand = undefined;
     this.avSessionManager.onPreviousCommand = undefined;
     this.avSessionManager.onStopCommand = undefined;
-    this.avSessionManager.onCastStateChange = undefined;
     this.avSessionManager.onAudioFocusHint = undefined;
   }
 
@@ -1960,7 +1940,7 @@ export class AvPlayerController {
       this.backgroundTaskListener = null;
     }
     if (this.backgroundTaskActive) {
-      const ctx = AppStorage.get<common.UIAbilityContext>('context');
+      const ctx = ContextProvider.get();
       this.backgroundTaskActive = false;
       if (ctx) BackgroundTaskManager.stopContinuousTask(ctx);
     }
@@ -1968,7 +1948,7 @@ export class AvPlayerController {
 
   // 由 BackgroundTaskStateListener 调用，集中管理后台任务的开关。
   public _bgTaskOnStateChange(to: PlayerState): void {
-    const ctx = AppStorage.get<common.UIAbilityContext>('context');
+    const ctx = ContextProvider.get();
     if (!ctx) return;
     const isActive = to === PlayerState.PLAYING || to === PlayerState.PAUSED || to === PlayerState.BUFFERING
       || to === PlayerState.READY || to === PlayerState.LOADING;

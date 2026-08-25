@@ -541,16 +541,8 @@
             "value": "暫無內容"
         },
         {
-            "name": "yt_video_details",
-            "value": "影片詳情"
-        },
-        {
             "name": "yt_error_invalid_video",
             "value": "無有效影片資訊"
-        },
-        {
-            "name": "yt_notice_direct_link_removed",
-            "value": "直鏈功能已移除，後續統一處理。"
         },
         {
             "name": "yt_dialog_select_quality",
@@ -2687,6 +2679,34 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "扩充播放、鉴权、令牌、刷新及回退诊斷，同时确保日志不记錄敏感 Cookie 和签名地址"
+        },
+        {
+            "name": "yt_changelog_0_5_9_1",
+            "value": "資訊流頁面改為延遲載入網格/列表：首頁、搜尋、歌單、頻道、訂閱長列表捲動更流暢"
+        },
+        {
+            "name": "yt_changelog_0_5_9_2",
+            "value": "修復部分機型冷啟動即崩潰的問題（@BuilderParam 綁定）"
+        },
+        {
+            "name": "yt_changelog_0_5_9_3",
+            "value": "修復登入狀態過期未正確處理、首頁靜默回落無提示的問題"
+        },
+        {
+            "name": "yt_changelog_0_5_9_4",
+            "value": "選項圖示與危險操作按鈕統一跟隨主題色，移除固定警示紅"
+        },
+        {
+            "name": "yt_changelog_0_5_9_5",
+            "value": "文字編解碼、Base64、URL 解析等切換為系統官方實作"
+        },
+        {
+            "name": "yt_changelog_0_5_9_6",
+            "value": "清理投屏死鏈、狀態輪詢等無用程式碼，精簡套件體積"
+        },
+        {
+            "name": "yt_changelog_0_5_9_7",
+            "value": "修復播放預取關聯、背景任務守衛等穩定性問題"
         },
         {
             "name": "yt_changelog_0_5_8_1",

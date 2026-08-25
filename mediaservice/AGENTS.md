@@ -7,7 +7,7 @@
 > architecture only — no changelogs.
 
 ## 1. Public surface (`mediaservice/Index.ets`)
-- `AvPlayerController`, `NativeLogBridgeFns` — main controller entry.
+- `AvPlayerController` — main controller entry.
 - `LocalMediaProxy` — facade over local proxy sessions (range + SABR dual).
 - `sabrSessionStore` — SABR lease / track-buffer store.
 - `SabrOfflineDownloader`, `SabrOfflineProgress`, `SabrOfflineDownloadOptions`
@@ -28,11 +28,13 @@
 - `PlayerState`, `isValidTransition`, `describeState`, `PlayerStateMachine`,
   `StateChangeListener`, `PlayerUiViewModel`.
 - `PlaybackPreferences`, `PlaybackPreferencesSnapshot`, `PlaybackPreferencesProvider`.
+- `ContextProvider`, `UIAbilityContextProvider` — injected UIAbilityContext
+  getter (replaces `AppStorage.get('context')` in mediaservice).
 - `BackgroundTaskManager`.
 - `Logger`（共享默认实例，tag `[Mediaservice]`）, `EnhancedLogger`, `LogSinkFn`, `LogSinkLevel`.
 - `PlayerModel`, `StreamCategories`, `CurrentStreams`, `VideoEntry`,
-  `AudioTrackOption`, `VideoData`, `StreamInfo`, `SelectOption`,
-  `AVPlayerState`, `CommonConstants`, `secondToTime`.
+  `StreamClassification`, `VideoData`, `StreamInfo`,
+  `SelectOption`, `AVPlayerState`, `CommonConstants`, `secondToTime`.
 - `ChapterInfo`, `SubtitleTrack` — re-exported from `youtube_core`.
 - `muxAudioVideo` — local-file remux (from `libmpv_napi`).
 
@@ -52,6 +54,8 @@ mediaservice/src/main/ets/
   proxy/
     LocalProxyServer.ets         — loopback HTTP server
     RangeProxy.ets               — byte-range passthrough
+    ProxyTrafficMeter.ets        — upstream network traffic meter (networkSpeedBps)
+    ProxyEncoding.ets            — shared UTF-8 TextEncoder singleton (encodeUtf8/encodeUtf8Bytes)
     InputParser.ets              — request URL parsing
     SessionStore.ets             — session map (`single` | `youtube-dual` | `sabr-dual`)
     YoutubeDashManifest.ets      — synthetic DASH helpers
@@ -60,7 +64,6 @@ mediaservice/src/main/ets/
     SabrSessionStore.ets         — acquire/release leases, PoToken provider +
                                    info-reloader hooks
     SabrTrackBuffer.ets          — per-track buffer + ensureReady
-    SabrProxyServe.ets           — serve SABR media over loopback
     SabrDashProxy.ets            — SABR DASH manifest/path serve
     SabrOfflineDownloader.ets    — offline download path
   state/
@@ -74,6 +77,7 @@ mediaservice/src/main/ets/
     AvSessionManager.ets         — AV session (app-layer focus / interruption)
     BackgroundTaskManager.ets    — background continuous task lifecycle
     PlaybackPreferences.ets      — UI/playback config (injected via setProvider)
+    ContextProvider.ets          — UIAbilityContext getter (injected via setProvider)
     CommonConstants.ets
   utils/
     Logger.ets, EnhancedLogger.ets, CommUtils.ets
@@ -124,10 +128,11 @@ stable local URL. Session types in `SessionStore`:
 (`!new_stream` / `!delay_open`, the pre-SABR production pattern). MPV never
 touches a DASH demuxer for these clients; the SIDX `youtube-dual` static
 manifest path (`buildDualDashUrl`) is retained for reference only.
-Upstream transports in `RangeProxy`: VISIONOS (and TVHTML5) googlevideo
-requests stream over RCP (visionos = body-less GET) so MPV's first byte never
-waits for a full buffered chunk; other clients use buffered `@ohos.net.http`
-GET. Connect timeout is 10s (PipePipe OkHttp parity); transfer/read stays 30s
+Upstream transports in `RangeProxy`: Android/iOS (empty-body POST) and
+VISIONOS (body-less GET) googlevideo requests stream over RCP so MPV's first
+byte never waits for a full buffered chunk; other clients — TVHTML5 included,
+for which RCP streaming has been 403-prone on range probes — use buffered
+`@ohos.net.http` GET. Connect timeout is 10s (PipePipe OkHttp parity); transfer/read stays 30s
 (RCP `transferMs` covers the whole stream). Every RCP session — YouTube and
 non-YouTube alike — resolves the app proxy through the shared
 `resolveRcpProxy` (http → upstream URL with auth, socks5 → loopback bridge
@@ -137,7 +142,7 @@ URL with `createTunnel:'always'`, otherwise `'no-proxy'`).
 1. Extractor returns SABR bootstrap (`YoutubeSabrInfo` / streams with SABR delivery).
 2. `sabrSessionStore.acquire` builds `YoutubeSabrSession` (youtube_core UMP).
 3. `SabrTrackBuffer.ensureReady` warms video then audio (PoToken via entry provider when needed).
-4. Loopback DASH/range URLs from `SabrDashProxy` / `SabrProxyServe` are handed to MPV.
+4. Loopback DASH/range URLs from `SabrDashProxy` are handed to MPV.
 5. Offline: `SabrOfflineDownloader` for entry downloads.
 
 Startup: demand-side SIDX fetches gate on the pending DASH PoToken injection
@@ -190,6 +195,9 @@ variant + audio pair.
 - `PlaybackPreferences.setProvider(...)` is the **only** way
   `mediaservice` reads UI/playback prefs. `entry` wires this in
   `EntryAbility.onCreate`.
+- `ContextProvider.setProvider(...)` is the **only** way `mediaservice`
+  reads the `UIAbilityContext` (lazy getter, also wired in
+  `EntryAbility.onCreate`).
 - `AvPlayerController.setEngineConfigProvider(...)` — MPV engine-specific
   knobs (hwdec, cache, demuxer, GPU API, etc.).
 - PoToken mint is **not** configured here; entry injects
@@ -209,9 +217,9 @@ variant + audio pair.
   the background continuous task alive across the playing lifecycle.
 
 ## 8. Conventions
-- **No `AppStorage` reads of config/prefs.** Use the `setProvider` hooks
-  above. Reading the `UIAbilityContext` (`AppStorage.get('context')`) and
-  the AVSession GC pin (`__avSession_pin`) are established exceptions.
+- **No `AppStorage` reads in mediaservice.** Config/prefs and the
+  `UIAbilityContext` go through the `setProvider` hooks. The AVSession GC
+  pin (`__avSession_pin` set/delete) is the sole remaining exception.
 - **No direct `console.log` / `hilog`.** Use the sink.
 - **No cross-device continuation APIs.** `@kit.AbilityKit` is imported only
   for `common` / `wantAgent` (UIAbilityContext, background task); handoff is
@@ -227,9 +235,9 @@ variant + audio pair.
   buffer, serve, offline download in `mediaservice`; PoToken WebView in `entry`.
 
 ## 9. Do not
-- Read config/prefs via `AppStorage` — inject through the `setProvider`
-  hooks (the `UIAbilityContext` lookup and AVSession pin are existing
-  exceptions).
+- Read config/prefs or the `UIAbilityContext` via `AppStorage` — inject
+  through the `setProvider` hooks (the AVSession pin is the only remaining
+  exception).
 - Use cross-device continuation APIs (handoff is `entry`'s concern);
   `@kit.AbilityKit` imports stay limited to `common` / `wantAgent`.
 - Edit files under `libmpv_napi/src/main/cpp/{ffmpeg-sdk,mpv-sdk}` — vendored.
@@ -237,6 +245,5 @@ variant + audio pair.
 - Feed MPV remote SABR/googlevideo URLs without the local proxy.
 - Add top-level mutable state in `Index.ets`; export factories or
   `getInstance()` accessors instead.
-- Commit `Crash_*.dmp`, `.cxx/`, `build/`, `.hvigor/` artifacts or any
-  `AGENTS.md`.
+- Commit `Crash_*.dmp`, `.cxx/`, `build/`, `.hvigor/` artifacts.
 - Put changelogs or commit-specific notes into this file.

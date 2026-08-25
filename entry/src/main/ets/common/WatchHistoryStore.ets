@@ -324,10 +324,11 @@ export class WatchHistoryStore {
     WatchHistoryStore.replaceAll(merged);
   }
 
-  /** 从 Preferences 加载并同步到 AppStorage（用于应用启动时初始化） */
-  static loadToAppStorage(): void {
+  /** 从 Preferences 加载并同步到 AppStorage（用于应用启动时初始化），返回加载结果 */
+  static loadToAppStorage(): WatchHistoryItem[] {
     const all = WatchHistoryStore.getAll();
     AppStorage.setOrCreate(APP_STORAGE_KEY, [...all]);
+    return all;
   }
 
   private static syncToAppStorage(): void {

@@ -33,8 +33,6 @@ export class PlayerUiViewModel {
   @Track subtitleTracks: SubtitleTrack[] = [];
   @Track currentSubtitleUrl: string = '';
   @Track subtitleText: string = '';
-  @Track isCasting: boolean = false;
-  @Track castDeviceName: string = '';
   // 当前实际播放流的实时信息（由 mpv getMediaInfo 提供）
   @Track mediaTitle: string = '';
   @Track containerFormat: string = '';

@@ -13,6 +13,9 @@ entry/src/main/
     entryability/EntryAbility.ets          — UIAbility (lifecycle, init, injection, prewarm)
     entrybackupability/EntryBackupAbility  — backup extension ability
     product/Index.ets                      — root page; bottom tabs + NavPathStack + Options sheet
+                                             (home tab UI + feed state machine live in
+                                             features/home/HomeTabContent.ets, options sheet host in
+                                             features/options/OptionsSheetHost.ets)
     common/                                — shared stores, components, models, utils
     features/<feature>/                    — per-feature pages + services (§2)
   module.json5                             — abilities, permissions, deviceTypes
@@ -22,22 +25,24 @@ entry/src/main/
 Bottom tabs in `product/Index.ets`: **Home | Subscriptions | Favorites | Local**.
 Search is a `NavDestination` (not a tab). Options is a panel/sheet (not a tab):
 one `bindSheet` (LARGE, system drag bar, close menu on the root title bar)
-hosting a single inner `HdsNavigation(optionsNavStack)`; all options pages —
-including About sub-pages (open_source / ai_models / changelog) — are
+hosting `OptionsSheetHost` — a single inner `HdsNavigation(optionsNavStack)`;
+all options pages —
+including About sub-pages (about_open_source / about_ai_models /
+about_changelog) — are
 destinations on that one stack (no third nav stack, no per-page safe-area
 padding: `buildSheetTitleBar` handles in-sheet insets).
 
 ## 2. Features (`features/<feature>/`)
 | Feature | Contents |
 |---|---|
-| `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI |
+| `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI; `HomeTabContent` — 首页 tab 内容宿主（feed 加载状态机 + 推荐位 banner + 三个 @LocalBuilder 卡片），Index 经 `HomeTabController` 触发 reset |
 | `search` | `SearchPage` (NavDestination) |
 | `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open) |
 | `playlist` | Playlist list + detail |
 | `subscription` | Subscription manage + feed service (bottom tab) |
 | `favorites` | `FavoritesPage` |
 | `local` | Local library + downloads |
-| `options` | Main / appearance / playback (incl. per-state 播放端点: guest `visionos|mweb`, signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network** / data-account / recovery / about-update (GitHub Releases check + AppGallery test link; about/update is inline in `OptionsMainPage` — there is no `OptionsAboutPage`; the About UI is `common/components/AboutPage.ets`) |
+| `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`），Index 经单对象 params 传回调。Main / appearance / playback (incl. per-state 播放端点: guest `visionos|mweb`, signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network** / data-account / recovery / about-update (GitHub Releases check + AppGallery test link; the update check — `UpdateChecker` + `APPGALLERY_TEST_URL` — is inline in `OptionsMainPage`, while the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
 | `help` | `HelpGuidePage` — 6-page onboarding/help swiper (welcome + sign-in, account data, network proxy, quality/cache, downloads). Two entries: first-launch full-screen overlay on `Index` (an `if`-mounted layer in the root Stack, shown while `PreferencesStore` key `cfg_help_seen` != `'true'` with a 500 ms delay; bindSheet/bindContentCover on Navigation-hosted nodes do NOT present at app-start timing — do not revert to them) and Options main page "帮助" item (`help_page` destination in the options sheet). `resetAllConfigs` resets the flag; `clearAllAppData` clears it via `PreferencesStore.clearAll()`. Illustrations are `resources/base/media/guide_*.png` (welcome page uses `app_icon.png`). |
 | `user` | User / channel info; Library saved playlists (WEB classic renderers + TV lockup view models) |
 | `auth` | WebView cookie login (`WebViewLoginPage`) + device/QR OAuth (`DeviceQrLoginPage`) |
@@ -53,7 +58,10 @@ Persistent state and shared singletons:
   the loopback CONNECT bridge, then points both the app-level proxy and
   the ArkWeb `ProxyController` override at it; `awaitReady()` lets the
   first network work (home load in `Index.aboutToAppear`, the Options
-  proxy test) wait for the bridge instead of leaking direct. The WebView
+  proxy test) wait for the bridge instead of leaking direct. During a
+  bridge self-heal re-listen (post-startup), the snapshot keeps the
+  bridge's last-known-good port so consumers fail fast on the dead port
+  rather than leaking direct there either. The WebView
   override has **no** direct-fallback rules — a dead proxy fails visibly.
 - `PlayerSession` — singleton player state for the active `AvPlayerController`.
 - `PlayerPresentation` — foreground / background / share / cast / PiP presentation
@@ -69,6 +77,17 @@ Persistent state and shared singletons:
 
 Reusable components: `HdsTitleBar`, video cards / grids / thumbs, error / about /
 log / tab error panels, option rows, backup + language pickers, placeholders.
+`MediaVideoFeed` is the shared video-feed skeleton (loading / error / empty /
+grid / wide-strip / single-list branches over Grid|List + LazyForEach); pages
+feed it a `FeedDataSource` (`common/model/FeedDataSource.ets`, prefix-diff
+`setData` for paged appends) plus stable Scroller/callback members, and pass
+volatile display state as a single `MediaVideoFeedParams` object-literal
+`@Prop`. Grid column counts are centralized in `ListLayoutUtils`
+(`getVideoGridColumnCount` / `getWideListColumnCount`). Builders passed into
+`MediaVideoFeed`'s `@BuilderParam`s must be declared `@LocalBuilder` (not
+`@Builder`, and never `.bind(this)`) — a plain `@Builder` passed by reference
+runs with `this` bound to the call-site component, so page builders that touch
+page state crash with "undefined is not callable".
 `SubTabBar` (`SubTabBarItem`) is the shared in-page sub-tab builder (48vp bar,
 16fp, 36×2 theme-color indicator) used by Local / Player / User pages. It takes
 a single `SubTabBarItemParams` object-literal param (by-reference refresh) —
@@ -92,9 +111,15 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 ## 5. Cross-module wiring (in `EntryAbility.onCreate`)
 - `PreferencesStore.init(context)` and `AppState.init()` (loads proxy + applies providers).
 - `PlaybackPreferences.setProvider(...)` — UI/playback prefs → `mediaservice`.
+- `ContextProvider.setProvider(...)` — lazy `UIAbilityContext` getter →
+  `mediaservice` (AVSession init, background continuous task).
 - `AvPlayerController.setEngineConfigProvider(...)` — MPV engine knobs → `mediaservice`.
 - `AppLogStore.init(enabled, context.filesDir)`.
-- `AuthSessionManager.init(context)` (youtube_core) + `AuthStateHelper.refresh()`.
+- `AuthSessionManager.init(context)` (youtube_core) +
+  `AuthSessionManager.setAuthStateChangeListener(() => AuthStateHelper.refresh())`
+  + `AuthStateHelper.refresh()` — the listener hook makes internal
+  credential-loss paths (OAuth `invalid_grant`, server-cleared SID-family
+  cookies) trigger the same auth-state refresh as explicit login/logout.
 - `AuthStateHelper.reconcilePlaybackClient()` — 登录态/鉴权开关变化后的唯一
   入口（内部调用 `YoutubePlayerClientConfig.resetToAuthDefault`，落到
   per-state configured 值）。Configured defaults: `mweb` (SABR) signed-in,
@@ -175,7 +200,8 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   `x-user-agent: grpc-web-javascript/0.1`. The WebView helper injects
   `window.yt.config_.EVENT_ID` before BotGuard and calls `vm.a(...)` with the
   9-argument signature (program, callback, true, interaction element, no-op,
-  `[[], []]`, undefined, false, loggerFunctions[5]). After a successful
+  `[[], []]`, undefined, false, the 5-element `loggerFunctions` array as the
+  9th argument). After a successful
   bootstrap the generator pins the bootstrap visitorData into
   `SessionIdentityManager`.
 - `warmRuntime(visitorData): void` is fire-and-forget BotGuard pre-init
@@ -207,8 +233,11 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   `KEEP_BACKGROUND_RUNNING`.
 - **Background playback**: continuous task lifecycle is owned by
   `mediaservice/PlayerStateMachine` (+ safety-net start from
-  `EntryAbility.onBackground`). Presentation (when to drop video tracks)
-  is owned by `PlayerPresentation` in entry, not by native MPV defaults alone.
+  `EntryAbility.onBackground`, registered only while the player is in an
+  active state — PLAYING/PAUSED/BUFFERING/READY/LOADING, the same set as
+  mediaservice's `BackgroundTaskStateListener`). Presentation (when to drop
+  video tracks) is owned by `PlayerPresentation` in entry, not by native MPV
+  defaults alone.
 - **Audio focus / interruptions**: handled at the application layer
   (player UI + AV session path), not as a native-only policy inside
   `libmpv_napi`.
@@ -223,7 +252,7 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   to the guest kiosk in `HomeFeedService` — the feed is never dead-ended;
   an auth rejection additionally raises the
   `yt_home_auth_expired_notice` banner via `homeModeNoticeMessage` in
-  `product/Index.ets`.
+  `features/home/HomeTabContent.ets`.
 
 ## 9. Player navigation and UI regression checks
 - Before adding a navigation path from `PlayerPage`, trace the comparable
@@ -258,8 +287,10 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   remove them after verification.
 
 ## 10. Reference clients
-- Parent-directory reference trees are `../NewPipe` and
-  `../PipePipe/PipePipeClient`. Relevant Android sources include
+- Reference clones (NewPipe, PipePipe, …) usually live in the parent
+  directory `../` — always check the local clones first when comparing
+  behavior, and ask the user for the path if one is missing (this machine
+  currently has only `../PipePipe`). Relevant Android sources include
   `app/src/main/java/org/schabi/newpipe/fragments/detail/BaseDescriptionFragment.java`,
   `fragments/detail/DescriptionFragment.java`, and
   `fragments/list/search/SearchFragment.java` under each tree as applicable.
@@ -278,7 +309,7 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 - Add a new module (HAR/HSP) without updating root `build-profile.json5`
   `modules[]` and the consumer's `oh-package.json5#dependencies`.
 - Commit `Crash_*.dmp`, `.cxx/`, `oh_modules/`, `build/`, `.hvigor/`,
-  `.deveco/plans/`, signing material, or any `AGENTS.md`.
+  `.deveco/plans/`, or signing material.
 - Add top-level mutable state in a HAR module's `Index.ets` — use
   `getInstance()` or factories.
 - Call `AppStorage.get` from `mediaservice` or `youtube_core` code paths.

@@ -407,11 +407,19 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
  * restart scheduled by a superseded generation is a no-op.
  * (TCPSocketServer has no 'close' event in the current SDK — 'error' is the
  * only async failure signal, so self-heal hooks it.)
+ *
+ * Outward port snapshot: `getPort()` reports `lastKnownGoodPort`, which is set
+ * on every successful listen and is NOT cleared when the server errors into the
+ * self-heal window — consumers keep routing at the (temporarily dead) loopback
+ * port so their connects fail fast instead of silently going direct, per the
+ * "a failing proxy must fail" rule. Only a real stop (`stop()` — user disabled
+ * the proxy, config changed, or the initial listen failed) clears it back to 0.
  */
 export class Socks5Bridge {
   private server: socket.TCPSocketServer | null = null;
   private config: Socks5Config | null = null;
   private localPort: number = 0;
+  private lastKnownGoodPort: number = 0;
   private running: boolean = false;
   private generation: number = 0;
   private selfHealAttempts: number = 0;
@@ -465,6 +473,9 @@ export class Socks5Bridge {
       this.server = server;
       this.config = cfg;
       this.localPort = addr.port ?? 0;
+      if (this.localPort > 0) {
+        this.lastKnownGoodPort = this.localPort;
+      }
       this.running = true;
       logger.info(TAG + ` started localPort=${this.localPort} socks5=${cfg.host}:${cfg.port} auth=${cfg.username.length > 0}`);
       server.on('connect', (conn: socket.TCPSocketConnection) => {
@@ -489,6 +500,9 @@ export class Socks5Bridge {
    * A listening server errored (e.g. netstack killed the fd): tear it down and
    * schedule a bounded self-heal re-listen. Stale servers (superseded by
    * stop()/start()) are ignored via the generation guard.
+   * `lastKnownGoodPort` is intentionally kept: while the bridge re-listens,
+   * `getPort()` still reports the old (now dead) port so proxy consumers fail
+   * fast on connect-refused instead of falling back to a silent direct route.
    */
   private handleServerError(server: socket.TCPSocketServer, cfg: Socks5Config, gen: number, e: Error): void {
     if (gen !== this.generation || this.server !== server) {
@@ -539,6 +553,7 @@ export class Socks5Bridge {
     }
     this.config = null;
     this.localPort = 0;
+    this.lastKnownGoodPort = 0;
     this.running = false;
   }
 
@@ -546,8 +561,14 @@ export class Socks5Bridge {
     return this.running;
   }
 
+  /**
+   * Outward port snapshot for proxy consumers. Reports the last successfully
+   * listened port; during the self-heal re-listen window this is the stale
+   * (dead) port on purpose — connects fail fast rather than leaking direct.
+   * 0 only when the bridge was never started or was explicitly stopped.
+   */
   getPort(): number {
-    return this.localPort;
+    return this.lastKnownGoodPort;
   }
 }
 

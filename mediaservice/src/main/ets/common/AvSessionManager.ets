@@ -15,6 +15,7 @@ import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { image } from '@kit.ImageKit';
 import { PlaybackEngineState } from '../engine/PlaybackEngine';
+import { ContextProvider } from './ContextProvider';
 import { HttpDownloader } from 'youtube_core';
 
 const TAG = '[AvSessionManager]';
@@ -42,12 +43,6 @@ export class AvSessionManager {
   public onNextCommand: (() => void) | undefined = undefined;
   public onPreviousCommand: (() => void) | undefined = undefined;
   public onStopCommand: (() => void) | undefined = undefined;
-
-  // Cast state
-  public isCasting: boolean = false;
-  public castDeviceName: string = '';
-  public onCastStateChange: ((isCasting: boolean, deviceName: string) => void) | undefined = undefined;
-  public onCastPlaybackStateChange: ((state: avSession.AVPlaybackState) => void) | undefined = undefined;
 
   /**
    * Unified audio-focus entry for the player controller (scheme A).
@@ -82,7 +77,7 @@ export class AvSessionManager {
   }
 
   private async initInternal(): Promise<void> {
-    this.context = AppStorage.get<common.UIAbilityContext>('context');
+    this.context = ContextProvider.get();
     if (!this.context) {
       Logger.error(TAG, 'init failed: context is undefined');
       return;
@@ -405,33 +400,7 @@ export class AvSessionManager {
       Logger.debug(TAG, 'Control center → stop');
       this.onStopCommand?.();
     });
-    // 注：当前系统版本 outputDeviceChange 事件名无效，如需监听投屏状态请改为定时轮询 getOutputDevice()
-  }
-
-  /**
-   * 轮询检查投屏设备状态。当前系统版本 outputDeviceChange 事件无效，
-   * 如需实时监听投屏状态，可由上层定时调用此方法（如每 3~5 秒一次）。
-   */
-  public async checkCastState(): Promise<void> {
-    if (!this.session) {
-      return;
-    }
-    try {
-      const outputDevice = await this.session.getOutputDevice();
-      const hasDevice = outputDevice !== undefined && outputDevice !== null;
-      if (hasDevice !== this.isCasting) {
-        this.isCasting = hasDevice;
-        if (hasDevice) {
-          Logger.info(TAG, `Cast connected`);
-        } else {
-          this.castDeviceName = '';
-          Logger.info(TAG, `Cast disconnected`);
-        }
-        this.onCastStateChange?.(hasDevice, this.castDeviceName);
-      }
-    } catch (e) {
-      Logger.warn(TAG, `checkCastState failed: ${(e as BusinessError).message}`);
-    }
+    // 注：当前系统版本 outputDeviceChange 事件名无效
   }
 
   // ─────────────────────────────────────────────────────────────────────────

@@ -9,8 +9,8 @@ import { UIConfig } from '../common/AppState';
 import { PlaybackConfig } from '../common/PlaybackConfig';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
-import { BackgroundTaskManager, AvPlayerController, LocalMediaProxy } from 'mediaservice';
-import { EnhancedLogger, PlaybackPreferences } from 'mediaservice';
+import { BackgroundTaskManager, AvPlayerController, LocalMediaProxy, PlayerState } from 'mediaservice';
+import { EnhancedLogger, PlaybackPreferences, ContextProvider } from 'mediaservice';
 import { AuthSessionManager, YTCoreLogger, YoutubeJavaScriptPlayerManager,
   YoutubePlayerClientConfig } from 'youtube_core';
 import { AuthStateHelper } from '../common/AuthStateHelper';
@@ -44,6 +44,9 @@ export default class EntryAbility extends UIAbility {
 
       PreferencesStore.init(this.context);
       AppState.init();
+      // 把 UIAbilityContext 读取注入 mediaservice（惰性 getter），
+      // 避免 AvSessionManager / 后台长时任务直接 AppStorage.get('context')。
+      ContextProvider.setProvider(() => this.context);
       // 把 UI 偏好读取注入 mediaservice，避免 controller 直接依赖 AppStorage
       PlaybackPreferences.setProvider(() => {
         const ui = AppStorage.get<UIConfig>('uiConfig') ?? new UIConfig();
@@ -75,9 +78,11 @@ export default class EntryAbility extends UIAbility {
       const logEnabled = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
       AppLogStore.init(logEnabled, this.context.filesDir);
       AuthSessionManager.init(this.context);
+      // 凭据内部失效路径（invalid_grant / 服务端清除 SID 等）也触发状态刷新。
+      AuthSessionManager.setAuthStateChangeListener(() => AuthStateHelper.refresh());
       AuthStateHelper.refresh();
       // Stream client per-state settings (Options → 播放端点): guest default
-      // visionos, signed-in default tv_downgraded; reconcile picks the
+      // visionos, signed-in default mweb; reconcile picks the
       // configured client for the current auth state.
       const pbConfig = AppStorage.get<PlaybackConfig>('playbackConfig') ?? new PlaybackConfig();
       YoutubePlayerClientConfig.setConfiguredClients(pbConfig.guestPlayerClient, pbConfig.authPlayerClient);
@@ -206,7 +211,17 @@ export default class EntryAbility extends UIAbility {
     WatchHistoryStore.flushIfDirty();
     // 后台长时任务由 PlayerStateMachine 统一管理；此处保留兜底注册以应对极端时序
     // （重复注册返回 9800005 会被静默忽略，详见 BackgroundTaskManager）。
-    BackgroundTaskManager.startContinuousTask(this.context);
+    // 仅播放活跃时才兜底注册（与 BackgroundTaskStateListener 同一活跃集合）：
+    // 从未播放就退后台时，注册注定失败，只会产生一条无意义的 ERROR 日志。
+    const playerState = PlayerSession.getInstance().playerState;
+    const isPlaybackActive = playerState === PlayerState.PLAYING || playerState === PlayerState.PAUSED
+      || playerState === PlayerState.BUFFERING || playerState === PlayerState.READY
+      || playerState === PlayerState.LOADING;
+    if (isPlaybackActive) {
+      BackgroundTaskManager.startContinuousTask(this.context);
+    } else {
+      logger.debug(`onBackground: skip safety-net continuous task, playerState=${playerState}`);
+    }
     // BACKGROUND may arm delayed video-off; PiP/OVERLAY keep video ON.
     PlayerPresentation.onAbilityBackground();
   }

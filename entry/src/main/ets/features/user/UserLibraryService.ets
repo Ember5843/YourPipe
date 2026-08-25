@@ -8,6 +8,7 @@ import {
   fetchTvBrowseContinuation,
   fetchTvBrowsePage
 } from 'youtube_core';
+import { util } from '@kit.ArkTS';
 import { AppLog } from '../../common/AppLog';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { WatchHistoryItem } from '../../common/WatchHistoryStore';
@@ -403,27 +404,13 @@ export class UserLibraryService {
   }
 
   private base64ToAscii(b64: string): string {
-    const table =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    // Platform base64 decode; the hand-rolled decoder skipped characters
+    // outside the alphabet, so filter first to keep that tolerance.
+    const cleaned = b64.replace(/[^A-Za-z0-9+/=]/g, '');
+    const bytes = new util.Base64Helper().decodeSync(cleaned);
     let out = '';
-    let buffer = 0;
-    let bits = 0;
-    for (let i = 0; i < b64.length; i++) {
-      const ch = b64.charAt(i);
-      if (ch === '=') {
-        break;
-      }
-      const val = table.indexOf(ch);
-      if (val < 0) {
-        continue;
-      }
-      buffer = (buffer << 6) | val;
-      bits += 6;
-      if (bits >= 8) {
-        bits -= 8;
-        const byte = (buffer >> bits) & 0xff;
-        out += String.fromCharCode(byte);
-      }
+    for (let i = 0; i < bytes.length; i++) {
+      out += String.fromCharCode(bytes[i]);
     }
     return out;
   }

@@ -1,14 +1,10 @@
 import { socket } from '@kit.NetworkKit';
-import { util } from '@kit.ArkTS';
 import { DashSession, StreamResource } from '../proxy/SessionStore';
+import { encodeUtf8 } from '../proxy/ProxyEncoding';
 import { SabrTrackBuffer } from './SabrTrackBuffer';
 import Logger from '../utils/Logger';
 
 const TAG = '[SabrDashProxy]';
-
-function encodeText(value: string): ArrayBuffer {
-  return new util.TextEncoder().encode(value).buffer as ArrayBuffer;
-}
 
 function xml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -112,19 +108,19 @@ export async function serveSabrDashSegment(conn: socket.TCPSocketConnection,
   const init = segmentName === 'init';
   const sequence = init ? -1 : parseInt(segmentName, 10);
   if (!init && (!Number.isFinite(sequence) || sequence <= 0)) {
-    await conn.send({ data: encodeText('HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
+    await conn.send({ data: encodeUtf8('HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
     return;
   }
   const data = await buffer.readSegment(init, sequence);
   if (!data) {
     Logger.info(TAG, `EOF itag=${buffer.getItag()} seq=${sequence} end=${buffer.getEndSegment()}`);
-    await conn.send({ data: encodeText('HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
+    await conn.send({ data: encodeUtf8('HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
     return;
   }
   const header = 'HTTP/1.1 200 OK\r\n'
     + `Content-Type: ${mimeType || 'application/octet-stream'}\r\n`
     + `Content-Length: ${data.length}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n`;
-  await conn.send({ data: encodeText(header) });
+  await conn.send({ data: encodeUtf8(header) });
   if (!headOnly && data.length > 0) {
     await conn.send({ data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer });
   }

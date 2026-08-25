@@ -6,6 +6,7 @@ import { YouTubePlayResult, YouTubePlayService } from '../features/player/YouTub
 import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
+import { formatDurationHms } from './utils/FormatUtils';
 import { YOUTUBE_VIDEO_ID } from './Constants';
 import { ErrorInfo, ErrorInfoOptions } from './model/ErrorInfo';
 
@@ -30,17 +31,6 @@ interface PreparedPlayback {
 function getFallbackThumbnailUrl(videoId: string): string {
   // Prefer maxres (highest). Client may 404 on some videos; UI has placeholder.
   return videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : '';
-}
-
-/** 秒 → "h:mm:ss" / "m:ss" 时长文本（播放队列卡片角标/信息区用） */
-function formatSecondsAsDuration(sec: number): string {
-  const total = Math.max(0, Math.floor(sec));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  const mm = m.toString().padStart(2, '0');
-  const ss = s.toString().padStart(2, '0');
-  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
 }
 
 export class PlayerSession {
@@ -916,7 +906,7 @@ export class PlayerSession {
           );
           v.publishedTimeText = r.publishedTimeText || '';
           v.durationText = r.lengthSeconds && r.lengthSeconds > 0
-            ? formatSecondsAsDuration(r.lengthSeconds)
+            ? formatDurationHms(Math.max(0, r.lengthSeconds))
             : '';
           return v;
         });

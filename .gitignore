@@ -21,6 +21,7 @@ CLAUDE.md
 .agents/
 .claude/
 .codex/
+.codebuddy/
 .cursor/
 .kimi-code/
 .opencode/

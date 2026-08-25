@@ -12,8 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CommonConstants as Const, Logger, StreamInfo, StreamCategories, PlayerModel, PlaybackStats } from 'mediaservice';
-import { formatBytes } from '../../../common/utils/FormatUtils';
+import { CommonConstants as Const, Logger, StreamInfo, StreamCategories, PlayerModel, PlaybackStats,
+  PlayerUiViewModel } from 'mediaservice';
+import { formatBytes, formatDurationHms } from '../../../common/utils/FormatUtils';
 import { LengthMetrics } from '@kit.ArkUI';
 import { ErrorPage } from '../../../common/components/ErrorPage';
 import { TabErrorPanel } from '../../../common/components/TabErrorPanel';
@@ -118,20 +119,9 @@ export struct VideoDetails {
   /** 会话级仅音频（封面层 + 关视频轨） */
   @StorageLink('isAudioOnlyMode') isAudioOnlyMode: boolean = false;
 
-  // ── mpv 实时播放流信息（由 PlayerPage 从 vm 传入）──
-  @Prop mpvVideoWidth: number = 0;
-  @Prop mpvVideoHeight: number = 0;
-  @Prop mpvContainerFormat: string = '';
-  @Prop mpvMediaTitle: string = '';
-  @Prop mpvVideoCodec: string = '';
-  @Prop mpvVideoBitRate: number = 0;
-  @Prop mpvFrameRate: number = 0;
-  @Prop mpvAudioCodec: string = '';
-  @Prop mpvAudioBitRate: number = 0;
-  @Prop mpvAudioChannels: number = 0;
-  @Prop mpvAudioSampleRate: number = 0;
-  @Prop mpvFileSize: number = 0;
-  @Prop mpvDuration: number = 0;
+  // ── mpv 实时播放流信息（与 AVPlayer 同一范式：ArkUI V1 的 @Track 不会穿透到
+  // 嵌套 @Observed，vm 必须由组件自己 @Link，字段变化才能触发 UI 重渲染）──
+  @Link vm: PlayerUiViewModel;
 
   private getEffectiveDesc(): string {
     return (this.videoDescription ?? this.item?.videoDescription) || '';
@@ -585,15 +575,6 @@ export struct VideoDetails {
     return `${ch} channels`;
   }
 
-  private formatDuration(sec: number): string {
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const s = Math.floor(sec % 60);
-    const mm = m.toString().padStart(2, '0');
-    const ss = s.toString().padStart(2, '0');
-    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
-  }
-
   @Builder
   StatsMetaRow() {
     // Title-adjacent stats: views / date / like / dislike. Items size to their
@@ -932,58 +913,58 @@ export struct VideoDetails {
       if (this.item.videoId.length > 0) {
         StreamInfoRow({ label: $r('app.string.yt_stats_video_id'), value: this.item.videoId })
       }
-      if (this.mpvContainerFormat.length > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stream_container'), value: this.mpvContainerFormat.toUpperCase() })
+      if (this.vm.containerFormat.length > 0) {
+        StreamInfoRow({ label: $r('app.string.yt_stream_container'), value: this.vm.containerFormat.toUpperCase() })
       }
-      if (this.mpvMediaTitle.length > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stream_media_title'), value: this.mpvMediaTitle })
+      if (this.vm.mediaTitle.length > 0) {
+        StreamInfoRow({ label: $r('app.string.yt_stream_media_title'), value: this.vm.mediaTitle })
       }
-      if (this.mpvDuration > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stream_duration'), value: this.formatDuration(this.mpvDuration) })
+      if (this.vm.durationTime > 0) {
+        StreamInfoRow({ label: $r('app.string.yt_stream_duration'), value: formatDurationHms(this.vm.durationTime) })
       }
-      if (this.mpvFileSize > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stream_file_size'), value: this.formatFileSize(this.mpvFileSize) })
+      if (this.vm.fileSize > 0) {
+        StreamInfoRow({ label: $r('app.string.yt_stream_file_size'), value: this.formatFileSize(this.vm.fileSize) })
       }
 
       // ── 视频流 ──
-      if (this.mpvVideoWidth > 0) {
+      if (this.vm.videoWidth > 0) {
         Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
         Text($r('app.string.yt_stream_video'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.yourtube_text_secondary'))
           .margin({ bottom: 6 })
-        StreamInfoRow({ label: $r('app.string.yt_stream_resolution'), value: `${this.mpvVideoWidth} × ${this.mpvVideoHeight}` })
-        if (this.mpvVideoCodec.length > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_codec'), value: this.mpvVideoCodec })
+        StreamInfoRow({ label: $r('app.string.yt_stream_resolution'), value: `${this.vm.videoWidth} × ${this.vm.videoHeight}` })
+        if (this.vm.videoCodec.length > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_codec'), value: this.vm.videoCodec })
         }
-        if (this.mpvVideoBitRate > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_bitrate'), value: this.formatBitrate(this.mpvVideoBitRate) })
+        if (this.vm.videoBitRate > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_bitrate'), value: this.formatBitrate(this.vm.videoBitRate) })
         }
-        if (this.mpvFrameRate > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_frame_rate'), value: `${this.mpvFrameRate.toFixed(2)} fps` })
+        if (this.vm.frameRate > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_frame_rate'), value: `${this.vm.frameRate.toFixed(2)} fps` })
         }
       }
 
       // ── 音频流 ──
-      if (this.mpvAudioCodec.length > 0 || this.mpvAudioSampleRate > 0) {
+      if (this.vm.audioCodec.length > 0 || this.vm.audioSampleRate > 0) {
         Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
         Text($r('app.string.yt_stream_audio'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.yourtube_text_secondary'))
           .margin({ bottom: 6 })
-        if (this.mpvAudioCodec.length > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_codec'), value: this.mpvAudioCodec })
+        if (this.vm.audioCodec.length > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_codec'), value: this.vm.audioCodec })
         }
-        if (this.mpvAudioBitRate > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_bitrate'), value: this.formatBitrate(this.mpvAudioBitRate) })
+        if (this.vm.audioBitRate > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_bitrate'), value: this.formatBitrate(this.vm.audioBitRate) })
         }
-        if (this.mpvAudioChannels > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_channels'), value: this.formatChannels(this.mpvAudioChannels) })
+        if (this.vm.audioChannels > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_channels'), value: this.formatChannels(this.vm.audioChannels) })
         }
-        if (this.mpvAudioSampleRate > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_sample_rate'), value: `${(this.mpvAudioSampleRate / 1000).toFixed(1)} kHz` })
+        if (this.vm.audioSampleRate > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_sample_rate'), value: `${(this.vm.audioSampleRate / 1000).toFixed(1)} kHz` })
         }
       }
 
@@ -998,7 +979,7 @@ export struct VideoDetails {
       StatsBarGraph({
         samples: this.statsSpeedSamples,
         kind: 'speed',
-        referenceBps: this.mpvVideoBitRate + this.mpvAudioBitRate
+        referenceBps: this.vm.videoBitRate + this.vm.audioBitRate
       })
         .margin({ top: 4, bottom: 8 })
       StreamInfoRow({ label: $r('app.string.yt_stats_buffer'), value: this.formatBufferSec(this.currentStatsBuffer()) })
@@ -1015,7 +996,7 @@ export struct VideoDetails {
       })
 
       // ── 无数据占位 ──
-      if (this.mpvVideoWidth === 0 && this.mpvAudioCodec.length === 0 && this.mpvContainerFormat.length === 0) {
+      if (this.vm.videoWidth === 0 && this.vm.audioCodec.length === 0 && this.vm.containerFormat.length === 0) {
         Text($r('app.string.yt_stream_loading'))
           .fontSize(13)
           .fontColor($r('app.color.yourtube_text_hint'))

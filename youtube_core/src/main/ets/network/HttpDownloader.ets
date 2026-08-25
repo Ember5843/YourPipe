@@ -252,7 +252,10 @@ export class HttpDownloader {
     }
     // SOCKS5: route through the loopback HTTP CONNECT bridge. The bridge owns
     // the native SOCKS5 tunnel (host/port/auth), so the http stack only sees
-    // 127.0.0.1. No port (bridge not started) → stay direct.
+    // 127.0.0.1. During the bridge's self-heal re-listen window its snapshot
+    // keeps reporting the last-known-good port, so connects fail fast on the
+    // dead port instead of silently going direct; port 0 (never started or
+    // explicitly stopped) is the only case that stays direct.
     if (snap.kind === 'socks5') {
       const localPort = snap.socks5LocalPort;
       if (localPort && localPort > 0) {

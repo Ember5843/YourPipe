@@ -146,42 +146,6 @@ export function generateTParameter(): string {
 }
 
 /**
- * Validate JSON response body from HTTP response.
- * Throws if response is HTML error page or non-200.
- * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.getValidJsonResponseBody
- */
-export interface JsonResponse {
-  responseCode: number;
-  result: string | ArrayBuffer;
-}
-
-/**
- * Decode an ArrayBuffer to a JS string byte-by-byte (latin1 semantics).
- * Shared by the cipher decoder and JSON body validation.
- */
-export function arrayBufferToString(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let result = '';
-  for (let i = 0; i < bytes.length; i++) {
-    result += String.fromCharCode(bytes[i]);
-  }
-  return result;
-}
-
-export function getValidJsonResponseBody(response: JsonResponse): string {
-  if (response.responseCode !== 200) {
-    throw new Error(`HTTP ${response.responseCode}`);
-  }
-  const body = typeof response.result === 'string'
-    ? response.result
-    : arrayBufferToString(response.result as ArrayBuffer);
-  if (body.trim().startsWith('<')) {
-    throw new Error('Response is HTML, not JSON');
-  }
-  return body;
-}
-
-/**
  * Check for default alerts in InnerTube response and throw if error.
  * Ported from org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper.defaultAlertsCheck
  */
@@ -281,22 +245,31 @@ export function braceMatchJsonObject(source: string, start: number): string {
 }
 
 /**
- * Parse a number string that may contain K/M/B suffixes or commas.
+ * Shared K/M/B-suffixed number parser.
+ * `fallback` is returned for empty input or no match; `round` selects
+ * Math.round over Math.floor. Comma handling is left to the caller's regex.
  */
-export function parseMixedNumber(text: string | undefined): number {
-  if (!text) return 0;
-  const cleanText = text.replace(/,/g, '').match(/(\d+(\.\d+)?)\s*([KMBkmb]?)/);
-  if (!cleanText) return 0;
-
-  let value = parseFloat(cleanText[1]);
-  const unit = cleanText[3].toLowerCase();
-
+function parseSuffixedNumber(text: string | undefined, fallback: number, pattern: RegExp, round: boolean): number {
+  if (!text) return fallback;
+  const m = text.match(pattern);
+  if (!m) return fallback;
+  const num = parseFloat(m[1].replace(/,/g, ''));
   let multiplier = 1;
+  const unit = m[2].toLowerCase();
   if (unit === 'k') multiplier = 1000;
   else if (unit === 'm') multiplier = 1000000;
   else if (unit === 'b') multiplier = 1000000000;
+  const value = num * multiplier;
+  return round ? Math.round(value) : Math.floor(value);
+}
 
-  return Math.floor(value * multiplier);
+/**
+ * Parse a number string that may contain K/M/B suffixes or commas.
+ * Commas are stripped as thousand separators before matching.
+ */
+export function parseMixedNumber(text: string | undefined): number {
+  if (!text) return 0;
+  return parseSuffixedNumber(text.replace(/,/g, ''), 0, /(\d+(?:\.\d+)?)\s*([KMBkmb]?)/, false);
 }
 
 /**
@@ -304,15 +277,7 @@ export function parseMixedNumber(text: string | undefined): number {
  * Ported from org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
  */
 export function parseSubscriberCount(text: string | undefined): number {
-  if (!text) return -1;
-  const m = text.match(/([\d,.]+)\s*([KMBkmb]?)/);
-  if (!m) return -1;
-  const num = parseFloat(m[1].replace(/,/g, ''));
-  const suffix = m[2].toUpperCase();
-  if (suffix === 'K') return Math.round(num * 1000);
-  if (suffix === 'M') return Math.round(num * 1000000);
-  if (suffix === 'B') return Math.round(num * 1000000000);
-  return Math.round(num);
+  return parseSuffixedNumber(text, -1, /([\d,.]+)\s*([KMBkmb]?)/, true);
 }
 
 /**

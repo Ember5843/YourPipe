@@ -147,7 +147,7 @@ export struct DeviceQrLoginPage {
           Text(this.stageLabel())
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.yourtube_text_warning'))
+            .fontColor(this.themePrimary)
           if (this.status.lastError.length > 0) {
             Text(this.status.lastError)
               .fontSize(13)

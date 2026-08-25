@@ -10,7 +10,7 @@ import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
-import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { getFeedContentWidthVp, getVideoGridColumnCount, getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 import { ActionHub } from '../../common/ActionHub';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { SubscriptionFeedItem } from '../../common/SubscriptionFeedStore';
@@ -33,7 +33,6 @@ export struct FavoritesPage {
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State overviewMap: Record<string, SearchPlaylistItem> = {};
   @State isLoading: boolean = false;
-  private readonly GRID_SIDE_PADDING: number = 12;
 
 
   aboutToAppear(): void {
@@ -42,24 +41,6 @@ export struct FavoritesPage {
 
   aboutToShow(): void {
     this.loadOverviews();
-  }
-
-  private getVideoGridColumnCount(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    if (contentWidth >= 1440) {
-      return 5;
-    }
-    if (contentWidth >= 1080) {
-      return 4;
-    }
-    if (contentWidth >= 760) {
-      return 3;
-    }
-    if (contentWidth >= 520) {
-      return 2;
-    }
-    return 1;
   }
 
   private buildPlaceholder(item: PlaylistItem, index: number): SearchPlaylistItem {
@@ -149,9 +130,7 @@ export struct FavoritesPage {
 
   /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
   private getWideListColumns(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    return getWideListColumnCount(contentWidth);
+    return getWideListColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth));
   }
 
   private getFeedCoverUrls(): string[] {
@@ -260,7 +239,7 @@ export struct FavoritesPage {
         if (this.uiConfig.homeLayoutMode === 'grid') {
           ListItem() {
             GridRow({
-              columns: this.getVideoGridColumnCount(),
+              columns: getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth)),
               gutter: { x: 8, y: 8 }
             }) {
               ForEach(this.favorites, (item: VideoItem) => {

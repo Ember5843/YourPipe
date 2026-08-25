@@ -469,6 +469,24 @@ export class DownloadManager {
     this.processQueue();
   }
 
+  /**
+   * Clear-all-app-data hook: cancel every in-flight task and drop the task
+   * list (AppStorage 'downloadTasks' is refreshed via notifyTasksChanged).
+   * Downloaded files under filesDir/downloads intentionally survive.
+   */
+  clearAllTasks(): void {
+    this.tasks.forEach((task: DownloadTask) => {
+      if (task.status !== DownloadStatus.COMPLETED) {
+        task._cancelled = true;
+        task.status = DownloadStatus.CANCELLED;
+      }
+      this.cancelDownloadNotification(task);
+    });
+    logger.info(`All download tasks cleared: count=${this.tasks.length} active=${this.activeTaskIds.size}`);
+    this.tasks = [];
+    this.notifyTasksChanged();
+  }
+
   async exportCompletedTask(taskId: string, destinationDir: string): Promise<string> {
     const task = this.tasks.find((item: DownloadTask) => item.id === taskId);
     if (!task) {

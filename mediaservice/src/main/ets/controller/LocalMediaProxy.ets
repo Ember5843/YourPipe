@@ -10,27 +10,7 @@ import { parseYoutubeDashIndex, YoutubeDashSegment } from '../proxy/YoutubeDashI
 import { VideoHwCaps } from '../engine/VideoHwCaps';
 
 const TAG: string = '[PlayerLog][LocalMediaProxy]';
-// PipePipe-aligned UAs (must match extractor ClientsConstants / YoutubeParsingHelper).
-// Android/iOS UAs are imported directly from ClientsConstants to avoid drift.
-const DEFAULT_USER_AGENT: string =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-  + 'Chrome/134.0.0.0 Safari/537.36,gzip(gfe)';
-const ANDROID_VR_USER_AGENT: string =
-  'com.google.android.apps.youtube.vr.oculus/1.65.10 '
-  + '(Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
-// PipePipe getVisionOsUserAgent (country code fixed to GB, matching the other constants).
-const VISIONOS_USER_AGENT: string =
-  'com.google.visionos.youtube/1.02(RealityDevice14,1; U; CPU visionOS 25_6_0 like Mac OS X; GB)';
-const SAFARI_USER_AGENT: string =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) '
-  + 'Version/15.5 Safari/605.1.15,gzip(gfe)';
-const MWEB_USER_AGENT: string =
-  'Mozilla/5.0 (iPad; CPU OS 16_7_10 like Mac OS X) AppleWebKit/605.1.15 '
-  + '(KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1,gzip(gfe)';
-const TV_DOWNGRADED_USER_AGENT: string = 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version';
-const TV_USER_AGENT: string =
-  'Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) '
-  + 'Version/15.4 Safari/605.1.15';
+// PipePipe-aligned UAs — all sourced from youtube_core ClientsConstants to avoid drift.
 
 interface LocalMediaResource {
   id?: string;
@@ -502,7 +482,7 @@ export class LocalMediaProxy {
       initRangeEnd: r.initRangeEnd !== undefined ? String(r.initRangeEnd) : '',
       indexRangeStart: r.indexRangeStart !== undefined ? String(r.indexRangeStart) : '',
       indexRangeEnd: r.indexRangeEnd !== undefined ? String(r.indexRangeEnd) : '',
-      userAgent: r.userAgent || DEFAULT_USER_AGENT,
+      userAgent: r.userAgent || ClientsConstants.WEB_USER_AGENT,
       referer: r.referer || 'https://www.youtube.com',
       contentLength: r.contentLength || 0,
       bitrate: r.bitrate || 0,
@@ -519,6 +499,7 @@ export class LocalMediaProxy {
 
   private static userAgentForClient(sourceClient?: string): string {
     // Keys match youtube_core YoutubePlayerClientKey / StreamInfo.sourceClient.
+    // All UA values come from youtube_core ClientsConstants (single source).
     switch (sourceClient) {
       case 'android':
       case 'ANDROID':
@@ -527,7 +508,7 @@ export class LocalMediaProxy {
       case 'ANDROID_VR':
         // RangeProxy overrides ANDROID_VR to getAndroidUserAgent for videoplayback;
         // keep extraction UA for non-range uses / logging.
-        return ANDROID_VR_USER_AGENT;
+        return ClientsConstants.ANDROID_VR_USER_AGENT;
       case 'ios':
       case 'IOS':
         return ClientsConstants.IOS_USER_AGENT;
@@ -536,21 +517,22 @@ export class LocalMediaProxy {
         // Token-free direct URLs; media fetches stay on the GET path with
         // the visionos UA (PipePipe treats VISIONOS like other non-mobile
         // streaming URLs — GET + no Origin/Referer).
-        return VISIONOS_USER_AGENT;
+        // PipePipe getVisionOsUserAgent, country code fixed to GB.
+        return ClientsConstants.visionOsUserAgent('GB');
       case 'web_safari':
       case 'safari':
-        return SAFARI_USER_AGENT;
+        return ClientsConstants.SAFARI_USER_AGENT;
       case 'mweb':
       case 'MWEB':
-        return MWEB_USER_AGENT;
+        return ClientsConstants.MWEB_USER_AGENT;
       case 'tv_downgraded':
       case 'TVHTML5':
-        return TV_DOWNGRADED_USER_AGENT;
+        return ClientsConstants.TVHTML5_DOWNGRADED_USER_AGENT;
       case 'tv':
       case 'TVHTML5_SIMPLY_EMBEDDED_PLAYER':
-        return TV_USER_AGENT;
+        return ClientsConstants.TVHTML5_SIMPLY_EMBEDDED_USER_AGENT;
       default:
-        return DEFAULT_USER_AGENT;
+        return ClientsConstants.WEB_USER_AGENT;
     }
   }
 

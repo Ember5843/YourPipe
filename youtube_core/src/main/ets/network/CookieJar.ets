@@ -239,7 +239,7 @@ export class CookieJar {
       const key = `${name}:${domain}:${path}`;
       this.cookies.set(key, cookie);
 
-      logger.debug(`Stored cookie: ${name}=${value}, domain=${domain}, path=${path}`);
+      logger.debug(`Stored cookie: ${name}, domain=${domain}, path=${path}`);
     }
   }
 
@@ -300,20 +300,6 @@ export class CookieJar {
       });
       keysToDelete.forEach(key => this.cookies.delete(key));
     }
-  }
-
-  /**
-   * 清理过期 Cookie
-   */
-  clearExpired(): void {
-    const keysToDelete: string[] = [];
-    this.cookies.forEach((cookie, key) => {
-      if (cookie.isExpired()) {
-        keysToDelete.push(key);
-        logger.debug(`Cleared expired cookie: ${cookie.name}`);
-      }
-    });
-    keysToDelete.forEach(key => this.cookies.delete(key));
   }
 
   /**

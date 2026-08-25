@@ -541,16 +541,8 @@
             "value": "Sin contenido"
         },
         {
-            "name": "yt_video_details",
-            "value": "Detalles del video"
-        },
-        {
             "name": "yt_error_invalid_video",
             "value": "Sin información de video válida"
-        },
-        {
-            "name": "yt_notice_direct_link_removed",
-            "value": "La función de enlace directo se ha eliminado, se procesará de forma unificada."
         },
         {
             "name": "yt_dialog_select_quality",
@@ -2687,6 +2679,34 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "Más diagnósticos de reproducción, autenticación, tokens, actualización y alternativas sin registrar cookies ni URL firmadas"
+        },
+        {
+            "name": "yt_changelog_0_5_9_1",
+            "value": "Las páginas de feed usan cuadrículas/listas de carga diferida: desplazamiento más fluido en Inicio, Búsqueda, Lista, Canal y Suscripciones"
+        },
+        {
+            "name": "yt_changelog_0_5_9_2",
+            "value": "Corregido el cierre al iniciar en frío en algunos dispositivos (vinculación de @BuilderParam)"
+        },
+        {
+            "name": "yt_changelog_0_5_9_3",
+            "value": "Corregido el manejo de sesión expirada: los errores se propagan y se muestra un aviso de reingreso"
+        },
+        {
+            "name": "yt_changelog_0_5_9_4",
+            "value": "Los iconos de opciones y los botones de acciones destructivas ahora siguen el color del tema (rojo fijo eliminado)"
+        },
+        {
+            "name": "yt_changelog_0_5_9_5",
+            "value": "Codificación de texto, Base64 y análisis de URL ahora usan implementaciones oficiales del sistema"
+        },
+        {
+            "name": "yt_changelog_0_5_9_6",
+            "value": "Eliminado código muerto como enlaces de cast y sondeo de estado; paquete más ligero"
+        },
+        {
+            "name": "yt_changelog_0_5_9_7",
+            "value": "Correcciones de estabilidad en la asociación de prefetch y la guarda de tareas en segundo plano"
         },
         {
             "name": "yt_changelog_0_5_8_1",

@@ -100,10 +100,17 @@ export class YouTubePlayService {
   private static instance: YouTubePlayService | undefined = undefined;
   private extractor: YouTubeExtractor | undefined = undefined;
   private context: common.UIAbilityContext;
-  private isInitializing: boolean = false;
-  /** In-flight DASH PoToken mint/injection for the latest play() (P0-2).
-   * Awaited by the proxy-side startup gate, never by play() itself. */
+  /** In-flight initialize() shared by concurrent callers (replaces the old
+   * isInitializing busy-wait). Rejects with the real init error on failure. */
+  private initPromise: Promise<void> | null = null;
+  /** In-flight DASH PoToken mint/injection for the currently playing video
+   * (P0-2). Awaited by the proxy-side startup gate, never by play() itself.
+   * Written by play() and by takePrefetched() when a prefetch hit promotes its
+   * video to current — never by a prefetch play() directly. */
   private pendingDashPotPromise: Promise<void> | null = null;
+  /** DASH pot injections keyed by videoId — lets a prefetched video's injection
+   * be promoted to the startup gate only when that video actually plays. */
+  private dashPotInjections: Map<string, Promise<void>> = new Map();
 
   /** Barrier used by the mediaservice startup gate: resolves when the pending
    * pot injection for the most recent play() finished (or none was needed). */
@@ -183,7 +190,7 @@ export class YouTubePlayService {
       return;
     }
     logger.info(`${TAG} prefetch start video=${videoId}`);
-    const task = this.play(videoId, `prefetch-${Date.now()}`);
+    const task = this.play(videoId, `prefetch-${Date.now()}`, true);
     this.prefetchInFlight.set(videoId, task);
     task.then((result: YouTubePlayResult) => {
       this.prefetchInFlight.delete(videoId);
@@ -212,6 +219,9 @@ export class YouTubePlayService {
     if (cached) {
       if (Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
         logger.info(`${TAG} prefetch hit video=${videoId} age=${Date.now() - cached.fetchedAtMs}ms`);
+        // Promote the prefetched video's pot injection to the startup gate:
+        // it is now the currently playing video.
+        this.pendingDashPotPromise = this.dashPotInjections.get(videoId) ?? null;
         return cached.result;
       }
       this.prefetchedResults.delete(videoId);
@@ -223,6 +233,7 @@ export class YouTubePlayService {
       this.prefetchInFlight.delete(videoId);
       if (result && result.success) {
         logger.info(`${TAG} prefetch in-flight consumed video=${videoId}`);
+        this.pendingDashPotPromise = this.dashPotInjections.get(videoId) ?? null;
         return result;
       }
     }
@@ -240,34 +251,41 @@ export class YouTubePlayService {
     }
     this.prefetchedResults.clear();
     this.prefetchInFlight.clear();
+    this.dashPotInjections.clear();
   }
 
   async initialize(): Promise<void> {
     if (this.extractor) return;
-    if (this.isInitializing) {
-      while (this.isInitializing) await this.sleep(100);
-      return;
+    if (this.initPromise) {
+      return this.initPromise;
     }
-    this.isInitializing = true;
+    this.initPromise = this.doInitialize();
     try {
-      this.extractor = new YouTubeExtractor(this.context);
-      await this.extractor.initialize();
-      this.syncExtractorLocale();
-      sabrSessionStore.setHttpClient(this.extractor.getHttpClient());
-      sabrSessionStore.setPoTokenProvider(SabrWebViewPoTokenProvider.getInstance());
-      // Stage 2: player /player requests pick up visitor-bound PoTokens through
-      // the identity layer; the provider fast-skips while BotGuard is cold.
-      SessionIdentityManager.setPlayerPoTokenHook(SabrWebViewPoTokenProvider.getInstance());
-      sabrSessionStore.setInfoReloader(new PlayServiceSabrInfoReloader(
-        (info: YoutubeSabrInfo, reason: string): Promise<YoutubeSabrInfo | undefined> =>
-          this.reprobeSabrInfoSerialized(info, reason)));
-      logger.info(`${TAG} YouTubePlayService initialized`);
+      await this.initPromise;
     } catch (e) {
+      // Surface the real init failure instead of letting callers hit
+      // 'extractor not initialized' later in extractSerialized.
       this.extractor = undefined;
       logger.error(`${TAG} initialize failed: ${(e as Error).message || e}`);
+      throw e as Error;
     } finally {
-      this.isInitializing = false;
+      this.initPromise = null;
     }
+  }
+
+  private async doInitialize(): Promise<void> {
+    this.extractor = new YouTubeExtractor(this.context);
+    await this.extractor.initialize();
+    this.syncExtractorLocale();
+    sabrSessionStore.setHttpClient(this.extractor.getHttpClient());
+    sabrSessionStore.setPoTokenProvider(SabrWebViewPoTokenProvider.getInstance());
+    // Stage 2: player /player requests pick up visitor-bound PoTokens through
+    // the identity layer; the provider fast-skips while BotGuard is cold.
+    SessionIdentityManager.setPlayerPoTokenHook(SabrWebViewPoTokenProvider.getInstance());
+    sabrSessionStore.setInfoReloader(new PlayServiceSabrInfoReloader(
+      (info: YoutubeSabrInfo, reason: string): Promise<YoutubeSabrInfo | undefined> =>
+        this.reprobeSabrInfoSerialized(info, reason)));
+    logger.info(`${TAG} YouTubePlayService initialized`);
   }
 
   async prewarmClientVersion(): Promise<void> {
@@ -336,9 +354,17 @@ export class YouTubePlayService {
     }
   }
 
-  async play(videoIdOrUrl: string, attemptId: string = ''): Promise<YouTubePlayResult> {
+  async play(videoIdOrUrl: string, attemptId: string = '', forPrefetch: boolean = false): Promise<YouTubePlayResult> {
     logger.info(`${TAG} play() called for ${videoIdOrUrl} attempt=${attemptId || '-'}`);
-    if (!this.extractor) await this.initialize();
+    if (!this.extractor) {
+      try {
+        await this.initialize();
+      } catch (e) {
+        const errorCode = YouTubeErrorCode.INITIALIZE_FAILED;
+        logger.error(`${TAG} play() aborted, initialize failed: ${(e as Error).message || e}`);
+        return { success: false, error: this.getErrorMessage(errorCode, undefined, e as Error), errorCode: errorCode };
+      }
+    }
 
     this.syncExtractorLocale();
 
@@ -381,11 +407,19 @@ export class YouTubePlayService {
         // submission instead of blocking play(). The proxy-side gate
         // (LocalMediaProxy.setStartupUrlGate) is the barrier that guarantees
         // pot= lands before the first upstream fetch consumes these URLs.
-        this.pendingDashPotPromise = this.injectDashPoToken(videoInfo).catch((e: Error) => {
+        const injection = this.injectDashPoToken(videoInfo).catch((e: Error) => {
           logger.warn(`${TAG} Dash PoToken injection failed, continuing without pot: ${String(e)}`);
         });
+        // Track per-videoId so a prefetch never clobbers the startup gate of
+        // the currently playing video; takePrefetched() promotes it on hit.
+        this.dashPotInjections.set(videoId, injection);
+        if (!forPrefetch) {
+          this.pendingDashPotPromise = injection;
+        }
       } else {
-        this.pendingDashPotPromise = null;
+        if (!forPrefetch) {
+          this.pendingDashPotPromise = null;
+        }
         logger.info(`${TAG} all playable streams are SABR; skipping Dash PoToken`);
       }
       const playerStreams: StreamInfo[] = this.mapToPlayerStreams(videoInfo.streams, videoInfo.durationMs);
@@ -675,10 +709,6 @@ export class YouTubePlayService {
     if (trimmed.length === 11) return trimmed;
     const match = trimmed.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})(?:&|\?|$)/);
     return match ? match[1] : undefined;
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   clearCache(): void {

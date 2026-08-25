@@ -118,8 +118,6 @@ export struct VideoPlayerPage {
    * so we never flash landscape-wide mid-rotate (0.5.1 gap).
    */
   private pendingOrientationSettle: boolean = false;
-  /** Whether local playback was active before a cast session took ownership. */
-  private resumeAfterCast: boolean = false;
   private pagePlaybackStateListener = (state: PlaybackState): void => {
     if (state.errorMsg) {
       this.isLoading = false;
@@ -389,19 +387,6 @@ export struct VideoPlayerPage {
 
     this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
 
-    this.controller.onCastStateChange = (isCasting: boolean, deviceName: string) => {
-      logger.info(`${TAG} Cast state changed: isCasting=${isCasting}, device=${deviceName}`);
-      if (isCasting) {
-        this.resumeAfterCast = this.vm.isPlaying;
-        this.controller.syncPause();
-      } else if (this.resumeAfterCast && this.isPageShow && !this.vm.isCasting) {
-        this.resumeAfterCast = false;
-        this.controller.syncPlay();
-      } else {
-        this.resumeAfterCast = false;
-      }
-    };
-
     harmonyShare.on('knockShare', this.knockShareCallback);
   }
 
@@ -445,8 +430,6 @@ export struct VideoPlayerPage {
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
     this.windowUtil.registerOffWindowSizeChange();
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
-    this.controller.onCastStateChange = undefined;
-    this.resumeAfterCast = false;
 
     // 退出播放页：关闭 PiP 自动启动（避免非播放页 home 键误启），注销生命周期回调
     const pip = PiPManager.getInstance();
@@ -864,19 +847,7 @@ export struct VideoPlayerPage {
                     tags: this.videoSource.tags || [],
                     channelId: this.detailChannelId,
                     channelAvatarUrl: this.detailChannelAvatarUrl,
-                    mpvVideoWidth: this.vm.videoWidth,
-                    mpvVideoHeight: this.vm.videoHeight,
-                    mpvContainerFormat: this.vm.containerFormat,
-                    mpvMediaTitle: this.vm.mediaTitle,
-                    mpvVideoCodec: this.vm.videoCodec,
-                    mpvVideoBitRate: this.vm.videoBitRate,
-                    mpvFrameRate: this.vm.frameRate,
-                    mpvAudioCodec: this.vm.audioCodec,
-                    mpvAudioBitRate: this.vm.audioBitRate,
-                    mpvAudioChannels: this.vm.audioChannels,
-                    mpvAudioSampleRate: this.vm.audioSampleRate,
-                    mpvFileSize: this.vm.fileSize,
-                    mpvDuration: this.vm.durationTime,
+                    vm: $vm,
                   })
                 }
               } else if (item.id === 1) {

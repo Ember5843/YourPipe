@@ -1,7 +1,6 @@
 import { AppLog } from '../../common/AppLog';
 import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 import { ActionHub } from '../../common/ActionHub';
-import { customAnimationUtil } from '../../common/AnimationUtil';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { SearchChannelItem, SearchPlaylistItem } from 'youtube_core';
@@ -11,7 +10,9 @@ import { ChannelInfoService, ChannelProfile } from '../../features/user/ChannelI
 
 import { SubscriptionFeedService } from '../../features/subscription/SubscriptionFeedService';
 import { UIConfig } from '../../common/AppState';
-import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { getFeedContentWidthVp, getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { MediaFeedItemSlot, MediaVideoFeed } from '../../common/components/MediaVideoFeed';
+import { FeedDataSource } from '../../common/model/FeedDataSource';
 import { PlaylistCard } from '../../features/playlist/components/PlaylistCard';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
@@ -73,7 +74,7 @@ export struct UserPage {
   @State errorMessageLive: ResourceStr = '';
 
   // Playlists Tab
-  @State playlistList: SearchPlaylistItem[] = [];
+  @State @Watch('syncPlaylistFeedSource') playlistList: SearchPlaylistItem[] = [];
   @State playlistNextPageToken: string | null = null;
   @State playlistVisitorData: string = '';
   @State isLoadingPlaylists: boolean = false;
@@ -86,7 +87,8 @@ export struct UserPage {
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
 
   private readonly BANNER_HEIGHT: number = 70;
-  private readonly GRID_SIDE_PADDING: number = 12;
+  /** 播放列表 Tab 的 LazyForEach 数据源（playlistList 重赋值经 @Watch 同步） */
+  private playlistFeedSource: FeedDataSource = new FeedDataSource();
 
   private rssFallbackService: SubscriptionFeedService = new SubscriptionFeedService();
   private channelInfoService: ChannelInfoService = new ChannelInfoService();
@@ -96,9 +98,16 @@ export struct UserPage {
 
   /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
   private getWideListColumns(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const contentWidth = Math.max(320, this.getUIContext().px2vp(widthPx) - this.GRID_SIDE_PADDING * 2);
-    return getWideListColumnCount(contentWidth);
+    return getWideListColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth));
+  }
+
+  private syncPlaylistFeedSource(): void {
+    this.playlistFeedSource.setData(this.playlistList, UserPage.keyOfPlaylist);
+  }
+
+  private static keyOfPlaylist(item: Object): string {
+    const playlist = item as SearchPlaylistItem;
+    return playlist.playlistId || playlist.id.toString();
   }
 
   private getChannelId(): string {
@@ -580,113 +589,46 @@ export struct UserPage {
   }
 
 
+  @LocalBuilder
+  PlaylistListCard(slot: MediaFeedItemSlot) {
+    PlaylistCard({
+      playlist: slot.item as SearchPlaylistItem
+    })
+  }
+
+  /**
+   * 播放列表 Tab：骨架收敛进 MediaVideoFeed（宽列 Grid / 单列 List + LazyForEach，
+   * 触底 loadMorePlaylists）。播放列表无网格模式，layoutPreference 恒为 list。
+   */
   @Builder
   PlaylistsTab() {
-    Column() {
-      if (this.isLoadingPlaylists) {
-        Row() {
-          LoadingProgress()
-            .color(this.themePrimary)
-            .width(30)
-            .height(30)
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 20 })
-      } else if (typeof this.errorMessagePlaylists === 'string' && this.errorMessagePlaylists.length > 0) {
-        Text(this.errorMessagePlaylists)
-          .fontSize(12)
-          .fontColor(this.themePrimary)
-          .margin({ left: 16, top: 12 })
-      } else if (this.playlistList.length === 0) {
-        Text($r('app.string.yt_empty_no_playlists'))
-          .fontSize(13)
-          .fontColor($r('app.color.yourtube_text_quaternary'))
-          .margin({ top: 20 })
-          .width('100%')
-          .textAlign(TextAlign.Center)
-      } else if (this.getWideListColumns() > 1) {
-        Scroll() {
-          Column() {
-            GridRow({
-              columns: this.getWideListColumns(),
-              gutter: { x: 8, y: 4 }
-            }) {
-              ForEach(this.playlistList, (item: SearchPlaylistItem) => {
-                GridCol({ span: 1 }) {
-                  PlaylistCard({
-                    playlist: item
-                  })
-                }
-                .transition(customAnimationUtil.isScaleTran(item.playlistId || item.id.toString(), this.uiConfig))
-              }, (item: SearchPlaylistItem) => item.playlistId || item.id.toString())
-            }
-            .width('100%')
-
-            if (this.isLoadingMorePlaylists) {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMorePlaylists();
-        })
-      } else {
-        List({ space: 4, scroller: this.scrollerForList }) {
-          ForEach(this.playlistList, (item: SearchPlaylistItem) => {
-            ListItem() {
-              PlaylistCard({
-                playlist: item
-              })
-            }
-            .transition(customAnimationUtil.isScaleTran(item.playlistId || item.id.toString(), this.uiConfig))
-          }, (item: SearchPlaylistItem) => item.playlistId || item.id.toString())
-
-          if (this.isLoadingMorePlaylists) {
-            ListItem() {
-              Row() {
-                LoadingProgress()
-                  .color(this.themePrimary)
-                  .width(26)
-                  .height(26)
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_page'))
-        .padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .edgeEffect(EdgeEffect.Spring)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadMorePlaylists();
-        })
+    MediaVideoFeed({
+      dataSource: this.playlistFeedSource,
+      gridScroller: this.scrollerForList,
+      listScroller: this.scrollerForList,
+      nestedScrollParentFirst: true,
+      itemKey: UserPage.keyOfPlaylist,
+      itemBuilder: this.PlaylistListCard,
+      onReachEnd: () => {
+        this.loadMorePlaylists();
+      },
+      params: {
+        layoutPreference: 'list',
+        gridColumns: 1,
+        listColumns: this.getWideListColumns(),
+        isLoading: this.isLoadingPlaylists,
+        isLoadingMore: this.isLoadingMorePlaylists,
+        errorMessage: this.errorMessagePlaylists,
+        emptyText: $r('app.string.yt_empty_no_playlists'),
+        hasHeader: false,
+        headerHorizontalBleed: 0,
+        gridContentPadding: { left: 12, right: 12, top: 8, bottom: 12 },
+        listContentPadding: { left: 12, right: 12, top: 8, bottom: 12 },
+        listContentEndOffset: 0,
+        stateScrollable: false,
+        useLayoutWeight: false
       }
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.yourtube_bg_page'))
+    })
   }
 
   @Builder

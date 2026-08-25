@@ -13,8 +13,9 @@ import { LocaleBundle } from '../../common/LocaleBundle';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { customAnimationUtil } from '../../common/AnimationUtil';
-import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
-import { resolveResourceStr } from '../../common/utils/ResourceStrUtil';
+import { getFeedContentWidthVp, getVideoGridColumnCount, getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
+import { MediaFeedItemSlot, MediaVideoFeed } from '../../common/components/MediaVideoFeed';
+import { FeedDataSource } from '../../common/model/FeedDataSource';
 import { UIConfig } from '../../common/AppState';
 import { SearchHistoryStore, SearchHistoryItem } from '../../common/SearchHistoryStore';
 import type { BusinessError } from '@kit.BasicServicesKit';
@@ -43,7 +44,7 @@ export struct SearchPage {
   @Prop initialQuery: string = '';
 
   @State query: string = '';
-  @State results: SearchInfoItem[] = [];
+  @State @Watch('syncFeedSource') results: SearchInfoItem[] = [];
   @State suggestions: string[] = [];
   @State isSearching: boolean = false;
   @State isSuggesting: boolean = false;
@@ -60,10 +61,11 @@ export struct SearchPage {
 
   private readonly SUGGESTION_DEBOUNCE_MS: number = 280;
   private readonly MAX_SUGGESTIONS: number = 12;
-  private readonly GRID_GUTTER: number = 8;
   private readonly SEARCH_RESULT_SIDE_PADDING: number = 12;
   private suggestionTimer: number = -1;
   private readonly resultScroller: Scroller = new Scroller();
+  /** 搜索结果的 LazyForEach 数据源（results 重赋值经 @Watch 同步） */
+  private feedSource: FeedDataSource = new FeedDataSource();
   private readonly suggestionScroller: Scroller = new Scroller();
   private hasAppliedInitialQuery: boolean = false;
   private isInitialSearchInFlight: boolean = false;
@@ -110,33 +112,20 @@ export struct SearchPage {
     this.dialogController = undefined;
   }
 
+  private syncFeedSource(): void {
+    this.feedSource.setData(this.results, SearchPage.keyOfResult);
+  }
+
+  private static keyOfResult(item: Object): string {
+    return (item as SearchInfoItem).id.toString();
+  }
+
   private getSearchContentWidth(): number {
-    const widthPx = this.deviceWidth > 0 ? this.deviceWidth : this.getUIContext().vp2px(360);
-    const widthVp = this.getUIContext().px2vp(widthPx);
-    return Math.max(320, widthVp - this.SEARCH_RESULT_SIDE_PADDING * 2);
+    return getFeedContentWidthVp(this.getUIContext(), this.deviceWidth, this.SEARCH_RESULT_SIDE_PADDING);
   }
 
-  private getSearchVideoColumnCount(): number {
-    const width = this.getSearchContentWidth();
-    if (width >= 1440) {
-      return 5;
-    }
-    if (width >= 1080) {
-      return 4;
-    }
-    if (width >= 760) {
-      return 3;
-    }
-    if (width >= 520) {
-      return 2;
-    }
-    return 1;
-  }
-
-  private getSearchVideoCardWidth(): number {
-    const columns = this.getSearchVideoColumnCount();
-    const contentWidth = this.getSearchContentWidth();
-    return Math.floor((contentWidth - this.GRID_GUTTER * (columns - 1)) / columns);
+  private gridColumns(): number {
+    return getVideoGridColumnCount(this.getSearchContentWidth());
   }
 
   /** 条式结果列表在宽屏（平板展开/2in1/电视）下的列数 */
@@ -187,11 +176,11 @@ export struct SearchPage {
       Row() {
         SymbolGlyph($r('sys.symbol.trash'))
           .fontSize(16)
-          .fontColor([$r('app.color.yourtube_text_warning')])
+          .fontColor([this.themePrimary])
           .margin({ right: 8 })
         Text($r('app.string.yt_action_clear_search_history'))
           .fontSize(14)
-          .fontColor($r('app.color.yourtube_text_warning'))
+          .fontColor(this.themePrimary)
       }
       .width('100%')
       .padding({ top: 8, bottom: 8 })
@@ -399,7 +388,7 @@ export struct SearchPage {
         },
         {
           value: $r('app.string.yt_action_delete'),
-          fontColor: $r('app.color.yourtube_text_warning'),
+          fontColor: this.themePrimary,
           action: () => {
             SearchHistoryStore.deleteSearchHistory(query);
             this.loadSearchHistory();
@@ -434,7 +423,7 @@ export struct SearchPage {
         },
         {
           value: $r('app.string.yt_action_clear'),
-          fontColor: $r('app.color.yourtube_text_warning'),
+          fontColor: this.themePrimary,
           action: () => {
             SearchHistoryStore.clearSearchHistory();
             this.loadSearchHistory();
@@ -587,272 +576,148 @@ export struct SearchPage {
     .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT, bottom: this.safeAreaBottom + 16 })
   }
 
-  @Builder ResultView() {
+  /** 网格模式卡片：STREAM=视频网格卡；频道/播放列表=整行卡（gridItemSpan 占满整行） */
+  @LocalBuilder
+  SearchGridCard(slot: MediaFeedItemSlot) {
+    if ((slot.item as SearchInfoItem).type === SearchInfoType.STREAM) {
+      VideoCardGrid({
+        video: (slot.item as SearchStreamItem).video,
+        actionLabel: $r('app.string.yt_action_favorite'),
+        actionType: 'favorite',
+        typeLabel: $r('app.string.yt_filter_videos'),
+        useFavoriteToggle: true
+      })
+    } else if ((slot.item as SearchInfoItem).type === SearchInfoType.CHANNEL) {
+      ChannelCard({
+        channel: slot.item as SearchChannelItem,
+        typeLabel: $r('app.string.yt_label_user')
+      })
+    } else if ((slot.item as SearchInfoItem).type === SearchInfoType.PLAYLIST) {
+      PlaylistCard({
+        playlist: slot.item as SearchPlaylistItem,
+        typeLabel: $r('app.string.yt_filter_playlists')
+      })
+    }
+  }
+
+  /** 条式卡片（单列 List 与宽列条式共用） */
+  @LocalBuilder
+  SearchListCard(slot: MediaFeedItemSlot) {
+    if ((slot.item as SearchInfoItem).type === SearchInfoType.STREAM) {
+      VideoCard({
+        video: (slot.item as SearchStreamItem).video,
+        actionLabel: $r('app.string.yt_action_favorite'),
+        actionType: 'favorite',
+        typeLabel: $r('app.string.yt_filter_videos'),
+        useFavoriteToggle: true
+      })
+    } else if ((slot.item as SearchInfoItem).type === SearchInfoType.CHANNEL) {
+      ChannelCard({
+        channel: slot.item as SearchChannelItem,
+        typeLabel: $r('app.string.yt_label_user')
+      })
+    } else if ((slot.item as SearchInfoItem).type === SearchInfoType.PLAYLIST) {
+      PlaylistCard({
+        playlist: slot.item as SearchPlaylistItem,
+        typeLabel: $r('app.string.yt_filter_playlists')
+      })
+    }
+  }
+
+  /** 滚动头部：顶部安全区退避 + 结果来源说明 */
+  @LocalBuilder
+  SearchResultHeader() {
     Column() {
-      if (this.isSearching && this.results.length === 0) {
-        Row() {
-          LoadingProgress()
-            .color(this.themePrimary)
-            .width(36)
-            .height(36)
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: this.safeAreaTop + TITLE_BAR_HEIGHT + 20 })
-      } else if (resolveResourceStr(this.errorMessage).length > 0 && this.results.length === 0) {
-        // 显示错误页面（有错误且无结果时）
-        ErrorPage({
-          errorMessage: this.errorMessage,
-          onRetry: () => {
-            this.runSearch(true);
-          }
-        })
-      } else if (this.results.length > 0 || this.hasSearched) {
-         if (this.results.length === 0 && this.hasSearched && !this.isSearching) {
-           Column() {
-            SymbolGlyph($r('sys.symbol.magnifyingglass'))
-              .fontSize(36)
-              .fontColor([$r('app.color.yourtube_text_disabled')])
-              .margin({ bottom: 10 })
-            Text($r('app.string.yt_search_no_results'))
-              .fontSize(13)
-              .fontColor($r('app.color.yourtube_text_quaternary'))
-          }
-          .width('100%')
-          .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT + 32 })
-          .alignItems(HorizontalAlign.Center)
-         } else {
-           if (this.uiConfig.homeLayoutMode === 'grid') {
-             Scroll(this.resultScroller) {
-               Column() {
-                 Blank().height(this.safeAreaTop + TITLE_BAR_HEIGHT)
+      Blank().height(this.safeAreaTop + TITLE_BAR_HEIGHT)
 
-                 Row() {
-                   Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
-                     .fontSize(12)
-                     .fontColor($r('app.color.yourtube_text_secondary'))
-                     .fontWeight(FontWeight.Medium)
-                 }
-                 .width('100%')
-                 .padding({ left: 4, right: 4, top: 12, bottom: 8 })
-
-                 Flex({
-                   direction: FlexDirection.Row,
-                   wrap: FlexWrap.Wrap,
-                   justifyContent: FlexAlign.Start
-                 }) {
-                   ForEach(this.results, (item: SearchInfoItem, index: number) => {
-                     if (item.type === SearchInfoType.STREAM) {
-                       Column() {
-                         VideoCardGrid({
-                           video: (item as SearchStreamItem).video,
-                           actionLabel: $r('app.string.yt_action_favorite'),
-                           actionType: 'favorite',
-                           typeLabel: $r('app.string.yt_filter_videos'),
-                           useFavoriteToggle: true
-                         })
-                       }
-                       .width(this.getSearchVideoCardWidth())
-                       .margin({
-                         right: (index + 1) % this.getSearchVideoColumnCount() === 0 ? 0 : this.GRID_GUTTER,
-                         bottom: this.GRID_GUTTER
-                       })
-                       .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                     } else if (item.type === SearchInfoType.CHANNEL) {
-                       Column() {
-                         ChannelCard({
-                           channel: item as SearchChannelItem,
-                           typeLabel: $r('app.string.yt_label_user')
-                         })
-                       }
-                       .width('100%')
-                       .margin({ bottom: this.GRID_GUTTER })
-                       .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                     } else if (item.type === SearchInfoType.PLAYLIST) {
-                       Column() {
-                         PlaylistCard({
-                           playlist: item as SearchPlaylistItem,
-                           typeLabel: $r('app.string.yt_filter_playlists')
-                         })
-                       }
-                       .width('100%')
-                       .margin({ bottom: this.GRID_GUTTER })
-                       .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                     }
-                   }, (item: SearchInfoItem) => item.id.toString())
-                 }
-                 .width('100%')
-
-                 if (this.isLoadingMore) {
-                   Row() {
-                     LoadingProgress()
-                       .color(this.themePrimary)
-                       .width(30)
-                       .height(30)
-                   }
-                   .width('100%')
-                   .justifyContent(FlexAlign.Center)
-                   .padding({ top: 12, bottom: 12 })
-                 }
-               }
-               .width('100%')
-             }
-              .width('100%')
-              .layoutWeight(1)
-              .backgroundColor($r('app.color.yourtube_bg_page'))
-              .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 })
-              .edgeEffect(EdgeEffect.Spring)
-              .scrollBar(BarState.Off)
-              .onReachEnd(() => {
-                this.runSearch(false);
-              })
-            } else if (this.getWideListColumns() > 1) {
-              Scroll(this.resultScroller) {
-                Column() {
-                  Blank().height(this.safeAreaTop + TITLE_BAR_HEIGHT)
-
-                  Row() {
-                    Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
-                      .fontSize(12)
-                      .fontColor($r('app.color.yourtube_text_secondary'))
-                      .fontWeight(FontWeight.Medium)
-                  }
-                  .width('100%')
-                  .padding({ left: 16, right: 16, top: 12, bottom: 4 })
-
-                  GridRow({
-                    columns: this.getWideListColumns(),
-                    gutter: { x: this.GRID_GUTTER, y: 4 }
-                  }) {
-                    ForEach(this.results, (item: SearchInfoItem) => {
-                      if (item.type === SearchInfoType.STREAM) {
-                        GridCol({ span: 1 }) {
-                          VideoCard({
-                            video: (item as SearchStreamItem).video,
-                            actionLabel: $r('app.string.yt_action_favorite'),
-                            actionType: 'favorite',
-                            typeLabel: $r('app.string.yt_filter_videos'),
-                            useFavoriteToggle: true
-                          })
-                        }
-                        .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                      } else if (item.type === SearchInfoType.CHANNEL) {
-                        GridCol({ span: this.getWideListColumns() }) {
-                          ChannelCard({
-                            channel: item as SearchChannelItem,
-                            typeLabel: $r('app.string.yt_label_user')
-                          })
-                        }
-                        .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                      } else if (item.type === SearchInfoType.PLAYLIST) {
-                        GridCol({ span: this.getWideListColumns() }) {
-                          PlaylistCard({
-                            playlist: item as SearchPlaylistItem,
-                            typeLabel: $r('app.string.yt_filter_playlists')
-                          })
-                        }
-                        .transition(customAnimationUtil.isScaleTran(item.id.toString(), this.uiConfig))
-                      }
-                    }, (item: SearchInfoItem) => item.id.toString())
-                  }
-                  .width('100%')
-
-                  if (this.isLoadingMore) {
-                    Row() {
-                      LoadingProgress()
-                        .color(this.themePrimary)
-                        .width(30)
-                        .height(30)
-                    }
-                    .width('100%')
-                    .justifyContent(FlexAlign.Center)
-                    .padding({ top: 12, bottom: 12 })
-                  }
-                }
-                .width('100%')
-              }
-              .width('100%')
-              .layoutWeight(1)
-              .backgroundColor($r('app.color.yourtube_bg_page'))
-              .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 })
-              .edgeEffect(EdgeEffect.Spring)
-              .scrollBar(BarState.Off)
-              .onReachEnd(() => {
-                this.runSearch(false);
-              })
-            } else {
-              List({ space: 4, scroller: this.resultScroller }) {
-                ListItem() {
-                  Column() {
-                  }
-                  .height(this.safeAreaTop + TITLE_BAR_HEIGHT)
-                }
-
-                ListItem() {
-                  Row() {
-                    Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
-                     .fontSize(12)
-                     .fontColor($r('app.color.yourtube_text_secondary'))
-                     .fontWeight(FontWeight.Medium)
-                 }
-                 .width('100%')
-                 .padding({ left: 16, right: 16, top: 12, bottom: 4 })
-               }
-
-              ForEach(this.results, (item: SearchInfoItem, index: number) => {
-                 ListItem() {
-                  if (item.type === SearchInfoType.STREAM) {
-                    VideoCard({
-                      video: (item as SearchStreamItem).video,
-                      actionLabel: $r('app.string.yt_action_favorite'),
-                      actionType: 'favorite',
-                      typeLabel: $r('app.string.yt_filter_videos'),
-                      useFavoriteToggle: true
-                    })
-                  } else if (item.type === SearchInfoType.CHANNEL) {
-                    ChannelCard({
-                      channel: item as SearchChannelItem,
-                      typeLabel: $r('app.string.yt_label_user')
-                    })
-                  } else if (item.type === SearchInfoType.PLAYLIST) {
-                    PlaylistCard({
-                      playlist: item as SearchPlaylistItem,
-                      typeLabel: $r('app.string.yt_filter_playlists')
-                    })
-                  }
-                 }
-                 .transition(customAnimationUtil.isScaleTran(index, this.uiConfig))
-              }, (item: SearchInfoItem) => item.id.toString())
-
-               if (this.isLoadingMore) {
-                 ListItem() {
-                   Row() {
-                     LoadingProgress()
-                       .color(this.themePrimary)
-                       .width(30)
-                       .height(30)
-                   }
-                   .width('100%')
-                   .justifyContent(FlexAlign.Center)
-                 }
-               }
-             }
-              .width('100%')
-              .layoutWeight(1)
-              .backgroundColor($r('app.color.yourtube_bg_page'))
-              .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 })
-              .edgeEffect(EdgeEffect.Spring)
-              .scrollBar(BarState.Off)
-              .onReachEnd(() => {
-                this.runSearch(false);
-              })
-            }
-          }
-       }
+      Row() {
+        Text(getContext().resourceManager.getStringSync($r('app.string.yt_search_results_from').id, this.query))
+          .fontSize(12)
+          .fontColor($r('app.color.yourtube_text_secondary'))
+          .fontWeight(FontWeight.Medium)
+      }
+      .width('100%')
+      .padding({ left: 4, right: 4, top: 12, bottom: 8 })
     }
     .width('100%')
-    .layoutWeight(1)
-    .backgroundColor($r('app.color.yourtube_bg_page'))
+  }
+
+  @LocalBuilder
+  SearchLoading() {
+    Row() {
+      LoadingProgress()
+        .color(this.themePrimary)
+        .width(36)
+        .height(36)
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.Center)
+    .margin({ top: this.safeAreaTop + TITLE_BAR_HEIGHT + 20 })
+  }
+
+  @LocalBuilder
+  SearchError() {
+    ErrorPage({
+      errorMessage: this.errorMessage,
+      onRetry: () => {
+        this.runSearch(true);
+      }
+    })
+  }
+
+  @LocalBuilder
+  SearchEmpty() {
+    Column() {
+      SymbolGlyph($r('sys.symbol.magnifyingglass'))
+        .fontSize(36)
+        .fontColor([$r('app.color.yourtube_text_disabled')])
+        .margin({ bottom: 10 })
+      Text($r('app.string.yt_search_no_results'))
+        .fontSize(13)
+        .fontColor($r('app.color.yourtube_text_quaternary'))
+    }
+    .width('100%')
+    .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT + 32 })
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  /**
+   * 骨架收敛进 MediaVideoFeed（Grid / 宽列 / 单列 List + LazyForEach）。
+   * 原网格分支的 Flex+定宽卡片改为 columnsTemplate Grid；频道/播放列表卡整行占列。
+   */
+  @Builder ResultView() {
+    MediaVideoFeed({
+      dataSource: this.feedSource,
+      gridScroller: this.resultScroller,
+      listScroller: this.resultScroller,
+      itemKey: SearchPage.keyOfResult,
+      gridItemSpan: (item: Object) => (item as SearchInfoItem).type === SearchInfoType.STREAM ? 1 : 99,
+      gridItemBuilder: this.SearchGridCard,
+      itemBuilder: this.SearchListCard,
+      headerBuilder: this.SearchResultHeader,
+      loadingBuilder: this.SearchLoading,
+      errorBuilder: this.SearchError,
+      emptyBuilder: this.SearchEmpty,
+      onReachEnd: () => {
+        this.runSearch(false);
+      },
+      params: {
+        layoutPreference: this.uiConfig.homeLayoutMode,
+        gridColumns: this.gridColumns(),
+        listColumns: this.getWideListColumns(),
+        isLoading: this.isSearching && this.results.length === 0,
+        isLoadingMore: this.isLoadingMore,
+        errorMessage: this.results.length === 0 ? this.errorMessage : '',
+        emptyText: '',
+        hasHeader: true,
+        headerHorizontalBleed: 0,
+        gridContentPadding: { left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 },
+        listContentPadding: { left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 16 },
+        listContentEndOffset: 0,
+        stateScrollable: false,
+        useLayoutWeight: false
+      }
+    })
   }
 
   @Builder

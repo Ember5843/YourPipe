@@ -60,6 +60,14 @@ export class ClientsConstants {
     "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version";
 
   // =====================
+  // TVHTML5_SIMPLY_EMBEDDED_PLAYER ('tv')
+  // =====================
+  /** PS4 Safari UA (NewPipe TVHTML5_SIMPLY_EMBEDDED_PLAYER) — the only non-Cobalt TV UA. */
+  static readonly TVHTML5_SIMPLY_EMBEDDED_USER_AGENT: string =
+    "Mozilla/5.0 (PlayStation; PlayStation 4/12.00) AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+    "Version/15.4 Safari/605.1.15";
+
+  // =====================
   // MWEB (PipePipe guest default stream client)
   // =====================
   static readonly MWEB_CLIENT_ID: string = "2";

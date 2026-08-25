@@ -1,6 +1,5 @@
 import { http } from '@kit.NetworkKit';
 import { YTCoreLogger } from '../../common/YTCoreLogger';
-import { arrayBufferToString } from '../../common/YoutubeParsingHelper';
 import { ApiConfig } from './ApiConfig';
 import { HttpDownloader } from '../../network/HttpDownloader';
 
@@ -96,7 +95,7 @@ export class PipePipeApiDecoder {
       const latestOptions: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         header: PipePipeApiDecoder.REQUEST_HEADERS,
-        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        expectDataType: http.HttpDataType.STRING,
         connectTimeout: 4000,
         readTimeout: 4000
       };
@@ -106,7 +105,7 @@ export class PipePipeApiDecoder {
       if (response.responseCode !== 200 || !response.result) {
         throw new Error(`latest-player HTTP ${response.responseCode}`);
       }
-      const body = arrayBufferToString(response.result as ArrayBuffer);
+      const body = response.result as string;
       const parsed = JSON.parse(body) as Record<string, Object>;
       const playerId = String(parsed['player'] ?? parsed['playerId'] ?? '');
       const signatureTimestamp = Number(parsed['signatureTimestamp'] ?? 0);
@@ -185,6 +184,7 @@ export class PipePipeApiDecoder {
       const decodeOptions: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         header: PipePipeApiDecoder.REQUEST_HEADERS,
+        expectDataType: http.HttpDataType.STRING,
         connectTimeout: timeout,
         readTimeout: timeout,
       };
@@ -195,9 +195,7 @@ export class PipePipeApiDecoder {
         throw new Error(`decode HTTP ${response.responseCode}`);
       }
 
-      const body = typeof response.result === 'string'
-        ? response.result
-        : arrayBufferToString(response.result as ArrayBuffer);
+      const body = response.result as string;
       const parsed = JSON.parse(body) as DecodeResponse;
 
       if (parsed.type !== 'result' || !Array.isArray(parsed.responses)) {

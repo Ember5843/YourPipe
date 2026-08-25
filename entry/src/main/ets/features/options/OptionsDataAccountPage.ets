@@ -356,7 +356,7 @@ export struct OptionsDataAccountPage {
         },
         {
           value: $r('app.string.yt_option_sign_out'),
-          fontColor: $r('app.color.yourtube_text_warning'),
+          fontColor: this.themePrimary,
           action: () => {
             this.signOut();
           }
@@ -489,7 +489,7 @@ export struct OptionsDataAccountPage {
         },
         {
           value: $r('app.string.yt_action_confirm'),
-          fontColor: $r('app.color.yourtube_text_warning'),
+          fontColor: this.themePrimary,
           action: () => {
             this.handleRestore(selected);
           }

@@ -541,16 +541,8 @@
             "value": "Aucun contenu"
         },
         {
-            "name": "yt_video_details",
-            "value": "Détails de la vidéo"
-        },
-        {
             "name": "yt_error_invalid_video",
             "value": "Aucune information vidéo valide"
-        },
-        {
-            "name": "yt_notice_direct_link_removed",
-            "value": "La fonction de lien direct a été supprimée, traitement unifié à suivre."
         },
         {
             "name": "yt_dialog_select_quality",
@@ -2687,6 +2679,34 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "Diagnostics enrichis pour lecture, connexion, jetons, actualisation et replis sans journaliser cookies ni URL signées"
+        },
+        {
+            "name": "yt_changelog_0_5_9_1",
+            "value": "Les pages de flux utilisent des grilles/listes à chargement différé : défilement plus fluide dans Accueil, Recherche, Playlist, Chaîne et Abonnements"
+        },
+        {
+            "name": "yt_changelog_0_5_9_2",
+            "value": "Correction du crash au démarrage à froid sur certains appareils (liaison @BuilderParam)"
+        },
+        {
+            "name": "yt_changelog_0_5_9_3",
+            "value": "Correction de la gestion de session expirée : les erreurs remontent et un avis de reconnexion s’affiche"
+        },
+        {
+            "name": "yt_changelog_0_5_9_4",
+            "value": "Les icônes d’options et les boutons d’actions destructives suivent désormais la couleur du thème (rouge fixe supprimé)"
+        },
+        {
+            "name": "yt_changelog_0_5_9_5",
+            "value": "Encodage de texte, Base64 et analyse d’URL utilisent désormais les implémentations officielles du système"
+        },
+        {
+            "name": "yt_changelog_0_5_9_6",
+            "value": "Suppression de code mort (liens de cast, sondage d’état) pour alléger le paquet"
+        },
+        {
+            "name": "yt_changelog_0_5_9_7",
+            "value": "Correctifs de stabilité pour l’association du prefetch et la garde des tâches en arrière-plan"
         },
         {
             "name": "yt_changelog_0_5_8_1",

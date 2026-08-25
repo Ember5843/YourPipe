@@ -1,10 +1,11 @@
 import { StreamResource } from './SessionStore';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { http, socket } from '@kit.NetworkKit';
-import { util } from '@kit.ArkTS';
+import { url } from '@kit.ArkTS';
 import { ClientsConstants, HttpDownloader, HttpProxyOptions } from 'youtube_core';
 import Logger from '../utils/Logger';
 import { proxyTrafficMeter } from './ProxyTrafficMeter';
+import { encodeUtf8, encodeUtf8Bytes } from './ProxyEncoding';
 
 const TAG = '[LocalProxy][RangeProxy]';
 const MAX_RETRIES = 2;
@@ -55,77 +56,83 @@ class BufferWriter implements rcp.WriteStream {
   }
 }
 
-function stripQueryParam(url: string, name: string): string {
-  const re = new RegExp(`([?&])${name}=[^&]*&?`);
-  let result = url.replace(re, (_match: string, sep: string): string => sep === '?' ? '?' : '');
-  if (result.endsWith('?') || result.endsWith('&')) {
-    result = result.substring(0, result.length - 1);
+/**
+ * Query params of a googlevideo URL via the official url.URL API (@kit.ArkTS).
+ * googlevideo videoplayback URLs are absolute https URLs, so construction
+ * succeeds in practice; on malformed input we return null and callers keep
+ * their "no match" semantics (empty value / flag false / URL unchanged).
+ * This replaces per-request regex compilation on the range-fetch hot path.
+ */
+function getQueryParams(rawUrl: string): url.URLParams | null {
+  try {
+    return new url.URL(rawUrl).searchParams;
+  } catch (_e) {
+    return null;
   }
-  return result;
 }
 
-function buildYoutubeRangeUrl(url: string, rangeSpec: string): string {
+function stripQueryParam(rawUrl: string, name: string): string {
+  try {
+    const parsed = new url.URL(rawUrl);
+    parsed.searchParams.delete(name);
+    return parsed.toString();
+  } catch (_e) {
+    // Malformed (non-absolute) input: keep the URL unchanged.
+    return rawUrl;
+  }
+}
+
+function buildYoutubeRangeUrl(rawUrl: string, rangeSpec: string): string {
   // Drop any pre-existing range= so MPV/SIDX never send duplicate range params.
-  const cleaned = stripQueryParam(url, 'range');
+  const cleaned = stripQueryParam(rawUrl, 'range');
   const sep = cleaned.includes('?') ? '&' : '?';
   return cleaned + sep + 'range=' + rangeSpec;
 }
 
-function appendYoutubeRn(url: string, urlKey: string): string {
-  let result = stripQueryParam(url, 'rn');
+function appendYoutubeRn(rawUrl: string, urlKey: string): string {
+  let result = stripQueryParam(rawUrl, 'rn');
   const rn = nextRequestNumber(urlKey);
   const sep = result.includes('?') ? '&' : '?';
   return `${result}${sep}rn=${rn}`;
 }
 
-function getYoutubeClient(url: string): string {
-  const match = url.match(/[?&]c=([^&]+)/);
-  if (!match || !match[1]) {
-    return '';
-  }
-  try {
-    return decodeURIComponent(match[1]).toUpperCase();
-  } catch (_error) {
-    return match[1].toUpperCase();
-  }
+function getYoutubeClient(rawUrl: string): string {
+  return (getQueryParams(rawUrl)?.get('c') ?? '').toUpperCase();
 }
 
-function getQueryFlag(url: string, name: string): boolean {
-  return new RegExp(`[?&]${name}=`).test(url);
-}
-
-function getQueryValue(url: string, name: string): string {
-  const match = url.match(new RegExp(`[?&]${name}=([^&]*)`));
-  if (!match || match[1] === undefined) {
-    return '';
-  }
-  try {
-    return decodeURIComponent(match[1]);
-  } catch (_error) {
-    return match[1];
-  }
-}
+// Fingerprint-only regexes, hoisted to module level so the per-request log
+// path does not recompile them. Host capture keeps the authority (host:port),
+// matching the previous inline behavior.
+const URL_AUTHORITY_RE = /^https?:\/\/([^/?#]+)/i;
+const SENSITIVE_PARAM_RE = /([?&])(n|sig|lsig|signature|pot|s)=[^&]*/gi;
 
 /** Safe fingerprint for comparing 403 vs success URLs without leaking sig/n/pot. */
-function youtubeUrlFingerprint(url: string): string {
+function youtubeUrlFingerprint(rawUrl: string): string {
   let host = '';
   try {
-    const m = url.match(/^https?:\/\/([^/?#]+)/i);
+    const m = rawUrl.match(URL_AUTHORITY_RE);
     host = m?.[1] || '';
   } catch (_e) {
     host = '';
   }
   // Short non-crypto digest of path+stable query shape (not secrets themselves).
   let hash = 2166136261;
-  const sample = url.replace(/([?&])(n|sig|lsig|signature|pot|s)=[^&]*/gi, '$1$2=*');
+  const sample = rawUrl.replace(SENSITIVE_PARAM_RE, '$1$2=*');
   for (let i = 0; i < sample.length; i++) {
     hash ^= sample.charCodeAt(i);
     hash = Math.imul(hash, 16777619);
   }
   const fp = (hash >>> 0).toString(16).padStart(8, '0');
-  return `host=${host} c=${getYoutubeClient(url) || '-'} expire=${getQueryValue(url, 'expire') || '-'} `
-    + `rn=${getQueryValue(url, 'rn') || '-'} hasN=${getQueryFlag(url, 'n')} hasPot=${getQueryFlag(url, 'pot')} `
-    + `hasSig=${getQueryFlag(url, 'sig') || getQueryFlag(url, 'signature') || getQueryFlag(url, 'lsig')} fp=${fp}`;
+  // One url.URL parse feeds all fields (params is null only on malformed input).
+  const params = getQueryParams(rawUrl);
+  const client = (params?.get('c') ?? '').toUpperCase();
+  const expire = params?.get('expire') ?? '';
+  const rn = params?.get('rn') ?? '';
+  const hasSig = (params?.has('sig') ?? false) || (params?.has('signature') ?? false)
+    || (params?.has('lsig') ?? false);
+  return `host=${host} c=${client || '-'} expire=${expire || '-'} `
+    + `rn=${rn || '-'} hasN=${params?.has('n') ?? false} hasPot=${params?.has('pot') ?? false} `
+    + `hasSig=${hasSig} fp=${fp}`;
 }
 
 // PipePipe YoutubeParsingHelper: ANDROID|ANDROID_VR → POST + Android app UA
@@ -298,7 +305,7 @@ function headersToHttpRecord(headers: rcp.RequestHeaders): Record<string, string
 
 function responseBodyToBytes(result: string | Object | ArrayBuffer): Uint8Array {
   if (typeof result === 'string') {
-    return new util.TextEncoder().encode(result);
+    return encodeUtf8Bytes(result);
   }
   try {
     return new Uint8Array(result as ArrayBuffer);
@@ -388,10 +395,6 @@ export function parseRangeHeader(header: string, totalLength: number): ParsedRan
   return result;
 }
 
-function encodeStr(s: string): ArrayBuffer {
-  return new util.TextEncoder().encode(s).buffer as ArrayBuffer;
-}
-
 function contentTypeFor(resource: StreamResource): string {
   const mime = resource.mimeType.toLowerCase();
   if (mime) return mime;
@@ -406,7 +409,7 @@ async function sendError(conn: socket.TCPSocketConnection, status: number, msg: 
   const body = msg;
   const hdr = `HTTP/1.1 ${status} Error\r\nContent-Type: text/plain\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`;
   try {
-    await sendRaw(conn, encodeStr(hdr + body));
+    await sendRaw(conn, encodeUtf8(hdr + body));
   } catch (_e) {}
 }
 
@@ -444,7 +447,7 @@ class TcpWriter implements rcp.WriteStream {
         const hdr = this.standalone
           ? `HTTP/1.1 200 OK\r\nContent-Type: ${this.contentType}\r\nContent-Length: ${contentLength}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n`
           : `HTTP/1.1 206 Partial Content\r\nContent-Type: ${this.contentType}\r\nContent-Range: bytes ${this.start}-${this.end}/${totalStr}\r\nContent-Length: ${contentLength}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n`;
-        await this.conn.send({ data: encodeStr(hdr) });
+        await this.conn.send({ data: encodeUtf8(hdr) });
         this.headerSent = true;
       }
       await this.conn.send({ data: buffer });
@@ -473,6 +476,74 @@ class MeteredWriteStream implements rcp.WriteStream {
   async write(buffer: ArrayBuffer): Promise<void | number> {
     proxyTrafficMeter.recordBytes(buffer.byteLength);
     return this.inner.write(buffer);
+  }
+}
+
+/**
+ * 带重试的上游拉取结果。三个 serveRange 分支共用同一循环骨架,只参数化
+ * 传输差异:
+ * - success: 数据已全部写入 writer,立即结束;
+ * - retry:   可重试失败,error 记入 lastError;retryDelayMs 提供分支专属
+ *            退避(如 YouTube 403/410 的 1000*(n+1)),缺省走 300*(n+1);
+ * - fatal:   终态失败(分支内部已自行应答,如 4xx → 502),不再重试。
+ */
+type FetchAttemptOutcome = 'success' | 'retry' | 'fatal';
+
+interface FetchAttemptResult {
+  outcome: FetchAttemptOutcome;
+  error?: string;
+  retryDelayMs?: number;
+}
+
+interface UpstreamRetryHooks {
+  /** 单次上游尝试(含分支专属日志与状态判定) */
+  fetchOnce: (attempt: number) => Promise<FetchAttemptResult>;
+  /** 每次尝试后释放传输句柄(RCP session.close / http.destroy) */
+  cleanup: () => void;
+  /** 异常 → 日志文本(YouTube 分支用 describeError,非 YouTube 分支沿用 String(e)) */
+  describeError: (e: Object) => string;
+}
+
+/**
+ * serveRange 的共用重试循环:MAX_RETRIES 次尝试、partial-write 短路
+ * (writer.hasEmittedAny() 后绝不再重试)、默认 300*(attempt+1) 退避,
+ * 循环耗尽后 sendError(502)。各分支的退避公式与错误格式由 hooks 参数化,
+ * 不在此统一。
+ */
+async function fetchUpstreamWithRetries(
+  hooks: UpstreamRetryHooks,
+  writer: TcpWriter,
+  conn: socket.TCPSocketConnection,
+  resourceId: string,
+  rangeSpec: string
+): Promise<void> {
+  let lastError = '';
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let retryDelayMs: number = 0;
+    try {
+      const result = await hooks.fetchOnce(attempt);
+      if (result.outcome === 'success' || result.outcome === 'fatal') {
+        return;
+      }
+      lastError = result.error ?? '';
+      retryDelayMs = result.retryDelayMs ?? 0;
+    } catch (e) {
+      lastError = hooks.describeError(e as Object);
+      Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resourceId}`);
+    } finally {
+      hooks.cleanup();
+    }
+    if (writer.hasEmittedAny()) {
+      Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resourceId} range=${rangeSpec} err=${lastError}`);
+      return;
+    }
+    if (attempt < MAX_RETRIES) {
+      await new Promise<void>(r => setTimeout(r, retryDelayMs > 0 ? retryDelayMs : 300 * (attempt + 1)));
+    }
+  }
+  Logger.error(TAG, `serveRange failed: ${lastError} resource=${resourceId}`);
+  if (!writer.hasEmittedAny()) {
+    await sendError(conn, 502, `upstream failed: ${lastError}`);
   }
 }
 
@@ -506,7 +577,7 @@ export async function serveRange(
   // Return empty 206 to satisfy the player without hitting upstream.
   if (start === end && total > 0 && start >= total) {
     const hdr = `HTTP/1.1 206 Partial Content\r\nContent-Type: ${contentType}\r\nContent-Range: bytes ${total - 1}-${total - 1}/${total}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`;
-    await sendRaw(conn, encodeStr(hdr));
+    await sendRaw(conn, encodeUtf8(hdr));
     return;
   }
 
@@ -515,12 +586,11 @@ export async function serveRange(
     const hdr = standaloneResponse
       ? `HTTP/1.1 200 OK\r\nContent-Type: ${contentType}\r\nContent-Length: ${end - start + 1}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n`
       : `HTTP/1.1 206 Partial Content\r\nContent-Type: ${contentType}\r\nContent-Range: bytes ${start}-${end}/${totalStr}\r\nContent-Length: ${end - start + 1}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n`;
-    await sendRaw(conn, encodeStr(hdr));
+    await sendRaw(conn, encodeUtf8(hdr));
     return;
   }
 
   const rangeSpec = `${start}-${end}`;
-  let lastError = '';
   const writer = new TcpWriter(conn, start, end, total, contentType, standaloneResponse);
 
   // YouTube videoplayback. Android/iOS: empty-body POST over RCP (see
@@ -532,14 +602,14 @@ export async function serveRange(
     const useStreamingGet = !usePost && isVisionOsUrl(resource.url);
     if (usePost || useStreamingGet) {
       const method = usePost ? 'POST' : 'GET';
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
-        if (attempt === 0) {
-          Logger.info(TAG, `serveRange yt: transport=rcp ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
-        }
-        const rcpSession = createYoutubePostSession(fetchUrl);
-        let retryDelayMs: number = 0;
-        try {
+      let rcpSession: rcp.Session | null = null;
+      await fetchUpstreamWithRetries({
+        fetchOnce: async (attempt: number): Promise<FetchAttemptResult> => {
+          const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
+          if (attempt === 0) {
+            Logger.info(TAG, `serveRange yt: transport=rcp ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+          }
+          rcpSession = createYoutubePostSession(fetchUrl);
           // GET must not carry a body (PipePipe plain GET); POST keeps the
           // empty-string body — googlevideo 411s on a body-less POST.
           const req = usePost
@@ -548,53 +618,42 @@ export async function serveRange(
           req.destination = { kind: 'stream', stream: new MeteredWriteStream(writer) };
           const resp = await rcpSession.fetch(req);
           if (resp.statusCode === 200 || resp.statusCode === 206) {
-            return;
+            return { outcome: 'success' };
           }
-          lastError = `status=${resp.statusCode}`;
           Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} resource=${resource.id} `
             + `${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
           if (resp.statusCode >= 400 && resp.statusCode < 500) {
             if (resp.statusCode === 403 || resp.statusCode === 410) {
               // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
               // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
-              retryDelayMs = 1000 * (attempt + 1);
+              const retryDelayMs = 1000 * (attempt + 1);
               Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
-            } else {
-              if (!writer.hasEmittedAny()) {
-                await sendError(conn, 502, `upstream ${resp.statusCode}`);
-              }
-              return;
+              return { outcome: 'retry', error: `status=${resp.statusCode}`, retryDelayMs };
             }
+            if (!writer.hasEmittedAny()) {
+              await sendError(conn, 502, `upstream ${resp.statusCode}`);
+            }
+            return { outcome: 'fatal' };
           }
-        } catch (e) {
-          lastError = describeError(e as Object);
-          Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resource.id}`);
-        } finally {
-          rcpSession.close();
-        }
-        if (writer.hasEmittedAny()) {
-          Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resource.id} range=${rangeSpec} err=${lastError}`);
-          return;
-        }
-        if (attempt < MAX_RETRIES) {
-          await new Promise<void>(r => setTimeout(r, retryDelayMs > 0 ? retryDelayMs : 300 * (attempt + 1)));
-        }
-      }
-      Logger.error(TAG, `serveRange failed: ${lastError} resource=${resource.id}`);
-      if (!writer.hasEmittedAny()) {
-        await sendError(conn, 502, `upstream failed: ${lastError}`);
-      }
+          return { outcome: 'retry', error: `status=${resp.statusCode}` };
+        },
+        cleanup: () => {
+          rcpSession?.close();
+          rcpSession = null;
+        },
+        describeError: describeError
+      }, writer, conn, resource.id, rangeSpec);
       return;
     }
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
-      const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
-      if (attempt === 0) {
-        Logger.info(TAG, `serveRange yt: transport=http ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
-      }
-      const req = http.createHttp();
-      let retryDelayMs: number = 0;
-      try {
+    let req: http.HttpRequest | null = null;
+    await fetchUpstreamWithRetries({
+      fetchOnce: async (attempt: number): Promise<FetchAttemptResult> => {
+        const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
+        const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
+        if (attempt === 0) {
+          Logger.info(TAG, `serveRange yt: transport=http ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
+        }
+        req = http.createHttp();
         const options: http.HttpRequestOptions = {
           method: http.RequestMethod.GET,
           header: headers,
@@ -608,103 +667,80 @@ export async function serveRange(
         if (response.responseCode === 200 || response.responseCode === 206) {
           const bytes = responseBodyToBytes(response.result);
           if (bytes.length === 0) {
-            lastError = `empty body status=${response.responseCode}`;
-          } else {
-            // Buffered GET: the whole body already arrived from the network here.
-            proxyTrafficMeter.recordBytes(bytes.length);
-            await writer.write(bytes.buffer as ArrayBuffer);
-            return;
+            return { outcome: 'retry', error: `empty body status=${response.responseCode}` };
           }
-        } else {
-          lastError = `status=${response.responseCode}`;
-          const bodyPreview = typeof response.result === 'string'
-            ? response.result.substring(0, 120)
-            : `bytes=${responseBodyToBytes(response.result).length}`;
-          Logger.warn(TAG, `serveRange: upstream ${response.responseCode} resource=${resource.id} `
-            + `body=${bodyPreview} ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
-          if (response.responseCode >= 400 && response.responseCode < 500) {
-            if (response.responseCode === 403 || response.responseCode === 410) {
-              // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
-              // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
-              retryDelayMs = 1000 * (attempt + 1);
-              Logger.warn(TAG, `serveRange: upstream ${response.responseCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
-            } else {
-              if (!writer.hasEmittedAny()) {
-                await sendError(conn, 502, `upstream ${response.responseCode}`);
-              }
-              return;
-            }
-          }
+          // Buffered GET: the whole body already arrived from the network here.
+          proxyTrafficMeter.recordBytes(bytes.length);
+          await writer.write(bytes.buffer as ArrayBuffer);
+          return { outcome: 'success' };
         }
-      } catch (e) {
-        lastError = describeError(e as Object);
-        Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resource.id}`);
-      } finally {
-        req.destroy();
-      }
-      if (writer.hasEmittedAny()) {
-        Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resource.id} range=${rangeSpec} err=${lastError}`);
-        return;
-      }
-      if (attempt < MAX_RETRIES) {
-        await new Promise<void>(r => setTimeout(r, retryDelayMs > 0 ? retryDelayMs : 300 * (attempt + 1)));
-      }
-    }
-    Logger.error(TAG, `serveRange failed: ${lastError} resource=${resource.id}`);
-    if (!writer.hasEmittedAny()) {
-      await sendError(conn, 502, `upstream failed: ${lastError}`);
-    }
+        const bodyPreview = typeof response.result === 'string'
+          ? response.result.substring(0, 120)
+          : `bytes=${responseBodyToBytes(response.result).length}`;
+        Logger.warn(TAG, `serveRange: upstream ${response.responseCode} resource=${resource.id} `
+          + `body=${bodyPreview} ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
+        if (response.responseCode >= 400 && response.responseCode < 500) {
+          if (response.responseCode === 403 || response.responseCode === 410) {
+            // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
+            // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
+            const retryDelayMs = 1000 * (attempt + 1);
+            Logger.warn(TAG, `serveRange: upstream ${response.responseCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
+            return { outcome: 'retry', error: `status=${response.responseCode}`, retryDelayMs };
+          }
+          if (!writer.hasEmittedAny()) {
+            await sendError(conn, 502, `upstream ${response.responseCode}`);
+          }
+          return { outcome: 'fatal' };
+        }
+        return { outcome: 'retry', error: `status=${response.responseCode}` };
+      },
+      cleanup: () => {
+        req?.destroy();
+        req = null;
+      },
+      describeError: describeError
+    }, writer, conn, resource.id, rangeSpec);
     return;
   }
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const sessionHeaders = makeHeaders(resource);
-    // 非 YouTube 资源（字幕等）同样要走应用代理；与 createYoutubePostSession 共用代理解析。
-    const config: rcp.Configuration = {
-      transfer: { timeout: { connectMs: CONNECT_TIMEOUT_MS, transferMs: TIMEOUT_MS } }
-    };
-    resolveRcpProxy(config, resource.url);
-    const rcpSession = rcp.createSession({
-      headers: sessionHeaders,
-      requestConfiguration: config
-    });
-    try {
+  let rcpSession: rcp.Session | null = null;
+  await fetchUpstreamWithRetries({
+    fetchOnce: async (_attempt: number): Promise<FetchAttemptResult> => {
+      const sessionHeaders = makeHeaders(resource);
+      // 非 YouTube 资源（字幕等）同样要走应用代理；与 createYoutubePostSession 共用代理解析。
+      const config: rcp.Configuration = {
+        transfer: { timeout: { connectMs: CONNECT_TIMEOUT_MS, transferMs: TIMEOUT_MS } }
+      };
+      resolveRcpProxy(config, resource.url);
+      rcpSession = rcp.createSession({
+        headers: sessionHeaders,
+        requestConfiguration: config
+      });
       const dest: rcp.DownloadToStream = { kind: 'stream', stream: writer };
-      const rangeHeaders: rcp.RequestHeaders = { 'Accept-Encoding': 'identity' };
-      if (resource.userAgent) rangeHeaders['User-Agent'] = resource.userAgent;
-      if (resource.referer) rangeHeaders['Referer'] = resource.referer;
-      rangeHeaders['Range'] = `bytes=${rangeSpec}`;
+      // UA/Referer/Accept-Encoding are already set as session headers via
+      // makeHeaders above; request headers only add Range (a repeated
+      // request-level header would just override the session value).
+      const rangeHeaders: rcp.RequestHeaders = { 'Range': `bytes=${rangeSpec}` };
       const req = new rcp.Request(resource.url, 'GET', rangeHeaders);
       req.destination = dest;
       const resp = await rcpSession.fetch(req);
 
       if (resp.statusCode === 200 || resp.statusCode === 206) {
-        return;
+        return { outcome: 'success' };
       }
       if (resp.statusCode >= 400 && resp.statusCode < 500) {
         Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} (non-retryable) resource=${resource.id} range=${rangeSpec}`);
         if (!writer.hasEmittedAny()) {
           await sendError(conn, 502, `upstream ${resp.statusCode}`);
         }
-        return;
+        return { outcome: 'fatal' };
       }
-      lastError = `status=${resp.statusCode}`;
-    } catch (e) {
-      lastError = String(e);
-      Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resource.id}`);
-    } finally {
-      rcpSession.close();
-    }
-    if (writer.hasEmittedAny()) {
-      Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resource.id} range=${rangeSpec} err=${lastError}`);
-      return;
-    }
-    if (attempt < MAX_RETRIES) {
-      await new Promise<void>(r => setTimeout(r, 300 * (attempt + 1)));
-    }
-  }
-  Logger.error(TAG, `serveRange failed: ${lastError} resource=${resource.id}`);
-  if (!writer.hasEmittedAny()) {
-    await sendError(conn, 502, `upstream failed: ${lastError}`);
-  }
+      return { outcome: 'retry', error: `status=${resp.statusCode}` };
+    },
+    cleanup: () => {
+      rcpSession?.close();
+      rcpSession = null;
+    },
+    describeError: (e: Object) => String(e)
+  }, writer, conn, resource.id, rangeSpec);
 }

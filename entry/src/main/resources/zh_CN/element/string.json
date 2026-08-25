@@ -569,16 +569,8 @@
             "value": "暂无内容"
         },
         {
-            "name": "yt_video_details",
-            "value": "视频详情"
-        },
-        {
             "name": "yt_error_invalid_video",
             "value": "无有效视频信息"
-        },
-        {
-            "name": "yt_notice_direct_link_removed",
-            "value": "直链功能已移除，后续统一处理。"
         },
         {
             "name": "yt_dialog_select_quality",
@@ -2687,6 +2679,34 @@
         {
             "name": "yt_changelog_0_5_5_20",
             "value": "扩充播放、鉴权、令牌、刷新及回退诊断，同时确保日志不记录敏感 Cookie 和签名地址"
+        },
+        {
+            "name": "yt_changelog_0_5_9_1",
+            "value": "信息流页面改为懒加载网格/列表：首页、搜索、歌单、频道、订阅长列表滚动更流畅"
+        },
+        {
+            "name": "yt_changelog_0_5_9_2",
+            "value": "修复部分机型冷启动即崩溃的问题（@BuilderParam 绑定）"
+        },
+        {
+            "name": "yt_changelog_0_5_9_3",
+            "value": "修复登录态过期不断链、首页静默回落无提示的问题"
+        },
+        {
+            "name": "yt_changelog_0_5_9_4",
+            "value": "选项图标与危险操作按钮统一跟随主题色，移除固定警示红"
+        },
+        {
+            "name": "yt_changelog_0_5_9_5",
+            "value": "文本编解码、Base64、URL 解析等切换为系统官方实现"
+        },
+        {
+            "name": "yt_changelog_0_5_9_6",
+            "value": "清理投屏死链、状态轮询等无用代码，精简包体积"
+        },
+        {
+            "name": "yt_changelog_0_5_9_7",
+            "value": "修复播放预取关联、后台任务守卫等稳定性问题"
         },
         {
             "name": "yt_changelog_0_5_8_1",
