@@ -1,6 +1,6 @@
 import { SearchChannelItem, SearchInfoItem, SearchPageResult, SearchPlaylistItem, SearchStreamItem, VideoItem } from 'youtube_core';
 import { ContentCountry, Localization, fetchSearchContinuation, fetchSearchPage } from 'youtube_core';
-import { getLockupChannelId, getLockupPlaylistCoverUrl, getLockupPlaylistId, getLockupTitle, getLockupUploaderName, getLockupVideoId, getLockupVideoThumbnailUrl } from './utils/LockupViewModelParser';
+import { getLockupChannelId, getLockupPlaylistCoverUrl, getLockupPlaylistId, getLockupPublishedTimeText, getLockupTitle, getLockupUploaderName, getLockupVideoId, getLockupVideoThumbnailUrl } from './utils/LockupViewModelParser';
 import { ThumbnailPlaceholder } from '../../common/ThumbnailPlaceholder';
 import { getTextFromRuns } from './utils/TextUtils';
 import { getThumbnailUrlFromThumbnailObject, pickBestThumbUrl } from './utils/ThumbnailUtils';
@@ -304,6 +304,7 @@ export class SearchService {
           const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, idCounter);
           const channelId = getLockupChannelId(lockup);
           const videoItem = new VideoItem(idCounter, videoId, title, author, "", thumbnailUrl, false, placeholderColor, channelId, "", "", "");
+          videoItem.publishedTimeText = getLockupPublishedTimeText(lockup);
           items.push(new SearchStreamItem(videoItem.id, videoItem));
           idCounter += 1;
           return;

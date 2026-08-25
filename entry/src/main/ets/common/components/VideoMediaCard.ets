@@ -274,6 +274,18 @@ export struct VideoMediaCard {
       .margin({ right: MEDIA_LIST_THUMB_GAP })
   }
 
+  /** Meta line: "观看次数 · 发布时间"，缺哪段显示哪段。 */
+  private getMetaInfoText(): string {
+    const parts: string[] = [];
+    if (this.video.viewCount && this.video.viewCount.length > 0) {
+      parts.push(this.video.viewCount);
+    }
+    if (this.video.publishedTimeText && this.video.publishedTimeText.length > 0) {
+      parts.push(this.video.publishedTimeText);
+    }
+    return parts.join(' · ');
+  }
+
   /** Title / author / viewCount stacked — shared by list and grid. */
   @Builder
   MetaTextStack() {
@@ -298,8 +310,8 @@ export struct VideoMediaCard {
           .margin({ bottom: 2 })
       }
 
-      if (this.showViewCount && this.video.viewCount && this.video.viewCount.length > 0) {
-        Text(this.video.viewCount)
+      if (this.showViewCount && this.getMetaInfoText().length > 0) {
+        Text(this.getMetaInfoText())
           .fontSize(MEDIA_META_SIZE)
           .fontColor($r('app.color.yourtube_text_hint'))
           .maxLines(1)

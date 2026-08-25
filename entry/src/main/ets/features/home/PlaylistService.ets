@@ -9,6 +9,7 @@ import {
   getLockupChannelId,
   getLockupIsLive,
   getLockupIsPremium,
+  getLockupPublishedTimeText,
   getLockupRequiresMembership,
   getLockupTitle,
   getLockupUploaderName,
@@ -328,7 +329,7 @@ export class PlaylistService {
     const isLive = getLockupIsLive(lockup);
     const isPremium = getLockupIsPremium(lockup);
     const requiresMembership = getLockupRequiresMembership(lockup);
-    return new VideoItem(
+    const item = new VideoItem(
       id,
       videoId,
       title || "Untitled",
@@ -345,6 +346,8 @@ export class PlaylistService {
       isPremium,
       requiresMembership
     );
+    item.publishedTimeText = getLockupPublishedTimeText(lockup);
+    return item;
   }
 
   private getPlaylistTotalCountText(playlistHeader: Record<string, Object> | undefined): string {

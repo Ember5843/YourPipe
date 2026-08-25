@@ -789,7 +789,7 @@ export struct OptionsDataAccountPage {
               icon: $r('sys.symbol.download_fill'),
               title: $r('app.string.yt_option_restore_data'),
               subtitle: $r('app.string.yt_option_restore_data_subtitle'),
-              iconColor: $r('app.color.yourtube_text_warning'),
+              iconColor: this.themePrimary,
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               transparentBackground: true,
               onClickAction: () => { this.openRestoreFilePicker(); }

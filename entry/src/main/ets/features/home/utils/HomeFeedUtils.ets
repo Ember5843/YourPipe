@@ -7,6 +7,7 @@ import {
   getLockupChannelId,
   getLockupIsLive,
   getLockupIsPremium,
+  getLockupPublishedTimeText,
   getLockupRequiresMembership,
   getLockupTitle,
   getLockupUploaderName,
@@ -240,10 +241,12 @@ export function buildHomeKioskVideoItems(
           const isLive = getLockupIsLive(lockupInRich);
           const isPremium = getLockupIsPremium(lockupInRich);
           const requiresMembership = getLockupRequiresMembership(lockupInRich);
-          items.push(new VideoItem(
+          const item = new VideoItem(
             idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor,
             channelId, channelAvatarUrl, "", "", null, isPremium, requiresMembership
-          ));
+          );
+          item.publishedTimeText = getLockupPublishedTimeText(lockupInRich);
+          items.push(item);
           idCounter += 1;
           return;
         }
@@ -343,10 +346,12 @@ export function buildHomeKioskVideoItems(
         const isLive = getLockupIsLive(lockup);
         const isPremium = getLockupIsPremium(lockup);
         const requiresMembership = getLockupRequiresMembership(lockup);
-        items.push(new VideoItem(
+        const item = new VideoItem(
           idCounter, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor,
           channelId, channelAvatarUrl, "", "", null, isPremium, requiresMembership
-        ));
+        );
+        item.publishedTimeText = getLockupPublishedTimeText(lockup);
+        items.push(item);
         idCounter += 1;
         return;
       }

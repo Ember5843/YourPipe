@@ -1,4 +1,5 @@
 import { pickBestThumbUrl } from './ThumbnailUtils';
+import { RelativeTimeParser } from '../../../common/utils/RelativeTimeParser';
 
 export function getLockupTitle(lockup: Record<string, Object>): string {
   const metadata = lockup["metadata"] as Record<string, Object>;
@@ -329,6 +330,32 @@ export function getLockupViewCount(lockup: Record<string, Object>): string {
       }
 
       if (isViewCountPart(part)) {
+        return content;
+      }
+    }
+  }
+  return "";
+}
+
+/**
+ * Publish / upload time text from lockup metadata rows. Mirrors PipePipe
+ * YoutubeLockupStreamInfoItemExtractor.getTextualUploadDate(): scan metadata
+ * parts and keep the first text that strictly parses as a relative time.
+ * Live/upcoming lockups carry no upload time — returns "" then.
+ */
+export function getLockupPublishedTimeText(lockup: Record<string, Object>): string {
+  const rows = getLockupMetadataRows(lockup);
+  if (!rows) {
+    return "";
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const parts = rows[i] ? (rows[i]["metadataParts"] as Array<Record<string, Object>>) : undefined;
+    if (!parts) {
+      continue;
+    }
+    for (let j = 0; j < parts.length; j++) {
+      const content = getPartTextContent(parts[j]);
+      if (content.length > 0 && RelativeTimeParser.parse(content) > 0) {
         return content;
       }
     }
