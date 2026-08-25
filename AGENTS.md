@@ -1,6 +1,6 @@
 # AGENTS.md — YourPipe
 
-> AI agent context file. Read this first. Local-only, git-ignored.
+> AI agent context file. Read this first. Tracked project documentation.
 > This file is the **project-level overview**: what the app is, how
 > modules wire, and which tools/conventions agents must follow.
 > For per-module deep context (file maps, internal conventions, do-nots),
@@ -246,8 +246,9 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   libmpv has no `network-proxy` property). Loopback stays direct.
 - **Dependency direction**: never import `entry` from HARs; never import
   `mediaservice` from `youtube_core`.
-- **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, build
-  trees, or any `AGENTS.md` (local-only, git-ignored).
+- **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, or build
+  trees. `AGENTS.md` files are tracked project docs — keep them in sync
+  with the code they describe.
 - **Persistence and recovery**: every new persistent preference, database,
   file, or cache must define how it participates in both "restore default
   settings" and "clear all app data". Wire disposable state into the relevant
