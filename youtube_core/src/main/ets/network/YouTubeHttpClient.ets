@@ -161,12 +161,14 @@ export class YouTubeHttpClient implements ClientVersionGet {
   /**
    * Binary POST for SABR (protobuf body, UMP ARRAY_BUFFER response).
    * Caller owns headers. Auth: WEB Cookie only when withAuth (never OAuth Bearer on SABR).
+   * onData reports response body bytes as they arrive (connection-speed metering).
    */
   async postBinary(
     url: string,
     data: Uint8Array,
     customHeaders?: Record<string, string | string[]>,
-    withAuth: boolean = false
+    withAuth: boolean = false,
+    onData?: (bytes: number) => void
   ): Promise<http.HttpResponse> {
     const requestId = YouTubeHttpClient.nextRequestId();
     const target = YouTubeHttpClient.safeRequestTarget(url);
@@ -186,7 +188,7 @@ export class YouTubeHttpClient implements ClientVersionGet {
       await this.injectWebAuthHeaders(headers);
     }
     try {
-      const response = await this.downloader.postBinary(url, data, headers, this.localization);
+      const response = await this.downloader.postBinary(url, data, headers, this.localization, true, onData);
       this.saveCookiesFromResponse(response, url);
       logger.info(`[NET] id=${requestId} phase=complete method=POST_BINARY target=${target} status=${response.responseCode} elapsed=${Date.now() - startedAt}ms`);
       return response;

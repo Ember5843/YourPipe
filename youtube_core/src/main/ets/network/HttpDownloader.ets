@@ -507,7 +507,8 @@ export class HttpDownloader {
     data: Uint8Array,
     headers?: Record<string, string[] | string>,
     localization?: Localization,
-    enableRetry: boolean = true
+    enableRetry: boolean = true,
+    onData?: (bytes: number) => void
   ): Promise<http.HttpResponse> {
     let lastError: HttpError | null = null;
     let attempt = 0;
@@ -516,7 +517,7 @@ export class HttpDownloader {
       attempt++;
       try {
         logger.debug(`POST-BIN-STREAM ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
-        const response = await this.postBinaryStreamOnce(url, data, headers, localization);
+        const response = await this.postBinaryStreamOnce(url, data, headers, localization, onData);
         if (response.responseCode && response.responseCode >= 400) {
           let errBody = '';
           try {
@@ -584,7 +585,8 @@ export class HttpDownloader {
     url: string,
     data: Uint8Array,
     headers?: Record<string, string[] | string>,
-    localization?: Localization
+    localization?: Localization,
+    onData?: (bytes: number) => void
   ): Promise<http.HttpResponse> {
     const requestHeaders = this.processBinaryHeaders(headers, localization);
     const httpRequest = http.createHttp();
@@ -672,6 +674,8 @@ export class HttpDownloader {
           new Uint8Array(copy).set(new Uint8Array(chunk));
           chunks.push(copy);
           totalBytes += chunk.byteLength;
+          // Arrival-time traffic sample for the connection-speed meter.
+          onData?.(chunk.byteLength);
         }
       });
 

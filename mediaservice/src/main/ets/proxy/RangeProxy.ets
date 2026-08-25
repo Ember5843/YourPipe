@@ -4,6 +4,7 @@ import { http, socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { ClientsConstants, HttpDownloader, HttpProxyOptions } from 'youtube_core';
 import Logger from '../utils/Logger';
+import { proxyTrafficMeter } from './ProxyTrafficMeter';
 
 const TAG = '[LocalProxy][RangeProxy]';
 const MAX_RETRIES = 2;
@@ -457,6 +458,24 @@ class TcpWriter implements rcp.WriteStream {
   }
 }
 
+/**
+ * WriteStream wrapper that meters inbound network bytes. RCP invokes write()
+ * once per received upstream chunk, so each call's byte count is fresh network
+ * traffic; the wrapped writer's loopback send to MPV is not metered.
+ */
+class MeteredWriteStream implements rcp.WriteStream {
+  private inner: rcp.WriteStream;
+
+  constructor(inner: rcp.WriteStream) {
+    this.inner = inner;
+  }
+
+  async write(buffer: ArrayBuffer): Promise<void | number> {
+    proxyTrafficMeter.recordBytes(buffer.byteLength);
+    return this.inner.write(buffer);
+  }
+}
+
 export async function serveRange(
   conn: socket.TCPSocketConnection,
   resource: StreamResource,
@@ -526,7 +545,7 @@ export async function serveRange(
           const req = usePost
             ? new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource), '')
             : new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource));
-          req.destination = { kind: 'stream', stream: writer };
+          req.destination = { kind: 'stream', stream: new MeteredWriteStream(writer) };
           const resp = await rcpSession.fetch(req);
           if (resp.statusCode === 200 || resp.statusCode === 206) {
             return;
@@ -591,6 +610,8 @@ export async function serveRange(
           if (bytes.length === 0) {
             lastError = `empty body status=${response.responseCode}`;
           } else {
+            // Buffered GET: the whole body already arrived from the network here.
+            proxyTrafficMeter.recordBytes(bytes.length);
             await writer.write(bytes.buffer as ArrayBuffer);
             return;
           }

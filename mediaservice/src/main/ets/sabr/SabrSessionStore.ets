@@ -3,12 +3,14 @@ import {
   SabrMediaSegment,
   SabrPoTokenProvider,
   SabrSegmentRequest,
+  setSabrNetworkTrafficSink,
   YoutubeSabrFormatMeta,
   YoutubeSabrInfo,
   YoutubeSabrSession,
   YouTubeHttpClient
 } from 'youtube_core';
 import Logger from '../utils/Logger';
+import { proxyTrafficMeter } from '../proxy/ProxyTrafficMeter';
 
 const TAG = '[SabrSessionStore]';
 
@@ -42,6 +44,9 @@ class SabrSessionStoreImpl {
 
   setHttpClient(client: YouTubeHttpClient): void {
     this.httpClient = client;
+    // UMP response bytes are the SABR path's true network ingress; meter them
+    // for the stats panel's connection speed (segment-cache hits never reach this).
+    setSabrNetworkTrafficSink((bytes: number) => proxyTrafficMeter.recordBytes(bytes));
   }
 
   setPoTokenProvider(provider?: SabrPoTokenProvider): void {

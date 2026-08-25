@@ -12,6 +12,7 @@ import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
 import { BackgroundTaskManager } from '../common/BackgroundTaskManager';
 import { PlaybackPreferences } from '../common/PlaybackPreferences';
+import { proxyTrafficMeter } from '../proxy/ProxyTrafficMeter';
 import { common } from '@kit.AbilityKit';
 import { audio } from '@kit.AudioKit';
 import { PlayerStateRelay, ProgressSubscriber, PlaybackStateSubscriber } from '../state/PlayerStateRelay';
@@ -146,10 +147,15 @@ export class AvPlayerController {
         cacheSpeedBps: 0,
         demuxerCacheDurationSec: 0,
         droppedFrames: 0,
-        decoderDroppedFrames: 0
+        decoderDroppedFrames: 0,
+        networkSpeedBps: 0
       };
     }
-    return this.playbackEngine.getPlaybackStats();
+    // MPV's cache-speed is meaningless behind the loopback proxy (it reads
+    // locally); connection speed comes from proxy-metered inbound traffic.
+    const stats = this.playbackEngine.getPlaybackStats();
+    stats.networkSpeedBps = proxyTrafficMeter.getRateBps();
+    return stats;
   }
 
   refreshPlaybackState(): void {

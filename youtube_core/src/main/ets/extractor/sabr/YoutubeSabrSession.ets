@@ -22,6 +22,20 @@ import { YoutubeSabrStreamState } from './YoutubeSabrStreamState';
 
 const logger = YTCoreLogger.getInstance('YoutubeSabrSession');
 
+/**
+ * Network-traffic hook: invoked with UMP response body bytes as they arrive
+ * from the network (per dataReceive chunk). mediaservice wires this to its
+ * proxy traffic meter so the stats panel reports real SABR throughput —
+ * segment-ingest callbacks cannot tell a session-cache hit from a fresh
+ * network arrival. High-frequency path: the sink must not log.
+ */
+type SabrNetworkTrafficSink = (bytes: number) => void;
+let networkTrafficSink: SabrNetworkTrafficSink | undefined = undefined;
+
+export function setSabrNetworkTrafficSink(sink?: SabrNetworkTrafficSink): void {
+  networkTrafficSink = sink;
+}
+
 const MAX_REQUESTS_PER_SEGMENT = 16;
 const MAX_BACKOFF_MS = 30000;
 const MAX_INCOMPLETE_MEDIA_RESPONSES = 3;
@@ -384,7 +398,8 @@ export class YoutubeSabrSession {
         + `a=${this.audioFormat.itag} v=${this.videoFormat.itag} `
         + `lmA=${this.audioFormat.lastModified || 0} lmV=${this.videoFormat.lastModified || 0}`);
 
-      const response = await this.httpClient.postBinary(url, body, headers, this.useAuth);
+      const response = await this.httpClient.postBinary(url, body, headers, this.useAuth,
+        (bytes: number) => networkTrafficSink?.(bytes));
       const status = response.responseCode;
       const contentType = extractContentType(response.header);
       requireUmpContentType(contentType, status);

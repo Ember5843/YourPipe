@@ -26,7 +26,7 @@ export { parseHlsMasterManifest } from './src/main/ets/extractor/HlsManifestPars
 
 // ── sabr（opt-in/debug 路径） ──
 export { YoutubeSabrInfo, YoutubeSabrFormatMeta } from './src/main/ets/extractor/sabr/YoutubeSabrInfo';
-export { YoutubeSabrSession } from './src/main/ets/extractor/sabr/YoutubeSabrSession';
+export { YoutubeSabrSession, setSabrNetworkTrafficSink } from './src/main/ets/extractor/sabr/YoutubeSabrSession';
 export { YoutubeSabrStreamState } from './src/main/ets/extractor/sabr/YoutubeSabrStreamState';
 export { SabrMediaSegment, SabrSegmentRequest } from './src/main/ets/extractor/sabr/SabrMediaSegment';
 export { SabrInfoReloader } from './src/main/ets/extractor/sabr/SabrInfoReloader';

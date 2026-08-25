@@ -40,10 +40,16 @@ export interface PlaybackState {
   errorCode?: number;
 }
 
-/** Live playback statistics snapshot (Stats-for-Nerds style), read from MPV properties. */
+/** Live playback statistics snapshot (Stats-for-Nerds style); MPV fields + proxy-metered network speed. */
 export interface PlaybackStats {
-  /** Demuxer cache fill speed in bytes/sec (~network connection speed). */
+  /** Demuxer cache fill speed in bytes/sec; collapses to 0 once the loopback-fed cache is full. */
   cacheSpeedBps: number;
+  /**
+   * Real network throughput in bytes/sec, metered at the local proxy's inbound
+   * side (`proxyTrafficMeter`). Optional because engine-level snapshots don't
+   * know proxy traffic; `AvPlayerController.getPlaybackStats()` always fills it.
+   */
+  networkSpeedBps?: number;
   /** Buffered media duration ahead of the play position, in seconds. */
   demuxerCacheDurationSec: number;
   /** Frames dropped by the video output. */
