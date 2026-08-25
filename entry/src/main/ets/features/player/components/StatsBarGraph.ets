@@ -15,27 +15,39 @@
 
 const MAX_BARS: number = 60;
 const GRAPH_HEIGHT_VP: number = 56;
-const BAR_MAX_HEIGHT_VP: number = 54;
-const BAR_PLACEHOLDER_HEIGHT_VP: number = 2;
+const BAR_PLACEHOLDER_HEIGHT_PX: number = 2;
+const BAR_GAP_PX: number = 1;
 const FALLBACK_SPEED_REFERENCE_BPS: number = 5 * 1000 * 1000;
 const COLOR_GOOD: string = '#34A853';
 const COLOR_WARN: string = '#F9AB00';
 const COLOR_BAD: string = '#E53935';
+// Matches app.color.yourtube_divider (#E0E0E0); Canvas fillStyle needs a literal.
+const COLOR_PLACEHOLDER: string = '#E0E0E0';
 
 /**
- * Stats-for-Nerds style live bar graph. Pure ArkUI (no Canvas): a bottom-aligned
- * row of equal-weight bars, latest sample at the right edge.
+ * Stats-for-Nerds style live bar graph, drawn with Canvas +
+ * CanvasRenderingContext2D (the official data-visualization pattern).
+ * Bars are bottom-aligned, right-aligned to the latest sample; older samples
+ * sit to the left and the left side stays empty until 60 samples accumulate.
  * kind 'speed': samples in bytes/sec, colored against referenceBps (stream bitrate);
  * kind 'buffer': samples in seconds, colored by absolute buffered duration.
  */
 @Component
 export struct StatsBarGraph {
   /** Oldest first, latest last. At most the last 60 samples are rendered. */
-  @Prop samples: number[] = [];
+  @Prop @Watch('onSamplesChanged') samples: number[] = [];
   /** 'speed' | 'buffer' */
   @Prop kind: string = 'speed';
   /** Speed reference (video+audio bitrate, bps). <=0 falls back to 5 Mbps. */
   @Prop referenceBps: number = 0;
+
+  private settings: RenderingContextSettings = new RenderingContextSettings(true);
+  private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
+  private canvasReady: boolean = false;
+
+  private onSamplesChanged(): void {
+    this.drawGraph();
+  }
 
   private visibleSamples(): number[] {
     if (this.samples.length <= MAX_BARS) {
@@ -58,16 +70,9 @@ export struct StatsBarGraph {
     return Math.max(maxSample, 10);
   }
 
-  private barHeight(sample: number): number {
+  private barColor(sample: number): string {
     if (sample <= 0) {
-      return BAR_PLACEHOLDER_HEIGHT_VP;
-    }
-    return Math.min(1, sample / this.maxScale()) * BAR_MAX_HEIGHT_VP;
-  }
-
-  private barColor(sample: number): ResourceColor {
-    if (sample <= 0) {
-      return $r('app.color.yourtube_divider');
+      return COLOR_PLACEHOLDER;
     }
     if (this.kind === 'speed') {
       const reference: number = this.referenceBps > 0 ? this.referenceBps : FALLBACK_SPEED_REFERENCE_BPS;
@@ -89,17 +94,52 @@ export struct StatsBarGraph {
     return COLOR_BAD;
   }
 
-  build() {
-    Row({ space: 1 }) {
-      ForEach(this.visibleSamples(), (sample: number) => {
-        Column()
-          .layoutWeight(1)
-          .height(this.barHeight(sample))
-          .backgroundColor(this.barColor(sample))
-      }, (sample: number, index: number) => `${index}_${sample.toFixed(0)}`)
+  private drawGraph(): void {
+    if (!this.canvasReady) {
+      return;
     }
-    .width('100%')
-    .height(GRAPH_HEIGHT_VP)
-    .alignItems(VerticalAlign.Bottom)
+    const w: number = this.context.width;
+    const h: number = this.context.height;
+    if (w <= 0 || h <= 0) {
+      return;
+    }
+    this.context.clearRect(0, 0, w, h);
+
+    const samples: number[] = this.visibleSamples();
+    const scale: number = this.maxScale();
+    const slotW: number = w / MAX_BARS;
+    const barW: number = Math.max(slotW - BAR_GAP_PX, 1);
+    const drawableH: number = Math.max(h - BAR_PLACEHOLDER_HEIGHT_PX, 0);
+
+    for (let i = 0; i < MAX_BARS; i++) {
+      // Right-aligned: latest sample at the right edge, left slots stay
+      // empty until enough samples have accumulated. An empty graph still
+      // renders the full placeholder baseline.
+      const sampleIndex: number = samples.length - MAX_BARS + i;
+      const sample: number = sampleIndex >= 0 ? samples[sampleIndex] : 0;
+      const x: number = w - (MAX_BARS - i) * slotW;
+      let barH: number;
+      if (sample <= 0) {
+        barH = BAR_PLACEHOLDER_HEIGHT_PX;
+      } else {
+        barH = Math.min(1, sample / scale) * drawableH;
+      }
+      const y: number = h - barH;
+      this.context.fillStyle = this.barColor(sample);
+      this.context.fillRect(x, y, barW, barH);
+    }
+  }
+
+  build() {
+    Canvas(this.context)
+      .width('100%')
+      .height(GRAPH_HEIGHT_VP)
+      .onReady(() => {
+        this.canvasReady = true;
+        this.drawGraph();
+      })
+      .onAreaChange(() => {
+        this.drawGraph();
+      })
   }
 }
