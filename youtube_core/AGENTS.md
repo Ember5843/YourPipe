@@ -136,7 +136,10 @@ youtube_core/src/main/
 - **Bootstrap**: `YoutubeSabrInfo` from player response (`serverAbrStreamingUrl` + formats).
 - **Session**: `YoutubeSabrSession` POSTs UMP, parses with `UmpReader` /
   `SabrResponseDecoder` / `SabrProto`, caches segments, applies PoToken when
-  protected (via `SabrPoTokenProvider` implemented in entry).
+  protected (via `SabrPoTokenProvider` implemented in entry). UMP response
+  body bytes are reported as they arrive (per `dataReceive` chunk) through
+  `setSabrNetworkTrafficSink` (wired by mediaservice to its proxy traffic
+  meter for the stats UI).
 - **Consumers**: `mediaservice` `sabrSessionStore` / `SabrTrackBuffer` lease the
   session and serve loopback DASH/range to MPV. Do not invent a second UMP client.
 - **Session identity** (`identity/SessionIdentityManager`): one visitorData is

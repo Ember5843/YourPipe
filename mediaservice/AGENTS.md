@@ -14,8 +14,13 @@
   — offline SABR download (used by entry `DownloadManager`).
 - `PlaybackEngine` (interface), `PlaybackEngineState`, `PlaybackState`,
   `PlaybackErrorCategory`, `EngineConfig`, `PlaybackStats` — engine contract
-  types (`PlaybackStats` = on-demand MPV cache-speed / demuxer-cache-duration /
-  dropped-frame snapshot for the entry stats UI).
+  types (`PlaybackStats` = on-demand snapshot for the entry stats UI:
+  MPV demuxer-cache-duration / dropped frames plus `networkSpeedBps`
+  from `proxyTrafficMeter` — real network bytes metered in `RangeProxy`
+  (upstream chunks) and at the SABR UMP POST response (wired via
+  `setSabrNetworkTrafficSink` in `sabrSessionStore.setHttpClient`), since MPV
+  `cache-speed` is loopback throughput and pins at 0 once the demuxer cache
+  cap is reached).
 - `VideoHwCaps` — device HW decoder capability snapshot + hwdec-codecs
   whitelist passthrough (value owned by native `getHwdecCodecsWhitelist`).
 - `PlayerState`, `isValidTransition`, `describeState`, `PlayerStateMachine`,
