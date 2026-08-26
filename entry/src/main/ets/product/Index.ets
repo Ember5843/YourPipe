@@ -136,7 +136,7 @@ struct Index {
     const followSystem = getContext().resourceManager.getStringSync($r('app.string.yt_lang_follow_system').id);
 
     // App UI 语言 - 使用固定的原生名称，不依赖当前 UI 语言进行翻译
-    const appCodes = ['default', 'zh-Hans', 'zh-HK', 'zh-TW', 'en-Latn', 'ru', 'de', 'fr', 'es', 'ar'];
+    const appCodes = ['default', 'zh-Hans', 'zh-HK', 'zh-TW', 'en-Latn', 'ru', 'de', 'fr', 'es', 'ar', 'ja', 'ko', 'pt-BR', 'it'];
     this.appLangItems = appCodes.map((code: string): LanguagePickerItem => {
       if (code === 'default') {
         return new LanguagePickerItem('default', followSystem, followSystem);
@@ -161,6 +161,14 @@ struct Index {
         native = 'Español';
       } else if (code === 'ar') {
         native = 'العربية';
+      } else if (code === 'ja') {
+        native = '日本語';
+      } else if (code === 'ko') {
+        native = '한국어';
+      } else if (code === 'pt-BR') {
+        native = 'Português (Brasil)';
+      } else if (code === 'it') {
+        native = 'Italiano';
       } else {
         try { native = i18n.System.getDisplayLanguage(code, code.split('-')[0]); } catch (_e) {}
       }

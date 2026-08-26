@@ -1,0 +1,3032 @@
+{
+    "string": [
+        {
+            "name": "module_desc",
+            "value": "module description"
+        },
+        {
+            "name": "EntryAbility_desc",
+            "value": "description"
+        },
+        {
+            "name": "EntryAbility_label",
+            "value": "label"
+        },
+        {
+            "name": "HOME_EXIT_TOAST",
+            "value": "もう一度戻るボタンを押すとアプリを終了します"
+        },
+        {
+            "name": "LIVING_LEFT_TEXT",
+            "value": "コメント "
+        },
+        {
+            "name": "LIVING_RIGHT_TEXT",
+            "value": " 件"
+        },
+        {
+            "name": "LIVING_WRITE",
+            "value": "コメントを書く"
+        },
+        {
+            "name": "number_of_viewers",
+            "value": "738,600 人が視聴中"
+        },
+        {
+            "name": "store_name",
+            "value": "公式ライブ配信ルーム"
+        },
+        {
+            "name": "yt_tab_home",
+            "value": "ホーム"
+        },
+        {
+            "name": "yt_tab_playlists",
+            "value": "再生リスト"
+        },
+        {
+            "name": "yt_tab_subscriptions",
+            "value": "登録チャンネル"
+        },
+        {
+            "name": "yt_tab_favorites",
+            "value": "お気に入り"
+        },
+        {
+            "name": "yt_tab_local",
+            "value": "ローカル"
+        },
+        {
+            "name": "yt_option_title",
+            "value": "オプション"
+        },
+        {
+            "name": "yt_option_group_settings",
+            "value": "設定"
+        },
+        {
+            "name": "yt_option_group_others",
+            "value": "その他"
+        },
+        {
+            "name": "yt_option_language",
+            "value": "言語"
+        },
+        {
+            "name": "yt_option_color",
+            "value": "カラー"
+        },
+        {
+            "name": "yt_option_color_subtitle",
+            "value": "テーマカラーとアクセントカラー"
+        },
+        {
+            "name": "yt_option_appearance",
+            "value": "外観"
+        },
+        {
+            "name": "yt_dark_mode_title",
+            "value": "ダークモード"
+        },
+        {
+            "name": "yt_dark_mode_system",
+            "value": "システムに従う"
+        },
+        {
+            "name": "yt_dark_mode_system_subtitle",
+            "value": "システム設定に合わせて自動で切り替え"
+        },
+        {
+            "name": "yt_dark_mode_light",
+            "value": "ライトモード"
+        },
+        {
+            "name": "yt_dark_mode_light_subtitle",
+            "value": "常にライトテーマを使用"
+        },
+        {
+            "name": "yt_dark_mode_dark",
+            "value": "ダークモード"
+        },
+        {
+            "name": "yt_dark_mode_dark_subtitle",
+            "value": "常にダークテーマを使用"
+        },
+        {
+            "name": "yt_setting_home_layout",
+            "value": "ホームのレイアウト"
+        },
+        {
+            "name": "yt_layout_grid",
+            "value": "カードモード"
+        },
+        {
+            "name": "yt_layout_list",
+            "value": "リストモード"
+        },
+        {
+            "name": "yt_option_log",
+            "value": "ログ"
+        },
+        {
+            "name": "yt_option_log_subtitle",
+            "value": "実行ログを表示"
+        },
+        {
+            "name": "yt_log_title",
+            "value": "ログ"
+        },
+        {
+            "name": "yt_log_enable",
+            "value": "ログ記録を有効化"
+        },
+        {
+            "name": "yt_log_enable_subtitle",
+            "value": "起動後に実行ログを記録"
+        },
+        {
+            "name": "yt_log_disabled_hint",
+            "value": "ログ記録が無効です\n上のスイッチをオンにすると記録を開始します"
+        },
+        {
+            "name": "yt_log_empty",
+            "value": "ログ記録はありません"
+        },
+        {
+            "name": "yt_log_session_active",
+            "value": "記録中"
+        },
+        {
+            "name": "yt_log_session_saved",
+            "value": "保存済み"
+        },
+        {
+            "name": "yt_log_no_sessions",
+            "value": "ログセッションはありません"
+        },
+        {
+            "name": "yt_log_delete_all_confirm",
+            "value": "すべてのログ記録を削除しますか？"
+        },
+        {
+            "name": "yt_log_delete_confirm_yes",
+            "value": "削除"
+        },
+        {
+            "name": "yt_log_delete_confirm_no",
+            "value": "キャンセル"
+        },
+        {
+            "name": "yt_action_close",
+            "value": "閉じる"
+        },
+        {
+            "name": "yt_option_about",
+            "value": "アプリについて"
+        },
+        {
+            "name": "yt_option_about_subtitle",
+            "value": "バージョンと謝辞"
+        },
+        {
+            "name": "yt_option_in_development",
+            "value": "開発中の機能"
+        },
+        {
+            "name": "yt_option_in_development_color",
+            "value": "カラーテーマのオプションはここに表示されます"
+        },
+        {
+            "name": "yt_lang_follow_system",
+            "value": "システムに従う"
+        },
+        {
+            "name": "yt_lang_simplified",
+            "value": "簡体中国語"
+        },
+        {
+            "name": "yt_lang_simplified_subtitle",
+            "value": "简体中文"
+        },
+        {
+            "name": "yt_lang_traditional_hk",
+            "value": "繁体中国語（香港）"
+        },
+        {
+            "name": "yt_lang_traditional_hk_subtitle",
+            "value": "繁體中文（香港）"
+        },
+        {
+            "name": "yt_lang_traditional_tw",
+            "value": "繁体中国語（台湾）"
+        },
+        {
+            "name": "yt_lang_traditional_tw_subtitle",
+            "value": "繁體中文（台灣）"
+        },
+        {
+            "name": "yt_lang_english",
+            "value": "英語"
+        },
+        {
+            "name": "yt_lang_english_subtitle",
+            "value": "English"
+        },
+        {
+            "name": "internet_reason",
+            "value": "ネットワークデータをリクエスト"
+        },
+        {
+            "name": "reason_background",
+            "value": "動画をバックグラウンドで再生し続ける"
+        },
+        {
+            "name": "video_name0",
+            "value": "@Cat"
+        },
+        {
+            "name": "video_name1",
+            "value": "@Mountaineer"
+        },
+        {
+            "name": "video_name2",
+            "value": "@Nice To Meet You"
+        },
+        {
+            "name": "video_name3",
+            "value": "@Tick"
+        },
+        {
+            "name": "video_name4",
+            "value": "@Faery"
+        },
+        {
+            "name": "video_description0",
+            "value": "#1 #Local video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+        },
+        {
+            "name": "video_description1",
+            "value": "#2 #Online video #Dream"
+        },
+        {
+            "name": "video_description3",
+            "value": "#4 #Online video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+        },
+        {
+            "name": "video_description4",
+            "value": "#5 #Online video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+        },
+        {
+            "name": "yt_section_language_region",
+            "value": "言語と地域"
+        },
+        {
+            "name": "yt_section_playback",
+            "value": "再生"
+        },
+        {
+            "name": "yt_section_language",
+            "value": "言語設定"
+        },
+        {
+            "name": "yt_section_content_translation",
+            "value": "コンテンツの翻訳"
+        },
+        {
+            "name": "yt_setting_translation_language",
+            "value": "翻訳先の言語"
+        },
+        {
+            "name": "yt_follow_app_language",
+            "value": "アプリの言語に従う"
+        },
+        {
+            "name": "yt_setting_ui_language",
+            "value": "アプリの UI 言語"
+        },
+        {
+            "name": "yt_setting_content_language",
+            "value": "コンテンツの言語"
+        },
+        {
+            "name": "yt_setting_content_region",
+            "value": "コンテンツの地域"
+        },
+        {
+            "name": "yt_section_video",
+            "value": "動画設定"
+        },
+        {
+            "name": "yt_setting_default_quality",
+            "value": "デフォルトの動画画質"
+        },
+        {
+            "name": "yt_setting_live_quality_cap",
+            "value": "ライブ配信の画質上限"
+        },
+        {
+            "name": "yt_setting_show_high_res",
+            "value": "高解像度を表示（1440p / 4K）"
+        },
+        {
+            "name": "yt_setting_show_high_res_subtitle",
+            "value": "画質セレクターに 4K を表示します。高い性能が必要です"
+        },
+        {
+            "name": "yt_setting_video_codec",
+            "value": "動画コーデック"
+        },
+        {
+            "name": "yt_section_audio",
+            "value": "音声設定"
+        },
+        {
+            "name": "yt_setting_audio_quality",
+            "value": "音質の上限"
+        },
+        {
+            "name": "yt_section_decoder",
+            "value": "デコーダー設定"
+        },
+        {
+            "name": "yt_setting_hwdec_mode",
+            "value": "ハードウェアデコードモード"
+        },
+        {
+            "name": "yt_setting_decoder_fallback",
+            "value": "デコーダーのフォールバック"
+        },
+        {
+            "name": "yt_setting_decoder_fallback_subtitle",
+            "value": "ハードウェアデコード失敗時にソフトウェアデコードへ自動で切り替え、黒画面を回避"
+        },
+        {
+            "name": "yt_section_buffer",
+            "value": "バッファ設定"
+        },
+        {
+            "name": "yt_setting_readahead",
+            "value": "先読みバッファ時間"
+        },
+        {
+            "name": "yt_setting_cache_pause",
+            "value": "バッファ不足からの復帰待機時間"
+        },
+        {
+            "name": "yt_setting_max_back_bytes",
+            "value": "後方バッファサイズ（後方シーク時に再取得しない）"
+        },
+        {
+            "name": "yt_quality_best",
+            "value": "最高画質"
+        },
+        {
+            "name": "yt_quality_auto",
+            "value": "自動"
+        },
+        {
+            "name": "yt_codec_h264_first",
+            "value": "自動（H.264 優先）"
+        },
+        {
+            "name": "yt_codec_force_h264",
+            "value": "H.264 を強制"
+        },
+        {
+            "name": "yt_codec_av1",
+            "value": "AV1"
+        },
+        {
+            "name": "yt_audio_high",
+            "value": "最高（≈256kbps AAC）"
+        },
+        {
+            "name": "yt_audio_medium",
+            "value": "標準（≈128kbps AAC）"
+        },
+        {
+            "name": "yt_audio_low",
+            "value": "データ節約（≈48kbps）"
+        },
+        {
+            "name": "yt_hwdec_auto",
+            "value": "自動（推奨）"
+        },
+        {
+            "name": "yt_hwdec_auto_safe",
+            "value": "ハードウェアデコードを強制"
+        },
+        {
+            "name": "yt_hwdec_no",
+            "value": "ソフトウェアのみ"
+        },
+        {
+            "name": "yt_recommended_suffix",
+            "value": "（推奨）"
+        },
+        {
+            "name": "yt_unit_seconds",
+            "value": "秒"
+        },
+        {
+            "name": "yt_unit_mb",
+            "value": "MB"
+        },
+        {
+            "name": "yt_placeholder_search",
+            "value": "検索"
+        },
+        {
+            "name": "yt_action_favorite",
+            "value": "お気に入りに追加"
+        },
+        {
+            "name": "yt_action_unfavorite",
+            "value": "お気に入りを解除"
+        },
+        {
+            "name": "yt_action_subscribe",
+            "value": "登録"
+        },
+        {
+            "name": "yt_action_unsubscribe",
+            "value": "登録解除"
+        },
+        {
+            "name": "yt_action_share",
+            "value": "共有"
+        },
+        {
+            "name": "yt_action_retry",
+            "value": "再試行"
+        },
+        {
+            "name": "yt_action_open_browser",
+            "value": "ブラウザで開く"
+        },
+        {
+            "name": "yt_action_show_more",
+            "value": "もっと見る"
+        },
+        {
+            "name": "yt_action_show_less",
+            "value": "折りたたむ"
+        },
+        {
+            "name": "yt_action_cancel",
+            "value": "キャンセル"
+        },
+        {
+            "name": "yt_action_confirm",
+            "value": "OK"
+        },
+        {
+            "name": "yt_action_delete",
+            "value": "削除"
+        },
+        {
+            "name": "yt_action_clear",
+            "value": "クリア"
+        },
+        {
+            "name": "yt_action_view_author",
+            "value": "投稿者を表示"
+        },
+        {
+            "name": "yt_action_clear_all",
+            "value": "すべてクリア"
+        },
+        {
+            "name": "yt_search_youtube",
+            "value": "YouTube 検索"
+        },
+        {
+            "name": "yt_search_youtube_music",
+            "value": "YouTube Music 検索"
+        },
+        {
+            "name": "yt_filter_all",
+            "value": "すべて"
+        },
+        {
+            "name": "yt_filter_videos",
+            "value": "動画"
+        },
+        {
+            "name": "yt_filter_channels",
+            "value": "チャンネル"
+        },
+        {
+            "name": "yt_filter_playlists",
+            "value": "再生リスト"
+        },
+        {
+            "name": "yt_filter_songs",
+            "value": "曲"
+        },
+        {
+            "name": "yt_filter_albums",
+            "value": "アルバム"
+        },
+        {
+            "name": "yt_search_history",
+            "value": "検索履歴"
+        },
+        {
+            "name": "yt_action_clear_search_history",
+            "value": "検索履歴をクリア"
+        },
+        {
+            "name": "yt_empty_no_search_history",
+            "value": "検索履歴はありません"
+        },
+        {
+            "name": "yt_search_no_results",
+            "value": "関連するコンテンツが見つかりませんでした"
+        },
+        {
+            "name": "yt_error_search_failed",
+            "value": "検索に失敗しました。後でもう一度お試しください"
+        },
+        {
+            "name": "yt_dialog_delete_search_record",
+            "value": "検索履歴を削除"
+        },
+        {
+            "name": "yt_confirm_clear_search_history",
+            "value": "すべての検索履歴をクリアしますか？"
+        },
+        {
+            "name": "yt_toast_cleared",
+            "value": "クリアしました"
+        },
+        {
+            "name": "yt_placeholder_search_content",
+            "value": "コンテンツを検索"
+        },
+        {
+            "name": "yt_empty_no_content",
+            "value": "コンテンツはありません"
+        },
+        {
+            "name": "yt_error_invalid_video",
+            "value": "有効な動画情報がありません"
+        },
+        {
+            "name": "yt_dialog_select_quality",
+            "value": "画質を選択"
+        },
+        {
+            "name": "yt_label_video_track",
+            "value": "映像トラック"
+        },
+        {
+            "name": "yt_warn_high_resolution",
+            "value": "この解像度は 1440p を超えています。一部のデバイスでは性能低下や再生のカクつきが発生する場合があります"
+        },
+        {
+            "name": "yt_label_audio_quality",
+            "value": "音質"
+        },
+        {
+            "name": "yt_player_syncing_buffer",
+            "value": "デュアルトラックのバッファを同期中..."
+        },
+        {
+            "name": "yt_error_playback_failed",
+            "value": "再生に失敗しました"
+        },
+        {
+            "name": "yt_error_load_video_info",
+            "value": "動画情報の取得に失敗しました"
+        },
+        {
+            "name": "yt_error_load_video",
+            "value": "動画の読み込みに失敗しました"
+        },
+        {
+            "name": "yt_error_load_exception",
+            "value": "読み込み中にエラーが発生しました"
+        },
+        {
+            "name": "yt_error_unknown",
+            "value": "不明なエラー"
+        },
+        {
+            "name": "yt_error_invalid_video_id",
+            "value": "無効な動画 ID"
+        },
+        {
+            "name": "yt_error_play_error_retry",
+            "value": "再生エラーが発生しました。もう一度お試しください"
+        },
+        {
+            "name": "yt_empty_no_comments",
+            "value": "コメントはありません"
+        },
+        {
+            "name": "yt_label_pinned",
+            "value": "固定"
+        },
+        {
+            "name": "yt_error_load_comments",
+            "value": "コメントの読み込みに失敗しました"
+        },
+        {
+            "name": "yt_label_reply",
+            "value": "返信"
+        },
+        {
+            "name": "yt_error_load_replies",
+            "value": "返信の読み込みに失敗しました"
+        },
+        {
+            "name": "yt_label_like",
+            "value": "高評価"
+        },
+        {
+            "name": "yt_translate_action",
+            "value": "翻訳"
+        },
+        {
+            "name": "yt_show_original",
+            "value": "原文を表示"
+        },
+        {
+            "name": "yt_translating",
+            "value": "翻訳中…"
+        },
+        {
+            "name": "yt_translate_failed",
+            "value": "翻訳に失敗しました。タップして再試行"
+        },
+        {
+            "name": "yt_label_dislike",
+            "value": "低評価"
+        },
+        {
+            "name": "yt_tab_videos",
+            "value": "動画"
+        },
+        {
+            "name": "yt_tab_shorts",
+            "value": "ショート"
+        },
+        {
+            "name": "yt_tab_live",
+            "value": "ライブ"
+        },
+        {
+            "name": "yt_tab_about",
+            "value": "概要"
+        },
+        {
+            "name": "yt_empty_no_videos",
+            "value": "動画はありません"
+        },
+        {
+            "name": "yt_empty_no_shorts",
+            "value": "ショート動画はありません"
+        },
+        {
+            "name": "yt_empty_no_live",
+            "value": "ライブ配信はありません"
+        },
+        {
+            "name": "yt_channel_info",
+            "value": "チャンネル情報"
+        },
+        {
+            "name": "yt_channel_id",
+            "value": "チャンネル ID"
+        },
+        {
+            "name": "yt_channel_subscribers",
+            "value": "登録者数"
+        },
+        {
+            "name": "yt_channel_video_count",
+            "value": "動画数"
+        },
+        {
+            "name": "yt_channel_description",
+            "value": "概要"
+        },
+        {
+            "name": "yt_error_load_user_videos",
+            "value": "ユーザー動画の読み込みに失敗しました"
+        },
+        {
+            "name": "yt_error_load_shorts",
+            "value": "ショート動画の読み込みに失敗しました"
+        },
+        {
+            "name": "yt_error_load_live",
+            "value": "ライブ配信の読み込みに失敗しました"
+        },
+        {
+            "name": "yt_label_user",
+            "value": "ユーザー"
+        },
+        {
+            "name": "yt_local_history",
+            "value": "視聴履歴"
+        },
+        {
+            "name": "yt_dialog_clear_history",
+            "value": "履歴をクリア"
+        },
+        {
+            "name": "yt_confirm_clear_history",
+            "value": "すべての視聴履歴をクリアしますか？"
+        },
+        {
+            "name": "yt_empty_no_history",
+            "value": "視聴履歴はありません"
+        },
+        {
+            "name": "yt_empty_history_hint",
+            "value": "視聴した動画がここに表示されます"
+        },
+        {
+            "name": "yt_time_just_now",
+            "value": "たった今"
+        },
+        {
+            "name": "yt_action_delete_record",
+            "value": "記録を削除"
+        },
+        {
+            "name": "yt_sub_manage_title",
+            "value": "登録中の投稿者"
+        },
+        {
+            "name": "yt_empty_no_subs",
+            "value": "登録中のユーザーはいません"
+        },
+        {
+            "name": "yt_empty_subs_hint",
+            "value": "「登録管理」から追加してください"
+        },
+        {
+            "name": "yt_empty_subs_hint_alt",
+            "value": "検索ページで気になる投稿者を登録しましょう"
+        },
+        {
+            "name": "yt_error_load_subs",
+            "value": "登録の読み込みに失敗しました"
+        },
+        {
+            "name": "yt_fav_videos_title",
+            "value": "お気に入りの動画"
+        },
+        {
+            "name": "yt_fav_playlists_title",
+            "value": "お気に入りの再生リスト"
+        },
+        {
+            "name": "yt_local_playlists_title",
+            "value": "ローカル再生リスト"
+        },
+        {
+            "name": "yt_local_playlists_tag",
+            "value": "ローカル"
+        },
+        {
+            "name": "yt_empty_no_local_playlists",
+            "value": "ローカル再生リストはありません"
+        },
+        {
+            "name": "yt_empty_local_playlists_hint",
+            "value": "再生ページで動画をローカル再生リストに保存できます"
+        },
+        {
+            "name": "yt_empty_no_fav_videos",
+            "value": "お気に入りの動画はありません"
+        },
+        {
+            "name": "yt_empty_no_fav_playlists",
+            "value": "お気に入りの再生リストはありません"
+        },
+        {
+            "name": "yt_empty_fav_playlists_hint",
+            "value": "検索ページで気になる再生リストをお気に入りに追加しましょう"
+        },
+        {
+            "name": "yt_about_current_version",
+            "value": "現在のバージョン"
+        },
+        {
+            "name": "yt_about_description",
+            "value": "HarmonyOS NEXT 向けオープンソース YouTube クライアント\n広告なし · トラッキングなし · 完全にローカルで解析"
+        },
+        {
+            "name": "yt_about_qq_group",
+            "value": "QQ グループ"
+        },
+        {
+            "name": "yt_about_tg_group",
+            "value": "Telegram グループ"
+        },
+        {
+            "name": "yt_about_github_repo",
+            "value": "GitHub リポジトリ"
+        },
+        {
+            "name": "yt_about_project_info",
+            "value": "プロジェクト情報"
+        },
+        {
+            "name": "yt_about_open_source",
+            "value": "使用しているオープンソースプロジェクト"
+        },
+        {
+            "name": "yt_about_ai_models",
+            "value": "開発補助 AI モデル"
+        },
+        {
+            "name": "yt_about_changelog",
+            "value": "更新履歴"
+        },
+        {
+            "name": "yt_about_check_update",
+            "value": "アップデートを確認"
+        },
+        {
+            "name": "yt_about_check_update_subtitle",
+            "value": "GitHub から最新バージョンを取得"
+        },
+        {
+            "name": "yt_update_check_failed",
+            "value": "アップデートの確認に失敗しました。後でもう一度お試しください"
+        },
+        {
+            "name": "yt_update_up_to_date",
+            "value": "最新バージョンです"
+        },
+        {
+            "name": "yt_update_available_title",
+            "value": "新しいバージョンがあります"
+        },
+        {
+            "name": "yt_update_open_appgallery",
+            "value": "AppTest"
+        },
+        {
+            "name": "yt_update_open_github",
+            "value": "GitHub"
+        },
+        {
+            "name": "yt_update_checking",
+            "value": "アップデートを確認中…"
+        },
+        {
+            "name": "yt_update_current_version",
+            "value": "現在のバージョン"
+        },
+        {
+            "name": "yt_update_new_version",
+            "value": "新しいバージョン"
+        },
+        {
+            "name": "yt_update_release_time",
+            "value": "更新日時"
+        },
+        {
+            "name": "yt_error_load_failed",
+            "value": "読み込みに失敗しました"
+        },
+        {
+            "name": "yt_error_play_failed_title",
+            "value": "再生に失敗しました"
+        },
+        {
+            "name": "yt_label_live",
+            "value": "ライブ"
+        },
+        {
+            "name": "yt_label_loading",
+            "value": "読み込み中..."
+        },
+        {
+            "name": "yt_error_load_playlists",
+            "value": "再生リストの読み込みに失敗しました"
+        },
+        {
+            "name": "yt_error_load_channel_info",
+            "value": "チャンネル情報の取得に失敗しました"
+        },
+        {
+            "name": "yt_tab_description",
+            "value": "概要"
+        },
+        {
+            "name": "yt_tab_comments",
+            "value": "コメント"
+        },
+        {
+            "name": "yt_tab_recommended",
+            "value": "おすすめ"
+        },
+        {
+            "name": "yt_home_recommended_error",
+            "value": "おすすめの読み込みに失敗しました。フォールバック済み、または後でもう一度お試しください"
+        },
+        {
+            "name": "yt_home_auth_expired_notice",
+            "value": "ログインの有効期限が切れました。ゲストのおすすめを表示しています。再度ログインしてください"
+        },
+        {
+            "name": "yt_home_kiosk_error",
+            "value": "Kiosk リクエストに失敗しました。後でもう一度お試しください"
+        },
+        {
+            "name": "yt_home_load_error",
+            "value": "ホームの読み込みに失敗しました。後でもう一度お試しください"
+        },
+        {
+            "name": "yt_player_mode_progressive",
+            "value": "プログレッシブ (Progressive)"
+        },
+        {
+            "name": "yt_player_mode_hls",
+            "value": "HLS ストリーム"
+        },
+        {
+            "name": "yt_player_mode_dash_manifest",
+            "value": "DASH ストリーム (Manifest)"
+        },
+        {
+            "name": "yt_player_mode_dash_track",
+            "value": "DASH トラック（映像・音声分離）"
+        },
+        {
+            "name": "yt_player_default",
+            "value": "デフォルト (Default)"
+        },
+        {
+            "name": "yt_player_step1_select_mode",
+            "value": "1. 再生モードを選択"
+        },
+        {
+            "name": "yt_player_step2_select_quality",
+            "value": "2. 画質を選択"
+        },
+        {
+            "name": "yt_player_video_quality",
+            "value": "動画の画質"
+        },
+        {
+            "name": "yt_player_step2_select_manifest",
+            "value": "2. マニフェストを選択"
+        },
+        {
+            "name": "yt_player_step2_select_track",
+            "value": "2. 映像・音声トラックを選択"
+        },
+        {
+            "name": "yt_player_audio_language_type",
+            "value": "音声言語 / タイプ"
+        },
+        {
+            "name": "yt_log_saved_to_downloads",
+            "value": "ダウンロードフォルダに保存しました"
+        },
+        {
+            "name": "yt_error_no_playable_stream",
+            "value": "再生可能なストリームが見つかりません"
+        },
+        {
+            "name": "yt_error_no_supported_stream",
+            "value": "対応する動画ストリームが見つかりません"
+        },
+        {
+            "name": "yt_error_age_restricted",
+            "value": "この動画には年齢制限があります"
+        },
+        {
+            "name": "yt_error_age_restricted_hint",
+            "value": "ブラウザで YouTube アカウントにログインすると視聴できます"
+        },
+        {
+            "name": "yt_error_geo_restricted",
+            "value": "このコンテンツはお住まいの地域では利用できません"
+        },
+        {
+            "name": "yt_error_geo_restricted_hint",
+            "value": "動画の投稿者が再生地域を制限しています"
+        },
+        {
+            "name": "yt_error_paid_content",
+            "value": "この動画は有料コンテンツです"
+        },
+        {
+            "name": "yt_error_paid_content_hint",
+            "value": "視聴には購入またはレンタルが必要です"
+        },
+        {
+            "name": "yt_error_premium_content",
+            "value": "このコンテンツは YouTube Premium メンバー限定です"
+        },
+        {
+            "name": "yt_error_premium_content_hint",
+            "value": "再生には YouTube Premium への登録が必要です"
+        },
+        {
+            "name": "yt_error_private_content",
+            "value": "この動画は非公開です"
+        },
+        {
+            "name": "yt_error_private_content_hint",
+            "value": "許可されたユーザーのみ視聴できます"
+        },
+        {
+            "name": "yt_error_login_required",
+            "value": "視聴にはログインが必要です"
+        },
+        {
+            "name": "yt_error_login_required_hint",
+            "value": "ブラウザで YouTube アカウントにログインしてください"
+        },
+        {
+            "name": "yt_error_account_terminated",
+            "value": "このチャンネルは停止されました"
+        },
+        {
+            "name": "yt_error_account_terminated_hint",
+            "value": "このアカウントは YouTube ポリシー違反により停止されました"
+        },
+        {
+            "name": "yt_error_live_offline",
+            "value": "ライブ配信は終了しました"
+        },
+        {
+            "name": "yt_error_live_offline_hint",
+            "value": "このライブストリームはオフラインか、まだ開始されていません"
+        },
+        {
+            "name": "yt_error_content_not_supported",
+            "value": "このタイプのコンテンツには対応していません"
+        },
+        {
+            "name": "yt_error_content_not_supported_hint",
+            "value": "この動画フォーマットは再生に対応していません"
+        },
+        {
+            "name": "yt_error_network",
+            "value": "ネットワーク接続に失敗しました"
+        },
+        {
+            "name": "yt_error_network_hint",
+            "value": "ネットワーク接続を確認してから再試行してください"
+        },
+        {
+            "name": "yt_error_timeout",
+            "value": "リクエストがタイムアウトしました"
+        },
+        {
+            "name": "yt_error_timeout_hint",
+            "value": "サーバーの応答が遅すぎます。後でもう一度お試しください"
+        },
+        {
+            "name": "yt_error_extraction_failed",
+            "value": "動画情報の解析に失敗しました"
+        },
+        {
+            "name": "yt_error_extraction_failed_hint",
+            "value": "動画の再生データを取得できません"
+        },
+        {
+            "name": "yt_error_cipher_failed",
+            "value": "動画ストリームの復号に失敗しました"
+        },
+        {
+            "name": "yt_error_cipher_failed_hint",
+            "value": "署名アルゴリズムが更新されました。アプリの更新をお待ちください"
+        },
+        {
+            "name": "new_app_name",
+            "value": "YourPipe"
+        },
+        {
+            "name": "yt_empty_no_playlists",
+            "value": "再生リストはありません"
+        },
+        {
+            "name": "yt_search_results_from",
+            "value": "\"%s\" の検索結果"
+        },
+        {
+            "name": "yt_option_group_recovery",
+            "value": "復元"
+        },
+        {
+            "name": "yt_option_reset_settings",
+            "value": "すべての設定をリセット"
+        },
+        {
+            "name": "yt_option_reset_settings_subtitle",
+            "value": "デフォルト設定に戻す"
+        },
+        {
+            "name": "yt_option_clear_all_data",
+            "value": "アプリの全データを消去"
+        },
+        {
+            "name": "yt_option_clear_all_data_subtitle",
+            "value": "履歴・キャッシュなどすべてのデータを消去"
+        },
+        {
+            "name": "yt_toast_reset_settings_done",
+            "value": "デフォルト設定に戻しました"
+        },
+        {
+            "name": "yt_toast_clear_all_data_done",
+            "value": "すべてのデータを消去しました"
+        },
+        {
+            "name": "yt_option_recovery",
+            "value": "復元"
+        },
+        {
+            "name": "yt_confirm_reset_settings",
+            "value": "すべての設定をデフォルトに戻しますか？この操作は元に戻せません。"
+        },
+        {
+            "name": "yt_confirm_clear_all_data",
+            "value": "アプリの全データを消去しますか？すべての履歴、お気に入り、登録、設定が削除され、元に戻せません。"
+        },
+        {
+            "name": "yt_setting_stream_buffer",
+            "value": "TCP ストリームバッファサイズ"
+        },
+        {
+            "name": "yt_setting_seek_keyframe",
+            "value": "高速シーク（キーフレーム）"
+        },
+        {
+            "name": "yt_setting_seek_keyframe_subtitle",
+            "value": "最寄りのキーフレームへジャンプして応答を高速化"
+        },
+        {
+            "name": "yt_action_download",
+            "value": "ダウンロード"
+        },
+        {
+            "name": "yt_download_title",
+            "value": "動画をダウンロード"
+        },
+        {
+            "name": "yt_download_step1_mode",
+            "value": "ステップ 1: ダウンロードモードを選択"
+        },
+        {
+            "name": "yt_download_step2_quality",
+            "value": "ステップ 2: 画質を選択"
+        },
+        {
+            "name": "yt_download_step2_tracks",
+            "value": "ステップ 2: トラックを選択"
+        },
+        {
+            "name": "yt_download_mode_progressive",
+            "value": "統合ストリーム (Progressive)"
+        },
+        {
+            "name": "yt_download_mode_dash",
+            "value": "分離トラック (DASH)"
+        },
+        {
+            "name": "yt_download_mode_hls",
+            "value": "HLS ストリーム"
+        },
+        {
+            "name": "yt_download_mode_sabr",
+            "value": "SABR トラック"
+        },
+        {
+            "name": "yt_download_progressive_hint",
+            "value": "推奨：映像と音声が統合済みで追加処理は不要"
+        },
+        {
+            "name": "yt_download_dash_hint",
+            "value": "映像と音声を別々にダウンロードして自動で結合"
+        },
+        {
+            "name": "yt_download_sabr_hint",
+            "value": "SABR/UMP セッションでセグメント単位に映像・音声を取得し自動結合（再生と同じ経路）"
+        },
+        {
+            "name": "yt_download_estimated_size",
+            "value": "推定サイズ"
+        },
+        {
+            "name": "yt_download_empty",
+            "value": "ダウンロードタスクはありません"
+        },
+        {
+            "name": "yt_download_empty_hint",
+            "value": "動画ページのダウンロードボタンから開始できます"
+        },
+        {
+            "name": "yt_label_progressive",
+            "value": "統合ストリームの画質"
+        },
+        {
+            "name": "yt_label_premium",
+            "value": "有料"
+        },
+        {
+            "name": "yt_label_members_only",
+            "value": "メンバー限定"
+        },
+        {
+            "name": "yt_option_data_account",
+            "value": "データとアカウント"
+        },
+        {
+            "name": "yt_option_data_account_subtitle",
+            "value": "ログインとローカルデータ"
+        },
+        {
+            "name": "yt_section_account",
+            "value": "アカウント"
+        },
+        {
+            "name": "yt_section_data_management",
+            "value": "データ管理"
+        },
+        {
+            "name": "yt_option_google_login",
+            "value": "Google ログイン"
+        },
+        {
+            "name": "yt_option_export_data",
+            "value": "データをエクスポート"
+        },
+        {
+            "name": "yt_option_export_data_subtitle",
+            "value": "ローカルデータを JSON でバックアップ"
+        },
+        {
+            "name": "yt_option_restore_data",
+            "value": "データを復元"
+        },
+        {
+            "name": "yt_option_restore_data_subtitle",
+            "value": "JSON からデータを復元"
+        },
+        {
+            "name": "yt_backup_item_settings",
+            "value": "アプリ設定"
+        },
+        {
+            "name": "yt_backup_item_subscriptions",
+            "value": "登録チャンネル"
+        },
+        {
+            "name": "yt_backup_item_favorites",
+            "value": "お気に入りの動画"
+        },
+        {
+            "name": "yt_backup_item_playlists",
+            "value": "お気に入りの再生リスト"
+        },
+        {
+            "name": "yt_backup_item_local_queues",
+            "value": "ローカル再生リスト"
+        },
+        {
+            "name": "yt_backup_item_watch_history",
+            "value": "視聴履歴"
+        },
+        {
+            "name": "yt_backup_item_search_history",
+            "value": "検索履歴"
+        },
+        {
+            "name": "yt_backup_item_auth",
+            "value": "YouTube ログイン状態"
+        },
+        {
+            "name": "yt_backup_export_title",
+            "value": "エクスポートする項目を選択"
+        },
+        {
+            "name": "yt_backup_restore_title",
+            "value": "復元する項目を選択"
+        },
+        {
+            "name": "yt_backup_confirm_restore",
+            "value": "復元すると選択したローカルデータが上書きされます。続行しますか？"
+        },
+        {
+            "name": "yt_backup_export_success",
+            "value": "エクスポートに成功しました"
+        },
+        {
+            "name": "yt_backup_export_failed",
+            "value": "エクスポートに失敗しました"
+        },
+        {
+            "name": "yt_backup_restore_success",
+            "value": "復元に成功しました"
+        },
+        {
+            "name": "yt_backup_restore_failed",
+            "value": "復元に失敗しました"
+        },
+        {
+            "name": "yt_backup_version_unsupported",
+            "value": "サポートされていないバックアップファイルのバージョンです"
+        },
+        {
+            "name": "yt_setting_home_feed_after_login",
+            "value": "ログイン後のホーム画面"
+        },
+        {
+            "name": "yt_home_feed_recommended",
+            "value": "おすすめ"
+        },
+        {
+            "name": "yt_home_feed_kiosk",
+            "value": "ライブ"
+        },
+        {
+            "name": "yt_option_sync_library_on_launch",
+            "value": "起動時にユーザーデータを同期"
+        },
+        {
+            "name": "yt_option_sync_library_on_launch_subtitle",
+            "value": "起動時にクラウドの履歴と登録を取得"
+        },
+        {
+            "name": "yt_option_auth_session",
+            "value": "ログイン状態で閲覧"
+        },
+        {
+            "name": "yt_option_sign_out",
+            "value": "ログアウト"
+        },
+        {
+            "name": "yt_option_sign_out_subtitle",
+            "value": "ログイン情報を消去"
+        },
+        {
+            "name": "yt_confirm_sign_out",
+            "value": "ログアウトしますか？保存済みのログイン情報が消去されます。"
+        },
+        {
+            "name": "yt_action_audio_only",
+            "value": "音声のみ"
+        },
+        {
+            "name": "yt_action_audio_only_play",
+            "value": "音声のみ再生"
+        },
+        {
+            "name": "yt_player_subtitle_off",
+            "value": "字幕をオフ"
+        },
+        {
+            "name": "yt_player_chapters",
+            "value": "チャプター"
+        },
+        {
+            "name": "yt_log_count_format",
+            "value": "%d 件のログ"
+        },
+        {
+            "name": "yt_log_regex_placeholder",
+            "value": "正規表現で絞り込み（例： DownloadManager|Task .*failed）"
+        },
+        {
+            "name": "yt_label_current",
+            "value": "現在"
+        },
+        {
+            "name": "yt_label_autoplay",
+            "value": "自動再生"
+        },
+        {
+            "name": "yt_download_hls_hint",
+            "value": "HLS ストリームは元のセグメント形式でダウンロードされ、1 つのファイルに結合されます"
+        },
+        {
+            "name": "yt_video_count_format",
+            "value": "%d 本の動画"
+        },
+        {
+            "name": "yt_playlist_name_placeholder",
+            "value": "再生リスト名"
+        },
+        {
+            "name": "yt_action_create",
+            "value": "作成"
+        },
+        {
+            "name": "yt_action_new_playlist",
+            "value": "新しい再生リスト"
+        },
+        {
+            "name": "yt_action_save_to_playlist",
+            "value": "再生リストに保存"
+        },
+        {
+            "name": "yt_comments_count_format",
+            "value": "コメント（%d）"
+        },
+        {
+            "name": "yt_replies_count_format",
+            "value": "%d 件の返信"
+        },
+        {
+            "name": "yt_error_no_downloadable_stream",
+            "value": "ダウンロード可能なメディアストリームがありません"
+        },
+        {
+            "name": "yt_action_sleep_timer",
+            "value": "スリープタイマー"
+        },
+        {
+            "name": "yt_stream_info_title",
+            "value": "ストリーム情報"
+        },
+        {
+            "name": "yt_stream_stats_title",
+            "value": "再生統計"
+        },
+        {
+            "name": "yt_stats_video_id",
+            "value": "動画 ID"
+        },
+        {
+            "name": "yt_stats_conn_speed",
+            "value": "接続速度"
+        },
+        {
+            "name": "yt_stats_buffer",
+            "value": "バッファ長"
+        },
+        {
+            "name": "yt_stats_dropped",
+            "value": "ドロップフレーム"
+        },
+        {
+            "name": "yt_stream_container",
+            "value": "コンテナ形式"
+        },
+        {
+            "name": "yt_stream_media_title",
+            "value": "メディアタイトル"
+        },
+        {
+            "name": "yt_stream_duration",
+            "value": "再生時間"
+        },
+        {
+            "name": "yt_stream_file_size",
+            "value": "ファイルサイズ"
+        },
+        {
+            "name": "yt_stream_video",
+            "value": "映像"
+        },
+        {
+            "name": "yt_stream_audio",
+            "value": "音声"
+        },
+        {
+            "name": "yt_stream_resolution",
+            "value": "解像度"
+        },
+        {
+            "name": "yt_stream_codec",
+            "value": "コーデック"
+        },
+        {
+            "name": "yt_stream_bitrate",
+            "value": "ビットレート"
+        },
+        {
+            "name": "yt_stream_frame_rate",
+            "value": "フレームレート"
+        },
+        {
+            "name": "yt_stream_channels",
+            "value": "チャンネル"
+        },
+        {
+            "name": "yt_stream_sample_rate",
+            "value": "サンプリングレート"
+        },
+        {
+            "name": "yt_stream_loading",
+            "value": "ストリーム情報を取得中…"
+        },
+        {
+            "name": "yt_sub_sync_sign_in_first",
+            "value": "登録リストを同期するには先にログインしてください"
+        },
+        {
+            "name": "yt_sub_sync_cloud_empty",
+            "value": "クラウドの登録リストは空です"
+        },
+        {
+            "name": "yt_sub_sync_result_added",
+            "value": "%d 件の登録を同期、%d 件を追加"
+        },
+        {
+            "name": "yt_sub_sync_result",
+            "value": "%d 件の登録を同期しました"
+        },
+        {
+            "name": "yt_sub_sync_failed",
+            "value": "登録リストの同期に失敗しました"
+        },
+        {
+            "name": "yt_refresh_failed",
+            "value": "更新に失敗しました"
+        },
+        {
+            "name": "yt_sub_pull_to_sync",
+            "value": "引き下げて YouTube の登録リストを同期"
+        },
+        {
+            "name": "yt_sub_signed_in_pull_hint",
+            "value": "ログイン済み。引き下げて YouTube の登録を同期できます"
+        },
+        {
+            "name": "yt_auth_subtitle_sign_in",
+            "value": "ログインしてパーソナライズされたおすすめを表示"
+        },
+        {
+            "name": "yt_auth_subtitle_cookie_active",
+            "value": "ログイン済み (Cookie)"
+        },
+        {
+            "name": "yt_auth_subtitle_active",
+            "value": "ログイン済み"
+        },
+        {
+            "name": "yt_auth_subtitle_incognito",
+            "value": "ログイン保存済み · シークレット"
+        },
+        {
+            "name": "yt_auth_notice_title",
+            "value": "ログインについて"
+        },
+        {
+            "name": "yt_auth_notice_message",
+            "value": "YouTube へのログインへようこそ。アカウントのコンテンツへの限定的なアクセスを提供し、一部のネットワーク環境で匿名モードが利用できない問題を効果的に緩和できます。追加のネットワーク通信が発生しますのでご了承ください :)"
+        },
+        {
+            "name": "yt_auth_continue_sign_in",
+            "value": "ログインを続行"
+        },
+        {
+            "name": "yt_cookie_collapse",
+            "value": "Cookie ログインを閉じる"
+        },
+        {
+            "name": "yt_cookie_sign_in",
+            "value": "Cookie ログイン"
+        },
+        {
+            "name": "yt_cookie_import_subtitle",
+            "value": "ブラウザの Cookie を貼り付け"
+        },
+        {
+            "name": "yt_cookie_import_help",
+            "value": "header 形式（SID=...; SAPISID=...）または EditThisCookie / Cookie-Editor でエクスポートした JSON に対応。SID と SAPISID / __Secure-3PAPISID が必要です。"
+        },
+        {
+            "name": "yt_cookie_import_placeholder",
+            "value": "SID=...; SAPISID=... または Cookie JSON"
+        },
+        {
+            "name": "yt_cookie_verifying",
+            "value": "Cookie を検証中…"
+        },
+        {
+            "name": "yt_cookie_import_confirm",
+            "value": "インポートして検証"
+        },
+        {
+            "name": "yt_cookie_verify_history",
+            "value": "オンライン検証に成功（履歴 %d 件）"
+        },
+        {
+            "name": "yt_cookie_verify_empty_history",
+            "value": "オンライン検証に成功（アカウントの履歴は空ですが認証に成功）"
+        },
+        {
+            "name": "yt_cookie_session_inactive",
+            "value": "セッションが有効ではありません。再度インポートしてください"
+        },
+        {
+            "name": "yt_cookie_verify_failed",
+            "value": "オンライン検証に失敗：%s"
+        },
+        {
+            "name": "yt_cookie_input_required",
+            "value": "Cookie 文字列を貼り付けてください"
+        },
+        {
+            "name": "yt_cookie_parse_failed",
+            "value": "Cookie を解析できません（header または EditThisCookie JSON に対応）"
+        },
+        {
+            "name": "yt_cookie_sid_missing",
+            "value": "ローカル検証に失敗：SID / SAPISID が見つかりません"
+        },
+        {
+            "name": "yt_cookie_sapisid_missing",
+            "value": "ローカル検証に失敗：SAPISID（または __Secure-3PAPISID）がありません"
+        },
+        {
+            "name": "yt_auth_module_unavailable",
+            "value": "認証モジュールが初期化されていません"
+        },
+        {
+            "name": "yt_cookie_local_validating",
+            "value": "ローカル形式の検証に成功。YouTube で検証中…"
+        },
+        {
+            "name": "yt_google_web_sign_in_subtitle",
+            "value": "ウェブで YouTube にログイン"
+        },
+        {
+            "name": "yt_google_web_sign_in_title",
+            "value": "YouTube ログイン"
+        },
+        {
+            "name": "yt_label_unknown",
+            "value": "不明"
+        },
+        {
+            "name": "yt_label_untitled",
+            "value": "無題"
+        },
+        {
+            "name": "yt_option_preferences",
+            "value": "環境設定"
+        },
+        {
+            "name": "yt_appearance_theme_color",
+            "value": "テーマカラー"
+        },
+        {
+            "name": "yt_playback_pip",
+            "value": "ピクチャーインピクチャー"
+        },
+        {
+            "name": "yt_playback_pip_on_return",
+            "value": "戻る操作でピクチャーインピクチャーへ"
+        },
+        {
+            "name": "yt_playback_pip_on_return_subtitle",
+            "value": "戻る/Home 操作で自動的にピクチャーインピクチャーへ"
+        },
+        {
+            "name": "yt_playback_player",
+            "value": "プレーヤー"
+        },
+        {
+            "name": "yt_playback_gestures",
+            "value": "再生ジェスチャー"
+        },
+        {
+            "name": "yt_playback_gesture_seek",
+            "value": "スワイプで再生位置を調整"
+        },
+        {
+            "name": "yt_playback_gesture_seek_subtitle",
+            "value": "画面を横にスワイプしてシーク"
+        },
+        {
+            "name": "yt_playback_gesture_brightness",
+            "value": "左側スワイプで輝度を調整"
+        },
+        {
+            "name": "yt_playback_gesture_brightness_subtitle",
+            "value": "画面左側を上下にスワイプして輝度を調整"
+        },
+        {
+            "name": "yt_playback_gesture_volume",
+            "value": "右側スワイプで音量を調整"
+        },
+        {
+            "name": "yt_playback_gesture_volume_subtitle",
+            "value": "画面右側を上下にスワイプして音量を調整"
+        },
+        {
+            "name": "yt_playback_hold_speed",
+            "value": "長押しで倍速再生"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "画面を押している間、一時的に倍速再生"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "長押し時の倍速"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "長押しの反応遅延"
+        },
+        {
+            "name": "yt_playback_background_audio_only",
+            "value": "バックグラウンドで音声のみ"
+        },
+        {
+            "name": "yt_playback_background_audio_only_subtitle",
+            "value": "バックグラウンドで映像デコードを停止して消費電力を削減"
+        },
+        {
+            "name": "yt_playback_auto_play_next",
+            "value": "次の動画を自動再生"
+        },
+        {
+            "name": "yt_playback_auto_play_next_subtitle",
+            "value": "起動時のキュー自動再生のデフォルト値として使用"
+        },
+        {
+            "name": "yt_playback_video_off_delay",
+            "value": "映像オフまでの遅延"
+        },
+        {
+            "name": "yt_playback_hwdec",
+            "value": "ハードウェアデコード"
+        },
+        {
+            "name": "yt_playback_hwdec_subtitle",
+            "value": "ハードウェアアクセラレーションで消費電力を削減"
+        },
+        {
+            "name": "yt_playback_gpu_rendering",
+            "value": "GPU レンダリング"
+        },
+        {
+            "name": "yt_playback_stream_endpoint",
+            "value": "再生エンドポイント"
+        },
+        {
+            "name": "yt_playback_guest_player_client",
+            "value": "ゲスト再生エンドポイント"
+        },
+        {
+            "name": "yt_playback_auth_player_client",
+            "value": "ログイン時の再生エンドポイント"
+        },
+        {
+            "name": "yt_setting_client_visionos",
+            "value": "VisionOS"
+        },
+        {
+            "name": "yt_setting_client_tv_downgraded",
+            "value": "TV Downgraded"
+        },
+        {
+            "name": "yt_setting_client_mweb",
+            "value": "MWEB (SABR)"
+        },
+        {
+            "name": "yt_playback_buffer_network",
+            "value": "バッファとネットワーク"
+        },
+        {
+            "name": "yt_playback_memory_cache",
+            "value": "メモリキャッシュ"
+        },
+        {
+            "name": "yt_playback_readahead",
+            "value": "先読みバッファ"
+        },
+        {
+            "name": "yt_playback_buffer_size",
+            "value": "バッファサイズ"
+        },
+        {
+            "name": "yt_download_concurrent_tasks",
+            "value": "同時ダウンロード数"
+        },
+        {
+            "name": "yt_toast_login_success",
+            "value": "ログインしました"
+        },
+        {
+            "name": "yt_login_extracting_auth",
+            "value": "ログインしました。認証情報を抽出中…"
+        },
+        {
+            "name": "yt_login_skip_pot",
+            "value": "スキップ（PoToken を抽出しない）"
+        },
+        {
+            "name": "yt_confirm_delete_search_item",
+            "value": "「%s」を削除しますか？"
+        },
+        {
+            "name": "yt_download_saved_to_downloads",
+            "value": "ダウンロードフォルダに保存しました"
+        },
+        {
+            "name": "yt_download_save_failed",
+            "value": "保存に失敗しました"
+        },
+        {
+            "name": "yt_date_today",
+            "value": "今日"
+        },
+        {
+            "name": "yt_date_days_ago",
+            "value": "%d 日前"
+        },
+        {
+            "name": "yt_date_weeks_ago",
+            "value": "%d 週間前"
+        },
+        {
+            "name": "yt_date_months_ago",
+            "value": "%d か月前"
+        },
+        {
+            "name": "yt_date_years_ago",
+            "value": "%d 年前"
+        },
+        {
+            "name": "yt_download_status_waiting",
+            "value": "待機中"
+        },
+        {
+            "name": "yt_download_status_video",
+            "value": "動画をダウンロード中"
+        },
+        {
+            "name": "yt_download_status_audio",
+            "value": "音声をダウンロード中"
+        },
+        {
+            "name": "yt_download_status_merging",
+            "value": "結合中"
+        },
+        {
+            "name": "yt_download_status_completed",
+            "value": "完了"
+        },
+        {
+            "name": "yt_download_status_failed",
+            "value": "ダウンロード失敗"
+        },
+        {
+            "name": "yt_download_status_cancelled",
+            "value": "キャンセル済み"
+        },
+        {
+            "name": "yt_download_started_format",
+            "value": "ダウンロード開始：%s"
+        },
+        {
+            "name": "yt_download_saved_format",
+            "value": "ダウンロードフォルダに保存：%s"
+        },
+        {
+            "name": "yt_download_completed_format",
+            "value": "ダウンロード完了：%s"
+        },
+        {
+            "name": "yt_toast_copied",
+            "value": "コピーしました"
+        },
+        {
+            "name": "yt_toast_copy_failed",
+            "value": "コピーに失敗しました"
+        },
+        {
+            "name": "yt_about_package_name",
+            "value": "パッケージ名"
+        },
+        {
+            "name": "yt_follow_system",
+            "value": "システムに従う"
+        },
+        {
+            "name": "yt_data_account_manage_sign_in",
+            "value": "データとログイン状態を管理"
+        },
+        {
+            "name": "yt_data_account_incognito",
+            "value": "ログイン保存済み · シークレットモード"
+        },
+        {
+            "name": "yt_data_account_cookie",
+            "value": "ログイン済み（Cookie）· データとアカウントを管理"
+        },
+        {
+            "name": "yt_data_account_signed_in",
+            "value": "ログイン済み · データとアカウントを管理"
+        },
+        {
+            "name": "yt_layout_card_mode",
+            "value": "カードモード"
+        },
+        {
+            "name": "yt_layout_list_mode",
+            "value": "リストモード"
+        },
+        {
+            "name": "yt_pip_playing",
+            "value": "ピクチャーインピクチャーで再生中"
+        },
+        {
+            "name": "yt_pip_restore_hint",
+            "value": "ピクチャーインピクチャーウィンドウをタップして復元"
+        },
+        {
+            "name": "yt_google_web_sign_in",
+            "value": "Google アカウントでログイン"
+        },
+        {
+            "name": "yt_login_sapisid_failed",
+            "value": "SAPISID を取得できませんでした。もう一度お試しください"
+        },
+        {
+            "name": "yt_time_minutes_ago",
+            "value": "%d 分前"
+        },
+        {
+            "name": "yt_time_hours_ago",
+            "value": "%d 時間前"
+        },
+        {
+            "name": "yt_history_sync_sign_in",
+            "value": "クラウド履歴を同期するには先にログインしてください"
+        },
+        {
+            "name": "yt_history_sync_success",
+            "value": "クラウド履歴を %d 件同期しました（ローカルの進捗と日時は保持）"
+        },
+        {
+            "name": "yt_history_sync_empty",
+            "value": "クラウド履歴は空です"
+        },
+        {
+            "name": "yt_history_sync_failed",
+            "value": "クラウド履歴の同期に失敗しました"
+        },
+        {
+            "name": "yt_sub_feed_youtube",
+            "value": "YouTube 登録フィード"
+        },
+        {
+            "name": "yt_sub_feed_title",
+            "value": "登録フィード"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "登録フィード"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "%d 件の登録チャンネル"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "%d 本の新着動画"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "引き下げて登録チャンネルの最新動画を取得"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "登録フィードのキャッシュ"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "登録フィード高速モード (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "軽量な RSS で取得。リクエストは少ないが情報は不完全"
+        },
+        {
+            "name": "yt_backup_error_no_context",
+            "value": "アプリのコンテキストを取得できません"
+        },
+        {
+            "name": "yt_backup_error_no_save_path",
+            "value": "保存先が選択されていません"
+        },
+        {
+            "name": "yt_backup_error_no_file",
+            "value": "ファイルが選択されていません"
+        },
+        {
+            "name": "yt_backup_error_format",
+            "value": "バックアップファイルの形式エラー"
+        },
+        {
+            "name": "yt_backup_error_wrong_app",
+            "value": "このアプリのバックアップファイルではありません"
+        },
+        {
+            "name": "yt_backup_error_version",
+            "value": "サポートされていないバックアップファイルのバージョンです"
+        },
+        {
+            "name": "yt_backup_error_empty",
+            "value": "バックアップファイルが空です"
+        },
+        {
+            "name": "yt_backup_error_restore",
+            "value": "復元に失敗しました"
+        },
+        {
+            "name": "yt_backup_error_export",
+            "value": "エクスポートに失敗しました"
+        },
+        {
+            "name": "yt_subscriptions_feed_local",
+            "value": "ローカル登録 RSS"
+        },
+        {
+            "name": "yt_playlist_video_count",
+            "value": "%d 本の動画"
+        },
+        {
+            "name": "yt_history_sync_pull_hint",
+            "value": "引き下げて YouTube の視聴履歴を同期"
+        },
+        {
+            "name": "yt_history_sync_sign_in_hint",
+            "value": "ログインするとクラウド履歴の同期を有効化"
+        },
+        {
+            "name": "yt_history_sync_signed_in_hint",
+            "value": "ログイン済み。引き下げてクラウド履歴を同期できます"
+        },
+        {
+            "name": "yt_subs_sync_signed_in_hint",
+            "value": "ログイン済み。引き下げて YouTube の登録を同期できます"
+        },
+        {
+            "name": "yt_setting_delay_immediate",
+            "value": "即時"
+        },
+        {
+            "name": "yt_setting_gpu_auto",
+            "value": "自動"
+        },
+        {
+            "name": "yt_label_opengl",
+            "value": "OpenGL"
+        },
+        {
+            "name": "yt_label_vulkan",
+            "value": "Vulkan"
+        },
+        {
+            "name": "yt_about_oss_newpipe_desc",
+            "value": "オープンソースの Android 向け YouTube クライアント。動画の閲覧・検索・ストリーム抽出の参考実装"
+        },
+        {
+            "name": "yt_about_oss_iplay_desc",
+            "value": "クロスプラットフォームのメディアプレーヤー。Emby、Jellyfin、複数サイトの切り替え、カスタム再生に対応"
+        },
+        {
+            "name": "yt_about_oss_ytdlp_desc",
+            "value": "高機能なコマンドライン音声・動画ダウンローダー。数千のサイトとフォーマットに対応"
+        },
+        {
+            "name": "yt_about_oss_finvideo_desc",
+            "value": "HarmonyOS NEXT 向け Jellyfin / Emby / Plex 動画プレーヤー"
+        },
+        {
+            "name": "yt_about_oss_hmsamples_desc",
+            "value": "ファーウェイ開発者向け長編動画再生・AVPlayer などの HarmonyOS 参考サンプル"
+        },
+        {
+            "name": "yt_about_license_reference",
+            "value": "リファレンス"
+        },
+        {
+            "name": "yt_changelog_0_5_3_1",
+            "value": "YouTube SABR/UMP ストリーミングに対応し、新フォーマット・高解像度・制限付き動画の互換性を向上"
+        },
+        {
+            "name": "yt_changelog_0_5_3_2",
+            "value": "動画抽出とクライアント選択を再構築し、PipePipe のリクエスト動作に準拠。リモート署名復号を復元し、重複抽出と起動待機を削減"
+        },
+        {
+            "name": "yt_changelog_0_5_3_3",
+            "value": "ローカル DASH メディアプロキシを改善：映像・音声トラック分離、セグメントキャッシュ、精密シーク、ストリーム切断復帰、再生終了処理"
+        },
+        {
+            "name": "yt_changelog_0_5_3_4",
+            "value": "SABR PoToken に対応。署名パラメータ・リクエストヘッダー・バイナリ応答処理を最適化し、403 / 再生不可 / 読み込み失敗を削減"
+        },
+        {
+            "name": "yt_changelog_0_5_3_5",
+            "value": "プレーヤー状態同期と画質・音声トラック切替を改善。再生後の無限読み込み、シークずれ、音声トラックメニューの問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_3_6",
+            "value": "再生リスト解析とページネーションを強化。新しいリスト構造・ロックされたコンテンツ・continuation に対応。リスト読み込みと連続再生を改善"
+        },
+        {
+            "name": "yt_changelog_0_5_3_7",
+            "value": "アカウントとデータ管理の入口を再編。ログイン状態・視聴履歴・ローカルページ・ダウンロードオプション・再生設定の連携を改善"
+        },
+        {
+            "name": "yt_changelog_0_5_3_8",
+            "value": "ホームのおすすめ、動画カード、テーマカラー、ピクチャーインピクチャー、システムメディアセッションを改善。複数の UI と再生の安定性問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_2_1",
+            "value": "プレーヤーページに音声のみモードを追加：映像をオフにして音声を再生。カバー画像に置き換わり、進捗と操作は引き続き利用可能"
+        },
+        {
+            "name": "yt_changelog_0_5_2_2",
+            "value": "音声のみモードではピクチャーインピクチャーなし。フォアグラウンド復帰後も音声のみを維持し、手動での再開が必要"
+        },
+        {
+            "name": "yt_changelog_0_5_2_3",
+            "value": "バックグラウンドで映像オフを遅延させて省電力化（再生設定で調整可能）"
+        },
+        {
+            "name": "yt_changelog_0_5_2_4",
+            "value": "システム割り込み時の音量低減（duck）を修正し、二重圧縮による無音を回避"
+        },
+        {
+            "name": "yt_changelog_0_5_2_5",
+            "value": "横向き・縦向き・全画面・ウィンドウ再生をより滑らかにし、黒画面とブラーを低減"
+        },
+        {
+            "name": "yt_changelog_0_5_2_6",
+            "value": "ログイン後のホーム画面がアカウント状態により適合。クラウドの視聴履歴と登録を同期可能"
+        },
+        {
+            "name": "yt_changelog_0_5_2_7",
+            "value": "動画カード、ライブバッジ、ページのセーフエリア表示をより明確に"
+        },
+        {
+            "name": "yt_changelog_0_5_2_8",
+            "value": "アプリの引き継ぎとタップによる動画リンク共有に対応"
+        },
+        {
+            "name": "yt_changelog_0_5_1_1",
+            "value": "既知の不具合を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_1_2",
+            "value": "PipePipe の issue に準拠"
+        },
+        {
+            "name": "yt_changelog_0_5_1_3",
+            "value": "ログイン後に視聴できない問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_1_4",
+            "value": "横向きで情報バーが誤って表示される問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_1_5",
+            "value": "設定ページの UI を最適化"
+        },
+        {
+            "name": "yt_changelog_0_5_1_6",
+            "value": "ローカル復号ロジックの検証を完了し、デプロイ可能に"
+        },
+        {
+            "name": "yt_changelog_0_5_0_1",
+            "value": "システム再生エンジンとサードパーティ FFMpeg を MPVPlayer に置き換え"
+        },
+        {
+            "name": "yt_changelog_0_5_0_2",
+            "value": "高解像度再生と字幕機能を復元"
+        },
+        {
+            "name": "yt_changelog_0_5_0_3",
+            "value": "HEVC/H.264 ハードウェアデコードに対応。API 23 以降では VP9/AV1 ハードウェアデコードを試行"
+        },
+        {
+            "name": "yt_changelog_0_5_0_4",
+            "value": "真の HDR 表示を追加"
+        },
+        {
+            "name": "yt_changelog_0_5_0_5",
+            "value": "非ログイン状態でのネットワーク転送ライブラリの能力を最適化"
+        },
+        {
+            "name": "yt_changelog_0_5_0_6",
+            "value": "エラー表示を最適化"
+        },
+        {
+            "name": "yt_changelog_0_5_0_7",
+            "value": "UI と設定項目を最適化"
+        },
+        {
+            "name": "yt_changelog_0_5_0_8",
+            "value": "PipePipe 最新版のパッチを適用"
+        },
+        {
+            "name": "yt_changelog_0_4_1_1",
+            "value": "動画の読み込み速度を最適化"
+        },
+        {
+            "name": "yt_changelog_0_4_1_2",
+            "value": "PipePipe 5.1.1 のパッチを適用"
+        },
+        {
+            "name": "yt_changelog_0_4_1_3",
+            "value": "Google ログインを許可し、ボット対策の問題をほぼ解消"
+        },
+        {
+            "name": "yt_changelog_0_4_1_4",
+            "value": "各種デバイスの全画面操作を最適化"
+        },
+        {
+            "name": "yt_changelog_0_4_1_5",
+            "value": "プレーヤーページの複数モジュールを開発"
+        },
+        {
+            "name": "yt_changelog_0_4_1_6",
+            "value": "ダウンロード機能の初期版を完成"
+        },
+        {
+            "name": "yt_changelog_0_4_1_7",
+            "value": "再生リスト機能を完成"
+        },
+        {
+            "name": "yt_changelog_0_4_1_8",
+            "value": "システムとキャストの入口を統合し、アプリ引き継ぎを試験導入"
+        },
+        {
+            "name": "yt_changelog_0_4_0_1",
+            "value": "yt-dlp エコシステムの解析と統合インターフェースをほぼ完成"
+        },
+        {
+            "name": "yt_changelog_0_4_0_2",
+            "value": "Google ログインを許可し、ボット対策の問題をほぼ解消"
+        },
+        {
+            "name": "yt_changelog_0_4_0_3",
+            "value": "再生メカニズムを最適化"
+        },
+        {
+            "name": "yt_changelog_0_4_0_4",
+            "value": "ローカル復号の代わりにクラウド復号を使用し、より安定に"
+        },
+        {
+            "name": "yt_changelog_0_3_1_1",
+            "value": "ページスタックとミニウィンドウ再生を改善"
+        },
+        {
+            "name": "yt_changelog_0_3_1_2",
+            "value": "サーバーキャッシュを追加し、再生をより滑らかに"
+        },
+        {
+            "name": "yt_changelog_0_3_1_3",
+            "value": "UI と操作を最適化"
+        },
+        {
+            "name": "yt_changelog_0_3_1_4",
+            "value": "より多くのページとサイズに適応"
+        },
+        {
+            "name": "yt_changelog_0_3_1_5",
+            "value": "既存コードを引き続き簡素化してバグを防止"
+        },
+        {
+            "name": "yt_changelog_0_3_1_6",
+            "value": "Google ログインの初期開発。PipePipe ログインの実現可能性を検証"
+        },
+        {
+            "name": "yt_changelog_0_3_1_7",
+            "value": "バックグラウンド再生の安定性を最適化"
+        },
+        {
+            "name": "yt_changelog_0_3_0_1",
+            "value": "リレー HTTP サーバー方式を最終的な実験候補として選定"
+        },
+        {
+            "name": "yt_changelog_0_3_0_2",
+            "value": "システムレベルのプレーヤーに戻し、ライフサイクルを改善"
+        },
+        {
+            "name": "yt_changelog_0_3_0_3",
+            "value": "UI と操作を最適化"
+        },
+        {
+            "name": "yt_changelog_0_3_0_4",
+            "value": "より多くのページとサイズに適応"
+        },
+        {
+            "name": "yt_changelog_0_3_0_5",
+            "value": "旧ライブラリとヘッダーを大幅に削除し、簡素化してバグを防止"
+        },
+        {
+            "name": "yt_changelog_0_3_0_6",
+            "value": "Google ログインの初期開発。SmartTube の実現可能性を検証"
+        },
+        {
+            "name": "yt_changelog_0_3_0_7",
+            "value": "バックグラウンド再生の安定性を最適化"
+        },
+        {
+            "name": "yt_changelog_0_2_0_1",
+            "value": "プロジェクトコードを再構築し、ライフサイクル管理と開発速度を最適化。新たなスタート"
+        },
+        {
+            "name": "yt_changelog_0_2_0_2",
+            "value": "再生とライブ配信を最適化。より滑らかで発熱も低減"
+        },
+        {
+            "name": "yt_changelog_0_2_0_3",
+            "value": "より多くのオプションとカスタマイズ可能な再生設定"
+        },
+        {
+            "name": "yt_changelog_0_2_0_4",
+            "value": "より充実したエラーメッセージとログ管理"
+        },
+        {
+            "name": "yt_changelog_0_2_0_5",
+            "value": "多言語対応を追加"
+        },
+        {
+            "name": "yt_changelog_0_2_0_6",
+            "value": "NewPipe コアコードを更新し、ネットワーク接続とデコードを最適化して安定性向上"
+        },
+        {
+            "name": "yt_changelog_0_2_0_7",
+            "value": "バックグラウンド再生の安定性を最適化"
+        },
+        {
+            "name": "yt_changelog_0_2_0_8",
+            "value": "システムレベルの AVPlayer 再生、安定性と省電力を最適化"
+        },
+        {
+            "name": "yt_changelog_0_1_2_1",
+            "value": "アプリの UI 言語切替時のフリーズを修正"
+        },
+        {
+            "name": "yt_changelog_0_1_2_2",
+            "value": "コンテンツ言語リストの中国語バリアント表示を最適化（簡体字 / 繁体字 香港 / 繁体字 台湾）"
+        },
+        {
+            "name": "yt_changelog_0_1_2_3",
+            "value": "ログのダウンロード完了後に保存先のヒントを表示"
+        },
+        {
+            "name": "yt_changelog_0_1_2_4",
+            "value": "「アプリについて」ページを追加"
+        },
+        {
+            "name": "yt_changelog_0_1_2_5",
+            "value": "高解像度の無効化オプションが機能しない問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_1_2_6",
+            "value": "設定ページ各モジュールの視覚スタイルを統一"
+        },
+        {
+            "name": "yt_changelog_0_1_1_1",
+            "value": "MPV 再生コアを統合し、ハードウェアデコードと高解像度動画に対応"
+        },
+        {
+            "name": "yt_changelog_0_1_1_2",
+            "value": "バックグラウンド再生とシステムメディアコントロール統合を実装"
+        },
+        {
+            "name": "yt_changelog_0_1_1_3",
+            "value": "言語と地域設定を完成。コンテンツ言語 / 地域の切替に対応"
+        },
+        {
+            "name": "yt_changelog_0_1_1_4",
+            "value": "ランタイムログシステムを追加し、セッションのエクスポートに対応"
+        },
+        {
+            "name": "yt_changelog_0_1_1_5",
+            "value": "タブレット横向きプレーヤーのレイアウトを最適化"
+        },
+        {
+            "name": "yt_changelog_0_1_0_1",
+            "value": "初回リリース：基本的な YouTube 動画の閲覧と検索"
+        },
+        {
+            "name": "yt_changelog_0_1_0_2",
+            "value": "NewPipe Extractor エンジンを統合"
+        },
+        {
+            "name": "yt_changelog_0_1_0_3",
+            "value": "チャンネル登録、お気に入り、再生リスト管理に対応"
+        },
+        {
+            "name": "yt_changelog_0_1_0_4",
+            "value": "ライブ配信の再生に対応"
+        },
+        {
+            "name": "yt_changelog_0_1_0_5",
+            "value": "コメントリストとチャンネルページ"
+        },
+        {
+            "name": "yt_label_version_format",
+            "value": "バージョン"
+        },
+        {
+            "name": "yt_label_projects",
+            "value": "件のプロジェクト"
+        },
+        {
+            "name": "yt_label_models",
+            "value": "件のモデル"
+        },
+        {
+            "name": "yt_label_latest_version",
+            "value": "最新 v"
+        },
+        {
+            "name": "yt_label_videos",
+            "value": "本の動画"
+        },
+        {
+            "name": "yt_label_videos_alt",
+            "value": "本の動画"
+        },
+        {
+            "name": "yt_label_favorites_videos",
+            "value": "本の動画"
+        },
+        {
+            "name": "yt_label_seconds_short",
+            "value": "秒"
+        },
+        {
+            "name": "yt_label_mb_short",
+            "value": "MB"
+        },
+        {
+            "name": "yt_setting_delay_5",
+            "value": "5 秒"
+        },
+        {
+            "name": "yt_setting_delay_15",
+            "value": "15 秒"
+        },
+        {
+            "name": "yt_setting_delay_30",
+            "value": "30 秒"
+        },
+        {
+            "name": "yt_setting_delay_60",
+            "value": "60 秒"
+        },
+        {
+            "name": "yt_setting_cache_secs_5",
+            "value": "5 秒"
+        },
+        {
+            "name": "yt_setting_cache_secs_10",
+            "value": "10 秒"
+        },
+        {
+            "name": "yt_setting_cache_secs_20",
+            "value": "20 秒"
+        },
+        {
+            "name": "yt_setting_cache_secs_30",
+            "value": "30 秒"
+        },
+        {
+            "name": "yt_setting_cache_secs_60",
+            "value": "60 秒"
+        },
+        {
+            "name": "yt_setting_readahead_5",
+            "value": "5 秒"
+        },
+        {
+            "name": "yt_setting_readahead_8",
+            "value": "8 秒"
+        },
+        {
+            "name": "yt_setting_readahead_15",
+            "value": "15 秒"
+        },
+        {
+            "name": "yt_setting_readahead_30",
+            "value": "30 秒"
+        },
+        {
+            "name": "yt_setting_readahead_60",
+            "value": "60 秒"
+        },
+        {
+            "name": "yt_setting_max_bytes_10",
+            "value": "10 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_20",
+            "value": "20 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_50",
+            "value": "50 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_100",
+            "value": "100 MB"
+        },
+        {
+            "name": "yt_changelog_0_5_4_1",
+            "value": "ローカル JS 署名復号とディスクキャッシュを改善。コールドスタート時のプリウォームと失敗時のフォールバックに対応し、リモート復号依存時の待機と失敗を削減"
+        },
+        {
+            "name": "yt_changelog_0_5_4_2",
+            "value": "DASH 音声トラックのメタデータ（xtags/acont）を補完。コンテンツ言語と原音トラックの優先設定に基づきデフォルト音声トラックを自動選択し、多言語動画での吹替誤選択を低減"
+        },
+        {
+            "name": "yt_changelog_0_5_4_3",
+            "value": "プレーヤーページにスリープタイマーを追加。時間になると再生を停止して終了。高評価数・再生回数を言語別にローカライズ表示し、情報エリアの配色を最適化"
+        },
+        {
+            "name": "yt_changelog_0_5_4_4",
+            "value": "全 UI 言語の文字列キーを整合。設定項目と「アプリについて」ページの [object Object] 表示を修正し、簡体中国語リソースを補完"
+        },
+        {
+            "name": "yt_changelog_0_5_4_5",
+            "value": "デフォルトのテーマカラーを赤に変更。プレーヤーのコントロール・情報エリアの背景色を追加してコントラストを向上"
+        },
+        {
+            "name": "yt_changelog_0_5_4_6",
+            "value": "ホームで引き下げて更新に対応。全データ消去時に認証設定・サムネイルキャッシュ・復号キャッシュも同時消去（ダウンロード済みメディアは保持）"
+        },
+        {
+            "name": "yt_changelog_0_5_4_7",
+            "value": "ネットワークリクエストログと抽出チェーンの診断情報を充実させ、読み込み失敗や認証関連の問題を特定しやすく"
+        },
+        {
+            "name": "yt_changelog_0_5_4_8",
+            "value": "MPV ランタイムを更新し、再生と UI に関する複数の安定性問題を修正"
+        },
+        {
+            "name": "yt_secure_shield_title",
+            "value": "セキュアシールドモードが有効です"
+        },
+        {
+            "name": "yt_secure_shield_content",
+            "value": "システムでセキュアシールドモードが有効になり、JIT が無効化されています。ローカル署名復号が利用できないため、リモート復号サービスを使用します。動画の再生開始が遅くなる場合があります。"
+        },
+        {
+            "name": "yt_secure_shield_dont_show",
+            "value": "今後表示しない"
+        },
+        {
+            "name": "yt_action_got_it",
+            "value": "了解"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data",
+            "value": "ユーザーデータにログイン状態を使用"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data_subtitle",
+            "value": "フィード、登録、履歴、検索"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback",
+            "value": "再生にログイン状態を使用"
+        },
+        {
+            "name": "yt_changelog_0_5_5_1",
+            "value": "起動時にセキュアシールド / JIT 制限を検出し、リモート署名復号が使われる場合を明確に説明"
+        },
+        {
+            "name": "yt_changelog_0_5_5_2",
+            "value": "引き下げて更新後にホームと登録カードが確実に再構築されるように（アイテム ID が変わらない場合を含む）"
+        },
+        {
+            "name": "yt_changelog_0_5_5_3",
+            "value": "永続的なマスター・ユーザーデータ・再生のログインスイッチを追加し、アカウントアクセスを個別に管理可能に"
+        },
+        {
+            "name": "yt_changelog_0_5_5_4",
+            "value": "ユーザーデータのログインをオフにすると、空の認証済み応答を表示する代わりに匿名のホームとローカルフィードにフォールバック"
+        },
+        {
+            "name": "yt_changelog_0_5_5_5",
+            "value": "再生のログインをオフにすると匿名プレーヤークライアントを選択し、SABR ダウンロードからアカウント認証情報を排除"
+        },
+        {
+            "name": "yt_changelog_0_5_5_6",
+            "value": "プレーヤーのおすすめが安定した匿名の YouTube next 応答を使用するように。ログイン中の空キュー問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_5_7",
+            "value": "制限付き動画向けに、認証済み再生クライアントの選択と LOGIN_REQUIRED の処理を安定化"
+        },
+        {
+            "name": "yt_changelog_0_5_5_8",
+            "value": "watch ページの署名タイムスタンプを優先使用し、リモートプレーヤーサービスへのフォールバック前の起動遅延を削減"
+        },
+        {
+            "name": "yt_changelog_0_5_5_9",
+            "value": "プレーヤーメタデータのキャッシュとリモート復号のタイムアウト短縮を追加し、低速なサービスが再生を長時間ブロックしないように"
+        },
+        {
+            "name": "yt_changelog_0_5_5_10",
+            "value": "DASH URL へのキャッシュ済み base64url PoToken 注入を追加し、googlevideo の 403 エラーを低減（トークン失敗は致命的にしない）"
+        },
+        {
+            "name": "yt_changelog_0_5_5_11",
+            "value": "競合していたボトムシートのバインドを統合し、「再生リストに保存」「ストリーム情報」「スリープタイマー」の各パネルを修正"
+        },
+        {
+            "name": "yt_changelog_0_5_5_12",
+            "value": "認証済みの再生リストとユーザーライブラリの閲覧を改善。アカウント使用が無効な場合は匿名・ローカルのフォールバックを維持"
+        },
+        {
+            "name": "yt_changelog_0_5_5_13",
+            "value": "プライベート閲覧で保存済み認証情報を削除せずにアカウント関連の表示を隠せるように。ログインモードへ簡単に復帰可能"
+        },
+        {
+            "name": "yt_changelog_0_5_5_14",
+            "value": "マスターまたは再生ログインのスイッチ変更時に、正しい匿名・認証済みプレーヤークライアントを即座に再選択"
+        },
+        {
+            "name": "yt_changelog_0_5_5_15",
+            "value": "履歴と登録のクラウド同期がユーザーデータスイッチに従うように。既存のローカル履歴と登録は引き続き利用可能"
+        },
+        {
+            "name": "yt_changelog_0_5_5_16",
+            "value": "再生リストの browse リクエストが必要に応じてアカウントアクセスを使用可能に。アカウント固有・制限付き再生リストの読み込みを改善"
+        },
+        {
+            "name": "yt_changelog_0_5_5_17",
+            "value": "PoToken 生成が古い固定バージョンではなく、現在解決された YouTube Web クライアントバージョンを共有するように"
+        },
+        {
+            "name": "yt_changelog_0_5_5_18",
+            "value": "PoToken のバイト列を URL セーフな Base64 に変換し、動画ごとに 5 分間キャッシュしてトークン生成の繰り返しを回避"
+        },
+        {
+            "name": "yt_changelog_0_5_5_19",
+            "value": "ユーザーデータと再生のリクエストが選択されたスコープ内でのみ認証情報を適用するように。意図しないアカウント Cookie の露出を低減"
+        },
+        {
+            "name": "yt_changelog_0_5_5_20",
+            "value": "再生・認証・トークン・更新・フォールバックの診断を拡充。機密性の高い Cookie や署名付き URL はログに出力しない"
+        },
+        {
+            "name": "yt_changelog_0_5_9_1",
+            "value": "フィードページを遅延読み込みのグリッド / リストに変更：ホーム、検索、再生リスト、チャンネル、登録の長いリストのスクロールがより滑らかに"
+        },
+        {
+            "name": "yt_changelog_0_5_9_2",
+            "value": "一部の機種でコールドスタート直後にクラッシュする問題を修正（@BuilderParam バインディング）"
+        },
+        {
+            "name": "yt_changelog_0_5_9_3",
+            "value": "ログイン期限切れ時にエラーが伝播しない問題と、ホームフィードが通知なしにサイレントフォールバックする問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_9_4",
+            "value": "オプションアイコンと危険操作ボタンがテーマカラーに従うように統一。固定の警告色（赤）を廃止"
+        },
+        {
+            "name": "yt_changelog_0_5_9_5",
+            "value": "テキストのエンコード / デコード、Base64、URL 解析をシステム公式実装に切り替え"
+        },
+        {
+            "name": "yt_changelog_0_5_9_6",
+            "value": "キャストのデッドリンクや状態ポーリングなどの不要コードを削除し、パッケージサイズを削減"
+        },
+        {
+            "name": "yt_changelog_0_5_9_7",
+            "value": "再生プリフェッチの関連付けやバックグラウンドタスクガードなどの安定性問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_8_1",
+            "value": "コメント翻訳：各コメントの下に「翻訳」ボタンを追加（Google 翻訳エンジン）。翻訳をその場で表示し、ワンタップで原文に切り替え可能"
+        },
+        {
+            "name": "yt_changelog_0_5_8_2",
+            "value": "「言語と地域」に「コンテンツの翻訳」設定グループを追加：翻訳先言語はデフォルトでアプリの言語に従い、手動指定も可能"
+        },
+        {
+            "name": "yt_changelog_0_5_8_3",
+            "value": "起動高速化を PipePipe に準拠：未ログイン時はデフォルトで visionos クライアントによる直接取得に変更（PoToken 不要）、ログイン時は tv_downgraded を使用"
+        },
+        {
+            "name": "yt_changelog_0_5_8_4",
+            "value": "ライブ配信が読み込み続ける問題を修正：ライブ項目の分類を修正し、ライブストリームが正常に再生開始"
+        },
+        {
+            "name": "yt_changelog_0_5_8_5",
+            "value": "ログイン経路の修正：Cookie と OAuth のデュアルレール認証を分離し、ウェブメタデータ / コメントリクエストで認証情報が混在しないように"
+        },
+        {
+            "name": "yt_changelog_0_5_8_6",
+            "value": "システムメディアコントロールに現在の動画タイトルと投稿者を表示：AVSession メタデータが時々空になる問題を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_8_7",
+            "value": "UI 修正：下部タブのハイライト更新、タブレットのガイドページレイアウト、チャンネルページカードモードのネストされたスクロール"
+        },
+        {
+            "name": "yt_changelog_0_5_7_1",
+            "value": "「アプリについて」ページに「アップデートを確認」を追加：GitHub の最新 Release のビルド番号と比較し、新バージョン検出時は AppGallery テストインストールまたは GitHub リリースページへワンタップで移動"
+        },
+        {
+            "name": "yt_changelog_0_5_7_2",
+            "value": "登録フィードページを追加：登録チャンネルの更新を時系列で集約。再生リストは視聴履歴を記録して進捗バッジを表示。リストはワイド画面に適応"
+        },
+        {
+            "name": "yt_changelog_0_5_7_3",
+            "value": "「次の動画を自動再生」設定スイッチを追加。「アプリについて」ページにオープンソースプロジェクトのロゴを補完。メディアデータリクエストが HTTP プロキシ経由に対応"
+        },
+        {
+            "name": "yt_changelog_0_5_7_4",
+            "value": "起動高速化：再生中にキューの次の動画を事前抽出、BotGuard を起動時にプリウォーム、STS / クライアントバージョンのメタデータをディスクに保存して再利用"
+        },
+        {
+            "name": "yt_changelog_0_5_7_5",
+            "value": "ライブ配信で HLS の複数画質バリアントの解析と切替に対応。SIDX インデックスを起動時にプリフェッチ。visitorData をセッション単位で固定して重複した取得を削減"
+        },
+        {
+            "name": "yt_changelog_0_5_7_6",
+            "value": "SABR の安定性：PoToken 生成にタイムアウトとサーキットブレーカーを追加、空応答時は即座に PoToken を再発行、セッション構築失敗時にリースを正しく解放"
+        },
+        {
+            "name": "yt_changelog_0_5_7_7",
+            "value": "自動連続再生の重複トリガーとソース切替の競合を修正（ソース送信を単一ライターに集約）。ピクチャーインピクチャーの閉鎖 / 復元リークと視聴履歴のマージ順序を修正"
+        },
+        {
+            "name": "yt_changelog_0_5_7_8",
+            "value": "HarmonyOS 6 で映像が表示されない問題を修正（OHNativeWindow を mpv に直接受け渡し）。ハードウェアデコード能力をデバイスごとの検出による宣言に変更"
+        },
+        {
+            "name": "yt_changelog_0_5_6_1",
+            "value": "SmartTube 方式のデバイス QR ログインによる YouTube OAuth に対応。Cookie ログインと共存可能"
+        },
+        {
+            "name": "yt_changelog_0_5_6_2",
+            "value": "ホーム・履歴・登録・ライブラリで Cookie/WEB + OAuth/TV のデュアルレール認証。公開ストリームは mweb のまま、制限付きコンテンツは TV にフォールバックする場合あり"
+        },
+        {
+            "name": "yt_changelog_0_5_6_3",
+            "value": "抽出・SABR・メディアリクエスト向けの HTTP プロキシ設定（ループバック再生は直接接続のまま）"
+        },
+        {
+            "name": "yt_changelog_0_5_6_4",
+            "value": "プレーヤーで動画チャプターに対応。チャプターへのジャンプと現在チャプターのハイライト"
+        },
+        {
+            "name": "yt_changelog_0_5_6_5",
+            "value": "分割画面 / フローティングウィンドウの動作を改善。スペースが狭い場合は上部のプレーヤーツールを「その他」メニューに集約"
+        },
+        {
+            "name": "yt_changelog_0_5_6_6",
+            "value": "再生メディアのライフサイクルを再構築し、開始・ソース切替・マルチウィンドウ利用をより確実に"
+        },
+        {
+            "name": "yt_changelog_0_5_6_7",
+            "value": "画質変更時に読み込み / バッファリングを即座に表示"
+        },
+        {
+            "name": "yt_changelog_0_5_6_8",
+            "value": "ダウンロードリストとリスト入場アニメーションを再設計。SABR オフラインパッケージングを改善。ライブのダウンロード入口を非表示に"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback_subtitle",
+            "value": "再生 API とストリーム URL の認証"
+        },
+        {
+            "name": "yt_player_more_tools",
+            "value": "その他"
+        },
+        {
+            "name": "yt_player_subtitles",
+            "value": "字幕"
+        },
+        {
+            "name": "yt_player_audio_track",
+            "value": "音声トラック"
+        },
+        {
+            "name": "yt_player_playback_speed",
+            "value": "再生速度"
+        },
+        {
+            "name": "yt_option_network",
+            "value": "ネットワーク"
+        },
+        {
+            "name": "yt_proxy_off",
+            "value": "プロキシオフ"
+        },
+        {
+            "name": "yt_proxy_incomplete",
+            "value": "設定が不完全"
+        },
+        {
+            "name": "yt_proxy_enable",
+            "value": "プロキシを使用"
+        },
+        {
+            "name": "yt_proxy_enable_subtitle",
+            "value": "以下のプロキシ経由で YouTube にアクセス"
+        },
+        {
+            "name": "yt_proxy_type",
+            "value": "プロキシタイプ"
+        },
+        {
+            "name": "yt_proxy_type_http",
+            "value": "HTTP"
+        },
+        {
+            "name": "yt_proxy_type_http_subtitle",
+            "value": "HTTP CONNECT プロキシ"
+        },
+        {
+            "name": "yt_proxy_type_socks5",
+            "value": "SOCKS5"
+        },
+        {
+            "name": "yt_proxy_type_socks5_subtitle",
+            "value": "SOCKS5 CONNECT"
+        },
+        {
+            "name": "yt_proxy_server",
+            "value": "サーバー"
+        },
+        {
+            "name": "yt_proxy_host",
+            "value": "ホスト"
+        },
+        {
+            "name": "yt_proxy_host_placeholder",
+            "value": "例： 127.0.0.1"
+        },
+        {
+            "name": "yt_proxy_port",
+            "value": "ポート"
+        },
+        {
+            "name": "yt_proxy_auth_optional",
+            "value": "認証（オプション）"
+        },
+        {
+            "name": "yt_proxy_username",
+            "value": "ユーザー名"
+        },
+        {
+            "name": "yt_proxy_password",
+            "value": "パスワード"
+        },
+        {
+            "name": "yt_proxy_optional_placeholder",
+            "value": "オプション"
+        },
+        {
+            "name": "yt_proxy_test",
+            "value": "接続をテスト"
+        },
+        {
+            "name": "yt_proxy_testing",
+            "value": "テスト中…"
+        },
+        {
+            "name": "yt_proxy_test_ok",
+            "value": "プロキシに接続できます"
+        },
+        {
+            "name": "yt_proxy_test_failed",
+            "value": "プロキシのテストに失敗しました"
+        },
+        {
+            "name": "yt_proxy_test_http_error",
+            "value": "予期しない HTTP ステータス"
+        },
+        {
+            "name": "yt_proxy_test_disabled",
+            "value": "先にプロキシを有効にしてください"
+        },
+        {
+            "name": "yt_proxy_loopback_note",
+            "value": "ローカル再生プロキシ（127.0.0.1）はこの設定を使用しません。"
+        },
+        {
+            "name": "yt_device_qr_sign_in",
+            "value": "QR / TV コードでログイン"
+        },
+        {
+            "name": "yt_device_qr_sign_in_subtitle",
+            "value": "コードをスキャンするか youtube.com/activate を開く"
+        },
+        {
+            "name": "yt_device_login_help",
+            "value": "別のデバイスでリンクを開くか QR コードをスキャンし、以下のコードを入力してこのアプリを承認してください。"
+        },
+        {
+            "name": "yt_device_login_requesting",
+            "value": "デバイスコードをリクエスト中…"
+        },
+        {
+            "name": "yt_device_login_waiting",
+            "value": "承認を待機中…"
+        },
+        {
+            "name": "yt_device_login_polling",
+            "value": "承認状態を確認中"
+        },
+        {
+            "name": "yt_device_login_success",
+            "value": "ログインしました"
+        },
+        {
+            "name": "yt_device_login_failed",
+            "value": "ログインに失敗しました"
+        },
+        {
+            "name": "yt_device_login_retry",
+            "value": "もう一度試す"
+        },
+        {
+            "name": "yt_option_help",
+            "value": "ヘルプ"
+        },
+        {
+            "name": "yt_option_help_subtitle",
+            "value": "初心者ガイドと基本的な使い方"
+        },
+        {
+            "name": "yt_guide_skip",
+            "value": "スキップ"
+        },
+        {
+            "name": "yt_guide_next",
+            "value": "次へ"
+        },
+        {
+            "name": "yt_guide_done",
+            "value": "完了"
+        },
+        {
+            "name": "yt_guide_p1_desc",
+            "value": "オープンソースのサードパーティ YouTube クライアント：ローカル MPV 再生、広告なし。データはあなたのデバイスにのみ保存されます。"
+        },
+        {
+            "name": "yt_guide_p2_title",
+            "value": "YouTube アカウントにログイン"
+        },
+        {
+            "name": "yt_guide_p2_desc",
+            "value": "「設定 → データとアカウント」からウェブまたは QR コードでログインできます。ログインすると登録チャンネルや再生リストなどのアカウントコンテンツを表示できます。ログインしなくてもゲストとして正常に利用できます。"
+        },
+        {
+            "name": "yt_guide_p3_title",
+            "value": "アカウントデータの管理"
+        },
+        {
+            "name": "yt_guide_p3_desc",
+            "value": "ログイン認証情報は本機にのみ保存され、第三者のサーバーにアップロードされることはありません。「データとアカウント」でいつでもログアウトまたはシークレットモードを有効にできます。ログアウトするとアカウントデータは消去されます。"
+        },
+        {
+            "name": "yt_guide_p3_user_data",
+            "value": "ユーザーデータに使用：登録・履歴などのアカウントデータを取得"
+        },
+        {
+            "name": "yt_guide_p3_playback",
+            "value": "再生に使用：ログイン状態で URL をリクエストし、ボット検証を回避"
+        },
+        {
+            "name": "yt_guide_p4_title",
+            "value": "ネットワークプロキシ"
+        },
+        {
+            "name": "yt_guide_p4_desc",
+            "value": "ネットワークが制限されている場合は、「設定 → ネットワーク」で HTTP または SOCKS5 プロキシを有効にし、サーバーアドレスとポートを入力できます。プロキシは外部ネットワークリクエストにのみ使用され、ローカル再生のループバックアドレスはプロキシを経由しません。"
+        },
+        {
+            "name": "yt_guide_p5_title",
+            "value": "画質とキャッシュ"
+        },
+        {
+            "name": "yt_guide_p5_desc",
+            "value": "「設定 → 再生」でデフォルト画質・モバイルネットワーク画質・キャッシュ時間を設定でき、必要に応じてデータ通信量の節約や画質向上ができます。"
+        },
+        {
+            "name": "yt_guide_p6_title",
+            "value": "ダウンロードとローカル"
+        },
+        {
+            "name": "yt_guide_p6_desc",
+            "value": "動画をローカルにダウンロードしてオフラインで視聴できます。ダウンロードしたコンテンツは「ローカル」ページで管理します。「全データを消去」してもダウンロード済みファイルは削除されません。"
+        }
+    ]
+}

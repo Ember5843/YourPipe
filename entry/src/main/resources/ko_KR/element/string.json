@@ -1,0 +1,3032 @@
+{
+    "string": [
+        {
+            "name": "module_desc",
+            "value": "module description"
+        },
+        {
+            "name": "EntryAbility_desc",
+            "value": "description"
+        },
+        {
+            "name": "EntryAbility_label",
+            "value": "label"
+        },
+        {
+            "name": "HOME_EXIT_TOAST",
+            "value": "한 번 더 누르면 앱이 종료됩니다"
+        },
+        {
+            "name": "LIVING_LEFT_TEXT",
+            "value": "총 "
+        },
+        {
+            "name": "LIVING_RIGHT_TEXT",
+            "value": " 개의 댓글"
+        },
+        {
+            "name": "LIVING_WRITE",
+            "value": "댓글 작성"
+        },
+        {
+            "name": "number_of_viewers",
+            "value": "738,600명 시청 중"
+        },
+        {
+            "name": "store_name",
+            "value": "공식 라이브"
+        },
+        {
+            "name": "yt_tab_home",
+            "value": "홈"
+        },
+        {
+            "name": "yt_tab_playlists",
+            "value": "재생목록"
+        },
+        {
+            "name": "yt_tab_subscriptions",
+            "value": "구독"
+        },
+        {
+            "name": "yt_tab_favorites",
+            "value": "즐겨찾기"
+        },
+        {
+            "name": "yt_tab_local",
+            "value": "로컬"
+        },
+        {
+            "name": "yt_option_title",
+            "value": "옵션"
+        },
+        {
+            "name": "yt_option_group_settings",
+            "value": "설정"
+        },
+        {
+            "name": "yt_option_group_others",
+            "value": "기타"
+        },
+        {
+            "name": "yt_option_language",
+            "value": "언어 설정"
+        },
+        {
+            "name": "yt_option_color",
+            "value": "색상 설정"
+        },
+        {
+            "name": "yt_option_color_subtitle",
+            "value": "테마 색상과 강조 색상"
+        },
+        {
+            "name": "yt_option_appearance",
+            "value": "모양"
+        },
+        {
+            "name": "yt_dark_mode_title",
+            "value": "다크 모드"
+        },
+        {
+            "name": "yt_dark_mode_system",
+            "value": "시스템 설정 따르기"
+        },
+        {
+            "name": "yt_dark_mode_system_subtitle",
+            "value": "시스템 설정에 따라 자동 전환"
+        },
+        {
+            "name": "yt_dark_mode_light",
+            "value": "라이트 모드"
+        },
+        {
+            "name": "yt_dark_mode_light_subtitle",
+            "value": "항상 라이트 테마 사용"
+        },
+        {
+            "name": "yt_dark_mode_dark",
+            "value": "다크 모드"
+        },
+        {
+            "name": "yt_dark_mode_dark_subtitle",
+            "value": "항상 다크 테마 사용"
+        },
+        {
+            "name": "yt_setting_home_layout",
+            "value": "홈 화면 레이아웃"
+        },
+        {
+            "name": "yt_layout_grid",
+            "value": "카드 모드"
+        },
+        {
+            "name": "yt_layout_list",
+            "value": "목록 모드"
+        },
+        {
+            "name": "yt_option_log",
+            "value": "로그"
+        },
+        {
+            "name": "yt_option_log_subtitle",
+            "value": "실행 기록 보기"
+        },
+        {
+            "name": "yt_log_title",
+            "value": "로그"
+        },
+        {
+            "name": "yt_log_enable",
+            "value": "로그 기록 켜기"
+        },
+        {
+            "name": "yt_log_enable_subtitle",
+            "value": "실행 시 로그 기록"
+        },
+        {
+            "name": "yt_log_disabled_hint",
+            "value": "로그 기록이 꺼져 있습니다\n위의 스위치를 켜서 캡처를 시작하세요"
+        },
+        {
+            "name": "yt_log_empty",
+            "value": "로그 기록 없음"
+        },
+        {
+            "name": "yt_log_session_active",
+            "value": "기록 중"
+        },
+        {
+            "name": "yt_log_session_saved",
+            "value": "저장됨"
+        },
+        {
+            "name": "yt_log_no_sessions",
+            "value": "로그 세션 없음"
+        },
+        {
+            "name": "yt_log_delete_all_confirm",
+            "value": "모든 로그 기록을 삭제하시겠습니까?"
+        },
+        {
+            "name": "yt_log_delete_confirm_yes",
+            "value": "삭제"
+        },
+        {
+            "name": "yt_log_delete_confirm_no",
+            "value": "취소"
+        },
+        {
+            "name": "yt_action_close",
+            "value": "닫기"
+        },
+        {
+            "name": "yt_option_about",
+            "value": "정보"
+        },
+        {
+            "name": "yt_option_about_subtitle",
+            "value": "버전 및 크레딧"
+        },
+        {
+            "name": "yt_option_in_development",
+            "value": "기능 개발 중"
+        },
+        {
+            "name": "yt_option_in_development_color",
+            "value": "색상 테마 옵션이 여기에 표시됩니다"
+        },
+        {
+            "name": "yt_lang_follow_system",
+            "value": "시스템 설정 따르기"
+        },
+        {
+            "name": "yt_lang_simplified",
+            "value": "중국어(간체)"
+        },
+        {
+            "name": "yt_lang_simplified_subtitle",
+            "value": "简体中文"
+        },
+        {
+            "name": "yt_lang_traditional_hk",
+            "value": "중국어(번체, 홍콩)"
+        },
+        {
+            "name": "yt_lang_traditional_hk_subtitle",
+            "value": "繁體中文（香港）"
+        },
+        {
+            "name": "yt_lang_traditional_tw",
+            "value": "중국어(번체, 타이완)"
+        },
+        {
+            "name": "yt_lang_traditional_tw_subtitle",
+            "value": "繁體中文（台灣）"
+        },
+        {
+            "name": "yt_lang_english",
+            "value": "영어"
+        },
+        {
+            "name": "yt_lang_english_subtitle",
+            "value": "English"
+        },
+        {
+            "name": "internet_reason",
+            "value": "네트워크 데이터 요청"
+        },
+        {
+            "name": "reason_background",
+            "value": "동영상 백그라운드 재생 유지"
+        },
+        {
+            "name": "video_name0",
+            "value": "@Cat"
+        },
+        {
+            "name": "video_name1",
+            "value": "@Mountaineer"
+        },
+        {
+            "name": "video_name2",
+            "value": "@Nice To Meet You"
+        },
+        {
+            "name": "video_name3",
+            "value": "@Tick"
+        },
+        {
+            "name": "video_name4",
+            "value": "@Faery"
+        },
+        {
+            "name": "video_description0",
+            "value": "#1 #Local video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+        },
+        {
+            "name": "video_description1",
+            "value": "#2 #Online video #Dream"
+        },
+        {
+            "name": "video_description3",
+            "value": "#4 #Online video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+        },
+        {
+            "name": "video_description4",
+            "value": "#5 #Online video #Colorful world, life is not only the immediate existence, but also poetry and distance"
+        },
+        {
+            "name": "yt_section_language_region",
+            "value": "언어 및 지역"
+        },
+        {
+            "name": "yt_section_playback",
+            "value": "재생"
+        },
+        {
+            "name": "yt_section_language",
+            "value": "언어 설정"
+        },
+        {
+            "name": "yt_section_content_translation",
+            "value": "콘텐츠 번역"
+        },
+        {
+            "name": "yt_setting_translation_language",
+            "value": "번역 대상 언어"
+        },
+        {
+            "name": "yt_follow_app_language",
+            "value": "앱 언어 따르기"
+        },
+        {
+            "name": "yt_setting_ui_language",
+            "value": "앱 UI 언어"
+        },
+        {
+            "name": "yt_setting_content_language",
+            "value": "콘텐츠 언어"
+        },
+        {
+            "name": "yt_setting_content_region",
+            "value": "콘텐츠 지역"
+        },
+        {
+            "name": "yt_section_video",
+            "value": "동영상 설정"
+        },
+        {
+            "name": "yt_setting_default_quality",
+            "value": "기본 동영상 화질"
+        },
+        {
+            "name": "yt_setting_live_quality_cap",
+            "value": "라이브 화질 상한"
+        },
+        {
+            "name": "yt_setting_show_high_res",
+            "value": "고해상도 표시 (1440p / 4K)"
+        },
+        {
+            "name": "yt_setting_show_high_res_subtitle",
+            "value": "화질 선택기에 4K 옵션 표시, 성능 요구 사항이 높음"
+        },
+        {
+            "name": "yt_setting_video_codec",
+            "value": "동영상 코덱 형식"
+        },
+        {
+            "name": "yt_section_audio",
+            "value": "오디오 설정"
+        },
+        {
+            "name": "yt_setting_audio_quality",
+            "value": "오디오 품질 상한"
+        },
+        {
+            "name": "yt_section_decoder",
+            "value": "디코더 설정"
+        },
+        {
+            "name": "yt_setting_hwdec_mode",
+            "value": "하드웨어 디코딩 모드"
+        },
+        {
+            "name": "yt_setting_decoder_fallback",
+            "value": "디코더 폴백"
+        },
+        {
+            "name": "yt_setting_decoder_fallback_subtitle",
+            "value": "하드웨어 디코딩 실패 시 소프트웨어 디코딩으로 자동 전환하여 검은 화면 방지"
+        },
+        {
+            "name": "yt_section_buffer",
+            "value": "버퍼링 정책"
+        },
+        {
+            "name": "yt_setting_readahead",
+            "value": "미리 읽기 버퍼 시간"
+        },
+        {
+            "name": "yt_setting_cache_pause",
+            "value": "버퍼 부족 시 재개 대기 시간"
+        },
+        {
+            "name": "yt_setting_max_back_bytes",
+            "value": "후방 버퍼 크기 (뒤로 탐색 시 스트림 재요청 안 함)"
+        },
+        {
+            "name": "yt_quality_best",
+            "value": "최고 화질"
+        },
+        {
+            "name": "yt_quality_auto",
+            "value": "자동"
+        },
+        {
+            "name": "yt_codec_h264_first",
+            "value": "자동 (H.264 우선)"
+        },
+        {
+            "name": "yt_codec_force_h264",
+            "value": "H.264 강제"
+        },
+        {
+            "name": "yt_codec_av1",
+            "value": "AV1"
+        },
+        {
+            "name": "yt_audio_high",
+            "value": "최고 (≈256kbps AAC)"
+        },
+        {
+            "name": "yt_audio_medium",
+            "value": "보통 (≈128kbps AAC)"
+        },
+        {
+            "name": "yt_audio_low",
+            "value": "데이터 절약 (≈48kbps)"
+        },
+        {
+            "name": "yt_hwdec_auto",
+            "value": "자동 (권장)"
+        },
+        {
+            "name": "yt_hwdec_auto_safe",
+            "value": "하드웨어 디코딩 강제"
+        },
+        {
+            "name": "yt_hwdec_no",
+            "value": "소프트웨어 디코딩만"
+        },
+        {
+            "name": "yt_recommended_suffix",
+            "value": "(권장)"
+        },
+        {
+            "name": "yt_unit_seconds",
+            "value": "초"
+        },
+        {
+            "name": "yt_unit_mb",
+            "value": "MB"
+        },
+        {
+            "name": "yt_placeholder_search",
+            "value": "검색"
+        },
+        {
+            "name": "yt_action_favorite",
+            "value": "즐겨찾기"
+        },
+        {
+            "name": "yt_action_unfavorite",
+            "value": "즐겨찾기 해제"
+        },
+        {
+            "name": "yt_action_subscribe",
+            "value": "구독"
+        },
+        {
+            "name": "yt_action_unsubscribe",
+            "value": "구독 취소"
+        },
+        {
+            "name": "yt_action_share",
+            "value": "공유"
+        },
+        {
+            "name": "yt_action_retry",
+            "value": "다시 시도"
+        },
+        {
+            "name": "yt_action_open_browser",
+            "value": "브라우저에서 열기"
+        },
+        {
+            "name": "yt_action_show_more",
+            "value": "더 보기"
+        },
+        {
+            "name": "yt_action_show_less",
+            "value": "접기"
+        },
+        {
+            "name": "yt_action_cancel",
+            "value": "취소"
+        },
+        {
+            "name": "yt_action_confirm",
+            "value": "확인"
+        },
+        {
+            "name": "yt_action_delete",
+            "value": "삭제"
+        },
+        {
+            "name": "yt_action_clear",
+            "value": "지우기"
+        },
+        {
+            "name": "yt_action_view_author",
+            "value": "작성자 보기"
+        },
+        {
+            "name": "yt_action_clear_all",
+            "value": "모두 지우기"
+        },
+        {
+            "name": "yt_search_youtube",
+            "value": "YouTube 검색"
+        },
+        {
+            "name": "yt_search_youtube_music",
+            "value": "YouTube Music 검색"
+        },
+        {
+            "name": "yt_filter_all",
+            "value": "전체"
+        },
+        {
+            "name": "yt_filter_videos",
+            "value": "동영상"
+        },
+        {
+            "name": "yt_filter_channels",
+            "value": "채널"
+        },
+        {
+            "name": "yt_filter_playlists",
+            "value": "재생목록"
+        },
+        {
+            "name": "yt_filter_songs",
+            "value": "노래"
+        },
+        {
+            "name": "yt_filter_albums",
+            "value": "앨범"
+        },
+        {
+            "name": "yt_search_history",
+            "value": "검색 기록"
+        },
+        {
+            "name": "yt_action_clear_search_history",
+            "value": "검색 기록 지우기"
+        },
+        {
+            "name": "yt_empty_no_search_history",
+            "value": "검색 기록 없음"
+        },
+        {
+            "name": "yt_search_no_results",
+            "value": "관련 콘텐츠를 찾을 수 없습니다"
+        },
+        {
+            "name": "yt_error_search_failed",
+            "value": "검색에 실패했습니다. 잠시 후 다시 시도하세요"
+        },
+        {
+            "name": "yt_dialog_delete_search_record",
+            "value": "검색 기록 삭제"
+        },
+        {
+            "name": "yt_confirm_clear_search_history",
+            "value": "모든 검색 기록을 지우시겠습니까?"
+        },
+        {
+            "name": "yt_toast_cleared",
+            "value": "모두 지움"
+        },
+        {
+            "name": "yt_placeholder_search_content",
+            "value": "콘텐츠 검색"
+        },
+        {
+            "name": "yt_empty_no_content",
+            "value": "콘텐츠 없음"
+        },
+        {
+            "name": "yt_error_invalid_video",
+            "value": "유효한 동영상 정보 없음"
+        },
+        {
+            "name": "yt_dialog_select_quality",
+            "value": "화질 선택"
+        },
+        {
+            "name": "yt_label_video_track",
+            "value": "동영상 트랙"
+        },
+        {
+            "name": "yt_warn_high_resolution",
+            "value": "이 화질은 1440p를 초과하여 일부 기기에서 성능 문제나 재생 끊김이 발생할 수 있습니다"
+        },
+        {
+            "name": "yt_label_audio_quality",
+            "value": "오디오 품질"
+        },
+        {
+            "name": "yt_player_syncing_buffer",
+            "value": "듀얼 트랙 캐시 동기화 중..."
+        },
+        {
+            "name": "yt_error_playback_failed",
+            "value": "재생 실패"
+        },
+        {
+            "name": "yt_error_load_video_info",
+            "value": "동영상 정보 가져오기 실패"
+        },
+        {
+            "name": "yt_error_load_video",
+            "value": "동영상 로드 실패"
+        },
+        {
+            "name": "yt_error_load_exception",
+            "value": "로드 중 오류 발생"
+        },
+        {
+            "name": "yt_error_unknown",
+            "value": "알 수 없는 오류"
+        },
+        {
+            "name": "yt_error_invalid_video_id",
+            "value": "유효하지 않은 동영상 ID"
+        },
+        {
+            "name": "yt_error_play_error_retry",
+            "value": "재생 오류가 발생했습니다. 다시 시도하세요"
+        },
+        {
+            "name": "yt_empty_no_comments",
+            "value": "댓글 없음"
+        },
+        {
+            "name": "yt_label_pinned",
+            "value": "고정됨"
+        },
+        {
+            "name": "yt_error_load_comments",
+            "value": "댓글 로드 실패"
+        },
+        {
+            "name": "yt_label_reply",
+            "value": "답글"
+        },
+        {
+            "name": "yt_error_load_replies",
+            "value": "답글 로드 실패"
+        },
+        {
+            "name": "yt_label_like",
+            "value": "좋아요"
+        },
+        {
+            "name": "yt_translate_action",
+            "value": "번역"
+        },
+        {
+            "name": "yt_show_original",
+            "value": "원문 보기"
+        },
+        {
+            "name": "yt_translating",
+            "value": "번역 중…"
+        },
+        {
+            "name": "yt_translate_failed",
+            "value": "번역 실패, 탭하여 다시 시도"
+        },
+        {
+            "name": "yt_label_dislike",
+            "value": "싫어요"
+        },
+        {
+            "name": "yt_tab_videos",
+            "value": "동영상"
+        },
+        {
+            "name": "yt_tab_shorts",
+            "value": "쇼츠"
+        },
+        {
+            "name": "yt_tab_live",
+            "value": "라이브"
+        },
+        {
+            "name": "yt_tab_about",
+            "value": "정보"
+        },
+        {
+            "name": "yt_empty_no_videos",
+            "value": "동영상 없음"
+        },
+        {
+            "name": "yt_empty_no_shorts",
+            "value": "쇼츠 없음"
+        },
+        {
+            "name": "yt_empty_no_live",
+            "value": "라이브 없음"
+        },
+        {
+            "name": "yt_channel_info",
+            "value": "채널 정보"
+        },
+        {
+            "name": "yt_channel_id",
+            "value": "채널 ID"
+        },
+        {
+            "name": "yt_channel_subscribers",
+            "value": "구독자 수"
+        },
+        {
+            "name": "yt_channel_video_count",
+            "value": "동영상 수"
+        },
+        {
+            "name": "yt_channel_description",
+            "value": "소개"
+        },
+        {
+            "name": "yt_error_load_user_videos",
+            "value": "사용자 동영상 로드 실패"
+        },
+        {
+            "name": "yt_error_load_shorts",
+            "value": "쇼츠 로드 실패"
+        },
+        {
+            "name": "yt_error_load_live",
+            "value": "라이브 로드 실패"
+        },
+        {
+            "name": "yt_label_user",
+            "value": "사용자"
+        },
+        {
+            "name": "yt_local_history",
+            "value": "시청 기록"
+        },
+        {
+            "name": "yt_dialog_clear_history",
+            "value": "기록 지우기"
+        },
+        {
+            "name": "yt_confirm_clear_history",
+            "value": "모든 시청 기록을 지우시겠습니까?"
+        },
+        {
+            "name": "yt_empty_no_history",
+            "value": "시청 기록 없음"
+        },
+        {
+            "name": "yt_empty_history_hint",
+            "value": "시청한 동영상이 여기에 표시됩니다"
+        },
+        {
+            "name": "yt_time_just_now",
+            "value": "방금"
+        },
+        {
+            "name": "yt_action_delete_record",
+            "value": "기록 삭제"
+        },
+        {
+            "name": "yt_sub_manage_title",
+            "value": "구독 중인 채널"
+        },
+        {
+            "name": "yt_empty_no_subs",
+            "value": "구독 중인 채널 없음"
+        },
+        {
+            "name": "yt_empty_subs_hint",
+            "value": "\"구독 관리\"에서 추가하세요"
+        },
+        {
+            "name": "yt_empty_subs_hint_alt",
+            "value": "검색 페이지에서 관심 있는 채널을 구독하세요"
+        },
+        {
+            "name": "yt_error_load_subs",
+            "value": "구독 로드 실패"
+        },
+        {
+            "name": "yt_fav_videos_title",
+            "value": "즐겨찾기한 동영상"
+        },
+        {
+            "name": "yt_fav_playlists_title",
+            "value": "즐겨찾기한 재생목록"
+        },
+        {
+            "name": "yt_local_playlists_title",
+            "value": "로컬 재생목록"
+        },
+        {
+            "name": "yt_local_playlists_tag",
+            "value": "로컬"
+        },
+        {
+            "name": "yt_empty_no_local_playlists",
+            "value": "로컬 재생목록 없음"
+        },
+        {
+            "name": "yt_empty_local_playlists_hint",
+            "value": "재생 페이지에서 동영상을 로컬 재생목록에 저장하세요"
+        },
+        {
+            "name": "yt_empty_no_fav_videos",
+            "value": "즐겨찾기한 동영상 없음"
+        },
+        {
+            "name": "yt_empty_no_fav_playlists",
+            "value": "즐겨찾기한 재생목록 없음"
+        },
+        {
+            "name": "yt_empty_fav_playlists_hint",
+            "value": "검색 페이지에서 관심 있는 재생목록을 즐겨찾기하세요"
+        },
+        {
+            "name": "yt_about_current_version",
+            "value": "현재 버전"
+        },
+        {
+            "name": "yt_about_description",
+            "value": "HarmonyOS NEXT 기반 오픈 소스 YouTube 클라이언트\n광고 없음 · 추적 없음 · 완전한 로컬 파싱"
+        },
+        {
+            "name": "yt_about_qq_group",
+            "value": "QQ 그룹"
+        },
+        {
+            "name": "yt_about_tg_group",
+            "value": "Telegram 그룹"
+        },
+        {
+            "name": "yt_about_github_repo",
+            "value": "GitHub 저장소"
+        },
+        {
+            "name": "yt_about_project_info",
+            "value": "프로젝트 정보"
+        },
+        {
+            "name": "yt_about_open_source",
+            "value": "사용된 오픈 소스 프로젝트"
+        },
+        {
+            "name": "yt_about_ai_models",
+            "value": "개발 보조 AI 모델"
+        },
+        {
+            "name": "yt_about_changelog",
+            "value": "업데이트 로그"
+        },
+        {
+            "name": "yt_about_check_update",
+            "value": "업데이트 확인"
+        },
+        {
+            "name": "yt_about_check_update_subtitle",
+            "value": "GitHub 최신 버전 가져오기"
+        },
+        {
+            "name": "yt_update_check_failed",
+            "value": "업데이트 확인에 실패했습니다. 잠시 후 다시 시도하세요"
+        },
+        {
+            "name": "yt_update_up_to_date",
+            "value": "최신 버전입니다"
+        },
+        {
+            "name": "yt_update_available_title",
+            "value": "새 버전 발견"
+        },
+        {
+            "name": "yt_update_open_appgallery",
+            "value": "AppTest"
+        },
+        {
+            "name": "yt_update_open_github",
+            "value": "GitHub"
+        },
+        {
+            "name": "yt_update_checking",
+            "value": "업데이트 확인 중…"
+        },
+        {
+            "name": "yt_update_current_version",
+            "value": "현재 버전"
+        },
+        {
+            "name": "yt_update_new_version",
+            "value": "새 버전"
+        },
+        {
+            "name": "yt_update_release_time",
+            "value": "업데이트 시간"
+        },
+        {
+            "name": "yt_error_load_failed",
+            "value": "로드 실패"
+        },
+        {
+            "name": "yt_error_play_failed_title",
+            "value": "재생 실패"
+        },
+        {
+            "name": "yt_label_live",
+            "value": "라이브"
+        },
+        {
+            "name": "yt_label_loading",
+            "value": "로드 중..."
+        },
+        {
+            "name": "yt_error_load_playlists",
+            "value": "재생목록 로드 실패"
+        },
+        {
+            "name": "yt_error_load_channel_info",
+            "value": "채널 정보 가져오기 실패"
+        },
+        {
+            "name": "yt_tab_description",
+            "value": "소개"
+        },
+        {
+            "name": "yt_tab_comments",
+            "value": "댓글"
+        },
+        {
+            "name": "yt_tab_recommended",
+            "value": "추천"
+        },
+        {
+            "name": "yt_home_recommended_error",
+            "value": "추천 피드 로드 실패, 대체 콘텐츠로 전환되었거나 잠시 후 다시 시도하세요"
+        },
+        {
+            "name": "yt_home_auth_expired_notice",
+            "value": "로그인 상태가 만료되어 게스트 추천을 표시합니다. 다시 로그인하세요"
+        },
+        {
+            "name": "yt_home_kiosk_error",
+            "value": "Kiosk 요청 실패. 잠시 후 다시 시도하세요"
+        },
+        {
+            "name": "yt_home_load_error",
+            "value": "홈 로드 실패. 잠시 후 다시 시도하세요"
+        },
+        {
+            "name": "yt_player_mode_progressive",
+            "value": "프로그레시브 (Progressive)"
+        },
+        {
+            "name": "yt_player_mode_hls",
+            "value": "HLS 스트리밍"
+        },
+        {
+            "name": "yt_player_mode_dash_manifest",
+            "value": "DASH 스트리밍 (Manifest)"
+        },
+        {
+            "name": "yt_player_mode_dash_track",
+            "value": "DASH 트랙 (오디오/비디오 분리)"
+        },
+        {
+            "name": "yt_player_default",
+            "value": "기본값 (Default)"
+        },
+        {
+            "name": "yt_player_step1_select_mode",
+            "value": "1. 재생 모드 선택"
+        },
+        {
+            "name": "yt_player_step2_select_quality",
+            "value": "2. 화질 선택"
+        },
+        {
+            "name": "yt_player_video_quality",
+            "value": "동영상 화질"
+        },
+        {
+            "name": "yt_player_step2_select_manifest",
+            "value": "2. 리소스 매니페스트 선택"
+        },
+        {
+            "name": "yt_player_step2_select_track",
+            "value": "2. 오디오/비디오 트랙 선택"
+        },
+        {
+            "name": "yt_player_audio_language_type",
+            "value": "오디오 언어 / 유형"
+        },
+        {
+            "name": "yt_log_saved_to_downloads",
+            "value": "다운로드 폴더에 저장됨"
+        },
+        {
+            "name": "yt_error_no_playable_stream",
+            "value": "재생 가능한 스트림을 찾을 수 없습니다"
+        },
+        {
+            "name": "yt_error_no_supported_stream",
+            "value": "지원되는 동영상 스트림을 찾을 수 없습니다"
+        },
+        {
+            "name": "yt_error_age_restricted",
+            "value": "연령 제한 동영상입니다"
+        },
+        {
+            "name": "yt_error_age_restricted_hint",
+            "value": "브라우저에서 YouTube 계정으로 로그인해야 시청할 수 있습니다"
+        },
+        {
+            "name": "yt_error_geo_restricted",
+            "value": "현재 지역에서 사용할 수 없는 콘텐츠입니다"
+        },
+        {
+            "name": "yt_error_geo_restricted_hint",
+            "value": "동영상 게시자가 재생 지역을 제한했습니다"
+        },
+        {
+            "name": "yt_error_paid_content",
+            "value": "유료 콘텐츠 동영상입니다"
+        },
+        {
+            "name": "yt_error_paid_content_hint",
+            "value": "구매 또는 대여 후 시청할 수 있습니다"
+        },
+        {
+            "name": "yt_error_premium_content",
+            "value": "YouTube Premium 회원 전용 콘텐츠입니다"
+        },
+        {
+            "name": "yt_error_premium_content_hint",
+            "value": "YouTube Premium을 구독해야 재생할 수 있습니다"
+        },
+        {
+            "name": "yt_error_private_content",
+            "value": "비공개 동영상입니다"
+        },
+        {
+            "name": "yt_error_private_content_hint",
+            "value": "권한이 있는 사용자만 시청할 수 있습니다"
+        },
+        {
+            "name": "yt_error_login_required",
+            "value": "로그인 후 시청할 수 있습니다"
+        },
+        {
+            "name": "yt_error_login_required_hint",
+            "value": "브라우저에서 YouTube 계정으로 로그인하세요"
+        },
+        {
+            "name": "yt_error_account_terminated",
+            "value": "이 채널은 해지되었습니다"
+        },
+        {
+            "name": "yt_error_account_terminated_hint",
+            "value": "YouTube 정책 위반으로 계정이 차단되었습니다"
+        },
+        {
+            "name": "yt_error_live_offline",
+            "value": "라이브가 종료되었습니다"
+        },
+        {
+            "name": "yt_error_live_offline_hint",
+            "value": "라이브 스트림이 오프라인이거나 아직 시작되지 않았습니다"
+        },
+        {
+            "name": "yt_error_content_not_supported",
+            "value": "지원되지 않는 콘텐츠 유형입니다"
+        },
+        {
+            "name": "yt_error_content_not_supported_hint",
+            "value": "이 동영상 형식은 아직 재생을 지원하지 않습니다"
+        },
+        {
+            "name": "yt_error_network",
+            "value": "네트워크 연결 실패"
+        },
+        {
+            "name": "yt_error_network_hint",
+            "value": "네트워크 연결을 확인한 후 다시 시도하세요"
+        },
+        {
+            "name": "yt_error_timeout",
+            "value": "요청 시간 초과"
+        },
+        {
+            "name": "yt_error_timeout_hint",
+            "value": "서버 응답이 너무 느립니다. 잠시 후 다시 시도하세요"
+        },
+        {
+            "name": "yt_error_extraction_failed",
+            "value": "동영상 정보 파싱 실패"
+        },
+        {
+            "name": "yt_error_extraction_failed_hint",
+            "value": "동영상 재생 데이터를 가져올 수 없습니다"
+        },
+        {
+            "name": "yt_error_cipher_failed",
+            "value": "동영상 스트림 복호화 실패"
+        },
+        {
+            "name": "yt_error_cipher_failed_hint",
+            "value": "서명 알고리즘이 업데이트되었습니다. 앱 업데이트를 기다려 주세요"
+        },
+        {
+            "name": "new_app_name",
+            "value": "YourPipe"
+        },
+        {
+            "name": "yt_empty_no_playlists",
+            "value": "재생목록 없음"
+        },
+        {
+            "name": "yt_search_results_from",
+            "value": "\"%s\"의 검색 결과"
+        },
+        {
+            "name": "yt_option_group_recovery",
+            "value": "복구"
+        },
+        {
+            "name": "yt_option_reset_settings",
+            "value": "모든 설정 복원"
+        },
+        {
+            "name": "yt_option_reset_settings_subtitle",
+            "value": "기본 설정으로 복원"
+        },
+        {
+            "name": "yt_option_clear_all_data",
+            "value": "앱 데이터 전체 삭제"
+        },
+        {
+            "name": "yt_option_clear_all_data_subtitle",
+            "value": "기록, 캐시 등 모든 데이터 삭제"
+        },
+        {
+            "name": "yt_toast_reset_settings_done",
+            "value": "기본 설정으로 복원됨"
+        },
+        {
+            "name": "yt_toast_clear_all_data_done",
+            "value": "모든 데이터가 삭제됨"
+        },
+        {
+            "name": "yt_option_recovery",
+            "value": "복구"
+        },
+        {
+            "name": "yt_confirm_reset_settings",
+            "value": "모든 설정을 기본값으로 복원하시겠습니까? 이 작업은 취소할 수 없습니다."
+        },
+        {
+            "name": "yt_confirm_clear_all_data",
+            "value": "앱 데이터를 모두 삭제하시겠습니까? 모든 기록, 즐겨찾기, 구독, 설정이 삭제되며 취소할 수 없습니다."
+        },
+        {
+            "name": "yt_setting_stream_buffer",
+            "value": "TCP 스트림 버퍼 크기"
+        },
+        {
+            "name": "yt_setting_seek_keyframe",
+            "value": "빠른 탐색 (키프레임)"
+        },
+        {
+            "name": "yt_setting_seek_keyframe_subtitle",
+            "value": "가장 가까운 키프레임으로 이동하여 응답 속도 향상"
+        },
+        {
+            "name": "yt_action_download",
+            "value": "다운로드"
+        },
+        {
+            "name": "yt_download_title",
+            "value": "동영상 다운로드"
+        },
+        {
+            "name": "yt_download_step1_mode",
+            "value": "1단계: 다운로드 모드 선택"
+        },
+        {
+            "name": "yt_download_step2_quality",
+            "value": "2단계: 화질 선택"
+        },
+        {
+            "name": "yt_download_step2_tracks",
+            "value": "2단계: 트랙 선택"
+        },
+        {
+            "name": "yt_download_mode_progressive",
+            "value": "병합 스트림 (Progressive)"
+        },
+        {
+            "name": "yt_download_mode_dash",
+            "value": "분리 트랙 (DASH)"
+        },
+        {
+            "name": "yt_download_mode_hls",
+            "value": "HLS 스트림"
+        },
+        {
+            "name": "yt_download_mode_sabr",
+            "value": "SABR 분리 트랙"
+        },
+        {
+            "name": "yt_download_progressive_hint",
+            "value": "권장: 동영상과 오디오가 이미 병합되어 추가 처리가 필요 없음"
+        },
+        {
+            "name": "yt_download_dash_hint",
+            "value": "동영상과 오디오를 각각 다운로드한 후 자동 병합"
+        },
+        {
+            "name": "yt_download_sabr_hint",
+            "value": "SABR/UMP 세션으로 세그먼트 단위 오디오/비디오를 받아 자동 병합 (재생과 동일 소스)"
+        },
+        {
+            "name": "yt_download_estimated_size",
+            "value": "예상 크기"
+        },
+        {
+            "name": "yt_download_empty",
+            "value": "다운로드 작업 없음"
+        },
+        {
+            "name": "yt_download_empty_hint",
+            "value": "동영상 페이지에서 다운로드 버튼을 눌러 시작하세요"
+        },
+        {
+            "name": "yt_label_progressive",
+            "value": "병합 스트림 품질"
+        },
+        {
+            "name": "yt_label_premium",
+            "value": "유료"
+        },
+        {
+            "name": "yt_label_members_only",
+            "value": "멤버 전용"
+        },
+        {
+            "name": "yt_option_data_account",
+            "value": "데이터 및 계정"
+        },
+        {
+            "name": "yt_option_data_account_subtitle",
+            "value": "로그인 및 로컬 데이터"
+        },
+        {
+            "name": "yt_section_account",
+            "value": "계정"
+        },
+        {
+            "name": "yt_section_data_management",
+            "value": "데이터 관리"
+        },
+        {
+            "name": "yt_option_google_login",
+            "value": "Google 로그인"
+        },
+        {
+            "name": "yt_option_export_data",
+            "value": "데이터보내기"
+        },
+        {
+            "name": "yt_option_export_data_subtitle",
+            "value": "로컬 데이터를 JSON으로 백업"
+        },
+        {
+            "name": "yt_option_restore_data",
+            "value": "데이터 복원"
+        },
+        {
+            "name": "yt_option_restore_data_subtitle",
+            "value": "JSON에서 데이터 복원"
+        },
+        {
+            "name": "yt_backup_item_settings",
+            "value": "앱 설정"
+        },
+        {
+            "name": "yt_backup_item_subscriptions",
+            "value": "구독"
+        },
+        {
+            "name": "yt_backup_item_favorites",
+            "value": "즐겨찾기 동영상"
+        },
+        {
+            "name": "yt_backup_item_playlists",
+            "value": "즐겨찾기 재생목록"
+        },
+        {
+            "name": "yt_backup_item_local_queues",
+            "value": "로컬 재생목록"
+        },
+        {
+            "name": "yt_backup_item_watch_history",
+            "value": "시청 기록"
+        },
+        {
+            "name": "yt_backup_item_search_history",
+            "value": "검색 기록"
+        },
+        {
+            "name": "yt_backup_item_auth",
+            "value": "YouTube 로그인 상태"
+        },
+        {
+            "name": "yt_backup_export_title",
+            "value": "보낼 항목 선택"
+        },
+        {
+            "name": "yt_backup_restore_title",
+            "value": "복원할 항목 선택"
+        },
+        {
+            "name": "yt_backup_confirm_restore",
+            "value": "복원하면 선택한 로컬 데이터를 덮어씁니다. 계속하시겠습니까?"
+        },
+        {
+            "name": "yt_backup_export_success",
+            "value": "보내기 성공"
+        },
+        {
+            "name": "yt_backup_export_failed",
+            "value": "보내기 실패"
+        },
+        {
+            "name": "yt_backup_restore_success",
+            "value": "복원 성공"
+        },
+        {
+            "name": "yt_backup_restore_failed",
+            "value": "복원 실패"
+        },
+        {
+            "name": "yt_backup_version_unsupported",
+            "value": "지원되지 않는 백업 파일 버전"
+        },
+        {
+            "name": "yt_setting_home_feed_after_login",
+            "value": "로그인 후 홈 콘텐츠"
+        },
+        {
+            "name": "yt_home_feed_recommended",
+            "value": "추천"
+        },
+        {
+            "name": "yt_home_feed_kiosk",
+            "value": "라이브"
+        },
+        {
+            "name": "yt_option_sync_library_on_launch",
+            "value": "시작 시 사용자 데이터 동기화"
+        },
+        {
+            "name": "yt_option_sync_library_on_launch_subtitle",
+            "value": "시작 시 클라우드 기록과 구독 가져오기"
+        },
+        {
+            "name": "yt_option_auth_session",
+            "value": "로그인 상태로 탐색"
+        },
+        {
+            "name": "yt_option_sign_out",
+            "value": "로그아웃"
+        },
+        {
+            "name": "yt_option_sign_out_subtitle",
+            "value": "로그인 정보 삭제"
+        },
+        {
+            "name": "yt_confirm_sign_out",
+            "value": "로그아웃하시겠습니까? 저장된 로그인 정보가 삭제됩니다."
+        },
+        {
+            "name": "yt_action_audio_only",
+            "value": "오디오만"
+        },
+        {
+            "name": "yt_action_audio_only_play",
+            "value": "오디오만 재생"
+        },
+        {
+            "name": "yt_player_subtitle_off",
+            "value": "자막 끄기"
+        },
+        {
+            "name": "yt_player_chapters",
+            "value": "챕터"
+        },
+        {
+            "name": "yt_log_count_format",
+            "value": "로그 %d개"
+        },
+        {
+            "name": "yt_log_regex_placeholder",
+            "value": "정규식 필터, 예: DownloadManager|Task .*failed"
+        },
+        {
+            "name": "yt_label_current",
+            "value": "현재"
+        },
+        {
+            "name": "yt_label_autoplay",
+            "value": "자동 재생"
+        },
+        {
+            "name": "yt_download_hls_hint",
+            "value": "HLS 스트림은 원본 세그먼트 형식으로 다운로드되어 하나의 파일로 이어 붙입니다"
+        },
+        {
+            "name": "yt_video_count_format",
+            "value": "동영상 %d개"
+        },
+        {
+            "name": "yt_playlist_name_placeholder",
+            "value": "재생목록 이름"
+        },
+        {
+            "name": "yt_action_create",
+            "value": "만들기"
+        },
+        {
+            "name": "yt_action_new_playlist",
+            "value": "새 재생목록"
+        },
+        {
+            "name": "yt_action_save_to_playlist",
+            "value": "재생목록에 저장"
+        },
+        {
+            "name": "yt_comments_count_format",
+            "value": "댓글 (%d)"
+        },
+        {
+            "name": "yt_replies_count_format",
+            "value": "답글 %d개"
+        },
+        {
+            "name": "yt_error_no_downloadable_stream",
+            "value": "다운로드 가능한 미디어 스트림이 없습니다"
+        },
+        {
+            "name": "yt_action_sleep_timer",
+            "value": "취침 타이머"
+        },
+        {
+            "name": "yt_stream_info_title",
+            "value": "스트림 정보"
+        },
+        {
+            "name": "yt_stream_stats_title",
+            "value": "재생 통계"
+        },
+        {
+            "name": "yt_stats_video_id",
+            "value": "동영상 ID"
+        },
+        {
+            "name": "yt_stats_conn_speed",
+            "value": "연결 속도"
+        },
+        {
+            "name": "yt_stats_buffer",
+            "value": "버퍼 길이"
+        },
+        {
+            "name": "yt_stats_dropped",
+            "value": "드롭된 프레임"
+        },
+        {
+            "name": "yt_stream_container",
+            "value": "컨테이너 형식"
+        },
+        {
+            "name": "yt_stream_media_title",
+            "value": "미디어 제목"
+        },
+        {
+            "name": "yt_stream_duration",
+            "value": "길이"
+        },
+        {
+            "name": "yt_stream_file_size",
+            "value": "파일 크기"
+        },
+        {
+            "name": "yt_stream_video",
+            "value": "동영상"
+        },
+        {
+            "name": "yt_stream_audio",
+            "value": "오디오"
+        },
+        {
+            "name": "yt_stream_resolution",
+            "value": "해상도"
+        },
+        {
+            "name": "yt_stream_codec",
+            "value": "코덱"
+        },
+        {
+            "name": "yt_stream_bitrate",
+            "value": "비트레이트"
+        },
+        {
+            "name": "yt_stream_frame_rate",
+            "value": "프레임 레이트"
+        },
+        {
+            "name": "yt_stream_channels",
+            "value": "채널"
+        },
+        {
+            "name": "yt_stream_sample_rate",
+            "value": "샘플 레이트"
+        },
+        {
+            "name": "yt_stream_loading",
+            "value": "스트림 정보 가져오는 중…"
+        },
+        {
+            "name": "yt_sub_sync_sign_in_first",
+            "value": "로그인 후 구독 목록을 동기화하세요"
+        },
+        {
+            "name": "yt_sub_sync_cloud_empty",
+            "value": "클라우드 구독 목록이 비어 있습니다"
+        },
+        {
+            "name": "yt_sub_sync_result_added",
+            "value": "구독 %d개 동기화됨, %d개 새로 추가"
+        },
+        {
+            "name": "yt_sub_sync_result",
+            "value": "구독 %d개 동기화됨"
+        },
+        {
+            "name": "yt_sub_sync_failed",
+            "value": "구독 목록 동기화 실패"
+        },
+        {
+            "name": "yt_refresh_failed",
+            "value": "새로고침 실패"
+        },
+        {
+            "name": "yt_sub_pull_to_sync",
+            "value": "당겨서 YouTube 구독 목록 동기화"
+        },
+        {
+            "name": "yt_sub_signed_in_pull_hint",
+            "value": "로그인됨, 당겨서 YouTube 구독 동기화 가능"
+        },
+        {
+            "name": "yt_auth_subtitle_sign_in",
+            "value": "로그인하여 맞춤 추천 받기"
+        },
+        {
+            "name": "yt_auth_subtitle_cookie_active",
+            "value": "로그인됨 (Cookie)"
+        },
+        {
+            "name": "yt_auth_subtitle_active",
+            "value": "로그인됨"
+        },
+        {
+            "name": "yt_auth_subtitle_incognito",
+            "value": "로그인 저장됨 · 시크릿"
+        },
+        {
+            "name": "yt_auth_notice_title",
+            "value": "로그인 안내"
+        },
+        {
+            "name": "yt_auth_notice_message",
+            "value": "YouTube 로그인을 환영합니다. 제한적인 계정 콘텐츠 접근을 제공하며, 일부 네트워크 환경에서 익명 모드를 사용할 수 없는 문제를 효과적으로 완화합니다. 약간의 추가 네트워크 오버헤드가 발생할 수 있으니 참고하세요 :)"
+        },
+        {
+            "name": "yt_auth_continue_sign_in",
+            "value": "계속 로그인"
+        },
+        {
+            "name": "yt_cookie_collapse",
+            "value": "Cookie 로그인 접기"
+        },
+        {
+            "name": "yt_cookie_sign_in",
+            "value": "Cookie 로그인"
+        },
+        {
+            "name": "yt_cookie_import_subtitle",
+            "value": "브라우저 Cookie 붙여넣기"
+        },
+        {
+            "name": "yt_cookie_import_help",
+            "value": "header 형식(SID=...; SAPISID=...) 또는 EditThisCookie / Cookie-Editor로보낸 JSON을 지원합니다. SID와 SAPISID / __Secure-3PAPISID가 포함되어야 합니다."
+        },
+        {
+            "name": "yt_cookie_import_placeholder",
+            "value": "SID=...; SAPISID=... 또는 Cookie JSON"
+        },
+        {
+            "name": "yt_cookie_verifying",
+            "value": "Cookie 확인 중…"
+        },
+        {
+            "name": "yt_cookie_import_confirm",
+            "value": "가져오기 및 확인"
+        },
+        {
+            "name": "yt_cookie_verify_history",
+            "value": "온라인 확인 통과 (기록 %d개)"
+        },
+        {
+            "name": "yt_cookie_verify_empty_history",
+            "value": "온라인 확인 통과 (계정 기록이 비어 있지만 인증 성공)"
+        },
+        {
+            "name": "yt_cookie_session_inactive",
+            "value": "세션이 적용되지 않았습니다. 다시 가져오세요"
+        },
+        {
+            "name": "yt_cookie_verify_failed",
+            "value": "온라인 확인 실패: %s"
+        },
+        {
+            "name": "yt_cookie_input_required",
+            "value": "Cookie 문자열을 붙여넣으세요"
+        },
+        {
+            "name": "yt_cookie_parse_failed",
+            "value": "Cookie를 파싱할 수 없습니다 (header 또는 EditThisCookie JSON 지원)"
+        },
+        {
+            "name": "yt_cookie_sid_missing",
+            "value": "로컬 확인 실패: SID / SAPISID를 찾을 수 없습니다"
+        },
+        {
+            "name": "yt_cookie_sapisid_missing",
+            "value": "로컬 확인 실패: SAPISID (또는 __Secure-3PAPISID)가 없습니다"
+        },
+        {
+            "name": "yt_auth_module_unavailable",
+            "value": "인증 모듈이 초기화되지 않았습니다"
+        },
+        {
+            "name": "yt_cookie_local_validating",
+            "value": "로컬 형식 통과, YouTube로 확인 중…"
+        },
+        {
+            "name": "yt_google_web_sign_in_subtitle",
+            "value": "웹에서 YouTube 로그인"
+        },
+        {
+            "name": "yt_google_web_sign_in_title",
+            "value": "YouTube 로그인"
+        },
+        {
+            "name": "yt_label_unknown",
+            "value": "알 수 없음"
+        },
+        {
+            "name": "yt_label_untitled",
+            "value": "제목 없음"
+        },
+        {
+            "name": "yt_option_preferences",
+            "value": "환경 설정"
+        },
+        {
+            "name": "yt_appearance_theme_color",
+            "value": "테마 색상"
+        },
+        {
+            "name": "yt_playback_pip",
+            "value": "PIP"
+        },
+        {
+            "name": "yt_playback_pip_on_return",
+            "value": "돌아갈 때 PIP로 전환"
+        },
+        {
+            "name": "yt_playback_pip_on_return_subtitle",
+            "value": "뒤로/Home 시 자동으로 PIP로 전환"
+        },
+        {
+            "name": "yt_playback_player",
+            "value": "플레이어"
+        },
+        {
+            "name": "yt_playback_gestures",
+            "value": "재생 제스처"
+        },
+        {
+            "name": "yt_playback_gesture_seek",
+            "value": "밀어서 재생 위치 조절"
+        },
+        {
+            "name": "yt_playback_gesture_seek_subtitle",
+            "value": "화면을 가로로 밀어 위치 조절"
+        },
+        {
+            "name": "yt_playback_gesture_brightness",
+            "value": "왼쪽을 밀어 밝기 조절"
+        },
+        {
+            "name": "yt_playback_gesture_brightness_subtitle",
+            "value": "화면 왼쪽을 위아래로 밀어 밝기 조절"
+        },
+        {
+            "name": "yt_playback_gesture_volume",
+            "value": "오른쪽을 밀어 음량 조절"
+        },
+        {
+            "name": "yt_playback_gesture_volume_subtitle",
+            "value": "화면 오른쪽을 위아래로 밀어 음량 조절"
+        },
+        {
+            "name": "yt_playback_hold_speed",
+            "value": "길게 눌러 배속 재생"
+        },
+        {
+            "name": "yt_playback_hold_speed_subtitle",
+            "value": "화면을 누르고 있는 동안 일시적으로 배속 재생"
+        },
+        {
+            "name": "yt_playback_hold_speed_value",
+            "value": "길게 누르기 배속"
+        },
+        {
+            "name": "yt_playback_hold_speed_delay",
+            "value": "길게 누르기 트리거 지연"
+        },
+        {
+            "name": "yt_playback_background_audio_only",
+            "value": "백그라운드 오디오만"
+        },
+        {
+            "name": "yt_playback_background_audio_only_subtitle",
+            "value": "백그라운드에서 비디오 디코딩을 꺼 배터리 절약"
+        },
+        {
+            "name": "yt_playback_auto_play_next",
+            "value": "다음 동영상 자동 재생"
+        },
+        {
+            "name": "yt_playback_auto_play_next_subtitle",
+            "value": "시작 시 대기열 자동 재생 기본값으로 사용"
+        },
+        {
+            "name": "yt_playback_video_off_delay",
+            "value": "비디오 끄기 지연"
+        },
+        {
+            "name": "yt_playback_hwdec",
+            "value": "하드웨어 디코딩"
+        },
+        {
+            "name": "yt_playback_hwdec_subtitle",
+            "value": "하드웨어 가속 디코딩, 배터리 절약"
+        },
+        {
+            "name": "yt_playback_gpu_rendering",
+            "value": "GPU 렌더링"
+        },
+        {
+            "name": "yt_playback_stream_endpoint",
+            "value": "재생 엔드포인트"
+        },
+        {
+            "name": "yt_playback_guest_player_client",
+            "value": "게스트 재생 엔드포인트"
+        },
+        {
+            "name": "yt_playback_auth_player_client",
+            "value": "로그인 재생 엔드포인트"
+        },
+        {
+            "name": "yt_setting_client_visionos",
+            "value": "VisionOS"
+        },
+        {
+            "name": "yt_setting_client_tv_downgraded",
+            "value": "TV Downgraded"
+        },
+        {
+            "name": "yt_setting_client_mweb",
+            "value": "MWEB (SABR)"
+        },
+        {
+            "name": "yt_playback_buffer_network",
+            "value": "버퍼링 및 네트워크"
+        },
+        {
+            "name": "yt_playback_memory_cache",
+            "value": "메모리 캐시"
+        },
+        {
+            "name": "yt_playback_readahead",
+            "value": "미리 읽기 버퍼"
+        },
+        {
+            "name": "yt_playback_buffer_size",
+            "value": "버퍼 크기"
+        },
+        {
+            "name": "yt_download_concurrent_tasks",
+            "value": "동시 다운로드 작업"
+        },
+        {
+            "name": "yt_toast_login_success",
+            "value": "로그인 성공"
+        },
+        {
+            "name": "yt_login_extracting_auth",
+            "value": "로그인 성공, 인증 정보 추출 중…"
+        },
+        {
+            "name": "yt_login_skip_pot",
+            "value": "건너뛰기 (PoToken 추출 안 함)"
+        },
+        {
+            "name": "yt_confirm_delete_search_item",
+            "value": "“%s”을(를) 삭제하시겠습니까?"
+        },
+        {
+            "name": "yt_download_saved_to_downloads",
+            "value": "다운로드 폴더에 저장됨"
+        },
+        {
+            "name": "yt_download_save_failed",
+            "value": "저장 실패"
+        },
+        {
+            "name": "yt_date_today",
+            "value": "오늘"
+        },
+        {
+            "name": "yt_date_days_ago",
+            "value": "%d일 전"
+        },
+        {
+            "name": "yt_date_weeks_ago",
+            "value": "%d주 전"
+        },
+        {
+            "name": "yt_date_months_ago",
+            "value": "%d개월 전"
+        },
+        {
+            "name": "yt_date_years_ago",
+            "value": "%d년 전"
+        },
+        {
+            "name": "yt_download_status_waiting",
+            "value": "대기 중"
+        },
+        {
+            "name": "yt_download_status_video",
+            "value": "동영상 다운로드 중"
+        },
+        {
+            "name": "yt_download_status_audio",
+            "value": "오디오 다운로드 중"
+        },
+        {
+            "name": "yt_download_status_merging",
+            "value": "병합 중"
+        },
+        {
+            "name": "yt_download_status_completed",
+            "value": "완료됨"
+        },
+        {
+            "name": "yt_download_status_failed",
+            "value": "다운로드 실패"
+        },
+        {
+            "name": "yt_download_status_cancelled",
+            "value": "취소됨"
+        },
+        {
+            "name": "yt_download_started_format",
+            "value": "다운로드 시작: %s"
+        },
+        {
+            "name": "yt_download_saved_format",
+            "value": "다운로드 폴더에 저장됨: %s"
+        },
+        {
+            "name": "yt_download_completed_format",
+            "value": "다운로드 완료: %s"
+        },
+        {
+            "name": "yt_toast_copied",
+            "value": "복사됨"
+        },
+        {
+            "name": "yt_toast_copy_failed",
+            "value": "복사 실패"
+        },
+        {
+            "name": "yt_about_package_name",
+            "value": "앱 패키지 이름"
+        },
+        {
+            "name": "yt_follow_system",
+            "value": "시스템 설정 따르기"
+        },
+        {
+            "name": "yt_data_account_manage_sign_in",
+            "value": "데이터 및 로그인 상태 관리"
+        },
+        {
+            "name": "yt_data_account_incognito",
+            "value": "로그인 저장됨 · 시크릿 모드 사용 중"
+        },
+        {
+            "name": "yt_data_account_cookie",
+            "value": "로그인됨 (Cookie) · 데이터 및 계정 관리"
+        },
+        {
+            "name": "yt_data_account_signed_in",
+            "value": "로그인됨 · 데이터 및 계정 관리"
+        },
+        {
+            "name": "yt_layout_card_mode",
+            "value": "카드 모드"
+        },
+        {
+            "name": "yt_layout_list_mode",
+            "value": "목록 모드"
+        },
+        {
+            "name": "yt_pip_playing",
+            "value": "PIP 재생 중"
+        },
+        {
+            "name": "yt_pip_restore_hint",
+            "value": "PIP 창을 탭하여 복원"
+        },
+        {
+            "name": "yt_google_web_sign_in",
+            "value": "Google 계정으로 로그인"
+        },
+        {
+            "name": "yt_login_sapisid_failed",
+            "value": "SAPISID를 가져오지 못했습니다. 다시 시도하세요"
+        },
+        {
+            "name": "yt_time_minutes_ago",
+            "value": "%d분 전"
+        },
+        {
+            "name": "yt_time_hours_ago",
+            "value": "%d시간 전"
+        },
+        {
+            "name": "yt_history_sync_sign_in",
+            "value": "로그인 후 클라우드 기록을 동기화하세요"
+        },
+        {
+            "name": "yt_history_sync_success",
+            "value": "클라우드 기록 %d개 동기화됨 (로컬 진행률과 시간 유지)"
+        },
+        {
+            "name": "yt_history_sync_empty",
+            "value": "클라우드 기록이 비어 있습니다"
+        },
+        {
+            "name": "yt_history_sync_failed",
+            "value": "클라우드 기록 동기화 실패"
+        },
+        {
+            "name": "yt_sub_feed_youtube",
+            "value": "YouTube 구독 피드"
+        },
+        {
+            "name": "yt_sub_feed_title",
+            "value": "구독 피드"
+        },
+        {
+            "name": "yt_sub_feed_entry_title",
+            "value": "구독 피드"
+        },
+        {
+            "name": "yt_sub_feed_entry_subtitle",
+            "value": "구독 채널 %d개"
+        },
+        {
+            "name": "yt_sub_feed_new_items",
+            "value": "새 동영상 %d개"
+        },
+        {
+            "name": "yt_sub_feed_empty_hint",
+            "value": "당겨서 구독 채널의 최신 동영상 새로고침"
+        },
+        {
+            "name": "yt_backup_item_subscription_feed",
+            "value": "구독 피드 캐시"
+        },
+        {
+            "name": "yt_feed_fast_mode_title",
+            "value": "구독 피드 빠른 모드 (RSS)"
+        },
+        {
+            "name": "yt_feed_fast_mode_subtitle",
+            "value": "경량 RSS로 가져오기, 요청은 적지만 정보가 불완전함"
+        },
+        {
+            "name": "yt_backup_error_no_context",
+            "value": "앱 컨텍스트를 가져올 수 없습니다"
+        },
+        {
+            "name": "yt_backup_error_no_save_path",
+            "value": "저장 경로가 선택되지 않았습니다"
+        },
+        {
+            "name": "yt_backup_error_no_file",
+            "value": "파일이 선택되지 않았습니다"
+        },
+        {
+            "name": "yt_backup_error_format",
+            "value": "백업 파일 형식 오류"
+        },
+        {
+            "name": "yt_backup_error_wrong_app",
+            "value": "이 앱의 백업 파일이 아닙니다"
+        },
+        {
+            "name": "yt_backup_error_version",
+            "value": "지원되지 않는 백업 파일 버전"
+        },
+        {
+            "name": "yt_backup_error_empty",
+            "value": "백업 파일이 비어 있습니다"
+        },
+        {
+            "name": "yt_backup_error_restore",
+            "value": "복원 실패"
+        },
+        {
+            "name": "yt_backup_error_export",
+            "value": "보내기 실패"
+        },
+        {
+            "name": "yt_subscriptions_feed_local",
+            "value": "로컬 구독 RSS"
+        },
+        {
+            "name": "yt_playlist_video_count",
+            "value": "동영상 %d개"
+        },
+        {
+            "name": "yt_history_sync_pull_hint",
+            "value": "당겨서 YouTube 시청 기록 동기화"
+        },
+        {
+            "name": "yt_history_sync_sign_in_hint",
+            "value": "로그인하여 클라우드 기록 동기화 활성화"
+        },
+        {
+            "name": "yt_history_sync_signed_in_hint",
+            "value": "로그인됨, 당겨서 클라우드 기록 동기화 가능"
+        },
+        {
+            "name": "yt_subs_sync_signed_in_hint",
+            "value": "로그인됨, 당겨서 YouTube 구독 동기화 가능"
+        },
+        {
+            "name": "yt_setting_delay_immediate",
+            "value": "즉시"
+        },
+        {
+            "name": "yt_setting_gpu_auto",
+            "value": "자동"
+        },
+        {
+            "name": "yt_label_opengl",
+            "value": "OpenGL"
+        },
+        {
+            "name": "yt_label_vulkan",
+            "value": "Vulkan"
+        },
+        {
+            "name": "yt_about_oss_newpipe_desc",
+            "value": "오픈 소스 Android용 YouTube 클라이언트. 동영상 탐색, 검색, 스트림 추출의 참조 구현"
+        },
+        {
+            "name": "yt_about_oss_iplay_desc",
+            "value": "크로스 플랫폼 미디어 플레이어. Emby, Jellyfin, 다중 사이트 전환 및 사용자 지정 재생 지원"
+        },
+        {
+            "name": "yt_about_oss_ytdlp_desc",
+            "value": "수천 개 사이트와 형식을 지원하는 기능 풍부한 명령줄 오디오/비디오 다운로드 도구"
+        },
+        {
+            "name": "yt_about_oss_finvideo_desc",
+            "value": "HarmonyOS NEXT용 Jellyfin / Emby / Plex 동영상 플레이어"
+        },
+        {
+            "name": "yt_about_oss_hmsamples_desc",
+            "value": "Huawei 개발자 장편 동영상 재생, AVPlayer 등 HarmonyOS 참조 예제"
+        },
+        {
+            "name": "yt_about_license_reference",
+            "value": "Reference"
+        },
+        {
+            "name": "yt_changelog_0_5_3_1",
+            "value": "YouTube SABR/UMP 스트리밍 지원 추가, 신형식·고해상도·제한된 동영상의 호환성 향상"
+        },
+        {
+            "name": "yt_changelog_0_5_3_2",
+            "value": "동영상 추출 및 클라이언트 선택 리팩터링, PipePipe 요청 동작에 맞춤, 원격 서명 복호화 복원, 중복 추출 및 시작 대기 시간 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_3_3",
+            "value": "로컬 DASH 미디어 프록시 개선: A/V 트랙 분리, 세그먼트 캐시, 정밀 탐색, 스트림 끊김 복구, 재생 종료 처리"
+        },
+        {
+            "name": "yt_changelog_0_5_3_4",
+            "value": "SABR PoToken 지원 추가; 서명 파라미터, 요청 헤더, 바이너리 응답 처리 최적화로 403 / 재생 불가 / 로드 실패 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_3_5",
+            "value": "플레이어 상태 동기화, 화질 및 오디오 트랙 전환 개선, 재생 후 무한 로딩, 탐색 오프셋 및 오디오 트랙 메뉴 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_3_6",
+            "value": "재생목록 파싱 및 페이지 매김 업그레이드, 새 목록 구조·잠긴 콘텐츠·연속 로드 지원; 목록 로딩 및 연속 재생 개선"
+        },
+        {
+            "name": "yt_changelog_0_5_3_7",
+            "value": "계정 및 데이터 관리 진입점 재구성, 로그인 상태·시청 기록·로컬 페이지·다운로드 옵션·재생 환경 설정 간 연동 개선"
+        },
+        {
+            "name": "yt_changelog_0_5_3_8",
+            "value": "홈 추천, 동영상 카드, 테마 색상, PIP, 시스템 미디어 세션 개선; 다수의 UI 및 재생 안정성 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_2_1",
+            "value": "플레이어 페이지에 오디오만 모드 추가: 비디오를 끄고 소리만 감상, 커버가 화면을 대체하며 진행률과 컨트롤 사용 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_2_2",
+            "value": "오디오만 모드에서는 PIP 미지원; 포그라운드 복귀 시 오디오만 유지, 수동 재개 필요"
+        },
+        {
+            "name": "yt_changelog_0_5_2_3",
+            "value": "백그라운드에서 비디오 끄기를 지연시켜 전력 절약 가능 (재생 설정에서 조절)"
+        },
+        {
+            "name": "yt_changelog_0_5_2_4",
+            "value": "시스템 브로드캐스트 인터럽트 수정: 올바른 duck 볼륨 감소, 이중 압축으로 인한 무음 방지"
+        },
+        {
+            "name": "yt_changelog_0_5_2_5",
+            "value": "가로/세로, 전체 화면, 창 모드 재생이 더 부드러워지고 화면 깜빡임과 블러 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_2_6",
+            "value": "로그인 후 홈이 계정 상태에 더 잘 맞고 클라우드 시청 기록 및 구독 동기화 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_2_7",
+            "value": "더 선명한 동영상 카드, 라이브 배지, 페이지 안전 영역 표시"
+        },
+        {
+            "name": "yt_changelog_0_5_2_8",
+            "value": "앱 핸드오프 및 탭하여 동영상 링크 공유 지원"
+        },
+        {
+            "name": "yt_changelog_0_5_1_1",
+            "value": "일부 알려진 버그 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_1_2",
+            "value": "PipePipe 이슈 반영"
+        },
+        {
+            "name": "yt_changelog_0_5_1_3",
+            "value": "로그인 후 시청 불가 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_1_4",
+            "value": "가로 모드에서 정보 바가 잘못 표시되는 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_1_5",
+            "value": "설정 페이지 UI 최적화"
+        },
+        {
+            "name": "yt_changelog_0_5_1_6",
+            "value": "로컬 복호화 로직 검증 완료, 배포 준비 완료"
+        },
+        {
+            "name": "yt_changelog_0_5_0_1",
+            "value": "시스템 재생 엔진과 서드파티 FFmpeg을 MPVPlayer로 교체"
+        },
+        {
+            "name": "yt_changelog_0_5_0_2",
+            "value": "고해상도 재생 및 자막 기능 복원"
+        },
+        {
+            "name": "yt_changelog_0_5_0_3",
+            "value": "HEVC/H.264 하드웨어 디코딩 지원; API 23 이상에서 VP9/AV1 하드웨어 디코딩 시도"
+        },
+        {
+            "name": "yt_changelog_0_5_0_4",
+            "value": "진정한 HDR 디스플레이 추가"
+        },
+        {
+            "name": "yt_changelog_0_5_0_5",
+            "value": "비로그인 상태의 네트워크 전송 라이브러리 기능 최적화"
+        },
+        {
+            "name": "yt_changelog_0_5_0_6",
+            "value": "오류 표시 최적화"
+        },
+        {
+            "name": "yt_changelog_0_5_0_7",
+            "value": "UI 및 설정 옵션 최적화"
+        },
+        {
+            "name": "yt_changelog_0_5_0_8",
+            "value": "PipePipe 최신 버전 패치 적용"
+        },
+        {
+            "name": "yt_changelog_0_4_1_1",
+            "value": "동영상 로딩 속도 최적화"
+        },
+        {
+            "name": "yt_changelog_0_4_1_2",
+            "value": "PipePipe 5.1.1 패치 적용"
+        },
+        {
+            "name": "yt_changelog_0_4_1_3",
+            "value": "Google 로그인 허용, 봇 보호 문제 기본 해소"
+        },
+        {
+            "name": "yt_changelog_0_4_1_4",
+            "value": "다양한 기기의 전체 화면 인터랙션 최적화"
+        },
+        {
+            "name": "yt_changelog_0_4_1_5",
+            "value": "플레이어 페이지의 여러 모듈 개발"
+        },
+        {
+            "name": "yt_changelog_0_4_1_6",
+            "value": "다운로드 기능 초기 버전 완료"
+        },
+        {
+            "name": "yt_changelog_0_4_1_7",
+            "value": "재생목록 기능 완성"
+        },
+        {
+            "name": "yt_changelog_0_4_1_8",
+            "value": "시스템 및 캐스트 진입점 통합, 실험적 앱 핸드오프 초기 버전"
+        },
+        {
+            "name": "yt_changelog_0_4_0_1",
+            "value": "yt-dlp 생태계 분석 및 통합 인터페이스 기본 완료"
+        },
+        {
+            "name": "yt_changelog_0_4_0_2",
+            "value": "Google 로그인 허용, 봇 보호 문제 기본 해소"
+        },
+        {
+            "name": "yt_changelog_0_4_0_3",
+            "value": "재생 메커니즘 최적화"
+        },
+        {
+            "name": "yt_changelog_0_4_0_4",
+            "value": "로컬 디코딩 대신 클라우드 디코딩 사용, 더 안정적"
+        },
+        {
+            "name": "yt_changelog_0_3_1_1",
+            "value": "페이지 스택 및 미니 창 재생 개선"
+        },
+        {
+            "name": "yt_changelog_0_3_1_2",
+            "value": "더 부드러운 재생을 위한 서버 캐시 추가"
+        },
+        {
+            "name": "yt_changelog_0_3_1_3",
+            "value": "UI 및 인터랙션 최적화"
+        },
+        {
+            "name": "yt_changelog_0_3_1_4",
+            "value": "더 많은 페이지 및 크기 대응"
+        },
+        {
+            "name": "yt_changelog_0_3_1_5",
+            "value": "버그 방지를 위해 기존 코드 계속 간소화"
+        },
+        {
+            "name": "yt_changelog_0_3_1_6",
+            "value": "Google 로그인 초기 개발, PipePipe 로그인 실현 가능성 검증"
+        },
+        {
+            "name": "yt_changelog_0_3_1_7",
+            "value": "백그라운드 재생 안정성 최적화"
+        },
+        {
+            "name": "yt_changelog_0_3_0_1",
+            "value": "릴레이 HTTP 서버 방식 최종 실험 채택"
+        },
+        {
+            "name": "yt_changelog_0_3_0_2",
+            "value": "라이프사이클 개선을 위해 시스템 레벨 플레이어로 복귀"
+        },
+        {
+            "name": "yt_changelog_0_3_0_3",
+            "value": "UI 및 인터랙션 최적화"
+        },
+        {
+            "name": "yt_changelog_0_3_0_4",
+            "value": "더 많은 페이지 및 크기 대응"
+        },
+        {
+            "name": "yt_changelog_0_3_0_5",
+            "value": "기존 라이브러리와 헤더 대거 제거, 버그 방지를 위해 간소화"
+        },
+        {
+            "name": "yt_changelog_0_3_0_6",
+            "value": "Google 로그인 초기 개발, SmartTube 실현 가능성 검증"
+        },
+        {
+            "name": "yt_changelog_0_3_0_7",
+            "value": "백그라운드 재생 안정성 최적화"
+        },
+        {
+            "name": "yt_changelog_0_2_0_1",
+            "value": "프로젝트 코드 리팩터링, 라이프사이클 관리 및 개발 속도 최적화, 새로운 시작"
+        },
+        {
+            "name": "yt_changelog_0_2_0_2",
+            "value": "재생 및 라이브 스트리밍 최적화, 더 부드러운 라이브, 발열 감소"
+        },
+        {
+            "name": "yt_changelog_0_2_0_3",
+            "value": "더 많은 옵션, 사용자 지정 가능한 재생 옵션"
+        },
+        {
+            "name": "yt_changelog_0_2_0_4",
+            "value": "더 풍부한 오류 메시지 및 로그 관리"
+        },
+        {
+            "name": "yt_changelog_0_2_0_5",
+            "value": "다국어 최적화 추가"
+        },
+        {
+            "name": "yt_changelog_0_2_0_6",
+            "value": "NewPipe 코어 코드 업데이트, 네트워크 연결 및 디코딩 최적화로 안정성 향상"
+        },
+        {
+            "name": "yt_changelog_0_2_0_7",
+            "value": "백그라운드 재생 안정성 최적화"
+        },
+        {
+            "name": "yt_changelog_0_2_0_8",
+            "value": "시스템 레벨 AVPlayer 재생, 안정성 및 전력 최적화"
+        },
+        {
+            "name": "yt_changelog_0_1_2_1",
+            "value": "앱 UI 언어 전환 시 UI 멈춤 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_1_2_2",
+            "value": "콘텐츠 언어 목록의 중국어 변형 표시 최적화 (간체 / 번체 홍콩 / 번체 타이완)"
+        },
+        {
+            "name": "yt_changelog_0_1_2_3",
+            "value": "로그 다운로드 완료 후 저장 경로 힌트 표시"
+        },
+        {
+            "name": "yt_changelog_0_1_2_4",
+            "value": "정보 페이지 추가"
+        },
+        {
+            "name": "yt_changelog_0_1_2_5",
+            "value": "고해상도 비활성화 옵션이 동작하지 않는 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_1_2_6",
+            "value": "설정 페이지 모듈 전반의 시각적 스타일 통일"
+        },
+        {
+            "name": "yt_changelog_0_1_1_1",
+            "value": "MPV 재생 코어 통합, 하드웨어 디코딩 및 고해상도 동영상 지원"
+        },
+        {
+            "name": "yt_changelog_0_1_1_2",
+            "value": "백그라운드 재생 및 시스템 미디어 컨트롤 통합 구현"
+        },
+        {
+            "name": "yt_changelog_0_1_1_3",
+            "value": "언어 및 지역 설정 완료, 콘텐츠 언어 / 지역 전환 지원"
+        },
+        {
+            "name": "yt_changelog_0_1_1_4",
+            "value": "실행 로그 시스템 추가, 세션보내기 지원"
+        },
+        {
+            "name": "yt_changelog_0_1_1_5",
+            "value": "태블릿 가로 모드 플레이어 레이아웃 최적화"
+        },
+        {
+            "name": "yt_changelog_0_1_0_1",
+            "value": "첫 출시: 기본적인 YouTube 동영상 탐색 및 검색"
+        },
+        {
+            "name": "yt_changelog_0_1_0_2",
+            "value": "NewPipe Extractor 엔진 통합"
+        },
+        {
+            "name": "yt_changelog_0_1_0_3",
+            "value": "채널 구독, 즐겨찾기, 재생목록 관리 지원"
+        },
+        {
+            "name": "yt_changelog_0_1_0_4",
+            "value": "라이브 스트림 재생 지원"
+        },
+        {
+            "name": "yt_changelog_0_1_0_5",
+            "value": "댓글 목록 및 채널 페이지"
+        },
+        {
+            "name": "yt_label_version_format",
+            "value": "버전"
+        },
+        {
+            "name": "yt_label_projects",
+            "value": "개 프로젝트"
+        },
+        {
+            "name": "yt_label_models",
+            "value": "개 모델"
+        },
+        {
+            "name": "yt_label_latest_version",
+            "value": "최신 v"
+        },
+        {
+            "name": "yt_label_videos",
+            "value": "개 동영상"
+        },
+        {
+            "name": "yt_label_videos_alt",
+            "value": "개 동영상"
+        },
+        {
+            "name": "yt_label_favorites_videos",
+            "value": "개 동영상"
+        },
+        {
+            "name": "yt_label_seconds_short",
+            "value": "초"
+        },
+        {
+            "name": "yt_label_mb_short",
+            "value": "MB"
+        },
+        {
+            "name": "yt_setting_delay_5",
+            "value": "5초"
+        },
+        {
+            "name": "yt_setting_delay_15",
+            "value": "15초"
+        },
+        {
+            "name": "yt_setting_delay_30",
+            "value": "30초"
+        },
+        {
+            "name": "yt_setting_delay_60",
+            "value": "60초"
+        },
+        {
+            "name": "yt_setting_cache_secs_5",
+            "value": "5초"
+        },
+        {
+            "name": "yt_setting_cache_secs_10",
+            "value": "10초"
+        },
+        {
+            "name": "yt_setting_cache_secs_20",
+            "value": "20초"
+        },
+        {
+            "name": "yt_setting_cache_secs_30",
+            "value": "30초"
+        },
+        {
+            "name": "yt_setting_cache_secs_60",
+            "value": "60초"
+        },
+        {
+            "name": "yt_setting_readahead_5",
+            "value": "5초"
+        },
+        {
+            "name": "yt_setting_readahead_8",
+            "value": "8초"
+        },
+        {
+            "name": "yt_setting_readahead_15",
+            "value": "15초"
+        },
+        {
+            "name": "yt_setting_readahead_30",
+            "value": "30초"
+        },
+        {
+            "name": "yt_setting_readahead_60",
+            "value": "60초"
+        },
+        {
+            "name": "yt_setting_max_bytes_10",
+            "value": "10 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_20",
+            "value": "20 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_50",
+            "value": "50 MB"
+        },
+        {
+            "name": "yt_setting_max_bytes_100",
+            "value": "100 MB"
+        },
+        {
+            "name": "yt_changelog_0_5_4_1",
+            "value": "로컬 JS 서명 복호화 및 디스크 캐시 개선, 콜드 스타트 예열 및 실패 시 폴백 지원, 원격 복호화 의존 시 대기 및 실패 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_4_2",
+            "value": "DASH 오디오 트랙 메타데이터(xtags/acont) 보완, 콘텐츠 언어와 원음 트랙 선호에 따라 기본 오디오 트랙 자동 선택, 다국어 영상의 더빙 오선택 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_4_3",
+            "value": "플레이어 페이지에 취침 타이머 추가, 시간이 되면 재생을 멈추고 종료; 좋아요/조회수를 언어별로 현지화하여 표시하고 정보 영역 색상 최적화"
+        },
+        {
+            "name": "yt_changelog_0_5_4_4",
+            "value": "전체 UI 언어 문자열 키 정렬, 설정 항목과 정보 페이지의 [object Object] 표시 문제 수정, 중국어 간체 리소스 보완"
+        },
+        {
+            "name": "yt_changelog_0_5_4_5",
+            "value": "기본 테마 색상을 빨간색으로 변경, 플레이어 컨트롤 영역/정보 영역 배경색을 추가하여 대비 향상"
+        },
+        {
+            "name": "yt_changelog_0_5_4_6",
+            "value": "홈에서 당겨서 새로고침 지원; 데이터 전체 삭제 시 인증 환경 설정, 썸네일 캐시, 복호화 캐시도 함께 삭제 (다운로드한 미디어는 유지)"
+        },
+        {
+            "name": "yt_changelog_0_5_4_7",
+            "value": "네트워크 요청 로그 및 추출 체인 진단 정보 보강, 로드 실패 및 인증 관련 문제 파악 용이"
+        },
+        {
+            "name": "yt_changelog_0_5_4_8",
+            "value": "MPV 런타임 라이브러리 동기 업데이트, 재생 및 UI 관련 다수의 안정성 문제 수정"
+        },
+        {
+            "name": "yt_secure_shield_title",
+            "value": "방패 보호 모드가 켜져 있습니다"
+        },
+        {
+            "name": "yt_secure_shield_content",
+            "value": "시스템에서 방패 보호 모드를 켜고 JIT을 비활성화했습니다. 로컬 서명 복호화를 사용할 수 없어 원격 복호화 서비스를 사용하며, 동영상 시작이 더 느려질 수 있습니다."
+        },
+        {
+            "name": "yt_secure_shield_dont_show",
+            "value": "다시 표시하지 않음"
+        },
+        {
+            "name": "yt_action_got_it",
+            "value": "알겠습니다"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data",
+            "value": "사용자 데이터에 로그인 상태 사용"
+        },
+        {
+            "name": "yt_option_auth_use_for_user_data_subtitle",
+            "value": "피드, 구독, 기록, 검색"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback",
+            "value": "재생에 로그인 상태 사용"
+        },
+        {
+            "name": "yt_changelog_0_5_5_1",
+            "value": "시작 시 Secure Shield/JIT 제한을 감지하고 원격 서명 복호화가 사용되는 경우를 명확히 안내"
+        },
+        {
+            "name": "yt_changelog_0_5_5_2",
+            "value": "당겨서 새로고침 후 홈 및 구독 카드가 안정적으로 다시 빌드됨 (항목 ID가 바뀌지 않는 경우 포함)"
+        },
+        {
+            "name": "yt_changelog_0_5_5_3",
+            "value": "영구적인 마스터, 사용자 데이터, 재생 로그인 스위치를 추가하여 계정 접근을 독립적으로 관리 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_5_4",
+            "value": "사용자 데이터 로그인을 끄면 인증된 빈 응답 대신 익명 홈 및 로컬 피드로 폴백"
+        },
+        {
+            "name": "yt_changelog_0_5_5_5",
+            "value": "재생 로그인을 끄면 익명 플레이어 클라이언트를 선택하고 SABR 다운로드에서 계정 자격 증명 제외"
+        },
+        {
+            "name": "yt_changelog_0_5_5_6",
+            "value": "플레이어 추천이 안정적인 익명 YouTube next 응답을 사용하여 로그인 상태에서 대기열이 비는 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_5_7",
+            "value": "인증된 재생 클라이언트 선택 및 제한된 동영상의 LOGIN_REQUIRED 처리 안정화"
+        },
+        {
+            "name": "yt_changelog_0_5_5_8",
+            "value": "시청 페이지의 서명 타임스탬프를 우선 사용하여 원격 플레이어 서비스 폴백 전 시작 지연 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_5_9",
+            "value": "캐시된 플레이어 메타데이터와 더 타이트한 원격 복호화 타임아웃 추가, 느린 서비스가 재생을 오래 막지 않도록 함"
+        },
+        {
+            "name": "yt_changelog_0_5_5_10",
+            "value": "DASH URL에 캐시된 base64url PoToken 주입을 추가하여 토큰 실패를 치명적으로 만들지 않으면서 googlevideo 403 오류 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_5_11",
+            "value": "충돌하던 하단 시트 바인딩을 통합하여 재생목록에 저장, 스트림 정보, 취침 타이머 패널 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_5_12",
+            "value": "계정 사용이 꺼져 있을 때 익명 및 로컬 폴백을 유지하면서 인증된 재생목록 및 사용자 라이브러리 탐색 개선"
+        },
+        {
+            "name": "yt_changelog_0_5_5_13",
+            "value": "비공개 탐색이 저장된 자격 증명을 삭제하지 않고 두 계정 화면을 모두 가릴 수 있어 로그인 모드로 쉽게 복귀 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_5_14",
+            "value": "마스터 또는 재생 로그인 스위치 변경 시 올바른 익명/인증 플레이어 클라이언트를 즉시 재선택"
+        },
+        {
+            "name": "yt_changelog_0_5_5_15",
+            "value": "기록 및 구독 클라우드 동기화가 사용자 데이터 스위치를 따르며 기존 로컬 기록과 구독 유지"
+        },
+        {
+            "name": "yt_changelog_0_5_5_16",
+            "value": "재생목록 탐색 요청이 필요 시 계정 접근을 사용할 수 있어 계정 전용 및 제한된 재생목록 로딩 개선"
+        },
+        {
+            "name": "yt_changelog_0_5_5_17",
+            "value": "PoToken 생성이 오래된 고정 버전 대신 현재 확인된 YouTube 웹 클라이언트 버전을 공유"
+        },
+        {
+            "name": "yt_changelog_0_5_5_18",
+            "value": "PoToken 바이트를 URL 안전 base64로 변환하고 반복 토큰 생성을 피하기 위해 동영상별로 5분간 캐시"
+        },
+        {
+            "name": "yt_changelog_0_5_5_19",
+            "value": "사용자 데이터 및 재생 요청이 선택한 범위 내에서만 자격 증명을 적용하여 의도치 않은 계정 Cookie 노출 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_5_20",
+            "value": "민감한 Cookie와 서명된 URL을 로그에서 제외하면서 재생, 인증, 토큰, 새로고침, 폴백 진단 확장"
+        },
+        {
+            "name": "yt_changelog_0_5_9_1",
+            "value": "피드 페이지를 지연 로딩 그리드/목록으로 변경: 홈, 검색, 재생목록, 채널, 구독의 긴 목록 스크롤이 더 부드러워짐"
+        },
+        {
+            "name": "yt_changelog_0_5_9_2",
+            "value": "일부 기기에서 콜드 스타트 시 즉시 충돌하는 문제 수정 (@BuilderParam 바인딩)"
+        },
+        {
+            "name": "yt_changelog_0_5_9_3",
+            "value": "로그인 상태 만료가 끊기지 않던 문제와 홈이 안내 없이 조용히 폴백하던 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_9_4",
+            "value": "옵션 아이콘과 위험 작업 버튼이 테마 색상을 따르도록 통일, 고정 경고 빨간색 제거"
+        },
+        {
+            "name": "yt_changelog_0_5_9_5",
+            "value": "텍스트 인코딩/디코딩, Base64, URL 파싱 등을 시스템 공식 구현으로 전환"
+        },
+        {
+            "name": "yt_changelog_0_5_9_6",
+            "value": "캐스트 죽은 링크, 상태 폴링 등 불필요한 코드 정리, 패키지 크기 축소"
+        },
+        {
+            "name": "yt_changelog_0_5_9_7",
+            "value": "재생 프리페치 연동, 백그라운드 작업 가드 등 안정성 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_8_1",
+            "value": "댓글 번역: 댓글 아래에 「번역」 버튼 추가 (Google 번역 엔진), 번역문을 제자리에 표시하고 한 번에 원문으로 전환 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_8_2",
+            "value": "「언어 및 지역」에 「콘텐츠 번역」 설정 그룹 추가: 번역 대상 언어는 기본적으로 앱 언어를 따르며 수동 지정도 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_8_3",
+            "value": "시작 재생 속도 PipePipe에 맞춤: 비로그인은 기본으로 visionos 클라이언트 직결 스트림 (PoToken 불필요), 로그인 상태는 tv_downgraded 사용"
+        },
+        {
+            "name": "yt_changelog_0_5_8_4",
+            "value": "라이브가 계속 로딩되던 문제 수정: 라이브 항목 분류 수정, 라이브 스트림 정상 재생 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_8_5",
+            "value": "로그인 경로 수정: Cookie와 OAuth 이중 레일 신원 분리, 웹 메타데이터/댓글 요청이 자격 증명을 혼용하지 않음"
+        },
+        {
+            "name": "yt_changelog_0_5_8_6",
+            "value": "시스템 재생 컨트롤에 현재 동영상 제목과 작성자 표시: AVSession 메타데이터가 간헐적으로 비던 문제 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_8_7",
+            "value": "UI 수정: 하단 탭 하이라이트 새로고침, 태블릿 가이드 페이지 레이아웃, 채널 페이지 카드 모드 중첩 스크롤"
+        },
+        {
+            "name": "yt_changelog_0_5_7_1",
+            "value": "정보 페이지에 「업데이트 확인」 추가: GitHub 최신 Release의 빌드 번호와 비교하여 새 버전 발견 시 AppGallery 테스트 설치 또는 GitHub 출시 페이지로 한 번에 이동"
+        },
+        {
+            "name": "yt_changelog_0_5_7_2",
+            "value": "구독 피드 페이지 추가: 구독 채널 업데이트를 시간순으로 집계; 재생목록이 시청 기록을 기록하고 진행률 배지 표시; 목록 와이드스크린 레이아웃 대응"
+        },
+        {
+            "name": "yt_changelog_0_5_7_3",
+            "value": "「다음 자동 재생」 설정 스위치 추가; 정보 페이지 오픈 소스 프로젝트 표기 보완; 미디어 데이터 요청의 HTTP 프록시 지원"
+        },
+        {
+            "name": "yt_changelog_0_5_7_4",
+            "value": "시작 재생 속도 향상: 재생 중 대기열 다음 동영상 미리 추출, BotGuard 부팅 예열, STS/클라이언트 버전 메타데이터 디스크 재사용"
+        },
+        {
+            "name": "yt_changelog_0_5_7_5",
+            "value": "라이브 HLS 다중 화질 변형 파싱 및 전환 지원; SIDX 인덱스 시작 프리페치; visitorData 세션 레벨 고정으로 중복 스트림 요청 감소"
+        },
+        {
+            "name": "yt_changelog_0_5_7_6",
+            "value": "SABR 안정성: PoToken 발급에 타임아웃 및 서킷 브레이커 추가, 빈 응답 시 즉시 PoToken 재발급, 세션 구축 실패 시 리스 정상 해제"
+        },
+        {
+            "name": "yt_changelog_0_5_7_7",
+            "value": "자동 연속 재생 중복 트리거 및 소스 전환 경합 수정 (소스 제출을 단일 작성자로 수렴); PIP 닫기/복원 누수 및 시청 기록 병합 순서 수정"
+        },
+        {
+            "name": "yt_changelog_0_5_7_8",
+            "value": "HarmonyOS 6에서 비디오 화면이 나오지 않던 문제 수정 (OHNativeWindow를 mpv로 직접 전달); 하드웨어 디코딩 기능을 기기별 감지 선언으로 변경"
+        },
+        {
+            "name": "yt_changelog_0_5_6_1",
+            "value": "YouTube OAuth용 SmartTube 스타일 기기 QR 로그인; Cookie 로그인과 공존 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_6_2",
+            "value": "홈, 기록, 구독, 라이브러리용 이중 레일 Cookie/WEB + OAuth/TV 인증; 공개 스트림은 mweb 유지, 제한된 콘텐츠는 TV로 폴백 가능"
+        },
+        {
+            "name": "yt_changelog_0_5_6_3",
+            "value": "추출기, SABR, 미디어 요청용 HTTP 프록시 설정 (루프백 재생은 직결 유지)"
+        },
+        {
+            "name": "yt_changelog_0_5_6_4",
+            "value": "플레이어에서 동영상 챕터 지원, 챕터 이동 및 현재 챕터 하이라이트"
+        },
+        {
+            "name": "yt_changelog_0_5_6_5",
+            "value": "분할 화면 / 플로팅 창 동작 개선; 공간이 부족할 때 상단 플레이어 도구를 더 보기 메뉴로 접기"
+        },
+        {
+            "name": "yt_changelog_0_5_6_6",
+            "value": "재생 미디어 라이프사이클 재구축으로 시작, 소스 전환, 멀티 윈도우 사용 안정성 향상"
+        },
+        {
+            "name": "yt_changelog_0_5_6_7",
+            "value": "화질 변경 시 로딩/버퍼링을 즉시 표시"
+        },
+        {
+            "name": "yt_changelog_0_5_6_8",
+            "value": "다운로드 목록 및 목록 진입 애니메이션 재설계; SABR 오프라인 패키징 개선; 라이브 다운로드 진입점 숨김"
+        },
+        {
+            "name": "yt_option_auth_use_for_playback_subtitle",
+            "value": "재생 API 및 스트림 URL 인증"
+        },
+        {
+            "name": "yt_player_more_tools",
+            "value": "더 보기"
+        },
+        {
+            "name": "yt_player_subtitles",
+            "value": "자막"
+        },
+        {
+            "name": "yt_player_audio_track",
+            "value": "오디오 트랙"
+        },
+        {
+            "name": "yt_player_playback_speed",
+            "value": "재생 속도"
+        },
+        {
+            "name": "yt_option_network",
+            "value": "네트워크"
+        },
+        {
+            "name": "yt_proxy_off",
+            "value": "프록시 끔"
+        },
+        {
+            "name": "yt_proxy_incomplete",
+            "value": "설정 미완료"
+        },
+        {
+            "name": "yt_proxy_enable",
+            "value": "프록시 사용"
+        },
+        {
+            "name": "yt_proxy_enable_subtitle",
+            "value": "아래 프록시를 통해 YouTube에 접속"
+        },
+        {
+            "name": "yt_proxy_type",
+            "value": "프록시 유형"
+        },
+        {
+            "name": "yt_proxy_type_http",
+            "value": "HTTP"
+        },
+        {
+            "name": "yt_proxy_type_http_subtitle",
+            "value": "HTTP CONNECT 프록시"
+        },
+        {
+            "name": "yt_proxy_type_socks5",
+            "value": "SOCKS5"
+        },
+        {
+            "name": "yt_proxy_type_socks5_subtitle",
+            "value": "SOCKS5 CONNECT"
+        },
+        {
+            "name": "yt_proxy_server",
+            "value": "서버"
+        },
+        {
+            "name": "yt_proxy_host",
+            "value": "호스트"
+        },
+        {
+            "name": "yt_proxy_host_placeholder",
+            "value": "예: 127.0.0.1"
+        },
+        {
+            "name": "yt_proxy_port",
+            "value": "포트"
+        },
+        {
+            "name": "yt_proxy_auth_optional",
+            "value": "인증 (선택 사항)"
+        },
+        {
+            "name": "yt_proxy_username",
+            "value": "사용자 이름"
+        },
+        {
+            "name": "yt_proxy_password",
+            "value": "비밀번호"
+        },
+        {
+            "name": "yt_proxy_optional_placeholder",
+            "value": "선택 사항"
+        },
+        {
+            "name": "yt_proxy_test",
+            "value": "연결 테스트"
+        },
+        {
+            "name": "yt_proxy_testing",
+            "value": "테스트 중…"
+        },
+        {
+            "name": "yt_proxy_test_ok",
+            "value": "프록시에 연결 가능"
+        },
+        {
+            "name": "yt_proxy_test_failed",
+            "value": "프록시 테스트 실패"
+        },
+        {
+            "name": "yt_proxy_test_http_error",
+            "value": "예기치 않은 HTTP 상태"
+        },
+        {
+            "name": "yt_proxy_test_disabled",
+            "value": "먼저 프록시를 활성화하세요"
+        },
+        {
+            "name": "yt_proxy_loopback_note",
+            "value": "로컬 재생 프록시 (127.0.0.1)는 이 설정을 사용하지 않습니다."
+        },
+        {
+            "name": "yt_device_qr_sign_in",
+            "value": "QR / TV 코드 로그인"
+        },
+        {
+            "name": "yt_device_qr_sign_in_subtitle",
+            "value": "QR 코드를 스캔하거나 youtube.com/activate 열기"
+        },
+        {
+            "name": "yt_device_login_help",
+            "value": "다른 기기에서 링크를 열거나 QR 코드를 스캔한 후 아래 코드를 입력하여 이 앱을 승인하세요."
+        },
+        {
+            "name": "yt_device_login_requesting",
+            "value": "기기 코드 요청 중…"
+        },
+        {
+            "name": "yt_device_login_waiting",
+            "value": "승인 대기 중…"
+        },
+        {
+            "name": "yt_device_login_polling",
+            "value": "승인 상태 확인 중"
+        },
+        {
+            "name": "yt_device_login_success",
+            "value": "로그인됨"
+        },
+        {
+            "name": "yt_device_login_failed",
+            "value": "로그인 실패"
+        },
+        {
+            "name": "yt_device_login_retry",
+            "value": "다시 시도"
+        },
+        {
+            "name": "yt_option_help",
+            "value": "도움말"
+        },
+        {
+            "name": "yt_option_help_subtitle",
+            "value": "초보자 가이드 및 기본 사용 설명"
+        },
+        {
+            "name": "yt_guide_skip",
+            "value": "건너뛰기"
+        },
+        {
+            "name": "yt_guide_next",
+            "value": "다음"
+        },
+        {
+            "name": "yt_guide_done",
+            "value": "완료"
+        },
+        {
+            "name": "yt_guide_p1_desc",
+            "value": "오픈 소스 서드파티 YouTube 클라이언트: 로컬 MPV 재생, 광고 없음, 데이터는 사용자 기기에만 저장됩니다."
+        },
+        {
+            "name": "yt_guide_p2_title",
+            "value": "YouTube 계정 로그인"
+        },
+        {
+            "name": "yt_guide_p2_desc",
+            "value": "「설정 → 데이터 및 계정」에서 웹 또는 QR 코드로 로그인하세요. 로그인하면 구독과 재생목록 등 계정 콘텐츠를 볼 수 있고, 로그인하지 않아도 게스트로 정상 사용할 수 있습니다."
+        },
+        {
+            "name": "yt_guide_p3_title",
+            "value": "계정 데이터 관리"
+        },
+        {
+            "name": "yt_guide_p3_desc",
+            "value": "로그인 자격 증명은 이 기기에만 저장되며 제3자 서버에 업로드되지 않습니다. 「데이터 및 계정」에서 언제든 로그아웃하거나 시크릿 모드를 켤 수 있으며, 로그아웃하면 계정 데이터가 삭제됩니다."
+        },
+        {
+            "name": "yt_guide_p3_user_data",
+            "value": "사용자 데이터용: 구독, 기록 등 계정 데이터 가져오기"
+        },
+        {
+            "name": "yt_guide_p3_playback",
+            "value": "재생용: 로그인 신원으로 URL 요청, 인간 확인 방지"
+        },
+        {
+            "name": "yt_guide_p4_title",
+            "value": "네트워크 프록시"
+        },
+        {
+            "name": "yt_guide_p4_desc",
+            "value": "네트워크가 제한된 경우 「설정 → 네트워크」에서 HTTP 또는 SOCKS5 프록시를 활성화하고 서버 주소와 포트를 입력하세요. 프록시는 외부 네트워크 요청에만 사용되며 로컬 재생 루프백 주소는 프록시를 거치지 않습니다."
+        },
+        {
+            "name": "yt_guide_p5_title",
+            "value": "화질 및 캐시"
+        },
+        {
+            "name": "yt_guide_p5_desc",
+            "value": "「설정 → 재생」에서 기본 화질, 모바일 네트워크 화질, 캐시 시간을 설정하여 필요에 따라 데이터를 절약하거나 화질을 높일 수 있습니다."
+        },
+        {
+            "name": "yt_guide_p6_title",
+            "value": "다운로드 및 로컬"
+        },
+        {
+            "name": "yt_guide_p6_desc",
+            "value": "동영상을 로컬에 다운로드하여 오프라인으로 시청할 수 있으며, 다운로드한 콘텐츠는 「로컬」 페이지에서 관리합니다. 「데이터 전체 삭제」는 다운로드한 파일을 삭제하지 않습니다."
+        }
+    ]
+}

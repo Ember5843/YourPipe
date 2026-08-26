@@ -215,8 +215,8 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   fast-skip so TTFF never waits on BotGuard.
 
 ## 7. i18n
-- 10 locales shipped: `base`, `en_US`, `ar_SA`, `de_DE`, `es_ES`, `fr_FR`,
-  `ru_RU`, `zh_CN`, `zh_HK`, `zh_TW`.
+- 14 locales shipped: `base`, `ar_SA`, `de_DE`, `en_US`, `es_ES`, `fr_FR`,
+  `it_IT`, `ja_JP`, `ko_KR`, `pt_BR`, `ru_RU`, `zh_CN`, `zh_HK`, `zh_TW`.
 - All new user-visible strings must be added to every locale.
 - Files: `entry/src/main/resources/<locale>/element/string.json`.
 
