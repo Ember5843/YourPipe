@@ -275,41 +275,67 @@ export struct MediaVideoFeed {
     }
   }
 
-  /** 网格（grid 布局）与宽列条式（宽屏 list 布局）共用的 Grid + LazyForEach */
+  /** 当前 Grid 分支列数：grid 模式用网格列数，宽列条式用条式列数。 */
+  private gridColumnCount(): number {
+    return Math.max(1,
+      this.params.layoutPreference === 'grid' ? this.params.gridColumns : this.params.listColumns);
+  }
+
   @Builder
-  GridFeed(columns: number, rowsGap: number, useListCards: boolean) {
+  FeedCardContent(item: Object, index: number) {
+    if (this.params.layoutPreference === 'grid') {
+      this.gridItemBuilder({ item: item, index: index })
+    } else {
+      this.itemBuilder({ item: item, index: index })
+    }
+  }
+
+  /**
+   * 网格（grid 布局）与宽列条式（宽屏 list 布局）共用的 Grid + LazyForEach。
+   * 零参数 + 体内直读 @Prop params：@Builder 按值参数不随状态刷新（见 §3
+   * SubTabBar 约定同款坑），列数/间距必须实时读，横竖屏、折叠、分屏切换时
+   * 断点列数才能自适应。
+   */
+  @Builder
+  GridFeed() {
     Grid(this.gridScroller) {
       if (this.params.hasHeader) {
         GridItem() {
           this.headerBuilder()
         }
         .columnStart(0)
-        .columnEnd(columns - 1)
+        .columnEnd(this.gridColumnCount() - 1)
         .margin({ left: -this.params.headerHorizontalBleed, right: -this.params.headerHorizontalBleed })
       }
       LazyForEach(this.dataSource, (item: Object, index: number) => {
-        GridItem() {
-          if (useListCards) {
-            this.itemBuilder({ item: item, index: index })
-          } else {
-            this.gridItemBuilder({ item: item, index: index })
+        if (this.gridSpanOf(item, this.gridColumnCount()) > 1) {
+          // 跨列卡（占满整行）：显式定位到整行
+          GridItem() {
+            this.FeedCardContent(item, index)
           }
+          .columnStart(0)
+          .columnEnd(this.gridSpanOf(item, this.gridColumnCount()) - 1)
+          .transition(customAnimationUtil.isScaleTran(this.itemKey(item, index), this.uiConfig))
+        } else {
+          // 普通卡：不得设置 columnStart/columnEnd —— 显式定位会脱离自动流式
+          // 排列，全部钉在第 0 列，视觉上退化为单列
+          GridItem() {
+            this.FeedCardContent(item, index)
+          }
+          .transition(customAnimationUtil.isScaleTran(this.itemKey(item, index), this.uiConfig))
         }
-        .columnStart(0)
-        .columnEnd(this.gridSpanOf(item, columns) - 1)
-        .transition(customAnimationUtil.isScaleTran(this.itemKey(item, index), this.uiConfig))
       }, (item: Object, index: number) => this.itemKey(item, index))
       if (this.params.isLoadingMore) {
         GridItem() {
           this.LoadingMoreFooter()
         }
         .columnStart(0)
-        .columnEnd(columns - 1)
+        .columnEnd(this.gridColumnCount() - 1)
       }
     }
-    .columnsTemplate(this.gridColumnsTemplate(columns))
+    .columnsTemplate(this.gridColumnsTemplate(this.gridColumnCount()))
     .columnsGap(8)
-    .rowsGap(rowsGap)
+    .rowsGap(this.params.layoutPreference === 'grid' ? 8 : 4)
     .width('100%')
     .layoutWeight(1)
     .padding(this.params.gridContentPadding ?? 0)
@@ -368,10 +394,8 @@ export struct MediaVideoFeed {
         this.StateArea('error')
       } else if (this.feedItemCount() === 0) {
         this.StateArea('empty')
-      } else if (this.params.layoutPreference === 'grid') {
-        this.GridFeed(Math.max(1, this.params.gridColumns), 8, false)
-      } else if (this.params.listColumns > 1) {
-        this.GridFeed(Math.max(1, this.params.listColumns), 4, true)
+      } else if (this.params.layoutPreference === 'grid' || this.params.listColumns > 1) {
+        this.GridFeed()
       } else {
         this.ListFeed()
       }

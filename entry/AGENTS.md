@@ -88,6 +88,10 @@ volatile display state as a single `MediaVideoFeedParams` object-literal
 `@Builder`, and never `.bind(this)`) — a plain `@Builder` passed by reference
 runs with `this` bound to the call-site component, so page builders that touch
 page state crash with "undefined is not callable".
+Its Grid branch must leave normal cards without `columnStart`/`columnEnd`
+(auto-flow placement); explicitly positioning every item pins them all to
+column 0 and collapses the grid to a single column — only full-width items
+(header/footer/span>1 cards) set `columnStart(0).columnEnd(columns-1)`.
 `SubTabBar` (`SubTabBarItem`) is the shared in-page sub-tab builder (48vp bar,
 16fp, 36×2 theme-color indicator) used by Local / Player / User pages. It takes
 a single `SubTabBarItemParams` object-literal param (by-reference refresh) —
