@@ -14,10 +14,11 @@
  */
 
 import { window } from '@kit.ArkUI';
-import { ConfigurationConstant } from '@kit.AbilityKit';
+import common from '@ohos.app.ability.common';
 import { Logger } from 'mediaservice';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { BreakpointSystem } from './BreakpointSystem';
+import { ColorModeManager } from '../ColorModeManager';
 
 const TAG: string = '[WindowUtil]';
 
@@ -329,8 +330,8 @@ export class WindowUtil {
           navigationBarContentColor: '#FFFFFF'
         });
       } else {
-        const currentColorMode = AppStorage.get<ConfigurationConstant.ColorMode>('currentColorMode');
-        const isDarkMode = currentColorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+        const context = AppStorage.get<common.UIAbilityContext>('context');
+        const isDarkMode = context !== undefined && ColorModeManager.isEffectiveDarkMode(context);
         const contentColor = isDarkMode ? '#FFFFFF' : '#000000';
         this.mainWindowClass.setWindowSystemBarProperties({
           statusBarContentColor: contentColor,

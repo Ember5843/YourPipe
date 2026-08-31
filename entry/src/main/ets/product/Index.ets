@@ -1,7 +1,6 @@
 import { AppLog } from '../common/AppLog';
 import window from '@ohos.window';
 import common from '@ohos.app.ability.common';
-import { ConfigurationConstant } from '@kit.AbilityKit';
 import { i18n } from '@kit.LocalizationKit';
 import { preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
@@ -273,6 +272,7 @@ struct Index {
       const hostContext = uiContext?.getHostContext() as common.UIAbilityContext;
       if (hostContext) {
         hostContext.getApplicationContext().setColorMode(colorMode);
+        ColorModeManager.publishEffectiveColorMode(hostContext, defaultUiConfig.darkMode);
       }
     });
 
@@ -392,6 +392,7 @@ struct Index {
       AppStorage.setOrCreate('currentColorMode', colorMode);
       if (hostContext) {
         hostContext.getApplicationContext().setColorMode(colorMode);
+        ColorModeManager.publishEffectiveColorMode(hostContext, defaultUiConfig.darkMode);
       }
     });
 
@@ -445,8 +446,7 @@ struct Index {
     window.getLastWindow(hostContext).then((windowClass) => {
       try {
         windowClass.setWindowLayoutFullScreen(true);
-        const currentColorMode = AppStorage.get<ConfigurationConstant.ColorMode>('currentColorMode');
-        const isDarkMode = currentColorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+        const isDarkMode = ColorModeManager.isEffectiveDarkMode(hostContext);
         const contentColor = isDarkMode ? '#FFFFFF' : '#000000';
         windowClass.setWindowSystemBarProperties({
           statusBarContentColor: contentColor,
@@ -1388,6 +1388,7 @@ struct Index {
       const hostContext = uiContext?.getHostContext() as common.UIAbilityContext;
       if (hostContext) {
         hostContext.getApplicationContext().setColorMode(colorMode);
+        ColorModeManager.publishEffectiveColorMode(hostContext, mode);
       }
     });
   }
