@@ -16,6 +16,8 @@ export interface PlaybackPreferencesSnapshot {
   defaultQuality: string;
   /** 直播 / 受限场景下的清晰度上限。 */
   mobileQuality: string;
+  /** 字幕延迟（毫秒，正值 = 延后显示）；覆盖层字幕查找时从播放位置中减去。 */
+  subtitleOffsetMs: number;
 }
 
 export type PlaybackPreferencesProvider = () => PlaybackPreferencesSnapshot;
@@ -24,6 +26,7 @@ const DEFAULT_SNAPSHOT: PlaybackPreferencesSnapshot = {
   searchLanguage: 'original',
   defaultQuality: 'best',
   mobileQuality: '480p',
+  subtitleOffsetMs: 0,
 };
 
 export class PlaybackPreferences {

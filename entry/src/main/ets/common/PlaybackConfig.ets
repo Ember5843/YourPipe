@@ -74,6 +74,51 @@ export const HOLD_SPEED_VALUES: number[] = [1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
 /** 长按触发延迟可选档位（毫秒） */
 export const HOLD_SPEED_DELAYS: number[] = [300, 500, 800, 1000];
 
+/** 覆盖层字幕字号倍率（相对播放器默认 14/18fp） */
+export type SubtitleFontScale = '0.75' | '1' | '1.25' | '1.5';
+export const SUBTITLE_FONT_SCALE_LABELS: SubtitleFontScale[] = ['0.75', '1', '1.25', '1.5'];
+
+/** 覆盖层字幕底部间距（vp） */
+export type SubtitleBottomMargin = '32' | '48' | '64' | '96';
+export const SUBTITLE_BOTTOM_MARGIN_LABELS: SubtitleBottomMargin[] = ['32', '48', '64', '96'];
+
+/** 覆盖层字幕字体颜色 */
+export type SubtitleFontColor = 'white' | 'yellow' | 'green' | 'cyan';
+export const SUBTITLE_FONT_COLOR_LABELS: SubtitleFontColor[] = ['white', 'yellow', 'green', 'cyan'];
+export const SUBTITLE_FONT_COLOR_VALUES: Record<SubtitleFontColor, string> = {
+  'white': '#FFFFFF',
+  'yellow': '#FFEB3B',
+  'green': '#4CAF50',
+  'cyan': '#00E5FF',
+};
+
+/** 覆盖层字幕背景样式 */
+export type SubtitleBackground = 'semi' | 'solid' | 'none';
+export const SUBTITLE_BACKGROUND_LABELS: SubtitleBackground[] = ['semi', 'solid', 'none'];
+export const SUBTITLE_BACKGROUND_VALUES: Record<SubtitleBackground, string> = {
+  'semi': '#80000000',
+  'solid': '#D9000000',
+  'none': '#00000000',
+};
+
+/** 字幕延迟档位（毫秒，正值 = 字幕延后显示，mpv sub-delay 语义） */
+export const SUBTITLE_OFFSET_VALUES: number[] = [-1000, -500, -250, 0, 250, 500, 1000];
+
+export function getSubtitleOffsetDisplay(value: number): string {
+  if (value === 0) return '0s';
+  const sign = value > 0 ? '+' : '-';
+  const abs = Math.abs(value);
+  return `${sign}${abs >= 1000 ? `${abs / 1000}` : `0.${abs / 10}`}s`;
+}
+
+export function getSubtitleFontColorDisplay(value: SubtitleFontColor): Resource {
+  return $r(`app.string.yt_subtitle_color_${value}`);
+}
+
+export function getSubtitleBackgroundDisplay(value: SubtitleBackground): Resource {
+  return $r(`app.string.yt_subtitle_bg_${value}`);
+}
+
 export function getHoldSpeedDelayDisplay(value: number): string {
   return value >= 1000 ? `${value / 1000}s` : `${value}ms`;
 }
@@ -144,6 +189,16 @@ export class PlaybackConfig {
   guestPlayerClient: GuestPlayerClient = 'visionos';
   /** 登录（且启用播放鉴权）时的 YouTube 播放端点 */
   authPlayerClient: AuthPlayerClient = 'mweb';
+  /** 覆盖层字幕字号倍率 */
+  subtitleFontScale: SubtitleFontScale = '1';
+  /** 覆盖层字幕底部间距（vp） */
+  subtitleBottomMarginVp: SubtitleBottomMargin = '48';
+  /** 覆盖层字幕字体颜色 */
+  subtitleFontColor: SubtitleFontColor = 'white';
+  /** 覆盖层字幕背景样式 */
+  subtitleBackground: SubtitleBackground = 'semi';
+  /** 字幕延迟（毫秒，正值 = 延后显示） */
+  subtitleOffsetMs: number = 0;
 
   constructor() {}
 
@@ -168,6 +223,11 @@ export class PlaybackConfig {
     next.gpuApi = this.gpuApi;
     next.guestPlayerClient = this.guestPlayerClient;
     next.authPlayerClient = this.authPlayerClient;
+    next.subtitleFontScale = this.subtitleFontScale;
+    next.subtitleBottomMarginVp = this.subtitleBottomMarginVp;
+    next.subtitleFontColor = this.subtitleFontColor;
+    next.subtitleBackground = this.subtitleBackground;
+    next.subtitleOffsetMs = this.subtitleOffsetMs;
     return next;
   }
 
@@ -206,6 +266,20 @@ export class PlaybackConfig {
     const authClient = PreferencesStore.getString('cfg_pb_authPlayerClient', 'mweb');
     cfg.authPlayerClient = AUTH_PLAYER_CLIENT_LABELS.includes(authClient as AuthPlayerClient)
       ? authClient as AuthPlayerClient : 'mweb';
+    const subScale = PreferencesStore.getString('cfg_pb_subtitleFontScale', '1');
+    cfg.subtitleFontScale = SUBTITLE_FONT_SCALE_LABELS.includes(subScale as SubtitleFontScale)
+      ? subScale as SubtitleFontScale : '1';
+    const subMargin = PreferencesStore.getString('cfg_pb_subtitleBottomMarginVp', '48');
+    cfg.subtitleBottomMarginVp = SUBTITLE_BOTTOM_MARGIN_LABELS.includes(subMargin as SubtitleBottomMargin)
+      ? subMargin as SubtitleBottomMargin : '48';
+    const subColor = PreferencesStore.getString('cfg_pb_subtitleFontColor', 'white');
+    cfg.subtitleFontColor = SUBTITLE_FONT_COLOR_LABELS.includes(subColor as SubtitleFontColor)
+      ? subColor as SubtitleFontColor : 'white';
+    const subBg = PreferencesStore.getString('cfg_pb_subtitleBackground', 'semi');
+    cfg.subtitleBackground = SUBTITLE_BACKGROUND_LABELS.includes(subBg as SubtitleBackground)
+      ? subBg as SubtitleBackground : 'semi';
+    const subOffset = Number(PreferencesStore.getString('cfg_pb_subtitleOffsetMs', '0'));
+    cfg.subtitleOffsetMs = SUBTITLE_OFFSET_VALUES.includes(subOffset) ? subOffset : 0;
 
     logger.info(`Loaded PlaybackConfig: ${JSON.stringify(cfg)}`);
     return cfg;
@@ -233,6 +307,11 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_gpuApi', cfg.gpuApi);
     PreferencesStore.setString('cfg_pb_guestPlayerClient', cfg.guestPlayerClient);
     PreferencesStore.setString('cfg_pb_authPlayerClient', cfg.authPlayerClient);
+    PreferencesStore.setString('cfg_pb_subtitleFontScale', cfg.subtitleFontScale);
+    PreferencesStore.setString('cfg_pb_subtitleBottomMarginVp', cfg.subtitleBottomMarginVp);
+    PreferencesStore.setString('cfg_pb_subtitleFontColor', cfg.subtitleFontColor);
+    PreferencesStore.setString('cfg_pb_subtitleBackground', cfg.subtitleBackground);
+    PreferencesStore.setString('cfg_pb_subtitleOffsetMs', String(cfg.subtitleOffsetMs));
 
     logger.info('Saved PlaybackConfig');
   }

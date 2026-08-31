@@ -4,8 +4,7 @@ import { display, window } from '@kit.ArkUI';
 import { i18n } from '@kit.LocalizationKit';
 import { BreakpointConstants } from '../common/constants/BreakpointConstants';
 import { PreferencesStore } from '../common/PreferencesStore';
-import { AppState } from '../common/AppState';
-import { UIConfig } from '../common/AppState';
+import { AppState, UIConfig, YourtubeDarkMode } from '../common/AppState';
 import { PlaybackConfig } from '../common/PlaybackConfig';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
@@ -21,7 +20,7 @@ import { WatchHistoryStore } from '../common/WatchHistoryStore';
 import { PlayerPresentation } from '../common/PlayerPresentation';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { SabrWebViewPoTokenProvider } from '../features/player/SabrWebViewPoTokenProvider';
-import type { EngineConfig } from 'mediaservice';
+import type { EngineConfig, PlaybackPreferencesSnapshot } from 'mediaservice';
 
 const logger = AppLog.getInstance('EntryAbility');
 
@@ -57,11 +56,13 @@ export default class EntryAbility extends UIAbility {
         const preferredAudio = contentLang.length > 0 && contentLang !== 'default'
           ? contentLang
           : 'original';
-        return {
+        const snapshot: PlaybackPreferencesSnapshot = {
           searchLanguage: preferredAudio,
           defaultQuality: pb.defaultQuality,
           mobileQuality: pb.mobileQuality,
+          subtitleOffsetMs: pb.subtitleOffsetMs,
         };
+        return snapshot;
       });
       // 注入 MPV 引擎配置提供者
       AvPlayerController.setEngineConfigProvider(() => {
@@ -164,7 +165,12 @@ export default class EntryAbility extends UIAbility {
   onConfigurationUpdate(newConfig: Configuration): void {
     logger.info(`onConfigurationUpdate: ${JSON.stringify(newConfig)}`);
     // 配置更新回调：语言、深色模式等系统配置变化时触发。
-    // 这里只记录日志，不做任何操作，避免与应用内的语言/主题切换逻辑冲突导致循环触发。
+    // 当用户选择跟随系统时，系统深色模式变化需要同步到 effectiveColorMode，
+    // 否则退出播放页等场景的状态栏内容颜色会沿用旧值。
+    const uiConfig: UIConfig = AppStorage.get<UIConfig>('uiConfig') ?? new UIConfig();
+    if (uiConfig.darkMode === YourtubeDarkMode.SYSTEM) {
+      ColorModeManager.publishEffectiveColorMode(this.context, YourtubeDarkMode.SYSTEM);
+    }
     // 语言切换由 LanguageManager.applyPersistedLanguage() 在 onCreate 时应用，
     // 运行时切换由 Index.ets applyLanguageSelection() 调用 i18n.System.setAppPreferredLanguage() 完成。
   }

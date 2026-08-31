@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Les vidéos peuvent être téléchargées pour être visionnées hors ligne et sont gérées dans l'onglet « Local ». « Effacer toutes les données de l'app » ne supprime jamais vos fichiers téléchargés."
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "Taille des sous-titres"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "Marge inférieure des sous-titres"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "Couleur des sous-titres"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "Arrière-plan des sous-titres"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "Décalage des sous-titres"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "Blanc"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "Jaune"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "Vert"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "Cyan"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "Aucun"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "Semi-transparent"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "Opaque"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "Format d'image"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "Ajuster"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "Remplir"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "Étirer"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "Réinitialiser le zoom"
         }
     ]
 }

@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Videos können zum Offline-Ansehen heruntergeladen und auf dem Tab „Lokal“ verwaltet werden. „Gesamte App-Daten löschen“ löscht deine heruntergeladenen Dateien niemals."
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "Untertitelgröße"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "Unterer Abstand der Untertitel"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "Untertitelfarbe"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "Untertitel-Hintergrund"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "Untertitel-Verzögerung"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "Weiß"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "Gelb"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "Grün"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "Cyan"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "Kein"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "Halbtransparent"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "Deckend"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "Seitenverhältnis"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "Einpassen"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "Füllen"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "Strecken"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "Zoom zurücksetzen"
         }
     ]
 }

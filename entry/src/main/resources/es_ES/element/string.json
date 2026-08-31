@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Los vídeos se pueden descargar para verlos sin conexión y se gestionan en la pestaña «Local». «Borrar todos los datos de la app» nunca elimina tus archivos descargados."
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "Tamaño de los subtítulos"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "Margen inferior de los subtítulos"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "Color de los subtítulos"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "Fondo de los subtítulos"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "Retraso de los subtítulos"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "Blanco"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "Amarillo"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "Verde"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "Cian"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "Ninguno"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "Semitransparente"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "Opaco"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "Relación de aspecto"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "Ajustar"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "Rellenar"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "Estirar"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "Restablecer zoom"
         }
     ]
 }

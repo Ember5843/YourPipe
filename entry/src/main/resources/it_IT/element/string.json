@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "I video possono essere scaricati per la visione offline e sono gestiti nella scheda Locale. «Cancella tutti i dati» non elimina mai i file scaricati."
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "Dimensione dei sottotitoli"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "Margine inferiore dei sottotitoli"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "Colore dei sottotitoli"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "Sfondo dei sottotitoli"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "Ritardo dei sottotitoli"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "Bianco"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "Giallo"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "Verde"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "Ciano"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "Nessuno"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "Semitrasparente"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "Opaco"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "Proporzioni"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "Adatta"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "Riempi"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "Estendi"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "Reimposta zoom"
         }
     ]
 }

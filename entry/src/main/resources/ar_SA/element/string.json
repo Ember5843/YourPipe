@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "يمكن تنزيل الفيديوهات لمشاهدتها دون اتصال وتُدار في علامة التبويب «محلي». لا يؤدي «مسح جميع بيانات التطبيق» أبدًا إلى حذف ملفاتك المنزّلة."
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "حجم الترجمة"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "الهامش السفلي للترجمة"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "لون الترجمة"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "خلفية الترجمة"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "تأخير الترجمة"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "أبيض"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "أصفر"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "أخضر"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "سماوي"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "بدون"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "شبه شفاف"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "معتم"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "نسبة العرض"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "ملاءمة"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "ملء"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "تمديد"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "إعادة تعيين التكبير"
         }
     ]
 }

@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Видео можно загружать для просмотра офлайн, они управляются на вкладке «Локальные». «Очистить все данные приложения» никогда не удаляет загруженные файлы."
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "Размер субтитров"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "Нижний отступ субтитров"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "Цвет субтитров"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "Фон субтитров"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "Задержка субтитров"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "Белый"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "Жёлтый"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "Зелёный"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "Бирюзовый"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "Нет"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "Полупрозрачный"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "Непрозрачный"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "Соотношение сторон"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "Вписать"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "Заполнить"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "Растянуть"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "Сбросить масштаб"
         }
     ]
 }

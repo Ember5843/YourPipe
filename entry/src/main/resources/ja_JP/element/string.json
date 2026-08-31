@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "動画をローカルにダウンロードしてオフラインで視聴できます。ダウンロードしたコンテンツは「ローカル」ページで管理します。「全データを消去」してもダウンロード済みファイルは削除されません。"
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "字幕のサイズ"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "字幕の下余白"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "字幕の文字色"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "字幕の背景"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "字幕の遅延"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "白"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "黄"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "緑"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "シアン"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "なし"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "半透明"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "不透明"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "アスペクト比"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "埋め込み"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "塗りつぶし"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "引き伸ばし"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "ズームをリセット"
         }
     ]
 }

@@ -37,7 +37,8 @@ import { PiPManager } from '../pip/PiPManager';
 import { PlayerUiViewModel } from 'mediaservice';
 import { MediaThumb } from '../../../common/components/MediaThumb';
 import { VideoItem } from 'youtube_core';
-import { PlaybackConfig } from '../../../common/PlaybackConfig';
+import { PlaybackConfig, SUBTITLE_FONT_COLOR_VALUES, SUBTITLE_BACKGROUND_VALUES } from '../../../common/PlaybackConfig';
+import { PreferencesStore } from '../../../common/PreferencesStore';
 
 const TAG: string = '[PlayerLog][VideoPlayer]';
 const GESTURE_LOCK_DISTANCE: number = 12;
@@ -58,8 +59,41 @@ const COMPACT_CONTROL_WIDTH: number = 360;
 const PROGRESS_MIN_WIDTH: number = 32;
 const TIMELINE_TEXT_MIN_WIDTH: number = 480;
 const TIMELINE_TEXT_MIN_HEIGHT: number = 240;
+/** 视频内边距的比例目标 = 视频显示高度的该比例（边距随视频区缩放，小屏不再绝对值顶到中部） */
+const SUBTITLE_VIDEO_MARGIN_RATIO: number = 0.10;
+/** 视频内边距下限（vp），极小窗口也不贴死底边 */
+const SUBTITLE_MARGIN_MIN_VP: number = 12;
+/** 字幕与控制条之间的最小间隙（vp） */
+const SUBTITLE_BAR_GAP_VP: number = 8;
+/** 拖动字幕时下移/上移的上限 = 视频显示高度的该比例 */
+const SUBTITLE_DRAG_MAX_RATIO: number = 0.6;
+/** 拖动字幕时水平偏移上限 = 容器宽度的该比例 */
+const SUBTITLE_DRAG_X_MAX_RATIO: number = 0.35;
 /** 顶部右侧工具条预估宽度超过容器一半时收成三横杠菜单 */
 const TOP_TOOLS_HALF_RATIO: number = 0.5;
+
+/** 视频显示区域在控制容器内的布局（letterbox 居中） */
+interface VideoLayoutVp {
+  letterboxVp: number;
+  videoHVp: number;
+  videoWVp: number;
+}
+
+/** 画面比例模式：fit=嵌入（等比全显）/ fill=填充（等比裁切铺满）/ stretch=拉伸（变形铺满） */
+type VideoAspectMode = 'fit' | 'fill' | 'stretch';
+
+/** 双指缩放上限倍率 */
+const VIDEO_PINCH_MAX_SCALE: number = 4;
+/** 双指手势判别：中点位移超过该值且主导 → 判定为平移（vp） */
+const PINCH_DECIDE_VP: number = 10;
+/** 双指手势判别：间距相对变化超过该比例且主导 → 判定为缩放 */
+const PINCH_DECIDE_SCALE_RATIO: number = 0.08;
+
+/** 画面缩放分量（模式基础 × 双指） */
+interface VideoScaleXY {
+  sx: number;
+  sy: number;
+}
 
 enum PlayerGestureMode {
   IDLE = 'idle',
@@ -248,6 +282,22 @@ export struct VideoPlayer {
   private controlsHideTimerId: number = -1;
   @State containerVpWidth: number = 0;
   @State containerVpHeight: number = 0;
+  /** 字幕拖动：垂直上浮（相对视频显示高度的比例）与水平偏移（相对容器宽度的比例）。
+   *  会话级、比例化——旋转/折叠/大小屏切换时位置观感不变。 */
+  @State subtitleDragLiftRatio: number = 0;
+  @State subtitleDragOffsetXRatio: number = 0;
+  /** 拖动中的高亮态（虚线取景框 + 气泡样式），需在 build 中响应 */
+  @State subtitleDragging: boolean = false;
+  /** 画面比例模式（嵌入/填充/拉伸），纯 UI 层 scale 实现，不重建 surface */
+  @State videoAspectMode: VideoAspectMode = 'fit';
+  /** 双指缩放倍率（1=未缩放），单指平移偏移（vp） */
+  @State videoPinchScale: number = 1;
+  @State videoPanXVp: number = 0;
+  @State videoPanYVp: number = 0;
+  private videoPinching: boolean = false;
+  private pinchStartScale: number = 1;
+  /** 实测底部控制条高度（vp，onAreaChange 持续更新；含导航条/全屏内边距），隐藏时也在树上 */
+  @State bottomControlBarVpH: number = 0;
   // horizontal seek gesture
   @State isGestureSeek: boolean = false;
   @State gestureSeekTime: number = 0;
@@ -502,6 +552,8 @@ export struct VideoPlayer {
       if (epoch === this.interactionEpoch && this.activeInteraction === PlayerInteractionKind.NONE &&
         this.isPageShow && !this.isAppBackground && this.canAutoHideControls()) {
         this.showControls = false;
+        // 提示层独立于 showControls 渲染，控制层隐藏时必须一并清掉，防止残留常驻
+        this.clearGestureHints();
       }
     }, CONTROLS_HIDE_DELAY);
   }
@@ -521,7 +573,7 @@ export struct VideoPlayer {
       return;
     }
     this.showControls = !this.showControls;
-    if (this.showControls) { this.scheduleHideControls(); } else { this.clearHideTimer(); }
+    if (this.showControls) { this.scheduleHideControls(); } else { this.clearHideTimer(); this.clearGestureHints(); }
   }
 
   private canAutoHideControls(): boolean {
@@ -568,6 +620,18 @@ export struct VideoPlayer {
     }
   }
 
+  /** 清空全部手势提示（seek/亮度/音量/双击/倍速），计时器一并取消。
+   *  用于控制层隐藏兜底——提示层独立于 showControls 渲染，不得比 UI 活得更久。 */
+  private clearGestureHints(): void {
+    this.clearTransientHintTimers();
+    this.isGestureSeek = false;
+    this.showBrightnessHint = false;
+    this.showVolumeHint = false;
+    this.showForwardHint = false;
+    this.showBackwardHint = false;
+    this.showSpeedBoostHint = false;
+  }
+
   private resetTransientUi(reason: string): void {
     this.interactionEpoch++;
     this.onHoldSpeedEnd('reset-ui');
@@ -581,14 +645,248 @@ export struct VideoPlayer {
     this.showForwardHint = false;
     this.showBackwardHint = false;
     this.isSliderDragging = false;
+    // 拖动中途的全屏切换/换源/页面隐藏必须复位，否则标志卡住会永久门禁根手势
+    this.subtitleDragging = false;
     this.trackThicknessSize = CommonConstants.TRACK_SIZE_MIN;
     this.sliderStyle = SliderStyle.NONE;
     this.showControls = true;
     Logger.debug(TAG, `Transient UI reset reason=${reason}`);
   }
 
+  private subtitleDragStartLiftRatio: number = 0;
+  private subtitleDragStartOffsetXRatio: number = 0;
+
+  /** 视频显示区域在控制容器内的布局：上下黑边高度 + 视频显示高度（居中 letterbox）。 */
+  private videoLayoutVp(): VideoLayoutVp {
+    const containerW = this.containerVpWidth;
+    const containerH = this.containerVpHeight;
+    if (containerW <= 0 || containerH <= 0 || !this.curSource.width || !this.curSource.height) {
+      return { letterboxVp: 0, videoHVp: containerH, videoWVp: containerW };
+    }
+    const videoAspect = this.curSource.width / this.curSource.height;
+    if (videoAspect > containerW / containerH) {
+      return { letterboxVp: (containerH - containerW / videoAspect) / 2, videoHVp: containerW / videoAspect, videoWVp: containerW };
+    }
+    return { letterboxVp: 0, videoHVp: containerH, videoWVp: containerH * videoAspect };
+  }
+
+  /**
+   * 字幕底部间距：锚定**视频显示区域**而非控制容器——小屏/竖屏时视频按宽高比
+   * 居中、上下有黑边，底部黑边高度加回去；全屏铺满时黑边为 0，自然退化为容器底。
+   * 视频内边距随视频显示高度按比例缩放（10%，设置值为上限，下限 12vp），
+   * 小屏贴底不占道，大屏行为与设置一致。
+   * 控制栏显示时只在会被控制条盖到的情况下上浮（实测条高 + 间隙），不再无条件常量上浮。
+   * 容器/控制条尺寸、视频比例全部走 @State 响应式，旋转/全屏/折叠/分屏自动重算。
+   */
+  private subtitleBottomVp(): number {
+    if (this.containerVpWidth <= 0 || this.containerVpHeight <= 0) {
+      return Number(this.playbackConfig.subtitleBottomMarginVp);
+    }
+    const layout = this.displayLayoutVp();
+    // 边距 = clamp(视频高×10%, 12, 设置值)：设置值是上限，实际随视频显示高度缩放。
+    // 小屏 ~200vp 视频 → ~20vp 贴底；全屏 ~800vp → 比例值超过设置值，用设置值。
+    const marginInVideo = Math.min(
+      Math.max(SUBTITLE_MARGIN_MIN_VP, layout.videoHVp * SUBTITLE_VIDEO_MARGIN_RATIO),
+      Number(this.playbackConfig.subtitleBottomMarginVp));
+    const rest = layout.letterboxVp + marginInVideo;
+    // 用户显式拖动过的位置优先于控制条避让；未拖动时才按需上浮
+    const hasDrag = this.subtitleDragLiftRatio !== 0 || this.subtitleDragOffsetXRatio !== 0;
+    const clearance = (!hasDrag && this.showControls) ? this.bottomControlBarVpH + SUBTITLE_BAR_GAP_VP : 0;
+    const lifted = Math.max(rest, clearance);
+    // 拖动值按比例存储，乘回当前视频显示高度——大小屏/折叠切换位置观感不变
+    return Math.min(
+      Math.max(lifted + this.subtitleDragLiftRatio * layout.videoHVp, layout.letterboxVp + 8),
+      layout.letterboxVp + layout.videoHVp * SUBTITLE_DRAG_MAX_RATIO);
+  }
+
+  /**
+   * 字幕拖动偏移复原：全屏切换、旋转、折叠、分屏等导致容器/窗口形态变化时调用。
+   * 拖动位置在形态内固定（不吸附、不回退），形态切换后回到默认位置重来。
+   */
+  private resetSubtitleDrag(): void {
+    if (this.subtitleDragLiftRatio !== 0 || this.subtitleDragOffsetXRatio !== 0) {
+      this.subtitleDragLiftRatio = 0;
+      this.subtitleDragOffsetXRatio = 0;
+    }
+    this.subtitleDragging = false;
+  }
+
+  /** 字幕/取景框的锚定布局：fill/stretch 时画面铺满容器（黑边为 0），fit 时按等比视频区。
+   *  注意与 videoScaleXY/clampVideoPan 用的 fit 布局分离——fill 倍率必须用 fit 尺寸算。 */
+  private displayLayoutVp(): VideoLayoutVp {
+    if (this.videoAspectMode !== 'fit') {
+      return { letterboxVp: 0, videoHVp: this.containerVpHeight, videoWVp: this.containerVpWidth };
+    }
+    return this.videoLayoutVp();
+  }
+
+  /**
+   * 画面总缩放（模式基础缩放 × 双指缩放）。纯 UI 层 scale，surface 不重建、
+   * 播放不受影响；fill/stretch 超出的部分由 PlayerContainer 的 clip(true) 裁掉。
+   */
+  private videoScaleXY(): VideoScaleXY {
+    const layout = this.videoLayoutVp();
+    const cw = Math.max(1, this.containerVpWidth);
+    const ch = Math.max(1, this.containerVpHeight);
+    const fitW = Math.max(1, layout.videoWVp);
+    const fitH = Math.max(1, layout.videoHVp);
+    let sx = 1;
+    let sy = 1;
+    if (this.videoAspectMode === 'fill') {
+      sx = Math.max(cw / fitW, ch / fitH);
+      sy = sx;
+    } else if (this.videoAspectMode === 'stretch') {
+      sx = cw / fitW;
+      sy = ch / fitH;
+    }
+    return { sx: sx * this.videoPinchScale, sy: sy * this.videoPinchScale };
+  }
+
+  /** 平移钳制：缩放后的画面不允许露出黑边（各方向最多移到边缘）。 */
+  private clampVideoPan(): void {
+    const layout = this.videoLayoutVp();
+    const scale = this.videoScaleXY();
+    const maxX = Math.max(0, (layout.videoWVp * scale.sx - this.containerVpWidth) / 2);
+    const maxY = Math.max(0, (layout.videoHVp * scale.sy - this.containerVpHeight) / 2);
+    this.videoPanXVp = Math.min(Math.max(this.videoPanXVp, -maxX), maxX);
+    this.videoPanYVp = Math.min(Math.max(this.videoPanYVp, -maxY), maxY);
+  }
+
+  /** 还原画面：缩放/平移归零（比例模式保持当前选择）。 */
+  private resetVideoZoom(): void {
+    this.videoPinchScale = 1;
+    this.videoPanXVp = 0;
+    this.videoPanYVp = 0;
+  }
+
+  private aspectModeLabel(): Resource {
+    return $r(`app.string.yt_aspect_${this.videoAspectMode}`);
+  }
+
+  /** 选择比例模式：切换模式并还原双指缩放（模式即基准）；菜单交互经 MENU 保活，不收起 UI。 */
+  private selectAspectMode(mode: VideoAspectMode): void {
+    this.videoAspectMode = mode;
+    this.resetVideoZoom();
+  }
+
+  @Builder
+  AspectMenu() {
+    Menu() {
+      if (this.videoPinchScale > 1 || this.videoPanXVp !== 0 || this.videoPanYVp !== 0) {
+        MenuItem({
+          content: $r('app.string.yt_aspect_reset')
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .onClick(() => this.resetVideoZoom())
+      }
+      ForEach(['fit', 'fill', 'stretch'] as VideoAspectMode[], (mode: VideoAspectMode) => {
+        MenuItem({
+          content: $r(`app.string.yt_aspect_${mode}`),
+          endIcon: this.videoAspectMode === mode ? $r('sys.symbol.checkmark') : ''
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .backgroundColor(this.videoAspectMode === mode
+            ? this.getSelectedMenuBackground() : Color.Transparent)
+          .onClick(() => this.selectAspectMode(mode))
+      }, (mode: VideoAspectMode) => mode)
+    }
+    .onAppear(() => this.onControlMenuAppear())
+    .onDisAppear(() => this.onControlMenuDisappear())
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .borderRadius(12)
+    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+    .width(220)
+  }
+
+  private pinchStartDistanceVp: number = 0;
+  private pinchLastMidXVp: number = 0;
+  private pinchLastMidYVp: number = 0;
+  private pinchStartMidXVp: number = 0;
+  private pinchStartMidYVp: number = 0;
+  /** 实际已应用的缩放值（滞后带判定基准） */
+  private pinchAppliedScale: number = 1;
+  /** 双指手势判别：起手先不定，间距变化主导→缩放，中点位移主导→平移，序列内互斥 */
+  private pinchGestureMode: 'undecided' | 'pan' | 'scale' = 'undecided';
+
+  /**
+   * 双指缩放（onTouch 手动跟踪双指距离）：PinchGesture 放在 Exclusive 手势组里
+   * 会被单指 pan 抢先识别（先动的手指赢），实测双指放不上来；改在触摸层处理。
+   * UI 隐藏时锁定；pinch 起手时取消进行中的单指 pan。
+   */
+  private onPinchTouch(event: TouchEvent): void {
+    if (!this.showControls) return;
+    if (event.touches.length === 2) {
+      const a = event.touches[0];
+      const b = event.touches[1];
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (!this.videoPinching) {
+        this.videoPinching = true;
+        this.pinchStartDistanceVp = Math.max(1, dist);
+        this.pinchStartScale = this.videoPinchScale;
+        this.pinchAppliedScale = this.videoPinchScale;
+        this.pinchStartMidXVp = (a.x + b.x) / 2;
+        this.pinchStartMidYVp = (a.y + b.y) / 2;
+        this.pinchLastMidXVp = this.pinchStartMidXVp;
+        this.pinchLastMidYVp = this.pinchStartMidYVp;
+        this.pinchGestureMode = 'undecided';
+        this.clearHideTimer();
+        // pinch 起手接管本次触摸序列：取消进行中的单指 pan 与字幕拖动
+        this.ignorePlayerPan('pinch-start');
+        this.subtitleDragging = false;
+        return;
+      }
+      if (event.type === TouchType.Move) {
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        if (this.pinchGestureMode === 'undecided') {
+          // 判别期：中点位移 vs 双指间距变化，谁明显主导就锁定谁（互斥）
+          const distChange = Math.abs(dist - this.pinchStartDistanceVp);
+          const midDisp = Math.hypot(midX - this.pinchStartMidXVp, midY - this.pinchStartMidYVp);
+          if (midDisp > PINCH_DECIDE_VP && midDisp > distChange * 1.5) {
+            this.pinchGestureMode = 'pan';
+          } else if (distChange / this.pinchStartDistanceVp > PINCH_DECIDE_SCALE_RATIO
+            && distChange > midDisp * 1.5) {
+            this.pinchGestureMode = 'scale';
+          }
+        }
+        if (this.pinchGestureMode === 'scale') {
+          const raw = this.pinchStartScale * (dist / this.pinchStartDistanceVp);
+          const clamped = Math.min(Math.max(raw, 1), VIDEO_PINCH_MAX_SCALE);
+          // 缩放滞后带：相对变化 <1% 不更新——触摸噪声不应变成画面抖动
+          if (Math.abs(clamped - this.pinchAppliedScale) / this.pinchAppliedScale >= 0.01) {
+            this.pinchAppliedScale = clamped;
+            this.videoPinchScale = clamped;
+            this.clampVideoPan();
+          }
+        } else if (this.pinchGestureMode === 'pan') {
+          // 双指平移 = 双指中点的位移（TouchObject 坐标单位即 vp，直接使用）
+          this.videoPanXVp += midX - this.pinchLastMidXVp;
+          this.videoPanYVp += midY - this.pinchLastMidYVp;
+          this.clampVideoPan();
+        }
+        this.pinchLastMidXVp = midX;
+        this.pinchLastMidYVp = midY;
+      }
+      return;
+    }
+    if (this.videoPinching && (event.type === TouchType.Up || event.type === TouchType.Cancel)) {
+      this.videoPinching = false;
+      // 缩回到接近 1 时彻底归位，清除浮点残留
+      if (this.videoPinchScale <= 1.05) {
+        this.resetVideoZoom();
+      }
+      this.scheduleHideControls();
+    }
+  }
+
   private onFullscreenModeChange(): void {
     this.resetTransientUi('fullscreen-change');
+    this.resetSubtitleDrag();
+    this.resetVideoZoom();
     this.calculateSurfaceSize();
   }
 
@@ -609,20 +907,37 @@ export struct VideoPlayer {
     Logger.debug(TAG, `Player pan ignored reason=${reason}`);
   }
 
+  private hiddenUiSeekOnly: boolean = false;
+
   private onPlayerPanStart(event: GestureEvent): void {
+    this.hiddenUiSeekOnly = false;
+    if (this.subtitleDragging || this.videoPinching) {
+      this.ignorePlayerPan(this.subtitleDragging ? 'subtitle-dragging' : 'pinching');
+      return;
+    }
     if (this.isSliderDragging) {
       this.gestureMode = PlayerGestureMode.IGNORED;
       Logger.debug(TAG, 'Player pan ignored reason=slider-dragging-start');
       return;
     }
-    this.beginInteraction(PlayerInteractionKind.PAN);
-    this.gestureMode = PlayerGestureMode.PENDING;
     const finger = event.fingerList[0];
     this.gestureStartX = (finger?.localX ?? 0) - event.offsetX;
     this.gestureStartY = (finger?.localY ?? 0) - event.offsetY;
     this.gestureSeekStartTime = this.currentTime;
     this.gestureSeekTime = this.currentTime;
     this.panEndTime = this.currentTime;
+    // UI 隐藏时只放行横滑 seek（进度/双击/长按三件套可在隐藏态工作），
+    // 不点亮控制层、不占用 activeInteraction；亮度/音量/字幕仍锁定。
+    if (!this.showControls) {
+      this.hiddenUiSeekOnly = true;
+      this.gestureMode = PlayerGestureMode.PENDING;
+      if (event.fingerList.length !== 1) {
+        this.ignorePlayerPan('finger-count');
+      }
+      return;
+    }
+    this.beginInteraction(PlayerInteractionKind.PAN);
+    this.gestureMode = PlayerGestureMode.PENDING;
     if (event.fingerList.length !== 1) {
       this.ignorePlayerPan('finger-count');
     } else if (this.isInFullscreenGestureSafeEdge(this.gestureStartX, this.gestureStartY)) {
@@ -634,6 +949,12 @@ export struct VideoPlayer {
     const absX = Math.abs(event.offsetX);
     const absY = Math.abs(event.offsetY);
     if (Math.max(absX, absY) < GESTURE_LOCK_DISTANCE) {
+      return;
+    }
+    // UI 隐藏时启动的受限 pan：只允许横滑 seek，垂直方向（亮度/音量）仍锁定。
+    // 画面平移是双指手势（onPinchTouch），单指始终留给进度/亮度/音量。
+    if (this.hiddenUiSeekOnly && absX < absY * GESTURE_AXIS_DOMINANCE) {
+      this.ignorePlayerPan('controls-hidden-vertical');
       return;
     }
     if (absX >= absY * GESTURE_AXIS_DOMINANCE) {
@@ -718,7 +1039,7 @@ export struct VideoPlayer {
 
   private onPlayerPanEnd(canceled: boolean): void {
     const mode = this.gestureMode;
-    const epoch = this.interactionEpoch;
+    this.hiddenUiSeekOnly = false;
     if (!canceled && mode === PlayerGestureMode.SEEK) {
       this.controller.syncSeek(this.panEndTime * 1000);
       Logger.debug(TAG, `Player pan seek committed positionMs=${Math.round(this.panEndTime * 1000)}`);
@@ -729,15 +1050,15 @@ export struct VideoPlayer {
     if (this.activeInteraction === PlayerInteractionKind.PAN) {
       this.activeInteraction = PlayerInteractionKind.NONE;
     }
+    // 提示隐藏计时不做 epoch 守卫：新交互会经 clearTransientHintTimers 取消旧计时器，
+    // epoch 失配反而会让提示永久常驻（如手势结束后点按切换了控制层）
     if (mode === PlayerGestureMode.SEEK) {
       if (canceled) {
         this.isGestureSeek = false;
       } else {
         this.seekHintHideTimerId = setTimeout(() => {
           this.seekHintHideTimerId = -1;
-          if (epoch === this.interactionEpoch) {
-            this.isGestureSeek = false;
-          }
+          this.isGestureSeek = false;
         }, SEEK_HINT_HIDE_DELAY);
       }
     } else if (mode === PlayerGestureMode.BRIGHTNESS) {
@@ -746,9 +1067,7 @@ export struct VideoPlayer {
       } else {
         this.brightnessHideTimerId = setTimeout(() => {
           this.brightnessHideTimerId = -1;
-          if (epoch === this.interactionEpoch) {
-            this.showBrightnessHint = false;
-          }
+          this.showBrightnessHint = false;
         }, SIDE_HINT_HIDE_DELAY);
       }
     } else if (mode === PlayerGestureMode.VOLUME) {
@@ -757,9 +1076,7 @@ export struct VideoPlayer {
       } else {
         this.volHideTimerId = setTimeout(() => {
           this.volHideTimerId = -1;
-          if (epoch === this.interactionEpoch) {
-            this.showVolumeHint = false;
-          }
+          this.showVolumeHint = false;
         }, SIDE_HINT_HIDE_DELAY);
       }
     }
@@ -780,6 +1097,7 @@ export struct VideoPlayer {
     if (this.speedBoostActive) {
       return;
     }
+    // 长按倍速同属「隐藏态也放行」的进度控制，不要求先点亮 UI
     if (!this.playbackConfig.holdSpeedEnabled) {
       Logger.debug(TAG, 'Hold speed boost ignored reason=disabled');
       return;
@@ -961,6 +1279,8 @@ export struct VideoPlayer {
           ? this.getSelectedMenuBackground() : Color.Transparent)
         .onClick(() => {
           this.controller.switchSubtitle('');
+          // 记忆字幕偏好：显式关闭记为空串，后续新视频不再自动开字幕
+          PreferencesStore.setString('cfg_subtitle_preferred_lang', '');
         })
       ForEach(this.vm.subtitleTracks, (track: SubtitleTrack) => {
         MenuItem({
@@ -973,6 +1293,7 @@ export struct VideoPlayer {
             ? this.getSelectedMenuBackground() : Color.Transparent)
           .onClick(() => {
             this.controller.switchSubtitle(track.url);
+            PreferencesStore.setString('cfg_subtitle_preferred_lang', track.languageCode || '');
           })
       }, (track: SubtitleTrack) => track.url)
     }
@@ -1155,7 +1476,7 @@ export struct VideoPlayer {
     if (this.chapters.length > 0) {
       count++;
     }
-    if (this.vm.subtitleTracks.length > 0) {
+    if (!this.curSource.isLive && this.vm.subtitleTracks.length > 0) {
       count++;
     }
     if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
@@ -1165,6 +1486,7 @@ export struct VideoPlayer {
       && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
       count++;
     }
+    count++; // 画面比例按钮常驻
     return count;
   }
 
@@ -1273,6 +1595,10 @@ export struct VideoPlayer {
         // rebuilds NativeWindow (black frames + janky PiP geometry).
         .aspectRatio(this.curSource.width && this.curSource.height
           ? this.curSource.width / this.curSource.height : 16 / 9)
+        // 画面比例/双指缩放/平移：纯 UI 变换（scale+translate），surface 不重建。
+        // fill/stretch 溢出由 PlayerContainer clip(true) 裁切。
+        .scale({ x: this.videoScaleXY().sx, y: this.videoScaleXY().sy, centerX: '50%', centerY: '50%' })
+        .translate({ x: this.videoPanXVp, y: this.videoPanYVp })
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const pxWidth = Math.round(this.getUIContext().vp2px(Number(newArea.width)));
           const pxHeight = Math.round(this.getUIContext().vp2px(Number(newArea.height)));
@@ -1378,24 +1704,82 @@ export struct VideoPlayer {
         .zIndex(CommonConstants.Z_INDEX_BASE + 2)
       }
 
-      // 字幕显示层
+      // 字幕拖动取景框：拖动时显示视频显示区域的虚线边界，提示可放置范围
+      if (this.subtitleDragging) {
+        Column()
+          .width('92%')
+          .height(Math.max(0, this.displayLayoutVp().videoHVp - 16))
+          .position({ x: this.containerVpWidth * 0.04, y: this.displayLayoutVp().letterboxVp + 8 })
+          .border({ width: 1, color: '#80FFFFFF', style: BorderStyle.Dashed, radius: 8 })
+          .zIndex(CommonConstants.Z_INDEX_BASE + 2.4)
+          .hitTestBehavior(HitTestMode.None)
+      }
+
+      // 字幕显示层（ArkUI 覆盖层字幕：VTT 由 mediaservice 解析成 vm.subtitleText；
+      // 字号/颜色/背景/底部间距跟随设置项，控制栏显示时按需上浮；
+      // 拖动仅在控制层显示时允许，全向自由移动（比例化存储），拖动期间控制层保活，
+      // 拖回底部/中线附近自动吸附回默认，mpv 不再烧录字幕进画面）
       if (this.vm.currentSubtitleUrl.length > 0 && this.vm.subtitleText.length > 0) {
         Column() {
           Text(this.vm.subtitleText)
-            .fontColor(Color.White)
-            .fontSize(this.isFullLandscapeScreen ? 18 : 14)
+            .fontColor(SUBTITLE_FONT_COLOR_VALUES[this.playbackConfig.subtitleFontColor])
+            .fontSize((this.isFullLandscapeScreen ? 18 : 14) * Number(this.playbackConfig.subtitleFontScale))
             .textAlign(TextAlign.Center)
-            .maxLines(3)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .constraintSize({ maxWidth: '90%' })
+            .textShadow({ radius: 4, color: Color.Black })
             .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-            .backgroundColor('#80000000')
-            .borderRadius(4)
+            .backgroundColor(this.subtitleDragging
+              ? '#B3000000'
+              : SUBTITLE_BACKGROUND_VALUES[this.playbackConfig.subtitleBackground])
+            .borderRadius(this.subtitleDragging ? 12 : 4)
+            .border({
+              width: this.subtitleDragging ? 1.5 : 0,
+              color: this.subtitleDragging ? this.themePrimary : Color.Transparent,
+              radius: 12
+            })
+            .scale({ x: this.subtitleDragging ? 1.03 : 1, y: this.subtitleDragging ? 1.03 : 1 })
         }
         .width('100%')
         .alignItems(HorizontalAlign.Center)
-        .position({ bottom: this.isFullLandscapeScreen ? 64 : 48 })
+        .position({ bottom: this.subtitleBottomVp() })
+        .offset({ x: this.subtitleDragOffsetXRatio * this.containerVpWidth, y: 0 })
         .zIndex(CommonConstants.Z_INDEX_BASE + 2.5)
-        .hitTestBehavior(HitTestMode.None)
+        // Transparent 命中：拖动用自身 PanGesture 处理，点按/双击穿透到根手势
+        // （Block 会让整条横带吞掉点击，和「单击点亮 UI」的总闸门冲突）。
+        // 根容器是 parallelGesture 会同时收到本次拖动，由 subtitleDragging 标志早退。
+        // 控制层隐藏时整个播放器手势体系是锁定的（需先点按点亮 UI），这里同步锁定。
+        .hitTestBehavior(HitTestMode.Transparent)
+        .gesture(
+          PanGesture({ direction: PanDirection.All, fingers: 1, distance: 4 })
+            .onActionStart(() => {
+              if (!this.showControls) return;
+              this.subtitleDragging = true;
+              this.subtitleDragStartLiftRatio = this.subtitleDragLiftRatio;
+              this.subtitleDragStartOffsetXRatio = this.subtitleDragOffsetXRatio;
+              // 拖动期间控制层保活：清掉自动隐藏计时，结束后重新排程
+              this.clearHideTimer();
+            })
+            .onActionUpdate((e: GestureEvent) => {
+              if (!this.subtitleDragging) return;
+              const videoH = Math.max(1, this.displayLayoutVp().videoHVp);
+              const containerW = Math.max(1, this.containerVpWidth);
+              // GestureEvent 偏移单位就是 vp（与根手势 seek 一致），不要再 px2vp
+              const lift = this.subtitleDragStartLiftRatio - e.offsetY / videoH;
+              const offsetX = this.subtitleDragStartOffsetXRatio + e.offsetX / containerW;
+              this.subtitleDragLiftRatio = Math.min(Math.max(lift, -0.5), SUBTITLE_DRAG_MAX_RATIO);
+              this.subtitleDragOffsetXRatio = Math.min(Math.max(offsetX, -SUBTITLE_DRAG_X_MAX_RATIO), SUBTITLE_DRAG_X_MAX_RATIO);
+            })
+            .onActionEnd(() => {
+              if (!this.subtitleDragging) return;
+              this.subtitleDragging = false;
+              this.scheduleHideControls();
+            })
+            .onActionCancel(() => {
+              if (!this.subtitleDragging) return;
+              this.subtitleDragging = false;
+              this.scheduleHideControls();
+            })
+        )
       }
 
       // 2. 手势提示层
@@ -1463,7 +1847,9 @@ export struct VideoPlayer {
       }
       .width('100%').height('100%')
       .opacity(this.showControls ? 1 : 0)
-      .hitTestBehavior(this.showControls ? HitTestMode.Transparent : HitTestMode.None)
+      // 隐藏时用 BLOCK_DESCENDANTS：HitTestMode.None 只禁用 Column 自身，
+      // 后代按钮（顶栏/进度条/菜单）不可见但仍可点到；BLOCK_DESCENDANTS 整棵子树禁用
+      .hitTestBehavior(this.showControls ? HitTestMode.Transparent : HitTestMode.BLOCK_DESCENDANTS)
       .zIndex(CommonConstants.Z_INDEX_MAX)
     }
     .width(CommonConstants.WIDTH_FULL_PERCENT)
@@ -1477,16 +1863,21 @@ export struct VideoPlayer {
       if (this.containerVpWidth > 0 && this.containerVpHeight > 0 &&
         (this.containerVpWidth !== w || this.containerVpHeight !== h)) {
         this.resetTransientUi('container-size-change');
+        this.resetSubtitleDrag();
+        // 与字幕策略一致：容器形态变化后缩放/平移也归零重来
+        this.resetVideoZoom();
       }
       this.containerVpWidth = w;
       this.containerVpHeight = h;
+      this.clampVideoPan();
       Logger.debug(TAG, `Control layout size=${Math.round(w)}x${Math.round(h)} fullscreen=${this.isFullLandscapeScreen}`);
     })
     .parallelGesture(
       GestureGroup(GestureMode.Exclusive,
         TapGesture({ count: 2, fingers: 1 })
           .onAction((event: GestureEvent) => {
-            const epoch = this.registerDoubleTapActivity();
+            // 双击 ±15s 属于「隐藏态也放行」的进度控制（会顺手点亮 UI）
+            this.registerDoubleTapActivity();
             const x: number = event.fingerList[0]?.localX ?? 0;
             if (x > this.containerVpWidth / 2) {
               Logger.info(TAG, 'Double-tap forward +15s');
@@ -1494,9 +1885,7 @@ export struct VideoPlayer {
               this.showForwardHint = true;
               this.forwardHintTimerId = setTimeout(() => {
                 this.forwardHintTimerId = -1;
-                if (epoch === this.interactionEpoch) {
-                  this.showForwardHint = false;
-                }
+                this.showForwardHint = false;
               }, DOUBLE_TAP_HINT_HIDE_DELAY);
             } else {
               Logger.info(TAG, 'Double-tap backward -15s');
@@ -1504,9 +1893,7 @@ export struct VideoPlayer {
               this.showBackwardHint = true;
               this.backwardHintTimerId = setTimeout(() => {
                 this.backwardHintTimerId = -1;
-                if (epoch === this.interactionEpoch) {
-                  this.showBackwardHint = false;
-                }
+                this.showBackwardHint = false;
               }, DOUBLE_TAP_HINT_HIDE_DELAY);
             }
           }),
@@ -1539,6 +1926,8 @@ export struct VideoPlayer {
           })
       )
     )
+    // 双指缩放在触摸层处理（PinchGesture 在 Exclusive 组内会被单指 pan 竞争掉）
+    .onTouch((event: TouchEvent) => this.onPinchTouch(event))
   }
 
   private menuSymbol(icon: Resource): SymbolGlyphModifier {
@@ -1560,7 +1949,7 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
       }
-      if (this.vm.subtitleTracks.length > 0) {
+      if (!this.curSource.isLive && this.vm.subtitleTracks.length > 0) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.AI_subtitles')),
           content: $r('app.string.yt_player_subtitles'),
@@ -1606,6 +1995,18 @@ export struct VideoPlayer {
         .contentFont({ size: 14 })
         .labelFont({ size: 14, weight: FontWeight.Medium })
         .labelFontColor($r('sys.color.font_primary'))
+      MenuItem({
+        symbolStartIcon: this.menuSymbol($r('sys.symbol.resolution_video')),
+        content: $r('app.string.yt_player_aspect_mode'),
+        labelInfo: this.aspectModeLabel(),
+        builder: (): void => {
+          this.AspectMenu()
+        }
+      })
+        .contentFontColor($r('sys.color.font_primary'))
+        .contentFont({ size: 14 })
+        .labelFont({ size: 14, weight: FontWeight.Medium })
+        .labelFontColor($r('sys.color.font_primary'))
     }
     .onAppear(() => this.onControlMenuAppear())
     .onDisAppear(() => this.onControlMenuDisappear())
@@ -1632,7 +2033,7 @@ export struct VideoPlayer {
           .bindMenu(this.ChapterMenu())
       }
 
-      if (this.vm.subtitleTracks.length > 0) {
+      if (!this.curSource.isLive && this.vm.subtitleTracks.length > 0) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.AI_subtitles'))
             .fontSize(CONTROL_ICON_SIZE)
@@ -1675,6 +2076,17 @@ export struct VideoPlayer {
         .maxLines(1)
         .textAlign(TextAlign.Center)
         .bindMenu(this.SpeedMenu())
+
+      // 画面比例：下拉菜单选择（与其他选项一致的交互），菜单打开期间 UI 保活
+      Text(this.aspectModeLabel())
+        .fontSize(13)
+        .fontColor(Color.White)
+        .fontWeight(FontWeight.Medium)
+        .height(CONTROL_SLOT_SIZE)
+        .padding({ left: 8, right: 8 })
+        .textAlign(TextAlign.Center)
+        .accessibilityText($r('app.string.yt_player_aspect_mode'))
+        .bindMenu(this.AspectMenu())
     }
     .alignItems(VerticalAlign.Center)
   }
@@ -1835,6 +2247,10 @@ export struct VideoPlayer {
       bottom: this.getControlBottomPad()
     })
     .linearGradient({ direction: GradientDirection.Bottom, colors: [['#00000000', 0.0], ['#66000000', 1.0]] })
+    // 实测控制条高度喂给字幕上浮计算（隐藏时仅 opacity=0，仍在树上持续上报）
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      this.bottomControlBarVpH = Number(newArea.height);
+    })
   }
 
   private sliderOnchange(value: number, mode: SliderChangeMode) {

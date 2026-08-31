@@ -1,10 +1,11 @@
 import { AppLog } from './AppLog';
 import { AbilityConstant, common } from '@kit.AbilityKit';
-import { AvPlayerController, VideoData, PlayerState, StateChangeListener, LocalMediaProxy } from 'mediaservice';
+import { AvPlayerController, VideoData, PlayerState, StateChangeListener, LocalMediaProxy, SubtitleTrack } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
 import { YouTubePlayResult, YouTubePlayService } from '../features/player/YouTubePlayService';
 import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
+import { PreferencesStore } from './PreferencesStore';
 import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
 import { formatDurationHms } from './utils/FormatUtils';
 import { YOUTUBE_VIDEO_ID } from './Constants';
@@ -794,6 +795,7 @@ export class PlayerSession {
         this._submittedVideoId = videoId;
         this._lastAutoAdvanceFromVideoId = '';
         this._cachedVideoSource = videoSource;
+        this.autoSelectPreferredSubtitle(videoSource);
         this.notifyPlaybackSourceChanged(videoSource, 'source-ready');
         // Live quality management: parse HLS variants in the background and
         // merge them into the quality list once ready. Playback never waits.
@@ -822,6 +824,25 @@ export class PlayerSession {
         options
       );
       return null;
+    }
+  }
+
+  /**
+   * 字幕语言偏好自动选轨（NewPipe 行为）：用户在字幕菜单的选择会持久化到
+   * cfg_subtitle_preferred_lang；新视频带字幕轨且偏好非空时自动开对应语言。
+   * 偏好为空串表示用户显式关闭过字幕，不自动开启。
+   */
+  private autoSelectPreferredSubtitle(source: VideoData): void {
+    const tracks = source.subtitleTracks;
+    if (!tracks || tracks.length === 0) return;
+    const preferred = PreferencesStore.getString('cfg_subtitle_preferred_lang', '');
+    if (preferred.length === 0) return;
+    const match = tracks.find((t: SubtitleTrack) => t.languageCode === preferred)
+      || tracks.find((t: SubtitleTrack) => t.languageCode.startsWith(preferred))
+      || tracks.find((t: SubtitleTrack) => preferred.startsWith(t.languageCode));
+    if (match) {
+      logger.info(`${TAG} auto-select subtitle lang=${match.languageCode} (preferred=${preferred}) video=${source.videoId}`);
+      this._controller.switchSubtitle(match.url);
     }
   }
 

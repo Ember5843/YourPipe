@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "支持把视频下载到本地离线观看，下载内容在「本地」页管理。「清除全部数据」不会删除你已下载的文件。"
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "字幕字号"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "字幕底部间距"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "字幕字体颜色"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "字幕背景"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "字幕延迟"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "白色"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "黄色"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "绿色"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "青色"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "无背景"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "半透明"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "实底"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "画面比例"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "嵌入"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "填充"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "拉伸"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "还原缩放"
         }
     ]
 }

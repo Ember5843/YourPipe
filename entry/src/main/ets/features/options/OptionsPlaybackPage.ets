@@ -13,6 +13,9 @@ import {
   getDemuxerMaxBytesDisplay, getBackgroundVideoOffDelayDisplay,
   HOLD_SPEED_VALUES, HOLD_SPEED_DELAYS, getHoldSpeedDelayDisplay,
   GUEST_PLAYER_CLIENT_LABELS, AUTH_PLAYER_CLIENT_LABELS, getPlayerClientDisplay,
+  SUBTITLE_FONT_SCALE_LABELS, SUBTITLE_BOTTOM_MARGIN_LABELS,
+  SUBTITLE_FONT_COLOR_LABELS, SUBTITLE_BACKGROUND_LABELS, SUBTITLE_OFFSET_VALUES,
+  getSubtitleFontColorDisplay, getSubtitleBackgroundDisplay, getSubtitleOffsetDisplay,
 } from '../../common/PlaybackConfig';
 import { PiPManager } from '../player/pip/PiPManager';
 
@@ -84,6 +87,26 @@ export struct OptionsPlaybackPage {
 
   private getHoldSpeedDelayOptions(): SelectOption[] {
     return HOLD_SPEED_DELAYS.map(v => ({ value: getHoldSpeedDelayDisplay(v) } as SelectOption));
+  }
+
+  private getSubtitleFontScaleOptions(): SelectOption[] {
+    return SUBTITLE_FONT_SCALE_LABELS.map(v => ({ value: `${v}x` } as SelectOption));
+  }
+
+  private getSubtitleBottomMarginOptions(): SelectOption[] {
+    return SUBTITLE_BOTTOM_MARGIN_LABELS.map(v => ({ value: v } as SelectOption));
+  }
+
+  private getSubtitleFontColorOptions(): SelectOption[] {
+    return SUBTITLE_FONT_COLOR_LABELS.map(v => ({ value: getSubtitleFontColorDisplay(v) } as SelectOption));
+  }
+
+  private getSubtitleBackgroundOptions(): SelectOption[] {
+    return SUBTITLE_BACKGROUND_LABELS.map(v => ({ value: getSubtitleBackgroundDisplay(v) } as SelectOption));
+  }
+
+  private getSubtitleOffsetOptions(): SelectOption[] {
+    return SUBTITLE_OFFSET_VALUES.map(v => ({ value: getSubtitleOffsetDisplay(v) } as SelectOption));
   }
 
   build() {
@@ -252,6 +275,87 @@ export struct OptionsPlaybackPage {
               onChange: (index: number) => {
                 const api = GPU_API_LABELS[index];
                 this.params.updatePlaybackConfig(cfg => cfg.gpuApi = api);
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_player_subtitles') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_subtitle_size'),
+              options: this.getSubtitleFontScaleOptions(),
+              selectedIndex: SUBTITLE_FONT_SCALE_LABELS.indexOf(this.playbackConfig.subtitleFontScale),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const v = SUBTITLE_FONT_SCALE_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.subtitleFontScale = v);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_subtitle_bottom_margin'),
+              options: this.getSubtitleBottomMarginOptions(),
+              selectedIndex: SUBTITLE_BOTTOM_MARGIN_LABELS.indexOf(this.playbackConfig.subtitleBottomMarginVp),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const v = SUBTITLE_BOTTOM_MARGIN_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.subtitleBottomMarginVp = v);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_subtitle_color'),
+              options: this.getSubtitleFontColorOptions(),
+              selectedIndex: SUBTITLE_FONT_COLOR_LABELS.indexOf(this.playbackConfig.subtitleFontColor),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const v = SUBTITLE_FONT_COLOR_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.subtitleFontColor = v);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_subtitle_background'),
+              options: this.getSubtitleBackgroundOptions(),
+              selectedIndex: SUBTITLE_BACKGROUND_LABELS.indexOf(this.playbackConfig.subtitleBackground),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const v = SUBTITLE_BACKGROUND_LABELS[index];
+                this.params.updatePlaybackConfig(cfg => cfg.subtitleBackground = v);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_subtitle_offset'),
+              options: this.getSubtitleOffsetOptions(),
+              selectedIndex: SUBTITLE_OFFSET_VALUES.indexOf(this.playbackConfig.subtitleOffsetMs),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const v = SUBTITLE_OFFSET_VALUES[index];
+                this.params.updatePlaybackConfig(cfg => cfg.subtitleOffsetMs = v);
               }
             })
           }

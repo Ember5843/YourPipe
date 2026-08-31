@@ -23,6 +23,7 @@ import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { HttpDownloader, parseHlsMasterManifest, StreamInfo as ParsedHlsStreamInfo } from 'youtube_core';
+import { SubtitleCue, parseVttSubtitles, findActiveSubtitleText } from '../subtitle/VttSubtitleParser';
 
 /** Live/post-live HLS track pair: video variant playlist + audio rendition playlist. */
 interface HlsTrackPair {
@@ -55,6 +56,10 @@ export class AvPlayerController {
   private currentHlsAudioUrl: string = '';
   /** itag of the live HLS variant currently playing; used to highlight the merged quality menu. */
   private livePlayingVariantItag: number | undefined = undefined;
+  /** Parsed cues of the currently selected subtitle track (ArkUI overlay, not mpv-burned). */
+  private subtitleCues: SubtitleCue[] = [];
+  /** Guards async subtitle loads against stale completions (track switch / new source). */
+  private subtitleLoadSeq: number = 0;
   private playbackEngine: PlaybackEngine = new MpvPlaybackEngine();
   private avSessionManager: AvSessionManager = AvSessionManager.getInstance();
   private stateMachine: PlayerStateMachine = new PlayerStateMachine();
@@ -499,9 +504,8 @@ export class AvPlayerController {
       const ok = await task;
       if (ok) {
         this.playbackEngine.setStateCallback((state: PlaybackState) => this.onPlaybackStateChange(state));
-        this.playbackEngine.setSubtitleCallback((text: string, _startTime: number, _duration: number) => {
-          this.vm.subtitleText = text;
-        });
+        // 字幕文本唯一写入口是覆盖层（switchSubtitle/updateSubtitleOverlayText）；
+        // 不再注册引擎 subtitleCallback，mpv 也不会再 sub-add 烧录。
         if (this.surfaceID.length > 0) {
           this.playbackEngine.attachSurface(this.surfaceID);
         }
@@ -532,6 +536,8 @@ export class AvPlayerController {
     this.resetPlaybackState();
     this.deferCurrentSessionDestroy();
     this.livePlayingVariantItag = undefined;
+    this.subtitleCues = [];
+    this.subtitleLoadSeq++;
     this.curSource = newSource;
     this.curIndex = newSource.index;
     // 不要用视频原生分辨率播种 ohos-surface-size。
@@ -911,13 +917,48 @@ export class AvPlayerController {
     this.seekableRangesListeners.clear();
   }
 
+  /**
+   * Subtitle selection renders through the ArkUI overlay (vm.subtitleText),
+   * not mpv's burned-in libass path: the VTT text is fetched and parsed
+   * app-side so position/size stay configurable and rendering never touches
+   * the video pipeline.
+   */
   public switchSubtitle(url: string): void {
     if (url === this.vm.currentSubtitleUrl) return;
     this.vm.currentSubtitleUrl = url;
-    if (url.length === 0) {
-      this.vm.subtitleText = '';
+    this.subtitleCues = [];
+    this.subtitleLoadSeq++;
+    this.vm.subtitleText = '';
+    if (url.length === 0) return;
+    this.loadSubtitleOverlay(url, this.subtitleLoadSeq, false);
+  }
+
+  /** VTT fetch + parse with one bounded retry; stale completions are dropped by seq/url. */
+  private loadSubtitleOverlay(url: string, seq: number, isRetry: boolean): void {
+    this.fetchText(url).then((text: string) => {
+      if (seq !== this.subtitleLoadSeq || url !== this.vm.currentSubtitleUrl) return;
+      this.subtitleCues = parseVttSubtitles(text);
+      Logger.info(TAG, `subtitle overlay loaded: cues=${this.subtitleCues.length} retry=${isRetry} url=${url.substring(0, 60)}`);
+    }).catch((e: Error) => {
+      if (seq !== this.subtitleLoadSeq || url !== this.vm.currentSubtitleUrl) return;
+      if (!isRetry) {
+        Logger.warn(TAG, `subtitle overlay load failed, retrying once: ${e.message || e}`);
+        setTimeout(() => this.loadSubtitleOverlay(url, seq, true), 2000);
+      } else {
+        Logger.error(TAG, `subtitle overlay load failed after retry: ${e.message || e}`);
+      }
+    });
+  }
+
+  /** Driven by engine time-pos updates (~100ms); cheap enough per tick. */
+  private updateSubtitleOverlayText(positionSec: number): void {
+    if (this.vm.currentSubtitleUrl.length === 0) return;
+    // 正值延迟 = 字幕延后显示 → 用更早的播放位置查找（mpv sub-delay 语义）
+    const offsetMs = PlaybackPreferences.snapshot().subtitleOffsetMs;
+    const text = findActiveSubtitleText(this.subtitleCues, Math.round(positionSec * 1000) - offsetMs);
+    if (text !== this.vm.subtitleText) {
+      this.vm.subtitleText = text;
     }
-    this.playbackEngine.setSubtitle(url);
   }
 
   private selectInitialStreams(isLive: boolean): boolean {
@@ -1749,6 +1790,7 @@ export class AvPlayerController {
     this.vm.isSeeking = state.isSeeking;
     this.vm.isEnded = state.isEnded;
     this.vm.currentTime = state.currentTime;
+    this.updateSubtitleOverlayText(state.currentTime);
     this.vm.durationTime = state.duration;
     this.vm.playbackSpeed = state.playbackSpeed;
     this.vm.cachedPercent = state.bufferingPercent;

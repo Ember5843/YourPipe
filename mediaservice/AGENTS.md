@@ -66,6 +66,9 @@ mediaservice/src/main/ets/
     SabrTrackBuffer.ets          — per-track buffer + ensureReady
     SabrDashProxy.ets            — SABR DASH manifest/path serve
     SabrOfflineDownloader.ets    — offline download path
+  subtitle/
+    VttSubtitleParser.ets        — WebVTT/SRT cue parsing + active-cue lookup
+                                   (rolling-window dedup for YouTube auto captions)
   state/
     PlayerState.ets              — state enum + valid transitions + describeState
     PlayerStateMachine.ets       — state machine + StateChangeListener
@@ -101,6 +104,14 @@ mediaservice/src/main/ets/
 - Background **audio-only** (disabling video tracks after a delay) is
   coordinated with entry’s `PlayerPresentation`; engine APIs apply
   property changes, they do not invent presentation policy.
+- **Subtitles render via the ArkUI overlay**, not mpv’s burned-in libass
+  path: `AvPlayerController.switchSubtitle` fetches the track URL
+  (timedtext `fmt=vtt`) through the proxy-aware `fetchText` (one bounded
+  retry), parses it with `subtitle/VttSubtitleParser`, and
+  `updateSubtitleOverlayText` (driven by the engine’s ~100ms time-pos
+  updates, adjusted by `PlaybackPreferences.subtitleOffsetMs`) writes
+  `vm.subtitleText`. Never re-add `sub-add` calls — the engine
+  `setSubtitle`/`subText` plumbing is dormant.
 - Source submission has a **single writer** — entry `PlayerSession.play()`;
   duplicate suppression lives there, so a controller submission always
   means a real load.

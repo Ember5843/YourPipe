@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Videos can be downloaded for offline viewing and are managed on the Local tab. \"Clear all data\" never deletes your downloaded files."
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "Subtitle size"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "Subtitle bottom margin"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "Subtitle font color"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "Subtitle background"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "Subtitle delay"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "White"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "Yellow"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "Green"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "Cyan"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "None"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "Semi-transparent"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "Solid"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "Aspect ratio"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "Fit"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "Fill"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "Stretch"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "Reset zoom"
         }
     ]
 }

@@ -3027,6 +3027,74 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Vídeos podem ser baixados para assistir offline e são gerenciados na aba \"Local\". \"Limpar todos os dados\" não exclui os arquivos baixados."
+        },
+        {
+            "name": "yt_setting_subtitle_size",
+            "value": "Tamanho das legendas"
+        },
+        {
+            "name": "yt_setting_subtitle_bottom_margin",
+            "value": "Margem inferior das legendas"
+        },
+        {
+            "name": "yt_setting_subtitle_color",
+            "value": "Cor das legendas"
+        },
+        {
+            "name": "yt_setting_subtitle_background",
+            "value": "Fundo das legendas"
+        },
+        {
+            "name": "yt_setting_subtitle_offset",
+            "value": "Atraso das legendas"
+        },
+        {
+            "name": "yt_subtitle_color_white",
+            "value": "Branco"
+        },
+        {
+            "name": "yt_subtitle_color_yellow",
+            "value": "Amarelo"
+        },
+        {
+            "name": "yt_subtitle_color_green",
+            "value": "Verde"
+        },
+        {
+            "name": "yt_subtitle_color_cyan",
+            "value": "Ciano"
+        },
+        {
+            "name": "yt_subtitle_bg_none",
+            "value": "Nenhum"
+        },
+        {
+            "name": "yt_subtitle_bg_semi",
+            "value": "Semitransparente"
+        },
+        {
+            "name": "yt_subtitle_bg_solid",
+            "value": "Opaco"
+        },
+        {
+            "name": "yt_player_aspect_mode",
+            "value": "Proporção"
+        },
+        {
+            "name": "yt_aspect_fit",
+            "value": "Ajustar"
+        },
+        {
+            "name": "yt_aspect_fill",
+            "value": "Preencher"
+        },
+        {
+            "name": "yt_aspect_stretch",
+            "value": "Esticar"
+        },
+        {
+            "name": "yt_aspect_reset",
+            "value": "Redefinir zoom"
         }
     ]
 }
