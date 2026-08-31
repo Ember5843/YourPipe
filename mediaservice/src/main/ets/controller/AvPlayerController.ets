@@ -22,12 +22,14 @@ import { PlayerUiViewModel } from '../state/PlayerUiViewModel';
 import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
-import { HttpDownloader, parseHlsMasterManifest } from 'youtube_core';
+import { HttpDownloader, parseHlsMasterManifest, StreamInfo as ParsedHlsStreamInfo } from 'youtube_core';
 
 /** Live/post-live HLS track pair: video variant playlist + audio rendition playlist. */
 interface HlsTrackPair {
   videoUrl: string;
   audioUrl: string;
+  /** itag of the picked video variant — identity for menu highlight across master re-fetches. */
+  itag?: number;
 }
 
 const TAG: string = '[PlayerLog][AvPlayerController]';
@@ -51,6 +53,8 @@ export class AvPlayerController {
   private curSource: VideoData;
   /** External audio (HLS audio rendition playlist) for the current source, '' when none. */
   private currentHlsAudioUrl: string = '';
+  /** itag of the live HLS variant currently playing; used to highlight the merged quality menu. */
+  private livePlayingVariantItag: number | undefined = undefined;
   private playbackEngine: PlaybackEngine = new MpvPlaybackEngine();
   private avSessionManager: AvSessionManager = AvSessionManager.getInstance();
   private stateMachine: PlayerStateMachine = new PlayerStateMachine();
@@ -267,8 +271,20 @@ export class AvPlayerController {
     if (!this.isActive() || this.curSource?.isLive !== true || variants.length === 0) {
       return;
     }
-    this.vm.playerModel.mergeLiveHlsVariants(variants, this.curSource?.hlsUrl || '');
-    Logger.info(TAG, `live HLS variants merged count=${variants.length}`);
+    this.vm.playerModel.mergeLiveHlsVariants(variants);
+    // Point the menu selection at the variant actually playing (matched by itag —
+    // the merged URLs come from a different master fetch and never string-match).
+    // A user pick made before the merge landed is already a merged entry; keep it.
+    const merged = this.vm.playerModel.getMergedVideoList();
+    const cur = this.vm.playerModel.getCurrentStreams().video;
+    if (!merged.some((e: VideoEntry) => e.stream === cur)) {
+      const playing = merged.find((e: VideoEntry) =>
+        e.stream.itag !== undefined && e.stream.itag === this.livePlayingVariantItag);
+      if (playing) {
+        this.vm.playerModel.updateVideoStream(playing.stream);
+      }
+    }
+    Logger.info(TAG, `live HLS variants merged count=${variants.length} playingItag=${this.livePlayingVariantItag ?? '-'}`);
   }
 
   public getAudioStreamList(): StreamInfo[] {
@@ -515,6 +531,7 @@ export class AvPlayerController {
     // suppression lives there. A submission here always means a real load.
     this.resetPlaybackState();
     this.deferCurrentSessionDestroy();
+    this.livePlayingVariantItag = undefined;
     this.curSource = newSource;
     this.curIndex = newSource.index;
     // 不要用视频原生分辨率播种 ohos-surface-size。
@@ -561,11 +578,12 @@ export class AvPlayerController {
     // The master itself cannot go to MPV: FFmpeg probes every variant playlist
     // serially (multi-10s TTFF) and the audio rendition goes stale → audio=eof.
     if (newSource.isLive && newSource.hlsUrl) {
-      const maxHeight = this.resolveMaxHeight(prefs.mobileQuality || '480p');
+      const maxHeight = this.resolveMaxHeight(prefs.defaultQuality || 'best');
       const hls = await this.resolveLiveHlsStreams(maxHeight);
       if (!this.isMediaSessionCurrent(generation)) return;
       const liveUrl = hls?.videoUrl || newSource.hlsUrl;
       this.currentHlsAudioUrl = hls?.audioUrl || '';
+      this.livePlayingVariantItag = hls?.itag;
       Logger.info(TAG, `Live stream: variant=${this.describePlaybackUrl(liveUrl)} audio=${this.currentHlsAudioUrl ? 'external' : (hls ? 'muxed/none' : 'master-fallback')}`);
       this.updateAvSessionMetadata(false);
       this.vm.isBuffering = true;
@@ -626,15 +644,16 @@ export class AvPlayerController {
     let playbackUrl = '';
     if (isLiveHlsSwitch) {
       // 直播切档：重解析 master（音频 rendition 只存在于 master），选中的
-      // variant playlist + 外挂音频 rendition 在直播边缘重启。Auto 走默认选档。
-      const isAutoEntry = (videoStream.kind || '').toLowerCase() === 'manifest_hls';
-      const maxHeight = this.resolveMaxHeight(PlaybackPreferences.snapshot().mobileQuality || '480p');
-      const hls = await this.resolveLiveHlsStreams(maxHeight, isAutoEntry ? undefined : videoStream.url);
+      // variant 按 itag 身份匹配（URL 每次响应重签，不能精确匹配），
+      // 新鲜签发的 variant playlist + 外挂音频 rendition 在直播边缘重启。
+      const maxHeight = this.resolveMaxHeight(PlaybackPreferences.snapshot().defaultQuality || 'best');
+      const hls = await this.resolveLiveHlsStreams(maxHeight, videoStream);
       if (!this.isMediaSessionCurrent(generation)) {
         this.endSourceSwitchUi(false);
         return;
       }
       this.currentHlsAudioUrl = hls?.audioUrl || '';
+      this.livePlayingVariantItag = hls?.itag ?? videoStream.itag;
       playbackUrl = hls?.videoUrl || videoStream.url;
     } else {
       playbackUrl = await this.createPlaybackUrl(videoStream, effectiveAudio, generation);
@@ -904,7 +923,7 @@ export class AvPlayerController {
   private selectInitialStreams(isLive: boolean): boolean {
     const categories = this.vm.playerModel.categorizedStreams;
     if (isLive) {
-      const manifest = this.selectManifestByCap(categories.hlsManifest.length > 0 ? categories.hlsManifest : categories.dashManifest, true);
+      const manifest = this.selectManifestByCap(categories.hlsManifest.length > 0 ? categories.hlsManifest : categories.dashManifest);
       if (manifest) {
         this.vm.playerModel.updateVideoStream(manifest);
         this.vm.playerModel.updateAudioStream(undefined);
@@ -916,7 +935,7 @@ export class AvPlayerController {
     const merged = this.vm.playerModel.getMergedVideoList();
     const video = this.selectBestVideoEntry(merged);
     if (!video) {
-      const manifest = this.selectManifestByCap(categories.hlsManifest.length > 0 ? categories.hlsManifest : categories.dashManifest, false);
+      const manifest = this.selectManifestByCap(categories.hlsManifest.length > 0 ? categories.hlsManifest : categories.dashManifest);
       if (manifest) {
         this.vm.playerModel.updateVideoStream(manifest);
         this.vm.playerModel.updateAudioStream(undefined);
@@ -951,10 +970,10 @@ export class AvPlayerController {
     return true;
   }
 
-  private selectBestVideo(streams: StreamInfo[], live: boolean): StreamInfo | undefined {
+  private selectBestVideo(streams: StreamInfo[]): StreamInfo | undefined {
     const prefs = PlaybackPreferences.snapshot();
-    const targetQuality = live ? prefs.mobileQuality : prefs.defaultQuality;
-    const maxHeight = this.resolveMaxHeight(targetQuality);
+    // 直播与点播一致，统一跟随设置里的默认清晰度偏好。
+    const maxHeight = this.resolveMaxHeight(prefs.defaultQuality);
     const underCap = streams.filter(s => this.resolutionLabelHeight(s) <= maxHeight);
     // Prefer hardware-decodable codecs when the device reports capability.
     // Avoid auto-picking 4K VP9 on devices without VP9 hardware (soft-decode heat).
@@ -972,13 +991,13 @@ export class AvPlayerController {
   }
 
   private selectBestProgressive(streams: StreamInfo[]): StreamInfo {
-    const selected = this.selectBestVideo(streams, false);
+    const selected = this.selectBestVideo(streams);
     return selected || streams[0];
   }
 
-  private selectManifestByCap(streams: StreamInfo[], live: boolean): StreamInfo | undefined {
+  private selectManifestByCap(streams: StreamInfo[]): StreamInfo | undefined {
     if (!streams || streams.length === 0) return undefined;
-    const selected = this.selectBestVideo(streams, live);
+    const selected = this.selectBestVideo(streams);
     return selected || streams[0];
   }
 
@@ -1079,13 +1098,13 @@ export class AvPlayerController {
 
   /**
    * Live HLS resolution: one master GET, pick a video variant (by explicit
-   * variantUrl, else highest ≤ targetHeight) and pair it with the master's
+   * picked variant, else highest ≤ targetHeight) and pair it with the master's
    * audio rendition playlist (EXT-X-MEDIA), played as mpv external audio.
    * YouTube live masters are split A/V (video-only variants); muxed masters
    * have no renditions and the variant alone already carries audio.
    * Returns null when the master cannot be fetched/parsed (caller falls back).
    */
-  private async resolveLiveHlsStreams(targetHeight: number, variantUrl?: string): Promise<HlsTrackPair | null> {
+  private async resolveLiveHlsStreams(targetHeight: number, picked?: StreamInfo): Promise<HlsTrackPair | null> {
     const masterUrl = this.curSource?.hlsUrl || '';
     if (!masterUrl) return null;
     const text = await this.fetchText(masterUrl);
@@ -1095,8 +1114,12 @@ export class AvPlayerController {
     const parsed = parseHlsMasterManifest(text, this.curSource?.videoId || '');
     const variants = parsed.videoStreams.filter((s) => !!s.url);
     if (variants.length === 0) return null;
-    let selected = variantUrl ? variants.find((s) => s.url === variantUrl) : undefined;
+    let selected = picked ? this.matchLiveHlsVariant(variants, picked) : undefined;
     if (!selected) {
+      if (picked) {
+        Logger.warn(TAG, `resolveLiveHlsStreams: picked variant not in fresh master `
+          + `(itag=${picked.itag ?? '-'} quality=${picked.quality || '-'}), falling back to ${targetHeight}p cap`);
+      }
       selected = variants
         .filter((s) => (s.height || 0) <= targetHeight)
         .sort((a, b) => (b.height || 0) - (a.height || 0))[0]
@@ -1107,9 +1130,33 @@ export class AvPlayerController {
     // where YouTube lists the default/original first).
     const audio = parsed.audioStreams.slice()
       .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-    Logger.info(TAG, `resolveLiveHlsStreams: ${selected.height || 0}p variants=${variants.length} audioRenditions=${parsed.audioStreams.length}`);
-    const pair: HlsTrackPair = { videoUrl: selected.url, audioUrl: audio?.url || '' };
+    Logger.info(TAG, `resolveLiveHlsStreams: ${selected.height || 0}p itag=${selected.itag ?? '-'} variants=${variants.length} audioRenditions=${parsed.audioStreams.length}`);
+    const pair: HlsTrackPair = { videoUrl: selected.url, audioUrl: audio?.url || '', itag: selected.itag };
     return pair;
+  }
+
+  /**
+   * Variant identity across master re-fetches. Live master responses re-sign
+   * every variant URL per request (expire/ei/sig rotate), so full-URL equality
+   * between two fetches never holds. itag is the stable identity (parser
+   * extracts it from the `/itag/<n>/` path segment); exact URL and
+   * height+fps are fallbacks for non-YouTube / unsigned masters.
+   */
+  private matchLiveHlsVariant(variants: ParsedHlsStreamInfo[], picked: StreamInfo): ParsedHlsStreamInfo | undefined {
+    if (picked.itag !== undefined) {
+      const byItag = variants.find((s) => s.itag === picked.itag);
+      if (byItag) return byItag;
+    }
+    if (picked.url) {
+      const byUrl = variants.find((s) => s.url === picked.url);
+      if (byUrl) return byUrl;
+    }
+    const height = picked.height || 0;
+    if (height > 0) {
+      return variants.find((s) => (s.height || 0) === height
+        && (s.videoFps || 0) === (picked.fps || 0));
+    }
+    return undefined;
   }
 
   private async fetchText(url: string): Promise<string> {

@@ -131,7 +131,10 @@ export function parseHlsMasterManifest(manifestContent: string, videoId: string)
 
       const stream: StreamInfo = {
         url: streamUrl,
-        itag: undefined,
+        // YouTube live variant URLs embed a stable `/itag/<n>/` path segment;
+        // the surrounding expire/ei/sig segments rotate on every master fetch,
+        // so itag is the only cross-fetch identity for a variant.
+        itag: extractHlsUrlItag(streamUrl),
         mimeType: 'video/mp2t',
         qualityLabel: resString,
         audioQuality: undefined,
@@ -231,6 +234,17 @@ function extractHlsStringAttribute(line: string, attribute: string): string | un
   match = matcher.exec(line);
   if (match) {
     return match[1];
+  }
+  return undefined;
+}
+
+function extractHlsUrlItag(url: string): number | undefined {
+  const match = /\/itag\/(\d+)/.exec(url);
+  if (match) {
+    try {
+      return parseInt(match[1], 10);
+    } catch (ignored) {
+    }
   }
   return undefined;
 }

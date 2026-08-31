@@ -226,13 +226,14 @@ export class PlayerModel {
 
   public getStreamCategories(): StreamCategories { return this.categorizedStreams; }
   /**
-   * Live quality management: replace mergedVideoList with [Auto(master),
-   * ...per-variant entries] once background parsing delivered HLS variants.
+   * Live quality management: replace mergedVideoList with per-variant entries
+   * once background parsing delivered HLS variants. No synthetic "Auto" master
+   * entry — the menu shows real variants only, with the playing one selected.
    * For live, the pre-merge list held DASH/OTF adaptive entries which cannot
    * be played through the proxy (no SIDX), so the list is replaced wholesale
    * instead of appended to.
    */
-  public mergeLiveHlsVariants(variants: StreamInfo[], masterUrl: string): void {
+  public mergeLiveHlsVariants(variants: StreamInfo[]): void {
     const seen = new Set<string>();
     const sorted = variants.filter((s: StreamInfo) => {
       if (!s.url || s.hasVideo !== true || seen.has(s.url)) return false;
@@ -241,18 +242,6 @@ export class PlayerModel {
     }).slice().sort((a: StreamInfo, b: StreamInfo) => (b.height || 0) - (a.height || 0));
     if (sorted.length === 0) return;
     const list: VideoEntry[] = [];
-    if (masterUrl.length > 0) {
-      const autoStream: StreamInfo = {
-        url: masterUrl,
-        kind: 'manifest_hls',
-        deliveryMethod: 'HLS',
-        hasVideo: true,
-        hasAudio: true,
-        mimeType: 'application/vnd.apple.mpegurl',
-        sourceClient: 'hls-auto',
-      };
-      list.push({ stream: autoStream } as VideoEntry);
-    }
     for (const s of sorted) {
       list.push({ stream: s } as VideoEntry);
       // Keep categories coherent for future per-track audio work.
@@ -264,7 +253,7 @@ export class PlayerModel {
     }
     this.mergedVideoList = list;
     this.liveQualityReady = true;
-    Logger.info(TAG, `live HLS variants merged: auto=${masterUrl.length > 0} variants=${sorted.length} `
+    Logger.info(TAG, `live HLS variants merged: variants=${sorted.length} `
       + sorted.map((s: StreamInfo) => s.quality || `${s.height}p`).join(','));
   }
   public getMergedVideoList(): VideoEntry[] { return this.mergedVideoList; }
