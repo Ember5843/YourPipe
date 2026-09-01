@@ -112,6 +112,18 @@ mediaservice/src/main/ets/
   updates, adjusted by `PlaybackPreferences.subtitleOffsetMs`) writes
   `vm.subtitleText`. Never re-add `sub-add` calls — the engine
   `setSubtitle`/`subText` plumbing is dormant.
+  `fetchText` throws on non-200; for `tlang=` (server-translated) URLs it
+  attaches login Cookie + SAPISIDHASH from
+  `setSubtitleAuthHeaderProvider` (wired by `EntryAbility`, PipePipe
+  risk-control parity).
+  App-generated subtitle content (AI translation `ai://…` / on-device ASR
+  `asr://…` tracks from entry) enters through
+  `AvPlayerController.switchSubtitleText(trackKey, vttText)` — same overlay
+  pipeline, no fetch, same-key re-push always re-applies. Those entry
+  callers are currently **[DISABLED]** in entry (P2/P3 commented out);
+  the controller entry point stays live. `parseVttSubtitles` / `SubtitleCue`
+  are exported from `mediaservice/Index.ets` for entry's AI subtitle
+  services.
 - Source submission has a **single writer** — entry `PlayerSession.play()`;
   duplicate suppression lives there, so a controller submission always
   means a real load.

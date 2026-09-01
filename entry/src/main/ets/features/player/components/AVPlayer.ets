@@ -16,6 +16,9 @@
 import { componentUtils, LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { ConfigurationConstant } from '@kit.AbilityKit';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
+import { i18n } from '@kit.LocalizationKit';
+import { AICaptionComponent, AICaptionController, AICaptionOptions } from '@kit.SpeechKit';
+import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
 import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
 import {
@@ -39,6 +42,13 @@ import { MediaThumb } from '../../../common/components/MediaThumb';
 import { VideoItem } from 'youtube_core';
 import { PlaybackConfig, SUBTITLE_FONT_COLOR_VALUES, SUBTITLE_BACKGROUND_VALUES } from '../../../common/PlaybackConfig';
 import { PreferencesStore } from '../../../common/PreferencesStore';
+import { LlmTranslateConfig } from '../../../common/LlmTranslateConfig';
+import { TranslationService } from '../../../common/TranslationService';
+import {
+  SubtitleTranslationService,
+  SubtitleTranslateProgress
+} from '../translate/SubtitleTranslationService';
+import { AsrCaptionService, AsrProgress } from '../asr/AsrCaptionService';
 
 const TAG: string = '[PlayerLog][VideoPlayer]';
 const GESTURE_LOCK_DISTANCE: number = 12;
@@ -286,8 +296,14 @@ export struct VideoPlayer {
    *  会话级、比例化——旋转/折叠/大小屏切换时位置观感不变。 */
   @State subtitleDragLiftRatio: number = 0;
   @State subtitleDragOffsetXRatio: number = 0;
+  @State aiTranslateProgress: string = '';
+  @State aiCaptionShown: boolean = false;
   /** 拖动中的高亮态（虚线取景框 + 气泡样式），需在 build 中响应 */
   @State subtitleDragging: boolean = false;
+  // 系统 AI 字幕（P1）：Speech Kit AICaptionComponent，自动捕获应用音频
+  private aiCaptionController: AICaptionController = new AICaptionController();
+  private aiCaptionOptions: AICaptionOptions | undefined = undefined;
+  private aiCaptionSupported: boolean = false;
   /** 画面比例模式（嵌入/填充/拉伸），纯 UI 层 scale 实现，不重建 surface */
   @State videoAspectMode: VideoAspectMode = 'fit';
   /** 双指缩放倍率（1=未缩放），单指平移偏移（vp） */
@@ -461,6 +477,36 @@ export struct VideoPlayer {
     // 却不下发系统 API，后续同值又被短路 → 播放中自动息屏。
     this.initializePlayerEnvironment(context);
 
+    // 系统 AI 字幕（P1）能力探测 + 惰性初始化：仅支持 Phone/Tablet/2in1 部分机型，
+    // 不支持模拟器；syscap 探测失败或 onError 都保持隐藏，不影响播放。
+    try {
+      this.aiCaptionSupported = canIUse('SystemCapability.AI.AICaption');
+    } catch (_e) {
+      this.aiCaptionSupported = false;
+    }
+    if (this.aiCaptionSupported && !this.aiCaptionOptions) {
+      // 源/目标语言字段是 6.1.1(API 24) 新增；低版本运行时下传会报 1012900013，按版本裁剪
+      const withLangFields = deviceInfo.sdkApiVersion >= 24;
+      // 用户配置的源语言（默认英文视频 → 中英双语；中文源只出中文）
+      const srcLang = this.playbackConfig.systemAiCaptionSource === 'zh' ? 'zh' : 'en';
+      const onPrepared = (): void => {
+        Logger.info(TAG, 'AICaption prepared');
+      };
+      const onError = (error: BusinessError): void => {
+        Logger.warn(TAG, `AICaption error code=${error.code} msg=${error.message}`);
+      };
+      this.aiCaptionOptions = withLangFields
+        ? {
+          initialOpacity: 1,
+          onPrepared: onPrepared,
+          onError: onError,
+          sourceLanguage: srcLang,
+          targetLanguage: srcLang === 'en' ? 'zh-en' : 'zh'
+        }
+        : { initialOpacity: 1, onPrepared: onPrepared, onError: onError };
+    }
+    this.aiCaptionShown = this.playbackConfig.systemAiCaption && this.aiCaptionSupported;
+
     // 注册进度监听（节流后的 currentTime/durationTime）
     this.controller.subscribeProgress(this.progressListener);
     this.controller.subscribePlaybackState(this.playbackStateListener);
@@ -468,6 +514,10 @@ export struct VideoPlayer {
     this.controller.addErrorListener(this.errorListener);
     this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
+    // AI 字幕翻译进度（字幕菜单内展示 x/y）
+    SubtitleTranslationService.getInstance().addProgressListener(this.aiTranslateProgressListener);
+    // AI 生成字幕（端侧 ASR）进度
+    AsrCaptionService.getInstance().addProgressListener(this.asrProgressListener);
     // 屏幕常亮：跟随播放状态机驱动
     this.controller.addStateListener(this.keepScreenListener);
     // 立即按当前 vm 状态同步一次（避免错过初始 PLAYING / 引擎已就绪）
@@ -1296,6 +1346,33 @@ export struct VideoPlayer {
             PreferencesStore.setString('cfg_subtitle_preferred_lang', track.languageCode || '');
           })
       }, (track: SubtitleTrack) => track.url)
+      // [DISABLED] AI 整轨字幕翻译（P2：gtx/LLM）——产品决定只保留 YouTube tlang
+      // 官方自动翻译轨（本块上方 ForEach 已含），gtx 客户端翻译入口注释，代码保留。
+      // if (this.vm.subtitleTracks.length > 0) {
+      //   MenuItem({
+      //     content: this.getAiTranslateLabel(),
+      //     endIcon: this.vm.currentSubtitleUrl.startsWith('ai://') ? $r('sys.symbol.checkmark') : ''
+      //   })
+      //     .contentFontColor($r('sys.color.font_primary'))
+      //     .contentFont({ size: 14 })
+      //     .backgroundColor(this.vm.currentSubtitleUrl.startsWith('ai://')
+      //       ? this.getSelectedMenuBackground() : Color.Transparent)
+      //     .onClick(() => {
+      //       this.onAiTranslateClick();
+      //     })
+      // }
+      // [DISABLED] AI 生成字幕（P3：端侧 SenseVoice ASR）——暂不开放，代码保留。
+      // MenuItem({
+      //   content: this.getAsrCaptionLabel(),
+      //   endIcon: this.vm.currentSubtitleUrl.startsWith('asr://') ? $r('sys.symbol.checkmark') : ''
+      // })
+      //   .contentFontColor($r('sys.color.font_primary'))
+      //   .contentFont({ size: 14 })
+      //   .backgroundColor(this.vm.currentSubtitleUrl.startsWith('asr://')
+      //     ? this.getSelectedMenuBackground() : Color.Transparent)
+      //   .onClick(() => {
+      //     this.onAsrCaptionClick();
+      //   })
     }
     .onAppear(() => this.onControlMenuAppear())
     .onDisAppear(() => this.onControlMenuDisappear())
@@ -1391,9 +1468,150 @@ export struct VideoPlayer {
   }
 
   private getSubtitleLabel(track: SubtitleTrack): string {
+    if (track.isAutoTranslated) {
+      // 虚拟自动翻译轨（tlang）：显示目标语言的原生名称 + 本地化标记
+      let langName = track.languageCode;
+      try {
+        langName = i18n.System.getDisplayLanguage(track.languageCode, track.languageCode);
+      } catch (_e) {
+        // 系统无法展示该语言码时回退为原始码
+      }
+      const marker = getContext().resourceManager.getStringSync($r('app.string.yt_player_subtitle_auto_translated').id);
+      return `${langName} · ${marker}`;
+    }
     return [track.name, track.languageCode, track.kind]
       .filter((value: string | undefined): boolean => !!value && value.trim().length > 0)
       .join(' · ');
+  }
+
+  // ── AI 字幕翻译（P2）──
+
+  private aiTranslateProgressListener = (p: SubtitleTranslateProgress | null): void => {
+    if (!p) {
+      this.aiTranslateProgress = '';
+      return;
+    }
+    this.aiTranslateProgress = `${p.doneBatches}/${p.totalBatches}`;
+  }
+
+  private getAiTranslateLabel(): string {
+    const base = getContext().resourceManager.getStringSync($r('app.string.yt_ai_translate_menu').id);
+    if (this.aiTranslateProgress.length > 0) {
+      return `${base} ${this.aiTranslateProgress}`;
+    }
+    const target = TranslationService.targetLanguage();
+    let langName = target;
+    try {
+      langName = i18n.System.getDisplayLanguage(target, target);
+    } catch (_e) {
+      // 回退为语言码
+    }
+    return `${base} · ${langName}`;
+  }
+
+  private onAiTranslateClick(): void {
+    const service = SubtitleTranslationService.getInstance();
+    // 翻译中点击 = 取消任务（不应用、不写缓存）
+    if (service.isRunning()) {
+      service.cancel();
+      this.aiTranslateProgress = '';
+      return;
+    }
+    const videoId = this.curSource.videoId ?? '';
+    if (videoId.length === 0 || this.vm.subtitleTracks.length === 0) {
+      return;
+    }
+    const cfg = LlmTranslateConfig.get();
+    if (cfg.engine === 'llm' && !cfg.isLlmReady()) {
+      this.getUIContext().getPromptAction().showToast({
+        message: $r('app.string.yt_ai_translate_llm_not_configured'),
+        duration: 2500
+      });
+      return;
+    }
+    const target = TranslationService.targetLanguage();
+    service.translateAndApply(videoId, this.vm.subtitleTracks, this.vm.currentSubtitleUrl, this.controller)
+      .then((res) => {
+        if (res.ok) {
+          // 记忆 AI 翻译偏好：新视频自动触发翻译（缓存命中时瞬时完成）
+          PreferencesStore.setString('cfg_subtitle_preferred_lang', `ai:${target}`);
+          if (res.partial) {
+            this.getUIContext().getPromptAction().showToast({
+              message: $r('app.string.yt_ai_translate_partial_fail'),
+              duration: 2500
+            });
+          }
+        } else if (!res.cancelled) {
+          Logger.warn(TAG, `AI translate failed: ${res.error || '-'}`);
+          this.getUIContext().getPromptAction().showToast({
+            message: $r('app.string.yt_ai_translate_failed'),
+            duration: 2500
+          });
+        }
+      });
+  }
+
+  // ── AI 生成字幕（P3，端侧 ASR）──
+
+  @State asrProgress: string = '';
+
+  private asrProgressListener = (p: AsrProgress | null): void => {
+    if (!p) {
+      this.asrProgress = '';
+      return;
+    }
+    let phase = '';
+    try {
+      switch (p.phase) {
+        case 'model':
+          phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_model').id);
+          break;
+        case 'audio':
+          phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_audio').id);
+          break;
+        case 'decode':
+          phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_decode').id);
+          break;
+        case 'transcribe':
+        default:
+          phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_transcribe').id);
+          break;
+      }
+    } catch (_e) {
+      phase = p.phase;
+    }
+    this.asrProgress = `${phase} ${p.percent}%`;
+  }
+
+  private getAsrCaptionLabel(): string {
+    const base = getContext().resourceManager.getStringSync($r('app.string.yt_asr_menu').id);
+    return this.asrProgress.length > 0 ? `${base} · ${this.asrProgress}` : base;
+  }
+
+  private onAsrCaptionClick(): void {
+    const service = AsrCaptionService.getInstance();
+    if (service.isRunning()) {
+      service.cancel();
+      this.asrProgress = '';
+      return;
+    }
+    const videoId = this.curSource.videoId ?? '';
+    if (videoId.length === 0) {
+      return;
+    }
+    const streams = this.curSource.streams ?? [];
+    service.generateAndApply(videoId, streams, this.controller)
+      .then((res) => {
+        if (res.ok && res.fromCache) {
+          Logger.info(TAG, `ASR caption applied from cache video=${videoId}`);
+        } else if (!res.ok && !res.cancelled) {
+          Logger.warn(TAG, `ASR caption failed: ${res.error || '-'}`);
+          this.getUIContext().getPromptAction().showToast({
+            message: $r('app.string.yt_asr_failed'),
+            duration: 2500
+          });
+        }
+      });
   }
 
   private getAudioLabel(stream: StreamInfo): string {
@@ -1472,11 +1690,12 @@ export struct VideoPlayer {
 
   /** 章节 / 字幕 / 音轨 / 画质 / 倍速 是否作为顶部独立图标展示 */
   private getTopToolCount(): number {
-    let count = 1; // speed always present
+    let count = this.curSource.isLive ? 0 : 1; // 倍速点播常驻，直播禁用
     if (this.chapters.length > 0) {
       count++;
     }
-    if (!this.curSource.isLive && this.vm.subtitleTracks.length > 0) {
+    // 字幕菜单对 VOD 常驻：无原生轨时仍有 AI 翻译（P2）/ AI 生成字幕（P3）入口
+    if (!this.curSource.isLive) {
       count++;
     }
     if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
@@ -1782,6 +2001,21 @@ export struct VideoPlayer {
         )
       }
 
+      // [DISABLED] 系统 AI 字幕面板（P1，Speech Kit AICaptionComponent）——实测面板
+      // 强制占据大片画面区域、体验不佳，产品阶段禁用挂载；设置项同步隐藏
+      // （OptionsPlaybackPage），代码保留。重新启用：恢复下方 if 块与设置行即可。
+      // if (this.playbackConfig.systemAiCaption && this.aiCaptionSupported) {
+      //   AICaptionComponent({
+      //     isShown: this.aiCaptionShown,
+      //     controller: this.aiCaptionController,
+      //     options: this.aiCaptionOptions
+      //   })
+      //     .width('92%')
+      //     .height(120)
+      //     .position({ x: '4%', bottom: this.subtitleBottomVp() + 72 })
+      //     .zIndex(CommonConstants.Z_INDEX_BASE + 2.6)
+      // }
+
       // 2. 手势提示层
       RelativeContainer() {
         if (this.isGestureSeek) {
@@ -1949,7 +2183,7 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
       }
-      if (!this.curSource.isLive && this.vm.subtitleTracks.length > 0) {
+      if (!this.curSource.isLive) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.AI_subtitles')),
           content: $r('app.string.yt_player_subtitles'),
@@ -1983,18 +2217,20 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
       }
-      MenuItem({
-        symbolStartIcon: this.menuSymbol($r('sys.symbol.play_circle')),
-        content: $r('app.string.yt_player_playback_speed'),
-        labelInfo: `${this.vm.playbackSpeed}x`,
-        builder: (): void => {
-          this.SpeedMenu()
-        }
-      })
-        .contentFontColor($r('sys.color.font_primary'))
-        .contentFont({ size: 14 })
-        .labelFont({ size: 14, weight: FontWeight.Medium })
-        .labelFontColor($r('sys.color.font_primary'))
+      if (!this.curSource.isLive) {
+        MenuItem({
+          symbolStartIcon: this.menuSymbol($r('sys.symbol.play_circle')),
+          content: $r('app.string.yt_player_playback_speed'),
+          labelInfo: `${this.vm.playbackSpeed}x`,
+          builder: (): void => {
+            this.SpeedMenu()
+          }
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .labelFont({ size: 14, weight: FontWeight.Medium })
+          .labelFontColor($r('sys.color.font_primary'))
+      }
       MenuItem({
         symbolStartIcon: this.menuSymbol($r('sys.symbol.resolution_video')),
         content: $r('app.string.yt_player_aspect_mode'),
@@ -2033,7 +2269,7 @@ export struct VideoPlayer {
           .bindMenu(this.ChapterMenu())
       }
 
-      if (!this.curSource.isLive && this.vm.subtitleTracks.length > 0) {
+      if (!this.curSource.isLive) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.AI_subtitles'))
             .fontSize(CONTROL_ICON_SIZE)
@@ -2067,15 +2303,17 @@ export struct VideoPlayer {
           .bindMenu(this.VideoMenu())
       }
 
-      Text(this.vm.playbackSpeed + 'x')
-        .fontSize(16)
-        .fontColor(Color.White)
-        .fontWeight(FontWeight.Medium)
-        .width(SPEED_CONTROL_WIDTH)
-        .height(CONTROL_SLOT_SIZE)
-        .maxLines(1)
-        .textAlign(TextAlign.Center)
-        .bindMenu(this.SpeedMenu())
+      if (!this.curSource.isLive) {
+        Text(this.vm.playbackSpeed + 'x')
+          .fontSize(16)
+          .fontColor(Color.White)
+          .fontWeight(FontWeight.Medium)
+          .width(SPEED_CONTROL_WIDTH)
+          .height(CONTROL_SLOT_SIZE)
+          .maxLines(1)
+          .textAlign(TextAlign.Center)
+          .bindMenu(this.SpeedMenu())
+      }
 
       // 画面比例：下拉菜单选择（与其他选项一致的交互），菜单打开期间 UI 保活
       Text(this.aspectModeLabel())
@@ -2316,6 +2554,8 @@ export struct VideoPlayer {
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
+    SubtitleTranslationService.getInstance().removeProgressListener(this.aiTranslateProgressListener);
+    AsrCaptionService.getInstance().removeProgressListener(this.asrProgressListener);
   }
 }
 

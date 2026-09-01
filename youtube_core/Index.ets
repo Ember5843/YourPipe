@@ -4,6 +4,7 @@
 // ── extractor ──
 export { YouTubeExtractor } from './src/main/ets/extractor/YouTubeExtractor';
 export { VideoInfo, ChapterInfo, SubtitleTrack } from './src/main/ets/extractor/VideoInfo';
+export { buildAutoTranslatedTrack, toYoutubeTlang } from './src/main/ets/extractor/SubtitleTranslate';
 export { StreamInfo } from './src/main/ets/extractor/StreamInfo';
 export {
   AccountTerminatedException,

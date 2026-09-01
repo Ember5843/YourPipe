@@ -6,6 +6,9 @@ import { YouTubePlayResult, YouTubePlayService } from '../features/player/YouTub
 import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { PreferencesStore } from './PreferencesStore';
+import { TranslationService } from './TranslationService';
+// [DISABLED] P2 gtx 已随菜单项注释关闭；恢复时取消注释本行与 autoSelectPreferredSubtitle 内的调用
+// import { SubtitleTranslationService } from '../features/player/translate/SubtitleTranslationService';
 import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
 import { formatDurationHms } from './utils/FormatUtils';
 import { YOUTUBE_VIDEO_ID } from './Constants';
@@ -831,12 +834,27 @@ export class PlayerSession {
    * 字幕语言偏好自动选轨（NewPipe 行为）：用户在字幕菜单的选择会持久化到
    * cfg_subtitle_preferred_lang；新视频带字幕轨且偏好非空时自动开对应语言。
    * 偏好为空串表示用户显式关闭过字幕，不自动开启。
+   * 偏好为 "ai:" 前缀（用户上次选择了 AI 翻译）时：有目标语言原生轨则选原生轨，
+   * 否则异步触发 AI 翻译（gtx 通道，磁盘/内存缓存命中时瞬时完成）。
    */
   private autoSelectPreferredSubtitle(source: VideoData): void {
     const tracks = source.subtitleTracks;
     if (!tracks || tracks.length === 0) return;
     const preferred = PreferencesStore.getString('cfg_subtitle_preferred_lang', '');
     if (preferred.length === 0) return;
+    if (preferred.startsWith('ai:')) {
+      // [DISABLED] P2 gtx 自动触发已随菜单项注释关闭（产品只保留 tlang 官方自动翻译）；
+      // ai: 偏好只保留"有原生轨选原生轨"的语义，不再后台触发 gtx 翻译。
+      const target = TranslationService.targetLanguage();
+      const nativeMatch = tracks.find((t: SubtitleTrack) => !t.isAutoTranslated
+        && (t.languageCode === target || t.languageCode.startsWith(target)
+          || (t.languageCode.length > 0 && target.startsWith(t.languageCode))));
+      if (nativeMatch) {
+        logger.info(`${TAG} auto-select native subtitle lang=${nativeMatch.languageCode} (ai preferred=${preferred}) video=${source.videoId}`);
+        this._controller.switchSubtitle(nativeMatch.url);
+      }
+      return;
+    }
     const match = tracks.find((t: SubtitleTrack) => t.languageCode === preferred)
       || tracks.find((t: SubtitleTrack) => t.languageCode.startsWith(preferred))
       || tracks.find((t: SubtitleTrack) => preferred.startsWith(t.languageCode));

@@ -16,6 +16,7 @@ import { OptionsLanguageAndRegionPage } from './OptionsLanguageAndRegionPage';
 import { OptionsRecoveryPage } from './OptionsRecoveryPage';
 import { OptionsDataAccountPage } from './OptionsDataAccountPage';
 import { OptionsNetworkPage } from './OptionsNetworkPage';
+import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
 import { HelpGuidePage } from '../help/HelpGuidePage';
 import { WebViewLoginPage } from '../auth/WebViewLoginPage';
 import { DeviceQrLoginPage } from '../auth/DeviceQrLoginPage';
@@ -111,6 +112,9 @@ export struct OptionsSheetHost {
   private getQualityDisplay(quality: VideoQualityCap): ResourceStr {
     switch (quality) {
       case 'best': return $r('app.string.yt_quality_best');
+      case '4320p': return '8K (4320p)';
+      case '2160p': return '4K (2160p)';
+      case '1440p': return '2K (1440p)';
       default: return quality;
     }
   }
@@ -127,6 +131,7 @@ export struct OptionsSheetHost {
             onLanguageClick: () => { this.pushOptionsPath('language'); },
             onPlaybackClick: () => { this.pushOptionsPath('playback'); },
             onNetworkClick: () => { this.pushOptionsPath('network'); },
+            onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
             onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
             onLogClick: () => { this.pushOptionsPath('log_page'); },
             onHelpClick: () => { this.pushOptionsPath('help_page'); },
@@ -191,6 +196,17 @@ export struct OptionsSheetHost {
               applyLanguageSelection: this.params.applyLanguageSelection
             }
           })
+      }
+    } else if (name === 'ai_translate') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_option_ai_translate'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+        OptionsAiTranslatePage({
+          params: {
+            themeColor: this.themePrimary
+          }
+        })
       }
     } else if (name === 'data_account') {
       OptionsNavScaffold({
@@ -368,6 +384,7 @@ export struct OptionsSheetHost {
           OptionsPlaybackPage({
             params: {
               themeColor: this.themePrimary,
+              appLangItems: this.params.appLangItems,
               updatePlaybackConfig: this.params.updatePlaybackConfig,
               updateUiConfig: this.params.updateUiConfig,
               getQualityDisplay: this.getQualityDisplay.bind(this),

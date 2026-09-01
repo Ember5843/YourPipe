@@ -26,6 +26,8 @@ import {
   YoutubePlayerClientConfig
 } from 'youtube_core';
 import { StreamInfo, SubtitleTrack, sabrSessionStore, LocalMediaProxy } from 'mediaservice';
+import { buildAutoTranslatedTrack } from 'youtube_core';
+import { TranslationService } from '../../common/TranslationService';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
 import { SabrWebViewPoTokenProvider } from './SabrWebViewPoTokenProvider';
@@ -433,13 +435,38 @@ export class YouTubePlayService {
         success: true,
         videoInfo: videoInfo,
         playerStreams: playerStreams,
-        subtitleTracks: videoInfo.subtitleTracks
+        subtitleTracks: this.withAutoTranslatedTrack(videoInfo)
       };
     } catch (e) {
       const errorCode = this.analyzeErrorCode(e as Error);
       logger.error(`${TAG} play() extraction exception: errorCode=${errorCode} message=${(e as Error).message}`);
       return { success: false, error: this.getErrorMessage(errorCode, undefined, e as Error), errorCode: errorCode };
     }
+  }
+
+  /**
+   * P0 自动翻译轨（YouTube timedtext tlang）：有可翻译轨且没有目标语言原生轨时，
+   * 追加一条服务端机器翻译虚拟轨。目标语言与评论翻译共用 TranslationService 设置。
+   * 返回新数组，不改动 videoInfo.subtitleTracks（prefetch 缓存复用同一 VideoInfo）。
+   * 注意：tlang 端点受 YouTube 按 IP 的 429 风控（"automated queries"），
+   * 被标记的网络会取不到内容（overlay 一次重试后静默失败）；登录头已挂
+   * （mediaservice fetchText），能否出字幕取决于出口 IP 信誉。
+   */
+  private withAutoTranslatedTrack(videoInfo: VideoInfo): SubtitleTrack[] {
+    const tracks = videoInfo.subtitleTracks;
+    if (videoInfo.isLive || tracks.length === 0) {
+      return tracks;
+    }
+    try {
+      const translated = buildAutoTranslatedTrack(tracks, TranslationService.subtitleTargetLanguage());
+      if (translated) {
+        logger.info(`${TAG} auto-translate track added: tlang=${translated.languageCode} video=${videoInfo.videoId}`);
+        return tracks.concat([translated]);
+      }
+    } catch (e) {
+      logger.warn(`${TAG} auto-translate track build failed: ${(e as Error).message || e}`);
+    }
+    return tracks;
   }
 
   /** youtube_core StreamInfo → mediaservice StreamInfo (shared by play() and

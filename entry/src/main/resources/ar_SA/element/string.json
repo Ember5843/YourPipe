@@ -289,6 +289,14 @@
             "value": "اتباع لغة التطبيق"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "ترجمة الترجمات تلقائيًا إلى"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "اتباع لغة الترجمة"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "لغة التطبيق"
         },
@@ -1040,6 +1048,158 @@
             "name": "yt_player_subtitle_off",
             "value": "إيقاف الترجمة"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "ترجمة تلقائية"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "ترجمة الترجمة بالذكاء الاصطناعي"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "محرك الترجمة"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "ترجمة Google المجانية"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "نموذج LLM مخصص (متوافق مع OpenAI)"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "إعدادات LLM"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "عنوان الواجهة (Base URL)"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "اسم النموذج"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "اختبار الاتصال"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "جارٍ الاختبار…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "تم الاتصال بنجاح"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "فشل الاتصال؛ تحقق من الإعدادات"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "العرض"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "ثنائي اللغة"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "إظهار النص الأصلي والترجمة معًا"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "يُرسَل نص الترجمة إلى خدمة الترجمة المحددة. تتبع اللغة المستهدفة \"لغة ترجمة المحتوى\"."
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "ترجمة ذكية"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "يرجى إعداد LLM في الإعدادات أولًا"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "فشلت ترجمة بعض الأسطر؛ تم الاحتفاظ بالنص الأصلي"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "فشلت ترجمة الترجمة؛ حاول لاحقًا"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "الترجمة الذكية للنظام"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "يتعرف النظام على الصوت الجاري تشغيله في الوقت الفعلي (أجهزة مدعومة فقط، صيني/إنجليزي)"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "لغة مصدر الترجمة الذكية"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "الصينية"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "توليد الترجمة بالذكاء الاصطناعي"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "تنزيل النموذج"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "تنزيل الصوت"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "فك ترميز الصوت"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "جارٍ التعرف"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "فشل توليد الترجمة؛ حاول لاحقًا"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "نموذج التعرف على الجهاز"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "جاهز (SenseVoice) zh/en/ja/ko/yue"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "لم يتم التنزيل (حوالي 230MB، يُفضل Wi-Fi)"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "جارٍ التنزيل"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "تنزيل النموذج"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "حذف النموذج"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "إلغاء"
+},
         {
             "name": "yt_player_chapters",
             "value": "الفصول"

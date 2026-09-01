@@ -64,6 +64,10 @@
       "srcPath": "./youtube_core"
     },
     {
+      "name": "asrengine",
+      "srcPath": "./asrengine"
+    },
+    {
       "name": "libmpv_napi",
       "srcPath": "./libmpv_napi",
       "targets": [

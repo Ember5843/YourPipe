@@ -18,11 +18,14 @@ import {
   getSubtitleFontColorDisplay, getSubtitleBackgroundDisplay, getSubtitleOffsetDisplay,
 } from '../../common/PlaybackConfig';
 import { PiPManager } from '../player/pip/PiPManager';
+import { LanguagePickerItem, buildExtendedLanguageItems } from '../../common/components/LanguagePickerDialog';
 
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 
 interface OptionsPlaybackPageParams {
   themeColor: ResourceColor;
+  /** 应用语言列表（字幕翻译目标语言选项的数据源） */
+  appLangItems: LanguagePickerItem[];
   updatePlaybackConfig: (updater: (cfg: PlaybackConfig) => void) => void;
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
   getQualityDisplay: (quality: VideoQualityCap) => ResourceStr;
@@ -38,6 +41,7 @@ export struct OptionsPlaybackPage {
 
   @Prop params: OptionsPlaybackPageParams = {
     themeColor: '#E53935',
+    appLangItems: [] as LanguagePickerItem[],
     updatePlaybackConfig: () => {},
     updateUiConfig: () => {},
     getQualityDisplay: (quality) => quality,
@@ -107,6 +111,13 @@ export struct OptionsPlaybackPage {
 
   private getSubtitleOffsetOptions(): SelectOption[] {
     return SUBTITLE_OFFSET_VALUES.map(v => ({ value: getSubtitleOffsetDisplay(v) } as SelectOption));
+  }
+
+  /** tlang 自动翻译字幕目标语言：'default' 项显示为「跟随翻译语言」 */
+  private getSubtitleTranslateLangItems(): LanguagePickerItem[] {
+    const followTranslation =
+      getContext().resourceManager.getStringSync($r('app.string.yt_follow_translation_language').id);
+    return buildExtendedLanguageItems(this.params.appLangItems, followTranslation);
   }
 
   build() {
@@ -359,6 +370,54 @@ export struct OptionsPlaybackPage {
               }
             })
           }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_setting_subtitle_translate_language'),
+              options: this.getSubtitleTranslateLangItems().map(item => ({ value: item.localizedName } as SelectOption)),
+              selectedIndex: Math.max(0, this.getSubtitleTranslateLangItems()
+                .findIndex(it => it.code === this.uiConfig.subtitleTranslateLanguage)),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const code = this.getSubtitleTranslateLangItems()[index].code;
+                this.params.updateUiConfig(cfg => cfg.subtitleTranslateLanguage = code);
+              }
+            })
+          }
+
+          // [DISABLED] 系统 AI 字幕（P1，Speech Kit AICaptionComponent）：实测面板占据
+          // 画面过大、体验不佳，设置项隐藏；播放器挂载点（AVPlayer）同步注释，代码保留。
+          // ListItem() {
+          //   PlaybackToggleRow({
+          //     title: $r('app.string.yt_setting_system_ai_caption'),
+          //     subtitle: $r('app.string.yt_setting_system_ai_caption_subtitle'),
+          //     isOn: this.playbackConfig.systemAiCaption,
+          //     themeColor: this.params.themeColor,
+          //     transparentBackground: true,
+          //     onChange: (val: boolean) => {
+          //       this.params.updatePlaybackConfig(cfg => cfg.systemAiCaption = val);
+          //     }
+          //   })
+          // }
+          // if (this.playbackConfig.systemAiCaption) {
+          //   ListItem() {
+          //     PlaybackSelectRow({
+          //       title: $r('app.string.yt_setting_system_ai_caption_source'),
+          //       options: [
+          //         { value: 'English' } as SelectOption,
+          //         { value: $r('app.string.yt_setting_system_ai_caption_source_zh') } as SelectOption
+          //       ],
+          //       selectedIndex: this.playbackConfig.systemAiCaptionSource === 'zh' ? 1 : 0,
+          //       fontColor: this.params.themeColor,
+          //       transparentBackground: true,
+          //       onChange: (index: number) => {
+          //         const v = index === 1 ? 'zh' : 'en';
+          //         this.params.updatePlaybackConfig(cfg => cfg.systemAiCaptionSource = v);
+          //       }
+          //     })
+          //   }
+          // }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .borderRadius(SECTION_CARD_RADIUS)

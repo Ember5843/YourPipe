@@ -301,6 +301,14 @@
             "value": "アプリの言語に従う"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "字幕の自動翻訳先言語"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "翻訳先言語に従う"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "アプリの UI 言語"
         },
@@ -1388,6 +1396,158 @@
             "name": "yt_player_subtitle_off",
             "value": "字幕をオフ"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "自動翻訳"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "AI 字幕翻訳"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "翻訳エンジン"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google 翻訳（無料）"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "カスタム LLM（OpenAI 互換）"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "LLM 設定"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "ベース URL"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "モデル名"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "接続テスト"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "テスト中…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "接続に成功しました"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "接続に失敗しました。設定を確認してください"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "表示"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "バイリンガル"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "原文と訳文を同時表示"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "字幕テキストは選択した翻訳サービスに送信されます。対象言語は「コンテンツ翻訳言語」に従います。"
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "AI 翻訳"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "先に設定で LLM を構成してください"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "一部の字幕を翻訳できませんでした（原文を表示）"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "字幕翻訳に失敗しました。後で再試行してください"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "システム AI 字幕"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "再生中の音声をシステムがリアルタイム認識（対応機種のみ、中国語/英語）"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "AI 字幕のソース言語"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "中国語"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "AI 字幕を生成"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "モデルをダウンロード中"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "音声をダウンロード中"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "音声をデコード中"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "認識中"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "AI 字幕生成に失敗しました。後で再試行してください"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "オンデバイス認識モデル"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "準備完了（SenseVoice、中/英/日/韓/粤）"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "未ダウンロード（約 230MB、Wi-Fi 推奨）"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "ダウンロード中"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "モデルをダウンロード"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "モデルを削除"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "キャンセル"
+},
         {
             "name": "yt_player_chapters",
             "value": "チャプター"

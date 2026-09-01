@@ -301,6 +301,14 @@
             "value": "Segui la lingua dell'app"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "Traduci automaticamente i sottotitoli in"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "Segui la lingua di traduzione"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "Lingua dell'interfaccia"
         },
@@ -1388,6 +1396,158 @@
             "name": "yt_player_subtitle_off",
             "value": "Sottotitoli disattivati"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "Traduzione automatica"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "Traduzione dei sottotitoli AI"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "Motore di traduzione"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google Traduttore (gratuito)"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "LLM personalizzato (compatibile con OpenAI)"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "Impostazioni LLM"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "URL di base"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "Nome del modello"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "Prova connessione"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "Test in corso…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "Connessione riuscita"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "Connessione non riuscita; controlla le impostazioni"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "Visualizzazione"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "Bilingue"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "Mostra originale e traduzione"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "Il testo dei sottotitoli viene inviato al servizio di traduzione selezionato. La lingua di destinazione segue \"Lingua di traduzione dei contenuti\"."
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "Traduzione AI"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "Configura prima l'LLM nelle impostazioni"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "Alcune righe non tradotte; testo originale mantenuto"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "Traduzione non riuscita; riprova più tardi"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "Sottotitoli AI di sistema"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "Il sistema trascrivi l'audio in riproduzione in tempo reale (solo dispositivi supportati, cinese/inglese)"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "Lingua di origine dei sottotitoli AI"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "Cinese"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "Genera sottotitoli AI"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "Download del modello"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "Download audio"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "Decodifica audio"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "Trascrizione in corso"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "Generazione sottotitoli AI non riuscita; riprova più tardi"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "Modello di riconoscimento sul dispositivo"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "Pronto (SenseVoice; zh/en/ja/ko/yue)"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "Non scaricato (~230 MB; Wi-Fi consigliato)"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "Download in corso"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "Scarica modello"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "Elimina modello"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "Annulla"
+},
         {
             "name": "yt_player_chapters",
             "value": "Capitoli"

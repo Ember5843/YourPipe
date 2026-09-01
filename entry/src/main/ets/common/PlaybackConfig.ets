@@ -3,10 +3,13 @@ import { AppLog } from './AppLog';
 
 const logger = AppLog.getInstance('PlaybackConfig');
 
-export type VideoQualityCap = 'best' | '1080p' | '720p' | '480p' | '360p' | '240p' | '144p';
+export type VideoQualityCap = 'best' | '4320p' | '2160p' | '1440p' | '1080p' | '720p' | '480p' | '360p' | '240p' | '144p';
 
 export const VIDEO_QUALITY_CAP_HEIGHT: Record<VideoQualityCap, number> = {
   'best': 9999,
+  '4320p': 4320,
+  '2160p': 2160,
+  '1440p': 1440,
   '1080p': 1080,
   '720p': 720,
   '480p': 480,
@@ -16,11 +19,14 @@ export const VIDEO_QUALITY_CAP_HEIGHT: Record<VideoQualityCap, number> = {
 };
 
 export const VIDEO_QUALITY_CAP_LABELS: VideoQualityCap[] = [
-  'best', '1080p', '720p', '480p', '360p', '240p', '144p'
+  'best', '4320p', '2160p', '1440p', '1080p', '720p', '480p', '360p', '240p', '144p'
 ];
 
 export const VIDEO_QUALITY_CAP_DISPLAY: Record<VideoQualityCap, string> = {
   'best': 'best',
+  '4320p': '8K (4320p)',
+  '2160p': '4K (2160p)',
+  '1440p': '2K (1440p)',
   '1080p': '1080p',
   '720p': '720p',
   '480p': '480p',
@@ -199,6 +205,10 @@ export class PlaybackConfig {
   subtitleBackground: SubtitleBackground = 'semi';
   /** 字幕延迟（毫秒，正值 = 延后显示） */
   subtitleOffsetMs: number = 0;
+  /** 系统 AI 字幕（Speech Kit AICaptionComponent 自动捕获应用音频；仅支持的机型/地区生效） */
+  systemAiCaption: boolean = false;
+  /** 系统 AI 字幕源语言（'zh'|'en'；英文源输出中英双语） */
+  systemAiCaptionSource: string = 'en';
 
   constructor() {}
 
@@ -228,6 +238,8 @@ export class PlaybackConfig {
     next.subtitleFontColor = this.subtitleFontColor;
     next.subtitleBackground = this.subtitleBackground;
     next.subtitleOffsetMs = this.subtitleOffsetMs;
+    next.systemAiCaption = this.systemAiCaption;
+    next.systemAiCaptionSource = this.systemAiCaptionSource;
     return next;
   }
 
@@ -280,6 +292,9 @@ export class PlaybackConfig {
       ? subBg as SubtitleBackground : 'semi';
     const subOffset = Number(PreferencesStore.getString('cfg_pb_subtitleOffsetMs', '0'));
     cfg.subtitleOffsetMs = SUBTITLE_OFFSET_VALUES.includes(subOffset) ? subOffset : 0;
+    cfg.systemAiCaption = PreferencesStore.getString('cfg_pb_systemAiCaption', 'false') === 'true';
+    const aiCaptionSrc = PreferencesStore.getString('cfg_pb_systemAiCaptionSource', 'en');
+    cfg.systemAiCaptionSource = (aiCaptionSrc === 'zh' || aiCaptionSrc === 'en') ? aiCaptionSrc : 'en';
 
     logger.info(`Loaded PlaybackConfig: ${JSON.stringify(cfg)}`);
     return cfg;
@@ -312,6 +327,8 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_subtitleFontColor', cfg.subtitleFontColor);
     PreferencesStore.setString('cfg_pb_subtitleBackground', cfg.subtitleBackground);
     PreferencesStore.setString('cfg_pb_subtitleOffsetMs', String(cfg.subtitleOffsetMs));
+    PreferencesStore.setString('cfg_pb_systemAiCaption', cfg.systemAiCaption ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_systemAiCaptionSource', cfg.systemAiCaptionSource);
 
     logger.info('Saved PlaybackConfig');
   }

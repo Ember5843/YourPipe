@@ -4,6 +4,7 @@ import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
 import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
 import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
 import { AuthAccountStatus, AuthStage } from 'youtube_core';
+import { LlmTranslateConfig } from '../../common/LlmTranslateConfig';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 import { common } from '@kit.AbilityKit';
 import { AppLog } from '../../common/AppLog';
@@ -22,6 +23,7 @@ interface OptionsMainPageParams {
   onPlaybackClick: () => void;
   onNetworkClick: () => void;
   onAppearanceClick: () => void;
+  onAiTranslateClick: () => void;
   onLogClick: () => void;
   onHelpClick: () => void;
   onRecoveryClick: () => void;
@@ -46,6 +48,7 @@ export struct OptionsMainPage {
     onPlaybackClick: () => {},
     onNetworkClick: () => {},
     onAppearanceClick: () => {},
+    onAiTranslateClick: () => {},
     onLogClick: () => {},
     onHelpClick: () => {},
     onRecoveryClick: () => {},
@@ -83,6 +86,12 @@ export struct OptionsMainPage {
 
   private getPlaybackSubtitle(): string {
     return this.playbackConfig.defaultQuality;
+  }
+
+  private getAiTranslateSubtitle(): ResourceStr {
+    return LlmTranslateConfig.get().engine === 'llm'
+      ? $r('app.string.yt_ai_translate_engine_llm')
+      : $r('app.string.yt_ai_translate_engine_gtx');
   }
 
   private getAppearanceSubtitle(): ResourceStr {
@@ -216,6 +225,20 @@ export struct OptionsMainPage {
           })
         }
         .padding({ left: 0, right: 0 })
+
+        // [DISABLED] AI 字幕翻译设置页（P2/P3 入口）——产品阶段只保留 YouTube tlang 自动翻译，
+        // 该设置入口暂时注释；恢复时同时恢复 AVPlayer.SubtitleMenu 中的对应菜单项。
+        // ListItem() {
+        //   OptionItem({
+        //     icon: $r('sys.symbol.character_on_character'),
+        //     title: $r('app.string.yt_option_ai_translate'),
+        //     subtitle: this.getAiTranslateSubtitle(),
+        //     iconColor: this.themePrimary,
+        //     clickEffectEnabled: this.params.clickEffectEnabled,
+        //     onClickAction: this.params.onAiTranslateClick
+        //   })
+        // }
+        // .padding({ left: 0, right: 0 })
 
         ListItem() {
           OptionItem({

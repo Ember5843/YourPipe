@@ -1,0 +1,11 @@
+{
+  "name": "asrengine",
+  "version": "1.0.0",
+  "description": "On-device ASR audio decode engine (NDK AVDemuxer + AudioCodec sync-mode PCM16k extractor)",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "asr_engine.so": "file:./src/main/cpp/types/asr_engine"
+  }
+}

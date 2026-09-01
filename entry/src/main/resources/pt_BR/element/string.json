@@ -301,6 +301,14 @@
             "value": "Seguir o idioma do app"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "Traduzir legendas automaticamente para"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "Seguir idioma de tradução"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "Idioma da interface"
         },
@@ -1388,6 +1396,158 @@
             "name": "yt_player_subtitle_off",
             "value": "Desativar legendas"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "Tradução automática"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "Tradução de legendas por IA"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "Motor de tradução"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google Tradutor (gratuito)"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "LLM personalizado (compatível com OpenAI)"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "Configurações de LLM"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "URL base"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "Nome do modelo"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "Testar conexão"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "Testando…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "Conexão bem-sucedida"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "Falha na conexão; verifique as configurações"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "Exibição"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "Bilíngue"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "Mostrar original e tradução"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "O texto das legendas é enviado ao serviço de tradução selecionado. O idioma de destino segue \"Idioma de tradução de conteúdo\"."
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "Traduzir com IA"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "Configure o LLM nas configurações primeiro"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "Algumas linhas falharam; original mantido"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "Falha na tradução; tente novamente mais tarde"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "Legendas IA do sistema"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "O sistema transcreve o áudio em reprodução em tempo real (apenas dispositivos compatíveis, chinês/inglês)"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "Idioma de origem das legendas IA"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "Chinês"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "Gerar legendas por IA"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "Baixando modelo"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "Baixando áudio"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "Decodificando áudio"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "Transcrevendo"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "Falha ao gerar legendas; tente mais tarde"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "Modelo de reconhecimento no dispositivo"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "Pronto (SenseVoice; zh/en/ja/ko/yue)"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "Não baixado (~230 MB; Wi-Fi recomendado)"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "Baixando"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "Baixar modelo"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "Excluir modelo"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "Cancelar"
+},
         {
             "name": "yt_player_chapters",
             "value": "Capítulos"

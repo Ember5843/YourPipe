@@ -289,6 +289,14 @@
             "value": "App-Sprache folgen"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "Untertitel automatisch übersetzen in"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "Übersetzungssprache folgen"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "App-Sprache"
         },
@@ -1024,6 +1032,158 @@
             "name": "yt_player_subtitle_off",
             "value": "Untertitel aus"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "Automatisch übersetzt"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "KI-Untertitelübersetzung"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "Übersetzungs-Engine"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google Übersetzer (kostenlos)"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "Benutzerdefiniertes LLM (OpenAI-kompatibel)"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "LLM-Einstellungen"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "Basis-URL"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "Modellname"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "Verbindung testen"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "Wird getestet…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "Verbindung erfolgreich"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "Verbindung fehlgeschlagen; Einstellungen prüfen"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "Anzeige"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "Zweisprachig"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "Original und Übersetzung zusammen anzeigen"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "Untertiteltext wird an den gewählten Übersetzungsdienst gesendet. Die Zielsprache folgt „Sprache für Inhaltsübersetzung“."
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "KI-Übersetzung"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "Bitte zuerst das LLM in den Einstellungen konfigurieren"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "Einige Zeilen konnten nicht übersetzt werden; Original beibehalten"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "Übersetzung fehlgeschlagen; später erneut versuchen"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "System-KI-Untertitel"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "System transkribiert die Wiedergabe in Echtzeit (nur unterstützte Geräte, Chinesisch/Englisch)"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "Quellsprache der KI-Untertitel"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "Chinesisch"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "KI-Untertitel erzeugen"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "Modell wird geladen"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "Audio wird geladen"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "Audio wird decodiert"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "Wird transkribiert"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "KI-Untertitel fehlgeschlagen; später erneut versuchen"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "On-Device-Erkennungsmodell"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "Bereit (SenseVoice; zh/en/ja/ko/yue)"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "Nicht heruntergeladen (~230 MB, WLAN empfohlen)"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "Wird heruntergeladen"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "Modell herunterladen"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "Modell löschen"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "Abbrechen"
+},
         {
             "name": "yt_setting_home_layout",
             "value": "Startseiten-Layout"

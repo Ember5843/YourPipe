@@ -37,12 +37,12 @@ padding: `buildSheetTitleBar` handles in-sheet insets).
 |---|---|
 | `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI; `HomeTabContent` — 首页 tab 内容宿主（feed 加载状态机 + 推荐位 banner + 三个 @LocalBuilder 卡片），Index 经 `HomeTabController` 触发 reset |
 | `search` | `SearchPage` (NavDestination) |
-| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open) |
+| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/`）——入口/设置项/自动触发均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
 | `playlist` | Playlist list + detail |
 | `subscription` | Subscription manage + feed service (bottom tab) |
 | `favorites` | `FavoritesPage` |
 | `local` | Local library + downloads |
-| `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`），Index 经单对象 params 传回调。Main / appearance / playback (incl. per-state 播放端点: guest `visionos|mweb`, signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network** / data-account / recovery / about-update (GitHub Releases check + AppGallery test link; the update check — `UpdateChecker` + `APPGALLERY_TEST_URL` — is inline in `OptionsMainPage`, while the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
+| `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`），Index 经单对象 params 传回调。Main / appearance / playback (incl. per-state 播放端点: guest `visionos|mweb`, signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network** / data-account / recovery / ai-translate (**[DISABLED]** `OptionsAiTranslatePage` — AI 字幕翻译引擎 gtx/LLM + 端侧识别模型下载管理；OptionsMainPage 入口行已注释，页面与 destination 保留) / about-update (GitHub Releases check + AppGallery test link; the update check — `UpdateChecker` + `APPGALLERY_TEST_URL` — is inline in `OptionsMainPage`, while the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
 | `help` | `HelpGuidePage` — 6-page onboarding/help swiper (welcome + sign-in, account data, network proxy, quality/cache, downloads). Two entries: first-launch full-screen overlay on `Index` (an `if`-mounted layer in the root Stack, shown while `PreferencesStore` key `cfg_help_seen` != `'true'` with a 500 ms delay; bindSheet/bindContentCover on Navigation-hosted nodes do NOT present at app-start timing — do not revert to them) and Options main page "帮助" item (`help_page` destination in the options sheet). `resetAllConfigs` resets the flag; `clearAllAppData` clears it via `PreferencesStore.clearAll()`. Illustrations are `resources/base/media/guide_*.png` (welcome page uses `app_icon.png`). |
 | `user` | User / channel info; Library saved playlists (WEB classic renderers + TV lockup view models) |
 | `auth` | WebView cookie login (`WebViewLoginPage`) + device/QR OAuth (`DeviceQrLoginPage`) |
@@ -51,7 +51,12 @@ padding: `buildSheetTitleBar` handles in-sheet insets).
 Persistent state and shared singletons:
 - `PreferencesStore.init(context)` — key/value store; init in `EntryAbility.onCreate`.
 - `AppState`, `UIConfig`, `PlaybackConfig` — `AppStorage`-backed config models
-  (playback quality/cache/GPU, background video-off delay, etc.).
+  (playback quality/cache/GPU, background video-off delay, system AI caption
+  (`systemAiCaption` + `systemAiCaptionSource`), etc.).
+- `LlmTranslateConfig` — AI 字幕翻译引擎配置（gtx/llm、baseUrl/model/apiKey、双语），
+  `PreferencesStore` 持久化（`cfg_ai_translate_*`），`resetAllConfigs` 复位（含 key）；
+  翻译缓存 `cacheDir/ai_subtitle/` 与 ASR 模型/缓存（`filesDir/asr_models/`、
+  `cacheDir/asr_caption/`）接入 `clearAllAppData`。
 - `NetworkProxyConfig` — HTTP/SOCKS proxy prefs; applies system
   `setAppHttpProxy` and injects `HttpProxyOptions.setProvider` into
   `youtube_core`. `applySystemAndProviders` is async: SOCKS5 first starts

@@ -62,6 +62,10 @@ import { ColorModeManager } from '../common/ColorModeManager';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../common/components/HdsTitleBar';
 import { MaterialUtil } from '../common/utils/MaterialUtil';
 import { PlaybackConfig } from '../common/PlaybackConfig';
+import { LlmTranslateConfig } from '../common/LlmTranslateConfig';
+import { SubtitleTranslationService } from '../features/player/translate/SubtitleTranslationService';
+import { AsrModelManager } from '../features/player/asr/AsrModelManager';
+import { AsrCaptionService } from '../features/player/asr/AsrCaptionService';
 import { PlayerSession } from '../common/PlayerSession';
 import { PiPManager } from '../features/player/pip/PiPManager';
 import { PlayQueueManager, QueueSourceType, PlayQueueSourceHint } from '../features/player/PlayQueueManager';
@@ -263,6 +267,8 @@ struct Index {
     // 订阅信息流快速模式与安全提示弹窗也是独立 Preferences 键，一并复位
     PreferencesStore.setString('cfg_feed_fast_mode', 'false');
     PreferencesStore.setString(PREF_SECURE_SHIELD_DONT_SHOW, 'false');
+    // AI 字幕翻译配置（含 apiKey）复位；翻译缓存不属于配置，保留
+    LlmTranslateConfig.reset();
 
     // 5. 应用深色模式
     Promise.resolve().then(() => {
@@ -358,6 +364,11 @@ struct Index {
       }
       YoutubeJavaScriptPlayerManager.clearPersistentCache()
         .catch((e: Error) => logger.warn(`Failed to clear cipher cache: ${e.message || e}`));
+      // AI 字幕翻译：磁盘缓存（cacheDir/ai_subtitle）+ 内存缓存
+      SubtitleTranslationService.clearPersistentCache();
+      // 端侧 ASR：识别模型（filesDir/asr_models）+ 识别缓存
+      AsrModelManager.clearAll();
+      AsrCaptionService.clearCaches();
     }
 
     // 5. 重置内存中的状态为默认值

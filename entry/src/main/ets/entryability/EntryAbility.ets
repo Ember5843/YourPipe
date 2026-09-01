@@ -64,6 +64,23 @@ export default class EntryAbility extends UIAbility {
         };
         return snapshot;
       });
+      // 注入字幕认证头提供者：tlang 自动翻译需要登录态 Cookie + SAPISIDHASH。
+      AvPlayerController.setSubtitleAuthHeaderProvider(async () => {
+        const authHeaders: Record<string, string> = {};
+        const mgr = AuthSessionManager.getInstance();
+        if (!mgr) {
+          return authHeaders;
+        }
+        const cookie = mgr.getCookieStringForPlayback();
+        if (cookie && cookie.length > 0) {
+          authHeaders['Cookie'] = cookie;
+          const authz = await mgr.getWebAuthorizationHeader();
+          if (authz && authz.length > 0) {
+            authHeaders['Authorization'] = authz;
+          }
+        }
+        return authHeaders;
+      });
       // 注入 MPV 引擎配置提供者
       AvPlayerController.setEngineConfigProvider(() => {
         const pb = AppStorage.get<PlaybackConfig>('playbackConfig') ?? new PlaybackConfig();

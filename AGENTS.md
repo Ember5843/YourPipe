@@ -69,12 +69,15 @@ adapting upstream behavior.
 | `mediaservice` | HAR | Playback engine, state machine, AV session, local range + SABR dual proxy, offline SABR download. | `mediaservice/AGENTS.md` |
 | `youtube_core` | HAR | YouTube extraction, cipher (JSVM + PipePipe), HLS, SABR/UMP session (session-pinned visitorData), dual-rail auth, HTTP proxy options. | `youtube_core/AGENTS.md` |
 | `libmpv_napi` | HAR | NAPI bridge to MPV; ships vendored FFmpeg + libmpv (arm64 product; x86_64 stub). | `libmpv_napi/AGENTS.md` |
+| `asrengine` | HAR | On-device ASR audio decode for AI subtitles (system NDK demux + AAC decode → 16kHz mono PCM file). | `asrengine/AGENTS.md` |
 
 Wire-up:
 ```
 entry  →  mediaservice  →  youtube_core
   │              └────→  @yourpipe/libmpv-napi (libmpv_napi)
-  └──────────→  youtube_core   (auth, extractor, proxy options, models)
+  ├──────────→  youtube_core   (auth, extractor, proxy options, models)
+  ├──────────→  asrengine      (AI subtitle P3 audio decode)
+  └──────────→  sherpa_onnx    (ohpm; on-device ASR inference)
 ```
 `youtube_core` has no HAR package deps (native `yourpipe_cipher` only).
 `libmpv_napi` is self-contained (embeds FFmpeg + libmpv on arm64).
@@ -251,6 +254,23 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   libmpv has no `network-proxy` property). Loopback stays direct.
 - **Dependency direction**: never import `entry` from HARs; never import
   `mediaservice` from `youtube_core`.
+- **AI subtitles**: the only live path is the server-side `tlang` translation
+  track (P0): built by `youtube_core` (`extractor/SubtitleTranslate.ets`,
+  `SubtitleTrack.isAutoTranslated`), appended by entry
+  `YouTubePlayService.withAutoTranslatedTrack`. mediaservice `fetchText`
+  attaches login Cookie + SAPISIDHASH for `tlang=` URLs via
+  `AvPlayerController.setSubtitleAuthHeaderProvider` (EntryAbility-wired,
+  PipePipe parity) and throws on non-200 so the overlay retry path sees
+  failures. **Known limitation**: YouTube risk-controls `tlang` by exit-IP
+  reputation (HTTP 429 "automated queries", anonymous AND signed-in) —
+  whether a track produces output depends on the network; there is no
+  client-side workaround (verified against PipePipe's implementation and a
+  request-header matrix). **P1/P2/P3 are implemented but disabled** at entry
+  points ([DISABLED] comments, code retained): P1 system AICaptionComponent
+  (AVPlayer mount + OptionsPlaybackPage rows), P2 gtx/LLM track translation
+  (AVPlayer menu item + OptionsMainPage entry + PlayerSession `ai:`
+  auto-trigger), P3 on-device ASR (AVPlayer menu item + `asrengine` module).
+  Re-enable by uncommenting those blocks.
 - **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, or build
   trees. `AGENTS.md` files are tracked project docs — keep them in sync
   with the code they describe, and never put machine-specific absolute

@@ -289,6 +289,14 @@
             "value": "Seguir idioma de la app"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "Traducir subtítulos automáticamente a"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "Seguir idioma de traducción"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "Idioma de la app"
         },
@@ -1040,6 +1048,158 @@
             "name": "yt_player_subtitle_off",
             "value": "Subtítulos desactivados"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "Traducción automática"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "Traducción de subtítulos con IA"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "Motor de traducción"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google Translate (gratuito)"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "LLM personalizado (compatible con OpenAI)"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "Configuración de LLM"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "URL base"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "Nombre del modelo"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "Probar conexión"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "Probando…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "Conexión correcta"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "Conexión fallida; revisa la configuración"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "Visualización"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "Bilingüe"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "Mostrar original y traducción"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "El texto de los subtítulos se envía al servicio de traducción elegido. El idioma destino sigue a «Idioma de traducción de contenido»."
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "Traducción IA"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "Configura primero el LLM en Ajustes"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "Algunas líneas no se tradujeron; se conserva el original"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "La traducción falló; inténtalo más tarde"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "Subtítulos IA del sistema"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "El sistema transcribe el audio en reproducción en tiempo real (solo dispositivos compatibles, chino/inglés)"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "Idioma de origen de subtítulos IA"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "Chino"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "Generar subtítulos con IA"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "Descargando modelo"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "Descargando audio"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "Decodificando audio"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "Transcribiendo"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "Falló la generación de subtítulos; inténtalo más tarde"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "Modelo de reconocimiento en el dispositivo"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "Listo (SenseVoice; zh/en/ja/ko/yue)"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "No descargado (~230 MB; se recomienda Wi-Fi)"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "Descargando"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "Descargar modelo"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "Eliminar modelo"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "Cancelar"
+},
         {
             "name": "yt_player_chapters",
             "value": "Capítulos"

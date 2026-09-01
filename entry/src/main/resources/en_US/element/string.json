@@ -289,6 +289,14 @@
             "value": "Follow app language"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "Auto-translate subtitles into"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "Follow translation language"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "App UI Language"
         },
@@ -1112,6 +1120,158 @@
             "name": "yt_player_subtitle_off",
             "value": "Subtitles off"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "Auto-translated"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "AI Subtitle Translation"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "Translation engine"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google Translate (free)"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "Custom LLM (OpenAI-compatible)"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "LLM settings"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "Base URL"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "Model name"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "Test connection"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "Testing…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "Connection successful"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "Connection failed; check your settings"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "Display"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "Bilingual"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "Show original and translation together"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "Subtitle text is sent to the selected translation service. The target language follows \"Content translation language\"."
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "AI Translate"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "Configure the LLM in Settings first"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "Some lines failed to translate; originals kept"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "Subtitle translation failed; try again later"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "System AI captions"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "System transcribes playing audio in real time (supported devices only, Chinese/English)"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "AI caption source language"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "Chinese"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "AI-generated subtitles"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "Downloading model"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "Downloading audio"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "Decoding audio"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "Transcribing"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "AI subtitle generation failed; try again later"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "On-device recognition model"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "Ready (SenseVoice; zh/en/ja/ko/yue)"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "Not downloaded (~230 MB; Wi-Fi recommended)"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "Downloading"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "Download model"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "Delete model"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "Cancel"
+},
         {
             "name": "yt_player_chapters",
             "value": "Chapters"

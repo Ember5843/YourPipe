@@ -301,6 +301,14 @@
             "value": "앱 언어 따르기"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "자동 번역 자막 언어"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "번역 대상 언어 따르기"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "앱 UI 언어"
         },
@@ -1388,6 +1396,158 @@
             "name": "yt_player_subtitle_off",
             "value": "자막 끄기"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "자동 번역"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "AI 자막 번역"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "번역 엔진"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google 번역(무료)"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "사용자 정의 LLM(OpenAI 호환)"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "LLM 설정"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "기본 URL"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "모델 이름"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "연결 테스트"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "테스트 중…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "연결 성공"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "연결 실패, 설정을 확인하세요"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "표시"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "이중 언어"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "원문과 번역문 함께 표시"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "자막 텍스트는 선택한 번역 서비스로 전송됩니다. 대상 언어는 \"콘텐츠 번역 언어\"를 따릅니다."
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "AI 번역"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "먼저 설정에서 LLM을 구성하세요"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "일부 자막 번역 실패, 원문을 표시합니다"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "자막 번역 실패, 나중에 다시 시도하세요"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "시스템 AI 자막"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "재생 중인 오디오를 시스템이 실시간으로 인식(지원 기기 한정, 중국어/영어)"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "AI 자막 원본 언어"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "중국어"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "AI 자막 생성"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "모델 다운로드 중"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "오디오 다운로드 중"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "오디오 디코딩 중"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "인식 중"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "AI 자막 생성 실패, 나중에 다시 시도하세요"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "온디바이스 인식 모델"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "준비됨(SenseVoice, 중/영/일/한/광둥)"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "다운로드되지 않음(약 230MB, Wi-Fi 권장)"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "다운로드 중"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "모델 다운로드"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "모델 삭제"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "취소"
+},
         {
             "name": "yt_player_chapters",
             "value": "챕터"

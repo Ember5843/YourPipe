@@ -3,7 +3,7 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { OptionItem } from '../../common/components/OptionItem';
 import { UIConfig } from '../../common/AppState';
-import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
+import { LanguagePickerItem, buildExtendedLanguageItems } from '../../common/components/LanguagePickerDialog';
 
 interface OptionsLanguageAndRegionPageParams {
   appLangItems: LanguagePickerItem[];
@@ -74,15 +74,7 @@ export struct OptionsLanguageAndRegionPage {
   /** 'default' + 应用支持的语言 + 额外翻译目标语言；default 项显示为「跟随应用语言」 */
   private getTranslationLangItems(): LanguagePickerItem[] {
     const followApp = getContext().resourceManager.getStringSync($r('app.string.yt_follow_app_language').id);
-    const items: LanguagePickerItem[] = [new LanguagePickerItem('default', followApp, followApp)];
-    for (const item of this.params.appLangItems) {
-      if (item.code !== 'default') {
-        items.push(item);
-      }
-    }
-    // Extra translation targets that are not app UI languages.
-    items.push(new LanguagePickerItem('it', 'Italiano', 'Italiano'));
-    return items;
+    return buildExtendedLanguageItems(this.params.appLangItems, followApp);
   }
 
   build() {

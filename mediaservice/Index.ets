@@ -16,6 +16,7 @@ export { VideoHwCaps } from './src/main/ets/engine/VideoHwCaps';
 export { PlayerModel, StreamCategories, CurrentStreams, VideoEntry, StreamClassification } from './src/main/ets/model/PlayerModel';
 export { VideoData, StreamInfo, SelectOption } from './src/main/ets/model/VideoData';
 export { ChapterInfo, SubtitleTrack } from 'youtube_core';
+export { parseVttSubtitles, SubtitleCue } from './src/main/ets/subtitle/VttSubtitleParser';
 export { BackgroundTaskManager } from './src/main/ets/common/BackgroundTaskManager';
 export { PlayerState, isValidTransition, describeState } from './src/main/ets/state/PlayerState';
 export { PlayerStateMachine, StateChangeListener } from './src/main/ets/state/PlayerStateMachine';

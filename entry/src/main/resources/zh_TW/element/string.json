@@ -289,6 +289,14 @@
             "value": "跟隨應用程式語言"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "自動翻譯字幕語言"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "跟隨翻譯語言"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "應用程式 UI 語言"
         },
@@ -1040,6 +1048,158 @@
             "name": "yt_player_subtitle_off",
             "value": "關閉字幕"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "自動翻譯"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "AI 字幕翻譯"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "翻譯引擎"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google 免費翻譯"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "自訂 LLM（OpenAI 相容）"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "LLM 設定"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "介面地址（Base URL）"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "模型名稱"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "測試連線"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "測試中…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "連線成功"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "連線失敗，請檢查設定"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "顯示"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "雙語對照"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "同時顯示原文與譯文"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "字幕文本將傳送到所選翻譯服務。目標語言與「內容翻譯語言」一致。"
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "AI 翻譯"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "請先在設定中完成 LLM 設定"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "部分字幕翻譯失敗，已保留原文"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "字幕翻譯失敗，請稍後重試"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "系統 AI 字幕"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "由系統即時識別播放中的音訊（部分機型支援，中/英文）"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "AI 字幕源語言"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "中文"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "AI 生成字幕"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "下載模型"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "下載音訊"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "解碼音訊"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "識別中"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "AI 生成字幕失敗，請稍後重試"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "端側識別模型"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "已就緒（SenseVoice，支援中/英/日/韓/粵）"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "未下載（約 230MB，建議 Wi-Fi 網絡）"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "下載中"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "下載模型"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "刪除模型"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "取消"
+},
         {
             "name": "yt_setting_home_layout",
             "value": "首頁佈局"

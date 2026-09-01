@@ -12,7 +12,7 @@ export interface PlaybackPreferencesSnapshot {
    * PipePipe default is "original"; explicit content languages use codes like "zh" / "en".
    */
   searchLanguage: string;
-  /** 默认清晰度上限：'best' | '1080p' | '720p' | '480p' | '360p' | '240p' | '144p' */
+  /** 默认清晰度上限：'best' | '4320p' | '2160p' | '1440p' | '1080p' | '720p' | '480p' | '360p' | '240p' | '144p' */
   defaultQuality: string;
   /** 直播 / 受限场景下的清晰度上限。 */
   mobileQuality: string;

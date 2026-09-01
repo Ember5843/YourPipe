@@ -7,7 +7,9 @@
   "license": "",
   "dependencies": {
     "mediaservice": "file:../mediaservice",
-    "youtube_core": "file:../youtube_core"
+    "youtube_core": "file:../youtube_core",
+    "asrengine": "file:../asrengine",
+    "sherpa_onnx": "1.12.1"
   }
 }
 

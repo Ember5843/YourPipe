@@ -289,6 +289,14 @@
             "value": "Как в приложении"
         },
         {
+            "name": "yt_setting_subtitle_translate_language",
+            "value": "Автоперевод субтитров на"
+        },
+        {
+            "name": "yt_follow_translation_language",
+            "value": "Как язык перевода"
+        },
+        {
             "name": "yt_setting_ui_language",
             "value": "Язык интерфейса"
         },
@@ -1040,6 +1048,158 @@
             "name": "yt_player_subtitle_off",
             "value": "Субтитры выключены"
         },
+{
+    "name": "yt_player_subtitle_auto_translated",
+    "value": "Автоперевод"
+},
+{
+    "name": "yt_option_ai_translate",
+    "value": "Перевод субтитров с ИИ"
+},
+{
+    "name": "yt_ai_translate_engine",
+    "value": "Движок перевода"
+},
+{
+    "name": "yt_ai_translate_engine_gtx",
+    "value": "Google Переводчик (бесплатно)"
+},
+{
+    "name": "yt_ai_translate_engine_llm",
+    "value": "Своя LLM (совместимая с OpenAI)"
+},
+{
+    "name": "yt_ai_translate_llm_section",
+    "value": "Настройки LLM"
+},
+{
+    "name": "yt_ai_translate_base_url",
+    "value": "Базовый URL"
+},
+{
+    "name": "yt_ai_translate_model",
+    "value": "Название модели"
+},
+{
+    "name": "yt_ai_translate_api_key",
+    "value": "API Key"
+},
+{
+    "name": "yt_ai_translate_test",
+    "value": "Проверить подключение"
+},
+{
+    "name": "yt_ai_translate_testing",
+    "value": "Проверка…"
+},
+{
+    "name": "yt_ai_translate_test_ok",
+    "value": "Подключение успешно"
+},
+{
+    "name": "yt_ai_translate_test_fail",
+    "value": "Ошибка подключения; проверьте настройки"
+},
+{
+    "name": "yt_ai_translate_display_section",
+    "value": "Отображение"
+},
+{
+    "name": "yt_ai_translate_bilingual",
+    "value": "Двуязычный режим"
+},
+{
+    "name": "yt_ai_translate_bilingual_subtitle",
+    "value": "Показывать оригинал и перевод"
+},
+{
+    "name": "yt_ai_translate_note",
+    "value": "Текст субтитров отправляется выбранному сервису перевода. Целевой язык совпадает с «Языком перевода контента»."
+},
+{
+    "name": "yt_ai_translate_menu",
+    "value": "ИИ-перевод"
+},
+{
+    "name": "yt_ai_translate_llm_not_configured",
+    "value": "Сначала настройте LLM в настройках"
+},
+{
+    "name": "yt_ai_translate_partial_fail",
+    "value": "Некоторые строки не переведены, показан оригинал"
+},
+{
+    "name": "yt_ai_translate_failed",
+    "value": "Ошибка перевода субтитров; повторите позже"
+},
+{
+    "name": "yt_setting_system_ai_caption",
+    "value": "Системные ИИ-субтитры"
+},
+{
+    "name": "yt_setting_system_ai_caption_subtitle",
+    "value": "Система распознаёт воспроизводимый звук в реальном времени (только поддерживаемые устройства, китайский/английский)"
+},
+{
+    "name": "yt_setting_system_ai_caption_source",
+    "value": "Язык источника ИИ-субтитров"
+},
+{
+    "name": "yt_setting_system_ai_caption_source_zh",
+    "value": "Китайский"
+},
+{
+    "name": "yt_asr_menu",
+    "value": "Создать субтитры (ИИ)"
+},
+{
+    "name": "yt_asr_phase_model",
+    "value": "Загрузка модели"
+},
+{
+    "name": "yt_asr_phase_audio",
+    "value": "Загрузка аудио"
+},
+{
+    "name": "yt_asr_phase_decode",
+    "value": "Декодирование аудио"
+},
+{
+    "name": "yt_asr_phase_transcribe",
+    "value": "Распознавание"
+},
+{
+    "name": "yt_asr_failed",
+    "value": "Ошибка генерации субтитров; повторите позже"
+},
+{
+    "name": "yt_asr_model_section",
+    "value": "Модель распознавания на устройстве"
+},
+{
+    "name": "yt_asr_model_status_ready",
+    "value": "Готово (SenseVoice; zh/en/ja/ko/yue)"
+},
+{
+    "name": "yt_asr_model_status_none",
+    "value": "Не загружено (~230 МБ, рекомендуется Wi-Fi)"
+},
+{
+    "name": "yt_asr_model_downloading",
+    "value": "Загрузка"
+},
+{
+    "name": "yt_asr_model_download",
+    "value": "Скачать модель"
+},
+{
+    "name": "yt_asr_model_delete",
+    "value": "Удалить модель"
+},
+{
+    "name": "yt_ai_action_cancel",
+    "value": "Отмена"
+},
         {
             "name": "yt_player_chapters",
             "value": "Главы"

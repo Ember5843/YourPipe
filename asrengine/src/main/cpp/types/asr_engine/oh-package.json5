@@ -1,0 +1,8 @@
+{
+  "name": "asr_engine.so",
+  "version": "1.0.0",
+  "description": "ASR audio decode NAPI (m4a/aac → 16kHz mono float32 PCM)",
+  "main": "",
+  "types": "index.d.ts",
+  "dependencies": {}
+}

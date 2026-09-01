@@ -45,9 +45,15 @@ export class AvPlayerController {
 
   // 静态配置回调，由 entry 层注入
   private static engineConfigProvider: (() => EngineConfig) | null = null;
+  /** 字幕认证头提供者：用于 tlang 自动翻译等需要登录态风控的轨道。 */
+  private static subtitleAuthHeaderProvider: (() => Promise<Record<string, string>>) | null = null;
 
   public static setEngineConfigProvider(provider: () => EngineConfig): void {
     AvPlayerController.engineConfigProvider = provider;
+  }
+
+  public static setSubtitleAuthHeaderProvider(provider: () => Promise<Record<string, string>>): void {
+    AvPlayerController.subtitleAuthHeaderProvider = provider;
   }
 
   private curIndex: number = 0;
@@ -540,6 +546,11 @@ export class AvPlayerController {
     this.subtitleLoadSeq++;
     this.curSource = newSource;
     this.curIndex = newSource.index;
+    // 直播禁用倍速：上一个点播残留的倍速不带入直播。mpv speed 跨 loadfile
+    // 持久，vm.reset() 只清 UI，引擎值会在下次状态同步回流，必须重置引擎。
+    if (newSource.isLive === true) {
+      this.playbackEngine.setPlaybackSpeed(1.0);
+    }
     // 不要用视频原生分辨率播种 ohos-surface-size。
     // 该属性必须等于 XComponent 布局像素（AVPlayer onAreaChange → resizeSurface）。
     // 用 stream WxH 会在小窗阶段把 VO 配成「片源分辨率」而非「窗口像素」，
@@ -693,8 +704,10 @@ export class AvPlayerController {
 
   public setPlaybackSpeed(speed: number): void {
     if (!this.isActive() || speed <= 0) return;
-    this.vm.playbackSpeed = speed;
-    this.playbackEngine.setPlaybackSpeed(speed);
+    // 直播禁用倍速：UI 入口已隐藏，这里兜底钳制到 1x
+    const applied = this.curSource.isLive === true ? 1.0 : speed;
+    this.vm.playbackSpeed = applied;
+    this.playbackEngine.setPlaybackSpeed(applied);
   }
 
   public resizeSurface(widthPx: number, heightPx: number): void {
@@ -938,6 +951,12 @@ export class AvPlayerController {
     this.fetchText(url).then((text: string) => {
       if (seq !== this.subtitleLoadSeq || url !== this.vm.currentSubtitleUrl) return;
       this.subtitleCues = parseVttSubtitles(text);
+      if (this.subtitleCues.length === 0) {
+        // 200 但零 cue（空 VTT 也是失败形态）：复位选中态，允许再次点选
+        Logger.warn(TAG, `subtitle overlay parsed 0 cues, resetting selection: retry=${isRetry} url=${url.substring(0, 60)}`);
+        this.resetFailedSubtitleSelection(url);
+        return;
+      }
       Logger.info(TAG, `subtitle overlay loaded: cues=${this.subtitleCues.length} retry=${isRetry} url=${url.substring(0, 60)}`);
     }).catch((e: Error) => {
       if (seq !== this.subtitleLoadSeq || url !== this.vm.currentSubtitleUrl) return;
@@ -946,8 +965,36 @@ export class AvPlayerController {
         setTimeout(() => this.loadSubtitleOverlay(url, seq, true), 2000);
       } else {
         Logger.error(TAG, `subtitle overlay load failed after retry: ${e.message || e}`);
+        // 失败必须复位选中态：currentSubtitleUrl 已占住该轨时，switchSubtitle 的
+        // 同 URL 早退会让用户再也无法通过点选触发重试（表现为"选了没反应"）
+        this.resetFailedSubtitleSelection(url);
       }
     });
+  }
+
+  /** 字幕加载失败后复位选中态（仅当失败 URL 仍是当前选中时）。 */
+  private resetFailedSubtitleSelection(url: string): void {
+    if (url === this.vm.currentSubtitleUrl) {
+      this.vm.currentSubtitleUrl = '';
+      this.subtitleCues = [];
+      this.vm.subtitleText = '';
+    }
+  }
+
+  /**
+   * AI 翻译/生成字幕入口：字幕内容已由应用侧生成（VTT 文本），跳过网络
+   * fetch 直接进 overlay 管线。trackKey（如 ai://<videoId>/<lang>）占用
+   * currentSubtitleUrl，菜单选中态与 seq 防串扰逻辑因此原样复用。
+   * 与 switchSubtitle 不同，同名 key 也会重载内容（双语切换/重试重推）。
+   */
+  public switchSubtitleText(trackKey: string, vttText: string): void {
+    this.vm.currentSubtitleUrl = trackKey;
+    this.subtitleCues = [];
+    this.subtitleLoadSeq++;
+    this.vm.subtitleText = '';
+    if (trackKey.length === 0 || vttText.length === 0) return;
+    this.subtitleCues = parseVttSubtitles(vttText);
+    Logger.info(TAG, `subtitle overlay (generated) loaded: cues=${this.subtitleCues.length} key=${trackKey.substring(0, 60)}`);
   }
 
   /** Driven by engine time-pos updates (~100ms); cheap enough per tick. */
@@ -1203,23 +1250,46 @@ export class AvPlayerController {
   private async fetchText(url: string): Promise<string> {
     const request = http.createHttp();
     try {
+      const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36',
+        'Referer': 'https://www.youtube.com/',
+      };
+      // tlang 自动翻译字幕受 YouTube 风控保护，需要登录态头（Cookie + SAPISIDHASH）。
+      // 参照 PipePipe SubtitleDeduplicator.downloadRemoteText 行为。
+      if (url.includes('tlang=') && AvPlayerController.subtitleAuthHeaderProvider) {
+        try {
+          const authHeaders = await AvPlayerController.subtitleAuthHeaderProvider();
+          const keys = Object.keys(authHeaders);
+          for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const value = authHeaders[key];
+            if (value && value.length > 0) {
+              headers[key] = value;
+            }
+          }
+          Logger.debug(TAG, `subtitle fetchText: attached auth headers for tlang url`);
+        } catch (e) {
+          Logger.warn(TAG, `subtitle auth header provider failed: ${(e as Error).message || e}`);
+        }
+      }
       const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.STRING,
-        header: {
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36',
-          'Referer': 'https://www.youtube.com/',
-        },
+        header: headers,
         connectTimeout: 8000,
         readTimeout: 10000,
       };
       HttpDownloader.applyProxyToOptions(options, url);
       const response = await request.request(url, options);
-      Logger.info(TAG, `manifest fetchText: code=${response.responseCode} len=${typeof response.result === 'string' ? response.result.length : 0}`);
-      return typeof response.result === 'string' ? response.result : '';
+      const body = typeof response.result === 'string' ? response.result : '';
+      if (response.responseCode !== 200) {
+        throw new Error(`HTTP ${response.responseCode} len=${body.length}`);
+      }
+      Logger.info(TAG, `manifest fetchText: code=${response.responseCode} len=${body.length}`);
+      return body;
     } catch (e) {
       Logger.warn(TAG, `manifest fetchText error: ${e}`);
-      return '';
+      throw e as Error;
     } finally {
       request.destroy();
     }
