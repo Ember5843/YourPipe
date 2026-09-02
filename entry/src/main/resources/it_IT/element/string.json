@@ -1405,6 +1405,10 @@
     "value": "Traduzione dei sottotitoli AI"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "Sottotitoli IA"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "Motore di traduzione"
 },
@@ -1505,16 +1509,8 @@
     "value": "Download del modello"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "Download audio"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "Decodifica audio"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "Trascrizione in corso"
+    "name": "yt_asr_live_progress",
+    "value": "Riconoscimento in diretta…"
 },
 {
     "name": "yt_asr_failed",
@@ -1526,11 +1522,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "Pronto (SenseVoice; zh/en/ja/ko/yue)"
+    "value": "Pronto (riconoscimento streaming zh/en)"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "Non scaricato (~230 MB; Wi-Fi consigliato)"
+    "value": "Non scaricato (~190 MB; Wi-Fi consigliato)"
 },
 {
     "name": "yt_asr_model_downloading",

@@ -1405,6 +1405,10 @@
     "value": "Tradução de legendas por IA"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "Legendas de IA"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "Motor de tradução"
 },
@@ -1505,16 +1509,8 @@
     "value": "Baixando modelo"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "Baixando áudio"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "Decodificando áudio"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "Transcrevendo"
+    "name": "yt_asr_live_progress",
+    "value": "Reconhecimento ao vivo…"
 },
 {
     "name": "yt_asr_failed",
@@ -1526,11 +1522,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "Pronto (SenseVoice; zh/en/ja/ko/yue)"
+    "value": "Pronto (reconhecimento streaming zh/en)"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "Não baixado (~230 MB; Wi-Fi recomendado)"
+    "value": "Não baixado (~190 MB; Wi-Fi recomendado)"
 },
 {
     "name": "yt_asr_model_downloading",

@@ -16,6 +16,7 @@ export {
 	VideoCodecParameters,
 	AudioStreamInfo,
 	VideoStreamInfo,
+	AudioTapChunk,
 } from './media-info';
 export type { VideoHwDecoderCaps } from './global';
 export { MpvPlayerController } from './controller/MpvPlayerController';

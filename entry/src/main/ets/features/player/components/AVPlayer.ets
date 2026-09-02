@@ -48,7 +48,8 @@ import {
   SubtitleTranslationService,
   SubtitleTranslateProgress
 } from '../translate/SubtitleTranslationService';
-import { AsrCaptionService, AsrProgress } from '../asr/AsrCaptionService';
+// [DISABLED] P3 端侧 ASR 实时识别：产品只保留 P0 tlang 官方自动翻译轨（代码保留）
+// import { AsrLiveCaptionService, AsrLiveProgress } from '../asr/AsrLiveCaptionService';
 
 const TAG: string = '[PlayerLog][VideoPlayer]';
 const GESTURE_LOCK_DISTANCE: number = 12;
@@ -495,15 +496,19 @@ export struct VideoPlayer {
       const onError = (error: BusinessError): void => {
         Logger.warn(TAG, `AICaption error code=${error.code} msg=${error.message}`);
       };
-      this.aiCaptionOptions = withLangFields
-        ? {
-          initialOpacity: 1,
-          onPrepared: onPrepared,
-          onError: onError,
-          sourceLanguage: srcLang,
-          targetLanguage: srcLang === 'en' ? 'zh-en' : 'zh'
-        }
-        : { initialOpacity: 1, onPrepared: onPrepared, onError: onError };
+      // 编译期同样受 SDK 版本约束：API 23 的 AICaptionOptions 类型没有语言字段，
+      // 字面量直传会编译失败，因此先构造基础对象再按版本补字段。
+      const baseOptions: AICaptionOptions = {
+        initialOpacity: 1,
+        onPrepared: onPrepared,
+        onError: onError
+      };
+      if (withLangFields) {
+        const extra = baseOptions as Record<string, ESObject>;
+        extra['sourceLanguage'] = srcLang;
+        extra['targetLanguage'] = srcLang === 'en' ? 'zh-en' : 'zh';
+      }
+      this.aiCaptionOptions = baseOptions;
     }
     this.aiCaptionShown = this.playbackConfig.systemAiCaption && this.aiCaptionSupported;
 
@@ -516,8 +521,9 @@ export struct VideoPlayer {
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
     // AI 字幕翻译进度（字幕菜单内展示 x/y）
     SubtitleTranslationService.getInstance().addProgressListener(this.aiTranslateProgressListener);
-    // AI 生成字幕（端侧 ASR）进度
-    AsrCaptionService.getInstance().addProgressListener(this.asrProgressListener);
+    // [DISABLED] P3 ASR：进度/失败监听随菜单项一起禁用
+    // AsrLiveCaptionService.getInstance().addProgressListener(this.asrLiveProgressListener);
+    // AsrLiveCaptionService.getInstance().addErrorListener(this.asrLiveErrorListener);
     // 屏幕常亮：跟随播放状态机驱动
     this.controller.addStateListener(this.keepScreenListener);
     // 立即按当前 vm 状态同步一次（避免错过初始 PLAYING / 引擎已就绪）
@@ -1328,6 +1334,7 @@ export struct VideoPlayer {
         .backgroundColor(this.vm.currentSubtitleUrl === ''
           ? this.getSelectedMenuBackground() : Color.Transparent)
         .onClick(() => {
+          // [DISABLED] P3 ASR 已禁用，关闭字幕无需停识别：AsrLiveCaptionService.getInstance().stop();
           this.controller.switchSubtitle('');
           // 记忆字幕偏好：显式关闭记为空串，后续新视频不再自动开字幕
           PreferencesStore.setString('cfg_subtitle_preferred_lang', '');
@@ -1342,6 +1349,7 @@ export struct VideoPlayer {
           .backgroundColor(this.vm.currentSubtitleUrl === track.url
             ? this.getSelectedMenuBackground() : Color.Transparent)
           .onClick(() => {
+            // [DISABLED] P3 ASR 已禁用：AsrLiveCaptionService.getInstance().stop();
             this.controller.switchSubtitle(track.url);
             PreferencesStore.setString('cfg_subtitle_preferred_lang', track.languageCode || '');
           })
@@ -1361,7 +1369,8 @@ export struct VideoPlayer {
       //       this.onAiTranslateClick();
       //     })
       // }
-      // [DISABLED] AI 生成字幕（P3：端侧 SenseVoice ASR）——暂不开放，代码保留。
+      // [DISABLED] P3 AI 生成字幕（端侧流式 ASR）菜单项：产品只保留 P0 tlang 官方自动翻译轨。
+      // 重新启用 = 取消本块及 AVPlayer 内其余 P3 [DISABLED] 注释块（import/监听器/标签与点击处理/注销）。
       // MenuItem({
       //   content: this.getAsrCaptionLabel(),
       //   endIcon: this.vm.currentSubtitleUrl.startsWith('asr://') ? $r('sys.symbol.checkmark') : ''
@@ -1551,68 +1560,71 @@ export struct VideoPlayer {
       });
   }
 
-  // ── AI 生成字幕（P3，端侧 ASR）──
-
-  @State asrProgress: string = '';
-
-  private asrProgressListener = (p: AsrProgress | null): void => {
-    if (!p) {
-      this.asrProgress = '';
-      return;
-    }
-    let phase = '';
-    try {
-      switch (p.phase) {
-        case 'model':
-          phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_model').id);
-          break;
-        case 'audio':
-          phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_audio').id);
-          break;
-        case 'decode':
-          phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_decode').id);
-          break;
-        case 'transcribe':
-        default:
-          phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_transcribe').id);
-          break;
-      }
-    } catch (_e) {
-      phase = p.phase;
-    }
-    this.asrProgress = `${phase} ${p.percent}%`;
-  }
-
-  private getAsrCaptionLabel(): string {
-    const base = getContext().resourceManager.getStringSync($r('app.string.yt_asr_menu').id);
-    return this.asrProgress.length > 0 ? `${base} · ${this.asrProgress}` : base;
-  }
-
-  private onAsrCaptionClick(): void {
-    const service = AsrCaptionService.getInstance();
-    if (service.isRunning()) {
-      service.cancel();
-      this.asrProgress = '';
-      return;
-    }
-    const videoId = this.curSource.videoId ?? '';
-    if (videoId.length === 0) {
-      return;
-    }
-    const streams = this.curSource.streams ?? [];
-    service.generateAndApply(videoId, streams, this.controller)
-      .then((res) => {
-        if (res.ok && res.fromCache) {
-          Logger.info(TAG, `ASR caption applied from cache video=${videoId}`);
-        } else if (!res.ok && !res.cancelled) {
-          Logger.warn(TAG, `ASR caption failed: ${res.error || '-'}`);
-          this.getUIContext().getPromptAction().showToast({
-            message: $r('app.string.yt_asr_failed'),
-            duration: 2500
-          });
-        }
-      });
-  }
+  // ── [DISABLED] AI 生成字幕（P3，端侧实时 ASR，PCM tap）——随菜单项禁用，代码保留 ──
+  //
+  // @State asrProgress: string = '';
+  //
+  // private getAsrCaptionLabel(): string {
+  //   const base = getContext().resourceManager.getStringSync($r('app.string.yt_asr_menu').id);
+  //   return this.asrProgress.length > 0 ? `${base} · ${this.asrProgress}` : base;
+  // }
+  //
+  // private asrLiveProgressListener = (p: AsrLiveProgress | null): void => {
+  //   if (!p) {
+  //     this.asrProgress = '';
+  //     return;
+  //   }
+  //   if (p.phase === 'model') {
+  //     let phase: string = p.phase;
+  //     try {
+  //       phase = getContext().resourceManager.getStringSync($r('app.string.yt_asr_phase_model').id);
+  //     } catch (_e) {
+  //       // 资源读取失败退回原始 phase 名
+  //     }
+  //     this.asrProgress = `${phase} ${p.percent}%`;
+  //     return;
+  //   }
+  //   try {
+  //     this.asrProgress = getContext().resourceManager.getStringSync($r('app.string.yt_asr_live_progress').id);
+  //   } catch (_e) {
+  //     this.asrProgress = '';
+  //   }
+  // }
+  //
+  // private asrLiveErrorListener = (err: string): void => {
+  //   Logger.warn(TAG, `ASR live caption failed: ${err}`);
+  //   this.asrProgress = '';
+  //   this.getUIContext().getPromptAction().showToast({
+  //     message: $r('app.string.yt_asr_failed'),
+  //     duration: 2500
+  //   });
+  // }
+  //
+  // private onAsrCaptionClick(): void {
+  //   const live = AsrLiveCaptionService.getInstance();
+  //   if (live.isActive()) {
+  //     // 关闭路径：停 tap + 清掉 asr:// overlay 选中态
+  //     live.stop();
+  //     this.asrProgress = '';
+  //     this.controller.switchSubtitle('');
+  //     return;
+  //   }
+  //   const videoId = this.curSource.videoId ?? '';
+  //   if (videoId.length === 0) {
+  //     return;
+  //   }
+  //   // 唯一定位：调用本地模型对当前播放实时生成字幕（MPV PCM tap）
+  //   live.start(videoId, this.controller)
+  //     .then((ok: boolean) => {
+  //       if (!ok) {
+  //         Logger.warn(TAG, `ASR live caption start failed video=${videoId}`);
+  //         this.getUIContext().getPromptAction().showToast({
+  //           message: $r('app.string.yt_asr_failed'),
+  //           duration: 2500
+  //         });
+  //       }
+  //     });
+  // }
 
   private getAudioLabel(stream: StreamInfo): string {
     return stream.audioTrackName?.trim()
@@ -2555,7 +2567,9 @@ export struct VideoPlayer {
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
     SubtitleTranslationService.getInstance().removeProgressListener(this.aiTranslateProgressListener);
-    AsrCaptionService.getInstance().removeProgressListener(this.asrProgressListener);
+    // [DISABLED] P3 ASR：监听器注销随注册一起禁用
+    // AsrLiveCaptionService.getInstance().removeProgressListener(this.asrLiveProgressListener);
+    // AsrLiveCaptionService.getInstance().removeErrorListener(this.asrLiveErrorListener);
   }
 }
 

@@ -254,8 +254,9 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   libmpv has no `network-proxy` property). Loopback stays direct.
 - **Dependency direction**: never import `entry` from HARs; never import
   `mediaservice` from `youtube_core`.
-- **AI subtitles**: the only live path is the server-side `tlang` translation
-  track (P0): built by `youtube_core` (`extractor/SubtitleTranslate.ets`,
+- **AI subtitles**: the live paths are the server-side `tlang` translation
+  track (P0) and on-device ASR (P3). P0 is built by `youtube_core`
+  (`extractor/SubtitleTranslate.ets`,
   `SubtitleTrack.isAutoTranslated`), appended by entry
   `YouTubePlayService.withAutoTranslatedTrack`. mediaservice `fetchText`
   attaches login Cookie + SAPISIDHASH for `tlang=` URLs via
@@ -265,11 +266,24 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   reputation (HTTP 429 "automated queries", anonymous AND signed-in) —
   whether a track produces output depends on the network; there is no
   client-side workaround (verified against PipePipe's implementation and a
-  request-header matrix). **P1/P2/P3 are implemented but disabled** at entry
-  points ([DISABLED] comments, code retained): P1 system AICaptionComponent
-  (AVPlayer mount + OptionsPlaybackPage rows), P2 gtx/LLM track translation
-  (AVPlayer menu item + OptionsMainPage entry + PlayerSession `ai:`
-  auto-trigger), P3 on-device ASR (AVPlayer menu item + `asrengine` module).
+  request-header matrix). **P3 on-device ASR is currently [DISABLED]** (the
+  product keeps only P0): `AsrLiveCaptionService` + resident worker
+  `entry/src/main/ets/workers/AsrStreamingWorker.ets` (sherpa-onnx
+  OnlineRecognizer, streaming zipformer bilingual zh-en int8, true-streaming
+  partials + endpoint-committed cues, MPV PCM tap passthrough) — menu entry,
+  Options page, and all wiring are commented out at entry points ([DISABLED]
+  comments, code retained; worker registration in entry/build-profile.json5
+  commented too). Model weights were managed by `AsrModelManager`
+  (`filesDir/asr_models/zipformer_bilingual`, legacy SenseVoice dir
+  auto-removed); `AsrModelManager.clearAll` /
+  `AsrLiveCaptionService.clearCaches` stay wired into clear-all-data so
+  already-downloaded models are still cleaned. The `asrengine` HAR (NDK AAC
+  decode for the former batch path) is retained in the build but currently
+  has no consumer.
+  **P1/P2 remain implemented but disabled** at entry points ([DISABLED]
+  comments, code retained): P1 system AICaptionComponent (AVPlayer mount +
+  OptionsPlaybackPage rows), P2 gtx/LLM track translation (AVPlayer menu
+  item + OptionsMainPage entry + PlayerSession `ai:` auto-trigger).
   Re-enable by uncommenting those blocks.
 - **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, or build
   trees. `AGENTS.md` files are tracked project docs — keep them in sync

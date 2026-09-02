@@ -1057,6 +1057,10 @@
     "value": "ترجمة الترجمة بالذكاء الاصطناعي"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "الترجمة بالذكاء الاصطناعي"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "محرك الترجمة"
 },
@@ -1157,16 +1161,8 @@
     "value": "تنزيل النموذج"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "تنزيل الصوت"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "فك ترميز الصوت"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "جارٍ التعرف"
+    "name": "yt_asr_live_progress",
+    "value": "جارٍ التعرف المباشر…"
 },
 {
     "name": "yt_asr_failed",
@@ -1178,11 +1174,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "جاهز (SenseVoice) zh/en/ja/ko/yue"
+    "value": "جاهز (تعرف فوري zh/en)"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "لم يتم التنزيل (حوالي 230MB، يُفضل Wi-Fi)"
+    "value": "لم يتم التنزيل (حوالي 190MB، يُفضل Wi-Fi)"
 },
 {
     "name": "yt_asr_model_downloading",

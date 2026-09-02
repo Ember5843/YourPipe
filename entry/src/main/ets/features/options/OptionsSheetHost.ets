@@ -16,7 +16,7 @@ import { OptionsLanguageAndRegionPage } from './OptionsLanguageAndRegionPage';
 import { OptionsRecoveryPage } from './OptionsRecoveryPage';
 import { OptionsDataAccountPage } from './OptionsDataAccountPage';
 import { OptionsNetworkPage } from './OptionsNetworkPage';
-import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
+// [DISABLED] P3：import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
 import { HelpGuidePage } from '../help/HelpGuidePage';
 import { WebViewLoginPage } from '../auth/WebViewLoginPage';
 import { DeviceQrLoginPage } from '../auth/DeviceQrLoginPage';
@@ -131,7 +131,7 @@ export struct OptionsSheetHost {
             onLanguageClick: () => { this.pushOptionsPath('language'); },
             onPlaybackClick: () => { this.pushOptionsPath('playback'); },
             onNetworkClick: () => { this.pushOptionsPath('network'); },
-            onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
+            // [DISABLED] P3：onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
             onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
             onLogClick: () => { this.pushOptionsPath('log_page'); },
             onHelpClick: () => { this.pushOptionsPath('help_page'); },
@@ -198,16 +198,17 @@ export struct OptionsSheetHost {
           })
       }
     } else if (name === 'ai_translate') {
-      OptionsNavScaffold({
-        title: $r('app.string.yt_option_ai_translate'),
-        onBack: () => { this.popOptionsPath(); }
-      }) {
-        OptionsAiTranslatePage({
-          params: {
-            themeColor: this.themePrimary
-          }
-        })
-      }
+      // [DISABLED] P3 AI 字幕设置页 destination（入口已禁用，本分支不可达；代码保留）：
+      // OptionsNavScaffold({
+      //   title: $r('app.string.yt_option_ai_subtitle'),
+      //   onBack: () => { this.popOptionsPath(); }
+      // }) {
+      //   OptionsAiTranslatePage({
+      //     params: {
+      //       themeColor: this.themePrimary
+      //     }
+      //   })
+      // }
     } else if (name === 'data_account') {
       OptionsNavScaffold({
         title: $r('app.string.yt_option_data_account'),

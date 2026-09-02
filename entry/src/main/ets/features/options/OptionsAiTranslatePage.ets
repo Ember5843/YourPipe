@@ -1,11 +1,12 @@
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
-import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
-import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
+// [DISABLED] P2 翻译引擎 UI 暂下线（产品保留 P0 tlang + P3 端侧识别），代码保留：
+// import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
+// import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
-import { LlmTranslateConfig } from '../../common/LlmTranslateConfig';
-import { LlmClient } from '../player/translate/LlmClient';
+// import { LlmTranslateConfig } from '../../common/LlmTranslateConfig';
+// import { LlmClient } from '../player/translate/LlmClient';
 import { AsrModelManager, AsrModelStatus } from '../player/asr/AsrModelManager';
-import { SelectOption } from 'mediaservice';
+// import { SelectOption } from 'mediaservice';
 import { AppLog } from '../../common/AppLog';
 
 const logger = AppLog.getInstance('OptionsAiTranslatePage');
@@ -15,22 +16,24 @@ export interface OptionsAiTranslatePageParams {
 }
 
 /**
- * AI 字幕翻译设置页（P2）：引擎选择（gtx 免费 / 用户自带 key 的 LLM）、
- * LLM 端点配置与连通性测试、双语对照开关。目标语言与评论翻译共用
- * 「内容翻译语言」设置，不在此重复。
+ * AI 字幕设置页：当前开放「端侧识别模型」管理（P3 权重的下载/删除/状态）。
+ * [DISABLED] P2 翻译引擎配置（引擎选择、LLM 端点、连通性测试、双语对照）代码
+ * 保留但注释；恢复时连同成员状态、aboutToAppear 配置读取、persist/runTest 及
+ * build() 内对应区块一起取消注释。
  */
 @Component
 export struct OptionsAiTranslatePage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop params: OptionsAiTranslatePageParams = { themeColor: '#E53935' };
 
-  @State private engine: string = 'gtx';
-  @State private baseUrl: string = '';
-  @State private model: string = '';
-  @State private apiKey: string = '';
-  @State private bilingual: boolean = true;
-  @State private testing: boolean = false;
-  @State private testMessage: ResourceStr = '';
+  // [DISABLED] P2 引擎/端点状态（随 UI 一起恢复）
+  // @State private engine: string = 'gtx';
+  // @State private baseUrl: string = '';
+  // @State private model: string = '';
+  // @State private apiKey: string = '';
+  // @State private bilingual: boolean = true;
+  // @State private testing: boolean = false;
+  // @State private testMessage: ResourceStr = '';
   @State private modelStatus: AsrModelStatus = 'not_downloaded';
   @State private modelPercent: number = 0;
 
@@ -40,12 +43,13 @@ export struct OptionsAiTranslatePage {
   }
 
   aboutToAppear(): void {
-    const cfg = LlmTranslateConfig.get();
-    this.engine = cfg.engine;
-    this.baseUrl = cfg.baseUrl;
-    this.model = cfg.model;
-    this.apiKey = cfg.apiKey;
-    this.bilingual = cfg.bilingual;
+    // [DISABLED] P2 配置读取
+    // const cfg = LlmTranslateConfig.get();
+    // this.engine = cfg.engine;
+    // this.baseUrl = cfg.baseUrl;
+    // this.model = cfg.model;
+    // this.apiKey = cfg.apiKey;
+    // this.bilingual = cfg.bilingual;
     const mgr = AsrModelManager.getInstance();
     this.modelStatus = mgr.getStatus();
     this.modelPercent = mgr.getPercent();
@@ -66,187 +70,190 @@ export struct OptionsAiTranslatePage {
     return $r('app.string.yt_asr_model_status_none');
   }
 
-  private persist(): void {
-    const next = new LlmTranslateConfig();
-    next.engine = this.engine;
-    next.baseUrl = this.baseUrl.trim();
-    next.model = this.model.trim();
-    next.apiKey = this.apiKey.trim();
-    next.bilingual = this.bilingual;
-    LlmTranslateConfig.update(next);
-  }
-
-  private getEngineOptions(): SelectOption[] {
-    return [
-      { value: $r('app.string.yt_ai_translate_engine_gtx') } as SelectOption,
-      { value: $r('app.string.yt_ai_translate_engine_llm') } as SelectOption
-    ];
-  }
-
-  private runTest(): void {
-    this.persist();
-    this.testing = true;
-    this.testMessage = '';
-    const cfg = LlmTranslateConfig.get();
-    LlmClient.testConnection(cfg)
-      .then(() => {
-        this.testMessage = $r('app.string.yt_ai_translate_test_ok');
-      })
-      .catch((e: Error) => {
-        logger.warn(`llm test failed: ${e.message || e}`);
-        this.testMessage = $r('app.string.yt_ai_translate_test_fail');
-      })
-      .finally(() => {
-        this.testing = false;
-      });
-  }
+  // [DISABLED] P2 配置持久化 / 引擎选项 / 连通性测试（随 UI 一起恢复）
+  // private persist(): void {
+  //   const next = new LlmTranslateConfig();
+  //   next.engine = this.engine;
+  //   next.baseUrl = this.baseUrl.trim();
+  //   next.model = this.model.trim();
+  //   next.apiKey = this.apiKey.trim();
+  //   next.bilingual = this.bilingual;
+  //   LlmTranslateConfig.update(next);
+  // }
+  //
+  // private getEngineOptions(): SelectOption[] {
+  //   return [
+  //     { value: $r('app.string.yt_ai_translate_engine_gtx') } as SelectOption,
+  //     { value: $r('app.string.yt_ai_translate_engine_llm') } as SelectOption
+  //   ];
+  // }
+  //
+  // private runTest(): void {
+  //   this.persist();
+  //   this.testing = true;
+  //   this.testMessage = '';
+  //   const cfg = LlmTranslateConfig.get();
+  //   LlmClient.testConnection(cfg)
+  //     .then(() => {
+  //       this.testMessage = $r('app.string.yt_ai_translate_test_ok');
+  //     })
+  //     .catch((e: Error) => {
+  //       logger.warn(`llm test failed: ${e.message || e}`);
+  //       this.testMessage = $r('app.string.yt_ai_translate_test_fail');
+  //     })
+  //     .finally(() => {
+  //       this.testing = false;
+  //     });
+  // }
 
   build() {
     Column() {
       List({ space: 6 }) {
-        ListItem() {
-          PlaybackSectionTitle({ title: $r('app.string.yt_ai_translate_engine') })
-        }
-        .padding({ left: 0, right: 0 })
-
-        ListItemGroup() {
-          ListItem() {
-            PlaybackSelectRow({
-              title: $r('app.string.yt_ai_translate_engine'),
-              options: this.getEngineOptions(),
-              selectedIndex: this.engine === 'llm' ? 1 : 0,
-              fontColor: this.params.themeColor,
-              transparentBackground: true,
-              onChange: (index: number) => {
-                this.engine = index === 1 ? 'llm' : 'gtx';
-                this.persist();
-              }
-            })
-          }
-        }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(SECTION_CARD_RADIUS)
-        .clip(true)
-
-        if (this.engine === 'llm') {
-          ListItem() {
-            PlaybackSectionTitle({ title: $r('app.string.yt_ai_translate_llm_section') })
-          }
-          .padding({ left: 0, right: 0 })
-
-          ListItemGroup() {
-            ListItem() {
-              TextInput({
-                text: this.baseUrl,
-                placeholder: $r('app.string.yt_ai_translate_base_url')
-              })
-                .width('100%')
-                .height(56)
-                .fontSize(15)
-                .fontColor($r('app.color.yourtube_text_primary'))
-                .padding({ left: 16, right: 16 })
-                .backgroundColor(Color.Transparent)
-                .onChange((v: string) => {
-                  this.baseUrl = v;
-                })
-                .onSubmit(() => {
-                  this.persist();
-                })
-            }
-
-            ListItem() {
-              TextInput({
-                text: this.model,
-                placeholder: $r('app.string.yt_ai_translate_model')
-              })
-                .width('100%')
-                .height(56)
-                .fontSize(15)
-                .fontColor($r('app.color.yourtube_text_primary'))
-                .padding({ left: 16, right: 16 })
-                .backgroundColor(Color.Transparent)
-                .onChange((v: string) => {
-                  this.model = v;
-                })
-                .onSubmit(() => {
-                  this.persist();
-                })
-            }
-
-            ListItem() {
-              TextInput({
-                text: this.apiKey,
-                placeholder: $r('app.string.yt_ai_translate_api_key')
-              })
-                .width('100%')
-                .height(56)
-                .fontSize(15)
-                .fontColor($r('app.color.yourtube_text_primary'))
-                .padding({ left: 16, right: 16 })
-                .type(InputType.Password)
-                .backgroundColor(Color.Transparent)
-                .onChange((v: string) => {
-                  this.apiKey = v;
-                })
-                .onSubmit(() => {
-                  this.persist();
-                })
-            }
-          }
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-          .borderRadius(SECTION_CARD_RADIUS)
-          .clip(true)
-          .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
-
-          ListItem() {
-            Button(this.testing ? $r('app.string.yt_ai_translate_testing') : $r('app.string.yt_ai_translate_test'))
-              .width('100%')
-              .height(48)
-              .fontSize(16)
-              .backgroundColor(this.themePrimary)
-              .fontColor(Color.White)
-              .borderRadius(16)
-              .enabled(!this.testing)
-              .onClick(() => {
-                this.runTest();
-              })
-          }
-          .padding({ left: 0, right: 0, top: 8 })
-
-          if (!(typeof this.testMessage === 'string' && this.testMessage.length === 0)) {
-            ListItem() {
-              Text(this.testMessage)
-                .fontSize(13)
-                .fontColor($r('app.color.yourtube_text_quaternary'))
-                .width('100%')
-                .padding({ left: 4, right: 4 })
-            }
-          }
-        }
-
-        ListItem() {
-          PlaybackSectionTitle({ title: $r('app.string.yt_ai_translate_display_section') })
-        }
-        .padding({ left: 0, right: 0 })
-
-        ListItemGroup() {
-          ListItem() {
-            PlaybackToggleRow({
-              title: $r('app.string.yt_ai_translate_bilingual'),
-              subtitle: $r('app.string.yt_ai_translate_bilingual_subtitle'),
-              isOn: this.bilingual,
-              themeColor: this.params.themeColor,
-              transparentBackground: true,
-              onChange: (val: boolean) => {
-                this.bilingual = val;
-                this.persist();
-              }
-            })
-          }
-        }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
-        .borderRadius(SECTION_CARD_RADIUS)
-        .clip(true)
+        // [DISABLED] P2 翻译引擎配置区（引擎选择 / LLM 端点 / 连通性测试 / 双语对照）
+        // 保留代码；恢复时连同上方成员与 import 一起取消注释。
+        // ListItem() {
+        //   PlaybackSectionTitle({ title: $r('app.string.yt_ai_translate_engine') })
+        // }
+        // .padding({ left: 0, right: 0 })
+        //
+        // ListItemGroup() {
+        //   ListItem() {
+        //     PlaybackSelectRow({
+        //       title: $r('app.string.yt_ai_translate_engine'),
+        //       options: this.getEngineOptions(),
+        //       selectedIndex: this.engine === 'llm' ? 1 : 0,
+        //       fontColor: this.params.themeColor,
+        //       transparentBackground: true,
+        //       onChange: (index: number) => {
+        //         this.engine = index === 1 ? 'llm' : 'gtx';
+        //         this.persist();
+        //       }
+        //     })
+        //   }
+        // }
+        // .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        // .borderRadius(SECTION_CARD_RADIUS)
+        // .clip(true)
+        //
+        // if (this.engine === 'llm') {
+        //   ListItem() {
+        //     PlaybackSectionTitle({ title: $r('app.string.yt_ai_translate_llm_section') })
+        //   }
+        //   .padding({ left: 0, right: 0 })
+        //
+        //   ListItemGroup() {
+        //     ListItem() {
+        //       TextInput({
+        //         text: this.baseUrl,
+        //         placeholder: $r('app.string.yt_ai_translate_base_url')
+        //       })
+        //         .width('100%')
+        //         .height(56)
+        //         .fontSize(15)
+        //         .fontColor($r('app.color.yourtube_text_primary'))
+        //         .padding({ left: 16, right: 16 })
+        //         .backgroundColor(Color.Transparent)
+        //         .onChange((v: string) => {
+        //           this.baseUrl = v;
+        //         })
+        //         .onSubmit(() => {
+        //           this.persist();
+        //         })
+        //     }
+        //
+        //     ListItem() {
+        //       TextInput({
+        //         text: this.model,
+        //         placeholder: $r('app.string.yt_ai_translate_model')
+        //       })
+        //         .width('100%')
+        //         .height(56)
+        //         .fontSize(15)
+        //         .fontColor($r('app.color.yourtube_text_primary'))
+        //         .padding({ left: 16, right: 16 })
+        //         .backgroundColor(Color.Transparent)
+        //         .onChange((v: string) => {
+        //           this.model = v;
+        //         })
+        //         .onSubmit(() => {
+        //           this.persist();
+        //         })
+        //     }
+        //
+        //     ListItem() {
+        //       TextInput({
+        //         text: this.apiKey,
+        //         placeholder: $r('app.string.yt_ai_translate_api_key')
+        //       })
+        //         .width('100%')
+        //         .height(56)
+        //         .fontSize(15)
+        //         .fontColor($r('app.color.yourtube_text_primary'))
+        //         .padding({ left: 16, right: 16 })
+        //         .type(InputType.Password)
+        //         .backgroundColor(Color.Transparent)
+        //         .onChange((v: string) => {
+        //           this.apiKey = v;
+        //         })
+        //         .onSubmit(() => {
+        //           this.persist();
+        //         })
+        //     }
+        //   }
+        //   .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        //   .borderRadius(SECTION_CARD_RADIUS)
+        //   .clip(true)
+        //   .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+        //
+        //   ListItem() {
+        //     Button(this.testing ? $r('app.string.yt_ai_translate_testing') : $r('app.string.yt_ai_translate_test'))
+        //       .width('100%')
+        //       .height(48)
+        //       .fontSize(16)
+        //       .backgroundColor(this.themePrimary)
+        //       .fontColor(Color.White)
+        //       .borderRadius(16)
+        //       .enabled(!this.testing)
+        //       .onClick(() => {
+        //         this.runTest();
+        //       })
+        //   }
+        //   .padding({ left: 0, right: 0, top: 8 })
+        //
+        //   if (!(typeof this.testMessage === 'string' && this.testMessage.length === 0)) {
+        //     ListItem() {
+        //       Text(this.testMessage)
+        //         .fontSize(13)
+        //         .fontColor($r('app.color.yourtube_text_quaternary'))
+        //         .width('100%')
+        //         .padding({ left: 4, right: 4 })
+        //     }
+        //   }
+        // }
+        //
+        // ListItem() {
+        //   PlaybackSectionTitle({ title: $r('app.string.yt_ai_translate_display_section') })
+        // }
+        // .padding({ left: 0, right: 0 })
+        //
+        // ListItemGroup() {
+        //   ListItem() {
+        //     PlaybackToggleRow({
+        //       title: $r('app.string.yt_ai_translate_bilingual'),
+        //       subtitle: $r('app.string.yt_ai_translate_bilingual_subtitle'),
+        //       isOn: this.bilingual,
+        //       themeColor: this.params.themeColor,
+        //       transparentBackground: true,
+        //       onChange: (val: boolean) => {
+        //         this.bilingual = val;
+        //         this.persist();
+        //       }
+        //     })
+        //   }
+        // }
+        // .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        // .borderRadius(SECTION_CARD_RADIUS)
+        // .clip(true)
 
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_asr_model_section') })
@@ -304,13 +311,14 @@ export struct OptionsAiTranslatePage {
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
-        ListItem() {
-          Text($r('app.string.yt_ai_translate_note'))
-            .fontSize(12)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
-            .width('100%')
-            .padding({ left: 4, right: 4, top: 8 })
-        }
+        // [DISABLED] P2 说明文案（字幕文本发往翻译服务的提示，随 P2 一起恢复）
+        // ListItem() {
+        //   Text($r('app.string.yt_ai_translate_note'))
+        //     .fontSize(12)
+        //     .fontColor($r('app.color.yourtube_text_quaternary'))
+        //     .width('100%')
+        //     .padding({ left: 4, right: 4, top: 8 })
+        // }
 
         ListItem() {
           Column().height(24)

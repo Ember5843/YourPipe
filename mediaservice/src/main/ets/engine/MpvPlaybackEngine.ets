@@ -1,6 +1,6 @@
 import { MpvPlayerController, MediaStatus, PlaybackState as NativePlaybackState,
   setHttpProxyEnv } from '@yourpipe/libmpv-napi';
-import type { MediaInfo } from '@yourpipe/libmpv-napi';
+import type { MediaInfo, AudioTapChunk } from '@yourpipe/libmpv-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, PlaybackStats,
   EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
@@ -528,6 +528,26 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   setSubtitleCallback(cb: (text: string, startTime: number, duration: number) => void): void {
     this.subtitleCallback = cb;
+  }
+
+  enableAudioTap(): void {
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl === null || this.destroyed) {
+      throw new Error('asr_tap_unavailable: engine not initialized');
+    }
+    ctrl.enableAudioTap();
+  }
+
+  disableAudioTap(): void {
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl === null || this.destroyed) return;
+    ctrl.disableAudioTap();
+  }
+
+  setAudioTapCallback(cb: ((chunk: AudioTapChunk) => void) | null): void {
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl === null || this.destroyed) return;
+    ctrl.setAudioTapCallback(cb);
   }
 
   private bindSurface(ctrl: MpvPlayerController, surfaceId: string): void {

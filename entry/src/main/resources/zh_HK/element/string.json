@@ -1057,6 +1057,10 @@
     "value": "AI 字幕翻譯"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "AI 字幕"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "翻譯引擎"
 },
@@ -1157,16 +1161,8 @@
     "value": "下載模型"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "下載音訊"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "解碼音訊"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "識別中"
+    "name": "yt_asr_live_progress",
+    "value": "即時識別中…"
 },
 {
     "name": "yt_asr_failed",
@@ -1178,11 +1174,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "已就緒（SenseVoice，支援中/英/日/韓/粵）"
+    "value": "已就緒（中英雙語串流識別）"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "未下載（約 230MB，建議 Wi-Fi 網絡）"
+    "value": "未下載（約 190MB，建議 Wi-Fi 網絡）"
 },
 {
     "name": "yt_asr_model_downloading",

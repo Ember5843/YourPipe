@@ -1405,6 +1405,10 @@
     "value": "AI 字幕翻译"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "AI 字幕"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "翻译引擎"
 },
@@ -1505,16 +1509,8 @@
     "value": "下载模型"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "下载音频"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "解码音频"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "识别中"
+    "name": "yt_asr_live_progress",
+    "value": "实时识别中…"
 },
 {
     "name": "yt_asr_failed",
@@ -1526,11 +1522,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "已就绪（SenseVoice，支持中/英/日/韩/粤）"
+    "value": "已就绪（中英双语流式识别）"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "未下载（约 230MB，建议 Wi-Fi 网络）"
+    "value": "未下载（约 190MB，建议 Wi-Fi 网络）"
 },
 {
     "name": "yt_asr_model_downloading",

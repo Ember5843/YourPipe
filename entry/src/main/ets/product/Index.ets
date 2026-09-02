@@ -65,7 +65,7 @@ import { PlaybackConfig } from '../common/PlaybackConfig';
 import { LlmTranslateConfig } from '../common/LlmTranslateConfig';
 import { SubtitleTranslationService } from '../features/player/translate/SubtitleTranslationService';
 import { AsrModelManager } from '../features/player/asr/AsrModelManager';
-import { AsrCaptionService } from '../features/player/asr/AsrCaptionService';
+import { AsrLiveCaptionService } from '../features/player/asr/AsrLiveCaptionService';
 import { PlayerSession } from '../common/PlayerSession';
 import { PiPManager } from '../features/player/pip/PiPManager';
 import { PlayQueueManager, QueueSourceType, PlayQueueSourceHint } from '../features/player/PlayQueueManager';
@@ -368,7 +368,7 @@ struct Index {
       SubtitleTranslationService.clearPersistentCache();
       // 端侧 ASR：识别模型（filesDir/asr_models）+ 识别缓存
       AsrModelManager.clearAll();
-      AsrCaptionService.clearCaches();
+      AsrLiveCaptionService.clearCaches();
     }
 
     // 5. 重置内存中的状态为默认值

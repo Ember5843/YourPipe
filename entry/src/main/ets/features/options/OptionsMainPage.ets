@@ -4,7 +4,8 @@ import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
 import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
 import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
 import { AuthAccountStatus, AuthStage } from 'youtube_core';
-import { LlmTranslateConfig } from '../../common/LlmTranslateConfig';
+// [DISABLED] P3 ASR 模型状态行已随 AI 字幕设置入口禁用
+// import { AsrModelManager } from '../player/asr/AsrModelManager';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
 import { common } from '@kit.AbilityKit';
 import { AppLog } from '../../common/AppLog';
@@ -23,7 +24,7 @@ interface OptionsMainPageParams {
   onPlaybackClick: () => void;
   onNetworkClick: () => void;
   onAppearanceClick: () => void;
-  onAiTranslateClick: () => void;
+  // [DISABLED] P3：onAiTranslateClick: () => void;
   onLogClick: () => void;
   onHelpClick: () => void;
   onRecoveryClick: () => void;
@@ -48,7 +49,7 @@ export struct OptionsMainPage {
     onPlaybackClick: () => {},
     onNetworkClick: () => {},
     onAppearanceClick: () => {},
-    onAiTranslateClick: () => {},
+    // [DISABLED] P3：onAiTranslateClick: () => {},
     onLogClick: () => {},
     onHelpClick: () => {},
     onRecoveryClick: () => {},
@@ -88,11 +89,18 @@ export struct OptionsMainPage {
     return this.playbackConfig.defaultQuality;
   }
 
-  private getAiTranslateSubtitle(): ResourceStr {
-    return LlmTranslateConfig.get().engine === 'llm'
-      ? $r('app.string.yt_ai_translate_engine_llm')
-      : $r('app.string.yt_ai_translate_engine_gtx');
-  }
+  // [DISABLED] P3 AI 字幕设置项副标题（端侧识别模型状态），随入口禁用，代码保留：
+  // private getAiSubtitleSubtitle(): ResourceStr {
+  //   const mgr = AsrModelManager.getInstance();
+  //   const status = mgr.getStatus();
+  //   if (status === 'ready') {
+  //     return $r('app.string.yt_asr_model_status_ready');
+  //   }
+  //   if (status === 'downloading') {
+  //     return `${getContext().resourceManager.getStringSync($r('app.string.yt_asr_model_downloading').id)} ${mgr.getPercent()}%`;
+  //   }
+  //   return $r('app.string.yt_asr_model_status_none');
+  // }
 
   private getAppearanceSubtitle(): ResourceStr {
     switch (this.uiConfig.darkMode) {
@@ -226,13 +234,13 @@ export struct OptionsMainPage {
         }
         .padding({ left: 0, right: 0 })
 
-        // [DISABLED] AI 字幕翻译设置页（P2/P3 入口）——产品阶段只保留 YouTube tlang 自动翻译，
-        // 该设置入口暂时注释；恢复时同时恢复 AVPlayer.SubtitleMenu 中的对应菜单项。
+        // [DISABLED] P3 AI 字幕设置页入口（端侧识别模型管理）：产品只保留 P0 tlang，代码保留。
+        // 重新启用 = 取消本块及 OptionsMainPage/OptionsSheetHost 内其余 P3 [DISABLED] 注释块。
         // ListItem() {
         //   OptionItem({
         //     icon: $r('sys.symbol.character_on_character'),
-        //     title: $r('app.string.yt_option_ai_translate'),
-        //     subtitle: this.getAiTranslateSubtitle(),
+        //     title: $r('app.string.yt_option_ai_subtitle'),
+        //     subtitle: this.getAiSubtitleSubtitle(),
         //     iconColor: this.themePrimary,
         //     clickEffectEnabled: this.params.clickEffectEnabled,
         //     onClickAction: this.params.onAiTranslateClick

@@ -3,6 +3,7 @@ import { AbilityConstant, common } from '@kit.AbilityKit';
 import { AvPlayerController, VideoData, PlayerState, StateChangeListener, LocalMediaProxy, SubtitleTrack } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
 import { YouTubePlayResult, YouTubePlayService } from '../features/player/YouTubePlayService';
+// [DISABLED] P3：import { AsrLiveCaptionService } from '../features/player/asr/AsrLiveCaptionService';
 import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { PreferencesStore } from './PreferencesStore';
@@ -1091,6 +1092,8 @@ export class PlayerSession {
    */
   private resetSession(preserveAudioOnly: boolean = false, clearSurface: boolean = false, preservePiP: boolean = false): void {
     this._playGeneration++;
+    // [DISABLED] P3 实时 ASR 已禁用（入口全注释，服务不可能 active；重新启用时恢复）：
+    // 源切换/页面退出/冷重置都必须停掉 PCM tap（幂等）：AsrLiveCaptionService.getInstance().stop();
     const keepAudioOnly = preserveAudioOnly && this._isAudioOnlyMode;
     this._controller.closeMediaSession(clearSurface);
     this._currentVideo = null;

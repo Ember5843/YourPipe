@@ -1900,6 +1900,54 @@ MPV_EXPORT int mpv_get_wakeup_pipe(mpv_handle *ctx);
 #endif
 
 /**
+ * OpenHarmony fork extension (NOT part of the upstream mpv client API).
+ *
+ * This declaration is a downstream addition of the OHOS mpv fork; it does not
+ * exist upstream and intentionally does not bump MPV_CLIENT_API_VERSION.
+ *
+ * The asrtap audio filter taps the playback audio chain and forwards a
+ * resampled copy of the audio (mono float32 PCM, at the filter's configured
+ * rate, 16 kHz by default) to a process-wide consumer callback registered
+ * with this function. The main audio chain is passed through untouched.
+ *
+ * The tap only produces data while the asrtap audio filter is inserted in the
+ * audio filter chain at runtime, e.g. with the af command:
+ * af add @asrtap:asrtap (remove it with af remove @asrtap).
+ *
+ * Threading contract: the callback is invoked synchronously from mpv's
+ * internal audio filter thread. It must never block, must not call any mpv
+ * client API functions, and should only copy the samples into the consumer's
+ * own buffer and return quickly.
+ *
+ * The callback receives:
+ *  - user:    the opaque pointer passed to mpv_asr_tap_set_callback().
+ *  - samples: n float32 mono samples (NULL if n == 0).
+ *  - n:       number of samples in this chunk (0 for the end-of-stream marker).
+ *  - pts:     media-time pts in seconds of the first sample in the chunk,
+ *             or MP_NOPTS_VALUE if unknown.
+ *  - flags:   a combination of MPV_ASR_TAP_FLAG_* values.
+ *
+ * MPV_ASR_TAP_FLAG_DISCONTINUITY is set on the first chunk after a seek,
+ * filter reset, or a detected pts jump; the consumer should drop any
+ * accumulated partial state. MPV_ASR_TAP_FLAG_EOF is delivered once with
+ * n == 0 when the end of the stream was reached and the tap was flushed.
+ *
+ * Setting a NULL callback disables the tap (the asrtap filter then degrades
+ * to a near-zero-cost pass-through).
+ *
+ * @param cb the consumer callback, or NULL to unregister
+ * @param user opaque pointer passed back to the callback
+ * @return 0 on success
+ */
+#define MPV_ASR_TAP_FLAG_DISCONTINUITY (1 << 0)
+#define MPV_ASR_TAP_FLAG_EOF (1 << 1)
+
+typedef void (*mpv_asr_tap_cb)(void *user, const float *samples, int n,
+                               double pts, int flags);
+
+MPV_EXPORT int mpv_asr_tap_set_callback(mpv_asr_tap_cb cb, void *user);
+
+/**
  * Defining MPV_CPLUGIN_DYNAMIC_SYM during plugin compilation will replace mpv_*
  * functions with function pointers. Those pointer will be initialized when
  * loading the plugin.

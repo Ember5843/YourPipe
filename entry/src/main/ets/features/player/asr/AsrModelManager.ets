@@ -9,7 +9,9 @@ const logger = AppLog.getInstance('AsrModelManager');
 export type AsrModelStatus = 'not_downloaded' | 'downloading' | 'ready';
 
 export interface AsrModelPaths {
-  model: string;
+  encoder: string;
+  decoder: string;
+  joiner: string;
   tokens: string;
 }
 
@@ -19,11 +21,15 @@ interface ModelFileSpec {
   minBytes: number;
 }
 
-const REPO: string = 'csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17';
+const REPO: string = 'csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20';
 const FILES: ModelFileSpec[] = [
-  { name: 'tokens.txt', minBytes: 100 * 1024 },
-  { name: 'model.int8.onnx', minBytes: 200 * 1024 * 1024 }
+  { name: 'tokens.txt', minBytes: 50 * 1024 },
+  { name: 'encoder-epoch-99-avg-1.int8.onnx', minBytes: 170 * 1024 * 1024 },
+  { name: 'decoder-epoch-99-avg-1.int8.onnx', minBytes: 12 * 1024 * 1024 },
+  { name: 'joiner-epoch-99-avg-1.int8.onnx', minBytes: 3 * 1024 * 1024 }
 ];
+/** 旧版 SenseVoice 模型目录名（遗留 ~230MB），下载成功/删除模型时一并清理 */
+const LEGACY_DIR_NAME: string = 'sensevoice';
 /**
  * 模型下载源（按序尝试，任一成功即停）：
  * 1. 项目自有 GitHub Release `asr-models`（原始散文件，无需解压 tar.bz2）；
@@ -37,9 +43,11 @@ const BASE_URLS: string[] = [
 ];
 
 /**
- * 端侧识别模型管理（P3）：SenseVoice Small int8（中/英/日/韩/粤）。
- * 模型存 filesDir/asr_models/sensevoice —— 属可清理资产，进"清除全部数据"，
- * 不进"恢复默认设置"（不是配置）。
+ * 端侧识别模型管理（P3）：sherpa-onnx 流式 zipformer 中英双语 int8
+ * （encoder ~173MB + decoder ~12.5MB + joiner ~3MB + tokens，真流式亚秒 partial）。
+ * 模型存 filesDir/asr_models/zipformer_bilingual —— 属可清理资产，进"清除全部数据"，
+ * 不进"恢复默认设置"（不是配置）。旧版 SenseVoice 目录（sensevoice/）在新模型
+ * 下载成功或删除模型时一并清理。
  */
 export class AsrModelManager {
   private static instance: AsrModelManager | null = null;
@@ -81,10 +89,15 @@ export class AsrModelManager {
     if (!dir || !this.filesReady()) {
       return null;
     }
-    return { model: `${dir}/model.int8.onnx`, tokens: `${dir}/tokens.txt` };
+    return {
+      encoder: `${dir}/encoder-epoch-99-avg-1.int8.onnx`,
+      decoder: `${dir}/decoder-epoch-99-avg-1.int8.onnx`,
+      joiner: `${dir}/joiner-epoch-99-avg-1.int8.onnx`,
+      tokens: `${dir}/tokens.txt`
+    };
   }
 
-  /** 下载模型（顺序拉取 tokens + model，镜像故障切换）。已在下载中直接返回 false。 */
+  /** 下载模型（顺序拉取 tokens + encoder/decoder/joiner，镜像故障切换）。已在下载中直接返回 false。 */
   async download(): Promise<boolean> {
     if (this.status === 'downloading') {
       logger.warn('download() called while already downloading');
@@ -133,6 +146,7 @@ export class AsrModelManager {
         return false;
       }
       this.setStatus('ready', 100);
+      this.removeLegacyModel();
       logger.info('ASR model ready');
       return true;
     } catch (e) {
@@ -161,6 +175,7 @@ export class AsrModelManager {
         logger.warn(`deleteModel failed: ${(e as Error).message || e}`);
       }
     }
+    this.removeLegacyModel();
     this.setStatus('not_downloaded', 0);
   }
 
@@ -174,7 +189,28 @@ export class AsrModelManager {
     if (!ctx) {
       return null;
     }
-    return `${ctx.filesDir}/asr_models/sensevoice`;
+    return `${ctx.filesDir}/asr_models/zipformer_bilingual`;
+  }
+
+  /** 旧版 SenseVoice 目录（v0.5.x 遗留，新流式模型启用后不再使用）。 */
+  private legacyModelDir(): string | null {
+    const ctx = AppStorage.get<common.UIAbilityContext>('context');
+    if (!ctx) {
+      return null;
+    }
+    return `${ctx.filesDir}/asr_models/${LEGACY_DIR_NAME}`;
+  }
+
+  private removeLegacyModel(): void {
+    const dir = this.legacyModelDir();
+    if (dir && fileIo.accessSync(dir)) {
+      try {
+        fileIo.rmdirSync(dir);
+        logger.info('legacy SenseVoice model dir removed');
+      } catch (e) {
+        logger.warn(`removeLegacyModel failed: ${(e as Error).message || e}`);
+      }
+    }
   }
 
   private filesReady(): boolean {

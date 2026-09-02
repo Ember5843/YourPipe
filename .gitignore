@@ -21,11 +21,15 @@ CLAUDE.md
 .agents/
 .claude/
 .codex/
+.codex-tmp/
 .codebuddy/
 .cursor/
+.deveco/
 .kimi-code/
 .opencode/
+.qoder/
 .trae/
+.trae-cn/
 
 # Trellis workflow (local-only, not shared)
 .trellis/
@@ -67,6 +71,7 @@ keys/
 /wb-req/
 /backups/
 /youtube-research/
+/介绍图/
 /audio-only-log.txt
 /runlog-*.txt
 /*-analysis.md

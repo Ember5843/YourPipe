@@ -24,6 +24,7 @@ import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { HttpDownloader, parseHlsMasterManifest, StreamInfo as ParsedHlsStreamInfo } from 'youtube_core';
 import { SubtitleCue, parseVttSubtitles, findActiveSubtitleText } from '../subtitle/VttSubtitleParser';
+import type { AudioTapChunk } from '@yourpipe/libmpv-napi';
 
 /** Live/post-live HLS track pair: video variant playlist + audio rendition playlist. */
 interface HlsTrackPair {
@@ -986,15 +987,39 @@ export class AvPlayerController {
    * fetch 直接进 overlay 管线。trackKey（如 ai://<videoId>/<lang>）占用
    * currentSubtitleUrl，菜单选中态与 seq 防串扰逻辑因此原样复用。
    * 与 switchSubtitle 不同，同名 key 也会重载内容（双语切换/重试重推）。
+   * 同 key 重推（P3 ASR 每 ~400ms 的增量刷新）不清空 vm.subtitleText：
+   * 清空会闪一空帧再等 ~100ms time-pos 驱动重写，表现为字幕闪烁；
+   * 新 cue 列表同步就位后，下一个 time-pos tick 自然刷新文本。
    */
   public switchSubtitleText(trackKey: string, vttText: string): void {
+    const trackChanged = this.vm.currentSubtitleUrl !== trackKey;
     this.vm.currentSubtitleUrl = trackKey;
     this.subtitleCues = [];
     this.subtitleLoadSeq++;
-    this.vm.subtitleText = '';
+    if (trackChanged) {
+      this.vm.subtitleText = '';
+    }
     if (trackKey.length === 0 || vttText.length === 0) return;
     this.subtitleCues = parseVttSubtitles(vttText);
     Logger.info(TAG, `subtitle overlay (generated) loaded: cues=${this.subtitleCues.length} key=${trackKey.substring(0, 60)}`);
+  }
+
+  /**
+   * ASR PCM tap 透传（entry P3 实时识别用）：无策略，直接转发引擎。
+   * 引擎未初始化或 vendored libmpv 缺 tap 导出时抛 asr_tap_unavailable。
+   */
+  public enableAudioTap(): void {
+    Logger.info(TAG, 'enableAudioTap');
+    this.playbackEngine.enableAudioTap();
+  }
+
+  public disableAudioTap(): void {
+    Logger.info(TAG, 'disableAudioTap');
+    this.playbackEngine.disableAudioTap();
+  }
+
+  public setAudioTapCallback(cb: ((chunk: AudioTapChunk) => void) | null): void {
+    this.playbackEngine.setAudioTapCallback(cb);
   }
 
   /** Driven by engine time-pos updates (~100ms); cheap enough per tick. */

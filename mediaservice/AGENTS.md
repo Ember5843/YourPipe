@@ -7,7 +7,11 @@
 > architecture only — no changelogs.
 
 ## 1. Public surface (`mediaservice/Index.ets`)
-- `AvPlayerController` — main controller entry.
+- `AvPlayerController` — main controller entry. Includes the thin ASR PCM
+  tap passthrough (`enableAudioTap` / `disableAudioTap` / `setAudioTapCallback`
+  → `MpvPlaybackEngine` → `MpvPlayerController`; no policy, entry owns
+  lifecycle via `AsrLiveCaptionService` — currently [DISABLED] in entry,
+  tap plumbing retained).
 - `LocalMediaProxy` — facade over local proxy sessions (range + SABR dual).
 - `sabrSessionStore` — SABR lease / track-buffer store.
 - `SabrOfflineDownloader`, `SabrOfflineProgress`, `SabrOfflineDownloadOptions`
@@ -119,9 +123,10 @@ mediaservice/src/main/ets/
   App-generated subtitle content (AI translation `ai://…` / on-device ASR
   `asr://…` tracks from entry) enters through
   `AvPlayerController.switchSubtitleText(trackKey, vttText)` — same overlay
-  pipeline, no fetch, same-key re-push always re-applies. Those entry
-  callers are currently **[DISABLED]** in entry (P2/P3 commented out);
-  the controller entry point stays live. `parseVttSubtitles` / `SubtitleCue`
+  pipeline, no fetch, same-key re-push always re-applies (same-key re-push
+  no longer blanks `vm.subtitleText`, so high-frequency incremental pushes
+  do not flash). P2 and P3 ASR are both **[DISABLED]** in entry
+  (commented out). `parseVttSubtitles` / `SubtitleCue`
   are exported from `mediaservice/Index.ets` for entry's AI subtitle
   services.
 - Source submission has a **single writer** — entry `PlayerSession.play()`;

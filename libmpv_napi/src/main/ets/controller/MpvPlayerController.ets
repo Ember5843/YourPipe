@@ -1,6 +1,6 @@
 import nativeModule from 'libmpv_napi.so';
 import { PlaybackState } from '../enums';
-import type { MediaInfo } from '../media-info';
+import type { AudioTapChunk, MediaInfo } from '../media-info';
 
 function createPlayerId(): string {
   const now = Date.now();
@@ -87,6 +87,26 @@ export class MpvPlayerController {
     nativeModule.setEventCallback(this.playerId, callback);
   }
 
+  /**
+   * Enable the mpv asrtap PCM tap: inserts the `@asrtap:asrtap` audio filter
+   * and starts delivering 16kHz mono float32 chunks to the callback set via
+   * setAudioTapCallback. Idempotent. Throws with code "asr_tap_unavailable"
+   * when the vendored libmpv lacks the tap export.
+   */
+  enableAudioTap(): void {
+    nativeModule.enableAudioTap(this.playerId);
+  }
+
+  /** Disable the audio tap (removes the filter, stops the consumer). Idempotent. */
+  disableAudioTap(): void {
+    nativeModule.disableAudioTap(this.playerId);
+  }
+
+  /** Set (or clear with null) the PCM chunk callback for the audio tap. */
+  setAudioTapCallback(callback: ((chunk: AudioTapChunk) => void) | null): void {
+    nativeModule.setAudioTapCallback(this.playerId, callback);
+  }
+
   command(args: string[]): void {
     nativeModule.command(this.playerId, args);
   }
@@ -96,4 +116,4 @@ export class MpvPlayerController {
   }
 }
 
-export type { MediaInfo };
+export type { MediaInfo, AudioTapChunk };

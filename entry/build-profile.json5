@@ -6,6 +6,8 @@
         "enable": false
       }
     }
+    // [DISABLED] P3 ASR worker（AsrStreamingWorker.ets 保留，重新启用时恢复注册）:
+    // "sourceOption": { "workers": ["./src/main/ets/workers/AsrStreamingWorker.ets"] }
   },
   "buildOptionSet": [
     {

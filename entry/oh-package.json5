@@ -9,7 +9,8 @@
     "mediaservice": "file:../mediaservice",
     "youtube_core": "file:../youtube_core",
     "asrengine": "file:../asrengine",
-    "sherpa_onnx": "1.12.1"
+    // 1.13.0 起修复 SherpaOnnxCreateOnlineRecognizerOHOS 空 mgr 崩溃（流式识别必需）
+    "sherpa_onnx": "1.13.3"
   }
 }
 

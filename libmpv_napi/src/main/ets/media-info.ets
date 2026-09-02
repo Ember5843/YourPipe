@@ -50,3 +50,14 @@ export interface MediaInfo {
   fileSize?: string;
   frameRate?: number;
 }
+
+// Mirrors the PCM chunk object produced by the audio tap bridge in
+// player_napi.cpp (mpv asrtap filter: 16kHz mono float32, ~200ms batches).
+// ptsMs is the media-timeline pts of the first sample. Control markers
+// (DISCONTINUITY=1: seek/reset, drop partial data; EOF=2: end of stream)
+// arrive with an empty samples array and the flag set.
+export interface AudioTapChunk {
+  ptsMs: number;
+  samples: Float32Array;
+  flags: number;
+}

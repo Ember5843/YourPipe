@@ -1405,6 +1405,10 @@
     "value": "AI 자막 번역"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "AI 자막"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "번역 엔진"
 },
@@ -1505,16 +1509,8 @@
     "value": "모델 다운로드 중"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "오디오 다운로드 중"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "오디오 디코딩 중"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "인식 중"
+    "name": "yt_asr_live_progress",
+    "value": "실시간 인식 중…"
 },
 {
     "name": "yt_asr_failed",
@@ -1526,11 +1522,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "준비됨(SenseVoice, 중/영/일/한/광둥)"
+    "value": "준비됨(중/영 스트리밍 인식)"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "다운로드되지 않음(약 230MB, Wi-Fi 권장)"
+    "value": "다운로드되지 않음(약 190MB, Wi-Fi 권장)"
 },
 {
     "name": "yt_asr_model_downloading",

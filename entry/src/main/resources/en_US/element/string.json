@@ -1129,6 +1129,10 @@
     "value": "AI Subtitle Translation"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "AI Subtitles"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "Translation engine"
 },
@@ -1229,16 +1233,8 @@
     "value": "Downloading model"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "Downloading audio"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "Decoding audio"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "Transcribing"
+    "name": "yt_asr_live_progress",
+    "value": "Recognizing live…"
 },
 {
     "name": "yt_asr_failed",
@@ -1250,11 +1246,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "Ready (SenseVoice; zh/en/ja/ko/yue)"
+    "value": "Ready (streaming zh/en recognition)"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "Not downloaded (~230 MB; Wi-Fi recommended)"
+    "value": "Not downloaded (~190 MB; Wi-Fi recommended)"
 },
 {
     "name": "yt_asr_model_downloading",

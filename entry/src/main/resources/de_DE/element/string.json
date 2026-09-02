@@ -1041,6 +1041,10 @@
     "value": "KI-Untertitelübersetzung"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "KI-Untertitel"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "Übersetzungs-Engine"
 },
@@ -1141,16 +1145,8 @@
     "value": "Modell wird geladen"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "Audio wird geladen"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "Audio wird decodiert"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "Wird transkribiert"
+    "name": "yt_asr_live_progress",
+    "value": "Live-Erkennung läuft…"
 },
 {
     "name": "yt_asr_failed",
@@ -1162,11 +1158,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "Bereit (SenseVoice; zh/en/ja/ko/yue)"
+    "value": "Bereit (Streaming-Erkennung zh/en)"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "Nicht heruntergeladen (~230 MB, WLAN empfohlen)"
+    "value": "Nicht heruntergeladen (~190 MB, WLAN empfohlen)"
 },
 {
     "name": "yt_asr_model_downloading",

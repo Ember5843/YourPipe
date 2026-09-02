@@ -1057,6 +1057,10 @@
     "value": "Перевод субтитров с ИИ"
 },
 {
+    "name": "yt_option_ai_subtitle",
+    "value": "ИИ-субтитры"
+},
+{
     "name": "yt_ai_translate_engine",
     "value": "Движок перевода"
 },
@@ -1157,16 +1161,8 @@
     "value": "Загрузка модели"
 },
 {
-    "name": "yt_asr_phase_audio",
-    "value": "Загрузка аудио"
-},
-{
-    "name": "yt_asr_phase_decode",
-    "value": "Декодирование аудио"
-},
-{
-    "name": "yt_asr_phase_transcribe",
-    "value": "Распознавание"
+    "name": "yt_asr_live_progress",
+    "value": "Идёт распознавание…"
 },
 {
     "name": "yt_asr_failed",
@@ -1178,11 +1174,11 @@
 },
 {
     "name": "yt_asr_model_status_ready",
-    "value": "Готово (SenseVoice; zh/en/ja/ko/yue)"
+    "value": "Готово (потоковое распознавание zh/en)"
 },
 {
     "name": "yt_asr_model_status_none",
-    "value": "Не загружено (~230 МБ, рекомендуется Wi-Fi)"
+    "value": "Не загружено (~190 МБ, рекомендуется Wi-Fi)"
 },
 {
     "name": "yt_asr_model_downloading",
