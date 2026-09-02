@@ -8,7 +8,7 @@
 **YouTube client for OpenHarmony / HarmonyOS**
 
 [![Version](https://img.shields.io/badge/version-0.5.6-blue?style=flat-square)](AppScope/app.json5)
-[![HarmonyOS](https://img.shields.io/badge/HarmonyOS-6.1.0(23)-black?style=flat-square)](https://developer.huawei.com/consumer/en/harmonyos/)
+[![HarmonyOS](https://img.shields.io/badge/HarmonyOS-7.0.0(26)-black?style=flat-square)](https://developer.huawei.com/consumer/en/harmonyos/)
 [![Player](https://img.shields.io/badge/player-MPV-brightgreen?style=flat-square)](https://github.com/mpv-player/mpv)
 [![License](https://img.shields.io/badge/license-GPL--3.0-yellow?style=flat-square)](LICENSE)
 
@@ -26,7 +26,7 @@ YourPipe is a YouTube client for **OpenHarmony / HarmonyOS**. It extracts stream
 |---|---|
 | **Package** | `com.talon.yourpipe` |
 | **Version** | `0.5.9` |
-| **Target SDK** | `6.1.0(23)` · HarmonyOS · stage model |
+| **Target SDK** | `26.0.0` (HarmonyOS 7.0.0 / API 26) · stage model |
 | **Devices** | phone · tablet · 2in1 · tv · car |
 
 Product VOD typically goes through a **SABR** dual-track local proxy into MPV (mweb player client). Playback is **MPV only**: the `libmpv_napi` module is a NAPI bridge over a vendored `libmpv.so`, originally derived from [libmdk-napi](https://github.com/wang-bin/libmdk-napi) (historical `mdk` names exist only in old commits).
@@ -70,7 +70,7 @@ entry  →  mediaservice  →  youtube_core
 
 ## Requirements
 
-- [DevEco Studio](https://developer.huawei.com/consumer/en/deveco-studio/) with HarmonyOS SDK **6.1.0(23)**
+- [DevEco Studio](https://developer.huawei.com/consumer/en/deveco-studio/) with HarmonyOS SDK **7.0.0(26)**
 - Device or emulator (phone / tablet / 2in1 / tv / car)
 - Real video playback needs an **arm64-v8a** device
 
