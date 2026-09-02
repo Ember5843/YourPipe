@@ -1,6 +1,6 @@
 import { YTCoreLogger } from '../common/YTCoreLogger';
 import { http } from '@kit.NetworkKit';
-import { HttpDownloader, HttpError } from './HttpDownloader';
+import { HttpDownloader, HttpAbortToken, HttpError } from './HttpDownloader';
 import { CookieJar, Cookie } from './CookieJar';
 import { Localization } from '../model/Localization';
 import { ContentCountry } from '../model/ContentCountry';
@@ -174,7 +174,8 @@ export class YouTubeHttpClient implements ClientVersionGet {
     data: Uint8Array,
     customHeaders?: Record<string, string | string[]>,
     withAuth: boolean = false,
-    onData?: (bytes: number) => void
+    onData?: (bytes: number) => void,
+    abortToken?: HttpAbortToken
   ): Promise<http.HttpResponse> {
     const requestId = YouTubeHttpClient.nextRequestId();
     const target = YouTubeHttpClient.safeRequestTarget(url);
@@ -194,7 +195,7 @@ export class YouTubeHttpClient implements ClientVersionGet {
       await this.injectWebAuthHeaders(headers);
     }
     try {
-      const response = await this.downloader.postBinary(url, data, headers, this.localization, true, onData);
+      const response = await this.downloader.postBinary(url, data, headers, this.localization, true, onData, abortToken);
       this.saveCookiesFromResponse(response, url);
       logger.info(`[NET] id=${requestId} phase=complete method=POST_BINARY target=${target} status=${response.responseCode} elapsed=${Date.now() - startedAt}ms`);
       return response;
@@ -289,8 +290,8 @@ export class YouTubeHttpClient implements ClientVersionGet {
       }
     }
 
-    // YouTube 特定处理
-    if (targetUrl && targetUrl.includes('youtube.com')) {
+    // YouTube 特定处理（严格主机匹配，避免 notyoutube.com / 路径携带 youtube.com 的 URL 命中）
+    if (targetUrl && AuthSessionManager.isYoutubeHost(targetUrl)) {
       // SOCS Cookie（隐私同意）— 仅页面请求需要
       if (!isApiRequest) {
         if (!headers['Cookie'] || !(headers['Cookie'] as string).includes('SOCS=')) {
@@ -337,9 +338,10 @@ export class YouTubeHttpClient implements ClientVersionGet {
    * 从响应中保存 Cookie
    */
   private saveCookiesFromResponse(response: http.HttpResponse, requestUrl: string): void {
-    // 从响应头中提取 Set-Cookie
+    // 从响应头中提取 Set-Cookie（netstack 可能归一化为小写，两种写法都查，
+    // 与 HttpDownloader.notifySetCookie 保持一致）
     const header = response.header as Record<string, string | string[]>;
-    const setCookieHeader = header?.['Set-Cookie'];
+    const setCookieHeader = header?.['Set-Cookie'] || header?.['set-cookie'];
     if (setCookieHeader) {
       this.cookieJar.parseSetCookie(setCookieHeader, requestUrl);
       // 异步保存到持久化存储

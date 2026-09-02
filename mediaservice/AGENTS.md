@@ -13,7 +13,16 @@
   lifecycle via `AsrLiveCaptionService` — currently [DISABLED] in entry,
   tap plumbing retained).
 - `LocalMediaProxy` — facade over local proxy sessions (range + SABR dual).
+  `abortAllUpstreamFetches(reason)` is the network-handover lever: aborts
+  every in-flight upstream fetch across sessions (via
+  `UpstreamCancelRegistry.cancelAll`) so stale connections fail fast on a
+  default-network switch; sessions/URLs stay alive and MPV's reconnect
+  re-issues the fetches.
 - `sabrSessionStore` — SABR lease / track-buffer store.
+  `abortAllInFlightPosts(reason)` is the network-handover lever: aborts each
+  active session's in-flight UMP POST (sessions stay open — unlike
+  `abort(key)`, no close; the session's own catch/retry paths re-POST on the
+  new network).
 - `SabrOfflineDownloader`, `SabrOfflineProgress`, `SabrOfflineDownloadOptions`
   — offline SABR download (used by entry `DownloadManager`).
 - `PlaybackEngine` (interface), `PlaybackEngineState`, `PlaybackState`,
@@ -58,6 +67,8 @@ mediaservice/src/main/ets/
   proxy/
     LocalProxyServer.ets         — loopback HTTP server
     RangeProxy.ets               — byte-range passthrough
+    RcpSessionPool.ets           — long-lived RCP sessions per proxy session (+ connectOnly pre-connect)
+    UpstreamCancelRegistry.ets   — in-flight upstream op registry (conn/session cancel)
     ProxyTrafficMeter.ets        — upstream network traffic meter (networkSpeedBps)
     ProxyEncoding.ets            — shared UTF-8 TextEncoder singleton (encodeUtf8/encodeUtf8Bytes)
     InputParser.ets              — request URL parsing
@@ -161,7 +172,15 @@ VISIONOS (body-less GET) googlevideo requests stream over RCP so MPV's first
 byte never waits for a full buffered chunk; other clients — TVHTML5 included,
 for which RCP streaming has been 403-prone on range probes — use buffered
 `@ohos.net.http` GET. Connect timeout is 10s (PipePipe OkHttp parity); transfer/read stays 30s
-(RCP `transferMs` covers the whole stream). Every RCP session — YouTube and
+(RCP `transferMs` covers the whole stream). YouTube streaming fetches share a
+long-lived RCP session per proxy session via `RcpSessionPool` (key =
+`sessionId|proxy-fingerprint`, LRU cap 32 — far below the system 1024-session
+limit; evict/destroy closes sessions, wired into `wireSessionCancel`), so the
+API-24 `connectOnly` pre-connect fired at source commit
+(`LocalProxyServer.createSession` / `addPreparedSession` →
+`preconnectYoutubeHosts`, video+audio hosts only, fire-and-forget, WARN-only
+on failure) warms the exact connection pool MPV's first range fetch then
+reuses. Every RCP session — YouTube and
 non-YouTube alike — resolves the app proxy through the shared
 `resolveRcpProxy` (http → upstream URL with auth, socks5 → loopback bridge
 URL with `createTunnel:'always'`, otherwise `'no-proxy'`).
@@ -178,11 +197,38 @@ Startup: demand-side SIDX fetches gate on the pending DASH PoToken injection
 prefetch was removed from the play path — its cache was only consumed by the
 non-product `youtube-dual` session, so it was dead traffic on the EDL path.
 
+**Upstream cancel / teardown**:
+- Every `serveRange` fetch registers its in-flight op (RCP request / netstack
+  `HttpRequest`) in `UpstreamCancelRegistry`, keyed by loopback connection and
+  session. A closed connection (MPV seek/disconnect, or a `TcpWriter` send
+  failure) cancels that connection's op; `DashSession.cancel` — wired by
+  `LocalProxyServer` at session registration and invoked by `destroySession` —
+  cancels all of the session's ops and, for SABR, calls
+  `sabrSessionStore.abort` (closes the UMP session only when this proxy
+  session is the sole lease holder; `release` stays the refCount-driven
+  closer). Aborted fetches are quiet teardown: the retry loop never retries
+  an abort and logs DEBUG only. `UpstreamCancelRegistry.cancelAll` aborts
+  every op across all sessions without tearing anything down — the
+  network-handover path (`LocalMediaProxy.abortAllUpstreamFetches`, wired by
+  entry `NetworkHandoverService`).
+- `SabrTrackBuffer.readSegment` has one overall wait budget
+  (`READ_SEGMENT_BUDGET_MS`, 45s) per call — the server-owned backoff deadline
+  is never cleared, only the wait is capped. Exhaustion throws
+  `SabrReadTimeoutError`; `SabrDashProxy` answers MPV with 504 so it retries
+  per its own reconnect policy.
+- `SabrTrackBuffer` keeps a `pumpGeneration` bumped by `resetForSeek`; a pump
+  in flight across a seek drops its post-await results instead of ingesting
+  old-window segments against the new `baseOffset`.
+
 **Pacing / lease rules**:
 - The SABR session owns the UMP server backoff: `pumpOnceLocked` waits out
   the remaining deadline **inside** the serialized pump lock
   (`YoutubeSabrSession.ets`, capped by `MAX_BACKOFF_MS`), and local
   recovery/seek never clears the server deadline.
+- Offline downloads acquire their lease with the `'|dl'` key suffix, so a
+  download never shares a session (playhead, segment cache, forward-jump
+  resets) with concurrent playback on the same video/formats; release/abort
+  key off `lease.key` and stay balanced automatically.
 - A failed session build must release the lease so the store can retry.
 - entry injects both the `SabrPoTokenProvider` and the `SabrInfoReloader`
   into `sabrSessionStore` (`setPoTokenProvider` / `setInfoReloader`);

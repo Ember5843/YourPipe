@@ -3077,6 +3077,10 @@
             "value": "Il proxy di riproduzione locale (127.0.0.1) non usa mai questa impostazione."
         },
         {
+            "name": "yt_proxy_bridge_unavailable",
+            "value": "Bridge proxy SOCKS5 disconnesso — risalva le impostazioni proxy per riconnetterti."
+        },
+        {
             "name": "yt_device_qr_sign_in",
             "value": "Accesso con codice QR / TV"
         },

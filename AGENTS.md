@@ -29,7 +29,8 @@
   originally derived from the upstream `wang-bin/libmdk-napi` package
   (historical `mdk` names exist only in old commits) — there is no MDK
   Player runtime.
-- **Stage model**, `apiType: stageMode`. Target SDK `6.1.0(23)`, runtimeOS
+- **Stage model**, `apiType: stageMode`. Target SDK `26.0.0` (HarmonyOS
+  7.0.0 / API 26), runtimeOS
   `HarmonyOS`. Native compiler: `BiSheng`.
 - **Devices**: phone / tablet / 2in1 / tv / car.
 - **Distribution / updates**: AppGallery test channel plus GitHub Releases
@@ -245,13 +246,27 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   (`AuthSessionManager.mergeAccountSetCookies`, hooked into every
   `HttpDownloader` response); a server-cleared SID/SAPISID marks the web
   rail rejected, and OAuth `invalid_grant` clears the refresh token.
-- **Proxy coverage**: one app proxy config (HTTP, or SOCKS5 via the
-  self-healing loopback CONNECT bridge `Socks5Bridge`) drives netstack
-  `http` requests, RCP sessions, ArkWeb (`ProxyController` — no
-  direct-fallback rules; a failing proxy must fail, not silently go
-  direct) and MPV's direct fetches (HLS/subtitles) through the
-  `http_proxy`/`no_proxy` process env (`setHttpProxyEnv`; the vendored
-  libmpv has no `network-proxy` property). Loopback stays direct.
+- **Proxy coverage**: one app proxy config (HTTP or SOCKS5) drives all
+  network stacks. netstack `http` requests use the API 26 native
+  `usingSocks5Proxy` (proxy-side DNS, no bridge hop); RCP sessions, ArkWeb
+  (`ProxyController` — no direct-fallback rules; a failing proxy must
+  fail, not silently go direct) and MPV's direct fetches
+  (HLS/subtitles, via the `http_proxy`/`no_proxy` process env from
+  `setHttpProxyEnv`; the vendored libmpv has no `network-proxy` property)
+  still route SOCKS5 through the self-healing loopback CONNECT bridge
+  `Socks5Bridge`, so the bridge must run whenever socks5 is configured
+  even though netstack no longer uses it. Loopback stays direct.
+  Startup prewarm chains are gated on `NetworkProxyConfig.awaitReady()`
+  so a proxy user's first requests never go direct while the proxy is
+  still being applied.
+- **Network handover**: entry `NetworkHandoverService` owns the single
+  `connection` default-network event subscription (SDK kit set has no
+  NetworkBoostKit `netHandover`); on a switch/loss (2s debounce) it calls
+  `LocalMediaProxy.abortAllUpstreamFetches` and
+  `sabrSessionStore.abortAllInFlightPosts` so stale in-flight connections
+  fail fast and the existing retry paths recover on the new network. SABR
+  sessions are never closed by this path — only the in-flight POST is
+  aborted.
 - **Dependency direction**: never import `entry` from HARs; never import
   `mediaservice` from `youtube_core`.
 - **AI subtitles**: the live paths are the server-side `tlang` translation

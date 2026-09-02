@@ -9,9 +9,14 @@
  * （翻页 append）→ 逐项 onDataAdd 增量通知，其余情况 onDataReloaded 全量刷新
  * （替代原先靠 key 里嵌 epoch 强刷重建的 hack）。
  */
+import { IDataSourcePrefetching } from '@kit.ArkUI';
+import { FeedThumbUrlOf, ThumbPrefetcher } from './ThumbPrefetcher';
+
 export type FeedItemKeyOf = (item: Object, index: number) => string;
 
-export class FeedDataSource implements IDataSource {
+export class FeedDataSource implements IDataSourcePrefetching {
+  /** 缩略图预取 URL 提取器；MediaVideoFeed 挂载时注入（缺省 defaultFeedThumbUrl） */
+  thumbUrlOf: FeedThumbUrlOf | null = null;
   private listeners: DataChangeListener[] = [];
   private dataArray: Object[] = [];
   private keys: string[] = [];
@@ -54,6 +59,33 @@ export class FeedDataSource implements IDataSource {
     this.dataArray = nextData;
     this.keys = [];
     this.notifyDataReload();
+  }
+
+  // ── IDataSourcePrefetching：配合 BasicPrefetcher 在滑动前预取缩略图 ──
+
+  prefetch(index: number): void {
+    const url: string = this.thumbUrlAt(index);
+    if (url.length > 0) {
+      ThumbPrefetcher.getInstance().prefetchUrl(url);
+    }
+  }
+
+  cancel(index: number): void {
+    const url: string = this.thumbUrlAt(index);
+    if (url.length > 0) {
+      ThumbPrefetcher.getInstance().cancelUrl(url);
+    }
+  }
+
+  private thumbUrlAt(index: number): string {
+    if (!this.thumbUrlOf || index < 0 || index >= this.dataArray.length) {
+      return '';
+    }
+    try {
+      return this.thumbUrlOf(this.dataArray[index]);
+    } catch {
+      return '';
+    }
   }
 
   registerDataChangeListener(listener: DataChangeListener): void {

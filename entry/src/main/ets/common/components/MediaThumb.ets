@@ -48,6 +48,12 @@ export struct MediaThumb {
     this.displayUrl = this.fallbackUrls.length > 0 ? this.fallbackUrls[0] : '';
   }
 
+  /** 卡片首请求档 URL（五级回退链首项）；列表预取必须与 Image 首请求 URL 一致才能命中同一缓存 */
+  static firstChoiceUrl(url: string): string {
+    const chain: string[] = MediaThumb.buildFallbackChain(url);
+    return chain.length > 0 ? chain[0] : '';
+  }
+
   private static buildFallbackChain(url: string): string[] {
     const input = (url || '').trim();
     if (input.length === 0) {

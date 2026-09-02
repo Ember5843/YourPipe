@@ -2,14 +2,18 @@ import { socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { sessionStore, DashSession } from './SessionStore';
 import { parseInputJson } from './InputParser';
-import { serveRange } from './RangeProxy';
+import { serveRange, preconnectYoutubeHosts } from './RangeProxy';
+import { rcpSessionPool } from './RcpSessionPool';
 import { encodeUtf8 } from './ProxyEncoding';
 import { buildSabrDashManifest, serveSabrDashSegment } from '../sabr/SabrDashProxy';
 import { buildYoutubeDashManifest } from './YoutubeDashManifest';
 import { sabrSessionStore } from '../sabr/SabrSessionStore';
+import { upstreamCancelRegistry } from './UpstreamCancelRegistry';
 import Logger from '../utils/Logger';
 
 const TAG = '[LocalProxy][Server]';
+/** Idle header-read budget: close connections that never finish the request head. */
+const HEADER_READ_TIMEOUT_MS = 10000;
 
 interface ParsedRequest {
   method: string;
@@ -48,12 +52,28 @@ async function sendText(conn: socket.TCPSocketConnection, status: number, status
 async function handleConnection(conn: socket.TCPSocketConnection): Promise<void> {
   return new Promise<void>((resolve) => {
     let rawRequest = '';
+    // Idle header-read timeout: a client that connects but never finishes the
+    // request head would otherwise hold the connection (and its slot) forever.
+    let headerTimer: number | undefined = setTimeout(() => {
+      headerTimer = undefined;
+      Logger.warn(TAG, `header read timeout (${HEADER_READ_TIMEOUT_MS}ms), closing idle connection`);
+      try { conn.close(); } catch (_) {}
+      resolve();
+    }, HEADER_READ_TIMEOUT_MS);
+    const clearHeaderTimer = (): void => {
+      if (headerTimer !== undefined) {
+        clearTimeout(headerTimer);
+        headerTimer = undefined;
+      }
+    };
 
     conn.on('message', async (value: socket.SocketMessageInfo) => {
       try {
         const chunk = new util.TextDecoder().decodeWithStream(new Uint8Array(value.message));
         rawRequest += chunk;
         if (!rawRequest.includes('\r\n\r\n')) return;
+        // Full request head parsed — the idle header-read guard no longer applies.
+        clearHeaderTimer();
 
         const req = parseHttpRequest(rawRequest);
         const pathOnly = req.path.split('?')[0];
@@ -93,8 +113,16 @@ async function handleConnection(conn: socket.TCPSocketConnection): Promise<void>
       }
     });
 
-    conn.on('close', () => resolve());
+    conn.on('close', () => {
+      clearHeaderTimer();
+      // MPV closed the loopback socket (seek/disconnect): abort this
+      // connection's in-flight upstream fetch so it stops downloading.
+      upstreamCancelRegistry.cancelConnection(conn);
+      resolve();
+    });
     conn.on('error', (e: Error) => {
+      clearHeaderTimer();
+      upstreamCancelRegistry.cancelConnection(conn);
       Logger.error(TAG, `connection error: ${e.message}`);
       resolve();
     });
@@ -157,7 +185,7 @@ async function routeRequest(
         if (dashSegment) exactRange = `bytes=${dashSegment.start}-${dashSegment.end}`;
       }
       if (exactRange) {
-        await serveRange(conn, resource, exactRange, method === 'HEAD', true);
+        await serveRange(conn, resource, exactRange, method === 'HEAD', true, session.id);
         return;
       }
       Logger.warn(TAG, `youtube-dual unknown segment ${segment}/${idx}/${name}`);
@@ -179,7 +207,7 @@ async function routeRequest(
       if (resource.isOtf) {
         Logger.warn(TAG, `OTF resource requested through byte-range endpoint: video/${idx}`);
       }
-      await serveRange(conn, resource, rangeHeader, method === 'HEAD');
+      await serveRange(conn, resource, rangeHeader, method === 'HEAD', false, session.id);
       return;
     }
     if (segment === 'audio' && session.hasAudio && idx < session.audios.length) {
@@ -187,11 +215,11 @@ async function routeRequest(
       if (resource.isOtf) {
         Logger.warn(TAG, `OTF resource requested through byte-range endpoint: audio/${idx}`);
       }
-      await serveRange(conn, resource, rangeHeader, method === 'HEAD');
+      await serveRange(conn, resource, rangeHeader, method === 'HEAD', false, session.id);
       return;
     }
     if (segment === 'resource' && parts[3] === 'main') {
-      await serveRange(conn, session.single, rangeHeader, method === 'HEAD');
+      await serveRange(conn, session.single, rangeHeader, method === 'HEAD', false, session.id);
       return;
     }
   }
@@ -253,15 +281,66 @@ export class LocalProxyServer {
       return '';
     }
     const id = sessionStore.add(session);
+    this.wireSessionCancel(session);
     Logger.info(TAG, `createSession: id=${id} type=${session.type} videos=${session.videos.length} audios=${session.audios.length}`);
+    // Source committed — warm the googlevideo host(s) on this session's pooled
+    // RCP session so MPV's first range fetch skips TCP/TLS (fire-and-forget).
+    preconnectYoutubeHosts(id, this.preconnectUrls(session));
     return id;
   }
 
   /** Register a pre-built session (used for SABR where buffers are attached in TS). */
   addPreparedSession(session: DashSession): string {
     const id = sessionStore.add(session);
+    this.wireSessionCancel(session);
     Logger.info(TAG, `addPreparedSession: id=${id} type=${session.type}`);
+    preconnectYoutubeHosts(id, this.preconnectUrls(session));
     return id;
+  }
+
+  /**
+   * Hosts the committed source will actually fetch over RangeProxy: the single
+   * resource, or the selected video + audio track. SABR media flows through
+   * youtube_core UMP (not RangeProxy), so sabr-dual is skipped; non-YouTube or
+   * non-streaming-client URLs are filtered inside preconnectYoutubeHosts.
+   */
+  private preconnectUrls(session: DashSession): string[] {
+    if (session.type === 'single') {
+      return session.single.url ? [session.single.url] : [];
+    }
+    if (session.type === 'youtube-dual') {
+      const urls: string[] = [];
+      if (session.videos.length > 0) {
+        urls.push(session.videos[0].url);
+      }
+      if (session.audios.length > 0) {
+        urls.push(session.audios[0].url);
+      }
+      return urls;
+    }
+    return [];
+  }
+
+  /**
+   * destroySession calls session.cancel?.() — wire it so teardown actually
+   * aborts in-flight upstream fetches (RCP cancel / netstack destroy, keyed by
+   * this session's loopback connections) and, for SABR, cuts the UMP session
+   * (close() aborts the in-flight POST, rejects queued pump waiters and
+   * interrupts backoff sleeps; sabrSessionStore.abort only acts when this
+   * proxy session is the sole lease holder, so release() never double-closes).
+   */
+  private wireSessionCancel(session: DashSession): void {
+    session.cancel = () => {
+      upstreamCancelRegistry.cancelSession(session.id);
+      // Close this proxy session's long-lived RCP sessions (connection pool +
+      // pre-connected hosts) — ordered after cancelSession so in-flight
+      // fetches are already flagged aborted (quiet teardown) when close()
+      // errors them out.
+      rcpSessionPool.closeForSession(session.id);
+      if (session.sabrLeaseKey) {
+        sabrSessionStore.abort(session.sabrLeaseKey);
+      }
+    };
   }
 
   destroySession(sessionId: string): void {

@@ -3077,6 +3077,10 @@
             "value": "로컬 재생 프록시 (127.0.0.1)는 이 설정을 사용하지 않습니다."
         },
         {
+            "name": "yt_proxy_bridge_unavailable",
+            "value": "SOCKS5 프록시 브리지 연결이 끊어졌습니다. 프록시 설정을 다시 저장하여 재연결하세요."
+        },
+        {
             "name": "yt_device_qr_sign_in",
             "value": "QR / TV 코드 로그인"
         },

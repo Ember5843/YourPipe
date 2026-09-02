@@ -1,6 +1,10 @@
 import web_webview from '@ohos.web.webview';
 import { SabrLocalDomPoTokenGenerator, SABR_POTOKEN_USER_AGENT } from './SabrLocalDomPoTokenGenerator';
 import { SabrWebViewPoTokenProvider } from './SabrWebViewPoTokenProvider';
+import { AppLog } from '../../common/AppLog';
+import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
+
+const logger = AppLog.getInstance('SabrPoTokenWebRuntime');
 
 @Component
 export struct SabrPoTokenWebRuntime {
@@ -12,6 +16,27 @@ export struct SabrPoTokenWebRuntime {
   aboutToDisappear(): void {
     this.provider.setMinter(undefined);
     this.generator = undefined;
+  }
+
+  // First-attached-WebView hook (this resident runtime attaches at startup):
+  // warm DNS + sockets for the origins other WebViews navigate to. The login
+  // WebView loads accounts.google.com and lands on www.youtube.com; the PoToken
+  // bootstrap itself fetches via HttpDownloader (netstack), not WebView
+  // navigation, so WebView prefetch would not help it. Must await the ArkWeb
+  // proxy override first — pre-connecting inside the async proxy-apply window
+  // would silently go direct for proxy users (same rule as startup prewarm).
+  private preconnectUpcomingWebOrigins(): void {
+    NetworkProxyConfig.awaitReady()
+      .then(() => {
+        try {
+          web_webview.WebviewController.prepareForPageLoad('https://www.youtube.com', true, 2);
+          web_webview.WebviewController.prepareForPageLoad('https://accounts.google.com', true, 1);
+          logger.debug('preconnected web origins: www.youtube.com x2, accounts.google.com x1');
+        } catch (e) {
+          logger.warn(`prepareForPageLoad failed: ${e}`);
+        }
+      })
+      .catch((e: Error) => logger.warn(`proxy awaitReady rejected, skip preconnect: ${e.message}`));
   }
 
   build() {
@@ -30,6 +55,7 @@ export struct SabrPoTokenWebRuntime {
         this.controller.loadData(
           '<!doctype html><html><head><title></title></head><body><div id="interaction"></div></body></html>',
           'text/html', 'UTF-8', 'https://www.youtube.com/', 'about:blank');
+        this.preconnectUpcomingWebOrigins();
       })
       .onPageEnd(() => {
         if (this.runtimeReady) {

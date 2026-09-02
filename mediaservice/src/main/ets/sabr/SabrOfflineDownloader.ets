@@ -37,9 +37,12 @@ export interface SabrOfflineDownloadOptions {
 }
 
 /**
- * Offline SABR dump — dual-track (same session as playback).
+ * Offline SABR dump — dual-track on a dedicated session.
  * One lease requests A+V together; each pump can fill both tracks.
  * Interleave writes so cache stays near play-head and does not thrash.
+ * The lease key carries a '|dl' suffix so the download never shares a session
+ * with concurrent playback: its playhead (setPlayHeadMs below) and any
+ * forward-jump stream reset stay isolated from the player's session.
  */
 export class SabrOfflineDownloader {
   static isSabrStream(stream?: StreamInfo | null): boolean {
@@ -70,7 +73,7 @@ export class SabrOfflineDownloader {
       + `track=${options.audio.audioTrackId || audioFmt.audioTrackId || '-'} `
       + `durationMs=${durationMs} useAuth=${useAuth}`);
 
-    const lease: SabrLease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth);
+    const lease: SabrLease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth, '|dl');
     try {
       const videoBuf = new SabrTrackBuffer(lease, false, durationMs);
       const audioBuf = new SabrTrackBuffer(lease, true, durationMs);

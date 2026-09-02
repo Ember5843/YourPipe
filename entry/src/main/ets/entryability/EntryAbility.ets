@@ -15,6 +15,8 @@ import { AuthSessionManager, YTCoreLogger, YoutubeJavaScriptPlayerManager,
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
+import { NetworkProxyConfig } from '../common/NetworkProxyConfig';
+import { NetworkHandoverService } from '../common/NetworkHandoverService';
 import { PlayerSession } from '../common/PlayerSession';
 import { WatchHistoryStore } from '../common/WatchHistoryStore';
 import { PlayerPresentation } from '../common/PlayerPresentation';
@@ -113,7 +115,14 @@ export default class EntryAbility extends UIAbility {
       YTCoreLogger.setSink((level, tag, message) => {
         AppLogStore.push(level, tag, message);
       });
-      YoutubeJavaScriptPlayerManager.startAppPrewarm(this.context)
+      // Gate on proxy readiness (AppState.init() above already kicked off
+      // applySystemAndProviders): startAppPrewarm hits the network (cipher JS /
+      // watch fetch), and running it inside the async proxy-apply window would
+      // go direct and leak the exit IP for proxy users. warmRuntime rides the
+      // same chain and is gated with it.
+      logger.debug('cipher prewarm gated on proxy readiness');
+      NetworkProxyConfig.awaitReady()
+        .then(() => YoutubeJavaScriptPlayerManager.startAppPrewarm(this.context))
         .then(() => {
           // Layer 1: BotGuard init belongs to app startup, not mid-playback.
           // The WebView may still be attaching; the provider queues the warm-up
@@ -125,6 +134,10 @@ export default class EntryAbility extends UIAbility {
         })
         .catch((e: Error) => logger.warn(`Cipher prewarm failed: ${e.message || e}`));
       this.startPlaybackPrewarm();
+      // Network-handover adaptation: on a default-network switch, abort stale
+      // in-flight proxy/SABR connections so playback fails fast and recovers
+      // on the new network instead of stalling until timeouts.
+      NetworkHandoverService.start();
       LanguageManager.applyPersistedLanguage();
       ColorModeManager.applyPersistedMode(this.context);
     } catch (err) {
@@ -149,11 +162,19 @@ export default class EntryAbility extends UIAbility {
     // P0-2 (TTFF): proxy-side startup gate — demand-side SIDX/segment fetches
     // wait for the pending pot injection without blocking play() submission.
     LocalMediaProxy.setStartupUrlGate(() => service.awaitPendingDashPoToken());
-    service.initialize().then(() => service.prewarmClientVersion()).then(() => {
-      logger.info(`Playback prewarm extractor ready elapsed=${Date.now() - startedAt}ms`);
-    }).catch((e: Error) => {
-      logger.warn(`Playback prewarm extractor failed: ${e.message || e}`);
-    });
+    // Gate the network parts (extractor bootstrap + clientVersion sw.js fetch)
+    // on proxy readiness so they never run in the async proxy-apply window and
+    // leak direct. MPV engine creation / loopback warmup above are local-only
+    // and stay immediate.
+    logger.debug('extractor prewarm gated on proxy readiness');
+    NetworkProxyConfig.awaitReady()
+      .then(() => service.initialize())
+      .then(() => service.prewarmClientVersion())
+      .then(() => {
+        logger.info(`Playback prewarm extractor ready elapsed=${Date.now() - startedAt}ms`);
+      }).catch((e: Error) => {
+        logger.warn(`Playback prewarm extractor failed: ${e.message || e}`);
+      });
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -175,6 +196,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    NetworkHandoverService.stop();
     PlayerSession.getInstance().controller.releaseVideo(0);
     logger.info('Ability onDestroy');
   }

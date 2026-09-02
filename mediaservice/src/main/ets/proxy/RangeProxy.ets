@@ -6,6 +6,8 @@ import { ClientsConstants, HttpDownloader, HttpProxyOptions } from 'youtube_core
 import Logger from '../utils/Logger';
 import { proxyTrafficMeter } from './ProxyTrafficMeter';
 import { encodeUtf8, encodeUtf8Bytes } from './ProxyEncoding';
+import { upstreamCancelRegistry, UpstreamAbortHandle } from './UpstreamCancelRegistry';
+import { rcpSessionPool } from './RcpSessionPool';
 
 const TAG = '[LocalProxy][RangeProxy]';
 const MAX_RETRIES = 2;
@@ -258,6 +260,25 @@ function createYoutubePostSession(url: string): rcp.Session {
   return rcp.createSession({ requestConfiguration: config });
 }
 
+/**
+ * Fingerprint of the app-proxy decision for a URL, folded into the pooled
+ * RCP session key so a proxy-config change lands on a fresh session instead
+ * of reusing one built with stale proxy settings.
+ */
+function rcpProxyFingerprint(rawUrl: string): string {
+  const snap = HttpProxyOptions.getSnapshot();
+  if (!HttpProxyOptions.isActive(snap) || HttpProxyOptions.shouldBypass(rawUrl, snap)) {
+    return 'direct';
+  }
+  if (snap.kind === 'socks5') {
+    return `socks5:${snap.socks5LocalPort ?? 0}`;
+  }
+  if (snap.kind === 'http') {
+    return `http:${snap.host.trim()}:${snap.port}:${snap.username}`;
+  }
+  return 'direct';
+}
+
 function uaKind(resource: StreamResource): string {
   const ua = resource.userAgent || '';
   if (ua.includes('Cobalt')) return 'tv-cobalt';
@@ -379,6 +400,52 @@ export async function fetchYoutubeRangeBytes(
   }
 }
 
+/**
+ * Fire-and-forget RCP pre-connect (API 24 `connectOnly`): warms TCP/TLS to
+ * the googlevideo host(s) of a just-committed source on the SAME pooled
+ * session the later range fetches acquire, so MPV's first upstream fetch
+ * skips the handshake. Only streaming-branch clients (Android/iOS empty-body
+ * POST and VISIONOS GET) fetch over RCP — other clients use buffered netstack
+ * http, so their hosts are skipped. Never blocks source commit; failure is
+ * WARN-only and leaves playback untouched (the first fetch simply pays the
+ * handshake as before).
+ */
+export function preconnectYoutubeHosts(sessionId: string, urls: string[]): void {
+  if (!sessionId) {
+    return;
+  }
+  const hosts: string[] = [];
+  for (const u of urls) {
+    if (!u) {
+      continue;
+    }
+    if (!isAndroidUrl(u) && !isIosUrl(u) && !isVisionOsUrl(u)) {
+      continue;
+    }
+    const authority = u.match(URL_AUTHORITY_RE)?.[1] || '';
+    if (authority && !hosts.includes(authority)) {
+      hosts.push(authority);
+    }
+  }
+  for (const authority of hosts) {
+    const warmUrl = `https://${authority}/`;
+    const entry = rcpSessionPool.acquire(`${sessionId}|${rcpProxyFingerprint(warmUrl)}`,
+      () => createYoutubePostSession(warmUrl));
+    if (entry.warmedHosts.has(authority)) {
+      continue;
+    }
+    entry.warmedHosts.add(authority);
+    const req = new rcp.Request(warmUrl, 'GET');
+    req.connectOnly = true;
+    Logger.info(TAG, `preconnect start session=${sessionId} host=${authority}`);
+    entry.session.fetch(req).then(() => {
+      Logger.debug(TAG, `preconnect done session=${sessionId} host=${authority}`);
+    }).catch((e: Object) => {
+      Logger.warn(TAG, `preconnect failed session=${sessionId} host=${authority}: ${describeError(e)}`);
+    });
+  }
+}
+
 export interface ParsedRange {
   start: number;
   end: number;
@@ -389,6 +456,17 @@ export function parseRangeHeader(header: string, totalLength: number): ParsedRan
   if (!header) return result;
   const match = header.match(/bytes=(\d*)-(\d*)/);
   if (!match) return result;
+  if (!match[1] && match[2]) {
+    // RFC 7233 suffix-byte-range-spec: bytes=-N requests the LAST N bytes,
+    // not bytes 0-N. Resolvable only when the total length is known; with an
+    // unknown total the caller rejects the request with 416.
+    const suffixLen = parseInt(match[2], 10);
+    if (suffixLen > 0 && totalLength > 0) {
+      result.start = Math.max(0, totalLength - suffixLen);
+      result.end = totalLength - 1;
+    }
+    return result;
+  }
   if (match[1]) result.start = parseInt(match[1], 10);
   if (match[2]) result.end = parseInt(match[2], 10);
   else if (totalLength > 0) result.end = totalLength - 1;
@@ -413,6 +491,49 @@ async function sendError(conn: socket.TCPSocketConnection, status: number, msg: 
   } catch (_e) {}
 }
 
+/**
+ * Per-session consecutive upstream-failure circuit breaker. MPV runs with
+ * reconnect_at_eof=1, so every 502 (sent with Connection: close) makes FFmpeg
+ * reconnect — against a dead/expired URL that is an unbounded loop of ~3
+ * upstream requests every ~8s that never converges. After
+ * UPSTREAM_FAILURE_CIRCUIT_THRESHOLD consecutive failure responses for the same
+ * session we answer 410 Gone instead: FFmpeg treats 410 as fatal and stops
+ * reconnecting. Any successfully served range resets the counter.
+ */
+const UPSTREAM_FAILURE_CIRCUIT_THRESHOLD = 5;
+const upstreamFailureCountMap: Map<string, number> = new Map<string, number>();
+/** 熔断计数表上限：超出时按插入序淘汰最旧条目，避免随会话数无限增长 */
+const UPSTREAM_FAILURE_MAP_CAP = 512;
+
+function noteUpstreamServeSuccess(sessionId: string): void {
+  if (sessionId) {
+    upstreamFailureCountMap.delete(sessionId);
+  }
+}
+
+async function sendUpstreamFailure(conn: socket.TCPSocketConnection, sessionId: string, msg: string): Promise<void> {
+  let count = 0;
+  if (sessionId) {
+    count = (upstreamFailureCountMap.get(sessionId) || 0) + 1;
+    // 删后重插刷新插入序，让淘汰近似 LRU
+    upstreamFailureCountMap.delete(sessionId);
+    upstreamFailureCountMap.set(sessionId, count);
+    if (upstreamFailureCountMap.size > UPSTREAM_FAILURE_MAP_CAP) {
+      const oldest = upstreamFailureCountMap.keys().next();
+      if (!oldest.done) {
+        upstreamFailureCountMap.delete(oldest.value);
+      }
+    }
+  }
+  if (count >= UPSTREAM_FAILURE_CIRCUIT_THRESHOLD) {
+    Logger.warn(TAG, `circuit open session=${sessionId} consecutiveFailures=${count} → 410 `
+      + `(stops FFmpeg reconnect loop) msg=${msg}`);
+    await sendError(conn, 410, `upstream gone: ${msg}`);
+    return;
+  }
+  await sendError(conn, 502, msg);
+}
+
 class TcpWriter implements rcp.WriteStream {
   private conn: socket.TCPSocketConnection;
   private headerSent: boolean = false;
@@ -423,6 +544,8 @@ class TcpWriter implements rcp.WriteStream {
   private contentType: string;
   private standalone: boolean;
   bytesEmitted: number = 0;
+  /** Fired once when a send failure marks the connection dead (MPV went away). */
+  onClosed?: () => void;
 
   constructor(conn: socket.TCPSocketConnection, start: number, end: number, total: number,
     contentType: string, standalone: boolean = false) {
@@ -436,6 +559,10 @@ class TcpWriter implements rcp.WriteStream {
 
   hasEmittedAny(): boolean {
     return this.headerSent || this.bytesEmitted > 0;
+  }
+
+  isClosed(): boolean {
+    return this.closed;
   }
 
   async write(buffer: ArrayBuffer): Promise<void | number> {
@@ -456,6 +583,12 @@ class TcpWriter implements rcp.WriteStream {
     } catch (e) {
       this.closed = true;
       Logger.warn(TAG, `TcpWriter.write failed (conn closed?): ${(e as Error).message}`);
+      // The client is gone: let the fetch path cancel the in-flight upstream
+      // request instead of downloading the rest of the chunk into a dead writer.
+      try {
+        this.onClosed?.();
+      } catch (_e) {
+      }
       return 0;
     }
   }
@@ -502,36 +635,54 @@ interface UpstreamRetryHooks {
   cleanup: () => void;
   /** 异常 → 日志文本(YouTube 分支用 describeError,非 YouTube 分支沿用 String(e)) */
   describeError: (e: Object) => string;
+  /**
+   * 连接/会话被撤销（MPV 断开、destroySession）时为 true：中止是正常拆链，
+   * 不重试、不应答错误页、只留 DEBUG 日志。
+   */
+  isAborted?: () => boolean;
 }
 
 /**
  * serveRange 的共用重试循环:MAX_RETRIES 次尝试、partial-write 短路
  * (writer.hasEmittedAny() 后绝不再重试)、默认 300*(attempt+1) 退避,
- * 循环耗尽后 sendError(502)。各分支的退避公式与错误格式由 hooks 参数化,
- * 不在此统一。
+ * 循环耗尽后经每会话熔断器 sendUpstreamFailure 应答(连续失败达阈值时
+ * 410 而非 502,阻止 FFmpeg reconnect_at_eof 无限重连)。各分支的退避公式
+ * 与错误格式由 hooks 参数化,不在此统一。
  */
 async function fetchUpstreamWithRetries(
   hooks: UpstreamRetryHooks,
   writer: TcpWriter,
   conn: socket.TCPSocketConnection,
   resourceId: string,
-  rangeSpec: string
+  rangeSpec: string,
+  sessionId: string = ''
 ): Promise<void> {
   let lastError = '';
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     let retryDelayMs: number = 0;
     try {
       const result = await hooks.fetchOnce(attempt);
-      if (result.outcome === 'success' || result.outcome === 'fatal') {
+      if (result.outcome === 'success') {
+        noteUpstreamServeSuccess(sessionId);
+        return;
+      }
+      if (result.outcome === 'fatal') {
         return;
       }
       lastError = result.error ?? '';
       retryDelayMs = result.retryDelayMs ?? 0;
     } catch (e) {
       lastError = hooks.describeError(e as Object);
-      Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resourceId}`);
+      if (!hooks.isAborted?.()) {
+        Logger.warn(TAG, `serveRange attempt=${attempt} error: ${lastError} resource=${resourceId}`);
+      }
     } finally {
       hooks.cleanup();
+    }
+    if (hooks.isAborted?.()) {
+      // Aborted by connection/session teardown — quiet exit, never retry.
+      Logger.debug(TAG, `serveRange aborted (conn/session teardown) resource=${resourceId} range=${rangeSpec}`);
+      return;
     }
     if (writer.hasEmittedAny()) {
       Logger.error(TAG, `serveRange: aborting retry after partial write, resource=${resourceId} range=${rangeSpec} err=${lastError}`);
@@ -539,11 +690,15 @@ async function fetchUpstreamWithRetries(
     }
     if (attempt < MAX_RETRIES) {
       await new Promise<void>(r => setTimeout(r, retryDelayMs > 0 ? retryDelayMs : 300 * (attempt + 1)));
+      if (hooks.isAborted?.()) {
+        Logger.debug(TAG, `serveRange aborted during retry backoff resource=${resourceId} range=${rangeSpec}`);
+        return;
+      }
     }
   }
   Logger.error(TAG, `serveRange failed: ${lastError} resource=${resourceId}`);
   if (!writer.hasEmittedAny()) {
-    await sendError(conn, 502, `upstream failed: ${lastError}`);
+    await sendUpstreamFailure(conn, sessionId, `upstream failed: ${lastError}`);
   }
 }
 
@@ -552,9 +707,17 @@ export async function serveRange(
   resource: StreamResource,
   rangeHeader: string,
   headOnly: boolean,
-  standaloneResponse: boolean = false
+  standaloneResponse: boolean = false,
+  sessionId: string = ''
 ): Promise<void> {
   const total = resource.contentLength;
+  if (total <= 0 && /^\s*bytes=-\d+\s*$/.test(rangeHeader)) {
+    // Suffix range (bytes=-N) needs the total size (RFC 7233); it is unknown
+    // for this resource, and serving bytes 0-N instead would be wrong data.
+    Logger.warn(TAG, `serveRange: suffix range with unknown total → 416 resource=${resource.id} range=${rangeHeader}`);
+    await sendError(conn, 416, 'suffix range requires known content length');
+    return;
+  }
   const parsed = parseRangeHeader(rangeHeader, total);
   const start = parsed.start;
   let end = parsed.end >= 0 ? parsed.end : (total > 0 ? total - 1 : start + 2 * 1024 * 1024 - 1);
@@ -592,6 +755,16 @@ export async function serveRange(
 
   const rangeSpec = `${start}-${end}`;
   const writer = new TcpWriter(conn, start, end, total, contentType, standaloneResponse);
+  // Set once the connection/session teardown cancels an in-flight upstream op;
+  // the retry loop treats it as quiet teardown (no retry, no error response).
+  let aborted = false;
+  // MPV closed the socket mid-stream (seek/disconnect): cancel this
+  // connection's in-flight upstream fetch instead of downloading into the
+  // dead writer (up to a full 10MB chunk per track would be wasted).
+  writer.onClosed = () => {
+    aborted = true;
+    upstreamCancelRegistry.cancelConnection(conn);
+  };
 
   // YouTube videoplayback. Android/iOS: empty-body POST over RCP (see
   // createYoutubePostSession), streamed straight to the socket. Other clients:
@@ -603,19 +776,36 @@ export async function serveRange(
     if (usePost || useStreamingGet) {
       const method = usePost ? 'POST' : 'GET';
       let rcpSession: rcp.Session | null = null;
+      // Pooled sessions are long-lived (shared per proxy session so the
+      // connectOnly pre-connect warms the very connection pool MPV's fetches
+      // hit) and must NOT be closed per attempt; only the legacy per-attempt
+      // fallback (no sessionId) is closed in cleanup.
+      let pooledSession = false;
+      let abortHandle: UpstreamAbortHandle | null = null;
       await fetchUpstreamWithRetries({
         fetchOnce: async (attempt: number): Promise<FetchAttemptResult> => {
           const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
           if (attempt === 0) {
             Logger.info(TAG, `serveRange yt: transport=rcp ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
           }
-          rcpSession = createYoutubePostSession(fetchUrl);
+          if (sessionId) {
+            rcpSession = rcpSessionPool.acquire(`${sessionId}|${rcpProxyFingerprint(fetchUrl)}`,
+              () => createYoutubePostSession(fetchUrl)).session;
+            pooledSession = true;
+          } else {
+            rcpSession = createYoutubePostSession(fetchUrl);
+          }
           // GET must not carry a body (PipePipe plain GET); POST keeps the
           // empty-string body — googlevideo 411s on a body-less POST.
           const req = usePost
             ? new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource), '')
             : new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource));
           req.destination = { kind: 'stream', stream: new MeteredWriteStream(writer) };
+          const sessionRef = rcpSession;
+          abortHandle = upstreamCancelRegistry.register(sessionId, conn, () => {
+            aborted = true;
+            sessionRef.cancel(req);
+          });
           const resp = await rcpSession.fetch(req);
           if (resp.statusCode === 200 || resp.statusCode === 206) {
             return { outcome: 'success' };
@@ -631,21 +821,30 @@ export async function serveRange(
               return { outcome: 'retry', error: `status=${resp.statusCode}`, retryDelayMs };
             }
             if (!writer.hasEmittedAny()) {
-              await sendError(conn, 502, `upstream ${resp.statusCode}`);
+              await sendUpstreamFailure(conn, sessionId, `upstream ${resp.statusCode}`);
             }
             return { outcome: 'fatal' };
           }
           return { outcome: 'retry', error: `status=${resp.statusCode}` };
         },
         cleanup: () => {
-          rcpSession?.close();
+          if (abortHandle) {
+            upstreamCancelRegistry.unregister(conn, abortHandle);
+            abortHandle = null;
+          }
+          if (!pooledSession) {
+            rcpSession?.close();
+          }
           rcpSession = null;
+          pooledSession = false;
         },
-        describeError: describeError
-      }, writer, conn, resource.id, rangeSpec);
+        describeError: describeError,
+        isAborted: () => aborted
+      }, writer, conn, resource.id, rangeSpec, sessionId);
       return;
     }
     let req: http.HttpRequest | null = null;
+    let httpAbortHandle: UpstreamAbortHandle | null = null;
     await fetchUpstreamWithRetries({
       fetchOnce: async (attempt: number): Promise<FetchAttemptResult> => {
         const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
@@ -654,6 +853,11 @@ export async function serveRange(
           Logger.info(TAG, `serveRange yt: transport=http ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
         }
         req = http.createHttp();
+        const reqRef = req;
+        httpAbortHandle = upstreamCancelRegistry.register(sessionId, conn, () => {
+          aborted = true;
+          reqRef.destroy();
+        });
         const options: http.HttpRequestOptions = {
           method: http.RequestMethod.GET,
           header: headers,
@@ -668,6 +872,11 @@ export async function serveRange(
           const bytes = responseBodyToBytes(response.result);
           if (bytes.length === 0) {
             return { outcome: 'retry', error: `empty body status=${response.responseCode}` };
+          }
+          if (writer.isClosed()) {
+            // Connection died while the body was buffering — nothing to serve.
+            Logger.debug(TAG, `serveRange: conn closed before buffered write resource=${resource.id} range=${rangeSpec}`);
+            return { outcome: 'fatal' };
           }
           // Buffered GET: the whole body already arrived from the network here.
           proxyTrafficMeter.recordBytes(bytes.length);
@@ -688,22 +897,28 @@ export async function serveRange(
             return { outcome: 'retry', error: `status=${response.responseCode}`, retryDelayMs };
           }
           if (!writer.hasEmittedAny()) {
-            await sendError(conn, 502, `upstream ${response.responseCode}`);
+            await sendUpstreamFailure(conn, sessionId, `upstream ${response.responseCode}`);
           }
           return { outcome: 'fatal' };
         }
         return { outcome: 'retry', error: `status=${response.responseCode}` };
       },
       cleanup: () => {
+        if (httpAbortHandle) {
+          upstreamCancelRegistry.unregister(conn, httpAbortHandle);
+          httpAbortHandle = null;
+        }
         req?.destroy();
         req = null;
       },
-      describeError: describeError
-    }, writer, conn, resource.id, rangeSpec);
+      describeError: describeError,
+      isAborted: () => aborted
+    }, writer, conn, resource.id, rangeSpec, sessionId);
     return;
   }
 
   let rcpSession: rcp.Session | null = null;
+  let plainAbortHandle: UpstreamAbortHandle | null = null;
   await fetchUpstreamWithRetries({
     fetchOnce: async (_attempt: number): Promise<FetchAttemptResult> => {
       const sessionHeaders = makeHeaders(resource);
@@ -723,6 +938,11 @@ export async function serveRange(
       const rangeHeaders: rcp.RequestHeaders = { 'Range': `bytes=${rangeSpec}` };
       const req = new rcp.Request(resource.url, 'GET', rangeHeaders);
       req.destination = dest;
+      const sessionRef = rcpSession;
+      plainAbortHandle = upstreamCancelRegistry.register(sessionId, conn, () => {
+        aborted = true;
+        sessionRef.cancel(req);
+      });
       const resp = await rcpSession.fetch(req);
 
       if (resp.statusCode === 200 || resp.statusCode === 206) {
@@ -731,16 +951,21 @@ export async function serveRange(
       if (resp.statusCode >= 400 && resp.statusCode < 500) {
         Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} (non-retryable) resource=${resource.id} range=${rangeSpec}`);
         if (!writer.hasEmittedAny()) {
-          await sendError(conn, 502, `upstream ${resp.statusCode}`);
+          await sendUpstreamFailure(conn, sessionId, `upstream ${resp.statusCode}`);
         }
         return { outcome: 'fatal' };
       }
       return { outcome: 'retry', error: `status=${resp.statusCode}` };
     },
     cleanup: () => {
+      if (plainAbortHandle) {
+        upstreamCancelRegistry.unregister(conn, plainAbortHandle);
+        plainAbortHandle = null;
+      }
       rcpSession?.close();
       rcpSession = null;
     },
-    describeError: (e: Object) => String(e)
-  }, writer, conn, resource.id, rangeSpec);
+    describeError: (e: Object) => String(e),
+    isAborted: () => aborted
+  }, writer, conn, resource.id, rangeSpec, sessionId);
 }

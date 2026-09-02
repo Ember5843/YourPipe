@@ -46,6 +46,8 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
   private mint?: LocalDomMintFn;
   private invalidateMinter?: LocalDomInvalidateFn;
   private mintPromise?: Promise<Uint8Array | undefined>;
+  /** videoId the in-flight mint is content-bound to (sole cache key for its result). */
+  private mintVideoId: string = '';
   /** Consecutive mint timeouts — the wedged ArkWeb-bridge signature. */
   private mintTimeoutStreak: number = 0;
   /** Circuit breaker: while set, getPoToken fails fast instead of re-entering a wedged WebView. */
@@ -175,6 +177,13 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
       logger.debug('getPlayerPoToken: Local DOM ArkWeb is not attached');
       return undefined;
     }
+    if (Date.now() < this.mintBrokenUntilMs) {
+      // Breaker open (UMP mint path detected a wedged WebView): fail fast with
+      // the same skip semantics as a mint timeout instead of burning 5s here.
+      logger.warn(`getPlayerPoToken: mint breaker open client=${clientName} `
+        + `remaining=${this.mintBrokenUntilMs - Date.now()}ms`);
+      return undefined;
+    }
     const coldStart = !this.runtimeWarmed;
     if (coldStart) {
       // Cold BotGuard: try one bounded cold mint instead of skipping (see doc
@@ -242,17 +251,41 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     }
     if (!this.mintPromise) {
       logger.info(`mint start video=${info.videoId} force=${forceRefresh}`);
-      this.mintPromise = this.mint(info.visitorData, info.videoId, forceRefresh);
+      this.mintVideoId = info.videoId;
+      const tracked = this.awaitMint(this.mint(info.visitorData, info.videoId, forceRefresh), info.videoId);
+      this.mintPromise = tracked;
+      try {
+        return await tracked;
+      } finally {
+        if (this.mintPromise === tracked) {
+          this.mintPromise = undefined;
+          this.mintVideoId = '';
+        }
+      }
     }
-    return await this.awaitMint(this.mintPromise, info.videoId);
+    if (this.mintVideoId === info.videoId) {
+      // Same content binding: join the in-flight mint; awaitMint caches the
+      // result under the initiating videoId only.
+      return await this.mintPromise;
+    }
+    // Different videoId: a content-bound token minted for another video is
+    // invalid for this one, and caching it under this videoId would poison the
+    // cache. Queue behind the in-flight mint (bounded by its own timeout and
+    // the breaker), then re-enter to mint for this videoId once it settles.
+    logger.info(`mint queued video=${info.videoId} behind in-flight video=${this.mintVideoId}`);
+    await this.mintPromise;
+    return this.getPoToken(info, _streamState, forceRefresh);
   }
 
   /**
    * Await one mint with a hard cap. A wedged ArkWeb JS bridge must never block
-   * SABR playback forever: on timeout the shared mintPromise is discarded so the
-   * next caller starts a fresh mint instead of awaiting the poisoned one.
+   * SABR playback forever: on timeout the caller discards the shared mintPromise
+   * so the next caller starts a fresh mint instead of awaiting the poisoned one.
    * Two consecutive timeouts open a short circuit breaker so a dead WebView
-   * fails fast (retryable error) instead of re-hanging every pump.
+   * fails fast (retryable error) instead of re-hanging every pump. Exactly one
+   * awaitMint wraps each mint, so the timeout streak counts mints, not waiters.
+   * The result is cached under `videoId` — always the INITIATING videoId, since
+   * the token is content-bound to it (waiters for other videoIds never join).
    */
   private async awaitMint(
     promise: Promise<Uint8Array | undefined>,
@@ -287,9 +320,6 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
       return undefined;
     } finally {
       clearTimeout(timerId);
-      if (this.mintPromise === promise) {
-        this.mintPromise = undefined;
-      }
     }
   }
 
@@ -308,6 +338,13 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     }
     if (!this.mint) {
       logger.warn('getDashPoToken: Local DOM ArkWeb is not attached');
+      return undefined;
+    }
+    if (Date.now() < this.mintBrokenUntilMs) {
+      // Breaker open (UMP mint path detected a wedged WebView): skip the pot
+      // injection instead of burning up to 30s on a dead bridge per segment.
+      logger.warn(`getDashPoToken: mint breaker open video=${videoId} `
+        + `remaining=${this.mintBrokenUntilMs - Date.now()}ms`);
       return undefined;
     }
     logger.info(`getDashPoToken: mint start video=${videoId}`);

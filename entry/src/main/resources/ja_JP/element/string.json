@@ -3077,6 +3077,10 @@
             "value": "ローカル再生プロキシ（127.0.0.1）はこの設定を使用しません。"
         },
         {
+            "name": "yt_proxy_bridge_unavailable",
+            "value": "SOCKS5 プロキシブリッジが切断されました。プロキシ設定を保存し直して再接続してください。"
+        },
+        {
             "name": "yt_device_qr_sign_in",
             "value": "QR / TV コードでログイン"
         },

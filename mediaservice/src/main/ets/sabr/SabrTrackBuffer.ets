@@ -5,6 +5,18 @@ import { SabrLease, sabrSessionStore } from './SabrSessionStore';
 const TAG = '[SabrTrackBuffer]';
 
 /**
+ * Single readSegment() call exceeded its overall wait budget. Typed so the
+ * proxy layer (SabrDashProxy) can answer MPV with 504 instead of blocking the
+ * loopback read for minutes — MPV then retries per its own reconnect policy.
+ */
+export class SabrReadTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SabrReadTimeoutError';
+  }
+}
+
+/**
  * Linear progressive view of SABR init + media segments for one track.
  * Maps HTTP Range offsets → segment bytes; pumps session when missing.
  * Cold seek: byte offset → time → SABR prepareSeek, then refill from target.
@@ -35,9 +47,23 @@ export class SabrTrackBuffer {
    * 覆盖常规回退seek；更深的后向读会落入淘汰空洞，走 cold-seek 重建窗口。
    */
   private static readonly KEEP_BEHIND_BYTES: number = 64 * 1024 * 1024;
+  /**
+   * Overall wait budget for ONE readSegment call (retries + backoff sleeps).
+   * MPV has no read timeout on the loopback, and the UMP server backoff can
+   * reach 30s per wait — without a cap a single segment read can block for
+   * minutes. The server-owned backoff deadline is never cleared; on exhaustion
+   * we throw SabrReadTimeoutError and the proxy answers 504.
+   */
+  private static readonly READ_SEGMENT_BUDGET_MS = 45000;
   private totalKnownBytes: number = 0;
   private fullyBuffered: boolean = false;
   private pumpPromise?: Promise<void>;
+  /**
+   * Bumped by resetForSeek. A pump that was in flight across the seek must not
+   * ingest old-window segments against the new baseOffset (byte misalignment) —
+   * doPump captures the generation and drops stale results after every await.
+   */
+  private pumpGeneration: number = 0;
   /** Stop free-pump after protected no-media until session backoff clears. */
   private stalledProtected: boolean = false;
   private emptyPumpStreak: number = 0;
@@ -72,6 +98,19 @@ export class SabrTrackBuffer {
   }
 
   /**
+   * Cached segment byte length without touching the network (-1 if not held).
+   * Used by the proxy to answer HEAD requests from local metadata instead of
+   * fetching the whole upstream segment just to discard the body.
+   */
+  peekSegmentLength(initSegment: boolean, sequenceNumber: number = -1): number {
+    if (initSegment) {
+      return this.init ? this.init.getLength() : -1;
+    }
+    const seg = this.mediaBySeq.get(sequenceNumber);
+    return seg ? seg.getLength() : -1;
+  }
+
+  /**
    * Exact segment access.
    * @param keepFullInit Offline dump must keep full init (incl. index/SIDX). Playback trims
    *   SIDX so hierarchical boxes do not break lavf — that trim corrupts remux if used offline.
@@ -89,7 +128,14 @@ export class SabrTrackBuffer {
     if (this.lease.session.isBeyondEnd(request)) {
       return undefined;
     }
+    const budgetDeadline = Date.now() + SabrTrackBuffer.READ_SEGMENT_BUDGET_MS;
     for (let attempt = 0; attempt < 4; attempt++) {
+      if (Date.now() >= budgetDeadline) {
+        Logger.warn(TAG, `read budget exhausted itag=${this.getItag()} seq=${sequenceNumber} `
+          + `attempt=${attempt} budgetMs=${SabrTrackBuffer.READ_SEGMENT_BUDGET_MS}`);
+        throw new SabrReadTimeoutError(
+          `readSegment budget exhausted itag=${this.getItag()} seq=${sequenceNumber}`);
+      }
       try {
         const segment = await this.lease.session.fetchSegment(request);
         if (initSegment) {
@@ -117,9 +163,13 @@ export class SabrTrackBuffer {
           throw e instanceof Error ? e : new Error(String(e));
         }
         const waitMs = Math.max(250, this.lease.session.getBackoffRemainingMs());
+        // Bound the sleep by the remaining call budget — the server backoff
+        // deadline itself stays untouched (session-owned), we only cap how
+        // long THIS read waits; the next loop iteration throws the timeout.
+        const boundedWaitMs = Math.min(waitMs, Math.max(0, budgetDeadline - Date.now()));
         Logger.warn(TAG, `wait transient itag=${this.getItag()} seq=${sequenceNumber} `
-          + `attempt=${attempt + 1} waitMs=${waitMs}`);
-        await sleepMs(waitMs);
+          + `attempt=${attempt + 1} waitMs=${boundedWaitMs}`);
+        await sleepMs(boundedWaitMs);
       }
     }
     return undefined;
@@ -431,7 +481,8 @@ export class SabrTrackBuffer {
 
   private async doPump(): Promise<void> {
     const itag = this.getItag();
-    const synced = this.syncFromSessionCache(itag);
+    const gen = this.pumpGeneration;
+    const synced = this.syncFromSessionCache(itag, gen);
     if (synced > 0) {
       this.emptyPumpStreak = 0;
       this.stalledProtected = false;
@@ -447,7 +498,14 @@ export class SabrTrackBuffer {
       const next = last + 1;
       try {
         const seg = await this.lease.session.fetchSegment(SabrSegmentRequest.media(itag, next));
-        this.ingestMedia(seg);
+        if (gen !== this.pumpGeneration) {
+          // A seek reset the window while this fetch was in flight — ingesting
+          // the old-window segment against the new baseOffset would corrupt
+          // byte alignment. Drop it; the next pump refills from the new window.
+          Logger.debug(TAG, `drop stale pump result itag=${itag} seq=${next} gen=${gen}→${this.pumpGeneration}`);
+          return;
+        }
+        this.ingestMedia(seg, gen);
         this.stalledProtected = false;
         this.emptyPumpStreak = 0;
         return;
@@ -466,6 +524,10 @@ export class SabrTrackBuffer {
       return;
     }
     const decoded = await this.lease.session.pumpOnce();
+    if (gen !== this.pumpGeneration) {
+      Logger.debug(TAG, `drop stale free-pump itag=${itag} gen=${gen}→${this.pumpGeneration}`);
+      return;
+    }
     let got = 0;
     for (const seg of decoded.segments) {
       if (seg.header.itag === itag) {
@@ -477,21 +539,21 @@ export class SabrTrackBuffer {
           }
         } else {
           const before = this.mediaBySeq.size;
-          this.ingestMedia(seg);
+          this.ingestMedia(seg, gen);
           if (this.mediaBySeq.size > before) {
             got++;
           }
         }
       }
     }
-    got += this.syncFromSessionCache(itag);
+    got += this.syncFromSessionCache(itag, gen);
     if (got === 0 && decoded.isProtectionBoundaryNoMediaResponse()) {
       this.stalledProtected = true;
       Logger.warn(TAG, `free pump protected no-media, stall itag=${itag}`);
     }
   }
 
-  private syncFromSessionCache(itag: number): number {
+  private syncFromSessionCache(itag: number, gen: number = this.pumpGeneration): number {
     let added = 0;
     for (const key of this.lease.session.listCachedKeys()) {
       if (!key.startsWith(`${itag}:`) || key.endsWith(':init')) {
@@ -505,7 +567,7 @@ export class SabrTrackBuffer {
       const cached = this.lease.session.getCachedSegment(SabrSegmentRequest.media(itag, seq));
       if (cached) {
         const before = this.mediaBySeq.size;
-        this.ingestMedia(cached);
+        this.ingestMedia(cached, gen);
         if (this.mediaBySeq.size > before) {
           added++;
         }
@@ -514,7 +576,11 @@ export class SabrTrackBuffer {
     return added;
   }
 
-  private ingestMedia(seg: SabrMediaSegment): void {
+  private ingestMedia(seg: SabrMediaSegment, gen: number = this.pumpGeneration): void {
+    if (gen !== this.pumpGeneration) {
+      // Stale pump from before a seek — never ingest against the new window.
+      return;
+    }
     if (seg.header.initSegment) {
       return;
     }
@@ -566,6 +632,9 @@ export class SabrTrackBuffer {
 
   resetForSeek(targetMs: number): void {
     sabrSessionStore.prepareSeek(this.lease.key, targetMs);
+    // Invalidate any in-flight pump: its post-await results belong to the old
+    // window and must not be ingested against the new baseOffset.
+    this.pumpGeneration++;
     this.mediaBySeq.clear();
     this.orderedSeq = [];
     this.offsetOfSeq = [];

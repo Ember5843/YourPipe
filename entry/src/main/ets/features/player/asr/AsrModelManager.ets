@@ -64,6 +64,14 @@ export class AsrModelManager {
   private cancelFlag: boolean = false;
   private listeners: Array<(status: AsrModelStatus, percent: number) => void> = [];
   private activeRequest: http.HttpRequest | null = null;
+  /** 当前 fetchToFile 的幂等 settle 钩子，供 cancelDownload 确定性收尾。 */
+  private activeSettle: ((error?: Error) => void) | null = null;
+  /** 单文件下载总超时兜底（大模型文件看门狗）。 */
+  private static readonly FETCH_TOTAL_TIMEOUT_MS: number = 5 * 60 * 1000;
+  /** 停滞检测：超过该时长无任何接收进度即判定流已死。 */
+  private static readonly FETCH_STALL_TIMEOUT_MS: number = 60 * 1000;
+  /** 停滞检测轮询间隔。 */
+  private static readonly FETCH_STALL_CHECK_MS: number = 15 * 1000;
 
   getStatus(): AsrModelStatus {
     if (this.status !== 'downloading') {
@@ -159,6 +167,13 @@ export class AsrModelManager {
 
   cancelDownload(): void {
     this.cancelFlag = true;
+    // 优先走活动下载的 settle 钩子：destroy() 之后 requestInStream/dataEnd
+    // 可能都不再回调，必须由这里确定性地按"已取消"收尾 Promise。
+    const settle = this.activeSettle;
+    if (settle) {
+      settle(new Error('cancelled'));
+      return;
+    }
     try {
       this.activeRequest?.destroy();
     } catch (_e) {
@@ -286,9 +301,12 @@ export class AsrModelManager {
       };
       HttpDownloader.applyProxyToOptions(options, url);
       let file: fileIo.File | null = null;
-      let failed = false;
       let receivedBytes = 0;
       let httpCode = 0;
+      let settled = false;
+      let totalTimerId: number = -1;
+      let stallTimerId: number = -1;
+      let lastProgressAtMs: number = Date.now();
       try {
         file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
       } catch (e) {
@@ -296,10 +314,64 @@ export class AsrModelManager {
         reject(new Error(`open dest failed: ${(e as Error).message || e}`));
         return;
       }
-      request.on('dataReceive', (data: ArrayBuffer) => {
-        if (failed || this.cancelFlag) {
+      // 幂等收尾：清看门狗、关文件、销毁请求、清活动句柄，只 settle 一次。
+      // requestInStream 在收到响应头（200）时即 resolve，中停滞/断流不会再
+      // 触发任何回调，所以所有路径（含看门狗与 cancelDownload）都必须经此收尾，
+      // 否则悬挂的 Promise 会把下载状态机卡死在 downloading。
+      const settle = (error?: Error): void => {
+        if (settled) {
           return;
         }
+        settled = true;
+        if (totalTimerId >= 0) {
+          clearTimeout(totalTimerId);
+          totalTimerId = -1;
+        }
+        if (stallTimerId >= 0) {
+          clearInterval(stallTimerId);
+          stallTimerId = -1;
+        }
+        if (this.activeSettle === settle) {
+          this.activeSettle = null;
+        }
+        try {
+          fileIo.closeSync(file!);
+        } catch (_e) {
+          // ignore
+        }
+        try {
+          request.destroy();
+        } catch (_e) {
+          // ignore
+        }
+        if (this.activeRequest === request) {
+          this.activeRequest = null;
+        }
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      };
+      this.activeSettle = settle;
+      // 看门狗 1：单文件总时长兜底。
+      totalTimerId = setTimeout(() => {
+        totalTimerId = -1;
+        logger.warn(`fetchToFile total timeout: url=${url} receivedBytes=${receivedBytes}`);
+        settle(new Error('download total timeout'));
+      }, AsrModelManager.FETCH_TOTAL_TIMEOUT_MS);
+      // 看门狗 2：停滞检测——中停滞时 dataReceive/dataReceiveProgress 都不再触发。
+      stallTimerId = setInterval(() => {
+        if (Date.now() - lastProgressAtMs > AsrModelManager.FETCH_STALL_TIMEOUT_MS) {
+          logger.warn(`fetchToFile stall timeout: url=${url} receivedBytes=${receivedBytes}`);
+          settle(new Error('download stalled (no progress)'));
+        }
+      }, AsrModelManager.FETCH_STALL_CHECK_MS);
+      request.on('dataReceive', (data: ArrayBuffer) => {
+        if (settled || this.cancelFlag) {
+          return;
+        }
+        lastProgressAtMs = Date.now();
         receivedBytes += data.byteLength;
         try {
           // fileIo.writeSync 只接受原始 ArrayBuffer，TypedArray 视图会报 Invalid arraybuffer。
@@ -318,58 +390,35 @@ export class AsrModelManager {
             offset += written;
           }
         } catch (e) {
-          failed = true;
-          reject(new Error(`write failed: ${(e as Error).message || e}`));
+          settle(new Error(`write failed: ${(e as Error).message || e}`));
         }
       });
       request.on('dataReceiveProgress', (data: http.DataReceiveProgressInfo) => {
+        lastProgressAtMs = Date.now();
         if (data.totalSize > 0) {
           const frac = data.receiveSize / data.totalSize;
           this.setStatus('downloading', Math.round((base + span * frac) * 100));
         }
       });
       request.on('dataEnd', () => {
-        try {
-          fileIo.closeSync(file!);
-        } catch (_e) {
-          // ignore
-        }
-        request.destroy();
-        this.activeRequest = null;
         // 记录最终字节数与 HTTP 状态，便于排查空 200 假成功
         logger.info(`fetchToFile finished: url=${url} httpCode=${httpCode} receivedBytes=${receivedBytes}`);
         // 失败/取消都必须 reject——悬挂的 Promise 会把下载状态机卡死在 downloading
         if (this.cancelFlag) {
-          reject(new Error('cancelled'));
-        } else if (failed) {
-          reject(new Error('write failed'));
+          settle(new Error('cancelled'));
         } else {
-          resolve();
+          settle();
         }
       });
       request.requestInStream(url, options)
         .then((code: number) => {
           httpCode = code;
           if (code !== 200 && code !== 206) {
-            failed = true;
-            try {
-              fileIo.closeSync(file!);
-            } catch (_e) {
-              // ignore
-            }
-            request.destroy();
-            reject(new Error(`HTTP ${code}`));
+            settle(new Error(`HTTP ${code}`));
           }
         })
         .catch((e: Error) => {
-          failed = true;
-          try {
-            fileIo.closeSync(file!);
-          } catch (_e) {
-            // ignore
-          }
-          request.destroy();
-          reject(new Error(e.message || 'request failed'));
+          settle(new Error(e.message || 'request failed'));
         });
     });
   }

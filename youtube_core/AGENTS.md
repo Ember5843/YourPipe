@@ -144,7 +144,12 @@ youtube_core/src/main/
   protected (via `SabrPoTokenProvider` implemented in entry). UMP response
   body bytes are reported as they arrive (per `dataReceive` chunk) through
   `setSabrNetworkTrafficSink` (wired by mediaservice to its proxy traffic
-  meter for the stats UI).
+  meter for the stats UI). `abortInFlightPost(reason)` is the
+  network-handover lever (wired by entry through mediaservice
+  `sabrSessionStore.abortAllInFlightPosts`): aborts only the in-flight UMP
+  POST so a stale connection fails fast on a default-network switch — the
+  session stays open, no policy/epoch state changes, and the existing
+  catch/retry paths re-POST on the new network.
 - **Consumers**: `mediaservice` `sabrSessionStore` / `SabrTrackBuffer` lease the
   session and serve loopback DASH/range to MPV. Do not invent a second UMP client.
 - **Session identity** (`identity/SessionIdentityManager`): one visitorData is
@@ -369,16 +374,40 @@ Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
   entry `NetworkProxyConfig` injects it. Do not read system proxy ad hoc.
 - `HttpDownloader` — used by entry `DownloadManager` to save streams.
   `setSetCookieObserver` (registered by `AuthSessionManager.init`) reports
-  every response's `Set-Cookie` for account-credential repair.
-- `Socks5Bridge` — SOCKS5 proxies are supported through a loopback HTTP
-  CONNECT bridge. Self-heals: a server `error` event schedules bounded
+  every response's `Set-Cookie` for account-credential repair. Buffered
+  `request()` runs an API 22 `HttpInterceptorChain` per attempt: a
+  REDIRECTION interceptor strips Cookie/Authorization when a redirect
+  leaves the YouTube host family (auth-header leak guard; local
+  `isYoutubeHostUrl` copy — importing the auth one would be circular),
+  and a FINAL_RESPONSE interceptor fires the Set-Cookie observer.
+  Interceptors do NOT apply to `requestInStream`, so
+  `postBinary`/`postBinaryStreamOnce` keep the manual observer call.
+- `Socks5Bridge` — loopback HTTP CONNECT bridge → SOCKS5. As of API 26 the
+  netstack paths (`HttpDownloader.applyProxyToOptions`, incl. the PipePipe
+  decoder calls) no longer use it: they set
+  `HttpRequestOptions.usingSocks5Proxy` with the real upstream proxy
+  (`dnsStrategy: connection.Socks5DnsStrategy.PROXY_MODE` so DNS resolves
+  proxy-side, loopback exclusionList) instead of pointing `usingProxy` at the
+  bridge. The bridge still must run for its remaining consumers — ArkWeb
+  `ProxyController`, RCP `createTunnel`, and MPV's `http_proxy` env — entry
+  starts/stops it independently. Self-heals: a server `error` event schedules bounded
   re-listens (1s/2s/4s, generation-guarded); tunnel connects retry once
   except for SOCKS5 auth errors (2301207/2301209). `getPort()` reports a
   last-known-good port: it is NOT cleared during the self-heal re-listen
   window, so proxy consumers keep routing at the dead loopback port and fail
-  fast (connect-refused) instead of silently going direct; only a real
-  `stop()` (user disabled/changed the proxy, or initial listen failed)
-  clears it to 0.
+  fast (connect-refused) instead of silently going direct. When self-heal
+  ultimately fails (re-listen failure or restart budget exhausted) the bridge
+  blows its fuse (`blowFuse`): the port is STILL kept, the server socket is
+  closed, pending heal timers are cancelled, and the single-slot
+  `setFailureListener` hook fires (entry surfaces "proxy unavailable" /
+  re-applies); `isFuseBlown()` exposes the state. Re-listens use `port: 0`
+  (a fresh ephemeral port each time); after a successful self-heal
+  re-listen whose port differs from the previous one, the single-slot
+  `setPortChangeListener` hook fires so entry can re-point the app-level
+  proxy / WebView override at the new port (mediaservice `RangeProxy` follows
+  `getPort()` lazily on its own). Only a real `stop()` (user
+  disabled/changed the proxy, or initial listen failed) clears the port to 0
+  and resets the fuse; a new `start()` does the same via its internal stop.
 
 ## 8. Native cipher (`yourpipe_cipher`)
 - Built from `youtube_core/src/main/cpp` as NAPI module `yourpipe_cipher`.

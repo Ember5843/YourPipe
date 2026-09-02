@@ -40,6 +40,8 @@ export class SabrLocalDomPoTokenGenerator {
   private bootstrap?: YoutubePageAttestationBootstrap;
   private sessionPoToken?: Uint8Array;
   private expiresAtMs: number = 0;
+  /** In-flight initialize() guard: concurrent mints share one bootstrap pass. */
+  private initPromise?: Promise<void>;
 
   constructor(controller: web_webview.WebviewController, resourceManager: resourceManager.ResourceManager) {
     this.controller = controller;
@@ -68,7 +70,30 @@ export class SabrLocalDomPoTokenGenerator {
     this.expiresAtMs = 0;
   }
 
-  private async initialize(): Promise<void> {
+  /**
+   * Idempotent bootstrap: while one initialization is running, later callers
+   * (e.g. the startup warmRuntime racing a real mint) await the same promise
+   * instead of duplicating the home-page fetch and interleaving runJavaScript
+   * on the singleton BotGuard state. The guard clears on settle — a failure
+   * leaves no stale promise so the next mint retries, and a success is
+   * re-entered once the bootstrap expires (mint() gates on expiresAtMs).
+   */
+  private initialize(): Promise<void> {
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+    const pending = this.doInitialize();
+    this.initPromise = pending;
+    const clear = (): void => {
+      if (this.initPromise === pending) {
+        this.initPromise = undefined;
+      }
+    };
+    pending.then(clear, clear);
+    return pending;
+  }
+
+  private async doInitialize(): Promise<void> {
     logger.info('initialization start');
     const helperBytes: Uint8Array = this.resourceManager.getRawFileContentSync('sabr_po_token.js');
     const helper = new util.TextDecoder('utf-8').decodeWithStream(helperBytes);

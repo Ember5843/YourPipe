@@ -63,11 +63,29 @@ Persistent state and shared singletons:
   the loopback CONNECT bridge, then points both the app-level proxy and
   the ArkWeb `ProxyController` override at it; `awaitReady()` lets the
   first network work (home load in `Index.aboutToAppear`, the Options
-  proxy test) wait for the bridge instead of leaking direct. During a
+  proxy test, startup prewarm chains) wait for the bridge instead of
+  leaking direct. Applies are serialized (promise-chain mutex) so
+  concurrent applies never interleave and the last requested config
+  lands last. During a
   bridge self-heal re-listen (post-startup), the snapshot keeps the
   bridge's last-known-good port so consumers fail fast on the dead port
-  rather than leaking direct there either. The WebView
+  rather than leaking direct there either; a successful self-heal
+  re-listen lands on a NEW ephemeral port, and the bridge's
+  `setPortChangeListener` hook (registered once by `NetworkProxyConfig`)
+  re-points only the app-level proxy + WebView override at the new port
+  (never a full re-apply). On fuse-blown the `setFailureListener` hook
+  logs an ERROR and toasts `yt_proxy_bridge_unavailable`; no
+  auto-restart — a user re-save re-applies and resets the fuse. The WebView
   override has **no** direct-fallback rules — a dead proxy fails visibly.
+- `NetworkHandoverService` — network-handover adaptation. Single
+  subscription site (`connection` default-network `netAvailable` /
+  `netUnavailable` events; the SDK kit set has no NetworkBoostKit
+  `netHandover`), started/stopped by `EntryAbility`. On a default-network
+  switch or loss (debounced 2s, netId-tracked) it aborts stale in-flight
+  connections so playback fails fast instead of stalling on timeouts:
+  `LocalMediaProxy.abortAllUpstreamFetches` (local-proxy upstream fetches)
+  and `sabrSessionStore.abortAllInFlightPosts` (SABR UMP in-flight POST
+  only — sessions stay open, their own retry/backoff paths recover).
 - `PlayerSession` — singleton player state for the active `AvPlayerController`.
 - `PlayerPresentation` — foreground / background / share / cast / PiP presentation
   mode; drives when video may be disabled for background audio-only.
@@ -87,7 +105,12 @@ grid / wide-strip / single-list branches over Grid|List + LazyForEach); pages
 feed it a `FeedDataSource` (`common/model/FeedDataSource.ets`, prefix-diff
 `setData` for paged appends) plus stable Scroller/callback members, and pass
 volatile display state as a single `MediaVideoFeedParams` object-literal
-`@Prop`. Grid column counts are centralized in `ListLayoutUtils`
+`@Prop`. `FeedDataSource` implements `IDataSourcePrefetching`: `MediaVideoFeed`
+binds it to a `BasicPrefetcher` and reports the visible range from
+`onScrollIndex`; `prefetch(index)` warms the item's first-choice thumbnail via
+`ThumbPrefetcher` (`common/model/ThumbPrefetcher.ets` → `cacheDownload`,
+LAZY strategy, bounded in-flight, `cancel(index)` aborts), so cards hit the
+system image cache when scrolled into view. Grid column counts are centralized in `ListLayoutUtils`
 (`getVideoGridColumnCount` / `getWideListColumnCount`). Builders passed into
 `MediaVideoFeed`'s `@BuilderParam`s must be declared `@LocalBuilder` (not
 `@Builder`, and never `.bind(this)`) — a plain `@Builder` passed by reference
@@ -147,24 +170,33 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   `serviceIntegrityDimensions.poToken`, fast-skipped while BotGuard is cold).
 - `EnhancedLogger.setSink(...)` (mediaservice) → `AppLogStore.push`.
 - `YTCoreLogger.setSink(...)` (youtube_core) → `AppLogStore.push`.
-- Startup prewarm chain (`startPlaybackPrewarm` + cipher/PoToken):
-  1. `YoutubeJavaScriptPlayerManager.startAppPrewarm` — cold-start disk fast
+- Startup prewarm chain (`startPlaybackPrewarm` + cipher/PoToken). Every
+  network-touching step is gated on `NetworkProxyConfig.awaitReady()`
+  (proxy apply is kicked off earlier in `AppState.init()`), so nothing
+  goes direct inside the async proxy-apply window; local-only steps
+  (MPV engine creation, loopback server warmup) run immediately:
+  1. `YoutubeJavaScriptPlayerManager.startAppPrewarm` (after
+     `awaitReady()`) — cold-start disk fast
      path (persisted STS `signatureTimestamp` + WEB `clientVersion` beside
      the cipher JS cache); the prewarmed visitorData pre-initializes the
      BotGuard WebView runtime (`SabrWebViewPoTokenProvider.warmRuntime`,
      queued until the WebView attaches) so the first real mint skips the
      home page bootstrap + interpreter dance mid-playback
-  2. `PlayerSession.prewarmPlaybackEngine()` (MPV)
-  3. `LocalMediaProxy.warmup()` + `LocalMediaProxy.setStartupUrlGate(...)`
+  2. `PlayerSession.prewarmPlaybackEngine()` (MPV; local, not gated)
+  3. `LocalMediaProxy.warmup()` (local loopback, not gated) +
+     `LocalMediaProxy.setStartupUrlGate(...)`
      — demand-side SIDX/segment fetches wait for the pending PoToken
      injection without blocking play() submission
-  4. `YouTubePlayService.initialize()` / `prewarmClientVersion()`
+  4. `YouTubePlayService.initialize()` / `prewarmClientVersion()` (after
+     `awaitReady()`)
   5. Queue-next prefetch: once playback is stable, `YouTubePlayService.prefetch`
      extracts the next queue item's streams on idle bandwidth (TTL'd result
      cache, consumed via `takePrefetched`). Extraction is serialized through
      a mutex — the extractor is a stateful singleton; prefetch must never
      run concurrently with real playback extraction.
 - `LanguageManager.applyPersistedLanguage()`, `ColorModeManager.applyPersistedMode(context)`.
+- `NetworkHandoverService.start()` / `stop()` — network-handover listener
+  lifecycle (see §3).
 
 ## 6. SABR PoToken ownership (entry)
 - Product VOD is direct-link DASH; the mweb SABR/UMP path is an opt-in/debug
@@ -178,7 +210,11 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
     bootstrap, then youtube_core re-pins a fresh visitorData and the next
     mint re-bootstraps from the home page)
   - `SabrPoTokenWebRuntime` — hidden WebView BotGuard runtime (desktop UA
-    pinned via `setCustomUserAgent`)
+    pinned via `setCustomUserAgent`). Its `onControllerAttached` (the app's
+    first WebView attach) also fires `WebviewController.prepareForPageLoad`
+    socket pre-connects for `www.youtube.com` / `accounts.google.com`,
+    gated on `NetworkProxyConfig.awaitReady()` so the pre-connect never
+    goes direct while the proxy override is still being applied.
   - `SabrLocalDomPoTokenGenerator` — local-DOM mint path (home page
     attestation bootstrap + EVENT_ID-bound BotGuard)
 - Do not move PoToken WebView policy into `mediaservice` or `youtube_core`;

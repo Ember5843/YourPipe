@@ -6,6 +6,7 @@ import { sabrSessionStore, SabrLease } from '../sabr/SabrSessionStore';
 import { SabrTrackBuffer } from '../sabr/SabrTrackBuffer';
 import { ClientsConstants, YoutubeSabrFormatMeta, YoutubeSabrInfo } from 'youtube_core';
 import { fetchYoutubeRangeBytes } from '../proxy/RangeProxy';
+import { upstreamCancelRegistry } from '../proxy/UpstreamCancelRegistry';
 import { parseYoutubeDashIndex, YoutubeDashSegment } from '../proxy/YoutubeDashIndex';
 import { VideoHwCaps } from '../engine/VideoHwCaps';
 
@@ -434,6 +435,20 @@ export class LocalMediaProxy {
 
   static stopAll(): void {
     localProxyServer.destroyAll();
+  }
+
+  /**
+   * Network-handover lever (wired by entry NetworkHandoverService): abort
+   * every in-flight upstream fetch across all proxy sessions so stale
+   * connections (default network switched) fail fast instead of hanging until
+   * their timeouts. Sessions and their URLs stay alive — aborted fetches are
+   * quiet teardown and MPV's reconnect re-issues them on the new network.
+   * Returns the number of aborted fetches.
+   */
+  static abortAllUpstreamFetches(reason: string): number {
+    const count = upstreamCancelRegistry.cancelAll();
+    Logger.info(TAG, `abortAllUpstreamFetches: reason=${reason} aborted=${count}`);
+    return count;
   }
 
   private static async createSession(inputJson: string): Promise<string> {

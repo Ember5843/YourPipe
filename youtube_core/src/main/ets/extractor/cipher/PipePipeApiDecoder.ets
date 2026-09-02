@@ -88,20 +88,21 @@ export class PipePipeApiDecoder {
 
     // PipePipe remote fallback when watch-page STS is unavailable.
     const latestUrl = ApiConfig.getLatestPlayerUrl();
+    const httpRequest = http.createHttp();
     try {
       // Remote is fallback only; keep a tight budget so the happy path
       // (watch HTML STS) is not blocked when the API is slow/unreachable.
-      const httpRequest = http.createHttp();
       const latestOptions: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         header: PipePipeApiDecoder.REQUEST_HEADERS,
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: 4000,
-        readTimeout: 4000
+        readTimeout: 4000,
+        reuseConnections: true,
+        inactivityMs: 30000
       };
       HttpDownloader.applyProxyToOptions(latestOptions, latestUrl);
       const response = await httpRequest.request(latestUrl, latestOptions);
-      httpRequest.destroy();
       if (response.responseCode !== 200 || !response.result) {
         throw new Error(`latest-player HTTP ${response.responseCode}`);
       }
@@ -123,6 +124,8 @@ export class PipePipeApiDecoder {
     } catch (e) {
       logger.warn('getLatestPlayer remote failed:', e);
       throw new Error('Player metadata not available — setLocalMetadata() or latest-player failed');
+    } finally {
+      httpRequest.destroy();
     }
   }
 
@@ -187,6 +190,8 @@ export class PipePipeApiDecoder {
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: timeout,
         readTimeout: timeout,
+        reuseConnections: true,
+        inactivityMs: 30000
       };
       HttpDownloader.applyProxyToOptions(decodeOptions, url);
       const response = await httpRequest.request(url, decodeOptions);

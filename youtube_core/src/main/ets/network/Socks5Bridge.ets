@@ -19,6 +19,9 @@ interface Socks5Config {
 }
 
 const CRLF: string = '\r\n';
+/** Idle cap per accepted connection: a client that never completes an HTTP
+ *  request head must not hold the connection (and its fd) forever. */
+const IDLE_HEAD_TIMEOUT_MS: number = 30000;
 
 function encodeText(s: string): ArrayBuffer {
   return new util.TextEncoder().encode(s).buffer as ArrayBuffer;
@@ -267,6 +270,7 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
   return new Promise<void>((resolve) => {
     let raw = new Uint8Array(0);
     let settled = false;
+    let idleTimerId: number = -1;
 
     const findHeaderEnd = (buf: Uint8Array): number => {
       for (let i = 0; i + 3 < buf.length; i++) {
@@ -277,11 +281,19 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
       return -1;
     };
 
+    const clearIdleTimer = (): void => {
+      if (idleTimerId >= 0) {
+        clearTimeout(idleTimerId);
+        idleTimerId = -1;
+      }
+    };
+
     const done = (): void => {
       if (settled) {
         return;
       }
       settled = true;
+      clearIdleTimer();
       // Deliberately do NOT off('message') here: some OHOS socket versions clear
       // all listeners of a type even when a specific callback is passed, which
       // would strip pipeConnections' forwarding handler and kill the data path.
@@ -289,6 +301,20 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
       // pipeConnections' own handlers take over forwarding.
       resolve();
     };
+
+    // Idle timeout: armed on accept, cleared once the request head is fully
+    // parsed (tunnel establishment and the pipe phase have their own bounds —
+    // openSocksTunnel's connect timeout, and an established CONNECT tunnel is
+    // long-lived by design). On expiry, close quietly.
+    idleTimerId = setTimeout(() => {
+      idleTimerId = -1;
+      logger.debug(TAG, `connection idle ${IDLE_HEAD_TIMEOUT_MS}ms without complete request head, closing`);
+      try {
+        conn.close();
+      } catch (_e) {
+      }
+      done();
+    }, IDLE_HEAD_TIMEOUT_MS);
 
     const requestHandler = async (value: socket.SocketMessageInfo): Promise<void> => {
       if (settled) {
@@ -309,6 +335,8 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
           }
           return;
         }
+        // Request head complete: the idle guard has done its job.
+        clearIdleTimer();
         const headText = new util.TextDecoder().decode(raw.subarray(0, headerEnd).slice());
         const headLines = headText.split(CRLF);
         const requestLine = headLines[0] || '';
@@ -412,9 +440,22 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
  * on every successful listen and is NOT cleared when the server errors into the
  * self-heal window — consumers keep routing at the (temporarily dead) loopback
  * port so their connects fail fast instead of silently going direct, per the
- * "a failing proxy must fail" rule. Only a real stop (`stop()` — user disabled
- * the proxy, config changed, or the initial listen failed) clears it back to 0.
+ * "a failing proxy must fail" rule. When self-heal ultimately fails the bridge
+ * blows its fuse (`blowFuse`): the port is STILL kept (fail-fast at the dead
+ * port) and the failure listener fires so entry can surface "proxy unavailable".
+ * Only a real stop (`stop()` — user disabled the proxy, config changed, or the
+ * initial listen failed) clears the port back to 0 and resets the fuse.
  */
+
+/** 熔断通知（单槽；entry 注册后可在代理彻底不可用时提示/触发重新应用）。 */
+export type Socks5BridgeFailureListener = (reason: string) => void;
+
+/**
+ * 端口变化通知（单槽）。自愈重监听使用 port:0（每次新临时端口），成功后新端口
+ * 与旧端口不同时触发，entry 据此把 app 级代理 / ArkWeb override 重指到新端口。
+ */
+export type Socks5BridgePortChangeListener = (port: number) => void;
+
 export class Socks5Bridge {
   private server: socket.TCPSocketServer | null = null;
   private config: Socks5Config | null = null;
@@ -423,6 +464,10 @@ export class Socks5Bridge {
   private running: boolean = false;
   private generation: number = 0;
   private selfHealAttempts: number = 0;
+  private healTimerId: number = -1;
+  private fuseBlown: boolean = false;
+  private failureListener?: Socks5BridgeFailureListener;
+  private portChangeListener?: Socks5BridgePortChangeListener;
   private static readonly MAX_SELF_HEAL_RESTARTS: number = 3;
 
   async start(host: string, port: number, username: string, password: string): Promise<boolean> {
@@ -448,11 +493,13 @@ export class Socks5Bridge {
 
   /**
    * Listen on a fresh TCPSocketServer and wire handlers. On failure closes the
-   * half-open server and stops the bridge (which bumps the generation, ending
-   * any self-heal chain in flight).
+   * half-open server. An initial-listen failure stops the bridge (clearing the
+   * port); a self-heal re-listen failure blows the fuse instead — the port is
+   * kept so consumers keep failing fast at the dead loopback port.
    */
-  private async listenOnce(cfg: Socks5Config, gen: number): Promise<boolean> {
+  private async listenOnce(cfg: Socks5Config, gen: number, isSelfHeal: boolean = false): Promise<boolean> {
     const server = socket.constructTCPSocketServerInstance();
+    const prevPort = this.lastKnownGoodPort;
     try {
       await server.listen({ address: '127.0.0.1', port: 0, family: 1 });
       if (gen !== this.generation) {
@@ -484,6 +531,20 @@ export class Socks5Bridge {
       server.on('error', (e: Error) => {
         this.handleServerError(server, cfg, gen, e);
       });
+      if (isSelfHeal && this.localPort > 0 && this.localPort !== prevPort) {
+        // 自愈重监听落在新的临时端口：通知 entry 把 app 级代理 / WebView
+        // override 从死掉的旧端口重指到新端口（HttpDownloader / RangeProxy 走
+        // 惰性 provider 快照，自行跟随 getPort()，无需通知）。
+        logger.info(TAG + ` self-heal re-listen moved port ${prevPort} -> ${this.localPort}`);
+        const listener = this.portChangeListener;
+        if (listener) {
+          try {
+            listener(this.localPort);
+          } catch (_e) {
+            logger.error(TAG + ' port change listener threw');
+          }
+        }
+      }
       return true;
     } catch (e) {
       logger.error(TAG + ` listen failed: ${describeErr(e)}`);
@@ -491,7 +552,11 @@ export class Socks5Bridge {
         server.close();
       } catch (_e) {
       }
-      this.stop();
+      if (isSelfHeal) {
+        this.blowFuse(`self-heal re-listen failed: ${describeErr(e)}`);
+      } else {
+        this.stop();
+      }
       return false;
     }
   }
@@ -519,19 +584,21 @@ export class Socks5Bridge {
     this.localPort = 0;
     this.running = false;
     if (this.selfHealAttempts >= Socks5Bridge.MAX_SELF_HEAL_RESTARTS) {
-      logger.error(TAG + ' self-heal budget exhausted, bridge stays down');
+      this.blowFuse('self-heal restart budget exhausted');
       return;
     }
     this.selfHealAttempts++;
     const delayMs = 1000 * (1 << (this.selfHealAttempts - 1)); // 1s, 2s, 4s
     logger.warn(TAG + ` scheduling self-heal restart attempt=${this.selfHealAttempts} delay=${delayMs}ms`);
-    setTimeout(() => {
+    this.healTimerId = setTimeout(() => {
+      this.healTimerId = -1;
       if (gen !== this.generation) {
         return; // stop() or a newer start() superseded this restart.
       }
-      this.listenOnce(cfg, gen).then((ok: boolean) => {
+      this.listenOnce(cfg, gen, true).then((ok: boolean) => {
         if (ok) {
           this.selfHealAttempts = 0;
+          this.fuseBlown = false;
           logger.info(TAG + ' self-heal restart succeeded');
         } else {
           logger.error(TAG + ' self-heal restart failed to listen');
@@ -542,8 +609,46 @@ export class Socks5Bridge {
     }, delayMs);
   }
 
+  /**
+   * 熔断：自愈彻底失败后的终态。保留 lastKnownGoodPort（消费者继续在死端口上
+   * fail-fast，绝不静默直连），关闭 server、取消未决自愈定时器、ERROR 日志并
+   * 触发失败监听。之后的 start()（新配置）或 stop()（用户关闭代理）清除熔断。
+   */
+  private blowFuse(reason: string): void {
+    this.generation++; // 使未决的自愈回调/陈旧 server 失效
+    if (this.healTimerId >= 0) {
+      clearTimeout(this.healTimerId);
+      this.healTimerId = -1;
+    }
+    if (this.server) {
+      try {
+        this.server.close();
+      } catch (_e) {
+      }
+      this.server = null;
+    }
+    this.config = null;
+    this.localPort = 0;
+    this.running = false;
+    this.fuseBlown = true;
+    // lastKnownGoodPort 故意保留 —— 见 getPort() 的 fail-fast 语义。
+    logger.error(TAG + ` fuse blown, bridge stays down at dead port=${this.lastKnownGoodPort}: ${reason}`);
+    const listener = this.failureListener;
+    if (listener) {
+      try {
+        listener(reason);
+      } catch (_e) {
+        logger.error(TAG + ' failure listener threw');
+      }
+    }
+  }
+
   stop(): void {
     this.generation++;
+    if (this.healTimerId >= 0) {
+      clearTimeout(this.healTimerId);
+      this.healTimerId = -1;
+    }
     if (this.server) {
       try {
         this.server.close();
@@ -555,10 +660,26 @@ export class Socks5Bridge {
     this.localPort = 0;
     this.lastKnownGoodPort = 0;
     this.running = false;
+    this.fuseBlown = false;
   }
 
   isRunning(): boolean {
     return this.running;
+  }
+
+  /** 熔断状态：自愈彻底失败后为 true，直到显式 start()/stop()。 */
+  isFuseBlown(): boolean {
+    return this.fuseBlown;
+  }
+
+  /** 注册/清除熔断通知（单槽，后注册覆盖先注册；同 HttpDownloader.setSetCookieObserver 风格）。 */
+  setFailureListener(listener?: Socks5BridgeFailureListener): void {
+    this.failureListener = listener;
+  }
+
+  /** 注册/清除端口变化通知（单槽；自愈重监听到新端口时触发）。 */
+  setPortChangeListener(listener?: Socks5BridgePortChangeListener): void {
+    this.portChangeListener = listener;
   }
 
   /**

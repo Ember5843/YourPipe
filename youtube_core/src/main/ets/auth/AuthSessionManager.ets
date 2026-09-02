@@ -5,6 +5,7 @@ import { SmartTubeAuthProbe } from './SmartTubeAuthProbe';
 import { CookieAuthCredential } from './CookieAuthCredential';
 import { SapisidHashUtil } from './SapisidHashUtil';
 import { HttpDownloader } from '../network/HttpDownloader';
+import { splitSetCookieHeader } from '../network/CookieJar';
 
 const logger = YTCoreLogger.getInstance('AuthSessionManager');
 
@@ -150,7 +151,15 @@ export class AuthSessionManager {
     if (!AuthSessionManager.isYoutubeHost(requestUrl)) {
       return;
     }
-    const lines: string[] = Array.isArray(setCookie) ? setCookie : [setCookie];
+    const rawLines: string[] = Array.isArray(setCookie) ? setCookie : [setCookie];
+    // netstack 可能把多个 Set-Cookie 逗号拼接成一个字符串，先按 RFC 6265 风格切分
+    const lines: string[] = [];
+    for (const raw of rawLines) {
+      const split = splitSetCookieHeader(raw);
+      for (const line of split) {
+        lines.push(line);
+      }
+    }
     const appliedNames: string[] = [];
     let touched = false;
     let cleared = false;
@@ -165,7 +174,7 @@ export class AuthSessionManager {
       const name = pair.substring(0, eq).trim();
       const value = pair.substring(eq + 1).trim();
       const isDelete = value.length === 0
-        || attrs.indexOf('Max-Age=0') >= 0
+        || attrs.toLowerCase().indexOf('max-age=0') >= 0
         || AuthSessionManager.hasPastExpiresAttr(attrs);
       if (isDelete) {
         if (AuthSessionManager.AUTH_CLEAR_COOKIE_NAMES.indexOf(name) >= 0) {
@@ -198,8 +207,8 @@ export class AuthSessionManager {
     }
   }
 
-  /** requestUrl 的 host 必须是 youtube.com 或其子域（小写比较）。 */
-  private static isYoutubeHost(requestUrl: string): boolean {
+  /** requestUrl 的 host 必须是 youtube.com 或其子域（小写比较）。公开给 YouTubeHttpClient 做鉴权头注入判定。 */
+  static isYoutubeHost(requestUrl: string): boolean {
     if (!requestUrl) {
       return false;
     }

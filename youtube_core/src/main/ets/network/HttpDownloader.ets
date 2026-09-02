@@ -9,6 +9,97 @@ const logger = YTCoreLogger.getInstance('HttpDownloader');
 /** 响应 Set-Cookie 观察者（AuthSessionManager 用于跟踪账号 cookie 被服务端清除/轮换）。 */
 export type SetCookieObserver = (setCookie: string | string[], url: string) => void;
 
+/** 提取 URL 的 host（小写，去 scheme/端口/路径）；解析失败返回空串。 */
+function extractHost(requestUrl: string): string {
+  if (!requestUrl) {
+    return '';
+  }
+  let rest = requestUrl.toLowerCase();
+  const schemeIdx = rest.indexOf('://');
+  if (schemeIdx >= 0) {
+    rest = rest.substring(schemeIdx + 3);
+  }
+  let end = rest.length;
+  const slashIdx = rest.indexOf('/');
+  if (slashIdx >= 0 && slashIdx < end) {
+    end = slashIdx;
+  }
+  const portIdx = rest.indexOf(':');
+  if (portIdx >= 0 && portIdx < end) {
+    end = portIdx;
+  }
+  return rest.substring(0, end);
+}
+
+/**
+ * host 必须是 youtube.com 或其子域。
+ * 复制自 AuthSessionManager.isYoutubeHost：auth 层已依赖本文件（Set-Cookie 观察者注册），
+ * 反向 import 会成环，故在 network 内保留一份最小判定。
+ */
+function isYoutubeHostUrl(requestUrl: string): boolean {
+  const host = extractHost(requestUrl);
+  return host === 'youtube.com' || host.endsWith('.youtube.com');
+}
+
+/** 重定向到非 YouTube 主机时需剥掉的鉴权头（小写比较）。 */
+const REDIRECT_STRIP_HEADERS: string[] = ['cookie', 'authorization'];
+
+/**
+ * REDIRECTION 拦截器（API 22+）：netstack 自动跟随 3xx 前触发，reqContext 是即将发出的
+ * 新请求。若重定向目标不是 YouTube 主机，剥掉 Cookie / Authorization（含 SAPISIDHASH，
+ * 走 Authorization 头），防止注入的登录头泄漏到跨域目标。日志只记 host，不记 URL。
+ */
+class RedirectAuthStripInterceptor implements http.HttpInterceptor {
+  interceptorType: http.InterceptorType = http.InterceptorType.REDIRECTION;
+
+  interceptorHandle(reqContext: http.HttpRequestContext, _rspContext: http.HttpResponse): Promise<http.ChainContinue> {
+    const targetUrl = reqContext.url;
+    if (isYoutubeHostUrl(targetUrl)) {
+      return Promise.resolve(true);
+    }
+    const header = reqContext.header as Record<string, Object>;
+    if (!header) {
+      return Promise.resolve(true);
+    }
+    // ArkTS 不支持 delete：重建一个不含鉴权头的 header 对象再赋回 reqContext。
+    const stripped: string[] = [];
+    const kept: Record<string, Object> = {};
+    Object.keys(header).forEach((key: string) => {
+      if (REDIRECT_STRIP_HEADERS.indexOf(key.toLowerCase()) >= 0) {
+        stripped.push(key);
+      } else {
+        kept[key] = header[key];
+      }
+    });
+    if (stripped.length > 0) {
+      reqContext.header = kept;
+      logger.warn(`Redirect to non-YouTube host=${extractHost(targetUrl) || '(invalid-url)'} stripped=[${stripped.join(',')}]`);
+    }
+    return Promise.resolve(true);
+  }
+}
+
+/** FINAL_RESPONSE 拦截器用的响应回调签名。 */
+type FinalResponseHook = (response: http.HttpResponse) => void;
+
+/**
+ * FINAL_RESPONSE 拦截器（API 22+）：拿到最终响应（任意状态码）后触发，
+ * 用于替代 request() 里手动的 Set-Cookie 观察者通知。
+ */
+class FinalResponseHookInterceptor implements http.HttpInterceptor {
+  interceptorType: http.InterceptorType = http.InterceptorType.FINAL_RESPONSE;
+  private readonly hook: FinalResponseHook;
+
+  constructor(hook: FinalResponseHook) {
+    this.hook = hook;
+  }
+
+  interceptorHandle(_reqContext: http.HttpRequestContext, rspContext: http.HttpResponse): Promise<http.ChainContinue> {
+    this.hook(rspContext);
+    return Promise.resolve(true);
+  }
+}
+
 // 错误分析结果接口
 export interface ErrorAnalysisResult {
   errorType: HttpErrorType;
@@ -142,6 +233,24 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * Cooperative abort handle for a streamed binary POST. The in-flight
+ * http.HttpRequest registers itself so the holder can destroy() it mid-flight;
+ * the request callbacks then error out through the normal catch paths.
+ */
+export class HttpAbortToken {
+  public aborted: boolean = false;
+  public request?: http.HttpRequest;
+
+  abort(): void {
+    this.aborted = true;
+    try {
+      this.request?.destroy();
+    } catch (_e) {
+    }
+  }
+}
+
 // HTTP 错误类型枚举
 export enum HttpErrorType {
   // 网络层错误
@@ -250,23 +359,24 @@ export class HttpDownloader {
       options.usingProxy = proxy;
       return;
     }
-    // SOCKS5: route through the loopback HTTP CONNECT bridge. The bridge owns
-    // the native SOCKS5 tunnel (host/port/auth), so the http stack only sees
-    // 127.0.0.1. During the bridge's self-heal re-listen window its snapshot
-    // keeps reporting the last-known-good port, so connects fail fast on the
-    // dead port instead of silently going direct; port 0 (never started or
-    // explicitly stopped) is the only case that stays direct.
+    // SOCKS5 (API 26): use the netstack-native SOCKS5 client with the real
+    // upstream proxy. PROXY_MODE lets the proxy resolve DNS (no local DNS
+    // leak); exclusionList mirrors the loopback bypass rules. The loopback
+    // HTTP CONNECT bridge (Socks5Bridge) is no longer used by netstack
+    // requests — it still serves ArkWeb ProxyController / RCP createTunnel /
+    // MPV env, so entry keeps it running independently.
     if (snap.kind === 'socks5') {
-      const localPort = snap.socks5LocalPort;
-      if (localPort && localPort > 0) {
-        options.usingProxy = {
-          host: '127.0.0.1',
-          port: localPort,
-          exclusionList: []
-        };
-      } else {
-        options.usingProxy = false;
+      const socks5: connection.Socks5Proxy = {
+        host: snap.host.trim(),
+        port: snap.port,
+        dnsStrategy: connection.Socks5DnsStrategy.PROXY_MODE,
+        exclusionList: HttpProxyOptions.defaultExclusions()
+      };
+      if (snap.username && snap.username.length > 0) {
+        socks5.username = snap.username;
+        socks5.password = snap.password || '';
       }
+      options.usingSocks5Proxy = socks5;
       return;
     }
     options.usingProxy = false;
@@ -293,12 +403,13 @@ export class HttpDownloader {
   ): Promise<http.HttpResponse> {
     let lastError: HttpError | null = null;
     let attempt = 0;
+    const maxAttempts = enableRetry ? HttpDownloader.MAX_RETRIES : 1;
 
-    while (attempt < (enableRetry ? HttpDownloader.MAX_RETRIES : 1)) {
+    while (attempt < maxAttempts) {
       attempt++;
       let httpRequest: http.HttpRequest | null = null;
       try {
-        logger.debug(`${method} ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES})`);
+        logger.debug(`${method} ${url} (attempt ${attempt}/${maxAttempts})`);
 
         // 1. 处理请求头（合并默认头和传入头，添加本地化相关头）
         const requestHeaders = this.processHeaders(headers, localization)
@@ -310,6 +421,27 @@ export class HttpDownloader {
         const request = http.createHttp()
         httpRequest = request
 
+        // 2.1 附加拦截器链（API 22+；链随 HttpRequest 实例走，每次 attempt 新建并重新 apply，
+        // apply 必须在 request() 之前）。REDIRECTION 防鉴权头随跨域重定向泄漏；
+        // FINAL_RESPONSE 统一触发 Set-Cookie 观察者（覆盖所有状态码）。
+        // 挂载失败时降级为手动通知，保证观察者契约不丢。
+        let interceptorsApplied = false;
+        try {
+          const chain = new http.HttpInterceptorChain();
+          chain.addChain([
+            new RedirectAuthStripInterceptor(),
+            new FinalResponseHookInterceptor((resp: http.HttpResponse) => {
+              HttpDownloader.notifySetCookie(resp, url);
+            })
+          ]);
+          interceptorsApplied = chain.apply(request);
+          if (!interceptorsApplied) {
+            logger.error('interceptor chain apply returned false; falling back to manual Set-Cookie notify');
+          }
+        } catch (e) {
+          logger.error('interceptor chain setup failed; falling back to manual Set-Cookie notify');
+        }
+
         // 3. 转换请求参数为 HTTP 模块所需格式
         const httpOptions: http.HttpRequestOptions = {
           'method': method as http.RequestMethod,
@@ -318,7 +450,10 @@ export class HttpDownloader {
           // 超时按调用方分级：播放/提取默认 30s，UI 浏览类传更短
           'connectTimeout': timeoutMs,
           'readTimeout': timeoutMs,
-          'usingCache': false
+          'usingCache': false,
+          // API 26 连接池复用：减少重复请求的 TCP/TLS 握手开销
+          'reuseConnections': true,
+          'inactivityMs': 30000
         }
         HttpDownloader.applyProxyToOptions(httpOptions, url);
 
@@ -339,7 +474,9 @@ export class HttpDownloader {
           )
         });
 
-        HttpDownloader.notifySetCookie(response, url);
+        if (!interceptorsApplied) {
+          HttpDownloader.notifySetCookie(response, url);
+        }
 
         // 5. 检查响应码
         if (response.responseCode && response.responseCode >= 400) {
@@ -376,7 +513,7 @@ export class HttpDownloader {
           logger.error(`HTTP error: ${httpError.getFriendlyMessage()}`);
 
           // 如果是可恢复的错误且还有重试机会，则重试
-          if (httpError.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
+          if (httpError.isRecoverable && attempt < maxAttempts) {
             logger.debug(`Retrying in ${HttpDownloader.RETRY_DELAY}ms...`);
             await this.sleep(HttpDownloader.RETRY_DELAY * attempt); // 递增延迟
             continue;
@@ -409,7 +546,7 @@ export class HttpDownloader {
         lastError = httpError;
 
         // 如果是可恢复的错误且还有重试机会
-        if (httpError.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
+        if (httpError.isRecoverable && attempt < maxAttempts) {
           logger.debug(`Retrying network error in ${HttpDownloader.RETRY_DELAY}ms...`);
           await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
           continue;
@@ -511,16 +648,20 @@ export class HttpDownloader {
     headers?: Record<string, string[] | string>,
     localization?: Localization,
     enableRetry: boolean = true,
-    onData?: (bytes: number) => void
+    onData?: (bytes: number) => void,
+    abortToken?: HttpAbortToken
   ): Promise<http.HttpResponse> {
     let lastError: HttpError | null = null;
     let attempt = 0;
     // SABR web-like posts must not inject default application/json Content-Type.
     while (attempt < (enableRetry ? HttpDownloader.MAX_RETRIES : 1)) {
       attempt++;
+      if (abortToken?.aborted) {
+        throw new HttpError('request aborted', url, 'POST');
+      }
       try {
         logger.debug(`POST-BIN-STREAM ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
-        const response = await this.postBinaryStreamOnce(url, data, headers, localization, onData);
+        const response = await this.postBinaryStreamOnce(url, data, headers, localization, onData, abortToken);
         if (response.responseCode && response.responseCode >= 400) {
           let errBody = '';
           try {
@@ -550,6 +691,9 @@ export class HttpDownloader {
             throw httpError;
           }
           if (httpError.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
+            if (abortToken?.aborted) {
+              throw new HttpError('request aborted', url, 'POST');
+            }
             await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
             continue;
           }
@@ -563,6 +707,9 @@ export class HttpDownloader {
             throw err;
           }
           if (err.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
+            if (abortToken?.aborted) {
+              throw new HttpError('request aborted', url, 'POST');
+            }
             await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
             continue;
           }
@@ -571,6 +718,9 @@ export class HttpDownloader {
         const businessError = err as BusinessError;
         lastError = new HttpError(businessError.message || 'Network error', url, 'POST');
         if (lastError.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
+          if (abortToken?.aborted) {
+            throw new HttpError('request aborted', url, 'POST');
+          }
           await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
           continue;
         }
@@ -589,7 +739,8 @@ export class HttpDownloader {
     data: Uint8Array,
     headers?: Record<string, string[] | string>,
     localization?: Localization,
-    onData?: (bytes: number) => void
+    onData?: (bytes: number) => void,
+    abortToken?: HttpAbortToken
   ): Promise<http.HttpResponse> {
     const requestHeaders = this.processBinaryHeaders(headers, localization);
     const httpRequest = http.createHttp();
@@ -602,7 +753,10 @@ export class HttpDownloader {
       connectTimeout: 30000,
       // Large SABR UMP payloads (init + many media segs) need a long read window.
       readTimeout: 180000,
-      usingCache: false
+      usingCache: false,
+      // API 26 连接池复用：SABR 反复 POST 同一 UMP 端点，流式结束后连接可入池复用
+      reuseConnections: true,
+      inactivityMs: 30000
     };
     HttpDownloader.applyProxyToOptions(httpOptions, url);
 
@@ -614,8 +768,24 @@ export class HttpDownloader {
       let requestReturned = false;
       let streamEnded = false;
       let settled = false;
+      // Overall watchdog: an empty-body response may never fire dataEnd, which
+      // would leave this Promise (and the SABR pump lock) unsettled forever.
+      // Budget = readTimeout + 5s grace.
+      const watchdogMs = 180000 + 5000;
+      let watchdogTimer: number = -1;
+
+      const clearWatchdog = (): void => {
+        if (watchdogTimer >= 0) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = -1;
+        }
+      };
 
       const cleanup = (): void => {
+        clearWatchdog();
+        if (abortToken && abortToken.request === httpRequest) {
+          abortToken.request = undefined;
+        }
         try {
           httpRequest.off('headersReceive');
           httpRequest.off('dataReceive');
@@ -650,6 +820,8 @@ export class HttpDownloader {
           cookies: '',
           resultType: http.HttpDataType.ARRAY_BUFFER
         } as http.HttpResponse;
+        // requestInStream 不支持拦截器链（SDK 明确仅 request() 支持），
+        // 这里的 Set-Cookie 观察者通知保持手动触发。
         HttpDownloader.notifySetCookie(resp, url);
         resolve(resp);
       };
@@ -686,6 +858,20 @@ export class HttpDownloader {
         streamEnded = true;
         finishOk();
       });
+
+      if (abortToken) {
+        abortToken.request = httpRequest;
+        if (abortToken.aborted) {
+          finishErr(new HttpError('request aborted', url, 'POST'));
+          return;
+        }
+      }
+
+      watchdogTimer = setTimeout(() => {
+        watchdogTimer = -1;
+        logger.warn(`POST-BIN-STREAM stalled: no dataEnd within ${watchdogMs}ms, aborting request`);
+        finishErr(new HttpError('stream stalled: no dataEnd', url, 'POST'));
+      }, watchdogMs);
 
       httpRequest.requestInStream(url, httpOptions).then((code: number) => {
         responseCode = code || 0;

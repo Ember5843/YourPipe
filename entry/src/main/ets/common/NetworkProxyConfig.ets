@@ -163,6 +163,12 @@ export class NetworkProxyConfig {
   /** Promise of the latest applySystemAndProviders run (never rejects). */
   private static applyPromise: Promise<void> = Promise.resolve();
 
+  /** Latest config that finished applyInternal — used by the bridge port-change listener. */
+  private static lastAppliedCfg?: NetworkProxyConfig;
+
+  /** Guard against double registration of the single-slot bridge listeners. */
+  private static bridgeListenersRegistered: boolean = false;
+
   /**
    * Resolves when the latest applySystemAndProviders has fully settled —
    * for socks5 that includes the loopback bridge listen. Startup network work
@@ -190,9 +196,72 @@ export class NetworkProxyConfig {
    * directly for kind==='http'.
    */
   static applySystemAndProviders(cfg: NetworkProxyConfig): Promise<void> {
-    const p: Promise<void> = NetworkProxyConfig.applyInternal(cfg);
+    NetworkProxyConfig.ensureBridgeListeners();
+    // Serialize applies (promise-chain mutex): each new apply chains onto the
+    // previous tail, so two applies can never interleave (e.g. a socks5 apply
+    // awaiting bridge start racing a user switch to http). The last requested
+    // config always lands last. awaitReady() returns the tail as of call time,
+    // so waiters resolve once the latest requested apply settles — they are not
+    // stuck behind applies requested after their awaitReady() call.
+    const tail: Promise<void> = NetworkProxyConfig.applyPromise;
+    const p: Promise<void> = tail
+      .catch((e: Error) => logger.warn(`previous proxy apply failed: ${e.message}`))
+      .then(() => NetworkProxyConfig.applyInternal(cfg));
     NetworkProxyConfig.applyPromise = p;
     return p;
+  }
+
+  /**
+   * Register the single-slot socks5Bridge listeners exactly once. Port change:
+   * a self-heal re-listen lands on a NEW ephemeral port, so the app-level proxy
+   * and the ArkWeb override (pointed at the old port by applyInternal) must be
+   * re-pointed — only those two pieces, never a full re-apply (that would
+   * restart the bridge). Fuse blown: log an ERROR and surface a toast; no
+   * auto-restart — a user re-save re-applies the config and resets the fuse.
+   */
+  private static ensureBridgeListeners(): void {
+    if (NetworkProxyConfig.bridgeListenersRegistered) {
+      return;
+    }
+    NetworkProxyConfig.bridgeListenersRegistered = true;
+    socks5Bridge.setPortChangeListener((port: number) => NetworkProxyConfig.onBridgePortChanged(port));
+    socks5Bridge.setFailureListener((reason: string) => NetworkProxyConfig.onBridgeFuseBlown(reason));
+  }
+
+  private static onBridgePortChanged(port: number): void {
+    const cfg = NetworkProxyConfig.lastAppliedCfg;
+    if (!cfg || !cfg.isReady() || cfg.kind !== 'socks5' || !socks5Bridge.isRunning()) {
+      logger.warn(`socks5 bridge port change to ${port} ignored (socks5 no longer the active config)`);
+      return;
+    }
+    logger.info(`socks5 bridge re-listened on new port=${port}, re-pointing app/webview proxy`);
+    // HttpProxyOptions needs no update: the installed provider reads
+    // socks5Bridge.getPort() lazily per snapshot, so downloaders/RangeProxy
+    // follow the new port on their own.
+    NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
+    NetworkProxyConfig.setAppProxy({
+      host: '127.0.0.1',
+      port: port,
+      exclusionList: HttpProxyOptions.defaultExclusions()
+    } as connection.HttpProxy, `app http proxy re-applied on socks5 bridge port=${port}`);
+  }
+
+  private static onBridgeFuseBlown(reason: string): void {
+    logger.error(`socks5 bridge fuse blown, proxy unavailable until settings are re-applied: ${reason}`);
+    NetworkProxyConfig.showToast($r('app.string.yt_proxy_bridge_unavailable'));
+  }
+
+  private static showToast(message: ResourceStr): void {
+    try {
+      const uiContext = AppStorage.get<UIContext>('uiContext');
+      if (!uiContext) {
+        logger.warn('proxy notice toast skipped, missing uiContext');
+        return;
+      }
+      uiContext.getPromptAction().showToast({ message, duration: 3000 });
+    } catch (e) {
+      logger.warn(`proxy notice toast failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   private static async applyInternal(cfg: NetworkProxyConfig): Promise<void> {
@@ -238,5 +307,6 @@ export class NetworkProxyConfig {
     }
 
     HttpProxyOptions.setProvider((): AppHttpProxySnapshot => cfg.toSnapshot());
+    NetworkProxyConfig.lastAppliedCfg = cfg;
   }
 }

@@ -3077,6 +3077,10 @@
             "value": "本地播放环回地址（127.0.0.1）不会走此代理。"
         },
         {
+            "name": "yt_proxy_bridge_unavailable",
+            "value": "SOCKS5 代理桥已断开，请重新保存代理设置以恢复连接。"
+        },
+        {
             "name": "yt_device_qr_sign_in",
             "value": "二维码 / 电视码登录"
         },

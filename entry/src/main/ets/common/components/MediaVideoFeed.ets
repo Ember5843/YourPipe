@@ -2,6 +2,8 @@ import { UIConfig } from '../AppState';
 import { customAnimationUtil } from '../AnimationUtil';
 import { resolveResourceStr } from '../utils/ResourceStrUtil';
 import { FeedDataSource, FeedItemKeyOf } from '../model/FeedDataSource';
+import { BasicPrefetcher, IPrefetcher } from '@kit.ArkUI';
+import { defaultFeedThumbUrl, FeedThumbUrlOf } from '../model/ThumbPrefetcher';
 
 /** 卡片 builder 的单参数（§3 对象字面量范式：by-reference 刷新） */
 export interface MediaFeedItemSlot {
@@ -75,6 +77,8 @@ export struct MediaVideoFeed {
   onReachEnd?: () => void = undefined;
   /** 仅单列 List 分支（PlaylistDetailPage 提前预加载） */
   onScrollIndex?: (first: number, last: number) => void = undefined;
+  /** 缩略图预取 URL 提取器（缺省 defaultFeedThumbUrl，覆盖 MediaVideoFeed 全部现有 item 形态） */
+  itemThumbUrl?: FeedThumbUrlOf = undefined;
   /** Tabs / 外层 Scroll 嵌套场景：scrollForward=PARENT_FIRST, scrollBackward=SELF_FIRST */
   nestedScrollParentFirst: boolean = false;
 
@@ -108,6 +112,8 @@ export struct MediaVideoFeed {
   /** 数据源 0↔N 跨界计数：驱动骨架分支重评估（追加由 LazyForEach 自身增量处理） */
   @State private dataVersion: number = 0;
   private lastFeedEmpty: boolean = true;
+  /** 滑动预取器：aboutToAppear 绑定 dataSource，onScrollIndex 上报可见区 */
+  private prefetcher: IPrefetcher | null = null;
   private feedListener: DataChangeListener = {
     onDataReloaded: () => {
       this.onFeedDataChanged();
@@ -143,10 +149,13 @@ export struct MediaVideoFeed {
 
   aboutToAppear(): void {
     this.dataSource.registerDataChangeListener(this.feedListener);
+    this.dataSource.thumbUrlOf = this.itemThumbUrl ?? defaultFeedThumbUrl;
+    this.prefetcher = new BasicPrefetcher(this.dataSource);
   }
 
   aboutToDisappear(): void {
     this.dataSource.unregisterDataChangeListener(this.feedListener);
+    this.prefetcher = null;
   }
 
   private onFeedDataChanged(): void {
@@ -184,6 +193,27 @@ export struct MediaVideoFeed {
     if (this.onReachEnd) {
       this.onReachEnd();
     }
+  }
+
+  /**
+   * onScrollIndex 上报的是容器项索引：hasHeader 时 header 占第 0 项，
+   * LazyForEach 数据项整体偏移 1；换算回数据源索引并钳位后交给 Prefetcher。
+   */
+  private handleVisibleAreaChanged(first: number, last: number): void {
+    if (!this.prefetcher) {
+      return;
+    }
+    const count: number = this.dataSource.totalCount();
+    if (count <= 0) {
+      return;
+    }
+    const offset: number = this.params.hasHeader ? 1 : 0;
+    const min: number = Math.max(0, Math.min(first - offset, count - 1));
+    const max: number = Math.max(0, Math.min(last - offset, count - 1));
+    if (min > max) {
+      return;
+    }
+    this.prefetcher.visibleAreaChanged(min, max);
   }
 
   @Builder
@@ -343,6 +373,9 @@ export struct MediaVideoFeed {
     .edgeEffect(EdgeEffect.Spring)
     .scrollBar((this.params.scrollBarOff ?? true) ? BarState.Off : BarState.Auto)
     .nestedScroll(this.feedNestedScroll())
+    .onScrollIndex((first: number, last: number) => {
+      this.handleVisibleAreaChanged(first, last);
+    })
     .onReachEnd(() => {
       this.handleReachEnd();
     })
@@ -377,6 +410,7 @@ export struct MediaVideoFeed {
     .scrollBar((this.params.scrollBarOff ?? true) ? BarState.Off : BarState.Auto)
     .nestedScroll(this.feedNestedScroll())
     .onScrollIndex((first: number, last: number) => {
+      this.handleVisibleAreaChanged(first, last);
       if (this.onScrollIndex) {
         this.onScrollIndex(first, last);
       }

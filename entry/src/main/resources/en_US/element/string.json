@@ -3077,6 +3077,10 @@
             "value": "Local playback proxy (127.0.0.1) never uses this setting."
         },
         {
+            "name": "yt_proxy_bridge_unavailable",
+            "value": "SOCKS5 proxy bridge disconnected — re-save proxy settings to reconnect."
+        },
+        {
             "name": "yt_device_qr_sign_in",
             "value": "QR / TV code sign-in"
         },

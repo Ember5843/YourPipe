@@ -67,14 +67,23 @@ class SabrSessionStoreImpl {
     return `${videoId}|p${profile}|a${audioItag}|t${audioTrackId || '-'}|v${videoItag}`;
   }
 
+  /**
+   * @param keySuffix Isolation suffix appended to the lease key. Offline
+   *   downloads pass '|dl' so a download never shares a session (playhead,
+   *   segment cache, forward-jump resets) with concurrent playback on the
+   *   same video/formats. release/abort key off lease.key, so they stay
+   *   balanced for suffixed keys without further changes.
+   */
   acquire(
     info: YoutubeSabrInfo,
     audioFormat: YoutubeSabrFormatMeta,
     videoFormat: YoutubeSabrFormatMeta,
-    useAuth: boolean = false
+    useAuth: boolean = false,
+    keySuffix: string = ''
   ): SabrLease {
     const key = this.makeKey(
-      info.videoId, info.profile, audioFormat.itag, audioFormat.audioTrackId, videoFormat.itag);
+      info.videoId, info.profile, audioFormat.itag, audioFormat.audioTrackId, videoFormat.itag)
+      + keySuffix;
     const existing = this.leases.get(key);
     if (existing) {
       existing.refCount++;
@@ -113,8 +122,47 @@ class SabrSessionStoreImpl {
     }
   }
 
+  /**
+   * Abort-level teardown for a lease whose proxy session is being destroyed:
+   * session.close() aborts the in-flight UMP POST, rejects queued pump waiters
+   * and interrupts backoff sleeps. Only fires when this lease is the sole
+   * holder — a shared lease (e.g. two proxy sessions on the same key) keeps
+   * its session alive, and release() remains the sole refCount-driven closer
+   * (close() itself is idempotent, so abort → release never double-closes).
+   * Offline downloads never share a key with playback: they acquire with the
+   * '|dl' suffix, so their abort/release lifecycle is fully independent.
+   */
+  abort(key: string): void {
+    const lease = this.leases.get(key);
+    if (!lease) {
+      return;
+    }
+    if (lease.refCount <= 1) {
+      Logger.info(TAG, `abort key=${key}`);
+      lease.session.close();
+    }
+  }
+
   get(key: string): SabrLease | undefined {
     return this.leases.get(key);
+  }
+
+  /**
+   * Network-handover lever (wired by entry NetworkHandoverService): abort the
+   * in-flight UMP POST of every active session so a stale connection errors
+   * out immediately. Unlike abort(key), sessions stay open — each session's
+   * existing catch/retry paths re-POST on the new network. Returns the number
+   * of sessions whose POST was aborted.
+   */
+  abortAllInFlightPosts(reason: string): number {
+    let count = 0;
+    for (const lease of this.leases.values()) {
+      if (lease.session.abortInFlightPost(reason)) {
+        count++;
+      }
+    }
+    Logger.info(TAG, `abortAllInFlightPosts: reason=${reason} sessions=${this.leases.size} aborted=${count}`);
+    return count;
   }
 
   async ensureInit(lease: SabrLease, isAudio: boolean): Promise<SabrMediaSegment> {

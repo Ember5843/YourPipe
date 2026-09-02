@@ -55,6 +55,11 @@ export struct WebViewLoginPage {
     return false;
   }
 
+  // No controller.prefetchPage here: this controller only attaches as the page
+  // opens and the declared src starts loading immediately, so prefetch would
+  // have zero lead time (and the 500ms throttle would just drop it). The
+  // accounts.google.com / www.youtube.com socket pre-connect fired at startup
+  // by SabrPoTokenWebRuntime.preconnectUpcomingWebOrigins covers this page.
   private static readonly LOGIN_URL: string =
     'https://accounts.google.com/ServiceLogin?service=youtube&continue=https://www.youtube.com/';
   private static readonly MUSIC_VIDEO_URL: string =

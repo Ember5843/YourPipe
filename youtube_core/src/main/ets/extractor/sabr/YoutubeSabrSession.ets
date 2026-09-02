@@ -1,5 +1,7 @@
 import { YTCoreLogger } from '../../common/YTCoreLogger';
+import { http } from '@kit.NetworkKit';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
+import { HttpAbortToken } from '../../network/HttpDownloader';
 import { ClientsConstants } from '../../model/ClientsConstants';
 import { SabrDecodedResponse } from './SabrDecodedResponse';
 import { SabrMediaSegment, SabrSegmentRequest } from './SabrMediaSegment';
@@ -31,6 +33,17 @@ const logger = YTCoreLogger.getInstance('YoutubeSabrSession');
  */
 type SabrNetworkTrafficSink = (bytes: number) => void;
 let networkTrafficSink: SabrNetworkTrafficSink | undefined = undefined;
+
+/** Queued pump waiter — close() rejects them all so no one hangs on the lock. */
+class PumpWaiter {
+  readonly resolve: () => void;
+  readonly reject: (reason?: Object) => void;
+
+  constructor(resolve: () => void, reject: (reason?: Object) => void) {
+    this.resolve = resolve;
+    this.reject = reject;
+  }
+}
 
 export function setSabrNetworkTrafficSink(sink?: SabrNetworkTrafficSink): void {
   networkTrafficSink = sink;
@@ -67,7 +80,11 @@ export class YoutubeSabrSession {
   private useAuth: boolean = false;
   /** Serialize pumps — concurrent A/V ensureReady must not dual-fire rn=1. */
   private pumpBusy: boolean = false;
-  private pumpWaiters: Array<() => void> = [];
+  private pumpWaiters: PumpWaiter[] = [];
+  /** In-flight UMP POST abort handle — close() destroys it to unblock the pump. */
+  private activePostAbort?: HttpAbortToken;
+  /** Resolves the interruptible server-backoff sleep early on close(). */
+  private backoffWaker?: () => void;
   private consecutiveNoMedia: number = 0;
   private consecutiveIntegrityFailures: number = 0;
   /** ROTATE_IDENTITY attempts (session-scoped, survives an epoch reset). */
@@ -133,10 +150,41 @@ export class YoutubeSabrSession {
   }
 
   close(): void {
+    if (this.closed) {
+      return;
+    }
     this.closed = true;
     this.segmentCache.clear();
     this.cacheOrder = [];
     this.cachedBytes = 0;
+    // Unblock everything the pump may be waiting on: queued pump waiters, the
+    // server-backoff sleep, and the in-flight UMP POST (destroying its request
+    // makes the downloader throw through the normal error path).
+    const closeError = new SabrProtocolException('SABR session closed', 'closed');
+    for (const waiter of this.pumpWaiters) {
+      waiter.reject(closeError);
+    }
+    this.pumpWaiters = [];
+    this.backoffWaker?.();
+    this.activePostAbort?.abort();
+  }
+
+  /**
+   * Network-handover lever (wired by entry through mediaservice): abort the
+   * in-flight UMP POST so a stale connection (default network switched) errors
+   * out now instead of hanging until the read timeout. The session stays open
+   * and no policy/epoch state changes — the abort surfaces as a normal network
+   * error through the existing catch paths and the next pump re-POSTs on the
+   * new network (requestNumber only advances on a decoded response, so the
+   * aborted rn is simply re-sent). Returns true when a POST was aborted.
+   */
+  abortInFlightPost(reason: string): boolean {
+    if (this.closed || !this.activePostAbort) {
+      return false;
+    }
+    logger.info(`[SABR] abort in-flight POST rn=${this.epoch.requestNumber}: ${reason}`);
+    this.activePostAbort.abort();
+    return true;
   }
 
   getCachedSegment(request: SabrSegmentRequest): SabrMediaSegment | undefined {
@@ -341,9 +389,12 @@ export class YoutubeSabrSession {
    */
   async pumpOnce(): Promise<SabrDecodedResponse> {
     while (this.pumpBusy) {
-      await new Promise<void>((resolve: () => void) => {
-        this.pumpWaiters.push(resolve);
+      await new Promise<void>((resolve: () => void, reject: (reason?: Object) => void) => {
+        this.pumpWaiters.push(new PumpWaiter(resolve, reject));
       });
+      if (this.closed) {
+        throw new SabrProtocolException('SABR session closed', 'closed');
+      }
     }
     this.pumpBusy = true;
     try {
@@ -352,7 +403,7 @@ export class YoutubeSabrSession {
       this.pumpBusy = false;
       const next = this.pumpWaiters.shift();
       if (next) {
-        next();
+        next.resolve();
       }
     }
   }
@@ -369,7 +420,10 @@ export class YoutubeSabrSession {
     const waitMs = this.getBackoffRemainingMs();
     if (waitMs > 0) {
       logger.info(`[SABR] honor backoff ${waitMs}ms before rn=${this.epoch.requestNumber}`);
-      await sleepMs(Math.min(waitMs, MAX_BACKOFF_MS));
+      await this.sleepBackoffInterruptible(Math.min(waitMs, MAX_BACKOFF_MS));
+      if (this.closed) {
+        throw new SabrProtocolException('SABR session closed', 'closed');
+      }
     }
 
     // PipePipe fetchAndProcessResponse: a media-incomplete response is never
@@ -398,8 +452,17 @@ export class YoutubeSabrSession {
         + `a=${this.audioFormat.itag} v=${this.videoFormat.itag} `
         + `lmA=${this.audioFormat.lastModified || 0} lmV=${this.videoFormat.lastModified || 0}`);
 
-      const response = await this.httpClient.postBinary(url, body, headers, this.useAuth,
-        (bytes: number) => networkTrafficSink?.(bytes));
+      const abortToken = new HttpAbortToken();
+      this.activePostAbort = abortToken;
+      let response: http.HttpResponse;
+      try {
+        response = await this.httpClient.postBinary(url, body, headers, this.useAuth,
+          (bytes: number) => networkTrafficSink?.(bytes), abortToken);
+      } finally {
+        if (this.activePostAbort === abortToken) {
+          this.activePostAbort = undefined;
+        }
+      }
       const status = response.responseCode;
       const contentType = extractContentType(response.header);
       requireUmpContentType(contentType, status);
@@ -507,6 +570,24 @@ export class YoutubeSabrSession {
       + `reload=${decoded.reloadRequested} seek=${decoded.sabrSeekReason} `
       + `noMedia=${this.consecutiveNoMedia}`);
     return decoded;
+  }
+
+  /**
+   * Server-backoff sleep that close() cuts short via backoffWaker — a closed
+   * session must not keep the pump parked for up to MAX_BACKOFF_MS.
+   */
+  private sleepBackoffInterruptible(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        this.backoffWaker = undefined;
+        resolve();
+      }, ms);
+      this.backoffWaker = () => {
+        clearTimeout(timer);
+        this.backoffWaker = undefined;
+        resolve();
+      };
+    });
   }
 
   /**
@@ -891,10 +972,4 @@ function extractContentType(header: Object | undefined): string | undefined {
     }
   }
   return undefined;
-}
-
-function sleepMs(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => {
-    setTimeout(() => resolve(), ms);
-  });
 }

@@ -1,7 +1,8 @@
 import { socket } from '@kit.NetworkKit';
+import { SabrProtocolException } from 'youtube_core';
 import { DashSession, StreamResource } from '../proxy/SessionStore';
 import { encodeUtf8 } from '../proxy/ProxyEncoding';
-import { SabrTrackBuffer } from './SabrTrackBuffer';
+import { SabrReadTimeoutError, SabrTrackBuffer } from './SabrTrackBuffer';
 import Logger from '../utils/Logger';
 
 const TAG = '[SabrDashProxy]';
@@ -111,7 +112,42 @@ export async function serveSabrDashSegment(conn: socket.TCPSocketConnection,
     await conn.send({ data: encodeUtf8('HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
     return;
   }
-  const data = await buffer.readSegment(init, sequence);
+  let data: Uint8Array | undefined;
+  if (headOnly) {
+    // HEAD must not fetch the whole upstream segment just to discard the body:
+    // answer from cached segment metadata when it is already held locally.
+    const cachedLen = buffer.peekSegmentLength(init, sequence);
+    if (cachedLen >= 0) {
+      const headHeader = 'HTTP/1.1 200 OK\r\n'
+        + `Content-Type: ${mimeType || 'application/octet-stream'}\r\n`
+        + `Content-Length: ${cachedLen}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n`;
+      await conn.send({ data: encodeUtf8(headHeader) });
+      return;
+    }
+    Logger.debug(TAG, `HEAD without cached metadata itag=${buffer.getItag()} seq=${sequence} — upstream read fallback`);
+  }
+  try {
+    data = await buffer.readSegment(init, sequence);
+  } catch (e) {
+    if (e instanceof SabrReadTimeoutError) {
+      // Overall read budget exhausted (UMP server backoff outwaited us). Answer
+      // 504 so MPV fails this request fast and retries per its own reconnect
+      // policy instead of blocking on the loopback for minutes.
+      Logger.warn(TAG, `read timeout → 504 itag=${buffer.getItag()} seq=${sequence}`);
+      await conn.send({ data: encodeUtf8('HTTP/1.1 504 Gateway Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
+      return;
+    }
+    if (e instanceof SabrProtocolException && e.kind === 'closed') {
+      // Session destroyed mid-read (destroySession → lease abort) — quiet
+      // teardown, the connection close is the only answer MPV needs.
+      Logger.debug(TAG, `read aborted (session closed) itag=${buffer.getItag()} seq=${sequence}`);
+      return;
+    }
+    if (e instanceof Error) {
+      throw e;
+    }
+    throw new Error(String(e));
+  }
   if (!data) {
     Logger.info(TAG, `EOF itag=${buffer.getItag()} seq=${sequence} end=${buffer.getEndSegment()}`);
     await conn.send({ data: encodeUtf8('HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });

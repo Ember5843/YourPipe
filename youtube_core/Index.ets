@@ -63,7 +63,7 @@ export { YouTubeHttpClient } from './src/main/ets/network/YouTubeHttpClient';
 export { YOUTUBE_COOKIE_STORAGE_NAME } from './src/main/ets/network/CookieJar';
 export { HttpDownloader } from './src/main/ets/network/HttpDownloader';
 export { HttpProxyOptions, AppHttpProxySnapshot, AppProxyKind } from './src/main/ets/network/HttpProxyOptions';
-export { socks5Bridge } from './src/main/ets/network/Socks5Bridge';
+export { socks5Bridge, Socks5BridgeFailureListener, Socks5BridgePortChangeListener } from './src/main/ets/network/Socks5Bridge';
 export { AuthAccountStatus, AuthStage } from './src/main/ets/auth/AuthModels';
 export { AuthSessionManager, AuthBackupState, AUTH_STORAGE_NAME } from './src/main/ets/auth/AuthSessionManager';
 export { CookieAuthCredential } from './src/main/ets/auth/CookieAuthCredential';

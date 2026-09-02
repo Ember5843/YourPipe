@@ -3077,6 +3077,10 @@
             "value": "O proxy local de reprodução (127.0.0.1) nunca usa esta configuração."
         },
         {
+            "name": "yt_proxy_bridge_unavailable",
+            "value": "A ponte de proxy SOCKS5 desconectou — salve as configurações de proxy novamente para reconectar."
+        },
+        {
             "name": "yt_device_qr_sign_in",
             "value": "Login por código QR / TV"
         },

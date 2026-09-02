@@ -16,6 +16,7 @@ export class CookieData {
   secure: boolean;
   httpOnly: boolean;
   sameSite?: string;
+  hostOnly: boolean;
 
   constructor(
     name: string,
@@ -25,7 +26,8 @@ export class CookieData {
     expires?: number,
     secure: boolean = false,
     httpOnly: boolean = false,
-    sameSite?: string
+    sameSite?: string,
+    hostOnly: boolean = false
   ) {
     this.name = name;
     this.value = value;
@@ -35,6 +37,7 @@ export class CookieData {
     this.secure = secure;
     this.httpOnly = httpOnly;
     this.sameSite = sameSite;
+    this.hostOnly = hostOnly;
   }
 }
 
@@ -50,6 +53,8 @@ export class Cookie {
   secure: boolean;
   httpOnly: boolean;
   sameSite?: string;
+  /** 无 Domain 属性设置的 cookie（RFC 6265 host-only）：仅精确主机匹配，不下发子域 */
+  hostOnly: boolean;
 
   constructor(
     name: string,
@@ -59,7 +64,8 @@ export class Cookie {
     expires?: number,
     secure: boolean = false,
     httpOnly: boolean = false,
-    sameSite?: string
+    sameSite?: string,
+    hostOnly: boolean = false
   ) {
     this.name = name;
     this.value = value;
@@ -69,6 +75,7 @@ export class Cookie {
     this.secure = secure;
     this.httpOnly = httpOnly;
     this.sameSite = sameSite;
+    this.hostOnly = hostOnly;
   }
 
   /**
@@ -92,8 +99,12 @@ export class Cookie {
       if (this.domain) {
         const host = urlObj.hostname.toLowerCase();
         const domain = this.domain.toLowerCase();
-        // Domain 匹配：完全匹配或以 .domain 结尾
-        if (domain.startsWith('.')) {
+        if (this.hostOnly) {
+          // host-only cookie（设置时无 Domain 属性）：RFC 6265 要求精确主机匹配
+          if (host !== domain) {
+            return false;
+          }
+        } else if (domain.startsWith('.')) {
           // 点前缀域：host 必须等于裸域或是其子域，防止后缀撞名（如 notyoutube.com 命中 .youtube.com）
           const bareDomain = domain.substring(1);
           if (host !== bareDomain && !host.endsWith('.' + bareDomain)) {
@@ -135,6 +146,46 @@ export class Cookie {
 export const YOUTUBE_COOKIE_STORAGE_NAME = 'youtube_cookies';
 
 /**
+ * RFC 6265 风格切分逗号拼接的 Set-Cookie 头值：netstack 可能把多个 Set-Cookie
+ * 头合并成一个逗号分隔字符串。只在逗号后（跳过空白）出现的 token 在 ';' 之前
+ * 含 '=' 时视为新 cookie 起点——expires 的 HTTP-date（"Wed, 21 Oct 2015 ..."）
+ * 里的逗号不满足该条件，不会误切。AuthSessionManager.mergeAccountSetCookies 共用。
+ */
+export function splitSetCookieHeader(headerValue: string): string[] {
+  const out: string[] = [];
+  let start = 0;
+  for (let i = 0; i < headerValue.length; i++) {
+    if (headerValue.charAt(i) !== ',') {
+      continue;
+    }
+    let j = i + 1;
+    while (j < headerValue.length && (headerValue.charAt(j) === ' ' || headerValue.charAt(j) === '\t')) {
+      j++;
+    }
+    let isNewCookie = false;
+    for (let k = j; k < headerValue.length; k++) {
+      const c = headerValue.charAt(k);
+      if (c === ';' || c === ',') {
+        break;
+      }
+      if (c === '=') {
+        isNewCookie = true;
+        break;
+      }
+    }
+    if (isNewCookie) {
+      out.push(headerValue.substring(start, i).trim());
+      start = i + 1;
+    }
+  }
+  const tail = headerValue.substring(start).trim();
+  if (tail.length > 0) {
+    out.push(tail);
+  }
+  return out;
+}
+
+/**
  * CookieJar - 管理 HTTP Cookie 的存储和检索
  */
 export class CookieJar {
@@ -158,11 +209,13 @@ export class CookieJar {
 
     // 处理数组或字符串
     const headerValues = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
-    
+
     for (const headerValue of headerValues) {
-      // 分割多个 Cookie（注意：Set-Cookie 头可能包含逗号，但在 expires 日期中也会有逗号）
-      // 简单处理：按 ";" 分割属性
-      const parts = headerValue.split(';');
+      // netstack 可能把多个 Set-Cookie 逗号拼接成一个字符串，先切分再逐条解析
+      const cookieStrings = splitSetCookieHeader(headerValue);
+      for (const cookieString of cookieStrings) {
+      // 按 ";" 分割属性
+      const parts = cookieString.split(';');
       if (parts.length === 0) continue;
 
       // 第一部分是 name=value
@@ -224,8 +277,10 @@ export class CookieJar {
         }
       }
 
-      // 如果没有指定 domain，从 URL 提取
+      // 如果没有指定 domain，从 URL 提取，并标记为 host-only（RFC 6265：不下发子域）
+      let hostOnly = false;
       if (!domain) {
+        hostOnly = true;
         try {
           const urlObj = new url.URL(requestUrl);
           domain = urlObj.hostname;
@@ -235,11 +290,12 @@ export class CookieJar {
       }
 
       // 创建 Cookie 对象并存储
-      const cookie = new Cookie(name, value, domain, path, expires, secure, httpOnly, sameSite);
+      const cookie = new Cookie(name, value, domain, path, expires, secure, httpOnly, sameSite, hostOnly);
       const key = `${name}:${domain}:${path}`;
       this.cookies.set(key, cookie);
 
       logger.debug(`Stored cookie: ${name}, domain=${domain}, path=${path}`);
+      }
     }
   }
 
@@ -336,7 +392,8 @@ export class CookieJar {
             cookie.expires,
             cookie.secure,
             cookie.httpOnly,
-            cookie.sameSite
+            cookie.sameSite,
+            cookie.hostOnly
           ));
         }
       }
@@ -360,20 +417,23 @@ export class CookieJar {
 
       this.cookies.clear();
       for (const obj of cookieArray) {
-        const cookie = obj as Cookie;
-        if (!cookie.isExpired || !cookie.isExpired()) {
-          const key = `${cookie.name}:${cookie.domain}:${cookie.path}`;
-          this.cookies.set(key, new Cookie(
-            cookie.name,
-            cookie.value,
-            cookie.domain,
-            cookie.path,
-            cookie.expires,
-            cookie.secure,
-            cookie.httpOnly,
-            cookie.sameSite
-          ));
+        const data = obj as CookieData;
+        // JSON.parse 出来的是裸对象，没有 isExpired 方法；直接按 expires 字段判过期
+        if (data.expires && Date.now() > data.expires) {
+          continue;
         }
+        const key = `${data.name}:${data.domain}:${data.path}`;
+        this.cookies.set(key, new Cookie(
+          data.name,
+          data.value,
+          data.domain,
+          data.path,
+          data.expires,
+          data.secure,
+          data.httpOnly,
+          data.sameSite,
+          data.hostOnly ?? false
+        ));
       }
 
       logger.debug(`Loaded ${this.cookies.size} cookies from storage`);
