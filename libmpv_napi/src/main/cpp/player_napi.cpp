@@ -177,6 +177,10 @@ struct PlayerContext {
     string mediaUrl;
     int64_t mediaStartPositionMs = 0;
     bool pendingLoad = false;
+    // Properties written while the surface was not ready (EnsureMpv returned
+    // false). Last value per name wins. Command-thread only; replayed by
+    // EnsureMpv right after mpv_initialize and cleared by DestroyMpv.
+    map<string, string> pendingProperties;
     atomic_int32_t state {kStateStopped};
     atomic_int32_t mediaStatus {kStatusNoMedia};
     atomic_int64_t lastPositionMs {0};
@@ -794,6 +798,23 @@ void ApplyWindowOption(PlayerContext& ctx)
                  wid.c_str(), widSource);
 }
 
+// Apply properties that were posted before the surface was ready. Runs after
+// mpv_initialize so user config (e.g. hwdec=no) overrides the fixed
+// mpv_create options above, and before this task's own command (the command
+// thread is serial), so per-file options land before the first loadfile.
+void ReplayPendingProperties(PlayerContext& ctx)
+{
+    if (ctx.pendingProperties.empty()) {
+        return;
+    }
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "replaying %{public}zu pending properties",
+                 ctx.pendingProperties.size());
+    for (const auto& [name, value] : ctx.pendingProperties) {
+        LogMpvError(name.c_str(), Mpv().set_property_string(ctx.mpv, name.c_str(), value.c_str()));
+    }
+    ctx.pendingProperties.clear();
+}
+
 bool EnsureMpv(PlayerContext& ctx)
 {
     if (ctx.surfaceId.empty() || ctx.surfaceId == "0") {
@@ -918,6 +939,7 @@ bool EnsureMpv(PlayerContext& ctx)
             return false;
         }
         ctx.initialized = true;
+        ReplayPendingProperties(ctx);
         LogMpvError("request log messages", Mpv().request_log_messages(ctx.mpv, "v"));
         ObservePlaybackProperties(ctx);
         StartEventLoop(ctx);
@@ -1165,6 +1187,8 @@ void DestroyMpv(PlayerContext& ctx)
     ctx.mpv = nullptr;
     ctx.initialized = false;
     ctx.window = nullptr;
+    // The command thread is already joined above, so clearing is race-free.
+    ctx.pendingProperties.clear();
     ctx.state.store(kStateStopped);
     SetMediaStatus(ctx, kStatusNoMedia, "destroy");
 }
@@ -1267,6 +1291,10 @@ void SetStringProperty(PlayerContext& ctx, const char* key, const string& value)
     const string property = key ? key : "";
     PostCommand(ctx, [property, value](PlayerContext& workerCtx) {
         if (!EnsureMpv(workerCtx)) {
+            // Surface not ready yet: keep the value and replay it after
+            // mpv_initialize instead of silently dropping it.
+            workerCtx.pendingProperties[property] = value;
+            OH_LOG_Print(LOG_APP, LOG_DEBUG, 0xFF00, "mpv", "pending property %{public}s", property.c_str());
             return;
         }
         SetMpvStringProperty(workerCtx, property.c_str(), value, property.c_str());
@@ -1549,6 +1577,8 @@ napi_value SetPlaybackRate(napi_env env, napi_callback_info info)
     lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
         PostCommand(ctx, [rate](PlayerContext& workerCtx) {
             if (!EnsureMpv(workerCtx)) {
+                workerCtx.pendingProperties["speed"] = to_string(rate);
+                OH_LOG_Print(LOG_APP, LOG_DEBUG, 0xFF00, "mpv", "pending property speed");
                 return;
             }
             SetMpvDoubleProperty(workerCtx, "speed", rate, "set speed");
@@ -1567,6 +1597,8 @@ napi_value SetVolume(napi_env env, napi_callback_info info)
         double mpvVolume = volume <= 1.0 ? volume * 100.0 : volume;
         PostCommand(ctx, [mpvVolume](PlayerContext& workerCtx) {
             if (!EnsureMpv(workerCtx)) {
+                workerCtx.pendingProperties["volume"] = to_string(mpvVolume);
+                OH_LOG_Print(LOG_APP, LOG_DEBUG, 0xFF00, "mpv", "pending property volume");
                 return;
             }
             SetMpvDoubleProperty(workerCtx, "volume", mpvVolume, "set volume");
