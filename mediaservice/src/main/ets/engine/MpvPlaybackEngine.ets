@@ -256,6 +256,20 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     }
   }
 
+  /**
+   * Re-apply the app proxy env for the currently loaded source. The socks5
+   * bridge re-listens on a NEW ephemeral port after a self-heal, while the
+   * process env installed at load() still points at the dead port; entry pings
+   * this from the bridge port-change hook so in-flight live HLS fetches move
+   * to the new port. No-op when nothing is loaded.
+   */
+  refreshNetworkProxy(): void {
+    if (this.destroyed || this.sourceUrl.length === 0) {
+      return;
+    }
+    this.applyNetworkProxy(this.sourceUrl);
+  }
+
   load(source: string, startPos: number, audioUrl: string = ''): boolean {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return false;

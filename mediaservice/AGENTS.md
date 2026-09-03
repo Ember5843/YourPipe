@@ -149,7 +149,11 @@ mediaservice/src/main/ets/
   `setHttpProxyEnv`, which sets `http_proxy` (+ `no_proxy` =
   `127.0.0.1,localhost` so the loopback proxy stays direct). The vendored
   libmpv has **no** `network-proxy` property — do not reintroduce that
-  `setProperty` call.
+  `setProperty` call. The env is only written at `load()`; when the socks5
+  bridge self-heals onto a new ephemeral port,
+  `MpvPlaybackEngine.refreshNetworkProxy()` re-applies it for the current
+  source (wired from entry's bridge port-change hook via
+  `AvPlayerController.refreshNetworkProxy`).
 
 ## 4. Local proxy architecture
 `LocalProxyServer` exposes a loopback HTTP endpoint so MPV always consumes a

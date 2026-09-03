@@ -40,26 +40,52 @@ function describeErr(e: Object): string {
   return String(e);
 }
 
-/** Numeric BusinessError code, or 0 when the error carries none. */
-function errorCodeOf(e: Object): number {
-  const rec = e as Record<string, Object>;
-  if (rec && typeof rec === 'object') {
-    const code = rec['code'];
-    if (typeof code === 'number') {
-      return code;
-    }
+// ── Hand-rolled SOCKS5 client (RFC 1928 / RFC 1929) ────────────────────────
+// The upstream leg used to delegate the SOCKS5 handshake to netstack's
+// socket-level client (socket.ProxyTypes.SOCKS5). On some builds (observed on
+// HarmonyOS 7.0.0.105) that layer establishes the tunnel but corrupts/resets
+// the byte stream: TLS through the tunnel dies with fatal-alert / CONN_RESET
+// while netstack logs "remove socks5 udp header failed". The bridge now runs
+// the handshake itself on a plain TCPSocket (CONNECT, ATYP=domain for
+// proxy-side DNS, optional username/password auth), so tunnel behavior no
+// longer depends on the netstack SOCKS5 implementation.
+
+const SOCKS_VER: number = 0x05;
+const SOCKS_CMD_CONNECT: number = 0x01;
+const SOCKS_AUTH_NONE: number = 0x00;
+const SOCKS_AUTH_USERPASS: number = 0x02;
+const SOCKS_NO_ACCEPTABLE_METHOD: number = 0xff;
+/** Budget for the whole handshake after TCP connect (greeting + auth + CONNECT reply). */
+const SOCKS_HANDSHAKE_TIMEOUT_MS: number = 15000;
+
+/** SOCKS5 握手/CONNECT 失败。authFailed=true 表示认证类失败——同样凭据重试无意义。 */
+export class SocksHandshakeError extends Error {
+  readonly authFailed: boolean;
+
+  constructor(message: string, authFailed: boolean = false) {
+    super(message);
+    this.name = 'SocksHandshakeError';
+    this.authFailed = authFailed;
   }
-  return 0;
 }
 
-/**
- * SOCKS5 authentication errors (2301207 invalid username/password,
- * 2301209 negotiated auth failure): retrying is pointless — the credentials
- * will fail again.
- */
-function isSocks5AuthError(e: Object): boolean {
-  const code = errorCodeOf(e);
-  return code === 2301207 || code === 2301209;
+/** SOCKS5 CONNECT 应答 rep 码 → 可读描述。 */
+function socksRepText(rep: number): string {
+  switch (rep) {
+    case 0x01: return 'general failure';
+    case 0x02: return 'not allowed by ruleset';
+    case 0x03: return 'network unreachable';
+    case 0x04: return 'host unreachable';
+    case 0x05: return 'connection refused';
+    case 0x06: return 'TTL expired';
+    case 0x07: return 'command not supported';
+    case 0x08: return 'address type not supported';
+    default: return `unknown rep=${rep}`;
+  }
+}
+
+function socksHandshakeTimeoutError(): SocksHandshakeError {
+  return new SocksHandshakeError('SOCKS5 handshake timeout');
 }
 
 /** NetAddress.family: 1=IPv4, 2=IPv6, 3=Domain (API 18+). */
@@ -107,77 +133,351 @@ function parseAuthority(authority: string): Socks5Target | undefined {
   return { host, port, isDomain };
 }
 
-/** Open a native SOCKS5 tunnel to the target through the configured server (single attempt). */
-function openSocksTunnelOnce(cfg: Socks5Config, target: Socks5Target): Promise<socket.TCPSocket> {
-  return new Promise<socket.TCPSocket>((resolve, reject) => {
-    const tcp = socket.constructTCPSocketInstance();
-    let settled = false;
-    const fail = (e: Error): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      try {
-        tcp.off('error');
-        tcp.close();
-      } catch (_e) {
-      }
-      reject(e);
-    };
+function encodeTextBytes(s: string): Uint8Array {
+  return new util.TextEncoder().encode(s);
+}
 
-    tcp.on('error', (e: Error) => {
-      fail(e);
-    });
+/** 把字节数组打成一帧待发送的 ArrayBuffer。 */
+function frameOf(bytes: number[]): ArrayBuffer {
+  return new Uint8Array(bytes).buffer as ArrayBuffer;
+}
 
-    const proxyOptions: socket.ProxyOptions = {
-      type: socket.ProxyTypes.SOCKS5,
-      address: { address: cfg.host, port: cfg.port, family: familyForHost(cfg.host) }
-    };
-    if (cfg.username && cfg.username.length > 0) {
-      proxyOptions.username = cfg.username;
-      proxyOptions.password = cfg.password || '';
+/** Parse an IPv6 literal into 16 bytes (supports '::' compression and an embedded IPv4 tail). */
+function parseIpv6(host: string): Uint8Array | undefined {
+  let h = host.trim();
+  if (h.startsWith('[') && h.endsWith(']')) {
+    h = h.substring(1, h.length - 1);
+  }
+  let v4: number[] | null = null;
+  if (h.indexOf('.') >= 0) {
+    const idx = h.lastIndexOf(':');
+    if (idx < 0) {
+      return undefined;
     }
-    const connectOptions: socket.TCPConnectOptions = {
-      address: {
-        address: target.host,
-        port: target.port,
-        family: target.isDomain ? 3 : familyForHost(target.host)
-      },
-      timeout: 15000,
-      proxy: proxyOptions
-    };
-    tcp.connect(connectOptions).then(() => {
-      if (settled) {
-        return;
+    const tail = h.substring(idx + 1);
+    if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(tail)) {
+      return undefined;
+    }
+    v4 = [];
+    const tailParts = tail.split('.');
+    for (let i = 0; i < tailParts.length; i++) {
+      v4.push(parseInt(tailParts[i], 10) & 0xff);
+    }
+    h = h.substring(0, idx + 1);
+    if (h.endsWith(':') && !h.endsWith('::')) {
+      h = h.substring(0, h.length - 1);
+    }
+  }
+  const parseGroups = (s: string): number[] | undefined => {
+    const out: number[] = [];
+    if (s.length === 0) {
+      return out;
+    }
+    const parts = s.split(':');
+    for (let i = 0; i < parts.length; i++) {
+      if (!/^[0-9a-fA-F]{1,4}$/.test(parts[i])) {
+        return undefined;
       }
-      settled = true;
-      try {
-        tcp.off('error');
-      } catch (_e) {
-      }
-      resolve(tcp);
-    }).catch((e: Error) => {
-      // Reject with the original object: netstack failures arrive as
-      // BusinessError-shaped objects (code/message); wrapping them in
-      // Error(String(e)) would destroy the code (logs show "[object Object]").
-      fail(e);
-    });
-  });
+      out.push(parseInt(parts[i], 16));
+    }
+    return out;
+  };
+  const v4Groups = v4 ? 2 : 0;
+  let groups: number[];
+  const dc = h.indexOf('::');
+  if (dc >= 0) {
+    const headGroups = parseGroups(h.substring(0, dc));
+    const tailGroups = parseGroups(h.substring(dc + 2));
+    if (!headGroups || !tailGroups || headGroups.length + tailGroups.length + v4Groups > 7) {
+      return undefined;
+    }
+    groups = headGroups;
+    const zeros = 8 - headGroups.length - tailGroups.length - v4Groups;
+    for (let i = 0; i < zeros; i++) {
+      groups.push(0);
+    }
+    for (let i = 0; i < tailGroups.length; i++) {
+      groups.push(tailGroups[i]);
+    }
+  } else {
+    const all = parseGroups(h);
+    if (!all || all.length + v4Groups !== 8) {
+      return undefined;
+    }
+    groups = all;
+  }
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 8; i++) {
+    const g = i < groups.length ? groups[i] : 0;
+    bytes[i * 2] = (g >> 8) & 0xff;
+    bytes[i * 2 + 1] = g & 0xff;
+  }
+  if (v4) {
+    bytes[12] = v4[0];
+    bytes[13] = v4[1];
+    bytes[14] = v4[2];
+    bytes[15] = v4[3];
+  }
+  return bytes;
+}
+
+/** CONNECT 目标编为 ATYP+ADDR+PORT 字节；域名走 ATYP=03（代理解析 DNS，不本地泄漏）。 */
+function socksTargetBytes(target: Socks5Target): number[] {
+  const out: number[] = [];
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(target.host)) {
+    out.push(0x01);
+    const parts = target.host.split('.');
+    for (let i = 0; i < 4; i++) {
+      out.push(parseInt(parts[i], 10) & 0xff);
+    }
+  } else if (target.host.indexOf(':') >= 0) {
+    const v6 = parseIpv6(target.host);
+    if (!v6) {
+      throw new SocksHandshakeError(`malformed IPv6 target ${target.host}`);
+    }
+    out.push(0x04);
+    for (let i = 0; i < 16; i++) {
+      out.push(v6[i]);
+    }
+  } else {
+    const name = encodeTextBytes(target.host);
+    if (name.length === 0 || name.length > 255) {
+      throw new SocksHandshakeError(`bad target host length=${name.length}`);
+    }
+    out.push(0x03);
+    out.push(name.length);
+    for (let i = 0; i < name.length; i++) {
+      out.push(name[i]);
+    }
+  }
+  out.push((target.port >> 8) & 0xff);
+  out.push(target.port & 0xff);
+  return out;
 }
 
 /**
- * Open a native SOCKS5 tunnel, retrying once after 300ms on transient failure
- * (the upstream proxy or the network can flap briefly). Authentication errors
- * (isSocks5AuthError) are rejected immediately — a retry would fail again.
+ * Handshake-phase byte pump over a TCPSocket: accumulates 'message' chunks and
+ * fulfills strictly-sequential exact-length reads (at most one outstanding).
+ * fail() rejects the pending read and every later one. After the handshake the
+ * caller detaches it via off('message'/'close'/'error') BEFORE pipeConnections
+ * attaches its own handlers — on some OHOS versions off(type) clears ALL
+ * listeners of that type, so the detach must happen before the pipe wires up.
  */
-async function openSocksTunnel(cfg: Socks5Config, target: Socks5Target): Promise<socket.TCPSocket> {
+class HandshakeReader {
+  private pending: number[] = [];
+  private waiter: HandshakeWaiter | null = null;
+  private failure: Object | null = null;
+  /** 非 null 即转发模式：之后每个 message 直接进 sink，不再走握手缓冲。 */
+  private pipeSink: ((bytes: Uint8Array) => void) | null = null;
+
+  readonly onMessage = (value: socket.SocketMessageInfo): void => {
+    const chunk = new Uint8Array(value.message);
+    if (this.pipeSink) {
+      this.pipeSink(chunk);
+      return;
+    }
+    for (let i = 0; i < chunk.length; i++) {
+      this.pending.push(chunk[i]);
+    }
+    const w = this.waiter;
+    if (w && this.pending.length >= w.needed) {
+      const out = new Uint8Array(this.pending.splice(0, w.needed));
+      this.waiter = null;
+      w.resolve(out);
+    }
+  };
+
+  readonly onClose = (): void => {
+    // 转发模式下 close/error 由 pipeConnections 自己的处理器负责 teardown。
+    if (this.pipeSink) {
+      return;
+    }
+    this.fail(new Error('connection closed during SOCKS5 handshake'));
+  };
+
+  readonly onError = (e: Error): void => {
+    if (this.pipeSink) {
+      return;
+    }
+    this.fail(new Error(`socket error during SOCKS5 handshake: ${describeErr(e)}`));
+  };
+
+  fail(e: Object): void {
+    if (!this.failure) {
+      this.failure = e;
+    }
+    const w = this.waiter;
+    this.waiter = null;
+    if (w) {
+      w.reject(this.failure);
+    }
+  }
+
+  readExactly(n: number): Promise<Uint8Array> {
+    if (this.failure) {
+      return Promise.reject(this.failure);
+    }
+    if (this.pending.length >= n) {
+      return Promise.resolve(new Uint8Array(this.pending.splice(0, n)));
+    }
+    if (this.waiter) {
+      return Promise.reject(new Error('concurrent handshake read not supported'));
+    }
+    return new Promise<Uint8Array>((resolve, reject) => {
+      this.waiter = { needed: n, resolve, reject };
+    });
+  }
+
+  /**
+   * 切到转发模式：先把握手阶段缓冲的剩余字节按序冲刷给 sink，之后每个
+   * message 直接转发。握手完成后保持挂接不 off——部分 OHOS 版本 off(type)
+   * 会误清该类型全部监听器；而且"摘 reader→pipe 重挂"窗口内到达的上游字节
+   * 无人接收会丢字节（TLS 流直接损坏）。
+   */
+  switchToPipe(sink: (bytes: Uint8Array) => void): void {
+    this.pipeSink = sink;
+    if (this.pending.length > 0) {
+      const out = new Uint8Array(this.pending.splice(0, this.pending.length));
+      this.pipeSink(out);
+    }
+  }
+}
+
+interface HandshakeWaiter {
+  needed: number;
+  resolve: (v: Uint8Array) => void;
+  reject: (e: Object) => void;
+}
+
+/** 已打通的隧道：socket + 仍挂在 socket 上的握手读取器（pipe 时切转发模式）。 */
+interface OpenedTunnel {
+  sock: socket.TCPSocket;
+  reader: HandshakeReader;
+}
+
+/** greeting + 可选用户名/密码认证 + CONNECT + 应答校验。 */
+async function doSocks5Handshake(tcp: socket.TCPSocket, reader: HandshakeReader,
+  cfg: Socks5Config, target: Socks5Target): Promise<void> {
+  const greeting: number[] = [SOCKS_VER, 0, SOCKS_AUTH_NONE];
+  if (cfg.username.length > 0) {
+    greeting.push(SOCKS_AUTH_USERPASS);
+  }
+  greeting[1] = greeting.length - 2;
+  await tcp.send({ data: frameOf(greeting) });
+  const sel = await reader.readExactly(2);
+  if (sel[0] !== SOCKS_VER) {
+    throw new SocksHandshakeError(`bad greeting reply version=${sel[0]}`);
+  }
+  if (sel[1] === SOCKS_NO_ACCEPTABLE_METHOD) {
+    throw new SocksHandshakeError('server accepted no offered auth method', true);
+  }
+  if (sel[1] === SOCKS_AUTH_USERPASS) {
+    const u = encodeTextBytes(cfg.username);
+    const p = encodeTextBytes(cfg.password);
+    if (u.length > 255 || p.length > 255) {
+      throw new SocksHandshakeError('credentials exceed 255 bytes', true);
+    }
+    const authReq: number[] = [0x01, u.length];
+    for (let i = 0; i < u.length; i++) {
+      authReq.push(u[i]);
+    }
+    authReq.push(p.length);
+    for (let i = 0; i < p.length; i++) {
+      authReq.push(p[i]);
+    }
+    await tcp.send({ data: frameOf(authReq) });
+    const authReply = await reader.readExactly(2);
+    if (authReply[1] !== 0x00) {
+      throw new SocksHandshakeError('username/password rejected by server', true);
+    }
+  } else if (sel[1] !== SOCKS_AUTH_NONE) {
+    throw new SocksHandshakeError(`server selected unsupported auth method=${sel[1]}`);
+  }
+
+  const connectReq: number[] = [SOCKS_VER, SOCKS_CMD_CONNECT, 0x00];
+  const targetBytes = socksTargetBytes(target);
+  for (let i = 0; i < targetBytes.length; i++) {
+    connectReq.push(targetBytes[i]);
+  }
+  await tcp.send({ data: frameOf(connectReq) });
+
+  const head = await reader.readExactly(4);
+  if (head[0] !== SOCKS_VER) {
+    throw new SocksHandshakeError(`bad CONNECT reply version=${head[0]}`);
+  }
+  const atyp = head[3];
+  if (atyp === 0x01) {
+    await reader.readExactly(4);
+  } else if (atyp === 0x03) {
+    const len = await reader.readExactly(1);
+    await reader.readExactly(len[0]);
+  } else if (atyp === 0x04) {
+    await reader.readExactly(16);
+  } else {
+    throw new SocksHandshakeError(`bad CONNECT reply atyp=${atyp}`);
+  }
+  await reader.readExactly(2); // BND.PORT
+  if (head[1] !== 0x00) {
+    throw new SocksHandshakeError(`CONNECT rejected: ${socksRepText(head[1])}`);
+  }
+}
+
+/** Single attempt: direct TCP to the SOCKS5 server + hand-rolled handshake. */
+async function openSocksTunnelOnce(cfg: Socks5Config, target: Socks5Target): Promise<OpenedTunnel> {
+  const tcp = socket.constructTCPSocketInstance();
+  const reader = new HandshakeReader();
+  tcp.on('message', reader.onMessage);
+  tcp.on('close', reader.onClose);
+  tcp.on('error', reader.onError);
+  let timeoutId: number = -1;
+  try {
+    await tcp.connect({
+      address: { address: cfg.host, port: cfg.port, family: familyForHost(cfg.host) },
+      timeout: SOCKS_HANDSHAKE_TIMEOUT_MS
+    });
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeoutId = setTimeout(() => {
+        reader.fail(socksHandshakeTimeoutError());
+        reject(socksHandshakeTimeoutError());
+      }, SOCKS_HANDSHAKE_TIMEOUT_MS);
+    });
+    // race 对两个分支都挂了 rejection 处理器，超时后 handshake 的迟到 reject 不会
+    // 变成 unhandled rejection。
+    await Promise.race([doSocks5Handshake(tcp, reader, cfg, target), timeoutPromise]);
+    clearTimeout(timeoutId);
+    timeoutId = -1;
+    // 不摘 reader、不清监听器：pipeConnections 会把它切到转发模式（见
+    // switchToPipe 注释），保持挂接同时消除"重挂窗口丢上游字节"的竞态。
+    return { sock: tcp, reader };
+  } catch (e) {
+    if (timeoutId >= 0) {
+      clearTimeout(timeoutId);
+    }
+    try {
+      tcp.off('message');
+      tcp.off('close');
+      tcp.off('error');
+      tcp.close();
+    } catch (_e) {
+    }
+    // 原样抛出，不包装：netstack 失败是 BusinessError 形状的对象，包装成
+    // Error(String(e)) 会丢掉 code（日志变 "[object Object]"）。
+    throw e as Error;
+  }
+}
+
+/**
+ * Open a SOCKS5 tunnel, retrying once after 300ms on transient failure (the
+ * upstream proxy or the network can flap briefly). Authentication failures
+ * (SocksHandshakeError.authFailed) are rejected immediately — the same
+ * credentials would fail again.
+ */
+async function openSocksTunnel(cfg: Socks5Config, target: Socks5Target): Promise<OpenedTunnel> {
   try {
     return await openSocksTunnelOnce(cfg, target);
   } catch (e) {
-    if (isSocks5AuthError(e)) {
-      // Re-throw the original object (cast for arkts-limited-throw): wrapping it
-      // in a new Error would destroy the netstack BusinessError code.
-      throw e as Error;
+    if (e instanceof SocksHandshakeError && e.authFailed) {
+      throw e;
     }
     logger.warn(TAG, `tunnel to ${target.host}:${target.port} failed, retry once in 300ms: ${describeErr(e)}`);
     await new Promise<void>((r) => setTimeout(r, 300));
@@ -185,14 +485,56 @@ async function openSocksTunnel(cfg: Socks5Config, target: Socks5Target): Promise
   }
 }
 
+/**
+ * 单方向串行写队列。分片入队前先复制（netstack 的 message ArrayBuffer 在回调
+ * 返回后可能被复用，异步 send 若仍引用原 buffer 会发出脏数据），send 串行
+ * await 保序——并发 send 不承诺落线顺序，TLS 流里字节乱序/丢字即致命。
+ * 任一 send 失败即通过 closeFn 关闭双方向。
+ */
+class SendQueue {
+  private tail: Promise<void> = Promise.resolve();
+  private closed: boolean = false;
+  private readonly sendFn: (data: ArrayBuffer) => Promise<void>;
+  private readonly closeFn: () => void;
+
+  constructor(sendFn: (data: ArrayBuffer) => Promise<void>, closeFn: () => void) {
+    this.sendFn = sendFn;
+    this.closeFn = closeFn;
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+
+  enqueue(bytes: Uint8Array): void {
+    if (this.closed) {
+      return;
+    }
+    const copy = bytes.slice();
+    this.tail = this.tail.then(async () => {
+      if (this.closed) {
+        return;
+      }
+      await this.sendFn(copy.buffer as ArrayBuffer);
+    }).catch(() => {
+      this.closeFn();
+    });
+  }
+}
+
 /** Bidirectional byte pipe between the proxy client and the SOCKS tunnel. */
-function pipeConnections(client: socket.TCPSocketConnection, tunnel: socket.TCPSocket): void {
+function pipeConnections(client: socket.TCPSocketConnection, tunnel: socket.TCPSocket,
+  reader: HandshakeReader): void {
   let closed = false;
+  const toClient = new SendQueue((data: ArrayBuffer) => client.send({ data: data }), (): void => closeAll());
+  const toTunnel = new SendQueue((data: ArrayBuffer) => tunnel.send({ data: data }), (): void => closeAll());
   const closeAll = (): void => {
     if (closed) {
       return;
     }
     closed = true;
+    toClient.close();
+    toTunnel.close();
     try {
       client.off('message');
       client.off('close');
@@ -215,21 +557,11 @@ function pipeConnections(client: socket.TCPSocketConnection, tunnel: socket.TCPS
     }
   };
 
-  tunnel.on('message', (value: socket.SocketMessageInfo) => {
-    if (closed) {
-      return;
-    }
-    client.send({ data: value.message }).catch(() => {
-      closeAll();
-    });
-  });
+  // 上行（tunnel→client）：复用握手阶段就挂在 tunnel 上的 reader，切到转发
+  // 模式；缓冲里可能已有上游在挂接窗口内送达的字节，由 switchToPipe 先冲刷。
+  reader.switchToPipe((bytes: Uint8Array) => toClient.enqueue(bytes));
   client.on('message', (value: socket.SocketMessageInfo) => {
-    if (closed) {
-      return;
-    }
-    tunnel.send({ data: value.message }).catch(() => {
-      closeAll();
-    });
+    toTunnel.enqueue(new Uint8Array(value.message));
   });
   tunnel.on('close', () => closeAll());
   tunnel.on('error', (e: Error) => {
@@ -361,9 +693,10 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
             const tunnel = await openSocksTunnel(cfg, addr);
             await sendRaw(conn, encodeText('HTTP/1.1 200 Connection Established' + CRLF + CRLF));
             if (early.length > 0) {
-              await tunnel.send({ data: early.buffer });
+              await tunnel.sock.send({ data: early.buffer });
             }
-            pipeConnections(conn, tunnel);
+            // 隧道侧缓冲的剩余字节由 switchToPipe 按序冲刷，无需单独处理。
+            pipeConnections(conn, tunnel.sock, tunnel.reader);
           } catch (e) {
             logger.warn(TAG, `CONNECT ${target} failed: ${describeErr(e)}`);
             await sendRaw(conn, encodeText('HTTP/1.1 502 Bad Gateway' + CRLF + 'Connection: close' + CRLF + CRLF));
@@ -391,11 +724,11 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
         try {
           const tunnel = await openSocksTunnel(cfg, addr);
           const head = buildForwardHead(requestLine, headLines.slice(1), pathAndQuery);
-          await tunnel.send({ data: encodeText(head) });
+          await tunnel.sock.send({ data: encodeText(head) });
           if (body.byteLength > 0) {
-            await tunnel.send({ data: body });
+            await tunnel.sock.send({ data: body });
           }
-          pipeConnections(conn, tunnel);
+          pipeConnections(conn, tunnel.sock, tunnel.reader);
         } catch (e) {
           logger.warn(TAG, `forward ${target} failed: ${describeErr(e)}`);
           await sendRaw(conn, encodeText('HTTP/1.1 502 Bad Gateway' + CRLF + 'Connection: close' + CRLF + CRLF));
@@ -422,12 +755,15 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
 }
 
 /**
- * Loopback HTTP CONNECT bridge → native SOCKS5.
+ * Loopback HTTP CONNECT bridge → SOCKS5.
  *
- * The http / rcp stacks only speak HTTP proxies, so when the user selects
- * SOCKS5 we expose a tiny HTTP proxy on 127.0.0.1 that opens the real tunnel
- * through socket.ProxyTypes.SOCKS5 (API 18+). HttpDownloader / RangeProxy point
- * their per-request proxy at 127.0.0.1:{port}; credentials stay on the bridge.
+ * ArkWeb ProxyController / RCP / MPV(FFmpeg http_proxy env) / app 级代理的
+ * 消费方都只能说 HTTP 代理，所以用户选 SOCKS5 时本桥在 127.0.0.1 暴露一个
+ * 微型 HTTP 代理，把每条 CONNECT 翻译成到目标的真实 SOCKS5 隧道。上游握手
+ * 由桥内手写（RFC 1928 CONNECT + 可选 RFC 1929 认证，见 openSocksTunnelOnce），
+ * 不再使用 netstack 的 socket.ProxyTypes.SOCKS5——该实现在部分系统版本上
+ * （如 7.0.0.105）能建通隧道但会损毁/重置字节流。认证信息只留在桥上，
+ * 127.0.0.1 侧永远无认证。
  *
  * Self-heal: a listening server that reports an 'error' event is torn down and
  * re-listened with the same config, up to MAX_SELF_HEAL_RESTARTS times with a

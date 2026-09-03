@@ -1272,6 +1272,14 @@ export class AvPlayerController {
     return undefined;
   }
 
+  /**
+   * 桥自愈换端口后由 entry 触发：把 MPV 直连抓取（直播 HLS 等）的
+   * http_proxy 进程 env 重指到桥的新端口。loopback 源仍保持直连（bypass）。
+   */
+  refreshNetworkProxy(): void {
+    (this.playbackEngine as MpvPlaybackEngine).refreshNetworkProxy();
+  }
+
   private async fetchText(url: string): Promise<string> {
     const request = http.createHttp();
     try {

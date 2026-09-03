@@ -390,9 +390,15 @@ Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
   proxy-side, loopback exclusionList) instead of pointing `usingProxy` at the
   bridge. The bridge still must run for its remaining consumers — ArkWeb
   `ProxyController`, RCP `createTunnel`, and MPV's `http_proxy` env — entry
-  starts/stops it independently. Self-heals: a server `error` event schedules bounded
+  starts/stops it independently. The upstream SOCKS5 handshake is **hand-rolled
+  in the bridge** (RFC 1928 CONNECT + optional RFC 1929 username/password auth
+  over a plain direct TCPSocket, ATYP=domain → proxy-side DNS, 15s budget) —
+  it must NOT go back to netstack's socket-level `socket.ProxyTypes.SOCKS5`:
+  that layer was observed on 7.0.0.105 to establish the tunnel yet
+  corrupt/reset the byte stream (TLS fatal alert / CONN_RESET through the
+  tunnel; netstack logging "remove socks5 udp header failed"). Self-heals: a server `error` event schedules bounded
   re-listens (1s/2s/4s, generation-guarded); tunnel connects retry once
-  except for SOCKS5 auth errors (2301207/2301209). `getPort()` reports a
+  except for handshake auth failures (`SocksHandshakeError.authFailed`). `getPort()` reports a
   last-known-good port: it is NOT cleared during the self-heal re-listen
   window, so proxy consumers keep routing at the dead loopback port and fail
   fast (connect-refused) instead of silently going direct. When self-heal

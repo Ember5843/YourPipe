@@ -7,6 +7,7 @@ import { YouTubePlayResult, YouTubePlayService } from '../features/player/YouTub
 import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { PreferencesStore } from './PreferencesStore';
+import { NetworkProxyConfig } from './NetworkProxyConfig';
 import { TranslationService } from './TranslationService';
 // [DISABLED] P2 gtx 已随菜单项注释关闭；恢复时取消注释本行与 autoSelectPreferredSubtitle 内的调用
 // import { SubtitleTranslationService } from '../features/player/translate/SubtitleTranslationService';
@@ -138,6 +139,11 @@ export class PlayerSession {
     this.bindControllerQueueControls();
     this.bindQueueSwitchHandler();
     this.registerContinueStateListener();
+    // socks5 桥自愈换端口时，把 MPV 直连抓取（直播 HLS）的 http_proxy env
+    // 重指到新端口——env 只在 load() 时写入，不会随快照自动跟随。
+    NetworkProxyConfig.setBridgeRepointListener(() => {
+      this._controller.refreshNetworkProxy();
+    });
     logger.debug(`${TAG} Session reset`);
   }
 

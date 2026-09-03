@@ -170,6 +170,17 @@ export class NetworkProxyConfig {
   private static bridgeListenersRegistered: boolean = false;
 
   /**
+   * 桥自愈换端口后的额外动作（单槽）。PlayerSession 注册它来刷新 MPV 的
+   * http_proxy 进程 env——env 只在 load() 时写入，不随 provider 快照惰性更新，
+   * 不刷新会让进行中的直播直连抓取继续打死掉的旧端口。
+   */
+  private static bridgeRepointListener?: () => void;
+
+  static setBridgeRepointListener(listener?: () => void): void {
+    NetworkProxyConfig.bridgeRepointListener = listener;
+  }
+
+  /**
    * Resolves when the latest applySystemAndProviders has fully settled —
    * for socks5 that includes the loopback bridge listen. Startup network work
    * (home feed, proxy test) should await this so it never runs in the bridge's
@@ -237,13 +248,22 @@ export class NetworkProxyConfig {
     logger.info(`socks5 bridge re-listened on new port=${port}, re-pointing app/webview proxy`);
     // HttpProxyOptions needs no update: the installed provider reads
     // socks5Bridge.getPort() lazily per snapshot, so downloaders/RangeProxy
-    // follow the new port on their own.
+    // follow the new port on their own. MPV's process env was written at
+    // load() and must be re-applied explicitly via the repoint listener.
     NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
     NetworkProxyConfig.setAppProxy({
       host: '127.0.0.1',
       port: port,
       exclusionList: HttpProxyOptions.defaultExclusions()
     } as connection.HttpProxy, `app http proxy re-applied on socks5 bridge port=${port}`);
+    const repointListener = NetworkProxyConfig.bridgeRepointListener;
+    if (repointListener) {
+      try {
+        repointListener();
+      } catch (e) {
+        logger.warn(`bridge repoint listener failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
   }
 
   private static onBridgeFuseBlown(reason: string): void {
