@@ -1,8 +1,7 @@
 import { AppLog } from '../common/AppLog';
 import { AbilityConstant, UIAbility, Want, Configuration } from '@kit.AbilityKit';
-import { display, window } from '@kit.ArkUI';
+import { window } from '@kit.ArkUI';
 import { i18n } from '@kit.LocalizationKit';
-import { BreakpointConstants } from '../common/constants/BreakpointConstants';
 import { PreferencesStore } from '../common/PreferencesStore';
 import { AppState, UIConfig, YourtubeDarkMode } from '../common/AppState';
 import { PlaybackConfig } from '../common/PlaybackConfig';
@@ -28,7 +27,6 @@ const logger = AppLog.getInstance('EntryAbility');
 
 
 export default class EntryAbility extends UIAbility {
-  private curBp: string = '';
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate('context', this.context);
     AppStorage.setOrCreate('playerLoading', false);
@@ -218,12 +216,6 @@ export default class EntryAbility extends UIAbility {
     // Main window is created, set main page for this ability
     logger.info('Ability onWindowStageCreate');
 
-    const windowObj = windowStage.getMainWindowSync();
-    this.updateBreakpoint(windowObj.getWindowProperties().windowRect.width);
-    windowObj.on('windowSizeChange', (windowSize) => {
-      this.updateBreakpoint(windowSize.width);
-    });
-
     windowStage.loadContent('product/Index', (err) => {
       if (err.code) {
         logger.error(`Failed to load the content. Cause: ${JSON.stringify(err)}`);
@@ -281,21 +273,5 @@ export default class EntryAbility extends UIAbility {
       return;
     }
     AppStorage.setOrCreate(PlaybackContinuationService.APP_STORAGE_PENDING_KEY, JSON.stringify(payload));
-  }
-
-  private updateBreakpoint(windowWidth: number): void {
-    const windowWidthVp = windowWidth / display.getDefaultDisplaySync().densityPixels;
-    let newBp: string = '';
-    if (windowWidthVp < 600) {
-      newBp = BreakpointConstants.BREAKPOINT_SM;
-    } else if (windowWidthVp < 840) {
-      newBp = BreakpointConstants.BREAKPOINT_MD;
-    } else {
-      newBp = BreakpointConstants.BREAKPOINT_LG;
-    }
-    if (this.curBp !== newBp) {
-      this.curBp = newBp;
-      AppStorage.setOrCreate('currentBreakpoint', this.curBp);
-    }
   }
 }

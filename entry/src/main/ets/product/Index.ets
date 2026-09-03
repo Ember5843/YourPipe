@@ -24,6 +24,8 @@ import { SubscriptionManagePage } from '../features/subscription/SubscriptionMan
 import { SubscriptionFeedPage } from '../features/subscription/SubscriptionFeedPage';
 import { SubscriptionFeedStore } from '../common/SubscriptionFeedStore';
 import { SubscriptionScrollCoordinator } from '../features/subscription/SubscriptionScrollCoordinator';
+import { FavoritesScrollCoordinator } from '../features/favorites/FavoritesScrollCoordinator';
+import { LocalScrollCoordinator } from '../features/local/LocalScrollCoordinator';
 import { FavoritesPage } from '../features/favorites/FavoritesPage';
 import { LocalPage } from '../features/local/LocalPage';
 import { UserPage } from '../features/user/UserPage';
@@ -1217,7 +1219,8 @@ struct Index {
       ]
     }))
     .bindToScrollable([this.homeTabController.gridScroller, this.homeTabController.listScroller,
-      SubscriptionScrollCoordinator.scroller])
+      SubscriptionScrollCoordinator.scroller, FavoritesScrollCoordinator.scroller,
+      LocalScrollCoordinator.scroller])
     .bindSheet($$this.showOptions, this.OptionsSheet(), {
       detents: [SheetSize.LARGE],
       dragBar: true,
@@ -1266,8 +1269,8 @@ struct Index {
         if (this.isRepliesOpen) {
           this.actionHub.emit(ActionHubEvent.EXIT_COMMENT_REPLIES);
           return true;
-        } else if (this.isPlayerFullLandscapeScreen && !(AppStorage.get<boolean>('isSplitScreen') ?? false)) {
-          // 分屏下播放页默认即铺满，返回应离开播放页而非空转“退出全屏”
+        } else if (this.isPlayerFullLandscapeScreen) {
+          // 仅手动全屏生效中返回=退出全屏；分屏/挤压铺满 PlayerPage 不发布，返回直接离开播放页
           this.actionHub.emit(ActionHubEvent.EXIT_FULLSCREEN);
           return true;
         } else {

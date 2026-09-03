@@ -21,6 +21,22 @@ class AnimationUtil {
       .animation({ duration: uiConfig.animationSpeed, curve: curves.springMotion(0.6, 0.8), delay });
   }
 
+  /**
+   * 仅插入方向的缩放淡入（删除直出 IDENTITY）。
+   * 用于 LazyForEach 滚动容器条目：滑入视区重建时不再播"原地缩小消失"，
+   * 由调用方做一次性门控（回收重建不再重放）。
+   */
+  public isScaleTranEnter(id: string | number, uiConfig: UIConfig): TransitionEffect | null {
+    if (!uiConfig.isAnimation) {
+      return null;
+    }
+    const delay = typeof id === 'string' ? this.getStaggerDelay(id) : (id * 10 + 30);
+    const insert = TransitionEffect.OPACITY
+      .combine(TransitionEffect.scale({ x: 0, y: 0 }))
+      .animation({ duration: uiConfig.animationSpeed, curve: curves.springMotion(0.6, 0.8), delay });
+    return TransitionEffect.asymmetric(insert, TransitionEffect.IDENTITY);
+  }
+
   public listItemremoveTran(id: string | number, uiConfig: UIConfig): TransitionEffect | null {
     if (!uiConfig.isAnimation) {
       return null;

@@ -248,7 +248,8 @@ export struct SubscriptionManagePage {
   }
 
   build() {
-    // 顶栏避让放在 Refresh 外侧，加载圈从标题栏下方出现（与内容区对齐）。
+    // 顶栏避让放在 Refresh 上（与首页同构）：加载圈从标题栏下方出现；
+    // List clip(false) 让上滑的卡片画进避让区、透出标题栏半透明材质。
     Column() {
       Refresh({ refreshing: $$this.isRefreshing }) {
         List({ scroller: SubscriptionScrollCoordinator.scroller, space: 4 }) {
@@ -309,11 +310,13 @@ export struct SubscriptionManagePage {
         .width('100%')
         .height('100%')
         .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
+        .clip(false)
         .edgeEffect(EdgeEffect.Spring)
         .scrollBar(BarState.Off)
       }
       .layoutWeight(1)
       .width('100%')
+      .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT })
       .pullToRefresh(true)
       .refreshOffset(64)
       .onRefreshing(() => {
@@ -322,7 +325,6 @@ export struct SubscriptionManagePage {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT })
     .backgroundColor($r('app.color.yourtube_bg_page'))
   }
 }

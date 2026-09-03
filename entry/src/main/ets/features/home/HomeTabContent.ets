@@ -400,7 +400,8 @@ export struct HomeTabContent {
       feedEpoch: this.homeFeedEpoch
     })
       .padding({ bottom: this.uiConfig.homeLayoutMode === 'grid' ? 4 : 8 })
-      .transition(customAnimationUtil.isScaleTran(`home_recommend_banner_${this.homeFeedEpoch}`, this.uiConfig))
+      // 插入-only 转场：禁止删除方向缩放（Grid 骨架切换/hasHeader 翻转时不再播"缩小消失"幽灵）
+      .transition(customAnimationUtil.isScaleTranEnter(`home_recommend_banner_${this.homeFeedEpoch}`, this.uiConfig))
   }
 
   @Builder LoadingBuilder() {

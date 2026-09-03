@@ -26,6 +26,8 @@ import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 import { formatDurationHms } from '../../common/utils/FormatUtils';
 import { AppLog } from '../../common/AppLog';
+import { LocalScrollCoordinator } from './LocalScrollCoordinator';
+
 
 const logger = AppLog.getInstance('LocalPage');
 
@@ -340,7 +342,14 @@ export struct LocalPage {
   }
 
   build() {
-    Tabs({ barPosition: BarPosition.Start }) {
+    // 对标 UserPage：外层 Scroll 收口，上滑时"观看历史/下载视频"Tab 栏跟随内容
+    // 上移（原为 Tabs padding top 避让，Tab 栏钉在标题栏下方不动）；顶部 spacer
+    // 负责避让状态栏 + 标题栏。外层 Scroller 经 LocalScrollCoordinator 暴露给
+    // Index 根标题栏 bindToScrollable，滚动渐变/材质效果与首页一致。
+    Scroll(LocalScrollCoordinator.scroller) {
+      Column() {
+        Row().width('100%').height(this.safeAreaTop + TITLE_BAR_HEIGHT)
+        Tabs({ barPosition: BarPosition.Start }) {
       // ── Tab 0: 观看记录 ──
       TabContent() {
         Refresh({ refreshing: $$this.isSyncingHistory }) {
@@ -440,6 +449,8 @@ export struct LocalPage {
           .height('100%')
           .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 88 })
           .edgeEffect(EdgeEffect.Spring)
+          // 外层 Scroll 先消费上滑（Tab 栏跟随上移），到顶后列表自身再滚（对标 UserPage）
+          .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
         }
         .width('100%')
         .height('100%')
@@ -479,8 +490,12 @@ export struct LocalPage {
       this.currentTabIndex = targetIndex;
     })
     .width('100%')
+      }
+    }
+    .scrollBar(BarState.Off)
+    .clip(false)
+    .width('100%')
     .height('100%')
-    .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT })
     .backgroundColor($r('app.color.yourtube_bg_page'))
   }
 

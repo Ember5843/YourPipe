@@ -114,8 +114,16 @@ export struct MediaVideoFeed {
   private lastFeedEmpty: boolean = true;
   /** 滑动预取器：aboutToAppear 绑定 dataSource，onScrollIndex 上报可见区 */
   private prefetcher: IPrefetcher | null = null;
+  /**
+   * 入场动画一次性门控：仅 feed（重）加载后的首屏条目允许播放缩放淡入，
+   * 播过即记入 done；滑动回收/重建、分页追加的条目一律直出，
+   * 杜绝条目滚动到上下边缘时"延迟弹出/原地消失"。
+   */
+  private entryAnimKeys: Set<string> = new Set();
+  private entryAnimDone: Set<string> = new Set();
   private feedListener: DataChangeListener = {
     onDataReloaded: () => {
+      this.armEntryAnim();
       this.onFeedDataChanged();
     },
     onDataAdd: (_index: number) => {
@@ -151,11 +159,64 @@ export struct MediaVideoFeed {
     this.dataSource.registerDataChangeListener(this.feedListener);
     this.dataSource.thumbUrlOf = this.itemThumbUrl ?? defaultFeedThumbUrl;
     this.prefetcher = new BasicPrefetcher(this.dataSource);
+    // 挂载时数据源可能已有数据（如订阅 tab 缓存），补一次门控布防
+    this.armEntryAnim();
   }
 
   aboutToDisappear(): void {
     this.dataSource.unregisterDataChangeListener(this.feedListener);
     this.prefetcher = null;
+  }
+
+  /**
+   * 布防入场动画：以当前数据源首屏条目（上限 24 条，覆盖任意布局一屏）为白名单。
+   * 仅在列表位于顶部时布防（初始加载、下拉刷新、回顶重置）；
+   * 滑动中途的全量重载（订阅后台合并、登录态回落重取等）不布防——
+   * 重建条目全部直出，杜绝滚动中/回滚时的边缘弹出重播。
+   * entryAnimDone 跨 reload 持久：播过入场动画的 key 终身不再重播。
+   */
+  private armEntryAnim(): void {
+    if (!this.isScrolledToTop()) {
+      this.entryAnimKeys = new Set<string>();
+      return;
+    }
+    const keys: string[] = [];
+    const count: number = Math.min(this.dataSource.totalCount(), 24);
+    for (let i = 0; i < count; i++) {
+      const key: string = this.itemKey(this.dataSource.getData(i), i);
+      if (!this.entryAnimDone.has(key)) {
+        keys.push(key);
+      }
+    }
+    this.entryAnimKeys = new Set<string>(keys);
+    // done 只增不减，设上限防长跑无限增长（到达上限清零，代价是旧 key 允许重播一次）
+    if (this.entryAnimDone.size > 2000) {
+      this.entryAnimDone.clear();
+    }
+  }
+
+  /** 列表是否停在顶部：scroller 未挂载/读数失败时按顶部处理（初始加载场景） */
+  private isScrolledToTop(): boolean {
+    const scroller: Scroller | undefined = this.gridScroller ?? this.listScroller;
+    if (!scroller) {
+      return true;
+    }
+    try {
+      // currentOffset 读数单位随版本为 px/vp，阈值取 2 两种单位下都只在贴顶时成立
+      return scroller.currentOffset().yOffset <= 2;
+    } catch {
+      return true;
+    }
+  }
+
+  /** 条目转场：白名单内且未播过 → 一次性插入方向缩放淡入；否则直出（null） */
+  private entryTransitionOf(item: Object, index: number): TransitionEffect | null {
+    const key: string = this.itemKey(item, index);
+    if (!this.entryAnimKeys.has(key) || this.entryAnimDone.has(key)) {
+      return null;
+    }
+    this.entryAnimDone.add(key);
+    return customAnimationUtil.isScaleTranEnter(key, this.uiConfig);
   }
 
   private onFeedDataChanged(): void {
@@ -338,6 +399,7 @@ export struct MediaVideoFeed {
         .margin({ left: -this.params.headerHorizontalBleed, right: -this.params.headerHorizontalBleed })
       }
       LazyForEach(this.dataSource, (item: Object, index: number) => {
+        // 入场动画一次性门控：仅加载/刷新后的首屏条目播放，回收重建直出
         if (this.gridSpanOf(item, this.gridColumnCount()) > 1) {
           // 跨列卡（占满整行）：显式定位到整行
           GridItem() {
@@ -345,14 +407,14 @@ export struct MediaVideoFeed {
           }
           .columnStart(0)
           .columnEnd(this.gridSpanOf(item, this.gridColumnCount()) - 1)
-          .transition(customAnimationUtil.isScaleTran(this.itemKey(item, index), this.uiConfig))
+          .transition(this.entryTransitionOf(item, index))
         } else {
           // 普通卡：不得设置 columnStart/columnEnd —— 显式定位会脱离自动流式
           // 排列，全部钉在第 0 列，视觉上退化为单列
           GridItem() {
             this.FeedCardContent(item, index)
           }
-          .transition(customAnimationUtil.isScaleTran(this.itemKey(item, index), this.uiConfig))
+          .transition(this.entryTransitionOf(item, index))
         }
       }, (item: Object, index: number) => this.itemKey(item, index))
       if (this.params.isLoadingMore) {
@@ -368,6 +430,8 @@ export struct MediaVideoFeed {
     .rowsGap(this.params.layoutPreference === 'grid' ? 8 : 4)
     .width('100%')
     .layoutWeight(1)
+    // 预创建屏外两行：快速甩动时条目在入屏前完成布局/首帧，避免边缘白块（"直接消失"）
+    .cachedCount(this.gridColumnCount() * 2)
     .padding(this.params.gridContentPadding ?? 0)
     .clip(this.params.clipContent ?? true)
     .edgeEffect(EdgeEffect.Spring)
@@ -390,10 +454,11 @@ export struct MediaVideoFeed {
         }
       }
       LazyForEach(this.dataSource, (item: Object, index: number) => {
+        // 同 Grid 分支：入场动画一次性门控，回收重建直出
         ListItem() {
           this.itemBuilder({ item: item, index: index })
         }
-        .transition(customAnimationUtil.isScaleTran(this.itemKey(item, index), this.uiConfig))
+        .transition(this.entryTransitionOf(item, index))
       }, (item: Object, index: number) => this.itemKey(item, index))
       if (this.params.isLoadingMore) {
         ListItem() {
@@ -403,6 +468,8 @@ export struct MediaVideoFeed {
     }
     .width('100%')
     .layoutWeight(1)
+    // 预创建屏外两条：快速甩动时入屏条目提前完成布局，避免边缘白块（"直接消失"）
+    .cachedCount(2)
     .padding(this.params.listContentPadding ?? 0)
     .contentEndOffset(this.params.listContentEndOffset)
     .clip(this.params.clipContent ?? true)

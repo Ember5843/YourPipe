@@ -6,8 +6,10 @@
  *
  * 页面仍持有自己的强类型数组（唯一事实来源），数组每次整体重赋值后调用
  * setData 同步本数据源；提供 keyOf 时做前缀比对：旧数据是新数据的严格前缀
- * （翻页 append）→ 逐项 onDataAdd 增量通知，其余情况 onDataReloaded 全量刷新
- * （替代原先靠 key 里嵌 epoch 强刷重建的 hack）。
+ * （翻页 append）→ 逐项 onDataAdd 增量通知；key 序列完全一致（同长度同序，
+ * 含内容未变的重复同步）→ 不触发全量重载，仅对引用变化的条目逐项
+ * onDataChange 原地刷新（不重建节点、不重播条目转场）；其余情况
+ * onDataReloaded 全量刷新（替代原先靠 key 里嵌 epoch 强刷重建的 hack）。
  */
 import { IDataSourcePrefetching } from '@kit.ArkUI';
 import { FeedThumbUrlOf, ThumbPrefetcher } from './ThumbPrefetcher';
@@ -45,11 +47,24 @@ export class FeedDataSource implements IDataSourcePrefetching {
       const isPureAppend: boolean = this.keys.length > 0
         && prefix === this.keys.length
         && nextKeys.length > this.keys.length;
+      // key 序列完全一致（同长度同序）
+      const isSameKeys: boolean = prefix === nextKeys.length && this.keys.length === nextKeys.length;
+      const oldData: Object[] = this.dataArray;
       this.dataArray = nextData;
       this.keys = nextKeys;
       if (isPureAppend) {
         for (let i = prefix; i < nextKeys.length; i++) {
           this.notifyDataAdd(i);
+        }
+        return;
+      }
+      // 不触发全量重载——避免订阅合并/原位更新/重复同步把可见条目重建重播入场动画。
+      // 仅对引用变化的条目逐项 notifyDataChange（原地刷新内容，不重建节点、不重播转场）。
+      if (isSameKeys) {
+        for (let i = 0; i < nextKeys.length; i++) {
+          if (oldData[i] !== nextData[i]) {
+            this.notifyDataChange(i);
+          }
         }
         return;
       }

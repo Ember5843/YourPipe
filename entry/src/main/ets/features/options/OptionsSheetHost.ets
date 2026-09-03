@@ -120,44 +120,55 @@ export struct OptionsSheetHost {
   }
 
   build() {
-    HdsNavigation(this.optionsNavStack) {
-      OptionsMainPage({
-          params: {
-            clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
-            appLangItems: this.params.appLangItems,
-            contentLangItems: this.params.contentLangItems,
-            contentCountryItems: this.params.contentCountryItems,
-            onDataAccountClick: () => { this.pushOptionsPath('data_account'); },
-            onLanguageClick: () => { this.pushOptionsPath('language'); },
-            onPlaybackClick: () => { this.pushOptionsPath('playback'); },
-            onNetworkClick: () => { this.pushOptionsPath('network'); },
-            // [DISABLED] P3：onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
-            onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
-            onLogClick: () => { this.pushOptionsPath('log_page'); },
-            onHelpClick: () => { this.pushOptionsPath('help_page'); },
-            onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
-            onAboutClick: () => { this.pushOptionsPath('about_page'); }
-          }
-        })
-        .width('100%')
-        .height('100%')
+    // 超宽窗口（2in1/TV 横屏）下限制选项页最大宽度并居中，避免整行拉满全宽
+    Column() {
+      HdsNavigation(this.optionsNavStack) {
+        OptionsMainPage({
+            params: {
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              appLangItems: this.params.appLangItems,
+              contentLangItems: this.params.contentLangItems,
+              contentCountryItems: this.params.contentCountryItems,
+              onDataAccountClick: () => { this.pushOptionsPath('data_account'); },
+              onLanguageClick: () => { this.pushOptionsPath('language'); },
+              onPlaybackClick: () => { this.pushOptionsPath('playback'); },
+              onNetworkClick: () => { this.pushOptionsPath('network'); },
+              // [DISABLED] P3：onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
+              onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
+              onLogClick: () => { this.pushOptionsPath('log_page'); },
+              onHelpClick: () => { this.pushOptionsPath('help_page'); },
+              onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
+              onAboutClick: () => { this.pushOptionsPath('about_page'); }
+            }
+          })
+          .width('100%')
+          .height('100%')
+      }
+      .mode(NavigationMode.Stack)
+      .navDestination(this.OptionsPageMap)
+      .titleMode(HdsNavigationTitleMode.MINI)
+      // 隐藏 HdsNavigation 自带的返回键：一级菜单（栈空）不需要返回，
+      // 子页返回由 OptionsNavScaffold 的自定义 backIcon 承担
+      .hideBackButton(true)
+      .titleBar(buildSheetTitleBar({
+        title: $r('app.string.yt_option_title'),
+        onBack: this.optionsDepth > 0 ? () => {
+          this.popOptionsPath();
+        } : undefined,
+        menus: [
+          buildTitleMenu($r('sys.symbol.xmark'), $r('app.string.yt_action_close'), () => {
+            this.params.onClose();
+          })
+        ]
+      }))
+      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .clip(true)
+      .width('100%')
+      .height('100%')
+      .constraintSize({ maxWidth: 720 })
     }
-    .mode(NavigationMode.Stack)
-    .navDestination(this.OptionsPageMap)
-    .titleMode(HdsNavigationTitleMode.MINI)
-    .titleBar(buildSheetTitleBar({
-      title: $r('app.string.yt_option_title'),
-      onBack: this.optionsDepth > 0 ? () => {
-        this.popOptionsPath();
-      } : undefined,
-      menus: [
-        buildTitleMenu($r('sys.symbol.xmark'), $r('app.string.yt_action_close'), () => {
-          this.params.onClose();
-        })
-      ]
-    }))
-    .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
-    .clip(true)
+    .width('100%')
+    .height('100%')
   }
 
   @Builder

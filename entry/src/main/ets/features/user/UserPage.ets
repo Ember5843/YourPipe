@@ -86,7 +86,20 @@ export struct UserPage {
   @State displayChannel: SearchChannelItem = new SearchChannelItem(0, '', 'Unknown', '', '', '', '', '#CCCCCC');
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
 
-  private readonly BANNER_HEIGHT: number = 70;
+  /** 频道 banner 高度：宽屏按内容宽分档放大，避免被 Cover 裁成细带 */
+  private getBannerHeightVp(): number {
+    const contentWidthVp = getFeedContentWidthVp(this.getUIContext(), this.deviceWidth);
+    if (contentWidthVp >= 1080) {
+      return 140;
+    }
+    if (contentWidthVp >= 760) {
+      return 110;
+    }
+    if (contentWidthVp >= 520) {
+      return 90;
+    }
+    return 70;
+  }
   /** 播放列表 Tab 的 LazyForEach 数据源（playlistList 重赋值经 @Watch 同步） */
   private playlistFeedSource: FeedDataSource = new FeedDataSource();
 
@@ -505,13 +518,13 @@ export struct UserPage {
       if (this.bannerUrl && this.bannerUrl.length > 0) {
         Image(this.bannerUrl)
           .width('100%')
-          .height(this.BANNER_HEIGHT)
+          .height(this.getBannerHeightVp())
           .objectFit(ImageFit.Cover)
           .backgroundColor(this.displayChannel.thumbnailColor || $r('app.color.yourtube_icon_hint'))
       } else {
         Rect()
           .width('100%')
-          .height(this.BANNER_HEIGHT)
+          .height(this.getBannerHeightVp())
           .fill(this.displayChannel.thumbnailColor || $r('app.color.yourtube_icon_hint'))
       }
 

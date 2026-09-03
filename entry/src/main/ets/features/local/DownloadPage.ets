@@ -68,6 +68,8 @@ export struct DownloadPage {
       .height('100%')
       .padding({ left: 12, right: 12, top: 4, bottom: 12 })
       .edgeEffect(EdgeEffect.Spring)
+      // LocalPage 外层 Scroll 先消费上滑（Tab 栏跟随上移），到顶后列表自身再滚
+      .nestedScroll({ scrollForward: NestedScrollMode.PARENT_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
     }
   }
 }

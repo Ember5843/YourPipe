@@ -26,46 +26,6 @@ export enum BreakpointTypeEnum {
   XL = 'xl',
 }
 
-export interface BreakpointTypes<T> {
-  xs?: T;
-  sm: T;
-  md: T;
-  lg: T;
-  xl?: T;
-}
-
-export class BreakpointType<T> {
-  private xs: T;
-  private sm: T;
-  private md: T;
-  private lg: T;
-  private xl: T;
-
-  public constructor(param: BreakpointTypes<T>) {
-    this.xs = param.xs || param.sm;
-    this.sm = param.sm;
-    this.md = param.md;
-    this.lg = param.lg;
-    this.xl = param.xl || param.lg;
-  }
-
-  public getValue(currentBreakpoint: string): T {
-    if (currentBreakpoint === BreakpointTypeEnum.XS) {
-      return this.xs;
-    }
-    if (currentBreakpoint === BreakpointTypeEnum.SM) {
-      return this.sm;
-    }
-    if (currentBreakpoint === BreakpointTypeEnum.MD) {
-      return this.md;
-    }
-    if (currentBreakpoint === BreakpointTypeEnum.XL) {
-      return this.xl;
-    }
-    return this.lg;
-  }
-}
-
 export class BreakpointSystem {
   private static instance: BreakpointSystem;
   private currentBreakpoint: BreakpointTypeEnum = BreakpointTypeEnum.MD;
@@ -76,7 +36,6 @@ export class BreakpointSystem {
   public static getInstance(): BreakpointSystem {
     if (!BreakpointSystem.instance) {
       BreakpointSystem.instance = new BreakpointSystem();
-      AppStorage.setOrCreate('currentBreakpoint', BreakpointTypeEnum.MD);
     }
     return BreakpointSystem.instance;
   }

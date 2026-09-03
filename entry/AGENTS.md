@@ -30,14 +30,17 @@ all options pages —
 including About sub-pages (about_open_source / about_ai_models /
 about_changelog) — are
 destinations on that one stack (no third nav stack, no per-page safe-area
-padding: `buildSheetTitleBar` handles in-sheet insets).
+padding: `buildSheetTitleBar` handles in-sheet insets). The inner
+`HdsNavigation` sets `hideBackButton(true)` — HDS shows its own back key in
+MINI title mode by default (even on the empty-stack root); sub-page back
+comes from `OptionsNavScaffold`'s custom `backIcon`.
 
 ## 2. Features (`features/<feature>/`)
 | Feature | Contents |
 |---|---|
 | `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI; `HomeTabContent` — 首页 tab 内容宿主（feed 加载状态机 + 推荐位 banner + 三个 @LocalBuilder 卡片），Index 经 `HomeTabController` 触发 reset |
 | `search` | `SearchPage` (NavDestination) |
-| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/` + `workers/AsrStreamingWorker.ets`：`AsrLiveCaptionService` 真流式识别，MPV PCM tap + sherpa OnlineRecognizer 流式 zipformer 中英双语 int8；菜单项、Options 入口/设置页、PlayerSession/AVPlayer 接线、build-profile worker 注册均已注释，`AsrModelManager.clearAll`/`clearCaches` 的清数据接线保留以清理已下载模型）——入口/设置项均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
+| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **布局状态机**（PlayerPage 方法派生，输入 `@Env(WINDOW_SIZE/BREAK_POINT)` + 视频比例：竖向窗口 → 上视频+下信息；真横屏且容得下 → 左视频+右信息栏 `clamp(W/3, 320, 480)`；非竖向但容不下 → 挤压强制铺满，信息经播放器菜单"视频信息"以 CENTER sheet 打开；内容组件 `components/PlayerInfoPanel.ets` 三处复用；信息 sheet 设 `showClose: false`（自带关闭按钮会与面板 Tab 栏重叠，关闭走拖拽条/点空白）。强制全屏态（分屏 / 挤压铺满，即 `isFullLandscapeScreen() && !isManualFullscreen`）经 `VideoPlayer.showFullscreenButton=false` 隐藏右下角全屏切换按钮——该状态下按钮无意义，仅用户手动全屏保留退出入口。注意：ArkUI V1 @Component 不支持 ES get 访问器，布局派生必须用普通方法）, **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/` + `workers/AsrStreamingWorker.ets`：`AsrLiveCaptionService` 真流式识别，MPV PCM tap + sherpa OnlineRecognizer 流式 zipformer 中英双语 int8；菜单项、Options 入口/设置页、PlayerSession/AVPlayer 接线、build-profile worker 注册均已注释，`AsrModelManager.clearAll`/`clearCaches` 的清数据接线保留以清理已下载模型）——入口/设置项均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
 | `playlist` | Playlist list + detail |
 | `subscription` | Subscription manage + feed service (bottom tab) |
 | `favorites` | `FavoritesPage` |
@@ -73,7 +76,11 @@ Persistent state and shared singletons:
   re-listen lands on a NEW ephemeral port, and the bridge's
   `setPortChangeListener` hook (registered once by `NetworkProxyConfig`)
   re-points only the app-level proxy + WebView override at the new port
-  (never a full re-apply). On fuse-blown the `setFailureListener` hook
+  (never a full re-apply), then fires `setBridgeRepointListener`
+  (registered by `PlayerSession`) to re-apply MPV's process-level
+  `http_proxy` env for the current source — the env is written only at
+  `load()` and would otherwise keep hitting the dead port
+  (`AvPlayerController.refreshNetworkProxy`). On fuse-blown the `setFailureListener` hook
   logs an ERROR and toasts `yt_proxy_bridge_unavailable`; no
   auto-restart — a user re-save re-applies and resets the fuse. The WebView
   override has **no** direct-fallback rules — a dead proxy fails visibly.
@@ -120,6 +127,35 @@ Its Grid branch must leave normal cards without `columnStart`/`columnEnd`
 (auto-flow placement); explicitly positioning every item pins them all to
 column 0 and collapses the grid to a single column — only full-width items
 (header/footer/span>1 cards) set `columnStart(0).columnEnd(columns-1)`.
+Feed-item entrance animation is **one-shot gated** (`armEntryAnim` /
+`entryTransitionOf` + `customAnimationUtil.isScaleTranEnter`): only the first
+screen of items after a (re)load **while the list is scrolled to the top** may
+play the insert-only scale/fade-in; `entryAnimDone` persists across reloads so
+a key that has played never replays. Mid-scroll full reloads (background
+subscription merges, auth-fallback refetches) do not arm at all, and
+`FeedDataSource.setData` with an unchanged key sequence (same length, same
+order — including redundant re-syncs) skips the full reload and only fires
+per-item `onDataChange` for reference-changed items, so recycled/recreated and
+paginated items always get `.transition(null)` and render instantly. Never hand
+a plain always-on `.transition(isScaleTran(...))` to LazyForEach feed items or
+to static header/footer items inside a lazy Grid/List — recycling or branch
+rebuilds replay it, so cards scrolled past the top/bottom edge vanish in place
+(scale-to-0 ghost) or pop in late instead of scrolling off; use the insert-only
+`isScaleTranEnter` where an entrance is genuinely wanted. Symmetric
+`isScaleTran` remains acceptable only on eager `ForEach` lists (favorites /
+local / downloads / comments), which never recycle and use the delete half as
+user-action feedback.
+Root-tab pages let content scroll **under** the root title bar (translucent
+material): reserve `safeAreaTop + TITLE_BAR_HEIGHT` as padding on a wrapper
+(Refresh/Column), keep the inner List/Grid `clip(false)`, and expose the
+page's primary `Scroller` via a coordinator static
+(`SubscriptionScrollCoordinator` / `FavoritesScrollCoordinator` /
+`LocalScrollCoordinator`) — `Index` binds all of them plus the home feed
+scrollers to the root `HdsNavigation.bindToScrollable` so the scroll-driven
+blur engages on every tab. `LocalPage` additionally wraps its nested Tabs in
+an outer `Scroll` (UserPage pattern: top spacer + Tabs, inner lists
+`nestedScroll` PARENT_FIRST), so the 观看历史/下载视频 tab bar follows the
+content upward instead of staying pinned.
 `SubTabBar` (`SubTabBarItem`) is the shared in-page sub-tab builder (48vp bar,
 16fp, 36×2 theme-color indicator) used by Local / Player / User pages. It takes
 a single `SubTabBarItemParams` object-literal param (by-reference refresh) —

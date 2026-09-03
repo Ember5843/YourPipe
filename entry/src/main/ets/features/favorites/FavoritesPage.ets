@@ -14,6 +14,7 @@ import { getFeedContentWidthVp, getVideoGridColumnCount, getWideListColumnCount 
 import { ActionHub } from '../../common/ActionHub';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { SubscriptionFeedItem } from '../../common/SubscriptionFeedStore';
+import { FavoritesScrollCoordinator } from './FavoritesScrollCoordinator';
 
 
 const logger = AppLog.getInstance('FavoritesPage');
@@ -209,7 +210,10 @@ export struct FavoritesPage {
   }
 
   build() {
-    List({ space: 4 }) {
+    // 顶栏避让放在外层 Column（与首页同构）：List clip(false) 让上滑内容
+    // 画进避让区、透出标题栏半透明材质；scroller 绑定根标题栏滚动效果。
+    Column() {
+      List({ space: 4, scroller: FavoritesScrollCoordinator.scroller }) {
       this.SubscriptionFeedEntry()
 
       // 收藏的视频部分
@@ -374,11 +378,16 @@ export struct FavoritesPage {
           .transition(customAnimationUtil.isScaleTran(queue.id, this.uiConfig))
         }, (queue: StoredLocalQueue) => queue.id + queue.videos.length)
       }
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 72 })
+      .clip(false)
+      .edgeEffect(EdgeEffect.Spring)
     }
     .width('100%')
-    .padding({ left: 12, right: 12, top: this.safeAreaTop + TITLE_BAR_HEIGHT, bottom: this.safeAreaBottom + 72 })
-    .edgeEffect(EdgeEffect.Spring)
     .height('100%')
+    .padding({ top: this.safeAreaTop + TITLE_BAR_HEIGHT })
     .backgroundColor($r('app.color.yourtube_bg_page'))
   }
 }
