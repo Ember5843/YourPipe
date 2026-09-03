@@ -2969,6 +2969,10 @@
             "value": "الترجمة"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "معلومات الفيديو"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "المسار الصوتي"
         },

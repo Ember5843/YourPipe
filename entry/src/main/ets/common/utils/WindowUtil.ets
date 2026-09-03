@@ -110,7 +110,8 @@ export class WindowUtil {
           WindowUtil.setAvoidArea(avoidAreaOption.type, avoidAreaOption.area);
         });
 
-        // 窗口就绪：按当前方向设置初始系统栏状态
+        // 窗口就绪：写入初始断点（currentBreakpoint 唯一写入源），并按当前方向设置初始系统栏状态
+        BreakpointSystem.getInstance().onWindowSizeChange(windowClass);
         this.updateSystemBar();
       } catch (error) {
         Logger.error(TAG, `setWindowStage getWindowProperties failed. Code:${err.code}, message:${err.message}`);
@@ -134,6 +135,12 @@ export class WindowUtil {
   isSplitScreenMode(): boolean {
     return this.currentWindowStatus === window.WindowStatusType.SPLIT_SCREEN
       || (AppStorage.get<boolean>('isSplitScreen') ?? false);
+  }
+
+  /** 悬浮窗：播放页不沉浸、全局不隐藏系统栏。 */
+  isFloatingWindowMode(): boolean {
+    return this.currentWindowStatus === window.WindowStatusType.FLOATING
+      || (AppStorage.get<boolean>('isFloatingWindow') ?? false);
   }
 
   /** @deprecated 使用 isSplitScreenMode；保留以免外部误用。 */
@@ -268,15 +275,17 @@ export class WindowUtil {
     AppStorage.setOrCreate('playerControlAvoidRight', right);
   }
 
-  setMainWindowOrientation(orientation: window.Orientation, callback?: Function): void {
+  setMainWindowOrientation(orientation: window.Orientation, callback?: Function, errorCallback?: Function): void {
     if (this.mainWindowClass === undefined) {
       Logger.error(`MainWindowClass is undefined`);
+      errorCallback?.();
       return;
     }
     this.mainWindowClass.setPreferredOrientation(orientation).then(() => {
       callback?.();
     }).catch((err: BusinessError) => {
       Logger.error(`Failed to set the ${orientation} of main window. Code:${err.code}, message:${err.message}`);
+      errorCallback?.();
     });
   }
 
@@ -361,7 +370,9 @@ export class WindowUtil {
       const isLandscape = rect.width > rect.height;
       const uiContext = this.mainWindowClass.getUIContext();
       const shortSideVp = uiContext.px2vp(Math.min(rect.width, rect.height));
-      const shouldHide = this.isPlayerFullscreenImmersive || (isLandscape && shortSideVp < 600);
+      const isFloating = this.currentWindowStatus === window.WindowStatusType.FLOATING;
+      // 悬浮窗不隐藏系统栏：窗口本身不铺满，隐藏会留下无法点击的系统区
+      const shouldHide = this.isPlayerFullscreenImmersive || (isLandscape && shortSideVp < 600 && !isFloating);
       if (shouldHide) {
         this.disableWindowSystemBar();
       } else {

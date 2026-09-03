@@ -2969,6 +2969,10 @@
             "value": "Sous-titres"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "Infos sur la vidéo"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "Piste audio"
         },

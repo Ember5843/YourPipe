@@ -2969,6 +2969,10 @@
             "value": "字幕"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "動画情報"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "音声トラック"
         },

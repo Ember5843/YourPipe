@@ -2969,6 +2969,10 @@
             "value": "자막"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "동영상 정보"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "오디오 트랙"
         },

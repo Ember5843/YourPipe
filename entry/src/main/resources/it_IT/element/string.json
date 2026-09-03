@@ -2969,6 +2969,10 @@
             "value": "Sottotitoli"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "Informazioni sul video"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "Traccia audio"
         },

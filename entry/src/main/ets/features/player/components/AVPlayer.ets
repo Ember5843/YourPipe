@@ -141,6 +141,8 @@ export struct VideoPlayer {
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @StorageProp('currentColorMode') currentColorMode: number = ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET;
   @Prop @Watch('onFullscreenModeChange') isFullLandscapeScreen: boolean = false;
+  /** 强制全屏（分屏/挤压铺满，非用户手动全屏）时隐藏右下角全屏切换按钮——该状态下按钮无意义 */
+  @Prop showFullscreenButton: boolean = true;
   @StorageProp('playerPageVisible') @Watch('onPageVisibilityChange') isPageShow: boolean = false;
   @StorageProp('isAppBackground') @Watch('onPageVisibilityChange') isAppBackground: boolean = false;
   /** 会话级仅音频：封面层在播控之下，不挡进度条/手势 */
@@ -366,6 +368,8 @@ export struct VideoPlayer {
   /** 当播放器内部发生不可恢复错误时，通知父组件重新获取流信息 */
   onRetry: () => void = () => {};
   onSurfaceReady?: (xc: XComponentController) => void;
+  /** 全屏/分屏/挤压铺满态：打开信息面板 sheet（PlayerPage 注入） */
+  onShowInfoPanel?: () => void;
 
   onSourceChange(): void {
     this.resetTransientUi('source-change');
@@ -2184,6 +2188,16 @@ export struct VideoPlayer {
   TopToolsCollapsedMenu() {
     // 折叠总菜单：symbolStartIcon 显示与展开态相同的系统图标；倍速用 labelInfo 显示当前 Nx。
     Menu() {
+      // 全屏/分屏/挤压铺满态：信息面板不挂载，提供"视频信息"入口打开 sheet
+      if (this.isFullLandscapeScreen && this.onShowInfoPanel) {
+        MenuItem({
+          symbolStartIcon: this.menuSymbol($r('sys.symbol.info_circle')),
+          content: $r('app.string.yt_player_info_panel')
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .onClick(() => this.onShowInfoPanel?.())
+      }
       if (this.chapters.length > 0) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.list_bullet_square')),
@@ -2269,6 +2283,19 @@ export struct VideoPlayer {
   @Builder
   TopToolsExpandedRow() {
     Row({ space: this.getControlItemGap() }) {
+      // 全屏/分屏/挤压铺满态：信息面板 sheet 入口
+      if (this.isFullLandscapeScreen && this.onShowInfoPanel) {
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph($r('sys.symbol.info_circle'))
+            .fontSize(CONTROL_ICON_SIZE)
+            .fontColor([Color.White])
+        }
+          .width(SPEED_CONTROL_WIDTH)
+          .height(CONTROL_SLOT_SIZE)
+          .accessibilityText($r('app.string.yt_player_info_panel'))
+          .onClick(() => this.onShowInfoPanel?.())
+      }
+
       if (this.chapters.length > 0) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.list_bullet_square'))
@@ -2475,18 +2502,20 @@ export struct VideoPlayer {
           .flexShrink(0)
       }
 
-      // 全屏按鈕 — fontSize 统一用 vp，移除冲突的 height(24)限制
-      Stack({ alignContent: Alignment.Center }) {
-        SymbolGlyph(this.isFullLandscapeScreen ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') : $r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-          .fontSize(CONTROL_ICON_SIZE)
-          .fontColor([Color.White])
+      // 全屏按鈕 — fontSize 统一用 vp，移除冲突的 height(24)限制；强制全屏态（分屏/挤压铺满）隐藏
+      if (this.showFullscreenButton) {
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph(this.isFullLandscapeScreen ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') : $r('sys.symbol.arrow_up_left_and_arrow_down_right'))
+            .fontSize(CONTROL_ICON_SIZE)
+            .fontColor([Color.White])
+        }
+          .width(CONTROL_SLOT_SIZE)
+          .height(CONTROL_SLOT_SIZE)
+          .onClick(() => {
+            this.registerControlActivity();
+            this.onFullScreenClick?.(!this.isFullLandscapeScreen);
+          })
       }
-        .width(CONTROL_SLOT_SIZE)
-        .height(CONTROL_SLOT_SIZE)
-        .onClick(() => {
-          this.registerControlActivity();
-          this.onFullScreenClick?.(!this.isFullLandscapeScreen);
-        })
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)

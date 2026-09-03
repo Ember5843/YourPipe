@@ -2969,6 +2969,10 @@
             "value": "字幕"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "影片資訊"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "音軌"
         },

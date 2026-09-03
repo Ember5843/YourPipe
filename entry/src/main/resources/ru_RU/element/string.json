@@ -2969,6 +2969,10 @@
             "value": "Субтитры"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "Сведения о видео"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "Аудиодорожка"
         },

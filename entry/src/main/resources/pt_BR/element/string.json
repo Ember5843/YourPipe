@@ -2969,6 +2969,10 @@
             "value": "Legendas"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "Informações do vídeo"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "Faixa de áudio"
         },

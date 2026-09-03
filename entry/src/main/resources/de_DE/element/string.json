@@ -2969,6 +2969,10 @@
             "value": "Untertitel"
         },
         {
+            "name": "yt_player_info_panel",
+            "value": "Videoinformationen"
+        },
+        {
             "name": "yt_player_audio_track",
             "value": "Tonspur"
         },

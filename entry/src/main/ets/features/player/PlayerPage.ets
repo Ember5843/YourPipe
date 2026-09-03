@@ -14,7 +14,7 @@ import { AppLog } from '../../common/AppLog';
  * limitations under the License.
  */
 
-import { window } from '@kit.ArkUI';
+import { uiObserver, window, curves } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { harmonyShare, systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
@@ -22,22 +22,16 @@ import { fileUri, fileIo as fs } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
 import { CommonConstants as Const, ChapterInfo, PlaybackState, PlayerState, VideoData } from 'mediaservice';
 import { WindowUtil } from '../../common/utils/WindowUtil';
-import { VideoDetails } from './components/VideoDetails';
 import { VideoPlayer } from './components/AVPlayer';
 // 播放器错误统一由 VideoPlayer / AVPlayer 内部处理，不再使用 ErrorPage 短路
-import { initTabData } from '../../common/model/TabViewModel';
-import { TabItem } from '../../common/model/TabItem';
-import { YouTubePlayService } from './YouTubePlayService';
 import { HttpDownloader, VideoItem } from 'youtube_core';
 import { ActionHub, ActionHubEvent } from '../../common/ActionHub';
-import { CommentNavWrapper } from './components/CommentNavWrapper';
 import { AvPlayerController, PlayerUiViewModel } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
-import { PlayQueueList } from './components/PlayQueueList';
+import { PlayerInfoPanel } from './components/PlayerInfoPanel';
 import { PiPManager } from './pip/PiPManager';
 import { PlaybackConfig } from '../../common/PlaybackConfig';
 import { MediaThumb } from '../../common/components/MediaThumb';
-import { SubTabBarItem } from '../../common/components/SubTabBar';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
 
 const logger = AppLog.getInstance('PlayerPage');
@@ -48,25 +42,26 @@ const TAG: string = '[PlayerLog][VideoPlayerPage]';
 export struct VideoPlayerPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageProp('selectedVideo') @Watch('onVideoChange') video: VideoItem | null = null;
-  @StorageProp('deviceHeight') deviceHeight: number =
-    AppStorage.get<number>('deviceHeight') || 0;
-  @StorageProp('deviceWidth') deviceWidth: number =
-    AppStorage.get<number>('deviceWidth') || 0;
   // statusBarHeight 由 WindowUtil 在 avoidAreaChange 时实时更新（TYPE_SYSTEM / TYPE_CUTOUT max）
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
   // Index Provide 的 safeAreaTop 作为兜底，避免 Storage 尚未写入时 inset 为 0
   @Consume('safeAreaTop') safeAreaTop: number = 0;
-  // 三种布局状态：
-  //   isFullLandscapeScreen = true  → 沉浸全屏（视频 100%）
-  //   isWideLayout         = true  → 宽窗口侧栏布局（左视频 60% + 右信息 40%）
-  //   都为 false                 → 竖屏（上视频 + 下 Tab）
-  // isManualFullscreen：用户点了全屏按钮。默认打开不强制全屏/横屏；仅分屏强制铺满。
-  @State isFullLandscapeScreen: boolean = false;
-  @State isWideLayout: boolean = false;
+  // 三种布局状态（全部由下方方法声明式派生，输入：@Env 窗口尺寸/二维断点 + 视频比例）：
+  //   isFullLandscapeScreen → 沉浸全屏（视频 100%）：分屏，或手动全屏且朝向已 settle
+  //   isWideLayout          → 宽窗口侧栏布局（左视频自适应 + 右信息固定宽）
+  //   都为 false            → 竖屏/窄横屏（上视频 + 下 Tab）
+  // isManualFullscreen：用户点了全屏按钮（事件驱动，唯一保留的布局 @State）。
   @State isManualFullscreen: boolean = false;
-  @State isImmersive: boolean = false;
+  /** 全屏/分屏/挤压铺满态下，信息面板 sheet 的可见性（入口在播放器菜单"视频信息"） */
+  @State showInfoPanel: boolean = false;
   /** 仅分屏：视频默认铺满分屏窗口 */
   @StorageProp('isSplitScreen') @Watch('onSplitScreenChange') isSplitScreen: boolean = false;
+  /** 悬浮窗：不沉浸、不隐藏系统栏 */
+  @StorageProp('isFloatingWindow') isFloatingWindow: boolean = false;
+  /** 响应式窗口尺寸（vp，API 23+）：布局派生的尺寸输入 */
+  @Env(SystemProperties.WINDOW_SIZE) winSize: window.SizeInVP;
+  /** 响应式系统二维断点（API 22+）：横向宽断点 + 纵向高宽比断点 */
+  @Env(SystemProperties.BREAK_POINT) winBp: uiObserver.WindowSizeLayoutBreakpointInfo;
   @Consume('actionHub') actionHub: ActionHub;
   onFullScreenChange?: (isFullScreen: boolean) => void;
 
@@ -85,8 +80,6 @@ export struct VideoPlayerPage {
   @State controller: AvPlayerController = PlayerSession.getInstance().controller;
   @State vm: PlayerUiViewModel = PlayerSession.getInstance().controller.vm;
   @State isPageShow: boolean = false;
-  @State tabArray: Array<TabItem> = initTabData();
-  @State currentTabIndex: number = 0;
   @State videoDescriptionError: string | null = null;
   @State errorInfo: ErrorInfo | null = null;
   @State detailLikeCount: string = '0';
@@ -113,11 +106,6 @@ export struct VideoPlayerPage {
     this.handleFullScreenExit();
   };
   private cachedThumbnailUri: string = '';
-  /**
-   * Cross-orient exit only: keep full layout until portrait size settles,
-   * so we never flash landscape-wide mid-rotate (0.5.1 gap).
-   */
-  private pendingOrientationSettle: boolean = false;
   private pagePlaybackStateListener = (state: PlaybackState): void => {
     if (state.errorMsg) {
       this.isLoading = false;
@@ -196,27 +184,109 @@ export struct VideoPlayerPage {
     }
   }
 
-  private getVideoHeightVp(): number {
-    // 宽布局（折叠屏展开/平板横屏）或全屏 → 撑满
-    if (this.isWideLayout || this.isFullLandscapeScreen) {
-      return this.getUIContext().px2vp(Math.max(this.deviceWidth, this.deviceHeight));
-    }
-    const shortSide = Math.min(this.deviceWidth, this.deviceHeight);
-    const maxHeight = this.getUIContext().px2vp(Math.max(this.deviceWidth, this.deviceHeight) * 0.45);
-    // 视频尺寸已知时，按实际比例计算容器高度
+  /** 信息栏目标宽 = 窗口宽 × 1/3 */
+  private static readonly PANEL_WIDTH_RATIO: number = 1 / 3;
+  /** 信息栏宽度区间（vp）：超宽屏不膨胀、窄横屏不被挤没 */
+  private static readonly PANEL_MIN_WIDTH_VP: number = 320;
+  private static readonly PANEL_MAX_WIDTH_VP: number = 480;
+  /** 侧栏准入的横版视频高度填充率保险值：仅挡极端方形窗口 */
+  private static readonly SIDE_MIN_VIDEO_FILL: number = 0.45;
+
+  /** 视频宽高比；尺寸未知时回退 16:9 */
+  private getVideoAspect(): number {
     if (this.videoSource.width && this.videoSource.height) {
-      const aspectRatio = this.videoSource.width / this.videoSource.height;
-      const rawHeight = this.getUIContext().px2vp(shortSide / aspectRatio);
-      return Math.max(200, Math.min(maxHeight, rawHeight));
+      return this.videoSource.width / this.videoSource.height;
     }
-    // 视频尺寸未知时（加载中），按 16:9 预占高度（最常见比例）
-    const defaultHeight = this.getUIContext().px2vp(shortSide / (16 / 9));
-    return Math.max(200, Math.min(maxHeight, defaultHeight));
+    return 16 / 9;
+  }
+
+  /** 信息栏宽度：窗口 1/3，clamp [320, 480] */
+  private getInfoPanelWidthVp(): number {
+    return Math.min(Math.max(this.winSize.width * VideoPlayerPage.PANEL_WIDTH_RATIO,
+      VideoPlayerPage.PANEL_MIN_WIDTH_VP), VideoPlayerPage.PANEL_MAX_WIDTH_VP);
+  }
+
+  /**
+   * 侧栏准入：真横屏（系统纵向断点 sm，H/W<0.8）+ 窗口宽 ≥ md（600vp）
+   * + 横版视频弱填充率保险（(W−P) ≥ a·H·0.45，仅挡极端方形窗口）。
+   * 类方形窗口（纵向断点 md，如双折内屏）与竖向窗口不侧栏。
+   * 竖版视频高度天然用满，直接放行。
+   */
+  private isSideAdmission(): boolean {
+    const widthBp = this.winBp.widthBreakpoint;
+    if (widthBp === WidthBreakpoint.WIDTH_XS || widthBp === WidthBreakpoint.WIDTH_SM) {
+      return false;
+    }
+    if (this.winBp.heightBreakpoint !== HeightBreakpoint.HEIGHT_SM) {
+      return false;
+    }
+    const aspect = this.getVideoAspect();
+    if (aspect < 1) {
+      return true;
+    }
+    return (this.winSize.width - this.getInfoPanelWidthVp())
+      >= aspect * this.winSize.height * VideoPlayerPage.SIDE_MIN_VIDEO_FILL;
+  }
+
+  /**
+   * 挤压强制铺满（第四态）：非竖向窗口但容不下侧栏（过窄/过方）——
+   * 视频像分屏一样铺满窗口，信息区不挂载，经播放器菜单"视频信息"以 sheet 打开。
+   */
+  private isCrampedFull(): boolean {
+    if (this.winBp.heightBreakpoint === HeightBreakpoint.HEIGHT_LG) {
+      return false;
+    }
+    return !this.isSideAdmission();
+  }
+
+  /**
+   * 沉浸全屏（视频铺满）：分屏；手动全屏且窗口朝向已与视频比例 settle
+   * （复刻 willRotate 等待语义）；或挤压窗口强制铺满。
+   */
+  private isFullLandscapeScreen(): boolean {
+    if (this.isSplitScreen || this.windowUtil.isSplitScreenMode()) {
+      return true;
+    }
+    if (this.isManualFullscreen) {
+      return (this.winSize.width > this.winSize.height) === (this.getVideoAspect() >= 1);
+    }
+    return this.isCrampedFull();
+  }
+
+  /** 宽窗口侧栏布局：未被铺满状态接管，且满足侧栏准入。 */
+  private isWideLayout(): boolean {
+    if (this.isFullLandscapeScreen()) {
+      return false;
+    }
+    return this.isSideAdmission();
+  }
+
+  /** 沉浸（顶部 inset 归零）：全屏铺满；或侧栏布局下短边<600vp 且非悬浮窗 */
+  private isImmersive(): boolean {
+    if (this.isFullLandscapeScreen()) {
+      return true;
+    }
+    if (!this.isWideLayout()) {
+      return false;
+    }
+    return Math.min(this.winSize.width, this.winSize.height) < 600 && !this.isFloatingWindow;
+  }
+
+  private getVideoHeightVp(): number {
+    // 宽布局或全屏 → 撑满（build 中实际传 100%，此处兜底）
+    if (this.isWideLayout() || this.isFullLandscapeScreen()) {
+      return Math.max(this.winSize.width, this.winSize.height);
+    }
+    const shortSide = Math.min(this.winSize.width, this.winSize.height);
+    const maxHeight = Math.max(this.winSize.width, this.winSize.height) * 0.45;
+    // 按视频实际比例计算容器高度（比例未知时 getVideoAspect 回退 16:9）
+    const rawHeight = shortSide / this.getVideoAspect();
+    return Math.max(200, Math.min(maxHeight, rawHeight));
   }
 
   /** Non-immersive top inset under status bar / punch-hole. Immersive → 0. */
   private getTopSafeInsetVp(): number {
-    if (this.isImmersive) {
+    if (this.isImmersive()) {
       return 0;
     }
     return Math.max(this.statusBarHeight || 0, this.safeAreaTop || 0);
@@ -358,19 +428,10 @@ export struct VideoPlayerPage {
     this.windowUtil.disableLandscapeMultiWindow();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
 
-    const initW = this.deviceWidth;
-    const initH = this.deviceHeight;
-    if (initW > 0 && initH > 0) {
-      this.applyLayoutForWindowSize(initW, initH);
-      logger.info(`${TAG} entered layout full=${this.isFullLandscapeScreen} wide=${this.isWideLayout} split=${this.isSplitScreen}`);
-    }
-
-    // 0.5.1 混合动画：
-    //   跨向旋转 → animateTo(0) 禁用属性动画，系统旋转独占
-    //   同向 full↔wide → 直接改状态，由容器 .animation(300) 驱动
-    this.windowUtil.registerOnWindowSizeChange((size) => {
-      this.onPlayerWindowSizeChange(size.width, size.height);
-    });
+    logger.info(`${TAG} entered layout full=${this.isFullLandscapeScreen()} wide=${this.isWideLayout()} split=${this.isSplitScreen}`
+      + ` win=${Math.round(this.winSize.width)}x${Math.round(this.winSize.height)}`
+      + ` wBp=${this.winBp.widthBreakpoint} hBp=${this.winBp.heightBreakpoint}`
+      + ` aspect=${this.getVideoAspect().toFixed(2)} panel=${Math.round(this.getInfoPanelWidthVp())}`);
 
     // Restore path already bound videoSource above; skip extract unless missing.
     if (!pipRestoreAttach) {
@@ -428,7 +489,6 @@ export struct VideoPlayerPage {
     this.windowUtil.setPlayerStatusBarStyle(false);
     this.windowUtil.disableLandscapeMultiWindow();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
-    this.windowUtil.registerOffWindowSizeChange();
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
 
     // 退出播放页：关闭 PiP 自动启动（避免非播放页 home 键误启），注销生命周期回调
@@ -613,104 +673,80 @@ export struct VideoPlayerPage {
     }
   }
 
-  private notifyFullScreenChange(): void {
+  private lastPublishedFullscreen: boolean = false;
+
+  /**
+   * 推送"手动全屏生效中"给宿主（Index 返回键判定：true → 返回=退出全屏；
+   * 分屏/挤压铺满不发布，返回直接离开播放页）。值变化才发；
+   * 根节点 onAreaChange 与各副作用路径都会调用，覆盖旋转 settle 等窗口驱动变化。
+   */
+  private publishFullscreenState(): void {
+    const active = this.isManualFullscreen && this.isFullLandscapeScreen();
+    if (active === this.lastPublishedFullscreen) {
+      return;
+    }
+    this.lastPublishedFullscreen = active;
     if (this.onFullScreenChange) {
-      this.onFullScreenChange(this.isFullLandscapeScreen);
+      this.onFullScreenChange(active);
     }
   }
 
   private onSplitScreenChange(): void {
-    // 分屏进出时立刻按当前窗口尺寸重算布局（不依赖下一次 sizeChange）
-    if (this.deviceWidth > 0 && this.deviceHeight > 0) {
-      this.onPlayerWindowSizeChange(this.deviceWidth, this.deviceHeight);
-    }
+    // 分屏状态是布局派生输入之一（isFullLandscapeScreen getter），此处只需同步副作用
+    this.syncFullscreenSideEffects();
   }
 
-  /**
-   * 布局规则（默认打开不做强制全屏/横屏）：
-   *   分屏 → 视频铺满分屏窗
-   *   用户手动全屏 → 沉浸全屏
-   *   否则仅按窗口宽高：横 → 宽布局，竖 → 竖屏详情
-   */
-  private applyLayoutForWindowSize(widthPx: number, heightPx: number): void {
-    const isLandscape = widthPx > heightPx;
-    const shortSideVp = this.getUIContext().px2vp(Math.min(widthPx, heightPx));
-    const inSplit = this.isSplitScreen || this.windowUtil.isSplitScreenMode();
-
-    if (inSplit) {
-      // 分屏：仅布局铺满，不改系统朝向
-      this.isFullLandscapeScreen = true;
-      this.isWideLayout = false;
-      this.isImmersive = true;
-    } else if (this.isManualFullscreen) {
-      this.isFullLandscapeScreen = true;
-      this.isWideLayout = false;
-      this.isImmersive = true;
-    } else if (isLandscape) {
-      this.isFullLandscapeScreen = false;
-      this.isWideLayout = true;
-      this.isImmersive = shortSideVp < 600;
-    } else {
-      this.isFullLandscapeScreen = false;
-      this.isWideLayout = false;
-      this.isImmersive = false;
-    }
-    // 系统栏：手动全屏或分屏沉浸时隐藏；其余交给 WindowUtil 方向策略
-    this.windowUtil.setPlayerFullscreenImmersive(this.isManualFullscreen || inSplit);
-    this.notifyFullScreenChange();
+  /** 全屏副作用收口：系统栏沉浸标志 + 通知宿主；仅随手动全屏/分屏状态变化调用 */
+  private syncFullscreenSideEffects(): void {
+    this.windowUtil.setPlayerFullscreenImmersive(
+      this.isManualFullscreen || this.isSplitScreen || this.windowUtil.isSplitScreenMode());
+    this.publishFullscreenState();
   }
 
-  private onPlayerWindowSizeChange(widthPx: number, heightPx: number): void {
-    // 0.5.1: duration:0 disables container .animation so system rotate owns the frame.
-    // Do not invent intermediate layouts — apply flags from final width/height only.
-    this.pendingOrientationSettle = false;
-    animateTo({ duration: 0 }, () => {
-      this.applyLayoutForWindowSize(widthPx, heightPx);
-    });
+  /** HDS 非线性动效：弹簧曲线驱动全屏进出布局收放（时长由弹簧物理参数决定，无需 duration） */
+  private animateFullscreenLayout(change: () => void): void {
+    this.getUIContext().animateTo({ curve: curves.springMotion() }, change);
   }
 
   private enterImmersiveFullscreen(): void {
     // 分屏已铺满，不锁朝向
     if (this.isSplitScreen || this.windowUtil.isSplitScreenMode()) {
       this.isManualFullscreen = false;
-      this.applyLayoutForWindowSize(this.deviceWidth, this.deviceHeight);
+      this.syncFullscreenSideEffects();
       return;
     }
 
     // 仅用户主动全屏：按视频比例锁朝向（默认打开路径不会走到这里）
-    const isLandscapeVideo = !!(this.videoSource.width && this.videoSource.height
-      && this.videoSource.width > this.videoSource.height);
+    const isLandscapeVideo = this.getVideoAspect() >= 1;
     const targetOrientation = isLandscapeVideo
       ? window.Orientation.LANDSCAPE
       : window.Orientation.PORTRAIT;
-    const isCurrentLandscape = this.deviceWidth > this.deviceHeight;
-    const willRotate = isLandscapeVideo !== isCurrentLandscape;
 
-    this.isManualFullscreen = true;
-    this.pendingOrientationSettle = false;
+    // animateTo 帧内：视频区收放 + InfoPanel 转场联动；需旋转时 settle 前布局不变、不触发本动画
+    this.animateFullscreenLayout(() => {
+      this.isManualFullscreen = true;
+    });
     this.windowUtil.setPlayerFullscreenImmersive(true);
     this.windowUtil.enableLandscapeMultiWindow();
-    this.windowUtil.setMainWindowOrientation(targetOrientation);
-
-    if (!willRotate) {
-      this.isWideLayout = false;
-      this.isFullLandscapeScreen = true;
-      this.isImmersive = true;
-      this.notifyFullScreenChange();
-    }
+    this.windowUtil.setMainWindowOrientation(targetOrientation, undefined, () => {
+      // 锁向失败（如 TV/车机 ROM 不支持）：回滚全屏状态，避免卡在竖屏"全屏"小窗
+      logger.warn(`${TAG} orientation lock failed; rolling back manual fullscreen`);
+      this.isManualFullscreen = false;
+      this.windowUtil.disableLandscapeMultiWindow();
+      this.windowUtil.setPlayerFullscreenImmersive(false);
+      this.publishFullscreenState();
+    });
+    // 布局由 getter 派生：窗口朝向 settle 后自动铺满，此处只需通知宿主
+    this.publishFullscreenState();
   }
 
   handleFullScreenExit(): void {
-    this.isManualFullscreen = false;
-    this.pendingOrientationSettle = false;
+    this.animateFullscreenLayout(() => {
+      this.isManualFullscreen = false;
+    });
     this.windowUtil.disableLandscapeMultiWindow();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
-    this.applyLayoutForWindowSize(this.deviceWidth, this.deviceHeight);
-  }
-
-  @Builder
-  tabBuilder(index: number, name: string | Resource) {
-    SubTabBarItem({ label: name, selected: this.currentTabIndex === index, themePrimary: this.themePrimary })
+    this.syncFullscreenSideEffects();
   }
 
   @Builder
@@ -823,55 +859,43 @@ export struct VideoPlayerPage {
     .backgroundColor(Color.Black)
   }
 
-  // ── 信息面板（详情 + 评论 Tab），手机竖屏和平板横屏复用 ──
+  // ── 信息面板：竖屏下方 / 横屏侧栏内联；全屏态经 sheet 打开（内容组件 PlayerInfoPanel）──
   @Builder
   InfoPanel() {
-    Column() {
-      Tabs({ barPosition: BarPosition.Start }) {
-        ForEach(this.tabArray, (item: TabItem) => {
-          TabContent() {
-            Column() {
-              if (item.id === 0) {
-                if (this.video) {
-                  VideoDetails({
-                    item: this.video,
-                    videoDescription: this.videoSource.videoDescription,
-                    streams: this.videoSource.streams || [],
-                    // Extractor sets videoInfo.isLive from isLiveNow only (not isLiveContent).
-                    // List badge item.isLive must not hide download on 直播回放.
-                    isLiveNow: this.videoSource.isLive === true,
-                    viewCount: this.videoSource.viewCount || 0,
-                    likeCount: this.detailLikeCount,
-                    dislikeCount: this.detailDislikeCount,
-                    publishDate: this.videoSource.publishDate || '',
-                    tags: this.videoSource.tags || [],
-                    channelId: this.detailChannelId,
-                    channelAvatarUrl: this.detailChannelAvatarUrl,
-                    vm: $vm,
-                  })
-                }
-              } else if (item.id === 1) {
-                CommentNavWrapper({ videoId: this.video?.videoId || '' })
-              } else {
-                PlayQueueList()
-              }
-            }
-            .width(Const.WIDTH_FULL_PERCENT)
-            .height(Const.HEIGHT_FULL_PERCENT)
-          }.tabBar(this.tabBuilder(item.id, item.name))
-        }, (item: TabItem, index: number) => JSON.stringify(item) + index)
-      }
-      .borderRadius({ topLeft: 16, topRight: 16 })
-      .barMode(BarMode.Fixed)
-      .barWidth(Const.WIDTH_FULL_PERCENT)
-      .barHeight(48)
-      .onAnimationStart((index: number, targetIndex: number) => {
-        this.currentTabIndex = targetIndex;
-      })
-      .backgroundColor($r('app.color.yourtube_bg_page'))
-    }
-    .layoutWeight(1)
+    PlayerInfoPanel({
+      video: this.video,
+      videoDescription: this.videoSource.videoDescription,
+      streams: this.videoSource.streams || [],
+      // Extractor sets videoInfo.isLive from isLiveNow only (not isLiveContent).
+      // List badge item.isLive must not hide download on 直播回放.
+      isLiveNow: this.videoSource.isLive === true,
+      viewCount: this.videoSource.viewCount || 0,
+      likeCount: this.detailLikeCount,
+      dislikeCount: this.detailDislikeCount,
+      publishDate: this.videoSource.publishDate || '',
+      tags: this.videoSource.tags || [],
+      channelId: this.detailChannelId,
+      channelAvatarUrl: this.detailChannelAvatarUrl,
+      vm: $vm,
+    })
+    // 宽布局：右栏固定宽（视频吃剩余空间）；竖屏/挤压态：占满剩余高度
+    .width(this.isWideLayout() ? this.getInfoPanelWidthVp() : Const.WIDTH_FULL_PERCENT)
+    .layoutWeight(this.isWideLayout() ? 0 : 1)
     .height(Const.HEIGHT_FULL_PERCENT)
+    // 挂载/卸载转场：仅在 animateTo 帧内播放（全屏进出），其余场景即时
+    .transition(TransitionEffect.asymmetric(
+      TransitionEffect.OPACITY.combine(TransitionEffect.move(TransitionEdge.END)),
+      TransitionEffect.OPACITY))
+  }
+
+  // ── 全屏/分屏/挤压铺满态的信息 sheet：CENTER 大面板，与 VideoDetails 的 BOTTOM 内层 sheet 形态错开 ──
+  @Builder
+  PlayerInfoSheetContent() {
+    Column() {
+      this.InfoPanel()
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder
@@ -880,10 +904,16 @@ export struct VideoPlayerPage {
       VideoPlayer({
         controller: $controller,
         vm: $vm,
-        isFullLandscapeScreen: this.isFullLandscapeScreen,
+        isFullLandscapeScreen: this.isFullLandscapeScreen(),
+        // 强制全屏（分屏 / 挤压强制铺满）下退出全屏无意义，隐藏全屏切换按钮；
+        // 仅用户手动全屏（isManualFullscreen）时保留退出入口
+        showFullscreenButton: !this.isFullLandscapeScreen() || this.isManualFullscreen,
+        onShowInfoPanel: () => {
+          this.showInfoPanel = true;
+        },
         onFullScreenClick: () => {
           // Toggle guard: 当前已是全屏 → 退出
-          if (this.isFullLandscapeScreen) {
+          if (this.isFullLandscapeScreen()) {
             this.handleFullScreenExit();
             return;
           }
@@ -950,23 +980,23 @@ export struct VideoPlayerPage {
           .backgroundColor(Color.Black)
 
         Flex({
-          direction: this.isWideLayout && !this.isFullLandscapeScreen
+          direction: this.isWideLayout() && !this.isFullLandscapeScreen()
             ? FlexDirection.Row : FlexDirection.Column
         }) {
           Stack() {
             this.VideoPlayerContent()
           }
-          .width(this.isFullLandscapeScreen ? Const.WIDTH_FULL_PERCENT :
-            this.isWideLayout ? '60%' : Const.WIDTH_FULL_PERCENT)
-          .height(this.isFullLandscapeScreen ? Const.HEIGHT_FULL_PERCENT :
-            this.isWideLayout ? Const.HEIGHT_FULL_PERCENT :
+          // 宽布局：视频吃剩余宽度（右栏固定宽）；其余状态铺满
+          .width(this.isFullLandscapeScreen() ? Const.WIDTH_FULL_PERCENT :
+            this.isWideLayout() ? 0 : Const.WIDTH_FULL_PERCENT)
+          .layoutWeight(this.isWideLayout() && !this.isFullLandscapeScreen() ? 1 : 0)
+          .height(this.isFullLandscapeScreen() ? Const.HEIGHT_FULL_PERCENT :
+            this.isWideLayout() ? Const.HEIGHT_FULL_PERCENT :
             this.getVideoHeightVp())
           .clip(true)
-          // 0.5.1：同向宽布局↔沉浸 300ms；跨向时 windowSizeChange 用 animateTo(0) 关掉本动画
-          .animation({ duration: 300, curve: Curve.EaseInOut })
 
           // 沉浸/分屏铺满时不占布局，避免详情 Tab 挤占小窗口高度
-          if (!this.isFullLandscapeScreen) {
+          if (!this.isFullLandscapeScreen()) {
             this.InfoPanel()
           }
         }
@@ -978,7 +1008,7 @@ export struct VideoPlayerPage {
 
       // Extra cover: if native surface still paints above the spacer, this opaque
       // bar sits at the very top of the page stack and masks status-bar region.
-      if (!this.isImmersive && this.getTopSafeInsetVp() > 0) {
+      if (!this.isImmersive() && this.getTopSafeInsetVp() > 0) {
         Column()
           .width(Const.WIDTH_FULL_PERCENT)
           .height(this.getTopSafeInsetVp())
@@ -990,5 +1020,18 @@ export struct VideoPlayerPage {
     .height(Const.HEIGHT_FULL_PERCENT)
     .backgroundColor(Color.Black)
     .clip(true)
+    // 布局变化（旋转 settle/分屏/全屏进出）后补发布"手动全屏生效中"（带变化去重）
+    .onAreaChange(() => {
+      this.publishFullscreenState();
+    })
+    // 全屏/分屏/挤压铺满态：信息面板以 CENTER sheet 打开（入口在播放器菜单"视频信息"）
+    .bindSheet($$this.showInfoPanel, this.PlayerInfoSheetContent(), {
+      detents: [SheetSize.LARGE],
+      dragBar: true,
+      preferType: SheetType.CENTER,
+      // 关闭 sheet 自带的右上角关闭按钮：全屏态下它会与面板顶部 Tab 栏重叠，
+      // 关闭交互由拖拽条（dragBar）和点击空白处承担
+      showClose: false
+    })
   }
 }
