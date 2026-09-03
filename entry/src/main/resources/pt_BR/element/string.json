@@ -69,6 +69,14 @@
             "value": "Outros"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "Geral"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "Personalização"
+        },
+        {
             "name": "yt_option_language",
             "value": "Idioma"
         },
@@ -1850,7 +1858,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "Gestos de reprodução"
+            "value": "Gestos e controles"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "Deslizar, pressionar e outros controles de reprodução"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1950,7 +1962,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "Buffer e rede"
+            "value": "Desempenho e buffer"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "Decodificação, renderização e cache de buffer"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Vídeos podem ser baixados para assistir offline e são gerenciados na aba \"Local\". \"Limpar todos os dados\" não exclui os arquivos baixados."
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "Tamanho, cor, fundo e tradução automática"
         },
         {
             "name": "yt_setting_subtitle_size",

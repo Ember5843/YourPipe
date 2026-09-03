@@ -37,6 +37,10 @@ interface OptionsDataAccountPageParams {
   onAuthChanged: () => void;
   /** Cookie 导入登录成功后的统一后置动作（与 WebView/QR 登录一致）。 */
   onLoginSuccess: () => void;
+  /** 恢复所有配置（确认弹窗由 Index 弹出）。 */
+  onResetSettings: () => void;
+  /** 清除应用全部数据（确认弹窗由 Index 弹出）。 */
+  onClearAllData: () => void;
 }
 
 @Component
@@ -51,7 +55,9 @@ export struct OptionsDataAccountPage {
     updateUiConfig: () => {},
     onHomeFeedStyleChanged: () => {},
     onAuthChanged: () => {},
-    onLoginSuccess: () => {}
+    onLoginSuccess: () => {},
+    onResetSettings: () => {},
+    onClearAllData: () => {}
   };
 
   @State isBusy: boolean = false;
@@ -793,6 +799,41 @@ export struct OptionsDataAccountPage {
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               transparentBackground: true,
               onClickAction: () => { this.openRestoreFilePicker(); }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_option_recovery') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            OptionItem({
+              icon: $r('sys.symbol.arrow_counterclockwise_clock'),
+              title: $r('app.string.yt_option_reset_settings'),
+              subtitle: $r('app.string.yt_option_reset_settings_subtitle'),
+              iconColor: this.themePrimary,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              transparentBackground: true,
+              onClickAction: () => { this.params.onResetSettings(); }
+            })
+          }
+
+          ListItem() {
+            OptionItem({
+              icon: $r('sys.symbol.trash'),
+              title: $r('app.string.yt_option_clear_all_data'),
+              subtitle: $r('app.string.yt_option_clear_all_data_subtitle'),
+              iconColor: this.themePrimary,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              transparentBackground: true,
+              onClickAction: () => { this.params.onClearAllData(); }
             })
           }
         }

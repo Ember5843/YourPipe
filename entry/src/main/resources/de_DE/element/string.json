@@ -69,6 +69,14 @@
             "value": "Sonstiges"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "Allgemein"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "Personalisierung"
+        },
+        {
             "name": "yt_option_language",
             "value": "Sprache"
         },
@@ -1850,7 +1858,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "Wiedergabegesten"
+            "value": "Gesten & Steuerung"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "Wischen, Halten und weitere Wiedergabesteuerung"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1950,7 +1962,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "Pufferung und Netzwerk"
+            "value": "Leistung & Pufferung"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "Dekodierung, Rendering & Puffer-Cache"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Videos können zum Offline-Ansehen heruntergeladen und auf dem Tab „Lokal“ verwaltet werden. „Gesamte App-Daten löschen“ löscht deine heruntergeladenen Dateien niemals."
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "Größe, Farbe, Hintergrund & Auto-Übersetzung"
         },
         {
             "name": "yt_setting_subtitle_size",

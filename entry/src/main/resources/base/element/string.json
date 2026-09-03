@@ -65,6 +65,14 @@
             "value": "设置"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "通用"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "个性化"
+        },
+        {
             "name": "yt_option_group_others",
             "value": "其他"
         },
@@ -1850,7 +1858,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "播放手势"
+            "value": "手势与操控"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "滑动、长按等播放操控方式"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1950,7 +1962,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "缓冲与网络"
+            "value": "性能与缓冲"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "解码、渲染与缓冲缓存"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "支持把视频下载到本地离线观看，下载内容在「本地」页管理。「清除全部数据」不会删除你已下载的文件。"
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "字号、颜色、背景与自动翻译"
         },
         {
             "name": "yt_setting_subtitle_size",

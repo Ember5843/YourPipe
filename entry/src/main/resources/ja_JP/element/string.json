@@ -65,6 +65,14 @@
             "value": "設定"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "一般"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "パーソナライズ"
+        },
+        {
             "name": "yt_option_group_others",
             "value": "その他"
         },
@@ -1850,7 +1858,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "再生ジェスチャー"
+            "value": "ジェスチャーと操作"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "スワイプ・長押しなどの再生操作"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1950,7 +1962,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "バッファとネットワーク"
+            "value": "パフォーマンスとバッファリング"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "デコード・レンダリングとバッファキャッシュ"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "動画をローカルにダウンロードしてオフラインで視聴できます。ダウンロードしたコンテンツは「ローカル」ページで管理します。「全データを消去」してもダウンロード済みファイルは削除されません。"
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "サイズ・色・背景と自動翻訳"
         },
         {
             "name": "yt_setting_subtitle_size",

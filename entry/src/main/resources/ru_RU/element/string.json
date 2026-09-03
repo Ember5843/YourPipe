@@ -65,6 +65,14 @@
             "value": "Настройки"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "Общие"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "Персонализация"
+        },
+        {
             "name": "yt_option_group_others",
             "value": "Другое"
         },
@@ -1502,7 +1510,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "Жесты воспроизведения"
+            "value": "Жесты и управление"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "Свайпы, удержание и другие элементы управления воспроизведением"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1602,7 +1614,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "Буферизация и сеть"
+            "value": "Производительность и буферизация"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "Декодирование, рендеринг и кэш буфера"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3195,6 +3211,10 @@
         {
             "name": "yt_setting_subtitle_size",
             "value": "Размер субтитров"
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "Размер, цвет, фон и автоперевод"
         },
         {
             "name": "yt_setting_subtitle_bottom_margin",

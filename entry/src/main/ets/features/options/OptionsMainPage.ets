@@ -22,12 +22,14 @@ interface OptionsMainPageParams {
   onDataAccountClick: () => void;
   onLanguageClick: () => void;
   onPlaybackClick: () => void;
+  onGestureControlClick: () => void;
+  onSubtitleClick: () => void;
+  onPerformanceClick: () => void;
   onNetworkClick: () => void;
   onAppearanceClick: () => void;
   // [DISABLED] P3：onAiTranslateClick: () => void;
   onLogClick: () => void;
   onHelpClick: () => void;
-  onRecoveryClick: () => void;
   onAboutClick: () => void;
 }
 
@@ -47,12 +49,14 @@ export struct OptionsMainPage {
     onDataAccountClick: () => {},
     onLanguageClick: () => {},
     onPlaybackClick: () => {},
+    onGestureControlClick: () => {},
+    onSubtitleClick: () => {},
+    onPerformanceClick: () => {},
     onNetworkClick: () => {},
     onAppearanceClick: () => {},
     // [DISABLED] P3：onAiTranslateClick: () => {},
     onLogClick: () => {},
     onHelpClick: () => {},
-    onRecoveryClick: () => {},
     onAboutClick: () => {}
   };
 
@@ -189,7 +193,7 @@ export struct OptionsMainPage {
     Column() {
       List({ space: 6 }) {
         ListItem() {
-          PlaybackSectionTitle({ title: $r('app.string.yt_option_preferences') })
+          PlaybackSectionTitle({ title: $r('app.string.yt_option_group_general') })
         }
         .padding({ left: 0, right: 0 })
 
@@ -206,7 +210,31 @@ export struct OptionsMainPage {
         .padding({ left: 0, right: 0 })
 
         ListItem() {
-          PlaybackSectionTitle({ title: $r('app.string.yt_option_group_settings') })
+          OptionItem({
+            icon: $r('sys.symbol.wifi'),
+            title: $r('app.string.yt_option_network'),
+            subtitle: this.networkProxyConfig.subtitle(),
+            iconColor: this.themePrimary,
+            clickEffectEnabled: this.params.clickEffectEnabled,
+            onClickAction: this.params.onNetworkClick
+          })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_option_group_personalization') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          OptionItem({
+            icon: $r('sys.symbol.paintpalette_fill'),
+            title: $r('app.string.yt_option_appearance'),
+            subtitle: this.getAppearanceSubtitle(),
+            iconColor: this.themePrimary,
+            clickEffectEnabled: this.params.clickEffectEnabled,
+            onClickAction: this.params.onAppearanceClick
+          })
         }
         .padding({ left: 0, right: 0 })
 
@@ -219,6 +247,11 @@ export struct OptionsMainPage {
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onLanguageClick
           })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_section_playback') })
         }
         .padding({ left: 0, right: 0 })
 
@@ -250,24 +283,36 @@ export struct OptionsMainPage {
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.wifi'),
-            title: $r('app.string.yt_option_network'),
-            subtitle: this.networkProxyConfig.subtitle(),
+            icon: $r('sys.symbol.hand_point_up_tap_fill'),
+            title: $r('app.string.yt_playback_gestures'),
+            subtitle: $r('app.string.yt_option_gesture_control_subtitle'),
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
-            onClickAction: this.params.onNetworkClick
+            onClickAction: this.params.onGestureControlClick
           })
         }
         .padding({ left: 0, right: 0 })
 
         ListItem() {
           OptionItem({
-            icon: $r('sys.symbol.paintpalette_fill'),
-            title: $r('app.string.yt_option_appearance'),
-            subtitle: this.getAppearanceSubtitle(),
+            icon: $r('sys.symbol.character_textbox'),
+            title: $r('app.string.yt_player_subtitles'),
+            subtitle: $r('app.string.yt_option_subtitle_style_subtitle'),
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
-            onClickAction: this.params.onAppearanceClick
+            onClickAction: this.params.onSubtitleClick
+          })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          OptionItem({
+            icon: $r('sys.symbol.gauge_with_dots_needle_33percent'),
+            title: $r('app.string.yt_playback_buffer_network'),
+            subtitle: $r('app.string.yt_option_perf_buffer_subtitle'),
+            iconColor: this.themePrimary,
+            clickEffectEnabled: this.params.clickEffectEnabled,
+            onClickAction: this.params.onPerformanceClick
           })
         }
         .padding({ left: 0, right: 0 })
@@ -297,18 +342,6 @@ export struct OptionsMainPage {
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onLogClick
-          })
-        }
-        .padding({ left: 0, right: 0 })
-
-        ListItem() {
-          OptionItem({
-            icon: $r('sys.symbol.arrow_counterclockwise_clock'),
-            title: $r('app.string.yt_option_recovery'),
-            subtitle: $r('app.string.yt_option_reset_settings_subtitle'),
-            iconColor: this.themePrimary,
-            clickEffectEnabled: this.params.clickEffectEnabled,
-            onClickAction: this.params.onRecoveryClick
           })
         }
         .padding({ left: 0, right: 0 })

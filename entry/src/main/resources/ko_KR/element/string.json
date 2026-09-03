@@ -61,6 +61,14 @@
             "value": "옵션"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "일반"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "개인 설정"
+        },
+        {
             "name": "yt_option_group_settings",
             "value": "설정"
         },
@@ -1850,7 +1858,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "재생 제스처"
+            "value": "제스처 및 조작"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "쓸어넘기기, 길게 누르기 등 재생 조작"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1950,7 +1962,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "버퍼링 및 네트워크"
+            "value": "성능 및 버퍼링"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "디코딩, 렌더링 및 버퍼 캐시"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "동영상을 로컬에 다운로드하여 오프라인으로 시청할 수 있으며, 다운로드한 콘텐츠는 「로컬」 페이지에서 관리합니다. 「데이터 전체 삭제」는 다운로드한 파일을 삭제하지 않습니다."
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "크기, 색상, 배경 및 자동 번역"
         },
         {
             "name": "yt_setting_subtitle_size",

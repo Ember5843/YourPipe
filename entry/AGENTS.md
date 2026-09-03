@@ -40,12 +40,12 @@ comes from `OptionsNavScaffold`'s custom `backIcon`.
 |---|---|
 | `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI; `HomeTabContent` — 首页 tab 内容宿主（feed 加载状态机 + 推荐位 banner + 三个 @LocalBuilder 卡片），Index 经 `HomeTabController` 触发 reset |
 | `search` | `SearchPage` (NavDestination) |
-| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **布局状态机**（PlayerPage 方法派生，输入 `@Env(WINDOW_SIZE/BREAK_POINT)` + 视频比例：竖向窗口 → 上视频+下信息；真横屏且容得下 → 左视频+右信息栏 `clamp(W/3, 320, 480)`；非竖向但容不下 → 挤压强制铺满，信息经播放器菜单"视频信息"以 CENTER sheet 打开；内容组件 `components/PlayerInfoPanel.ets` 三处复用；信息 sheet 设 `showClose: false`（自带关闭按钮会与面板 Tab 栏重叠，关闭走拖拽条/点空白）。强制全屏态（分屏 / 挤压铺满，即 `isFullLandscapeScreen() && !isManualFullscreen`）经 `VideoPlayer.showFullscreenButton=false` 隐藏右下角全屏切换按钮——该状态下按钮无意义，仅用户手动全屏保留退出入口。注意：ArkUI V1 @Component 不支持 ES get 访问器，布局派生必须用普通方法）, **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/` + `workers/AsrStreamingWorker.ets`：`AsrLiveCaptionService` 真流式识别，MPV PCM tap + sherpa OnlineRecognizer 流式 zipformer 中英双语 int8；菜单项、Options 入口/设置页、PlayerSession/AVPlayer 接线、build-profile worker 注册均已注释，`AsrModelManager.clearAll`/`clearCaches` 的清数据接线保留以清理已下载模型）——入口/设置项均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
+| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **布局状态机**（PlayerPage 方法派生，输入 `@Env(WINDOW_SIZE/BREAK_POINT)` + 视频比例：竖向窗口 → 上视频+下信息；真横屏且容得下 → 左视频+右信息栏 `clamp(W/3, 320, 480)`；非竖向但容不下 → 挤压强制铺满，信息经播放器菜单"视频信息"以 CENTER sheet 打开；内容组件 `components/PlayerInfoPanel.ets` 三处复用；信息 sheet 必须 `showClose: false`（自带关闭按钮与面板 Tab 栏重叠，关闭走拖拽条/点空白）；强制全屏态（`isFullLandscapeScreen() && !isManualFullscreen`）必须 `VideoPlayer.showFullscreenButton=false`（仅用户手动全屏保留退出入口）；ArkUI V1 @Component 不支持 ES get 访问器——布局派生必须用普通方法）, **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/` + `workers/AsrStreamingWorker.ets`：`AsrLiveCaptionService` 真流式识别，MPV PCM tap + sherpa OnlineRecognizer 流式 zipformer 中英双语 int8；菜单项、Options 入口/设置页、PlayerSession/AVPlayer 接线、build-profile worker 注册均已注释，`AsrModelManager.clearAll`/`clearCaches` 的清数据接线保留以清理已下载模型）——入口/设置项均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
 | `playlist` | Playlist list + detail |
 | `subscription` | Subscription manage + feed service (bottom tab) |
 | `favorites` | `FavoritesPage` |
 | `local` | Local library + downloads |
-| `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`），Index 经单对象 params 传回调。Main / appearance / playback (incl. per-state 播放端点: guest `visionos|mweb`, signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network** / data-account / recovery / ai-subtitle (`OptionsAiTranslatePage` — 端侧识别模型下载/删除管理，标题 `yt_option_ai_subtitle`，OptionsMainPage 入口行已开放；P2 翻译引擎 gtx/LLM 配置区 **[DISABLED]** 注释保留在页内) / about-update (GitHub Releases check + AppGallery test link; the update check — `UpdateChecker` + `APPGALLERY_TEST_URL` — is inline in `OptionsMainPage`, while the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
+| `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`；无入口的 app_lang/content_lang/content_country picker destination 已移除），Index 经单对象 params 传回调。Main（一级菜单分 通用/个性化/播放/其他 四组）/ appearance / playback（拆分为四页：播放 `OptionsPlaybackPage`（含 下载 并发 picker）/ 手势与操控 `OptionsGestureControlPage`（长按倍速 `HOLD_SPEED_VALUES` 等手势项）/ 字幕 `OptionsSubtitlePage`（字幕样式：字号/底边距/颜色/背景/偏移/翻译语言）/ 性能与缓冲 `OptionsPerformancePage`（后台纯音频、硬解、GPU 渲染、内存缓存/预读/缓冲大小调参）；播放端点 per-state: guest `visionos|mweb`, signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network** / log_page（应用日志页）/ data-account（页尾含 恢复 组：恢复所有配置 / 清除应用全部数据；独立 `OptionsRecoveryPage` 已删除，回调经 data_account destination 透传）/ ai-subtitle **[DISABLED]**（`ai_translate` destination 与 OptionsMainPage 入口行均已注释，产品只保留 P0 tlang；`OptionsAiTranslatePage` — 端侧识别模型下载/删除管理，标题 `yt_option_ai_subtitle`，页内 P2 gtx/LLM 配置区同处注释块） / about-update (GitHub Releases check + AppGallery test link; the update-check call site is inline in `OptionsMainPage`, `UpdateChecker` + `APPGALLERY_TEST_URL` live in `common/UpdateChecker.ets`; the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
 | `help` | `HelpGuidePage` — 6-page onboarding/help swiper (welcome + sign-in, account data, network proxy, quality/cache, downloads). Two entries: first-launch full-screen overlay on `Index` (an `if`-mounted layer in the root Stack, shown while `PreferencesStore` key `cfg_help_seen` != `'true'` with a 500 ms delay; bindSheet/bindContentCover on Navigation-hosted nodes do NOT present at app-start timing — do not revert to them) and Options main page "帮助" item (`help_page` destination in the options sheet). `resetAllConfigs` resets the flag; `clearAllAppData` clears it via `PreferencesStore.clearAll()`. Illustrations are `resources/base/media/guide_*.png` (welcome page uses `app_icon.png`). |
 | `user` | User / channel info; Library saved playlists (WEB classic renderers + TV lockup view models) |
 | `auth` | WebView cookie login (`WebViewLoginPage`) + device/QR OAuth (`DeviceQrLoginPage`) |
@@ -109,42 +109,36 @@ Reusable components: `HdsTitleBar`, video cards / grids / thumbs, error / about 
 log / tab error panels, option rows, backup + language pickers, placeholders.
 `MediaVideoFeed` is the shared video-feed skeleton (loading / error / empty /
 grid / wide-strip / single-list branches over Grid|List + LazyForEach); pages
-feed it a `FeedDataSource` (`common/model/FeedDataSource.ets`, prefix-diff
-`setData` for paged appends) plus stable Scroller/callback members, and pass
-volatile display state as a single `MediaVideoFeedParams` object-literal
-`@Prop`. `FeedDataSource` implements `IDataSourcePrefetching`: `MediaVideoFeed`
+feed it a `FeedDataSource` (`common/model/FeedDataSource.ets`; `setData`
+prefix-diffs for paged appends and skips the full reload entirely when the
+key sequence is unchanged, firing only per-item `onDataChange`) plus stable
+Scroller/callback members, and pass volatile display state as a single
+`MediaVideoFeedParams` object-literal `@Prop`. `FeedDataSource` implements `IDataSourcePrefetching`: `MediaVideoFeed`
 binds it to a `BasicPrefetcher` and reports the visible range from
 `onScrollIndex`; `prefetch(index)` warms the item's first-choice thumbnail via
 `ThumbPrefetcher` (`common/model/ThumbPrefetcher.ets` → `cacheDownload`,
 LAZY strategy, bounded in-flight, `cancel(index)` aborts), so cards hit the
 system image cache when scrolled into view. Grid column counts are centralized in `ListLayoutUtils`
-(`getVideoGridColumnCount` / `getWideListColumnCount`). Builders passed into
-`MediaVideoFeed`'s `@BuilderParam`s must be declared `@LocalBuilder` (not
-`@Builder`, and never `.bind(this)`) — a plain `@Builder` passed by reference
-runs with `this` bound to the call-site component, so page builders that touch
-page state crash with "undefined is not callable".
-Its Grid branch must leave normal cards without `columnStart`/`columnEnd`
-(auto-flow placement); explicitly positioning every item pins them all to
-column 0 and collapses the grid to a single column — only full-width items
-(header/footer/span>1 cards) set `columnStart(0).columnEnd(columns-1)`.
-Feed-item entrance animation is **one-shot gated** (`armEntryAnim` /
-`entryTransitionOf` + `customAnimationUtil.isScaleTranEnter`): only the first
-screen of items after a (re)load **while the list is scrolled to the top** may
-play the insert-only scale/fade-in; `entryAnimDone` persists across reloads so
-a key that has played never replays. Mid-scroll full reloads (background
-subscription merges, auth-fallback refetches) do not arm at all, and
-`FeedDataSource.setData` with an unchanged key sequence (same length, same
-order — including redundant re-syncs) skips the full reload and only fires
-per-item `onDataChange` for reference-changed items, so recycled/recreated and
-paginated items always get `.transition(null)` and render instantly. Never hand
-a plain always-on `.transition(isScaleTran(...))` to LazyForEach feed items or
-to static header/footer items inside a lazy Grid/List — recycling or branch
-rebuilds replay it, so cards scrolled past the top/bottom edge vanish in place
-(scale-to-0 ghost) or pop in late instead of scrolling off; use the insert-only
-`isScaleTranEnter` where an entrance is genuinely wanted. Symmetric
-`isScaleTran` remains acceptable only on eager `ForEach` lists (favorites /
-local / downloads / comments), which never recycle and use the delete half as
-user-action feedback.
+(`getVideoGridColumnCount` / `getWideListColumnCount`). Feed builder / layout rules (hard constraints):
+- Builders passed into `MediaVideoFeed`'s `@BuilderParam`s must be
+  `@LocalBuilder` — never `@Builder`, never `.bind(this)` (a plain `@Builder`
+  passed by reference binds `this` to the call-site component, so builders
+  that touch page state break).
+- The Grid branch leaves normal cards without `columnStart`/`columnEnd`
+  (auto-flow placement) — explicitly positioning every item pins them to
+  column 0 and collapses the grid to a single column; only full-width items
+  (header/footer/span>1 cards) set `columnStart(0).columnEnd(columns-1)`.
+- Never give LazyForEach feed items or header/footer items inside a lazy
+  Grid/List an always-on `.transition(isScaleTran(...))` — recycling and
+  branch rebuilds replay it, so cards vanish or pop mid-scroll instead of
+  scrolling off. Entrance animation is **one-shot gated** (`armEntryAnim` /
+  `entryTransitionOf` + `customAnimationUtil.isScaleTranEnter`): only the
+  first screen of items after a (re)load **while the list is scrolled to the
+  top** may play the insert-only scale/fade-in; mid-scroll full reloads
+  (background subscription merges, auth-fallback refetches) do not arm, and
+  a key that has played never replays (`entryAnimDone` persists across
+  reloads). Symmetric `isScaleTran` is acceptable only on eager `ForEach`
+  lists (favorites / local / downloads / comments), which never recycle.
 Root-tab pages let content scroll **under** the root title bar (translucent
 material): reserve `safeAreaTop + TITLE_BAR_HEIGHT` as padding on a wrapper
 (Refresh/Column), keep the inner List/Grid `clip(false)`, and expose the
@@ -167,6 +161,8 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 `avoidLayoutSafeArea: true` on the title bar.
 
 ## 4. AppStorage keys
+Key cross-cutting keys (**non-exhaustive** — grep `AppStorage.setOrCreate`
+in entry for the full set):
 - `context`, `uiContext`, `isAppBackground`, `currentBreakpoint`, `playerLoading`
 - `uiConfig` (`UIConfig`), `playbackConfig` (`PlaybackConfig`)
 - `networkProxyConfig` (`NetworkProxyConfig`) — set in `AppState.init` / Options Network
@@ -175,6 +171,15 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   save/reset/restore.
 - `PlaybackContinuationService.APP_STORAGE_PENDING_KEY` — JSON-serialized
   continuation payload awaiting consumer.
+Additional families set at startup / by the player shell: window & safe-area
+geometry (`deviceWidth`/`deviceHeight`, `statusBarHeight`, `navBarHeight`,
+`cutoutAvoid*` / `systemAvoid*` / `playerControlAvoid*` / `playerGestureSafe*`,
+`windowStatus`), theme (`themePrimaryColor`, `currentColorMode` /
+`effectiveColorMode`), PiP / window-mode flags (`isPiPActive`,
+`isPipHandoffPending`, `isFloatingWindow`, `isSplitScreen`, `isMultiWindow`,
+`isAudioOnlyMode`, `playerPageVisible`, `selectedVideo`), and collection
+store caches (`favorites`, `playlists`, `subscriptions`, `watchHistory`,
+`localQueues`, `downloadTasks`, `authStatus`).
 
 ## 5. Cross-module wiring (in `EntryAbility.onCreate`)
 - `PreferencesStore.init(context)` and `AppState.init()` (loads proxy + applies providers).
@@ -265,14 +270,14 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
   DASH caches key on `videoId` only — a visitor change takes effect through
   the generator's bootstrap invalidation plus the invalidate-time cache clear.
   Player/per-video pot cache TTL is 6h (inline literal).
-- **Binding follows the home page experiment flags** (PipePipe 5.3.0):
+- **Binding follows the home page experiment flags** (PipePipe parity):
   content binding mints per identifier (videoId for /player + UMP pots),
   session binding mints once against the DataSync ID (signed-in) or the
   bootstrap visitorData (anonymous) and every mint returns that session token.
   DASH `pot=` has its own short-TTL cache. All are cleared together on
   identity invalidation.
-- **Attestation bootstrap** (PipePipe 5.3.0 `YoutubePageAttestationBootstrap`,
-  issue #2820): the BotGuard challenge is parsed from the
+- **Attestation bootstrap** (PipePipe `YoutubePageAttestationBootstrap`):
+  the BotGuard challenge is parsed from the
   `https://www.youtube.com` home page (`ytcfg.set` + `window.ytAtN`) —
   `/att/get` is no longer used. The home fetch sends `Accept-Language: en-US`,
   the login cookie when signed in (else `PREF=hl=en&gl=US`) and the desktop
@@ -370,8 +375,8 @@ Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
 ## 10. Reference clients
 - Reference clones (NewPipe, PipePipe, …) usually live in the parent
   directory `../` — always check the local clones first when comparing
-  behavior, and ask the user for the path if one is missing (this machine
-  currently has only `../PipePipe`). Relevant Android sources include
+  behavior, and ask the user for the path if one is missing. Relevant Android
+  sources include
   `app/src/main/java/org/schabi/newpipe/fragments/detail/BaseDescriptionFragment.java`,
   `fragments/detail/DescriptionFragment.java`, and
   `fragments/list/search/SearchFragment.java` under each tree as applicable.

@@ -65,6 +65,14 @@
             "value": "Configuración"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "General"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "Personalización"
+        },
+        {
             "name": "yt_option_group_others",
             "value": "Otros"
         },
@@ -1502,7 +1510,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "Gestos de reproducción"
+            "value": "Gestos y controles"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "Deslizar, mantener pulsado y otros controles de reproducción"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1602,7 +1614,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "Búfer y red"
+            "value": "Rendimiento y almacenamiento en búfer"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "Decodificación, renderizado y caché de búfer"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Los vídeos se pueden descargar para verlos sin conexión y se gestionan en la pestaña «Local». «Borrar todos los datos de la app» nunca elimina tus archivos descargados."
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "Tamaño, color, fondo y traducción automática"
         },
         {
             "name": "yt_setting_subtitle_size",

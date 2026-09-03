@@ -61,8 +61,16 @@
             "value": "Options"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "Général"
+        },
+        {
             "name": "yt_option_group_settings",
             "value": "Paramètres"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "Personnalisation"
         },
         {
             "name": "yt_option_group_others",
@@ -1502,7 +1510,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "Gestes de lecture"
+            "value": "Gestes et commandes"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "Balayage, appui long et autres commandes de lecture"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1602,7 +1614,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "Mise en mémoire tampon et réseau"
+            "value": "Performances et mise en mémoire tampon"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "Décodage, rendu et cache de mémoire tampon"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Les vidéos peuvent être téléchargées pour être visionnées hors ligne et sont gérées dans l'onglet « Local ». « Effacer toutes les données de l'app » ne supprime jamais vos fichiers téléchargés."
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "Taille, couleur, arrière-plan et traduction auto"
         },
         {
             "name": "yt_setting_subtitle_size",

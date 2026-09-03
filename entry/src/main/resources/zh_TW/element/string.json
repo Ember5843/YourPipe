@@ -21,6 +21,14 @@
             "value": "選項"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "通用"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "個人化"
+        },
+        {
             "name": "yt_option_group_settings",
             "value": "設定"
         },
@@ -1850,7 +1858,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "播放手勢"
+            "value": "手勢與操控"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "滑動、長按等播放操控方式"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1950,7 +1962,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "緩衝與網路"
+            "value": "效能與緩衝"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "解碼、轉譯與緩衝快取"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "支援把影片下載到本機離線觀看，下載內容在「本地」頁管理。「清除應用全部資料」不會刪除你已下載的檔案。"
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "字體大小、顏色、背景與自動翻譯"
         },
         {
             "name": "yt_setting_subtitle_size",

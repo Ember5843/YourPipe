@@ -29,6 +29,14 @@
             "value": "Others"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "General"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "Personalization"
+        },
+        {
             "name": "yt_option_language",
             "value": "Language"
         },
@@ -1574,7 +1582,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "Playback gestures"
+            "value": "Gestures & controls"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "Swipe, hold and other playback controls"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1674,7 +1686,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "Buffering and network"
+            "value": "Performance & buffering"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "Decoding, rendering & buffer cache"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "Videos can be downloaded for offline viewing and are managed on the Local tab. \"Clear all data\" never deletes your downloaded files."
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "Size, color, background & auto-translation"
         },
         {
             "name": "yt_setting_subtitle_size",

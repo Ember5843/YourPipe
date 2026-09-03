@@ -65,6 +65,14 @@
             "value": "الإعدادات"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "عام"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "التخصيص"
+        },
+        {
             "name": "yt_option_group_others",
             "value": "أخرى"
         },
@@ -1502,7 +1510,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "إيماءات التشغيل"
+            "value": "الإيماءات وعناصر التحكم"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "التمرير والضغط المطول وعناصر التحكم الأخرى في التشغيل"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1602,7 +1614,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "التخزين المؤقت والشبكة"
+            "value": "الأداء والتخزين المؤقت"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "فك الترميز والعرض وذاكرة التخزين المؤقت"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "يمكن تنزيل الفيديوهات لمشاهدتها دون اتصال وتُدار في علامة التبويب «محلي». لا يؤدي «مسح جميع بيانات التطبيق» أبدًا إلى حذف ملفاتك المنزّلة."
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "الحجم واللون والخلفية والترجمة التلقائية"
         },
         {
             "name": "yt_setting_subtitle_size",

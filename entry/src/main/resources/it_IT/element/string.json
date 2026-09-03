@@ -65,6 +65,14 @@
             "value": "Impostazioni"
         },
         {
+            "name": "yt_option_group_general",
+            "value": "Generale"
+        },
+        {
+            "name": "yt_option_group_personalization",
+            "value": "Personalizzazione"
+        },
+        {
             "name": "yt_option_group_others",
             "value": "Altro"
         },
@@ -1850,7 +1858,11 @@
         },
         {
             "name": "yt_playback_gestures",
-            "value": "Gesti di riproduzione"
+            "value": "Gesti e controlli"
+        },
+        {
+            "name": "yt_option_gesture_control_subtitle",
+            "value": "Scorri, tieni premuto e altri controlli di riproduzione"
         },
         {
             "name": "yt_playback_gesture_seek",
@@ -1950,7 +1962,11 @@
         },
         {
             "name": "yt_playback_buffer_network",
-            "value": "Buffer e rete"
+            "value": "Prestazioni e buffering"
+        },
+        {
+            "name": "yt_option_perf_buffer_subtitle",
+            "value": "Decodifica, rendering e cache del buffer"
         },
         {
             "name": "yt_playback_memory_cache",
@@ -3191,6 +3207,10 @@
         {
             "name": "yt_guide_p6_desc",
             "value": "I video possono essere scaricati per la visione offline e sono gestiti nella scheda Locale. «Cancella tutti i dati» non elimina mai i file scaricati."
+        },
+        {
+            "name": "yt_option_subtitle_style_subtitle",
+            "value": "Dimensione, colore, sfondo e traduzione automatica"
         },
         {
             "name": "yt_setting_subtitle_size",

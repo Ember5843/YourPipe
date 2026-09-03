@@ -2,7 +2,6 @@ import { AppLog } from '../../common/AppLog';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
 import { LanguagePickerItem } from '../../common/components/LanguagePickerDialog';
-import { LanguagePickerPage } from '../../common/components/LanguagePickerPage';
 import { LogPage } from '../../common/components/LogPage';
 import { AboutPage, OpenSourcePage, AiModelsPage, ChangelogPage } from '../../common/components/AboutPage';
 import { buildTitleMenu, buildSheetTitleBar } from '../../common/components/HdsTitleBar';
@@ -12,8 +11,10 @@ import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
 import { OptionsMainPage } from './OptionsMainPage';
 import { OptionsAppearancePage } from './OptionsAppearancePage';
 import { OptionsPlaybackPage } from './OptionsPlaybackPage';
+import { OptionsGestureControlPage } from './OptionsGestureControlPage';
+import { OptionsSubtitlePage } from './OptionsSubtitlePage';
+import { OptionsPerformancePage } from './OptionsPerformancePage';
 import { OptionsLanguageAndRegionPage } from './OptionsLanguageAndRegionPage';
-import { OptionsRecoveryPage } from './OptionsRecoveryPage';
 import { OptionsDataAccountPage } from './OptionsDataAccountPage';
 import { OptionsNetworkPage } from './OptionsNetworkPage';
 // [DISABLED] P3：import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
@@ -132,12 +133,14 @@ export struct OptionsSheetHost {
               onDataAccountClick: () => { this.pushOptionsPath('data_account'); },
               onLanguageClick: () => { this.pushOptionsPath('language'); },
               onPlaybackClick: () => { this.pushOptionsPath('playback'); },
+              onGestureControlClick: () => { this.pushOptionsPath('gesture_control'); },
+              onSubtitleClick: () => { this.pushOptionsPath('subtitle'); },
+              onPerformanceClick: () => { this.pushOptionsPath('performance'); },
               onNetworkClick: () => { this.pushOptionsPath('network'); },
               // [DISABLED] P3：onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
               onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
               onLogClick: () => { this.pushOptionsPath('log_page'); },
               onHelpClick: () => { this.pushOptionsPath('help_page'); },
-              onRecoveryClick: () => { this.pushOptionsPath('recovery'); },
               onAboutClick: () => { this.pushOptionsPath('about_page'); }
             }
           })
@@ -232,7 +235,9 @@ export struct OptionsSheetHost {
             updateUiConfig: this.params.updateUiConfig,
             onHomeFeedStyleChanged: () => { this.params.refreshHomeAfterAuthChange(); },
             onAuthChanged: () => { this.params.refreshHomeAfterAuthChange(); },
-            onLoginSuccess: () => { this.params.handleLoginSuccess(); }
+            onLoginSuccess: () => { this.params.handleLoginSuccess(); },
+            onResetSettings: () => { this.params.onResetSettings(); },
+            onClearAllData: () => { this.params.onClearAllData(); }
           }
         })
       }
@@ -319,36 +324,6 @@ export struct OptionsSheetHost {
           }
         })
       }
-    } else if (name === 'app_lang') {
-      LanguagePickerPage({
-        title: $r('app.string.yt_setting_ui_language'),
-        items: this.params.appLangItems,
-        selectedCode: this.uiConfig.userLanguage,
-        onSelect: (code: string) => { this.params.applyLanguageSelection(code); },
-        onBack: () => { this.popOptionsPath(); }
-      })
-    } else if (name === 'content_lang') {
-      LanguagePickerPage({
-        title: $r('app.string.yt_setting_content_language'),
-        items: this.params.contentLangItems,
-        selectedCode: this.uiConfig.searchLanguage,
-        onSelect: (code: string) => {
-          this.params.updateUiConfig(cfg => cfg.searchLanguage = code === 'default' ? 'default' : code);
-          this.params.reloadHomeForSearchLocaleChange();
-        },
-        onBack: () => { this.popOptionsPath(); }
-      })
-    } else if (name === 'content_country') {
-      LanguagePickerPage({
-        title: $r('app.string.yt_setting_content_region'),
-        items: this.params.contentCountryItems,
-        selectedCode: this.uiConfig.searchCountry,
-        onSelect: (code: string) => {
-          this.params.updateUiConfig(cfg => cfg.searchCountry = code === 'default' ? 'default' : code.toUpperCase());
-          this.params.reloadHomeForSearchLocaleChange();
-        },
-        onBack: () => { this.popOptionsPath(); }
-      })
     } else if (name === 'log_page') {
       OptionsNavScaffold({
         title: $r('app.string.yt_log_title'),
@@ -396,7 +371,7 @@ export struct OptionsSheetHost {
           OptionsPlaybackPage({
             params: {
               themeColor: this.themePrimary,
-              appLangItems: this.params.appLangItems,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               updatePlaybackConfig: this.params.updatePlaybackConfig,
               updateUiConfig: this.params.updateUiConfig,
               getQualityDisplay: this.getQualityDisplay.bind(this),
@@ -404,15 +379,44 @@ export struct OptionsSheetHost {
             }
           })
       }
-    } else if (name === 'recovery') {
+    } else if (name === 'gesture_control') {
       OptionsNavScaffold({
-        title: $r('app.string.yt_option_recovery'),
+        title: $r('app.string.yt_playback_gestures'),
         onBack: () => { this.popOptionsPath(); }
       }) {
-          OptionsRecoveryPage({
+          OptionsGestureControlPage({
             params: {
-              onResetSettingsClick: () => { this.params.onResetSettings(); },
-              onClearAllDataClick: () => { this.params.onClearAllData(); }
+              themeColor: this.themePrimary,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              updatePlaybackConfig: this.params.updatePlaybackConfig
+            }
+          })
+      }
+    } else if (name === 'subtitle') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_player_subtitles'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+          OptionsSubtitlePage({
+            params: {
+              themeColor: this.themePrimary,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              appLangItems: this.params.appLangItems,
+              updatePlaybackConfig: this.params.updatePlaybackConfig,
+              updateUiConfig: this.params.updateUiConfig
+            }
+          })
+      }
+    } else if (name === 'performance') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_playback_buffer_network'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+          OptionsPerformancePage({
+            params: {
+              themeColor: this.themePrimary,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              updatePlaybackConfig: this.params.updatePlaybackConfig
             }
           })
       }
