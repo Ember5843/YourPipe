@@ -2,6 +2,8 @@
 
 > On-device ASR audio-decode HAR (AI subtitle P3). One NAPI function that turns
 > a local m4a/AAC file into a 16kHz mono float32 PCM file for sherpa-onnx.
+> Retained in the build (entry declares the package dep) but currently has no
+> consumer — end-side ASR is [DISABLED]; see the root `AGENTS.md`.
 > Durable architecture only — no changelogs.
 
 ## 1. Public surface (`Index.ets`)
@@ -23,7 +25,9 @@ asrengine/
 ```
 
 ## 3. Conventions
-- **System NDK only** (`native_media_avdemuxer/avsource/acodec/codecbase`) —
+- **System NDK only** (`ace_napi.z`, `hilog_ndk.z`, `native_media_avdemuxer`,
+  `native_media_avsource`, `native_media_acodec`, `native_media_codecbase`,
+  `native_media_core` per `CMakeLists.txt` `target_link_libraries`) —
   no vendored FFmpeg/mpv linkage, both ABIs (`arm64-v8a`, `x86_64`) build the
   same real code (decoding is a system capability, emulator included).
 - Decode scope is **local files via fd** (entry downloads the audio track

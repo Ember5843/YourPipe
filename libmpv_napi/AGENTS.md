@@ -60,13 +60,17 @@ libmpv_napi/src/main/
     CMakeLists.txt                     — arm64 product path vs x86_64 stub
     player_napi.cpp                    — MPV C API bridge (arm64 product)
     player_napi_stub.cpp               — x86_64 emulator UI stub (no libmpv)
-    media_info_napi.cpp                — MediaInfo marshalling
-    mux_napi.cpp                       — FFmpeg mux/remux NAPI
-    global_napi.cpp                    — shared NAPI helpers (ToString / Undefined / log handler)
+    media_info_napi.cpp / .h           — MediaInfo marshalling (`MediaInfoToNapi`; header
+                                         declares the `MpvPropReader` property-reader hook)
+    mux_napi.cpp / .h                  — FFmpeg mux/remux NAPI (`RegisterMuxModule`)
+    global_napi.cpp / .h               — shared NAPI helpers (ToString / Undefined / log handler)
     hwdec_probe.cpp / .h               — OHOS HW decoder capability probe;
                                          also derives the hwdec-codecs whitelist
                                          (probe-filtered, legacy full list on probe failure)
-    mpv_ohcodec_shim.cpp               — OHOS hardware codec adapter for MPV
+    mpv_ohcodec_shim.cpp               — inert dlopen symbol stub: a no-op
+                                         `ff_ohcodec_discard_buffer` so vendored libmpv
+                                         resolves the symbol at load time; same source
+                                         (and content) for both ABIs
     ffmpeg-sdk/                        — vendored static libs (read-only; arm64)
     mpv-sdk/                           — vendored libmpv.so.2 (read-only; arm64)
     types/libmpv_napi/                 — NAPI `.so` types package (oh-package.json5)
@@ -75,11 +79,14 @@ libmpv_napi/src/main/
 ## 3. Native build (CMake)
 - `cmake_minimum_required(VERSION 3.17)`, C++20.
 - **x86_64**: early-return stub — `mpv_napi` from `player_napi_stub.cpp` +
-  empty-ish `mpv_ohcodec_shim`; no FFmpeg/libmpv link. Emulator UI only.
+  the same `mpv_ohcodec_shim` stub (identical source for both ABIs); no
+  FFmpeg/libmpv link. Emulator UI only.
 - **arm64-v8a** product libraries:
   - `mpv_napi` (MODULE) — the NAPI bridge `.so` consumed by ArkTS.
-  - `mpv_ohcodec_shim` (SHARED) — the OHOS hardware codec adapter for MPV,
-    copied next to `libmpv_napi.so` via a POST_BUILD copy.
+  - `mpv_ohcodec_shim` (SHARED) — inert symbol stub, not a codec adapter: it
+    defines a no-op `ff_ohcodec_discard_buffer` so vendored libmpv resolves
+    that symbol at dlopen; copied next to `libmpv_napi.so` via a POST_BUILD
+    copy.
 - Product links:
   - `ace_napi.z`, `ace_ndk.z`, `hilog_ndk.z`, `ohfileuri`,
     `native_window` (surface / XComponent correlation)
@@ -91,7 +98,8 @@ libmpv_napi/src/main/
   - `-Wl,--start-group` / `--end-group` to resolve the avformat/avcodec/
     avutil circular references.
   - `native_media_core`, `native_media_codecbase`, `native_media_vdec`
-    (for the ohdec codec shim).
+    (referenced by libavcodec's `ohdec.o` OHOS hardware decoder; libmpv
+    links them too).
   - `z` for `libxml2`.
 - POST_BUILD copies `libmpv.so.2` from `mpv-sdk/lib/${OHOS_ARCH}/` next to
   `libmpv_napi.so` (arm64 only).

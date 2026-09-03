@@ -26,6 +26,7 @@ youtube_core/src/main/
       PlayabilityChecker.ets           — playability 状态判定（无状态静态方法）
       VideoInfo.ets, StreamInfo.ets, ItagInfo.ets
       HlsManifestParser.ets            — HLS m3u8 parser
+      SubtitleTranslate.ets            — server-side tlang track build (P0)
       PlayerResponseTypes.ets          — player_response JSON shapes
       YouTubeExceptions.ets            — extraction errors
       CommentItem.ets
@@ -103,7 +104,7 @@ youtube_core/src/main/
      configured value for the current auth state (entry 侧统一经
      `AuthStateHelper.reconcilePlaybackClient`). `web_safari` / `android_vr`
      are unused endpoints kept for reference (android_vr was dropped upstream
-     by PipePipe v5.3.0). The explicit pin (`setYoutubePlayerClient`) survives
+     by PipePipe). The explicit pin (`setYoutubePlayerClient`) survives
      per-extraction `applyAuthDefault` but is DORMANT — the settings UI goes
      through the per-state config, not the pin.
    - `tv_downgraded` + Bearer doubles as the **restricted / OAuth recovery**
@@ -167,7 +168,8 @@ youtube_core/src/main/
 - **UMP request headers** mirror PipePipe `buildRequestHeaders`
   (`YoutubeSabrSession.buildSabrHeaders`): one constant shape for every
   profile — `Content-Type: application/x-protobuf` + `Accept:
-  application/vnd.yt-ump` + `Accept-Encoding: identity` + MWEB UA. **No**
+  application/vnd.yt-ump` + `Accept-Encoding: identity` + UA (WEB UA when
+  `profile==='web'`, MWEB UA otherwise). **No**
   `Origin`/`Referer`/`Accept-Language`/`X-Goog-Visitor-Id`, and **no**
   `Cookie` or `Authorization` on UMP POSTs (login is bound through the
   /player request, never on the UMP rail).
@@ -186,7 +188,7 @@ youtube_core/src/main/
   are decided by `BuiltinSabrSessionPolicy` → action chains, executed by
   `YoutubeSabrSession`. No-media + status>=3 (attestation required) fails
   immediately (`kind='attestation_required'`). status==2 (pending) rotates
-  first **with or without media** (PipePipe 60462a13 — a pending response can
+  first **with or without media** (PipePipe parity — a pending response can
   carry the demanded segment): `ROTATE_IDENTITY` (budget 3: invalidate
   identity → re-probe via `reprobeSabrInfo` → visitorData must change → epoch
   reset; local progress (FormatProgress + segment cache) lives in
@@ -200,16 +202,16 @@ youtube_core/src/main/
   is spent) → FAIL. The pending counter increments only on no-media pending
   responses; three consecutive fail regardless. All budgets live in
   `policy/SabrSessionPolicy.ets` (`SABR_MAX_*`).
-- **Token acceptance past ~1min** (PipePipe 5.3.0, issue #2820 / BgUtils
-  PR#44): YouTube binds the initial BotGuard attestation challenge to the home
-  page session's `EVENT_ID` and embeds it in the page HTML (`window.ytAtN`).
-  The bootstrap MUST be parsed from `https://www.youtube.com` (home fetch with
-  login cookies or anonymous `PREF=hl=en&gl=US`): `ytcfg.set` calls yield
-  `EVENT_ID`, `VISITOR_DATA`/`EOM_VISITOR_DATA`, `DATASYNC_ID`, WEB
-  clientVersion and the `html5_generate_content_po_token` /
-  `html5_generate_session_po_token` experiment flags that select CONTENT /
-  SESSION binding. Out-of-band `/att/get` challenges mint tokens the SABR
-  server rejects at the ~1min protection boundary (status 2 → 3). The
+- **BotGuard attestation bootstrap** (PipePipe parity): the initial
+  attestation challenge is bound to the home page session's `EVENT_ID` and
+  embedded in the page HTML (`window.ytAtN`). Parse the bootstrap only from
+  the `https://www.youtube.com` home fetch (login cookies or anonymous
+  `PREF=hl=en&gl=US`): `ytcfg.set` calls yield `EVENT_ID`,
+  `VISITOR_DATA`/`EOM_VISITOR_DATA`, `DATASYNC_ID`, WEB clientVersion and the
+  `html5_generate_content_po_token` / `html5_generate_session_po_token`
+  experiment flags that select CONTENT / SESSION binding. Never mint from
+  out-of-band `/att/get` challenges — retired; their tokens are rejected at
+  the ~1min protection boundary (status 2 → 3). The
   BotGuard JS must set `window.yt.config_.EVENT_ID` before running the VM and
   call `vm.a(...)` with the 9-argument signature (`program`, callback, `true`,
   interaction element, no-op, `[[], []]`, `undefined`, `false`,
@@ -270,7 +272,7 @@ youtube_core/src/main/
   the BotGuard runtime is cold it attempts ONE bounded cold mint under the
   same 5s cap instead of skipping — an un-potted android_vr response 403s on
   googlevideo — and falls back to skipping on timeout). tv_downgraded requests
-  stay entirely token-free (PipePipe 7673caed). The UMP streamerContext
+  stay entirely token-free (PipePipe parity). The UMP streamerContext
   carries the separate per-video pot (content binding = `videoId`, ~91B).
   Identity invalidation clears all three caches (UMP, dash, player) and
   invalidates the generator's bootstrap so the next mint re-fetches the home
@@ -394,9 +396,9 @@ Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
   in the bridge** (RFC 1928 CONNECT + optional RFC 1929 username/password auth
   over a plain direct TCPSocket, ATYP=domain → proxy-side DNS, 15s budget) —
   it must NOT go back to netstack's socket-level `socket.ProxyTypes.SOCKS5`:
-  that layer was observed on 7.0.0.105 to establish the tunnel yet
-  corrupt/reset the byte stream (TLS fatal alert / CONN_RESET through the
-  tunnel; netstack logging "remove socks5 udp header failed"). Self-heals: a server `error` event schedules bounded
+  that layer establishes the tunnel yet corrupts/resets the byte stream (TLS
+  fatal alert / CONN_RESET through the tunnel; netstack logs "remove socks5
+  udp header failed"). Self-heals: a server `error` event schedules bounded
   re-listens (1s/2s/4s, generation-guarded); tunnel connects retry once
   except for handshake auth failures (`SocksHandshakeError.authFailed`). `getPort()` reports a
   last-known-good port: it is NOT cleared during the self-heal re-listen

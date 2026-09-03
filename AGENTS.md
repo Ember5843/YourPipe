@@ -23,7 +23,7 @@
   (Options → 播放端点: guest `visionos|mweb`, signed-in
   `tv_downgraded|mweb`). `android_vr` and `web_safari` are unused endpoints,
   unreachable in product (no UI, kept for reference only); `android_vr`
-  requires a session pot and was dropped upstream by PipePipe v5.3.0.
+  requires a session pot.
   The `libmpv_napi` module
   (`MpvPlayerView` / `MpvPlayerController`) is the NAPI bridge to MPV,
   originally derived from the upstream `wang-bin/libmdk-napi` package
@@ -227,16 +227,16 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   queue item's streams are prefetched after playback stabilizes. Extraction
   is serialized through a mutex (the extractor is a stateful singleton);
   prefetch must never run concurrently with real playback extraction.
-- **SABR pacing / PoToken** (applies to the mweb opt-in path): the UMP server backoff is session-owned (epoch
-  state) and must survive recovery/seek (local stall resets do not clear it);
-  PoToken mint is bounded by a timeout + circuit breaker so a wedged WebView
-  can never hang SABR playback. Mid-stream protection challenges are handled
-  by youtube_core's policy layer (`sabr/policy/`): status==2 pending →
-  ROTATE_IDENTITY (visitor identity invalidate + re-probe, budget 3) →
-  PoToken force-refresh (budget 2) → RELOAD_PLAYER (in-place re-probe,
-  budget 2); status>=3 fails fast. Visitor identity is pinned/invalidated only
-  through `SessionIdentityManager`; a PoToken must never be reused across a
-  visitorData change.
+- **SABR pacing / PoToken** (mweb opt-in path): the UMP server backoff is
+  session-owned (epoch state) and must survive recovery/seek — local stall
+  resets never clear it. PoToken mint is bounded by a timeout + circuit
+  breaker so a wedged WebView can never hang SABR playback. Mid-stream
+  protection challenges follow youtube_core's policy chain (`sabr/policy/`):
+  status==2 pending → ROTATE_IDENTITY (budget 3) → PoToken force-refresh
+  (budget 2) → RELOAD_PLAYER (budget 2); status>=3 fails fast. Visitor
+  identity is pinned/invalidated only through `SessionIdentityManager`; a
+  PoToken must never be reused across a visitorData change. Details:
+  `youtube_core/AGENTS.md` §4, `entry/AGENTS.md` §6.
 - **Login data expiry**: `youtube_core` browse APIs raise a typed
   `AuthExpiredError` on 401 / Innertube error 16 (`UNAUTHENTICATED`) when
   auth was attached; the signed-in home feed then falls back to the guest
@@ -246,19 +246,19 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   (`AuthSessionManager.mergeAccountSetCookies`, hooked into every
   `HttpDownloader` response); a server-cleared SID/SAPISID marks the web
   rail rejected, and OAuth `invalid_grant` clears the refresh token.
-- **Proxy coverage**: one app proxy config (HTTP or SOCKS5) drives all
-  network stacks. netstack `http` requests use the API 26 native
-  `usingSocks5Proxy` (proxy-side DNS, no bridge hop); RCP sessions, ArkWeb
-  (`ProxyController` — no direct-fallback rules; a failing proxy must
-  fail, not silently go direct) and MPV's direct fetches
-  (HLS/subtitles, via the `http_proxy`/`no_proxy` process env from
-  `setHttpProxyEnv`; the vendored libmpv has no `network-proxy` property)
-  still route SOCKS5 through the self-healing loopback CONNECT bridge
-  `Socks5Bridge`, so the bridge must run whenever socks5 is configured
-  even though netstack no longer uses it. Loopback stays direct.
-  Startup prewarm chains are gated on `NetworkProxyConfig.awaitReady()`
-  so a proxy user's first requests never go direct while the proxy is
-  still being applied.
+- **Proxy coverage**: one app proxy config (HTTP or SOCKS5) drives every
+  network stack — netstack `http` (API 26 native `usingSocks5Proxy`,
+  proxy-side DNS, no bridge hop), RCP sessions, ArkWeb `ProxyController`,
+  and MPV's direct fetches (`http_proxy`/`no_proxy` process env via
+  `setHttpProxyEnv`). ArkWeb / RCP / MPV route SOCKS5 through the
+  self-healing loopback CONNECT bridge `Socks5Bridge`, so the bridge must
+  run whenever socks5 is configured even though netstack no longer uses it.
+  The ArkWeb override has no direct-fallback rules — a failing proxy must
+  fail, not silently go direct. Loopback stays direct. Startup prewarm
+  chains gate on `NetworkProxyConfig.awaitReady()` so a proxy user's first
+  requests never go direct while the proxy is still being applied. Details:
+  `entry/AGENTS.md` §3, `youtube_core/AGENTS.md` §7,
+  `mediaservice/AGENTS.md` §3.
 - **Network handover**: entry `NetworkHandoverService` owns the single
   `connection` default-network event subscription (SDK kit set has no
   NetworkBoostKit `netHandover`); on a switch/loss (2s debounce) it calls
@@ -269,37 +269,25 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   aborted.
 - **Dependency direction**: never import `entry` from HARs; never import
   `mediaservice` from `youtube_core`.
-- **AI subtitles**: the live paths are the server-side `tlang` translation
-  track (P0) and on-device ASR (P3). P0 is built by `youtube_core`
-  (`extractor/SubtitleTranslate.ets`,
-  `SubtitleTrack.isAutoTranslated`), appended by entry
-  `YouTubePlayService.withAutoTranslatedTrack`. mediaservice `fetchText`
-  attaches login Cookie + SAPISIDHASH for `tlang=` URLs via
-  `AvPlayerController.setSubtitleAuthHeaderProvider` (EntryAbility-wired,
-  PipePipe parity) and throws on non-200 so the overlay retry path sees
-  failures. **Known limitation**: YouTube risk-controls `tlang` by exit-IP
-  reputation (HTTP 429 "automated queries", anonymous AND signed-in) —
-  whether a track produces output depends on the network; there is no
-  client-side workaround (verified against PipePipe's implementation and a
-  request-header matrix). **P3 on-device ASR is currently [DISABLED]** (the
-  product keeps only P0): `AsrLiveCaptionService` + resident worker
-  `entry/src/main/ets/workers/AsrStreamingWorker.ets` (sherpa-onnx
-  OnlineRecognizer, streaming zipformer bilingual zh-en int8, true-streaming
-  partials + endpoint-committed cues, MPV PCM tap passthrough) — menu entry,
-  Options page, and all wiring are commented out at entry points ([DISABLED]
-  comments, code retained; worker registration in entry/build-profile.json5
-  commented too). Model weights were managed by `AsrModelManager`
-  (`filesDir/asr_models/zipformer_bilingual`, legacy SenseVoice dir
-  auto-removed); `AsrModelManager.clearAll` /
-  `AsrLiveCaptionService.clearCaches` stay wired into clear-all-data so
-  already-downloaded models are still cleaned. The `asrengine` HAR (NDK AAC
-  decode for the former batch path) is retained in the build but currently
-  has no consumer.
-  **P1/P2 remain implemented but disabled** at entry points ([DISABLED]
-  comments, code retained): P1 system AICaptionComponent (AVPlayer mount +
-  OptionsPlaybackPage rows), P2 gtx/LLM track translation (AVPlayer menu
-  item + OptionsMainPage entry + PlayerSession `ai:` auto-trigger).
-  Re-enable by uncommenting those blocks.
+- **AI subtitles**: the only live path is P0, the server-side `tlang`
+  translation track — built by `youtube_core`
+  (`extractor/SubtitleTranslate.ets`, `SubtitleTrack.isAutoTranslated`),
+  appended by entry `YouTubePlayService.withAutoTranslatedTrack`;
+  mediaservice `fetchText` attaches login Cookie + SAPISIDHASH for `tlang=`
+  URLs via `AvPlayerController.setSubtitleAuthHeaderProvider` and throws on
+  non-200 so the overlay retry path sees failures. Known limitation: YouTube
+  risk-controls `tlang` by exit-IP reputation (HTTP 429 "automated queries",
+  anonymous AND signed-in) — whether a track produces output depends on the
+  network; there is no client-side workaround. P1 (system
+  AICaptionComponent), P2 (gtx/LLM track translation), and P3 (on-device
+  sherpa-onnx ASR via `AsrLiveCaptionService` + worker) are all [DISABLED]
+  at their entry points — menu/Options entries and wiring commented out,
+  code retained; re-enable by uncommenting those blocks. The `asrengine`
+  HAR is retained in the build but has no consumer.
+  `AsrModelManager.clearAll` / `AsrLiveCaptionService.clearCaches` stay
+  wired into clear-all-data so already-downloaded models are still cleaned.
+  Details: `entry/AGENTS.md` §2 (player feature), `mediaservice/AGENTS.md`
+  §3.
 - **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, or build
   trees. `AGENTS.md` files are tracked project docs — keep them in sync
   with the code they describe, and never put machine-specific absolute

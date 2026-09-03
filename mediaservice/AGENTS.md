@@ -11,7 +11,8 @@
   tap passthrough (`enableAudioTap` / `disableAudioTap` / `setAudioTapCallback`
   → `MpvPlaybackEngine` → `MpvPlayerController`; no policy, entry owns
   lifecycle via `AsrLiveCaptionService` — currently [DISABLED] in entry,
-  tap plumbing retained).
+  tap plumbing retained). `AudioTapChunk` is re-exported from
+  `@yourpipe/libmpv-napi` for tap consumers.
 - `LocalMediaProxy` — facade over local proxy sessions (range + SABR dual).
   `abortAllUpstreamFetches(reason)` is the network-handover lever: aborts
   every in-flight upstream fetch across sessions (via
@@ -241,10 +242,13 @@ non-product `youtube-dual` session, so it was dead traffic on the EDL path.
   warmup on status>=2 media); protection recovery (rotate/reload) happens
   inside the session via youtube_core's policy layer.
 - Transient vs terminal SABR errors are distinguished by
-  `SabrProtocolException.kind` ('protection'/'no_media'/'segment_unavailable'
-  are retryable, 'beyond_end' signals end-of-stream to the caller;
-  'attestation_required'/'reload_exhausted' are terminal) — never match on
-  error message strings.
+  `SabrProtocolException.kind` (`SabrErrorKind` — 9 kinds, defined in
+  `youtube_core` `extractor/sabr/SabrProtocolException.ets`):
+  'protection'/'no_media'/'segment_unavailable' are retryable,
+  'beyond_end' signals end-of-stream to the caller, 'closed' is quiet
+  teardown on session close, 'attestation_required'/'reload_exhausted'/
+  'redirect'/'protocol' are terminal — never match on error message
+  strings.
 - `SabrTrackBuffer` pumps on demand to satisfy each range request
   (`readRange` → `ensureBytes`); each pump first tries an opportunistic
   direct fetch of the next segment, then falls back to the session's
@@ -264,8 +268,8 @@ Never feed mpv a bare variant URL without the external audio — variants are
 video-only. Two mpv traps this avoids: list `-set` parsing splits on literal
 `,` and `:` inside these URLs (change-list `append` takes one raw item), and
 `audio-add` before the file is playing silently no-ops. Master-direct +
-`hls-bitrate` is also rejected: FFmpeg probes every variant serially
-(measured 57 s TTFF) and the audio renditions expire mid-probe. A quality
+`hls-bitrate` is also rejected: FFmpeg probes every variant serially and
+the audio renditions expire mid-probe. A quality
 switch re-runs the same helper and restarts at the live edge with the new
 variant + audio pair.
 
@@ -290,7 +294,8 @@ variant + audio pair.
 - States: `idle`, `initializing`, `loading`, `ready`, `playing`, `paused`,
   `buffering`, `completed`, `released`, `error`. See `PlayerState.ets` for the
   full enum + `isValidTransition` rules.
-- Listeners register via `PlayerStateMachine.addStateChangeListener(listener)`.
+- Listeners register via `PlayerStateMachine.addListener(listener)` /
+  `removeListener(listener)`.
 - The `backgroundTaskListener` is attached in `AvPlayerController` to keep
   the background continuous task alive across the playing lifecycle.
 
