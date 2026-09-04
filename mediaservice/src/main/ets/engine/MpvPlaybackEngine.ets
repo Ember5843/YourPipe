@@ -483,20 +483,15 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   setVideoOutputEnabled(enabled: boolean): void {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
+    // Push only on actual change: callers re-apply the preference on every
+    // state emission, and unconditional pushes flood mpv (one Set property
+    // log per call). The post-load "media defaults back to vid=auto" case is
+    // covered by applyReadyActions() re-applying vid=no after ready.
     const force = enabled !== this.videoOutputOn;
     this.videoOutputOn = enabled;
-    // Always push property: after load, media defaults may ignore prior vid=no.
-    if (enabled) {
-      ctrl.setProperty('vid', 'auto');
-      if (force) {
-        Logger.info(TAG, 'video output ON (vid=auto)');
-      }
-    } else {
-      ctrl.setProperty('vid', 'no');
-      if (force) {
-        Logger.info(TAG, 'video output OFF (vid=no)');
-      }
-    }
+    if (!force) return;
+    ctrl.setProperty('vid', enabled ? 'auto' : 'no');
+    Logger.info(TAG, enabled ? 'video output ON (vid=auto)' : 'video output OFF (vid=no)');
   }
 
   getState(): PlaybackState {
