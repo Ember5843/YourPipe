@@ -2,6 +2,7 @@ import { StreamInfo, SelectOption, StreamCategories, PlayerModel } from 'mediase
 import { UIConfig } from '../../../common/AppState';
 import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
 import { formatBytes } from '../../../common/utils/FormatUtils';
+import { DownloadTask } from '../../../common/DownloadManager';
 
 export interface DownloadSelection {
   video?: StreamInfo;
@@ -10,6 +11,31 @@ export interface DownloadSelection {
   hls?: StreamInfo;
   /** True when selected video/audio are SABR (UMP session download). */
   sabr?: boolean;
+}
+
+/**
+ * DownloadDialog 确认回调的建任务收口：播放页 VideoDetails 与卡片长按下载
+ * 入口（Index.startCardDownload）共用。返回 null = 选择无效（调用方早退）。
+ */
+export function buildDownloadTaskFromSelection(videoId: string, title: string, author: string,
+  thumbnailUrl: string, selection: DownloadSelection): DownloadTask | null {
+  let videoStream: StreamInfo;
+  let audioStream: StreamInfo | null = null;
+  if (selection.progressive) {
+    videoStream = selection.progressive;
+  } else if (selection.hls) {
+    videoStream = selection.hls;
+  } else if (selection.sabr && selection.video && selection.audio) {
+    videoStream = selection.video;
+    audioStream = selection.audio;
+  } else if (selection.video) {
+    videoStream = selection.video;
+    audioStream = selection.audio || null;
+  } else {
+    return null;
+  }
+  return new DownloadTask(`dl_${Date.now()}_${videoId}`, videoId, title, author, thumbnailUrl,
+    videoStream, audioStream);
 }
 
 enum DownloadMode {

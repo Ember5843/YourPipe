@@ -45,7 +45,8 @@ export struct ChannelVideoTab {
   }
 
   private gridColumns(): number {
-    return getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth));
+    return getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth),
+      UIConfig.gridDensityOffset(this.uiConfig.homeGridDensity));
   }
 
   /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */

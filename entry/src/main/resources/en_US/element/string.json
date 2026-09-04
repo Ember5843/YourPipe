@@ -745,6 +745,10 @@
             "value": "Delete Record"
         },
         {
+            "name": "yt_action_remove_from_queue",
+            "value": "Remove from queue"
+        },
+        {
             "name": "yt_sub_manage_title",
             "value": "Subscribed Authors"
         },
@@ -1331,6 +1335,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "No downloadable streams available"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "Live streams can't be downloaded"
         },
         {
             "name": "yt_action_sleep_timer",
@@ -2183,6 +2191,22 @@
         {
             "name": "yt_layout_list",
             "value": "List mode"
+        },
+        {
+            "name": "yt_setting_card_density",
+            "value": "Card density"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "Auto"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "Compact"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "Cozy"
         },
         {
             "name": "yt_backup_error_no_context",

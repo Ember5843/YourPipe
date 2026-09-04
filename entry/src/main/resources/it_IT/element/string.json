@@ -133,6 +133,22 @@
             "value": "Modalità elenco"
         },
         {
+            "name": "yt_setting_card_density",
+            "value": "Densità schede"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "Automatica"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "Compatta"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "Ampia"
+        },
+        {
             "name": "yt_option_log",
             "value": "Log"
         },
@@ -771,6 +787,10 @@
         {
             "name": "yt_action_delete_record",
             "value": "Elimina record"
+        },
+        {
+            "name": "yt_action_remove_from_queue",
+            "value": "Rimuovi dalla coda"
         },
         {
             "name": "yt_sub_manage_title",
@@ -1607,6 +1627,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "Nessuno stream scaricabile disponibile"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "I contenuti in diretta non possono essere scaricati"
         },
         {
             "name": "yt_action_sleep_timer",

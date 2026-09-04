@@ -243,6 +243,33 @@ export class YouTubePlayService {
   }
 
   /**
+   * 卡片长按「下载」入口的流提取：不触碰播放器，也不改写
+   * pendingDashPotPromise（forPrefetch=true）；经 extractChain 互斥串行。
+   * 命中 30 分钟 prefetch 缓存时零网络（不消费、不提升为播放会话）。
+   * 返回前等待该视频的 DASH PoToken 注入落地，保证交给下载器的直链已带 pot=。
+   */
+  async extractForDownload(videoId: string): Promise<YouTubePlayResult> {
+    const trimmed = (videoId || '').trim();
+    const cached = this.prefetchedResults.get(trimmed);
+    let result: YouTubePlayResult;
+    if (cached && Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
+      logger.info(`${TAG} download extract prefetch hit video=${trimmed}`);
+      result = cached.result;
+    } else {
+      logger.info(`${TAG} download extract start video=${trimmed}`);
+      result = await this.play(trimmed, '', true);
+    }
+    if (result.success) {
+      const injection = this.dashPotInjections.get(trimmed);
+      if (injection) {
+        // play() 内已对注入 Promise 挂 catch 兜底；await 只为时序（pot= 先于建任务）
+        await injection;
+      }
+    }
+    return result;
+  }
+
+  /**
    * Drop every cached/in-flight prefetch. Required on playback-endpoint
    * changes: prefetched stream URLs were extracted with the old client and
    * must not be served by takePrefetched under the new one.

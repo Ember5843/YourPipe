@@ -243,7 +243,8 @@ export struct FavoritesPage {
         if (this.uiConfig.homeLayoutMode === 'grid') {
           ListItem() {
             GridRow({
-              columns: getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth)),
+              columns: getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth),
+                UIConfig.gridDensityOffset(this.uiConfig.homeGridDensity)),
               gutter: { x: 8, y: 8 }
             }) {
               ForEach(this.favorites, (item: VideoItem) => {

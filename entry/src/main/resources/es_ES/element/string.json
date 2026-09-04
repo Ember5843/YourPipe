@@ -745,6 +745,10 @@
             "value": "Eliminar registro"
         },
         {
+            "name": "yt_action_remove_from_queue",
+            "value": "Quitar de la cola"
+        },
+        {
             "name": "yt_sub_manage_title",
             "value": "Mis suscripciones"
         },
@@ -1259,6 +1263,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "No hay transmisiones descargables"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "Las transmisiones en vivo no se pueden descargar"
         },
         {
             "name": "yt_action_sleep_timer",
@@ -1847,6 +1855,22 @@
         {
             "name": "yt_layout_list",
             "value": "Modo lista"
+        },
+        {
+            "name": "yt_setting_card_density",
+            "value": "Densidad de tarjetas"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "Automática"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "Compacta"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "Amplia"
         },
         {
             "name": "yt_codec_av1",

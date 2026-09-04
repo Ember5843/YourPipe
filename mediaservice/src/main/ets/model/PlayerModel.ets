@@ -194,6 +194,19 @@ export class PlayerModel {
     return { categories, mergedVideoList };
   }
 
+  /**
+   * 下载路径的分类收口：classifyStreamList(requirePlayableUrl=true) + 下载 UI
+   * 排序（视频/混流按 height 降序，音频按 bitrate 降序）。entry 侧播放页
+   * VideoDetails 与卡片长按菜单的下载入口共用，避免两份排序逻辑漂移。
+   */
+  public static classifyForDownload(streams: StreamInfo[]): StreamCategories {
+    const categories: StreamCategories = PlayerModel.classifyStreamList(streams, true).categories;
+    categories.video.sort((a: StreamInfo, b: StreamInfo): number => (b.height || 0) - (a.height || 0));
+    categories.audio.sort((a: StreamInfo, b: StreamInfo): number => (b.bitrate || 0) - (a.bitrate || 0));
+    categories.progressive.sort((a: StreamInfo, b: StreamInfo): number => (b.height || 0) - (a.height || 0));
+    return categories;
+  }
+
   public classifyStreams(streams: StreamInfo[], preferredLanguage?: string, audioMaxBitrate?: number): void {
     const classification = PlayerModel.classifyStreamList(streams);
     this.categorizedStreams = classification.categories;

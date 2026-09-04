@@ -745,6 +745,10 @@
             "value": "Supprimer l'enregistrement"
         },
         {
+            "name": "yt_action_remove_from_queue",
+            "value": "Retirer de la file"
+        },
+        {
             "name": "yt_sub_manage_title",
             "value": "Mes abonnements"
         },
@@ -1259,6 +1263,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "Aucun flux téléchargeable disponible"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "Les diffusions en direct ne peuvent pas être téléchargées"
         },
         {
             "name": "yt_action_sleep_timer",
@@ -1847,6 +1855,22 @@
         {
             "name": "yt_layout_list",
             "value": "Mode liste"
+        },
+        {
+            "name": "yt_setting_card_density",
+            "value": "Densité des cartes"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "Automatique"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "Compacte"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "Aérée"
         },
         {
             "name": "yt_codec_av1",

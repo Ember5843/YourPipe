@@ -133,6 +133,22 @@
             "value": "列表模式"
         },
         {
+            "name": "yt_setting_card_density",
+            "value": "卡片密度"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "自动"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "紧凑"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "宽松"
+        },
+        {
             "name": "yt_option_log",
             "value": "日志"
         },
@@ -771,6 +787,10 @@
         {
             "name": "yt_action_delete_record",
             "value": "删除记录"
+        },
+        {
+            "name": "yt_action_remove_from_queue",
+            "value": "从队列移除"
         },
         {
             "name": "yt_sub_manage_title",
@@ -1607,6 +1627,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "没有可下载的媒体流"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "直播内容暂不支持下载"
         },
         {
             "name": "yt_action_sleep_timer",

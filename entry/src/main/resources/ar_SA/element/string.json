@@ -745,6 +745,10 @@
             "value": "حذف السجل"
         },
         {
+            "name": "yt_action_remove_from_queue",
+            "value": "إزالة من قائمة الانتظار"
+        },
+        {
             "name": "yt_sub_manage_title",
             "value": "اشتراكاتي"
         },
@@ -1259,6 +1263,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "لا توجد تدفقات متاحة للتنزيل"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "لا يمكن تنزيل البث المباشر"
         },
         {
             "name": "yt_action_sleep_timer",
@@ -1847,6 +1855,22 @@
         {
             "name": "yt_layout_list",
             "value": "وضع القائمة"
+        },
+        {
+            "name": "yt_setting_card_density",
+            "value": "كثافة البطاقات"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "تلقائي"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "مضغوط"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "مريح"
         },
         {
             "name": "yt_codec_av1",

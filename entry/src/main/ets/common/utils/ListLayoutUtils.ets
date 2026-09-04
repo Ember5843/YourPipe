@@ -30,19 +30,19 @@ export function getFeedContentWidthVp(uiContext: UIContext, deviceWidthPx: numbe
  * 网格模式（grid 布局）视频卡片列数。
  * 阈值表 1440/1080/760/520 —— 原 Index / SearchPage / PlaylistDetailPage /
  * ChannelVideoTab / SubscriptionFeedPage / FavoritesPage 六处逐字节复制的收口。
+ * densityOffset 来自 UIConfig.homeGridDensity（紧凑 +1 / 宽松 -1 / 自动 0），
+ * 在阈值基数上偏移后钳位到 [1,5]；±1 不会脱离宽度阈值表的合理区间。
  */
-export function getVideoGridColumnCount(contentWidthVp: number): number {
+export function getVideoGridColumnCount(contentWidthVp: number, densityOffset: number = 0): number {
+  let base: number = 1;
   if (contentWidthVp >= 1440) {
-    return 5;
+    base = 5;
+  } else if (contentWidthVp >= 1080) {
+    base = 4;
+  } else if (contentWidthVp >= 760) {
+    base = 3;
+  } else if (contentWidthVp >= 520) {
+    base = 2;
   }
-  if (contentWidthVp >= 1080) {
-    return 4;
-  }
-  if (contentWidthVp >= 760) {
-    return 3;
-  }
-  if (contentWidthVp >= 520) {
-    return 2;
-  }
-  return 1;
+  return Math.max(1, Math.min(5, base + densityOffset));
 }

@@ -745,6 +745,10 @@
             "value": "刪除記錄"
         },
         {
+            "name": "yt_action_remove_from_queue",
+            "value": "從佇列移除"
+        },
+        {
             "name": "yt_sub_manage_title",
             "value": "我訂閱的作者"
         },
@@ -1259,6 +1263,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "沒有可下載的媒體串流"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "直播內容暫不支援下載"
         },
         {
             "name": "yt_action_sleep_timer",
@@ -1847,6 +1855,22 @@
         {
             "name": "yt_layout_list",
             "value": "列表模式"
+        },
+        {
+            "name": "yt_setting_card_density",
+            "value": "卡片密度"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "自動"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "緊湊"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "寬鬆"
         },
         {
             "name": "yt_codec_av1",

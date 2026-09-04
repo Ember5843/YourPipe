@@ -6,6 +6,14 @@ import { SubscriptionUser } from '../../../common/SubscriptionModel';
 import { UIConfig } from '../../../common/AppState';
 import { Callback } from '@ohos.base';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
+import {
+  MEDIA_CARD_RADIUS,
+  MEDIA_CARD_SHADOW_OFFSET_Y,
+  MEDIA_CARD_SHADOW_RADIUS,
+  MEDIA_META_SIZE,
+  MEDIA_TITLE_LINE_HEIGHT,
+  MEDIA_TITLE_SIZE
+} from '../../../common/components/MediaCardTokens';
 
 interface ContextMenuItem {
   symbolStartIcon?: SymbolGlyphModifier;
@@ -100,25 +108,71 @@ export struct ChannelCard {
   @Builder
   contextMenuBuilder() {
     Scroll() {
-      Menu() {
-        ForEach(this.getContextMenus(), (item: ContextMenuItem) => {
-          MenuItem({
-            symbolStartIcon: item.symbolStartIcon,
-            content: item.content
-          })
-            .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
-            .contentFontColor(item.contentColor ?? $r('sys.color.font_primary'))
-            .onClick(() => {
-              item.callback();
-            });
-        });
+      Column() {
+        // 信息区（与视频卡菜单同范式）：名称 / 订阅数·视频数 / 简介
+        Column() {
+          Text(this.channel.name || $r('app.string.yt_label_unknown'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.yourtube_text_primary'))
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+
+          if ((this.channel.subscriberText && this.channel.subscriberText.length > 0)
+            || (this.channel.videoCountText && this.channel.videoCountText.length > 0)) {
+            Text([
+              this.channel.subscriberText || '',
+              this.channel.videoCountText || ''
+            ].filter((s: string) => s.length > 0).join(' · '))
+              .fontSize(12)
+              .fontColor($r('app.color.yourtube_text_quaternary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+              .margin({ top: 4 })
+          }
+
+          if (this.channel.description && this.channel.description.length > 0) {
+            Text(this.channel.description)
+              .fontSize(12)
+              .fontColor($r('app.color.yourtube_text_hint'))
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+              .margin({ top: 2 })
+          }
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+
+        Divider()
+          .strokeWidth(0.5)
+          .color($r('sys.color.comp_divider'))
+
+        Menu() {
+          ForEach(this.getContextMenus(), (item: ContextMenuItem) => {
+            MenuItem({
+              symbolStartIcon: item.symbolStartIcon,
+              content: item.content
+            })
+              .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+              .contentFontColor(item.contentColor ?? $r('sys.color.font_primary'))
+              .onClick(() => {
+                item.callback();
+              });
+          });
+        }
+        .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+        .width('100%')
+        .height('auto')
       }
       .backgroundColor($r('app.color.yourtube_bg_surface'))
-      .borderRadius(12)
-      .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
-      .width(180)
-      .height('auto')
-      //.transition(customAnimationUtil.isMenuTransition(this.uiConfig));
+      .borderRadius(MEDIA_CARD_RADIUS)
+      .clip(true)
+      // 与视频卡菜单统一 220vp（原 180vp）
+      .width(220)
     }
     .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
     .edgeEffect(EdgeEffect.Spring);
@@ -157,18 +211,18 @@ export struct ChannelCard {
 
       Column() {
         Text(this.channel.name || $r('app.string.yt_label_unknown'))
-          .fontSize(14)
+          .fontSize(MEDIA_TITLE_SIZE)
           .fontColor($r('app.color.yourtube_text_primary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .lineHeight(18)
+          .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
           .fontWeight(FontWeight.Medium)
           .margin({ bottom: 2 });
 
         Row() {
           if (this.channel.subscriberText && this.channel.subscriberText.length > 0) {
             Text(this.channel.subscriberText)
-              .fontSize(11)
+              .fontSize(MEDIA_META_SIZE)
               .fontColor($r('app.color.yourtube_text_quaternary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis });
@@ -177,7 +231,7 @@ export struct ChannelCard {
             Text(this.channel.subscriberText && this.channel.subscriberText.length > 0
               ? ` · ${this.channel.videoCountText}`
               : this.channel.videoCountText)
-              .fontSize(11)
+              .fontSize(MEDIA_META_SIZE)
               .fontColor($r('app.color.yourtube_text_hint'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis });
@@ -218,9 +272,14 @@ export struct ChannelCard {
     .width('100%')
     .padding({ left: 10, right: 10, top: 8, bottom: 8 })
     .alignItems(VerticalAlign.Top)
-    .borderRadius(12)
+    .borderRadius(MEDIA_CARD_RADIUS)
     .backgroundColor($r('app.color.yourtube_bg_surface'))
-    .shadow({ radius: 4, color: $r('app.color.yourtube_shadow'), offsetX: 0, offsetY: 2 })
+    .shadow({
+      radius: MEDIA_CARD_SHADOW_RADIUS,
+      color: $r('app.color.yourtube_shadow'),
+      offsetX: 0,
+      offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
+    })
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .bindContextMenu(this.isShowContextMenu, this.contextMenuBuilder, {
       preview: MenuPreviewMode.IMAGE,

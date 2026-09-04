@@ -1,6 +1,9 @@
 import { VideoItem } from 'youtube_core';
 import { ActionHub } from '../../../common/ActionHub';
 import { MediaThumb } from '../../../common/components/MediaThumb';
+import { VideoItemContextMenu } from '../../../common/components/VideoItemContextMenu';
+import { UIConfig } from '../../../common/AppState';
+import { customVibrator } from '../../../common/VibratorUtil';
 
 /**
  * Multi-card banner strategy:
@@ -28,6 +31,8 @@ struct HomeRecommendBannerPage {
   @Prop bannerHeightVp: number = 200;
   onOpenVideo?: (video: VideoItem) => void;
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @State isShowContextMenu: boolean = false;
 
   private handleOpen(): void {
     if (this.onOpenVideo) {
@@ -35,6 +40,14 @@ struct HomeRecommendBannerPage {
       return;
     }
     this.actionHub.openVideo(this.video);
+  }
+
+  @Builder
+  bannerMenuBuilder() {
+    // Banner 与卡片同一套长按菜单（信息区 + 收藏/作者/纯音频/下载/分享）
+    VideoItemContextMenu({
+      video: this.video
+    })
   }
 
   private getTitle(): string {
@@ -78,9 +91,26 @@ struct HomeRecommendBannerPage {
     .height('100%')
     .borderRadius(12)
     .clip(true)
+    .bindContextMenu(this.isShowContextMenu, this.bannerMenuBuilder, {
+      preview: MenuPreviewMode.IMAGE,
+      previewAnimationOptions: { scale: [1.0, 1.1] },
+      placement: Placement.BottomRight,
+      aboutToAppear: () => {
+        if (this.uiConfig.isVibrate) {
+          customVibrator.vibratorTriggerOfHapticClockTimer();
+        }
+      },
+      aboutToDisappear: () => {
+        this.isShowContextMenu = false;
+      }
+    })
     .onClick(() => {
       this.handleOpen();
     })
+    .gesture(LongPressGesture()
+      .onAction(() => {
+        this.isShowContextMenu = true;
+      }))
   }
 }
 

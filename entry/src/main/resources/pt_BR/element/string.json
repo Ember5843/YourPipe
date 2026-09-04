@@ -133,6 +133,22 @@
             "value": "Modo lista"
         },
         {
+            "name": "yt_setting_card_density",
+            "value": "Densidade dos cartões"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "Automática"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "Compacta"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "Espaçosa"
+        },
+        {
             "name": "yt_option_log",
             "value": "Registros"
         },
@@ -771,6 +787,10 @@
         {
             "name": "yt_action_delete_record",
             "value": "Excluir registro"
+        },
+        {
+            "name": "yt_action_remove_from_queue",
+            "value": "Remover da fila"
         },
         {
             "name": "yt_sub_manage_title",
@@ -1607,6 +1627,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "Nenhum stream de mídia disponível para download"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "Transmissões ao vivo não podem ser baixadas"
         },
         {
             "name": "yt_action_sleep_timer",

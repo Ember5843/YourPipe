@@ -133,6 +133,22 @@
             "value": "목록 모드"
         },
         {
+            "name": "yt_setting_card_density",
+            "value": "카드 밀도"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "자동"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "촘촘하게"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "여유 있게"
+        },
+        {
             "name": "yt_option_log",
             "value": "로그"
         },
@@ -771,6 +787,10 @@
         {
             "name": "yt_action_delete_record",
             "value": "기록 삭제"
+        },
+        {
+            "name": "yt_action_remove_from_queue",
+            "value": "대기열에서 삭제"
         },
         {
             "name": "yt_sub_manage_title",
@@ -1607,6 +1627,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "다운로드 가능한 미디어 스트림이 없습니다"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "라이브 스트림은 다운로드할 수 없습니다"
         },
         {
             "name": "yt_action_sleep_timer",

@@ -5,10 +5,11 @@ import { AuthAccountStatus, AuthSessionManager, SearchPlaylistItem, VideoItem } 
 import { customVibrator } from '../../common/VibratorUtil';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
-import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { DownloadPage } from './DownloadPage';
 import { MediaThumb } from '../../common/components/MediaThumb';
 import { SubTabBarItem } from '../../common/components/SubTabBar';
+import { VideoItemContextMenu, VideoMenuExtraItem } from '../../common/components/VideoItemContextMenu';
 import {
   MEDIA_CARD_RADIUS,
   MEDIA_CARD_SHADOW_OFFSET_Y,
@@ -53,8 +54,6 @@ struct HistoryCard {
   @State isShowContextMenu: boolean = false;
   onOpen: (item: WatchHistoryItem) => void = (_item: WatchHistoryItem) => {};
 
-  @Consume('actionHub') actionHub: ActionHub = new ActionHub();
-
   private toVideoItem(): VideoItem {
     return new VideoItem(
       0,
@@ -91,49 +90,36 @@ struct HistoryCard {
     }
   }
 
-  private openAudioOnly(): void {
-    this.isShowContextMenu = false;
-    // 播放列表条目没有单视频可音频续播，按普通打开处理（进入列表）
-    if (this.isPlaylistEntry()) {
-      this.onOpen(this.item);
-      return;
-    }
-    this.actionHub.openVideo(this.toVideoItem(), undefined, true);
+  /** 删除记录是历史页的表面特有项，追加在共享菜单标准项之后（主题色强调）。 */
+  private buildExtraMenuItems(): VideoMenuExtraItem[] {
+    const items: VideoMenuExtraItem[] = [];
+    const del: VideoMenuExtraItem = {
+      symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
+        .fontSize(SYMBOL_FONT_SIZE)
+        .fontColor([$r('sys.color.font_primary')]),
+      content: $r('app.string.yt_action_delete_record'),
+      contentColor: this.themePrimary,
+      callback: () => {
+        this.deleteItem();
+      }
+    };
+    items.push(del);
+    return items;
   }
 
   @Builder
   historyMenuBuilder() {
-    Scroll() {
-      Menu() {
-        MenuItem({
-          symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.earphone'))
-            .fontSize(SYMBOL_FONT_SIZE)
-            .fontColor([$r('sys.color.font_primary')]),
-          content: $r('app.string.yt_action_audio_only_play')
-        })
-          .contentFontColor($r('sys.color.font_primary'))
-          .onClick(() => {
-            this.openAudioOnly();
-          });
-        MenuItem({
-          symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
-            .fontSize(SYMBOL_FONT_SIZE)
-            .fontColor([$r('sys.color.font_primary')]),
-          content: $r('app.string.yt_action_delete_record')
-        })
-          .contentFontColor(this.themePrimary)
-          .onClick(() => {
-            this.deleteItem();
-          });
-      }
-      .backgroundColor($r('app.color.yourtube_bg_surface'))
-      .borderRadius(MEDIA_CARD_RADIUS)
-      .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
-      .width(180)
-      .height('auto')
-    }
-    .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-    .edgeEffect(EdgeEffect.Spring)
+    // 菜单统一走 VideoItemContextMenu；播放列表来源条目没有单视频语义，
+    // 整组关闭视频标准项与信息区，只留"删除记录"。
+    VideoItemContextMenu({
+      video: this.toVideoItem(),
+      showInfo: !this.isPlaylistEntry(),
+      showFavorite: !this.isPlaylistEntry(),
+      showAudioOnly: !this.isPlaylistEntry(),
+      showDownload: !this.isPlaylistEntry(),
+      showShare: !this.isPlaylistEntry(),
+      extraItems: this.buildExtraMenuItems()
+    })
   }
 
   build() {
@@ -234,7 +220,7 @@ struct HistoryCard {
     })
     .bindContextMenu(this.isShowContextMenu, this.historyMenuBuilder, {
       preview: MenuPreviewMode.IMAGE,
-      previewAnimationOptions: { scale: [1.0, 1.05] },
+      previewAnimationOptions: { scale: [1.0, 1.1] },
       placement: Placement.BottomRight,
       aboutToAppear: () => {
         if (this.uiConfig.isVibrate) {

@@ -1,6 +1,10 @@
 import { VideoItem } from 'youtube_core';
 import { PlayQueueManager, QueueSourceType, QueueChangeListener } from '../PlayQueueManager';
 import { MediaThumb } from '../../../common/components/MediaThumb';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { UIConfig } from '../../../common/AppState';
+import { customVibrator } from '../../../common/VibratorUtil';
+import { VideoItemContextMenu, VideoMenuExtraItem } from '../../../common/components/VideoItemContextMenu';
 import {
   MEDIA_CARD_RADIUS,
   MEDIA_CARD_SHADOW_OFFSET_Y,
@@ -31,6 +35,160 @@ class PlayQueueListListener extends QueueChangeListener {
     setTimeout(() => {
       this.component.scrollToCurrent();
     }, 100);
+  }
+}
+
+const QUEUE_MENU_SYMBOL_SIZE: number = 16;
+
+/**
+ * 队列条目行。独立 @Component：长按菜单的 bindContextMenu 需要每行自己的
+ * 布尔状态，@Builder 共享 @State 会让所有行的菜单联动。
+ * 菜单统一走 VideoItemContextMenu；队列语义差异：关闭"纯音频播放"
+ * （点击即队列内切换，纯音频重开会丢队列上下文），追加特有项"从队列移除"。
+ */
+@Component
+struct QueueRowItem {
+  @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
+  @Prop item: VideoItem;
+  @Prop index: number = 0;
+  /** 是否当前播放项（标题染色 + 缩略图波形遮罩）；父级 currentIndex 变化时随 @Prop 刷新。 */
+  @Prop isCurrent: boolean = false;
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @State isShowContextMenu: boolean = false;
+  onSwitch: (index: number) => void = (_index: number) => {};
+  private manager: PlayQueueManager = PlayQueueManager.getInstance();
+
+  private buildExtraMenuItems(): VideoMenuExtraItem[] {
+    const items: VideoMenuExtraItem[] = [];
+    const remove: VideoMenuExtraItem = {
+      symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.minus_circle'))
+        .fontSize(QUEUE_MENU_SYMBOL_SIZE)
+        .fontColor([$r('sys.color.font_primary')]),
+      content: $r('app.string.yt_action_remove_from_queue'),
+      contentColor: this.themePrimary,
+      callback: () => {
+        this.manager.removeAt(this.index);
+        this.isShowContextMenu = false;
+      }
+    };
+    items.push(remove);
+    return items;
+  }
+
+  @Builder
+  queueMenuBuilder() {
+    VideoItemContextMenu({
+      video: this.item,
+      showAudioOnly: false,
+      extraItems: this.buildExtraMenuItems()
+    })
+  }
+
+  @Builder
+  Thumbnail(item: VideoItem) {
+    Stack({ alignContent: Alignment.Center }) {
+      MediaThumb({
+        imageUrl: item.thumbnailUrl || '',
+        placeholderColor: item.thumbnailColor || '',
+        widthVp: MEDIA_LIST_THUMB_WIDTH,
+        heightVp: MEDIA_LIST_THUMB_HEIGHT,
+        borderRadiusVp: MEDIA_THUMB_RADIUS,
+        showLive: true,
+        isLive: item.isLive
+      })
+
+      if (this.isCurrent) {
+        Column() {
+          SymbolGlyph($r('sys.symbol.waveform'))
+            .fontSize(20)
+            .fontColor([Color.White])
+        }
+        .width(MEDIA_LIST_THUMB_WIDTH)
+        .height(MEDIA_LIST_THUMB_HEIGHT)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('rgba(0,0,0,0.4)')
+        .borderRadius(MEDIA_THUMB_RADIUS)
+      }
+    }
+    .width(MEDIA_LIST_THUMB_WIDTH)
+    .height(MEDIA_LIST_THUMB_HEIGHT)
+  }
+
+  build() {
+    Row() {
+      this.Thumbnail(this.item)
+
+      Column() {
+        Text(this.item.title || '')
+          .fontSize(MEDIA_TITLE_SIZE)
+          .fontColor(this.isCurrent
+            ? this.themePrimary
+            : $r('app.color.yourtube_text_primary'))
+          .fontWeight(FontWeight.Medium)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
+          .width('100%')
+          .margin({ bottom: 2 })
+
+        if (this.item.author && this.item.author.length > 0) {
+          Text(this.item.author)
+            .fontSize(MEDIA_META_SIZE)
+            .fontColor($r('app.color.yourtube_text_quaternary'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+            .margin({ bottom: 2 })
+        }
+
+        if (this.item.viewCount && this.item.viewCount.length > 0) {
+          Text(this.item.viewCount)
+            .fontSize(MEDIA_META_SIZE)
+            .fontColor($r('app.color.yourtube_text_hint'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+        }
+      }
+      .layoutWeight(1)
+      .constraintSize({ minHeight: MEDIA_LIST_THUMB_HEIGHT })
+      .alignItems(HorizontalAlign.Start)
+      .margin({ left: MEDIA_LIST_THUMB_GAP })
+    }
+    .width('100%')
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .alignItems(VerticalAlign.Top)
+    .borderRadius(MEDIA_CARD_RADIUS)
+    .backgroundColor(this.isCurrent
+      ? $r('app.color.yourtube_bg_surface_muted')
+      : $r('app.color.yourtube_bg_surface'))
+    .shadow({
+      radius: MEDIA_CARD_SHADOW_RADIUS,
+      color: $r('app.color.yourtube_shadow'),
+      offsetX: 0,
+      offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
+    })
+    .bindContextMenu(this.isShowContextMenu, this.queueMenuBuilder, {
+      preview: MenuPreviewMode.IMAGE,
+      previewAnimationOptions: { scale: [1.0, 1.1] },
+      placement: Placement.BottomRight,
+      aboutToAppear: () => {
+        if (this.uiConfig.isVibrate) {
+          customVibrator.vibratorTriggerOfHapticClockTimer();
+        }
+      },
+      aboutToDisappear: () => {
+        this.isShowContextMenu = false;
+      }
+    })
+    .onClick(() => {
+      this.onSwitch(this.index);
+    })
+    .gesture(LongPressGesture()
+      .onAction(() => {
+        this.isShowContextMenu = true;
+      }))
   }
 }
 
@@ -198,104 +356,18 @@ export struct PlayQueueList {
   }
 
   @Builder
-  Thumbnail(item: VideoItem, index: number) {
-    Stack({ alignContent: Alignment.Center }) {
-      MediaThumb({
-        imageUrl: item.thumbnailUrl || '',
-        placeholderColor: item.thumbnailColor || '',
-        widthVp: MEDIA_LIST_THUMB_WIDTH,
-        heightVp: MEDIA_LIST_THUMB_HEIGHT,
-        borderRadiusVp: MEDIA_THUMB_RADIUS,
-        showLive: true,
-        isLive: item.isLive
-      })
-
-      // 在 body 内比较 this.currentIndex（建立 this 依赖）；若以 isPlaying 快照
-      // 按值传入，切歌时波形遮罩不会随状态刷新（V1 @Builder 按值冻结）。
-      if (index === this.currentIndex) {
-        Column() {
-          SymbolGlyph($r('sys.symbol.waveform'))
-            .fontSize(20)
-            .fontColor([Color.White])
-        }
-        .width(MEDIA_LIST_THUMB_WIDTH)
-        .height(MEDIA_LIST_THUMB_HEIGHT)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-        .backgroundColor('rgba(0,0,0,0.4)')
-        .borderRadius(MEDIA_THUMB_RADIUS)
-      }
-    }
-    .width(MEDIA_LIST_THUMB_WIDTH)
-    .height(MEDIA_LIST_THUMB_HEIGHT)
-  }
-
-  @Builder
-  QueueRow(item: VideoItem, index: number) {
-    Row() {
-      this.Thumbnail(item, index)
-
-      Column() {
-        Text(item.title || '')
-          .fontSize(MEDIA_TITLE_SIZE)
-          .fontColor(index === this.currentIndex
-            ? this.themePrimary
-            : $r('app.color.yourtube_text_primary'))
-          .fontWeight(FontWeight.Medium)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
-          .width('100%')
-          .margin({ bottom: 2 })
-
-        if (item.author && item.author.length > 0) {
-          Text(item.author)
-            .fontSize(MEDIA_META_SIZE)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width('100%')
-            .margin({ bottom: 2 })
-        }
-
-        if (item.viewCount && item.viewCount.length > 0) {
-          Text(item.viewCount)
-            .fontSize(MEDIA_META_SIZE)
-            .fontColor($r('app.color.yourtube_text_hint'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width('100%')
-        }
-      }
-      .layoutWeight(1)
-      .constraintSize({ minHeight: MEDIA_LIST_THUMB_HEIGHT })
-      .alignItems(HorizontalAlign.Start)
-      .margin({ left: MEDIA_LIST_THUMB_GAP })
-    }
-    .width('100%')
-    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
-    .alignItems(VerticalAlign.Top)
-    .borderRadius(MEDIA_CARD_RADIUS)
-    .backgroundColor(index === this.currentIndex
-      ? $r('app.color.yourtube_bg_surface_muted')
-      : $r('app.color.yourtube_bg_surface'))
-    .shadow({
-      radius: MEDIA_CARD_SHADOW_RADIUS,
-      color: $r('app.color.yourtube_shadow'),
-      offsetX: 0,
-      offsetY: MEDIA_CARD_SHADOW_OFFSET_Y
-    })
-    .onClick(() => {
-      this.switchToVideo(item, index);
-    })
-  }
-
-  @Builder
   QueueListMode() {
     List({ space: 4, scroller: this.listScroller }) {
       ForEach(this.queue, (item: VideoItem, index: number) => {
         ListItem() {
-          this.QueueRow(item, index)
+          QueueRowItem({
+            item: item,
+            index: index,
+            isCurrent: index === this.currentIndex,
+            onSwitch: (i: number) => {
+              this.switchToVideo(item, i);
+            }
+          })
         }
       }, (item: VideoItem, index: number) => `${item.videoId}_${index}`)
 

@@ -133,6 +133,22 @@
             "value": "リストモード"
         },
         {
+            "name": "yt_setting_card_density",
+            "value": "カードの密度"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "自動"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "コンパクト"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "ゆったり"
+        },
+        {
             "name": "yt_option_log",
             "value": "ログ"
         },
@@ -771,6 +787,10 @@
         {
             "name": "yt_action_delete_record",
             "value": "記録を削除"
+        },
+        {
+            "name": "yt_action_remove_from_queue",
+            "value": "キューから削除"
         },
         {
             "name": "yt_sub_manage_title",
@@ -1607,6 +1627,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "ダウンロード可能なメディアストリームがありません"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "ライブ配信はダウンロードできません"
         },
         {
             "name": "yt_action_sleep_timer",

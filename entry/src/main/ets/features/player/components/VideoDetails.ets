@@ -23,11 +23,11 @@ import { ChannelInfoService } from '../../user/ChannelInfoService';
 import { VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../../../common/SubscriptionModel';
 import { ChannelCard } from '../../user/components/ChannelCard';
-import { DownloadDialog, DownloadSelection } from './DownloadDialog';
+import { DownloadDialog, DownloadSelection, buildDownloadTaskFromSelection } from './DownloadDialog';
 import { SavePlaylistSheet } from './SavePlaylistSheet';
 import { StatsBarGraph } from './StatsBarGraph';
 import { StreamInfoRow } from './StreamInfoRow';
-import { DownloadManager, DownloadTask } from '../../../common/DownloadManager';
+import { DownloadManager } from '../../../common/DownloadManager';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
 import { LanguageManager } from '../../../common/LanguageManager';
@@ -412,18 +412,9 @@ export struct VideoDetails {
   }
 
   private classifyStreamsForDownload(): void {
-    if (!this.streams || this.streams.length === 0) {
-      this.streamCategories = PlayerModel.classifyStreamList([], true).categories;
-      return;
-    }
-
-    // 分类规则与播放路径共用 PlayerModel.classifyStreamList（下载要求可拉取的
-    // 媒体 URL，SABR 用 sabrInfo 引导）；下载 UI 需要排序，这里在结果上排序。
-    const categories = PlayerModel.classifyStreamList(this.streams, true).categories;
-    categories.video.sort((a: StreamInfo, b: StreamInfo): number => (b.height || 0) - (a.height || 0));
-    categories.audio.sort((a: StreamInfo, b: StreamInfo): number => (b.bitrate || 0) - (a.bitrate || 0));
-    categories.progressive.sort((a: StreamInfo, b: StreamInfo): number => (b.height || 0) - (a.height || 0));
-    this.streamCategories = categories;
+    // 分类+排序收口在 PlayerModel.classifyForDownload（下载要求可拉取的媒体
+    // URL，SABR 用 sabrInfo 引导），与卡片长按下载入口共用同一份逻辑。
+    this.streamCategories = PlayerModel.classifyForDownload(this.streams ?? []);
   }
 
   private isCurrentlyLive(): boolean {
@@ -458,35 +449,12 @@ export struct VideoDetails {
         videoAuthor: this.item.author,
         thumbnailUrl: this.item.thumbnailUrl,
         onConfirm: (selection: DownloadSelection) => {
-          const taskId = `dl_${Date.now()}_${this.item.videoId}`;
-          let videoStream: StreamInfo;
-          let audioStream: StreamInfo | null = null;
-
-          if (selection.progressive) {
-            videoStream = selection.progressive;
-          } else if (selection.hls) {
-            videoStream = selection.hls;
-          } else if (selection.sabr && selection.video && selection.audio) {
-            videoStream = selection.video;
-            audioStream = selection.audio;
-          } else if (selection.video) {
-            videoStream = selection.video;
-            audioStream = selection.audio || null;
-          } else {
-            return;
+          const task = buildDownloadTaskFromSelection(
+            this.item.videoId, this.item.title, this.item.author, this.item.thumbnailUrl, selection);
+          if (task) {
+            task._context = ctx;
+            this.downloadManager.addTask(task);
           }
-
-          const task = new DownloadTask(
-            taskId,
-            this.item.videoId,
-            this.item.title,
-            this.item.author,
-            this.item.thumbnailUrl,
-            videoStream,
-            audioStream
-          );
-          task._context = ctx;
-          this.downloadManager.addTask(task);
         },
         onCancel: () => {}
       }),
@@ -799,7 +767,10 @@ export struct VideoDetails {
       detents: [SheetSize.MEDIUM, SheetSize.LARGE],
       dragBar: true,
       backgroundColor: $r('app.color.yourtube_bg_page'),
-      preferType: SheetType.BOTTOM,
+      // CENTER：宽窗（≥600vp，平板/2in1/横屏）下呈居中卡片，避免底部 sheet 拉满
+      // 全宽导致信息稀疏；窄窗（<600vp，手机竖屏）系统自动回退为底部样式，与
+      // PlayerPage 视频信息 sheet / Index 选项 sheet 同一范式。
+      preferType: SheetType.CENTER,
       showClose: false,
       onWillDisappear: () => {
         this.activeSheet = 0;

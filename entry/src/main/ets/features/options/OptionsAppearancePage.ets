@@ -6,6 +6,9 @@ import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
 import { ColorPresetItem, COLOR_PRESETS, ThemeManager } from '../../common/ThemeManager';
 
+/** 网格卡片密度档位（与 UIConfig.homeGridDensity 取值一一对应）。 */
+const GRID_DENSITY_VALUES: string[] = ['auto', 'compact', 'cozy'];
+
 interface OptionsAppearancePageParams {
   themeColor: ResourceColor;
   applyDarkModeSelection: (mode: YourtubeDarkMode) => void;
@@ -34,6 +37,19 @@ export struct OptionsAppearancePage {
   private getDarkModeIndex(): number {
     return [YourtubeDarkMode.SYSTEM, YourtubeDarkMode.LIGHT, YourtubeDarkMode.DARK]
       .indexOf(this.uiConfig.darkMode);
+  }
+
+  private getGridDensityOptions(): SelectOption[] {
+    return [
+      $r('app.string.yt_density_auto'),
+      $r('app.string.yt_density_compact'),
+      $r('app.string.yt_density_cozy')
+    ].map(label => ({ value: label } as SelectOption));
+  }
+
+  private getGridDensityIndex(): number {
+    const index: number = GRID_DENSITY_VALUES.indexOf(this.uiConfig.homeGridDensity);
+    return index >= 0 ? index : 0;
   }
 
   private applyColorPreset(preset: ColorPresetItem): void {
@@ -151,6 +167,28 @@ export struct OptionsAppearancePage {
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
+
+        // 卡片密度（紧凑/自动/宽松 = 网格列数 +1/0/-1），仅卡片模式下有意义
+        if (this.uiConfig.homeLayoutMode === 'grid') {
+          ListItemGroup() {
+            ListItem() {
+              PlaybackSelectRow({
+                title: $r('app.string.yt_setting_card_density'),
+                options: this.getGridDensityOptions(),
+                selectedIndex: this.getGridDensityIndex(),
+                fontColor: this.params.themeColor,
+                transparentBackground: true,
+                onChange: (index: number) => {
+                  const density: string = GRID_DENSITY_VALUES[index];
+                  this.params.updateUiConfig(cfg => { cfg.homeGridDensity = density; });
+                }
+              })
+            }
+          }
+          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .borderRadius(SECTION_CARD_RADIUS)
+          .clip(true)
+        }
       }
       .width('100%')
       .layoutWeight(1)

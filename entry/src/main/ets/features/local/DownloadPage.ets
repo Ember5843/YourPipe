@@ -4,6 +4,10 @@ import { common } from '@kit.AbilityKit';
 import { MediaThumb } from '../../common/components/MediaThumb';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
+import { VideoItem } from 'youtube_core';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { customVibrator } from '../../common/VibratorUtil';
+import { VideoItemContextMenu, VideoMenuExtraItem } from '../../common/components/VideoItemContextMenu';
 import {
   MEDIA_CARD_RADIUS,
   MEDIA_CARD_SHADOW_OFFSET_Y,
@@ -18,7 +22,7 @@ import {
 } from '../../common/components/MediaCardTokens';
 
 /** Match VideoMediaCard list action geometry. */
-const ACTION_BTN_HEIGHT: number = 24;
+const ACTION_BTN_HEIGHT: number = 28;
 const ACTION_BTN_WIDTH: number = 72;
 const ACTION_BTN_RESERVE: number = 28;
 
@@ -81,6 +85,66 @@ struct DownloadTaskRow {
   @ObjectLink task: DownloadTask;
   private downloadManager: DownloadManager = DownloadManager.getInstance();
   @State exporting: boolean = false;
+  @State isShowContextMenu: boolean = false;
+
+  /** 任务行 → 视频语义（channelId 未入库，"查看作者"项会自动隐藏）。 */
+  private toVideoItem(): VideoItem {
+    return new VideoItem(
+      0,
+      this.task.videoId,
+      this.task.title,
+      this.task.author,
+      '',
+      this.task.thumbnailUrl,
+      false,
+      '#1A1A1A',
+      '',
+      '',
+      ''
+    );
+  }
+
+  /** 任务特有项：进行中 = 取消任务；其它 = 删除任务（主题色强调）。 */
+  private buildTaskMenuExtras(): VideoMenuExtraItem[] {
+    const items: VideoMenuExtraItem[] = [];
+    if (isActiveStatus(this.task.status)) {
+      const cancelItem: VideoMenuExtraItem = {
+        symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.xmark_circle'))
+          .fontSize(16)
+          .fontColor([$r('sys.color.font_primary')]),
+        content: $r('app.string.yt_action_cancel'),
+        callback: () => {
+          this.downloadManager.cancelTask(this.task.id);
+          this.isShowContextMenu = false;
+        }
+      };
+      items.push(cancelItem);
+    } else {
+      const deleteItem: VideoMenuExtraItem = {
+        symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
+          .fontSize(16)
+          .fontColor([$r('sys.color.font_primary')]),
+        content: $r('app.string.yt_action_delete'),
+        contentColor: this.themePrimary,
+        callback: () => {
+          this.downloadManager.deleteTask(this.task.id);
+          this.isShowContextMenu = false;
+        }
+      };
+      items.push(deleteItem);
+    }
+    return items;
+  }
+
+  @Builder
+  taskMenuBuilder() {
+    // 任务行复用视频统一菜单；任务本身即下载产物，关闭"下载"项
+    VideoItemContextMenu({
+      video: this.toVideoItem(),
+      showDownload: false,
+      extraItems: this.buildTaskMenuExtras()
+    })
+  }
 
   build() {
     // Layout mirrors VideoMediaCard list: thumb | meta stack (title/author/status) + action bottom-end.
@@ -148,6 +212,23 @@ struct DownloadTaskRow {
         this.exportTaskToDownloads();
       }
     })
+    .bindContextMenu(this.isShowContextMenu, this.taskMenuBuilder, {
+      preview: MenuPreviewMode.IMAGE,
+      previewAnimationOptions: { scale: [1.0, 1.1] },
+      placement: Placement.BottomRight,
+      aboutToAppear: () => {
+        if (this.uiConfig.isVibrate) {
+          customVibrator.vibratorTriggerOfHapticClockTimer();
+        }
+      },
+      aboutToDisappear: () => {
+        this.isShowContextMenu = false;
+      }
+    })
+    .gesture(LongPressGesture()
+      .onAction(() => {
+        this.isShowContextMenu = true;
+      }))
   }
 
   @Builder
@@ -195,7 +276,7 @@ struct DownloadTaskRow {
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .style({
           content: `${this.getProgressValue()}%`,
-          font: { size: 10, weight: FontWeight.Medium },
+          font: { size: 12, weight: FontWeight.Medium },
           fontColor: this.getProgressValue() >= 45
             ? Color.White
             : $r('app.color.yourtube_text_primary'),
@@ -209,7 +290,7 @@ struct DownloadTaskRow {
     } else if (this.task.status === DownloadStatus.COMPLETED) {
       // Same action button tokens as VideoMediaCard.ActionButton
       Button($r('app.string.yt_download_status_completed'))
-        .fontSize(10)
+        .fontSize(12)
         .fontColor($r('app.color.yourtube_text_inverse'))
         .backgroundColor(this.themePrimary)
         .height(ACTION_BTN_HEIGHT)
@@ -220,7 +301,7 @@ struct DownloadTaskRow {
         })
     } else {
       Button($r('app.string.yt_action_delete'))
-        .fontSize(10)
+        .fontSize(12)
         .fontColor($r('app.color.yourtube_text_inverse'))
         .backgroundColor(this.task.status === DownloadStatus.FAILED
           ? $r('app.color.yourtube_error')

@@ -107,6 +107,21 @@ Persistent state and shared singletons:
 
 Reusable components: `HdsTitleBar`, video cards / grids / thumbs, error / about /
 log / tab error panels, option rows, backup + language pickers, placeholders.
+`VideoItemContextMenu` (`common/components/VideoItemContextMenu.ets`) is the single
+long-press context menu for video items: info section + standard items (favorite
+toggle / view author / audio-only / download / share) + per-surface `extraItems`.
+Surfaces trim standard items via `show*` flags — the play queue disables
+audio-only (its click already switches in-queue), playlist-sourced history entries
+disable the whole video set (delete-record extra only). It resolves `actionHub`
+through its own `@Consume` (bindContextMenu content shares the host tree; never
+assign a host's `@Consume` into a child's plain property). The download item
+routes to `ActionHub.downloadVideo` → `Index.startCardDownload`:
+`YouTubePlayService.extractForDownload` (extractChain-serialized, prefetch-cache
+aware, awaits the per-video DASH PoToken injection before handing out URLs) →
+gates (extract failure / live (`videoInfo.isLive`, never the list badge) / no
+downloadable streams → toast) → root-hosted `DownloadDialog`. Task construction is
+shared via `buildDownloadTaskFromSelection` (`DownloadDialog.ets`); classification
++ download sorting via `PlayerModel.classifyForDownload` (mediaservice).
 `MediaVideoFeed` is the shared video-feed skeleton (loading / error / empty /
 grid / wide-strip / single-list branches over Grid|List + LazyForEach); pages
 feed it a `FeedDataSource` (`common/model/FeedDataSource.ets`; `setData`
@@ -119,7 +134,10 @@ binds it to a `BasicPrefetcher` and reports the visible range from
 `ThumbPrefetcher` (`common/model/ThumbPrefetcher.ets` → `cacheDownload`,
 LAZY strategy, bounded in-flight, `cancel(index)` aborts), so cards hit the
 system image cache when scrolled into view. Grid column counts are centralized in `ListLayoutUtils`
-(`getVideoGridColumnCount` / `getWideListColumnCount`). Feed builder / layout rules (hard constraints):
+(`getVideoGridColumnCount` / `getWideListColumnCount`); grid mode additionally applies the user's
+card-density preference (`UIConfig.homeGridDensity`: `compact` +1 / `cozy` −1 / `auto` 0 — Options →
+appearance, persisted `cfg_homeGridDensity`) via `UIConfig.gridDensityOffset` as the second
+`getVideoGridColumnCount` argument, clamped to [1,5]. Feed builder / layout rules (hard constraints):
 - Builders passed into `MediaVideoFeed`'s `@BuilderParam`s must be
   `@LocalBuilder` — never `@Builder`, never `.bind(this)` (a plain `@Builder`
   passed by reference binds `this` to the call-site component, so builders
@@ -156,7 +174,17 @@ a single `SubTabBarItemParams` object-literal param (by-reference refresh) —
 global `@Builder`s with multiple by-value params never re-render on caller
 state changes; keep new shared builders on the same single-param pattern.
 Shared geometry tokens live in `MediaCardTokens` (`MEDIA_CARD_*`,
-`SECTION_CARD_RADIUS`, `TITLE_BAR_HEIGHT`); floating-title-bar pages reserve
+`SECTION_CARD_RADIUS`, `TITLE_BAR_HEIGHT`) — media rows/cards (VideoMediaCard,
+PlaylistCard, ChannelCard, DownloadTaskRow, history, queue) must consume them,
+never literals. Grid-mode `VideoMediaCard` is a top-to-bottom card:
+edge-to-edge 16:9 thumbnail clipped by the card radius (thumb radius 0), meta
+bar below = title (≤2 lines) + one meta row `作者 · 统计` (stat slot = view
+count → publish time → duration, first available) with the action button
+pinned at the row's right end; both segments render whenever the data exists
+and overflow truncates with ellipsis — the long-press menu carries the full
+info.
+PlaylistCard/ChannelCard context menus follow the same 220vp + info-section
+pattern as `VideoItemContextMenu`; floating-title-bar pages reserve
 `safeAreaTop + TITLE_BAR_HEIGHT` at content top and set
 `avoidLayoutSafeArea: true` on the title bar.
 

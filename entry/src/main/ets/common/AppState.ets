@@ -28,6 +28,8 @@ export class UIConfig {
   animationSpeed: number = 300;
   enableLogger: boolean = false;
   homeLayoutMode: string = 'list';
+  /** 网格卡片密度：'compact'(+1 列) | 'auto'(随宽度阈值) | 'cozy'(-1 列)。 */
+  homeGridDensity: string = 'auto';
   /** After login: 'recommended' | 'kiosk'. Signed-out always uses kiosk. */
   homeFeedStyle: string = 'recommended';
   /** When signed in: pull cloud history + subscription list on app launch (one-way). */
@@ -51,6 +53,7 @@ export class UIConfig {
     next.animationSpeed = this.animationSpeed;
     next.enableLogger = this.enableLogger;
     next.homeLayoutMode = this.homeLayoutMode;
+    next.homeGridDensity = this.homeGridDensity;
     next.homeFeedStyle = this.homeFeedStyle;
     next.syncUserLibraryOnLaunch = this.syncUserLibraryOnLaunch;
     next.maxConcurrentDownloads = this.maxConcurrentDownloads;
@@ -62,6 +65,24 @@ export class UIConfig {
       return 'kiosk';
     }
     return 'recommended';
+  }
+
+  static normalizeHomeGridDensity(value: string): string {
+    if (value === 'compact' || value === 'cozy') {
+      return value;
+    }
+    return 'auto';
+  }
+
+  /** 密度档位 → 网格列数偏移（getVideoGridColumnCount 的第二参数）。 */
+  static gridDensityOffset(density: string): number {
+    if (density === 'compact') {
+      return 1;
+    }
+    if (density === 'cozy') {
+      return -1;
+    }
+    return 0;
   }
 
   /** 从 PreferencesStore 加载持久化的字段 */
@@ -76,6 +97,9 @@ export class UIConfig {
     config.colorPreset = PreferencesStore.getString('cfg_colorPreset', 'default');
     config.enableLogger = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
     config.homeLayoutMode = PreferencesStore.getString('cfg_homeLayoutMode', 'list');
+    config.homeGridDensity = UIConfig.normalizeHomeGridDensity(
+      PreferencesStore.getString('cfg_homeGridDensity', 'auto')
+    );
     config.homeFeedStyle = UIConfig.normalizeHomeFeedStyle(
       PreferencesStore.getString('cfg_homeFeedStyle', 'recommended')
     );
@@ -101,6 +125,7 @@ export class UIConfig {
     PreferencesStore.setString('cfg_colorPreset', config.colorPreset);
     PreferencesStore.setString('cfg_enableLogger', config.enableLogger ? 'true' : 'false');
     PreferencesStore.setString('cfg_homeLayoutMode', config.homeLayoutMode);
+    PreferencesStore.setString('cfg_homeGridDensity', UIConfig.normalizeHomeGridDensity(config.homeGridDensity));
     PreferencesStore.setString('cfg_homeFeedStyle', UIConfig.normalizeHomeFeedStyle(config.homeFeedStyle));
     PreferencesStore.setString(
       'cfg_syncUserLibraryOnLaunch',

@@ -125,7 +125,8 @@ export struct SearchPage {
   }
 
   private gridColumns(): number {
-    return getVideoGridColumnCount(this.getSearchContentWidth());
+    return getVideoGridColumnCount(this.getSearchContentWidth(),
+      UIConfig.gridDensityOffset(this.uiConfig.homeGridDensity));
   }
 
   /** 条式结果列表在宽屏（平板展开/2in1/电视）下的列数 */

@@ -18,7 +18,9 @@ import { WatchHistoryItem, WatchHistoryStore } from '../common/WatchHistoryStore
 import { DownloadManager, DownloadTask } from '../common/DownloadManager';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
 import { AppLogStore } from '../common/AppLogStore';
-import { LocalMediaProxy, PlayerState } from 'mediaservice';
+import { LocalMediaProxy, PlayerState, PlayerModel } from 'mediaservice';
+import { DownloadDialog, DownloadSelection, buildDownloadTaskFromSelection } from '../features/player/components/DownloadDialog';
+import { DownloadPrepareDialog } from '../common/components/DownloadPrepareDialog';
 import { SearchPage, SearchPageLaunchParams } from '../features/search/SearchPage';
 import { SubscriptionManagePage } from '../features/subscription/SubscriptionManagePage';
 import { SubscriptionFeedPage } from '../features/subscription/SubscriptionFeedPage';
@@ -808,6 +810,9 @@ struct Index {
     this.actionHub.sharePlaylist = (playlist: SearchPlaylistItem) => {
       this.sharePlaylist(playlist);
     };
+    this.actionHub.downloadVideo = (video: VideoItem) => {
+      this.startCardDownload(video);
+    };
     this.actionHub.on(ActionHubEvent.IS_REPLIES_OPEN_CHANGE, (isOpen: boolean) => {
       this.isRepliesOpen = isOpen;
     });
@@ -1076,6 +1081,83 @@ struct Index {
     const name = playlist.name || getContext().resourceManager.getStringSync($r('app.string.yt_filter_playlists').id);
     const url = playlistId ? `https://www.youtube.com/playlist?list=${playlistId}` : '';
     sharePlainText(this.getUIContext(), name, url);
+  }
+
+  // ── 卡片长按「下载」：提取可下载流 → 闸门（失败/直播/无流 toast）→ DownloadDialog ──
+  private downloadPrepareController: CustomDialogController | null = null;
+  private cardDownloadDialogController: CustomDialogController | null = null;
+
+  private startCardDownload(video: VideoItem): void {
+    const videoId = (video.videoId || '').trim();
+    if (!videoId) {
+      return;
+    }
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!ctx) {
+      return;
+    }
+    logger.info(`startCardDownload video=${videoId}`);
+    this.downloadPrepareController?.close();
+    this.downloadPrepareController = new CustomDialogController({
+      builder: DownloadPrepareDialog(),
+      alignment: DialogAlignment.Center,
+      customStyle: true,
+      autoCancel: false
+    });
+    this.downloadPrepareController.open();
+    YouTubePlayService.getInstance(ctx).extractForDownload(videoId)
+      .then((result) => {
+        this.downloadPrepareController?.close();
+        this.downloadPrepareController = null;
+        if (!result.success || !result.videoInfo) {
+          logger.warn(`startCardDownload extract failed video=${videoId} code=${result.errorCode || '-'}`);
+          this.getUIContext().getPromptAction().showToast({
+            message: result.error?.message ?? $r('app.string.yt_error_network')
+          });
+          return;
+        }
+        // 直播不可下载。权威判定取 player_response 的 isLive；列表角标
+        // item.isLive 会误伤直播回放（与 VideoDetails.isCurrentlyLive 同规）。
+        if (result.videoInfo.isLive) {
+          this.getUIContext().getPromptAction().showToast({ message: $r('app.string.yt_error_live_not_downloadable') });
+          return;
+        }
+        const categories = PlayerModel.classifyForDownload(result.playerStreams ?? []);
+        if (categories.video.length === 0 && categories.progressive.length === 0
+          && categories.hlsManifest.length === 0) {
+          this.getUIContext().getPromptAction().showToast({ message: $r('app.string.yt_error_no_downloadable_stream') });
+          return;
+        }
+        DownloadManager.getInstance().setContext(ctx);
+        this.cardDownloadDialogController = new CustomDialogController({
+          builder: DownloadDialog({
+            streamCategories: categories,
+            videoId: videoId,
+            videoTitle: video.title,
+            videoAuthor: video.author,
+            thumbnailUrl: video.thumbnailUrl,
+            onConfirm: (selection: DownloadSelection) => {
+              const task = buildDownloadTaskFromSelection(videoId, video.title, video.author,
+                video.thumbnailUrl, selection);
+              if (task) {
+                task._context = ctx;
+                DownloadManager.getInstance().addTask(task);
+              }
+            },
+            onCancel: () => {}
+          }),
+          alignment: DialogAlignment.Center,
+          customStyle: true,
+          autoCancel: true
+        });
+        this.cardDownloadDialogController?.open();
+      })
+      .catch((e: Error) => {
+        this.downloadPrepareController?.close();
+        this.downloadPrepareController = null;
+        logger.warn(`startCardDownload exception video=${videoId}: ${e.message || e}`);
+        this.getUIContext().getPromptAction().showToast({ message: $r('app.string.yt_error_network') });
+      });
   }
 
   private initLanguageSettings(): void {

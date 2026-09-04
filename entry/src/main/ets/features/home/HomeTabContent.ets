@@ -332,7 +332,8 @@ export struct HomeTabContent {
   }
 
   private gridColumns(): number {
-    return getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth));
+    return getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth),
+      UIConfig.gridDensityOffset(this.uiConfig.homeGridDensity));
   }
 
   private shouldShowHomeRecommendBanner(): boolean {

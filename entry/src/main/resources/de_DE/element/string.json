@@ -745,6 +745,10 @@
             "value": "Eintrag löschen"
         },
         {
+            "name": "yt_action_remove_from_queue",
+            "value": "Aus Warteschlange entfernen"
+        },
+        {
             "name": "yt_sub_manage_title",
             "value": "Meine Abos"
         },
@@ -1201,6 +1205,22 @@
             "value": "Listenmodus"
         },
         {
+            "name": "yt_setting_card_density",
+            "value": "Kartendichte"
+        },
+        {
+            "name": "yt_density_auto",
+            "value": "Automatisch"
+        },
+        {
+            "name": "yt_density_compact",
+            "value": "Kompakt"
+        },
+        {
+            "name": "yt_density_cozy",
+            "value": "Großzügig"
+        },
+        {
             "name": "yt_codec_av1",
             "value": "AV1"
         },
@@ -1607,6 +1627,10 @@
         {
             "name": "yt_error_no_downloadable_stream",
             "value": "Keine herunterladbaren Streams verfügbar"
+        },
+        {
+            "name": "yt_error_live_not_downloadable",
+            "value": "Livestreams können nicht heruntergeladen werden"
         },
         {
             "name": "yt_action_sleep_timer",

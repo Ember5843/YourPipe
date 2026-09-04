@@ -28,6 +28,13 @@ export class ActionHub {
   shareChannel: (channel: SearchChannelItem) => void = () => {};
   sharePlaylist: (playlist: SearchPlaylistItem) => void = () => {};
 
+  /**
+   * 卡片长按菜单「下载」入口：提取该视频的可下载流（extractChain 串行），
+   * 成功且可下载时弹 DownloadDialog；直播/无流/提取失败走 toast。
+   * 由 Index 实现（根组件托管弹窗 UIContext）。
+   */
+  downloadVideo: (video: VideoItem) => void = () => {};
+
   /** Save the current play queue as a local playlist. */
   saveCurrentQueueAsLocal: (name: string) => void = () => {};
 
