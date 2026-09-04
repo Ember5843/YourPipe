@@ -213,7 +213,9 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
 - **Player stack**: product backend is MPV only (`libmpv_napi` +
   `MpvPlaybackEngine`). Do not reintroduce a second decoder/player path.
 - **Playback media path**: guest VOD is direct-link-first (`visionos` →
-  adaptiveFormats direct URLs → local range/DASH proxy); signed-in VOD
+  adaptiveFormats direct URLs → loopback proxy synthesizes a static MPD from
+  SIDX → vendored mpv's native `demux_dash`; the dual-track `edl://` pattern
+  survives only as a build-time fallback); signed-in VOD
   defaults to the mweb **SABR** path, with `tv_downgraded` direct links
   still selectable. `android_vr` and `web_safari` are unused endpoints,
   unreachable in product (no UI, kept for reference only); `android_vr`

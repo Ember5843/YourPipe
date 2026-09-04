@@ -116,6 +116,14 @@ are built in WSL and then vendored here:
   - `libmpv_napi/src/main/cpp/ffmpeg-sdk/lib/${OHOS_ARCH}/libav*.a` (+ headers in `include/`)
 - Run the WSL build, then copy the new outputs into this repo. Hvigor picks
   them up at the next build. Today only **arm64-v8a** is vendored.
+- The vendored `libmpv.so.2` carries fork patches (mpv checkout branch
+  `feat/demux-dash`, local-only, never pushed): a native static-MPD DASH
+  demuxer (`demux/demux_dash.c`, registered before lavf, content-sniffed)
+  that natively consumes the loopback proxy's synthetic MPDs (SABR and
+  youtube-dual sessions), plus a `demux_timeline` patch that keeps a stable
+  codec object across same-params DASH segments (no per-segment decoder
+  flush/reinit — critical for ohcodec's slow EOS drain). Reapply that branch
+  when rebasing onto a newer upstream mpv.
 
 ## 5. Render surface: product path vs dormant standby
 - **Product path**: entry `AVPlayer.ets` lays out an **inline XComponent**

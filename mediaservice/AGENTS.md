@@ -162,16 +162,21 @@ stable local URL. Session types in `SessionStore`:
 
 | Type | Role |
 |---|---|
-| `single` | Simple range/proxy session (also the per-track building block of EDL dual playback) |
-| `youtube-dual` | Progressive/DASH dual (video+audio) with SIDX/`YoutubeDashIndex` (reference/rollback only, not on the production path) |
+| `single` | Simple range/proxy session (also the per-track building block of the EDL dual-playback fallback) |
+| `youtube-dual` | Direct-link DASH dual (video+audio) with SIDX/`YoutubeDashIndex` — the production path for visionos / tv_downgraded VOD |
 | `sabr-dual` | SABR UMP dual tracks via `sabrSessionStore` (mweb opt-in path) |
 
 **Direct-link dual path (product VOD: visionos / tv_downgraded)**:
-`AvPlayerController.buildDualEdlUrl` creates two `single` open-range sessions
-(video + audio) and hands MPV a native `edl://` URL
-(`!new_stream` / `!delay_open`, the pre-SABR production pattern). MPV never
-touches a DASH demuxer for these clients; the SIDX `youtube-dual` static
-manifest path (`buildDualDashUrl`) is retained for reference only.
+`AvPlayerController.buildDualDashUrl` creates one `youtube-dual` session
+(SIDX-parsed exact segment tables for both tracks) and hands MPV a loopback
+`manifest.mpd` (SegmentTemplate + SegmentTimeline, per-segment proxy endpoints
+`/session/{id}/video|audio/0/{init|N}`), demuxed by mpv's native `demux_dash`.
+`buildDualEdlUrl` (two `single` open-range sessions + `edl://`) survives only
+as the build-time fallback when SIDX/init metadata is unavailable. Segment
+responses are exact and complete: `serveExactSegmentRange` in `RangeProxy`
+serves one 200 per segment and slices >10MB segments into sequential upstream
+fetches internally (YouTube throttles larger ranges) so MPV never sees a
+truncated segment.
 Upstream transports in `RangeProxy`: Android/iOS (empty-body POST) and
 VISIONOS (body-less GET) googlevideo requests stream over RCP so MPV's first
 byte never waits for a full buffered chunk; other clients — TVHTML5 included,
@@ -199,8 +204,8 @@ URL with `createTunnel:'always'`, otherwise `'no-proxy'`).
 
 Startup: demand-side SIDX fetches gate on the pending DASH PoToken injection
 (`LocalMediaProxy.setStartupUrlGate`). The former fire-and-forget SIDX
-prefetch was removed from the play path — its cache was only consumed by the
-non-product `youtube-dual` session, so it was dead traffic on the EDL path.
+prefetch was removed from the play path; SIDX is fetched on demand at
+`youtube-dual` session build (parallel for both tracks, transient-403 retry).
 
 **Upstream cancel / teardown**:
 - Every `serveRange` fetch registers its in-flight op (RCP request / netstack

@@ -1342,7 +1342,7 @@ export class AvPlayerController {
     const kind = (video.kind || '').toLowerCase();
     if (delivery === 'SABR' || kind === 'sabr') {
       if (audio) {
-        return await this.buildSabrDualEdlUrl(video, audio, generation);
+        return await this.buildSabrDualDashUrl(video, audio, generation);
       }
       Logger.error(TAG, 'createPlaybackUrl: SABR requires paired audio stream');
       return '';
@@ -1367,6 +1367,14 @@ export class AvPlayerController {
     switch (delivery) {
       case 'DASH':
         if (audio && this.isSeparatedDash(video, audio)) {
+          // Production: synthetic static MPD (SIDX-derived SegmentTemplate)
+          // consumed by mpv's native demux_dash. EDL remains as the build-time
+          // fallback when SIDX/init metadata is unavailable.
+          const dashUrl = await this.buildDualDashUrl(video, audio, generation);
+          if (dashUrl) {
+            return dashUrl;
+          }
+          Logger.warn(TAG, 'createPlaybackUrl: static DASH unavailable, falling back to EDL');
           return await this.buildDualEdlUrl(video, audio, generation);
         }
         return await this.buildSingleProxyUrl(video, generation);
@@ -1394,7 +1402,7 @@ export class AvPlayerController {
     return playbackUrl;
   }
 
-  private async buildSabrDualEdlUrl(video: StreamInfo, audio: StreamInfo,
+  private async buildSabrDualDashUrl(video: StreamInfo, audio: StreamInfo,
     generation: number): Promise<string> {
     let resolvedDuration = this.resolveDurationMs(video, audio);
     if (resolvedDuration <= 0) {
@@ -1403,10 +1411,10 @@ export class AvPlayerController {
       resolvedDuration = vMeta > 0 ? vMeta : aMeta;
     }
     if (resolvedDuration <= 0) {
-      Logger.error(TAG, 'buildSabrDualEdlUrl: unknown duration, refusing EDL');
+      Logger.error(TAG, 'buildSabrDualDashUrl: unknown duration, refusing EDL');
       return '';
     }
-    Logger.info(TAG, `buildSabrDualEdlUrl: video=[itag=${video.itag}] audio=[itag=${audio.itag}] durationMs=${resolvedDuration}`);
+    Logger.info(TAG, `buildSabrDualDashUrl: video=[itag=${video.itag}] audio=[itag=${audio.itag}] durationMs=${resolvedDuration}`);
     try {
       const sessionId = await LocalMediaProxy.createSabrDualSession(video, audio, resolvedDuration, false);
       if (!this.isMediaSessionCurrent(generation)) {
@@ -1415,7 +1423,7 @@ export class AvPlayerController {
       }
       const playbackUrl = LocalMediaProxy.getPlaybackUrl(sessionId);
       if (!playbackUrl.startsWith('http://127.0.0.1:')) {
-        Logger.error(TAG, `buildSabrDualEdlUrl: invalid playbackUrl sessionId=${sessionId}`);
+        Logger.error(TAG, `buildSabrDualDashUrl: invalid playbackUrl sessionId=${sessionId}`);
         LocalMediaProxy.destroySession(sessionId);
         return '';
       }
@@ -1424,17 +1432,16 @@ export class AvPlayerController {
       // MPV remains the DASH demuxer/player; the proxy owns segment demand, seeks and EOF.
       return playbackUrl;
     } catch (e) {
-      Logger.error(TAG, `buildSabrDualEdlUrl failed: ${e}`);
+      Logger.error(TAG, `buildSabrDualDashUrl failed: ${e}`);
       return '';
     }
   }
 
   /**
-   * Dual adaptive VOD via MPV-native EDL (pre-SABR production pattern, cf97a08):
-   * two open-range single-url sessions + edl:// !new_stream/!delay_open.
-   * Production path for direct-link clients (android_vr / tv_downgraded) —
-   * bypasses the SIDX / DASH-demuxer stack (MPV DASH is not used for these).
-   * buildDualDashUrl below is retained only as reference for a static-DASH rollback.
+   * Dual adaptive VOD via MPV-native EDL: two open-range single-url sessions
+   * + edl:// !new_stream/!delay_open. Reference/rollback only — the production
+   * path for direct-link clients (visionos / tv_downgraded) is the synthetic
+   * static MPD from buildDualDashUrl, consumed by mpv's native demux_dash.
    */
   private async buildDualEdlUrl(video: StreamInfo, audio: StreamInfo,
     generation: number = this.mediaSessionGeneration): Promise<string> {
@@ -1498,7 +1505,13 @@ export class AvPlayerController {
     return edlUrl;
   }
 
-  /** Static-DASH variant retained for reference/rollback; not on the production path. */
+  /**
+   * Production dual adaptive VOD: synthetic static MPD (SIDX-derived
+   * SegmentTemplate + SegmentTimeline, per-segment proxy endpoints) served by
+   * the loopback proxy and demuxed by mpv's native demux_dash. Requires
+   * init/index ranges on both tracks; returns '' when unavailable (caller
+   * falls back to buildDualEdlUrl).
+   */
   private async buildDualDashUrl(video: StreamInfo, audio: StreamInfo,
     generation: number): Promise<string> {
     const durationMs = this.resolveDurationMs(video, audio);
