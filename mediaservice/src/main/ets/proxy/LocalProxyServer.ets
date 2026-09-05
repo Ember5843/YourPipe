@@ -2,7 +2,7 @@ import { socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { sessionStore, DashSession } from './SessionStore';
 import { parseInputJson } from './InputParser';
-import { serveRange, serveExactSegmentRange, preconnectYoutubeHosts } from './RangeProxy';
+import { serveRange, preconnectYoutubeHosts } from './RangeProxy';
 import { rcpSessionPool } from './RcpSessionPool';
 import { encodeUtf8 } from './ProxyEncoding';
 import { buildSabrDashManifest, serveSabrDashSegment } from '../sabr/SabrDashProxy';
@@ -169,8 +169,6 @@ async function routeRequest(
 
   // Preprocessed YouTube DASH SegmentTemplate: /session/{id}/video|audio/0/{init|N}
   // Only exact SIDX byte ranges — never open whole-file Range (403 / seek storms).
-  // Served via serveExactSegmentRange: one complete 200 response per segment,
-  // sliced internally when a segment exceeds the upstream throttle threshold.
   if (session.type === 'youtube-dual' && parts.length >= 5
     && (segment === 'video' || segment === 'audio')) {
     const idx = parseInt(parts[3], 10) || 0;
@@ -178,21 +176,16 @@ async function routeRequest(
     if (idx < resources.length) {
       const resource = resources[idx];
       const name = parts[4];
-      let start = -1;
-      let end = -1;
+      let exactRange = '';
       if (name === 'init') {
-        start = Number(resource.initRangeStart);
-        end = Number(resource.initRangeEnd);
+        exactRange = `bytes=${resource.initRangeStart}-${resource.initRangeEnd}`;
       } else {
         const sequence = parseInt(name, 10);
         const dashSegment = resource.dashSegments?.find((item) => item.sequence === sequence);
-        if (dashSegment) {
-          start = dashSegment.start;
-          end = dashSegment.end;
-        }
+        if (dashSegment) exactRange = `bytes=${dashSegment.start}-${dashSegment.end}`;
       }
-      if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start) {
-        await serveExactSegmentRange(conn, resource, start, end, method === 'HEAD', session.id);
+      if (exactRange) {
+        await serveRange(conn, resource, exactRange, method === 'HEAD', true, session.id);
         return;
       }
       Logger.warn(TAG, `youtube-dual unknown segment ${segment}/${idx}/${name}`);

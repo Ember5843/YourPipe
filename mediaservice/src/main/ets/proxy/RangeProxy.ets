@@ -702,227 +702,6 @@ async function fetchUpstreamWithRetries(
   }
 }
 
-/**
- * YouTube videoplayback range fetch shared by serveRange (open progressive
- * ranges) and serveExactSegmentRange (exact DASH segments). Android/iOS:
- * empty-body POST over RCP (see createYoutubePostSession), streamed straight
- * to the socket. Other clients: buffered GET via @ohos.net.http (same stack
- * as the extractor) — RCP streaming has been 403-prone for TVHTML5 range
- * probes.
- */
-async function serveYoutubeRangeWithRetries(
-  conn: socket.TCPSocketConnection,
-  resource: StreamResource,
-  rangeSpec: string,
-  writer: TcpWriter,
-  markAborted: () => void,
-  isAborted: () => boolean,
-  sessionId: string
-): Promise<void> {
-  const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
-  const useStreamingGet = !usePost && isVisionOsUrl(resource.url);
-  if (usePost || useStreamingGet) {
-    const method = usePost ? 'POST' : 'GET';
-    let rcpSession: rcp.Session | null = null;
-    // Pooled sessions are long-lived (shared per proxy session so the
-    // connectOnly pre-connect warms the very connection pool MPV's fetches
-    // hit) and must NOT be closed per attempt; only the legacy per-attempt
-    // fallback (no sessionId) is closed in cleanup.
-    let pooledSession = false;
-    let abortHandle: UpstreamAbortHandle | null = null;
-    await fetchUpstreamWithRetries({
-      fetchOnce: async (attempt: number): Promise<FetchAttemptResult> => {
-        const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
-        if (attempt === 0) {
-          Logger.info(TAG, `serveRange yt: transport=rcp ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
-        }
-        if (sessionId) {
-          rcpSession = rcpSessionPool.acquire(`${sessionId}|${rcpProxyFingerprint(fetchUrl)}`,
-            () => createYoutubePostSession(fetchUrl)).session;
-          pooledSession = true;
-        } else {
-          rcpSession = createYoutubePostSession(fetchUrl);
-        }
-        // GET must not carry a body (PipePipe plain GET); POST keeps the
-        // empty-string body — googlevideo 411s on a body-less POST.
-        const req = usePost
-          ? new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource), '')
-          : new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource));
-        req.destination = { kind: 'stream', stream: new MeteredWriteStream(writer) };
-        const sessionRef = rcpSession;
-        abortHandle = upstreamCancelRegistry.register(sessionId, conn, () => {
-          markAborted();
-          sessionRef.cancel(req);
-        });
-        const resp = await rcpSession.fetch(req);
-        if (resp.statusCode === 200 || resp.statusCode === 206) {
-          return { outcome: 'success' };
-        }
-        Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} resource=${resource.id} `
-          + `${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
-        if (resp.statusCode >= 400 && resp.statusCode < 500) {
-          if (resp.statusCode === 403 || resp.statusCode === 410) {
-            // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
-            // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
-            const retryDelayMs = 1000 * (attempt + 1);
-            Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
-            return { outcome: 'retry', error: `status=${resp.statusCode}`, retryDelayMs };
-          }
-          if (!writer.hasEmittedAny()) {
-            await sendUpstreamFailure(conn, sessionId, `upstream ${resp.statusCode}`);
-          }
-          return { outcome: 'fatal' };
-        }
-        return { outcome: 'retry', error: `status=${resp.statusCode}` };
-      },
-      cleanup: () => {
-        if (abortHandle) {
-          upstreamCancelRegistry.unregister(conn, abortHandle);
-          abortHandle = null;
-        }
-        if (!pooledSession) {
-          rcpSession?.close();
-        }
-        rcpSession = null;
-        pooledSession = false;
-      },
-      describeError: describeError,
-      isAborted: isAborted
-    }, writer, conn, resource.id, rangeSpec, sessionId);
-    return;
-  }
-  let req: http.HttpRequest | null = null;
-  let httpAbortHandle: UpstreamAbortHandle | null = null;
-  await fetchUpstreamWithRetries({
-    fetchOnce: async (attempt: number): Promise<FetchAttemptResult> => {
-      const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
-      const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
-      if (attempt === 0) {
-        Logger.info(TAG, `serveRange yt: transport=http ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
-      }
-      req = http.createHttp();
-      const reqRef = req;
-      httpAbortHandle = upstreamCancelRegistry.register(sessionId, conn, () => {
-        markAborted();
-        reqRef.destroy();
-      });
-      const options: http.HttpRequestOptions = {
-        method: http.RequestMethod.GET,
-        header: headers,
-        expectDataType: http.HttpDataType.ARRAY_BUFFER,
-        connectTimeout: CONNECT_TIMEOUT_MS,
-        readTimeout: TIMEOUT_MS,
-        usingCache: false,
-      };
-      HttpDownloader.applyProxyToOptions(options, fetchUrl);
-      const response = await req.request(fetchUrl, options);
-      if (response.responseCode === 200 || response.responseCode === 206) {
-        const bytes = responseBodyToBytes(response.result);
-        if (bytes.length === 0) {
-          return { outcome: 'retry', error: `empty body status=${response.responseCode}` };
-        }
-        if (writer.isClosed()) {
-          // Connection died while the body was buffering — nothing to serve.
-          Logger.debug(TAG, `serveRange: conn closed before buffered write resource=${resource.id} range=${rangeSpec}`);
-          return { outcome: 'fatal' };
-        }
-        // Buffered GET: the whole body already arrived from the network here.
-        proxyTrafficMeter.recordBytes(bytes.length);
-        await writer.write(bytes.buffer as ArrayBuffer);
-        return { outcome: 'success' };
-      }
-      const bodyPreview = typeof response.result === 'string'
-        ? response.result.substring(0, 120)
-        : `bytes=${responseBodyToBytes(response.result).length}`;
-      Logger.warn(TAG, `serveRange: upstream ${response.responseCode} resource=${resource.id} `
-        + `body=${bodyPreview} ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
-      if (response.responseCode >= 400 && response.responseCode < 500) {
-        if (response.responseCode === 403 || response.responseCode === 410) {
-          // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
-          // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
-          const retryDelayMs = 1000 * (attempt + 1);
-          Logger.warn(TAG, `serveRange: upstream ${response.responseCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
-          return { outcome: 'retry', error: `status=${response.responseCode}`, retryDelayMs };
-        }
-        if (!writer.hasEmittedAny()) {
-          await sendUpstreamFailure(conn, sessionId, `upstream ${response.responseCode}`);
-        }
-        return { outcome: 'fatal' };
-      }
-      return { outcome: 'retry', error: `status=${response.responseCode}` };
-    },
-    cleanup: () => {
-      if (httpAbortHandle) {
-        upstreamCancelRegistry.unregister(conn, httpAbortHandle);
-        httpAbortHandle = null;
-      }
-      req?.destroy();
-      req = null;
-    },
-    describeError: describeError,
-    isAborted: isAborted
-  }, writer, conn, resource.id, rangeSpec, sessionId);
-}
-
-/**
- * youtube-dual exact DASH segment serving: a single standalone 200 response
- * whose Content-Length covers the WHOLE [start, end] segment. Upstream is
- * fetched in ≤10MB slices (YouTube throttles larger ranges, see serveRange's
- * MAX_CHUNK_SIZE) written sequentially into the same writer, so MPV always
- * sees a complete segment — a truncated segment would read as an early-EOF
- * timestamp hole to the DASH timeline.
- */
-export async function serveExactSegmentRange(
-  conn: socket.TCPSocketConnection,
-  resource: StreamResource,
-  start: number,
-  end: number,
-  headOnly: boolean,
-  sessionId: string
-): Promise<void> {
-  const contentType = contentTypeFor(resource);
-  if (headOnly) {
-    const hdr = `HTTP/1.1 200 OK\r\nContent-Type: ${contentType}\r\nContent-Length: ${end - start + 1}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n`;
-    await sendRaw(conn, encodeUtf8(hdr));
-    return;
-  }
-  if (!resource.isYoutubePlayback) {
-    Logger.error(TAG, `serveExactSegmentRange: non-YouTube resource=${resource.id}, refusing`);
-    await sendError(conn, 502, 'exact segments require a YouTube resource');
-    return;
-  }
-  const writer = new TcpWriter(conn, start, end, resource.contentLength, contentType, true);
-  let aborted = false;
-  writer.onClosed = () => {
-    aborted = true;
-    upstreamCancelRegistry.cancelConnection(conn);
-  };
-  // Slice bound mirrors serveRange's MAX_CHUNK_SIZE.
-  const MAX_SLICE_SIZE = 10 * 1024 * 1024;
-  let sliceStart = start;
-  while (sliceStart <= end && !aborted && !writer.isClosed()) {
-    const sliceEnd = Math.min(sliceStart + MAX_SLICE_SIZE - 1, end);
-    const rangeSpec = `${sliceStart}-${sliceEnd}`;
-    const expectedBytes = sliceEnd - start + 1;
-    await serveYoutubeRangeWithRetries(conn, resource, rangeSpec, writer,
-      () => { aborted = true; }, () => aborted, sessionId);
-    if (writer.bytesEmitted < expectedBytes) {
-      // Slice failed after retries (or the connection died): the response is
-      // truncated either way, so stop here and let MPV hit EOF.
-      if (!aborted) {
-        Logger.error(TAG, `serveExactSegmentRange: short slice resource=${resource.id} `
-          + `range=${rangeSpec} emitted=${writer.bytesEmitted}/${expectedBytes}`);
-      }
-      return;
-    }
-    sliceStart = sliceEnd + 1;
-  }
-  if (end - start + 1 > MAX_SLICE_SIZE) {
-    Logger.info(TAG, `serveExactSegmentRange: sliced ${Math.ceil((end - start + 1) / MAX_SLICE_SIZE)}x `
-      + `resource=${resource.id} range=${start}-${end}`);
-  }
-}
-
 export async function serveRange(
   conn: socket.TCPSocketConnection,
   resource: StreamResource,
@@ -987,11 +766,154 @@ export async function serveRange(
     upstreamCancelRegistry.cancelConnection(conn);
   };
 
-  // YouTube videoplayback is served by serveYoutubeRangeWithRetries (shared
-  // with the exact DASH segment path below).
+  // YouTube videoplayback. Android/iOS: empty-body POST over RCP (see
+  // createYoutubePostSession), streamed straight to the socket. Other clients:
+  // buffered GET via @ohos.net.http (same stack as extractor) — RCP streaming
+  // has been 403-prone for TVHTML5 range probes.
   if (resource.isYoutubePlayback) {
-    await serveYoutubeRangeWithRetries(conn, resource, rangeSpec, writer,
-      () => { aborted = true; }, () => aborted, sessionId);
+    const usePost = isAndroidUrl(resource.url) || isIosUrl(resource.url);
+    const useStreamingGet = !usePost && isVisionOsUrl(resource.url);
+    if (usePost || useStreamingGet) {
+      const method = usePost ? 'POST' : 'GET';
+      let rcpSession: rcp.Session | null = null;
+      // Pooled sessions are long-lived (shared per proxy session so the
+      // connectOnly pre-connect warms the very connection pool MPV's fetches
+      // hit) and must NOT be closed per attempt; only the legacy per-attempt
+      // fallback (no sessionId) is closed in cleanup.
+      let pooledSession = false;
+      let abortHandle: UpstreamAbortHandle | null = null;
+      await fetchUpstreamWithRetries({
+        fetchOnce: async (attempt: number): Promise<FetchAttemptResult> => {
+          const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
+          if (attempt === 0) {
+            Logger.info(TAG, `serveRange yt: transport=rcp ${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+          }
+          if (sessionId) {
+            rcpSession = rcpSessionPool.acquire(`${sessionId}|${rcpProxyFingerprint(fetchUrl)}`,
+              () => createYoutubePostSession(fetchUrl)).session;
+            pooledSession = true;
+          } else {
+            rcpSession = createYoutubePostSession(fetchUrl);
+          }
+          // GET must not carry a body (PipePipe plain GET); POST keeps the
+          // empty-string body — googlevideo 411s on a body-less POST.
+          const req = usePost
+            ? new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource), '')
+            : new rcp.Request(fetchUrl, method, makeYoutubeHeaders(resource));
+          req.destination = { kind: 'stream', stream: new MeteredWriteStream(writer) };
+          const sessionRef = rcpSession;
+          abortHandle = upstreamCancelRegistry.register(sessionId, conn, () => {
+            aborted = true;
+            sessionRef.cancel(req);
+          });
+          const resp = await rcpSession.fetch(req);
+          if (resp.statusCode === 200 || resp.statusCode === 206) {
+            return { outcome: 'success' };
+          }
+          Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} resource=${resource.id} `
+            + `${describeYoutubeRequest(resource, method, fetchUrl, rangeSpec)}`);
+          if (resp.statusCode >= 400 && resp.statusCode < 500) {
+            if (resp.statusCode === 403 || resp.statusCode === 410) {
+              // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
+              // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
+              const retryDelayMs = 1000 * (attempt + 1);
+              Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
+              return { outcome: 'retry', error: `status=${resp.statusCode}`, retryDelayMs };
+            }
+            if (!writer.hasEmittedAny()) {
+              await sendUpstreamFailure(conn, sessionId, `upstream ${resp.statusCode}`);
+            }
+            return { outcome: 'fatal' };
+          }
+          return { outcome: 'retry', error: `status=${resp.statusCode}` };
+        },
+        cleanup: () => {
+          if (abortHandle) {
+            upstreamCancelRegistry.unregister(conn, abortHandle);
+            abortHandle = null;
+          }
+          if (!pooledSession) {
+            rcpSession?.close();
+          }
+          rcpSession = null;
+          pooledSession = false;
+        },
+        describeError: describeError,
+        isAborted: () => aborted
+      }, writer, conn, resource.id, rangeSpec, sessionId);
+      return;
+    }
+    let req: http.HttpRequest | null = null;
+    let httpAbortHandle: UpstreamAbortHandle | null = null;
+    await fetchUpstreamWithRetries({
+      fetchOnce: async (attempt: number): Promise<FetchAttemptResult> => {
+        const fetchUrl = appendYoutubeRn(buildYoutubeRangeUrl(resource.url, rangeSpec), resource.url);
+        const headers = headersToHttpRecord(makeYoutubeHeaders(resource));
+        if (attempt === 0) {
+          Logger.info(TAG, `serveRange yt: transport=http ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
+        }
+        req = http.createHttp();
+        const reqRef = req;
+        httpAbortHandle = upstreamCancelRegistry.register(sessionId, conn, () => {
+          aborted = true;
+          reqRef.destroy();
+        });
+        const options: http.HttpRequestOptions = {
+          method: http.RequestMethod.GET,
+          header: headers,
+          expectDataType: http.HttpDataType.ARRAY_BUFFER,
+          connectTimeout: CONNECT_TIMEOUT_MS,
+          readTimeout: TIMEOUT_MS,
+          usingCache: false,
+        };
+        HttpDownloader.applyProxyToOptions(options, fetchUrl);
+        const response = await req.request(fetchUrl, options);
+        if (response.responseCode === 200 || response.responseCode === 206) {
+          const bytes = responseBodyToBytes(response.result);
+          if (bytes.length === 0) {
+            return { outcome: 'retry', error: `empty body status=${response.responseCode}` };
+          }
+          if (writer.isClosed()) {
+            // Connection died while the body was buffering — nothing to serve.
+            Logger.debug(TAG, `serveRange: conn closed before buffered write resource=${resource.id} range=${rangeSpec}`);
+            return { outcome: 'fatal' };
+          }
+          // Buffered GET: the whole body already arrived from the network here.
+          proxyTrafficMeter.recordBytes(bytes.length);
+          await writer.write(bytes.buffer as ArrayBuffer);
+          return { outcome: 'success' };
+        }
+        const bodyPreview = typeof response.result === 'string'
+          ? response.result.substring(0, 120)
+          : `bytes=${responseBodyToBytes(response.result).length}`;
+        Logger.warn(TAG, `serveRange: upstream ${response.responseCode} resource=${resource.id} `
+          + `body=${bodyPreview} ${describeYoutubeRequest(resource, 'GET', fetchUrl, rangeSpec)}`);
+        if (response.responseCode >= 400 && response.responseCode < 500) {
+          if (response.responseCode === 403 || response.responseCode === 410) {
+            // YouTube 流未就绪/处理中窗口:有界退避重试而非立即失败
+            // (对齐 PipePipe reloadPlayQueueManager / SmartTube reloadVideo 的原地重试语义)
+            const retryDelayMs = 1000 * (attempt + 1);
+            Logger.warn(TAG, `serveRange: upstream ${response.responseCode} retryable, backoff=${retryDelayMs}ms attempt=${attempt} resource=${resource.id} range=${rangeSpec}`);
+            return { outcome: 'retry', error: `status=${response.responseCode}`, retryDelayMs };
+          }
+          if (!writer.hasEmittedAny()) {
+            await sendUpstreamFailure(conn, sessionId, `upstream ${response.responseCode}`);
+          }
+          return { outcome: 'fatal' };
+        }
+        return { outcome: 'retry', error: `status=${response.responseCode}` };
+      },
+      cleanup: () => {
+        if (httpAbortHandle) {
+          upstreamCancelRegistry.unregister(conn, httpAbortHandle);
+          httpAbortHandle = null;
+        }
+        req?.destroy();
+        req = null;
+      },
+      describeError: describeError,
+      isAborted: () => aborted
+    }, writer, conn, resource.id, rangeSpec, sessionId);
     return;
   }
 
