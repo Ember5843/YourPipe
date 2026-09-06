@@ -2877,6 +2877,38 @@
             "value": "Diagnostics enrichis pour lecture, connexion, jetons, actualisation et replis sans journaliser cookies ni URL signées"
         },
         {
+            "name": "yt_changelog_0_6_0_1",
+            "value": "Système de sous-titres refait : rendu en surcouche avec police, couleur, fond, position et délai personnalisables"
+        },
+        {
+            "name": "yt_changelog_0_6_0_2",
+            "value": "Nouvelle traduction automatique des sous-titres par IA : toute piste peut être traduite en direct vers la langue choisie"
+        },
+        {
+            "name": "yt_changelog_0_6_0_3",
+            "value": "Nouveaux gestes de lecture : double appui ±15s, appui long pour la vitesse, zoom et déplacement à deux doigts, changement de format"
+        },
+        {
+            "name": "yt_changelog_0_6_0_4",
+            "value": "Nouveau panneau d'infos du lecteur : description, commentaires et file d'attente en un, panneau latéral auto sur écrans larges"
+        },
+        {
+            "name": "yt_changelog_0_6_0_5",
+            "value": "Cartes repensées, menus d'appui long unifiés, téléchargement vidéo directement depuis la carte"
+        },
+        {
+            "name": "yt_changelog_0_6_0_6",
+            "value": "Prise en charge du proxy SOCKS5 ; reprise rapide de la lecture après bascule Wi-Fi/cellulaire"
+        },
+        {
+            "name": "yt_changelog_0_6_0_7",
+            "value": "Plafond de qualité porté à 2K/4K/8K ; nouvelles langues japonais/coréen/italien/portuguais"
+        },
+        {
+            "name": "yt_changelog_0_6_0_8",
+            "value": "Page des paramètres regroupée ; les directs sont verrouillés à la vitesse normale"
+        },
+        {
             "name": "yt_changelog_0_5_9_1",
             "value": "Les pages de flux utilisent des grilles/listes à chargement différé : défilement plus fluide dans Accueil, Recherche, Playlist, Chaîne et Abonnements"
         },

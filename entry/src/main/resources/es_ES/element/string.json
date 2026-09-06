@@ -2877,6 +2877,38 @@
             "value": "Más diagnósticos de reproducción, autenticación, tokens, actualización y alternativas sin registrar cookies ni URL firmadas"
         },
         {
+            "name": "yt_changelog_0_6_0_1",
+            "value": "Sistema de subtítulos rehecho: renderizado en superposición con tamaño, color, fondo, posición y retardo personalizables"
+        },
+        {
+            "name": "yt_changelog_0_6_0_2",
+            "value": "Nueva traducción automática de subtítulos por IA: cualquier pista se traduce en tiempo real al idioma elegido"
+        },
+        {
+            "name": "yt_changelog_0_6_0_3",
+            "value": "Nuevos gestos de reproducción: doble toque ±15s, pulsación larga para velocidad, zoom y desplazamiento con dos dedos, cambio de relación"
+        },
+        {
+            "name": "yt_changelog_0_6_0_4",
+            "value": "Nuevo panel de información del reproductor: descripción, comentarios y cola en uno, panel lateral automático en pantallas anchas"
+        },
+        {
+            "name": "yt_changelog_0_6_0_5",
+            "value": "Tarjetas rediseñadas, menús de pulsación larga unificados, descarga de vídeos directamente desde la tarjeta"
+        },
+        {
+            "name": "yt_changelog_0_6_0_6",
+            "value": "Soporte de proxy SOCKS5; recuperación rápida de la reproducción tras cambiar Wi-Fi/móvil"
+        },
+        {
+            "name": "yt_changelog_0_6_0_7",
+            "value": "Límite de calidad ampliado a 2K/4K/8K; nuevos idiomas japonés/coreano/italiano/portugués"
+        },
+        {
+            "name": "yt_changelog_0_6_0_8",
+            "value": "Página de ajustes reorganizada; los directos se bloquean a velocidad normal"
+        },
+        {
             "name": "yt_changelog_0_5_9_1",
             "value": "Las páginas de feed usan cuadrículas/listas de carga diferida: desplazamiento más fluido en Inicio, Búsqueda, Lista, Canal y Suscripciones"
         },

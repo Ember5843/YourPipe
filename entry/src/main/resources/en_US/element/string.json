@@ -2877,6 +2877,38 @@
             "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs"
         },
         {
+            "name": "yt_changelog_0_6_0_1",
+            "value": "Rebuilt subtitle system: overlay rendering with customizable font size, color, background, position and delay"
+        },
+        {
+            "name": "yt_changelog_0_6_0_2",
+            "value": "New AI subtitle translation: any subtitle track can be translated on the fly into a target language"
+        },
+        {
+            "name": "yt_changelog_0_6_0_3",
+            "value": "New playback gestures: double-tap +/-15s seek, long-press speed boost, two-finger pan & zoom, aspect ratio toggle"
+        },
+        {
+            "name": "yt_changelog_0_6_0_4",
+            "value": "New player info panel: description, comments and queue in one place, auto-expanding side panel on wide screens"
+        },
+        {
+            "name": "yt_changelog_0_6_0_5",
+            "value": "Redesigned cards, unified long-press menus, download videos directly from cards"
+        },
+        {
+            "name": "yt_changelog_0_6_0_6",
+            "value": "SOCKS5 proxy support; fast playback recovery after Wi-Fi/cellular network switches"
+        },
+        {
+            "name": "yt_changelog_0_6_0_7",
+            "value": "Quality cap raised to 2K/4K/8K; new Japanese/Korean/Italian/Portuguese interface languages"
+        },
+        {
+            "name": "yt_changelog_0_6_0_8",
+            "value": "Settings page regrouped; live streams locked to normal playback speed"
+        },
+        {
             "name": "yt_changelog_0_5_9_1",
             "value": "Feed pages switch to lazy-loaded grids/lists: smoother scrolling on Home, Search, Playlist, Channel and Subscriptions"
         },

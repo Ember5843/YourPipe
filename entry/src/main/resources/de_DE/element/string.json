@@ -2877,6 +2877,38 @@
             "value": "Mehr Diagnosen für Wiedergabe, Anmeldung, Token, Aktualisierung und Fallbacks ohne sensible Cookies oder signierte URLs im Protokoll"
         },
         {
+            "name": "yt_changelog_0_6_0_1",
+            "value": "Untertitelsystem neu gebaut: Overlay-Rendering mit anpassbarer Schriftgröße, Farbe, Hintergrund, Position und Verzögerung"
+        },
+        {
+            "name": "yt_changelog_0_6_0_2",
+            "value": "Neue KI-Untertitelübersetzung: jede Untertitelspur kann in Echtzeit in eine Zielsprache übersetzt werden"
+        },
+        {
+            "name": "yt_changelog_0_6_0_3",
+            "value": "Neue Wiedergabegesten: Doppeltipp ±15s, langer Druck für Tempo, Zwei-Finger-Zoom und -Verschieben, Seitenverhältniswechsel"
+        },
+        {
+            "name": "yt_changelog_0_6_0_4",
+            "value": "Neues Player-Infopanel: Beschreibung, Kommentare und Warteschlange in einem, Seitenpanel auf breiten Bildschirmen automatisch"
+        },
+        {
+            "name": "yt_changelog_0_6_0_5",
+            "value": "Neu gestaltete Karten, vereinheitlichte Langdruck-Menüs, Videos direkt von der Karte herunterladen"
+        },
+        {
+            "name": "yt_changelog_0_6_0_6",
+            "value": "SOCKS5-Proxy-Unterstützung; schnelle Wiedergabewiederherstellung nach Wi-Fi/Mobilfunk-Wechsel"
+        },
+        {
+            "name": "yt_changelog_0_6_0_7",
+            "value": "Qualitätsobergrenze auf 2K/4K/8K angehoben; neue Sprachen Japanisch/Koreanisch/Italienisch/Portugiesisch"
+        },
+        {
+            "name": "yt_changelog_0_6_0_8",
+            "value": "Einstellungsseite neu gegliedert; Livestreams auf normale Geschwindigkeit fixiert"
+        },
+        {
             "name": "yt_changelog_0_5_9_1",
             "value": "Feed-Seiten nutzen jetzt lazy geladene Grids/Listen: flüssigeres Scrollen in Start, Suche, Playlist, Kanal und Abos"
         },

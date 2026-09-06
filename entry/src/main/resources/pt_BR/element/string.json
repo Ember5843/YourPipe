@@ -2877,6 +2877,38 @@
             "value": "Expandidos os diagnósticos de reprodução, autenticação, token, atualização e fallback, mantendo cookies sensíveis e URLs assinadas fora dos registros"
         },
         {
+            "name": "yt_changelog_0_6_0_1",
+            "value": "Sistema de legendas refeito: renderização em overlay com fonte, cor, fundo, posição e atraso personalizáveis"
+        },
+        {
+            "name": "yt_changelog_0_6_0_2",
+            "value": "Novo recurso de tradução automática de legendas por IA: qualquer faixa pode ser traduzida em tempo real para o idioma escolhido"
+        },
+        {
+            "name": "yt_changelog_0_6_0_3",
+            "value": "Novos gestos de reprodução: toque duplo ±15s, toque longo para velocidade, zoom e pan com dois dedos, troca de proporção"
+        },
+        {
+            "name": "yt_changelog_0_6_0_4",
+            "value": "Novo painel de informações do player: descrição, comentários e fila em um só lugar, painel lateral automático em telas largas"
+        },
+        {
+            "name": "yt_changelog_0_6_0_5",
+            "value": "Cards redesenhados, menus de toque longo unificados, download de vídeos direto do card"
+        },
+        {
+            "name": "yt_changelog_0_6_0_6",
+            "value": "Suporte a proxy SOCKS5; recuperação rápida da reprodução após troca Wi-Fi/celular"
+        },
+        {
+            "name": "yt_changelog_0_6_0_7",
+            "value": "Limite de qualidade ampliado para 2K/4K/8K; novos idiomas japonês/coreano/italiano/português"
+        },
+        {
+            "name": "yt_changelog_0_6_0_8",
+            "value": "Página de configurações reorganizada; transmissões ao vivo travadas na velocidade normal"
+        },
+        {
             "name": "yt_changelog_0_5_9_1",
             "value": "As páginas de feed mudaram para grades/listas com carregamento lento: rolagem mais fluida em Início, Pesquisa, Playlist, Canal e Inscrições"
         },

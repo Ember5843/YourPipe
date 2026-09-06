@@ -2877,6 +2877,38 @@
             "value": "Estesa la diagnostica di riproduzione, autenticazione, token, refresh e fallback, mantenendo cookie sensibili e URL firmati fuori dai log"
         },
         {
+            "name": "yt_changelog_0_6_0_1",
+            "value": "Sistema sottotitoli rifatto: rendering overlay con dimensione font, colore, sfondo, posizione e ritardo personalizzabili"
+        },
+        {
+            "name": "yt_changelog_0_6_0_2",
+            "value": "Nuova traduzione automatica AI dei sottotitoli: qualsiasi traccia può essere tradotta in tempo reale nella lingua scelta"
+        },
+        {
+            "name": "yt_changelog_0_6_0_3",
+            "value": "Nuovi gesti di riproduzione: doppio tocco ±15s, lunga pressione per la velocità, zoom e pan a due dita, cambio proporzioni"
+        },
+        {
+            "name": "yt_changelog_0_6_0_4",
+            "value": "Nuovo pannello informazioni del player: descrizione, commenti e coda in uno, pannello laterale automatico su schermi larghi"
+        },
+        {
+            "name": "yt_changelog_0_6_0_5",
+            "value": "Schede ridisegnate, menu long-press unificati, download video direttamente dalla scheda"
+        },
+        {
+            "name": "yt_changelog_0_6_0_6",
+            "value": "Supporto proxy SOCKS5; ripristino rapido della riproduzione dopo cambio Wi-Fi/cellulare"
+        },
+        {
+            "name": "yt_changelog_0_6_0_7",
+            "value": "Limite qualità alzato a 2K/4K/8K; nuove lingue interfaccia giapponese/coreana/italiana/portoghese"
+        },
+        {
+            "name": "yt_changelog_0_6_0_8",
+            "value": "Impostazioni riorganizzate; le dirette sono bloccate alla velocità normale"
+        },
+        {
             "name": "yt_changelog_0_5_9_1",
             "value": "Le pagine dei feed passano a griglie/elenchi a caricamento lazy: scorrimento più fluido in Home, Ricerca, Playlist, Canale e Iscrizioni"
         },

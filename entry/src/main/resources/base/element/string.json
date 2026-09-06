@@ -2877,6 +2877,38 @@
             "value": "Expanded playback, authentication, token, refresh, and fallback diagnostics while keeping sensitive cookies and signed URLs out of logs"
         },
         {
+            "name": "yt_changelog_0_6_0_1",
+            "value": "字幕系统重做：覆盖层渲染，支持字体大小/颜色/背景/位置/延迟自定义"
+        },
+        {
+            "name": "yt_changelog_0_6_0_2",
+            "value": "新增 AI 字幕自动翻译：任意字幕轨可实时翻译为指定目标语言"
+        },
+        {
+            "name": "yt_changelog_0_6_0_3",
+            "value": "全新播放手势：双击 ±15s 快进快退、长按倍速、双指缩放与平移、画面比例切换"
+        },
+        {
+            "name": "yt_changelog_0_6_0_4",
+            "value": "新增播放器信息面板：简介/评论/播放队列三合一，宽屏自动展开侧栏"
+        },
+        {
+            "name": "yt_changelog_0_6_0_5",
+            "value": "卡片全新设计，统一长按菜单，支持卡片直接下载视频"
+        },
+        {
+            "name": "yt_changelog_0_6_0_6",
+            "value": "新增 SOCKS5 代理支持；Wi-Fi/蜂窝网络切换后播放快速恢复"
+        },
+        {
+            "name": "yt_changelog_0_6_0_7",
+            "value": "画质上限开放至 2K/4K/8K；新增日语/韩语/意大利语/葡萄牙语界面"
+        },
+        {
+            "name": "yt_changelog_0_6_0_8",
+            "value": "设置页重新分组；直播锁定原倍速播放"
+        },
+        {
             "name": "yt_changelog_0_5_9_1",
             "value": "信息流页面改为懒加载网格/列表：首页、搜索、歌单、频道、订阅长列表滚动更流畅"
         },
