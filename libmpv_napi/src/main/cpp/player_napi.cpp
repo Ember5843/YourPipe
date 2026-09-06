@@ -61,12 +61,6 @@ constexpr int32_t kStatusSeeking = 1 << 7;
 constexpr int32_t kStatusPrepared = 1 << 8;
 constexpr int32_t kStatusInvalid = 1 << 31;
 
-// Audio tap (mpv asrtap filter PCM bridge): a fixed 8s ring of 16kHz mono
-// float32 samples (512KB), delivered to ArkTS in ~200ms batches.
-constexpr size_t kAudioTapRingCapacity = 16000 * 8;
-constexpr size_t kAudioTapBatchSamples = 3200;
-constexpr double kAudioTapSampleRate = 16000.0;
-
 struct MpvApi {
     void* library = nullptr;
     bool attempted = false;
@@ -89,8 +83,6 @@ struct MpvApi {
     int (*observe_property)(mpv_handle*, uint64_t, const char*, mpv_format) = nullptr;
     mpv_event* (*wait_event)(mpv_handle*, double) = nullptr;
     void (*wakeup)(mpv_handle*) = nullptr;
-    // Optional tap export (only present in tap-enabled vendored builds).
-    int (*asr_tap_set_callback)(mpv_asr_tap_cb, void*) = nullptr;
 };
 
 MpvApi& Mpv()
@@ -148,15 +140,6 @@ bool LoadMpv()
     ok = LoadSymbol(api.library, api.wait_event, "mpv_wait_event") && ok;
     ok = LoadSymbol(api.library, api.wakeup, "mpv_wakeup") && ok;
 
-    // Optional symbol, resolved non-fatally: an older vendored .so without the
-    // asrtap export must not break the rest of the bridge.
-    api.asr_tap_set_callback =
-        reinterpret_cast<decltype(api.asr_tap_set_callback)>(dlsym(api.library, "mpv_asr_tap_set_callback"));
-    if (!api.asr_tap_set_callback) {
-        OH_LOG_Print(LOG_APP, LOG_WARN, 0xFF00, "mpv",
-                     "mpv_asr_tap_set_callback not found — audio tap unavailable");
-    }
-
     api.available = ok;
     if (!ok) {
         dlclose(api.library);
@@ -165,11 +148,6 @@ bool LoadMpv()
     return api.available;
 }
 
-struct AudioTapMarker {
-    double pts;   // seconds, media timeline
-    int flags;    // MPV_ASR_TAP_FLAG_* combination
-};
-
 struct PlayerContext {
     mpv_handle* mpv = nullptr;
     void* window = nullptr;
@@ -177,10 +155,6 @@ struct PlayerContext {
     string mediaUrl;
     int64_t mediaStartPositionMs = 0;
     bool pendingLoad = false;
-    // Properties written while the surface was not ready (EnsureMpv returned
-    // false). Last value per name wins. Command-thread only; replayed by
-    // EnsureMpv right after mpv_initialize and cleared by DestroyMpv.
-    map<string, string> pendingProperties;
     atomic_int32_t state {kStateStopped};
     atomic_int32_t mediaStatus {kStatusNoMedia};
     atomic_int64_t lastPositionMs {0};
@@ -207,23 +181,6 @@ struct PlayerContext {
     napi_threadsafe_function tsfn = nullptr;
     /** Native-side throttle for time-pos events (type 1); 0 = push immediately. */
     atomic_int64_t lastTimePosPushMs {0};
-
-    // ---- Audio tap state (mpv asrtap PCM bridge) ----
-    // Writer: mpv's internal audio filter thread (OnAsrPcm). Reader:
-    // audioTapThread (consumer). Delivery to ArkTS goes through audioTapTsfn.
-    mutex audioTapMutex;
-    condition_variable audioTapCv;
-    vector<float> audioTapRing;              // fixed ring, kAudioTapRingCapacity samples
-    size_t audioTapRingHead = 0;             // index of the oldest sample
-    size_t audioTapRingSize = 0;
-    double audioTapRingPts = 0.0;            // pts (seconds) of the oldest sample
-    deque<AudioTapMarker> audioTapControlQueue;
-    atomic_bool audioTapEnabled {false};
-    atomic_bool audioTapRunning {false};     // consumer thread loop active
-    thread audioTapThread;
-    atomic_uint64_t audioTapDropped {0};     // samples dropped (ring overflow / JS backpressure)
-    napi_threadsafe_function audioTapTsfn = nullptr;
-    mutex audioTapTsfnMutex;                 // serializes TSFN create / release / call
 };
 
 mutex gMutex;
@@ -798,23 +755,6 @@ void ApplyWindowOption(PlayerContext& ctx)
                  wid.c_str(), widSource);
 }
 
-// Apply properties that were posted before the surface was ready. Runs after
-// mpv_initialize so user config (e.g. hwdec=no) overrides the fixed
-// mpv_create options above, and before this task's own command (the command
-// thread is serial), so per-file options land before the first loadfile.
-void ReplayPendingProperties(PlayerContext& ctx)
-{
-    if (ctx.pendingProperties.empty()) {
-        return;
-    }
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "replaying %{public}zu pending properties",
-                 ctx.pendingProperties.size());
-    for (const auto& [name, value] : ctx.pendingProperties) {
-        LogMpvError(name.c_str(), Mpv().set_property_string(ctx.mpv, name.c_str(), value.c_str()));
-    }
-    ctx.pendingProperties.clear();
-}
-
 bool EnsureMpv(PlayerContext& ctx)
 {
     if (ctx.surfaceId.empty() || ctx.surfaceId == "0") {
@@ -939,7 +879,6 @@ bool EnsureMpv(PlayerContext& ctx)
             return false;
         }
         ctx.initialized = true;
-        ReplayPendingProperties(ctx);
         LogMpvError("request log messages", Mpv().request_log_messages(ctx.mpv, "v"));
         ObservePlaybackProperties(ctx);
         StartEventLoop(ctx);
@@ -947,222 +886,6 @@ bool EnsureMpv(PlayerContext& ctx)
     }
 
     return true;
-}
-
-// ---------------------------------------------------------------------------
-// Audio tap (mpv asrtap PCM bridge)
-//
-// mpv_asr_tap_set_callback() registers a process-global callback that mpv's
-// asrtap audio filter invokes on mpv's internal audio filter thread with
-// 16kHz mono float32 chunks — but only while the filter is inserted via
-// ["af","add","@asrtap:asrtap"]. OnAsrPcm is the hot path: allocation-free
-// (fixed ring), non-blocking, no napi calls, no logging. The per-player
-// consumer thread batches ~200ms of audio and hands it to ArkTS through a
-// dedicated TSFN (payload ownership moves to the ArrayBuffer finalizer).
-// ---------------------------------------------------------------------------
-
-/** TSFN payload. `samples` is owned; nullptr for control markers. */
-struct TsfnAudioTap {
-    double ptsMs;
-    int flags;
-    float* samples;
-    size_t count;
-};
-
-// mpv asrtap filter callback — runs on mpv's audio filter thread.
-void OnAsrPcm(void* user, const float* samples, int n, double pts, int flags)
-{
-    auto* ctx = static_cast<PlayerContext*>(user);
-    if (!ctx || !ctx->audioTapRunning.load()) {
-        return;
-    }
-    const scoped_lock lock(ctx->audioTapMutex);
-    // Re-check under the lock: StopAudioTapConsumer frees the ring under this
-    // same mutex, so a writer that raced the running flag must bail here.
-    if (!ctx->audioTapRunning.load() || ctx->audioTapRing.size() != kAudioTapRingCapacity) {
-        return;
-    }
-    if (flags != 0) {
-        // Control marker (DISCONTINUITY / EOF), queued instead of samples.
-        // DISCONTINUITY means any partial data is stale: drop the ring.
-        if (flags & MPV_ASR_TAP_FLAG_DISCONTINUITY) {
-            ctx->audioTapRingHead = 0;
-            ctx->audioTapRingSize = 0;
-        }
-        ctx->audioTapControlQueue.push_back({pts, flags});
-    } else if (samples && n > 0) {
-        if (ctx->audioTapRingSize == 0) {
-            ctx->audioTapRingPts = pts;
-        }
-        size_t incoming = static_cast<size_t>(n);
-        // A single chunk larger than the ring keeps only its tail.
-        if (incoming > kAudioTapRingCapacity) {
-            const size_t skip = incoming - kAudioTapRingCapacity;
-            samples += skip;
-            pts += static_cast<double>(skip) / kAudioTapSampleRate;
-            incoming = kAudioTapRingCapacity;
-            ctx->audioTapRingPts = pts;
-            ctx->audioTapDropped.fetch_add(skip);
-        }
-        // On overflow drop the OLDEST samples; never block the writer. The
-        // consumer thread logs this throttled from the dropped counter.
-        if (ctx->audioTapRingSize + incoming > kAudioTapRingCapacity) {
-            const size_t overflow = ctx->audioTapRingSize + incoming - kAudioTapRingCapacity;
-            ctx->audioTapRingHead = (ctx->audioTapRingHead + overflow) % kAudioTapRingCapacity;
-            ctx->audioTapRingSize -= overflow;
-            ctx->audioTapRingPts += static_cast<double>(overflow) / kAudioTapSampleRate;
-            ctx->audioTapDropped.fetch_add(overflow);
-        }
-        const size_t tail = (ctx->audioTapRingHead + ctx->audioTapRingSize) % kAudioTapRingCapacity;
-        for (size_t i = 0; i < incoming; i++) {
-            ctx->audioTapRing[(tail + i) % kAudioTapRingCapacity] = samples[i];
-        }
-        ctx->audioTapRingSize += incoming;
-    }
-    ctx->audioTapCv.notify_one();
-}
-
-void AudioTapConsumerLoop(PlayerContext& ctx)
-{
-    bool loggedFirstChunk = false;
-    uint64_t loggedDropped = 0;
-    for (;;) {
-        TsfnAudioTap* chunk = nullptr;
-        {
-            unique_lock<mutex> lock(ctx.audioTapMutex);
-            // Wake on a full batch, a pending marker, or shutdown; the timeout
-            // flushes partial batches (slow input / tail before EOF).
-            ctx.audioTapCv.wait_for(lock, chrono::milliseconds(200), [&ctx]() {
-                return !ctx.audioTapRunning.load() || !ctx.audioTapControlQueue.empty()
-                    || ctx.audioTapRingSize >= kAudioTapBatchSamples;
-            });
-            if (!ctx.audioTapRunning.load() && ctx.audioTapRingSize == 0
-                && ctx.audioTapControlQueue.empty()) {
-                break;
-            }
-            // Markers are delivered only once the ring has drained, so their
-            // order relative to the audio stays correct (a DISCONTINUITY marker
-            // clears the ring at write time and is therefore delivered at once).
-            if (ctx.audioTapRingSize == 0 && !ctx.audioTapControlQueue.empty()) {
-                const AudioTapMarker marker = ctx.audioTapControlQueue.front();
-                ctx.audioTapControlQueue.pop_front();
-                chunk = new TsfnAudioTap{marker.pts * 1000.0, marker.flags, nullptr, 0};
-            } else if (ctx.audioTapRingSize > 0) {
-                const size_t take = min(ctx.audioTapRingSize, kAudioTapBatchSamples);
-                float* data = new float[take];
-                for (size_t i = 0; i < take; i++) {
-                    data[i] = ctx.audioTapRing[(ctx.audioTapRingHead + i) % kAudioTapRingCapacity];
-                }
-                const double ptsMs = ctx.audioTapRingPts * 1000.0;
-                ctx.audioTapRingHead = (ctx.audioTapRingHead + take) % kAudioTapRingCapacity;
-                ctx.audioTapRingSize -= take;
-                ctx.audioTapRingPts += static_cast<double>(take) / kAudioTapSampleRate;
-                chunk = new TsfnAudioTap{ptsMs, 0, data, take};
-            }
-        }
-        if (!chunk) {
-            continue;
-        }
-        if (!loggedFirstChunk && chunk->count > 0) {
-            loggedFirstChunk = true;
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "audio tap first PCM chunk ptsMs=%{public}lld",
-                         static_cast<long long>(chunk->ptsMs));
-        }
-        // Throttled drop report: first drop, then at most every 100 lost samples.
-        const uint64_t dropped = ctx.audioTapDropped.load();
-        if (dropped != loggedDropped && (loggedDropped == 0 || dropped - loggedDropped >= 100)) {
-            OH_LOG_Print(LOG_APP, LOG_WARN, 0xFF00, "mpv",
-                         "audio tap dropped %{public}llu samples total (ring overflow / JS backpressure)",
-                         static_cast<unsigned long long>(dropped));
-            loggedDropped = dropped;
-        }
-        bool queued = false;
-        {
-            const scoped_lock tsfnLock(ctx.audioTapTsfnMutex);
-            if (ctx.audioTapTsfn) {
-                queued = napi_call_threadsafe_function(ctx.audioTapTsfn, chunk, napi_tsfn_nonblocking) == napi_ok;
-            }
-        }
-        if (!queued) {
-            // No callback / queue full / TSFN released: drop, never leak.
-            ctx.audioTapDropped.fetch_add(chunk->count);
-            delete[] chunk->samples;
-            delete chunk;
-        }
-    }
-    ctx.audioTapRunning = false;
-}
-
-void StartAudioTapConsumer(PlayerContext& ctx)
-{
-    if (ctx.audioTapRunning.load()) {
-        return;
-    }
-    if (ctx.audioTapThread.joinable()) {
-        ctx.audioTapThread.join();
-    }
-    {
-        const scoped_lock lock(ctx.audioTapMutex);
-        if (ctx.audioTapRing.size() != kAudioTapRingCapacity) {
-            ctx.audioTapRing.assign(kAudioTapRingCapacity, 0.0f);
-        }
-        ctx.audioTapRingHead = 0;
-        ctx.audioTapRingSize = 0;
-        ctx.audioTapRingPts = 0.0;
-        ctx.audioTapControlQueue.clear();
-        ctx.audioTapDropped.store(0);
-    }
-    ctx.audioTapRunning = true;
-    ctx.audioTapThread = thread([&ctx]() { AudioTapConsumerLoop(ctx); });
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "audio tap consumer started");
-}
-
-void StopAudioTapConsumer(PlayerContext& ctx)
-{
-    ctx.audioTapRunning = false;
-    ctx.audioTapCv.notify_all();
-    if (ctx.audioTapThread.joinable()) {
-        // The consumer drains the ring and pending markers before exiting.
-        ctx.audioTapThread.join();
-    }
-    {
-        const scoped_lock lock(ctx.audioTapMutex);
-        ctx.audioTapRingHead = 0;
-        ctx.audioTapRingSize = 0;
-        ctx.audioTapControlQueue.clear();
-        vector<float>().swap(ctx.audioTapRing);
-    }
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "audio tap consumer stopped");
-}
-
-void ReleaseAudioTapTsfn(PlayerContext& ctx)
-{
-    const scoped_lock lock(ctx.audioTapTsfnMutex);
-    if (ctx.audioTapTsfn) {
-        napi_release_threadsafe_function(ctx.audioTapTsfn, napi_tsfn_release);
-        ctx.audioTapTsfn = nullptr;
-    }
-}
-
-// Teardown used by disableAudioTap and DestroyMpv. Safe to call with the tap
-// never enabled. Ordering: remove the filter and unregister the mpv callback
-// FIRST (OnAsrPcm dereferences ctx), then join the consumer, then release TSFN.
-void TeardownAudioTap(PlayerContext& ctx)
-{
-    if (!ctx.audioTapEnabled.load() && !ctx.audioTapRunning.load() && !ctx.audioTapTsfn) {
-        return;
-    }
-    if (ctx.mpv && ctx.initialized && Mpv().command) {
-        const char* removeArgs[] = {"af", "remove", "@asrtap", nullptr};
-        LogMpvError("audio tap af remove", Mpv().command(ctx.mpv, removeArgs));
-    }
-    if (Mpv().asr_tap_set_callback) {
-        Mpv().asr_tap_set_callback(nullptr, nullptr);
-    }
-    ctx.audioTapEnabled = false;
-    StopAudioTapConsumer(ctx);
-    ReleaseAudioTapTsfn(ctx);
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "audio tap disabled");
 }
 
 void DestroyMpv(PlayerContext& ctx)
@@ -1175,10 +898,6 @@ void DestroyMpv(PlayerContext& ctx)
     }
     ctx.commandCv.notify_all();
     StopCommandLoop(ctx);
-    // Tap teardown after the command loop is joined (no queued enable/disable
-    // task can race it) but before mpv_terminate_destroy: the asrtap callback
-    // dereferences ctx, so it must be unregistered while mpv is still alive.
-    TeardownAudioTap(ctx);
     StopEventLoop(ctx);
     if (ctx.mpv) {
         Mpv().terminate_destroy(ctx.mpv);
@@ -1187,8 +906,6 @@ void DestroyMpv(PlayerContext& ctx)
     ctx.mpv = nullptr;
     ctx.initialized = false;
     ctx.window = nullptr;
-    // The command thread is already joined above, so clearing is race-free.
-    ctx.pendingProperties.clear();
     ctx.state.store(kStateStopped);
     SetMediaStatus(ctx, kStatusNoMedia, "destroy");
 }
@@ -1291,10 +1008,6 @@ void SetStringProperty(PlayerContext& ctx, const char* key, const string& value)
     const string property = key ? key : "";
     PostCommand(ctx, [property, value](PlayerContext& workerCtx) {
         if (!EnsureMpv(workerCtx)) {
-            // Surface not ready yet: keep the value and replay it after
-            // mpv_initialize instead of silently dropping it.
-            workerCtx.pendingProperties[property] = value;
-            OH_LOG_Print(LOG_APP, LOG_DEBUG, 0xFF00, "mpv", "pending property %{public}s", property.c_str());
             return;
         }
         SetMpvStringProperty(workerCtx, property.c_str(), value, property.c_str());
@@ -1577,8 +1290,6 @@ napi_value SetPlaybackRate(napi_env env, napi_callback_info info)
     lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
         PostCommand(ctx, [rate](PlayerContext& workerCtx) {
             if (!EnsureMpv(workerCtx)) {
-                workerCtx.pendingProperties["speed"] = to_string(rate);
-                OH_LOG_Print(LOG_APP, LOG_DEBUG, 0xFF00, "mpv", "pending property speed");
                 return;
             }
             SetMpvDoubleProperty(workerCtx, "speed", rate, "set speed");
@@ -1597,8 +1308,6 @@ napi_value SetVolume(napi_env env, napi_callback_info info)
         double mpvVolume = volume <= 1.0 ? volume * 100.0 : volume;
         PostCommand(ctx, [mpvVolume](PlayerContext& workerCtx) {
             if (!EnsureMpv(workerCtx)) {
-                workerCtx.pendingProperties["volume"] = to_string(mpvVolume);
-                OH_LOG_Print(LOG_APP, LOG_DEBUG, 0xFF00, "mpv", "pending property volume");
                 return;
             }
             SetMpvDoubleProperty(workerCtx, "volume", mpvVolume, "set volume");
@@ -1782,126 +1491,6 @@ napi_value SetEventCallback(napi_env env, napi_callback_info info)
     return Undefined(env);
 }
 
-napi_value EnableAudioTap(napi_env env, napi_callback_info info)
-{
-    size_t argc = 1; napi_value args[1];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    const auto id = ToString(env, args[0]);
-    if (!LoadMpv() || !Mpv().asr_tap_set_callback) {
-        // Older vendored libmpv without the asrtap export: fail loudly, the
-        // rest of the bridge keeps working.
-        napi_throw_error(env, "asr_tap_unavailable",
-                         "audio tap unavailable: vendored libmpv lacks mpv_asr_tap_set_callback");
-        return Undefined(env);
-    }
-    lockFor(id, [](PlayerContext& ctx) {
-        if (ctx.audioTapEnabled.load()) {
-            return;  // idempotent
-        }
-        ctx.audioTapEnabled = true;
-        PostCommand(ctx, [](PlayerContext& workerCtx) {
-            if (!EnsureMpv(workerCtx)) {
-                workerCtx.audioTapEnabled = false;
-                return;
-            }
-            // Consumer first, so no callback chunk can arrive before it runs.
-            StartAudioTapConsumer(workerCtx);
-            Mpv().asr_tap_set_callback(OnAsrPcm, &workerCtx);
-            RunMpvCommand(workerCtx, {"af", "add", "@asrtap:asrtap"}, "audio tap af add");
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "audio tap enabled");
-        });
-    });
-    return Undefined(env);
-}
-
-napi_value DisableAudioTap(napi_env env, napi_callback_info info)
-{
-    size_t argc = 1; napi_value args[1];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    lockFind(ToString(env, args[0]), [](PlayerContext& ctx) {
-        if (!ctx.audioTapEnabled.load()) {
-            return;  // idempotent
-        }
-        ctx.audioTapEnabled = false;
-        // Route the mpv-side teardown through the command thread so it is
-        // ordered after the enable command. The TSFN survives until the
-        // callback is cleared (setAudioTapCallback(null)) or the player dies.
-        PostCommand(ctx, [](PlayerContext& workerCtx) {
-            if (workerCtx.mpv && workerCtx.initialized && Mpv().command) {
-                const char* removeArgs[] = {"af", "remove", "@asrtap", nullptr};
-                LogMpvError("audio tap af remove", Mpv().command(workerCtx.mpv, removeArgs));
-            }
-            if (Mpv().asr_tap_set_callback) {
-                Mpv().asr_tap_set_callback(nullptr, nullptr);
-            }
-            StopAudioTapConsumer(workerCtx);
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "audio tap disabled");
-        });
-    });
-    return Undefined(env);
-}
-
-napi_value SetAudioTapCallback(napi_env env, napi_callback_info info)
-{
-    size_t argc = 2; napi_value args[2];
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    napi_value resourceName;
-    napi_create_string_utf8(env, "mpvAudioTap", NAPI_AUTO_LENGTH, &resourceName);
-    napi_valuetype callbackType = napi_undefined;
-    if (argc > 1 && args[1] != nullptr) {
-        napi_typeof(env, args[1], &callbackType);
-    }
-    lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) {
-        ReleaseAudioTapTsfn(ctx);
-        if (callbackType != napi_function) {
-            return;  // null/undefined clears the callback
-        }
-        // Bounded queue (32): PCM batches are ~200ms; a wedged JS thread must
-        // not grow memory — the consumer drops and frees payloads when full.
-        const scoped_lock lock(ctx.audioTapTsfnMutex);
-        napi_create_threadsafe_function(env, args[1], nullptr, resourceName, 32, 1,
-            nullptr, nullptr, nullptr,
-            [](napi_env tEnv, napi_value jsCb, void*, void* data) {
-                auto* chunk = static_cast<TsfnAudioTap*>(data);
-                napi_value chunkObj = nullptr;
-                napi_create_object(tEnv, &chunkObj);
-                // Sample ownership moves into the ArrayBuffer; the finalizer frees it.
-                napi_value arrayBuffer = nullptr;
-                if (chunk->samples && chunk->count > 0) {
-                    if (napi_create_external_arraybuffer(tEnv, chunk->samples,
-                            chunk->count * sizeof(float),
-                            [](napi_env, void* finalizeData, void*) {
-                                delete[] static_cast<float*>(finalizeData);
-                            },
-                            nullptr, &arrayBuffer) == napi_ok) {
-                        chunk->samples = nullptr;
-                    }
-                } else {
-                    void* empty = nullptr;
-                    napi_create_arraybuffer(tEnv, 0, &empty, &arrayBuffer);
-                }
-                if (arrayBuffer) {
-                    napi_value typedArray = nullptr;
-                    napi_create_typedarray(tEnv, napi_float32_array, chunk->count, arrayBuffer, 0, &typedArray);
-                    napi_set_named_property(tEnv, chunkObj, "samples", typedArray);
-                }
-                napi_value ptsMs = nullptr;
-                napi_create_double(tEnv, chunk->ptsMs, &ptsMs);
-                napi_set_named_property(tEnv, chunkObj, "ptsMs", ptsMs);
-                napi_value flags = nullptr;
-                napi_create_int32(tEnv, chunk->flags, &flags);
-                napi_set_named_property(tEnv, chunkObj, "flags", flags);
-                napi_value argv[1] = {chunkObj};
-                napi_value global;
-                napi_get_global(tEnv, &global);
-                napi_call_function(tEnv, global, jsCb, 1, argv, nullptr);
-                delete[] chunk->samples;  // no-op once ownership moved
-                delete chunk;
-            }, &ctx.audioTapTsfn);
-    });
-    return Undefined(env);
-}
-
 napi_value IsPlaying(napi_env env, napi_callback_info info)
 {
     size_t argc = 1; napi_value args[1];
@@ -2004,9 +1593,6 @@ napi_value Init(napi_env env, napi_value exports)
         {"setHttpProxyEnv", nullptr, SetHttpProxyEnv, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, SetEventCallback, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"enableAudioTap", nullptr, EnableAudioTap, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"disableAudioTap", nullptr, DisableAudioTap, nullptr, nullptr, nullptr, napi_default, nullptr},
-        {"setAudioTapCallback", nullptr, SetAudioTapCallback, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"command", nullptr, MpvCommand, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
 

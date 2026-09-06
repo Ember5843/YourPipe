@@ -84,18 +84,6 @@ export interface MediaInfo {
 // enums.ets and should be imported from the HAR package, not from this native
 // module.
 
-/**
- * One PCM chunk from the mpv asrtap audio tap (16kHz mono float32, ~200ms
- * batches). ptsMs is the media-timeline pts of the first sample. Control
- * markers (DISCONTINUITY=1: seek/reset, drop partial data; EOF=2: end of
- * stream) arrive with an empty samples array and the flag set.
- */
-export interface AudioTapChunk {
-  ptsMs: number;
-  samples: Float32Array;
-  flags: number;
-}
-
 export interface NativeMpvPlayerModule {
   releasePlayer: (playerId: string) => void;
   setMedia: (playerId: string, url: string, startPositionMs?: number) => void;
@@ -115,17 +103,6 @@ export interface NativeMpvPlayerModule {
   getMediaInfo: (playerId: string) => MediaInfo;
   getDuration: (playerId: string) => number;
   setEventCallback: (playerId: string, callback: (type: number, value: number) => void) => void;
-  /**
-   * Enable the mpv asrtap PCM tap: inserts the `@asrtap:asrtap` audio filter
-   * and starts delivering 16kHz mono float32 chunks through the callback set
-   * by setAudioTapCallback. Idempotent. Throws with code "asr_tap_unavailable"
-   * when the vendored libmpv lacks the tap export.
-   */
-  enableAudioTap: (playerId: string) => void;
-  /** Disable the audio tap (removes the filter, stops the consumer). Idempotent. */
-  disableAudioTap: (playerId: string) => void;
-  /** Set (or clear with null) the PCM chunk callback for the audio tap. */
-  setAudioTapCallback: (playerId: string, callback: ((chunk: AudioTapChunk) => void) | null) => void;
   isPlaying: (playerId: string) => boolean;
   setVideoSurfaceSize: (playerId: string, width: number, height: number) => void;
   setVideoSurfaceId: (playerId: string, surfaceId: string) => void;

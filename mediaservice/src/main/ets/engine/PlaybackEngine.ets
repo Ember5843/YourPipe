@@ -1,5 +1,3 @@
-import type { AudioTapChunk } from '@yourpipe/libmpv-napi';
-
 export type PlaybackEngineState = 'stopped' | 'buffering' | 'paused' | 'playing';
 
 export type PlaybackErrorCategory = 'network' | 'url_expired' | 'format' | 'source' | 'unknown';
@@ -110,14 +108,4 @@ export interface PlaybackEngine {
 
   setStateCallback(cb: (state: PlaybackState) => void): void;
   setSubtitleCallback(cb: (text: string, startTime: number, duration: number) => void): void;
-
-  /**
-   * ASR PCM tap (16kHz mono float32 chunks on the media timeline). Thin
-   * passthrough to the native asrtap filter; policy lives in entry
-   * (AsrLiveCaptionService). enableAudioTap throws "asr_tap_unavailable"
-   * when the engine/native export is missing.
-   */
-  enableAudioTap(): void;
-  disableAudioTap(): void;
-  setAudioTapCallback(cb: ((chunk: AudioTapChunk) => void) | null): void;
 }

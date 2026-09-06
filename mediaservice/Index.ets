@@ -24,4 +24,3 @@ export { PlayerUiViewModel } from './src/main/ets/state/PlayerUiViewModel';
 export { PlaybackPreferences, PlaybackPreferencesSnapshot, PlaybackPreferencesProvider } from './src/main/ets/common/PlaybackPreferences';
 export { ContextProvider, UIAbilityContextProvider } from './src/main/ets/common/ContextProvider';
 export { muxAudioVideo } from '@yourpipe/libmpv-napi';
-export type { AudioTapChunk } from '@yourpipe/libmpv-napi';

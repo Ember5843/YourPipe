@@ -7,12 +7,9 @@
 > architecture only — no changelogs.
 
 ## 1. Public surface (`mediaservice/Index.ets`)
-- `AvPlayerController` — main controller entry. Includes the thin ASR PCM
-  tap passthrough (`enableAudioTap` / `disableAudioTap` / `setAudioTapCallback`
-  → `MpvPlaybackEngine` → `MpvPlayerController`; no policy, entry owns
-  lifecycle via `AsrLiveCaptionService` — currently [DISABLED] in entry,
-  tap plumbing retained). `AudioTapChunk` is re-exported from
-  `@yourpipe/libmpv-napi` for tap consumers.
+- `AvPlayerController` — main controller entry. (The ASR PCM tap passthrough
+  was removed when the vendored libmpv was reverted to the pre-ASR binary;
+  P3 ASR remains [DISABLED] in entry and its tap calls are commented out.)
 - `LocalMediaProxy` — facade over local proxy sessions (range + SABR dual).
   `abortAllUpstreamFetches(reason)` is the network-handover lever: aborts
   every in-flight upstream fetch across sessions (via

@@ -33,12 +33,6 @@
   fetches (HLS, subtitles) through the app proxy while loopback stays
   direct. Called by `mediaservice` `MpvPlaybackEngine`; no-op on the
   x86_64 stub.
-- Audio tap: `enableAudioTap` / `disableAudioTap` / `setAudioTapCallback`
-  (`MpvPlayerController` wrappers, `AudioTapChunk` type). Bridges the vendored
-  mpv `asrtap` filter (`mpv_asr_tap_set_callback`, resolved non-fatally —
-  absent on older vendored .so) to ArkTS: 16kHz mono float32 ring (8s) →
-  consumer thread → TSFN batches (~200ms, `{ptsMs, samples, flags}`; flag
-  1=discontinuity, 2=EOF as empty-sample chunks). No-ops on the x86_64 stub.
 - HW probe: `probeVideoHwDecoders` + `VideoHwDecoderCaps` (OHOS decoder
   capability query for upper layers) and `getHwdecCodecsWhitelist` (the
   probe-derived hwdec-codecs whitelist string; native is the single source of

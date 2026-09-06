@@ -24,7 +24,6 @@ import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { HttpDownloader, parseHlsMasterManifest, StreamInfo as ParsedHlsStreamInfo } from 'youtube_core';
 import { SubtitleCue, parseVttSubtitles, findActiveSubtitleText } from '../subtitle/VttSubtitleParser';
-import type { AudioTapChunk } from '@yourpipe/libmpv-napi';
 
 /** Live/post-live HLS track pair: video variant playlist + audio rendition playlist. */
 interface HlsTrackPair {
@@ -1005,22 +1004,10 @@ export class AvPlayerController {
   }
 
   /**
-   * ASR PCM tap 透传（entry P3 实时识别用）：无策略，直接转发引擎。
-   * 引擎未初始化或 vendored libmpv 缺 tap 导出时抛 asr_tap_unavailable。
+   * ASR PCM tap 已随播放器回退移除（vendored libmpv 回到 0.5.9，无 asrtap
+   * 导出）。P3 实时识别整体为 [DISABLED] 状态，入口本已注释；此处不再保留
+   * 透传方法。重新启用 P3 需要先恢复 libmpv_napi 的 tap 支持。
    */
-  public enableAudioTap(): void {
-    Logger.info(TAG, 'enableAudioTap');
-    this.playbackEngine.enableAudioTap();
-  }
-
-  public disableAudioTap(): void {
-    Logger.info(TAG, 'disableAudioTap');
-    this.playbackEngine.disableAudioTap();
-  }
-
-  public setAudioTapCallback(cb: ((chunk: AudioTapChunk) => void) | null): void {
-    this.playbackEngine.setAudioTapCallback(cb);
-  }
 
   /** Driven by engine time-pos updates (~100ms); cheap enough per tick. */
   private updateSubtitleOverlayText(positionSec: number): void {

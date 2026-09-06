@@ -1,10 +1,19 @@
 import { worker, MessageEvents, ErrorEvent } from '@kit.ArkTS';
 import { fileIo } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
-import { AvPlayerController, AudioTapChunk } from 'mediaservice';
+import { AvPlayerController } from 'mediaservice';
 import { AppLog } from '../../../common/AppLog';
 import { AsrModelManager, AsrModelPaths, AsrModelStatus } from './AsrModelManager';
 import { AsrCue, asrTrackKey, buildAsrVtt } from './AsrVtt';
+
+// [DISABLED] P3 实时 ASR 依赖的 MPV PCM tap 已随播放器回退（vendored libmpv
+// 回到 0.5.9）移除。本服务的 tap 挂接/回调均已注释；重新启用需要先恢复
+// libmpv_napi 的 asrtap 支持。此处仅保留类型形状以维持代码可编译。
+interface AudioTapChunk {
+  ptsMs: number;
+  samples: Float32Array;
+  flags: number;
+}
 
 const logger = AppLog.getInstance('AsrLiveCaption');
 
@@ -173,9 +182,9 @@ export class AsrLiveCaptionService {
         throw new Error('asr worker init failed');
       }
 
-      // 3. 挂 PCM tap（vendored libmpv 缺导出时抛 asr_tap_unavailable）
-      controller.setAudioTapCallback((chunk: AudioTapChunk) => this.onPcm(chunk));
-      controller.enableAudioTap();
+      // 3. 挂 PCM tap —— [DISABLED] tap 已随播放器回退移除（见文件头注释）。
+      // controller.setAudioTapCallback((chunk: AudioTapChunk) => this.onPcm(chunk));
+      // controller.enableAudioTap();
       if (this.state !== 'preparing') {
         this.teardownTap();
         return false; // 启动尾段被 stop()
@@ -411,20 +420,8 @@ export class AsrLiveCaptionService {
   }
 
   private teardownTap(): void {
-    const c = this.controller;
-    if (!c) {
-      return;
-    }
-    try {
-      c.setAudioTapCallback(null);
-    } catch (e) {
-      logger.warn(`live asr clear tap callback failed: ${(e as Error).message || e}`);
-    }
-    try {
-      c.disableAudioTap();
-    } catch (e) {
-      logger.warn(`live asr disable tap failed: ${(e as Error).message || e}`);
-    }
+    // [DISABLED] PCM tap 已随播放器回退移除，无底层资源需要释放。
+    // 保留空实现以维持 P3 代码结构可编译。
   }
 
   /** 附着到在途模型下载：轮询状态直到 ready/not_downloaded，期间响应 stop。 */

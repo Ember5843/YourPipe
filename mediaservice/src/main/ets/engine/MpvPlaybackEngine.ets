@@ -1,6 +1,6 @@
 import { MpvPlayerController, MediaStatus, PlaybackState as NativePlaybackState,
   setHttpProxyEnv } from '@yourpipe/libmpv-napi';
-import type { MediaInfo, AudioTapChunk } from '@yourpipe/libmpv-napi';
+import type { MediaInfo } from '@yourpipe/libmpv-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, PlaybackStats,
   EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
@@ -262,6 +262,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
    * process env installed at load() still points at the dead port; entry pings
    * this from the bridge port-change hook so in-flight live HLS fetches move
    * to the new port. No-op when nothing is loaded.
+   * （网络功能，非播放行为 — 回退 0.5.9 播放器时保留）
    */
   refreshNetworkProxy(): void {
     if (this.destroyed || this.sourceUrl.length === 0) {
@@ -483,15 +484,20 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   setVideoOutputEnabled(enabled: boolean): void {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return;
-    // Push only on actual change: callers re-apply the preference on every
-    // state emission, and unconditional pushes flood mpv (one Set property
-    // log per call). The post-load "media defaults back to vid=auto" case is
-    // covered by applyReadyActions() re-applying vid=no after ready.
     const force = enabled !== this.videoOutputOn;
     this.videoOutputOn = enabled;
-    if (!force) return;
-    ctrl.setProperty('vid', enabled ? 'auto' : 'no');
-    Logger.info(TAG, enabled ? 'video output ON (vid=auto)' : 'video output OFF (vid=no)');
+    // Always push property: after load, media defaults may ignore prior vid=no.
+    if (enabled) {
+      ctrl.setProperty('vid', 'auto');
+      if (force) {
+        Logger.info(TAG, 'video output ON (vid=auto)');
+      }
+    } else {
+      ctrl.setProperty('vid', 'no');
+      if (force) {
+        Logger.info(TAG, 'video output OFF (vid=no)');
+      }
+    }
   }
 
   getState(): PlaybackState {
@@ -537,26 +543,6 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   setSubtitleCallback(cb: (text: string, startTime: number, duration: number) => void): void {
     this.subtitleCallback = cb;
-  }
-
-  enableAudioTap(): void {
-    const ctrl: MpvPlayerController | null = this.controller;
-    if (ctrl === null || this.destroyed) {
-      throw new Error('asr_tap_unavailable: engine not initialized');
-    }
-    ctrl.enableAudioTap();
-  }
-
-  disableAudioTap(): void {
-    const ctrl: MpvPlayerController | null = this.controller;
-    if (ctrl === null || this.destroyed) return;
-    ctrl.disableAudioTap();
-  }
-
-  setAudioTapCallback(cb: ((chunk: AudioTapChunk) => void) | null): void {
-    const ctrl: MpvPlayerController | null = this.controller;
-    if (ctrl === null || this.destroyed) return;
-    ctrl.setAudioTapCallback(cb);
   }
 
   private bindSurface(ctrl: MpvPlayerController, surfaceId: string): void {
