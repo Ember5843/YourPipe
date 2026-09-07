@@ -52,9 +52,11 @@ export class SabrTrackBuffer {
    * MPV has no read timeout on the loopback, and the UMP server backoff can
    * reach 30s per wait — without a cap a single segment read can block for
    * minutes. The server-owned backoff deadline is never cleared; on exhaustion
-   * we throw SabrReadTimeoutError and the proxy answers 504.
+   * we throw SabrReadTimeoutError and the proxy answers 504. Sized above the
+   * in-pump network retry budget (75s) so a mid-outage POST retry inside
+   * fetchSegment is not cut short by this outer deadline.
    */
-  private static readonly READ_SEGMENT_BUDGET_MS = 45000;
+  private static readonly READ_SEGMENT_BUDGET_MS = 90000;
   private totalKnownBytes: number = 0;
   private fullyBuffered: boolean = false;
   private pumpPromise?: Promise<void>;
@@ -158,7 +160,7 @@ export class SabrTrackBuffer {
           return undefined;
         }
         const transient = e instanceof SabrProtocolException
-          && (e.kind === 'protection' || e.kind === 'no_media');
+          && (e.kind === 'protection' || e.kind === 'no_media' || e.kind === 'network');
         if (!transient || attempt >= 3) {
           throw e instanceof Error ? e : new Error(String(e));
         }

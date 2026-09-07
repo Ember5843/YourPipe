@@ -1,7 +1,7 @@
 import { YTCoreLogger } from '../../common/YTCoreLogger';
 import { http } from '@kit.NetworkKit';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
-import { HttpAbortToken } from '../../network/HttpDownloader';
+import { HttpAbortToken, HttpError } from '../../network/HttpDownloader';
 import { ClientsConstants } from '../../model/ClientsConstants';
 import { SabrDecodedResponse } from './SabrDecodedResponse';
 import { SabrMediaSegment, SabrSegmentRequest } from './SabrMediaSegment';
@@ -55,6 +55,8 @@ const MAX_INCOMPLETE_MEDIA_RESPONSES = 3;
 const MAX_CACHE_BYTES = 32 * 1024 * 1024;
 const SEEK_KEEP_WINDOW_MS = 8000;
 const EVICT_BEHIND_MS = 10000;
+/** Total wall-clock budget for in-pump network-error retries of one POST. */
+const NETWORK_RETRY_BUDGET_MS = 75000;
 
 /**
  * Stateful SABR media session (PipePipe YoutubeSabrSession subset for VOD).
@@ -456,8 +458,7 @@ export class YoutubeSabrSession {
       this.activePostAbort = abortToken;
       let response: http.HttpResponse;
       try {
-        response = await this.httpClient.postBinary(url, body, headers, this.useAuth,
-          (bytes: number) => networkTrafficSink?.(bytes), abortToken);
+        response = await this.postBinaryWithNetworkRetry(url, body, headers, abortToken);
       } finally {
         if (this.activePostAbort === abortToken) {
           this.activePostAbort = undefined;
@@ -570,6 +571,55 @@ export class YoutubeSabrSession {
       + `reload=${decoded.reloadRequested} seek=${decoded.sabrSeekReason} `
       + `noMedia=${this.consecutiveNoMedia}`);
     return decoded;
+  }
+
+  /**
+   * One UMP POST with bounded in-pump retries for network-class failures
+   * (connection reset / TLS handshake break / timeout / 5xx). A transient
+   * network drop used to propagate straight out of the pump: every layer up to
+   * the proxy had zero retry, the segment request died, and FFmpeg skipped to
+   * the next segment, drifting the session playhead. Retrying here keeps the
+   * pump lock held, so no other track's request can interleave; a failed POST
+   * never received a response, so rn and the server backoff state stay untouched.
+   * Budget-bounded so a dead link fails into kind='network' (→ 502 → the
+   * controller's recovery ladder) instead of hanging the read forever.
+   */
+  private async postBinaryWithNetworkRetry(url: string, body: Uint8Array,
+    headers: Record<string, string[] | string>, abortToken: HttpAbortToken): Promise<http.HttpResponse> {
+    const deadline = Date.now() + NETWORK_RETRY_BUDGET_MS;
+    let attempt = 0;
+    let lastNetworkError: Error | undefined = undefined;
+    while (true) {
+      if (this.closed) {
+        throw new SabrProtocolException('SABR session closed', 'closed');
+      }
+      if (abortToken.aborted) {
+        throw new SabrProtocolException('SABR request aborted', 'closed');
+      }
+      attempt++;
+      try {
+        return await this.httpClient.postBinary(url, body, headers, this.useAuth,
+          (bytes: number) => networkTrafficSink?.(bytes), abortToken);
+      } catch (e) {
+        if (this.closed) {
+          throw new SabrProtocolException('SABR session closed', 'closed');
+        }
+        const isNetworkClass = e instanceof HttpError && e.responseCode !== 403 && e.isRecoverable;
+        if (!isNetworkClass || Date.now() >= deadline) {
+          if (isNetworkClass) {
+            logger.error(`[SABR] network retry budget exhausted rn=${this.epoch.requestNumber} `
+              + `attempts=${attempt} error=${(e as Error).message}`);
+            throw new SabrProtocolException(`SABR network failure: ${(e as Error).message}`, 'network');
+          }
+          throw e instanceof Error ? e : new Error(String(e));
+        }
+        lastNetworkError = e instanceof Error ? e : new Error(String(e));
+        const waitMs = Math.min(1000 * attempt, 5000);
+        logger.warn(`[SABR] network retry attempt=${attempt} waitMs=${waitMs} `
+          + `rn=${this.epoch.requestNumber} error=${lastNetworkError.message}`);
+        await this.sleepBackoffInterruptible(waitMs);
+      }
+    }
   }
 
   /**

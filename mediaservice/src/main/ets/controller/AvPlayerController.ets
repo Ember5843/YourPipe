@@ -103,6 +103,16 @@ export class AvPlayerController {
   private isRecovering: boolean = false;
   private readonly MAX_ERROR_RETRIES = 2;
   private lastKnownGoodPosition: number = 0;
+
+  // Playback stall watchdog (pure in-memory state)
+  /** Tick interval for the stall watchdog timer. */
+  private static readonly STALL_TICK_MS = 5000;
+  /** A playback window is stalled when the position advances less than this over STALL_DETECT_MS. */
+  private static readonly STALL_MIN_PROGRESS_SEC = 1;
+  private static readonly STALL_DETECT_MS = 20000;
+  private stallWatchdogTimer: number = -1;
+  private stallBaselinePosSec: number = -1;
+  private stallBaselineAtMs: number = 0;
   /**
    * Quality/audio switch in flight: keep spinner on while proxy rebuilds + engine reloads.
    * loadStarted becomes true only after createPlaybackUrl finishes and load() is called,
@@ -816,7 +826,9 @@ export class AvPlayerController {
         }
         break;
       default:
-        Logger.info(TAG, `[AudioFocus] action=unhandled hint=${name} raw=${hint}`);
+        // Unrecognized hints (e.g. raw=3 seen alongside session deactivation)
+        // need no action; keep them observable at DEBUG without INFO noise.
+        Logger.debug(TAG, `[AudioFocus] action=unhandled hint=${name} raw=${hint}`);
         break;
     }
   }
@@ -835,10 +847,12 @@ export class AvPlayerController {
   }
 
   public syncSeekFast(seekTime: number): void {
+    this.resetStallBaseline();
     if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, true);
   }
 
   public syncSeekExact(seekTime: number): void {
+    this.resetStallBaseline();
     if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, false);
   }
 
@@ -904,6 +918,7 @@ export class AvPlayerController {
     this.errorRetryCount = 0;
     this.isRecovering = false;
     this.lastKnownGoodPosition = 0;
+    this.stopStallWatchdog();
     this.systemPausedByFocus = false;
     this.systemStoppedByFocus = false;
     this.duckActive = false;
@@ -1823,7 +1838,18 @@ export class AvPlayerController {
   }
 
   private onPlaybackStateChange(state: PlaybackState): void {
-    if (!this.isActive()) return;
+    if (!this.isActive()) {
+      this.stopStallWatchdog();
+      return;
+    }
+    // Watchdog lifecycle follows the media window: armed from the first engine
+    // state of an active session, stopped when the session goes away.
+    this.ensureStallWatchdog();
+    if (state.errorMsg) {
+      // An in-flight recovery/retry resets the baseline so the watchdog does
+      // not fire on top of an already-handled failure.
+      this.resetStallBaseline();
+    }
 
     if (this.startupAttemptId.length > 0 && state.isReady && !this.startupFileLoadedLogged) {
       this.startupFileLoadedLogged = true;
@@ -1997,6 +2023,82 @@ export class AvPlayerController {
       }
     }
     return true;
+  }
+
+  /**
+   * Playback stall watchdog. MPV/FFmpeg can silently stop making progress
+   * (SABR pump parked, dead upstream fetch, hung demuxer) without ever
+   * emitting an error — until now those freezes had no recovery at all. When
+   * an active, non-seek, non-paused playback window stops advancing the
+   * position for STALL_DETECT_MS, a synthetic network-class error is injected
+   * into the standard handlePlaybackError ladder (same-URL retries, then the
+   * entry-side fresh-stream re-extraction with resume).
+   */
+  private ensureStallWatchdog(): void {
+    if (this.stallWatchdogTimer >= 0) {
+      return;
+    }
+    this.stallBaselinePosSec = this.lastKnownGoodPosition;
+    this.stallBaselineAtMs = Date.now();
+    this.stallWatchdogTimer = setInterval(() => this.stallWatchdogTick(), AvPlayerController.STALL_TICK_MS);
+  }
+
+  private stopStallWatchdog(): void {
+    if (this.stallWatchdogTimer >= 0) {
+      clearInterval(this.stallWatchdogTimer);
+      this.stallWatchdogTimer = -1;
+    }
+    this.stallBaselinePosSec = -1;
+    this.stallBaselineAtMs = 0;
+  }
+
+  private resetStallBaseline(): void {
+    this.stallBaselinePosSec = this.lastKnownGoodPosition;
+    this.stallBaselineAtMs = Date.now();
+  }
+
+  private stallWatchdogTick(): void {
+    if (!this.isActive() || this.isRecovering) {
+      this.resetStallBaseline();
+      return;
+    }
+    // Only watch windows that should be delivering media: READY/PLAYING/BUFFERING
+    // and not user-paused (PAUSED state), user-seeking, or mid quality switch.
+    const watching = this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING,
+      PlayerState.BUFFERING)
+      && !this.vm.isSeeking && !this.vm.isSourceSwitching;
+    if (!watching) {
+      this.resetStallBaseline();
+      return;
+    }
+    const pos = this.lastKnownGoodPosition;
+    if (pos <= 0) {
+      // Still before first frame — startup buffering has its own UX, don't fire here.
+      return;
+    }
+    if (this.stallBaselinePosSec < 0) {
+      this.resetStallBaseline();
+      return;
+    }
+    const elapsedMs = Date.now() - this.stallBaselineAtMs;
+    if (elapsedMs < AvPlayerController.STALL_DETECT_MS) {
+      return;
+    }
+    const progressed = pos - this.stallBaselinePosSec;
+    if (progressed >= AvPlayerController.STALL_MIN_PROGRESS_SEC) {
+      this.resetStallBaseline();
+      return;
+    }
+    Logger.warn(TAG, `stall watchdog: pos frozen at ${pos.toFixed(2)}s for `
+      + `${Math.round(elapsedMs / 1000)}s videoId=${this.curSource?.videoId || 'unknown'} `
+      + `state=${this.stateMachine.currentState} — injecting recovery`);
+    this.resetStallBaseline();
+    // Synthetic network-class error feeds the standard retry ladder; the error
+    // state itself stays invisible to the user unless every recovery fails.
+    const synthetic: PlaybackState = this.getPlaybackState();
+    synthetic.errorCategory = 'network';
+    synthetic.errorMsg = '[WATCHDOG] playback stalled';
+    this.handlePlaybackError(synthetic);
   }
 
   private async handlePlaybackError(state: PlaybackState): Promise<void> {

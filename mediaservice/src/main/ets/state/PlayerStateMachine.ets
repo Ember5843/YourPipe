@@ -58,6 +58,13 @@ export class PlayerStateMachine {
     }
     if (!isValidTransition(from, to)) {
       const allowed = this.getAllowedTransitions(from);
+      if (from === PlayerState.LOADING && to === PlayerState.COMPLETED) {
+        // Known-benign: a stale end-of-media event from the previous source
+        // arriving while the new source is still loading. The rejection is
+        // the intended protection; only log noise, no ERROR.
+        Logger.debug(`${this.debugTag} stale COMPLETED ignored during LOADING (previous media end)`);
+        return false;
+      }
       Logger.error(
         `${this.debugTag} Illegal transition: ${describeState(from)} → ${describeState(to)}. ` +
         `Allowed: [${allowed.map(s => describeState(s)).join(', ')}]`

@@ -106,7 +106,15 @@ async function handleConnection(conn: socket.TCPSocketConnection): Promise<void>
 
         await routeRequest(conn, req.method, parts, req.rangeHeader, session);
       } catch (e) {
+        // A route handler that throws after the request head was consumed must
+        // still answer HTTP: a bare connection close makes FFmpeg skip ahead
+        // (segment drift) where a status code keeps its retry semantics intact.
         Logger.error(TAG, `handleConnection error: ${e}`);
+        try {
+          await sendText(conn, 502, 'Bad Gateway', 'text/plain', 'proxy handler failure');
+        } catch (_sendErr) {
+          // Socket already gone — nothing left to answer.
+        }
       } finally {
         conn.close();
         resolve();

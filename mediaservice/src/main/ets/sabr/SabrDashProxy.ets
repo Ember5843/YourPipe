@@ -143,10 +143,24 @@ export async function serveSabrDashSegment(conn: socket.TCPSocketConnection,
       Logger.debug(TAG, `read aborted (session closed) itag=${buffer.getItag()} seq=${sequence}`);
       return;
     }
-    if (e instanceof Error) {
-      throw e;
+    if (e instanceof SabrProtocolException && e.kind === 'network') {
+      // In-pump network retry budget exhausted (link down longer than the
+      // budget). 502 tells FFmpeg this fetch failed terminally; its reconnect
+      // logic plus the controller recovery ladder take over from here.
+      Logger.warn(TAG, `upstream network failure → 502 itag=${buffer.getItag()} seq=${sequence}`);
+      await conn.send({ data: encodeUtf8('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
+      return;
     }
-    throw new Error(String(e));
+    // Never leave MPV with a bare connection close: an unclassifiable read
+    // failure still deserves an explicit HTTP status.
+    const message = e instanceof Error ? e.message : String(e);
+    Logger.error(TAG, `segment read failed → 502 itag=${buffer.getItag()} seq=${sequence} error=${message}`);
+    try {
+      await conn.send({ data: encodeUtf8('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
+    } catch (_sendErr) {
+      // Socket already gone — nothing left to answer.
+    }
+    return;
   }
   if (!data) {
     Logger.info(TAG, `EOF itag=${buffer.getItag()} seq=${sequence} end=${buffer.getEndSegment()}`);

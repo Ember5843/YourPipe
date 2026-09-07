@@ -449,7 +449,13 @@ export class YouTubePlayService {
         if (!forPrefetch) {
           this.pendingDashPotPromise = null;
         }
-        logger.info(`${TAG} all playable streams are SABR; skipping Dash PoToken`);
+        // SABR-only extraction: media URLs never take pot=, but the UMP
+        // session's streamerContext does — without a pre-minted per-video pot
+        // the first UMP POST returns an empty response and the session pays a
+        // mint + server backoff round-trip before the first media arrives.
+        // Warm the provider cache here (bounded by the mint timeout + breaker)
+        // so applyPoTokenForProtectedResponse hits it instantly.
+        this.prewarmSabrPoToken(videoInfo);
       }
       const playerStreams: StreamInfo[] = this.mapToPlayerStreams(videoInfo.streams, videoInfo.durationMs);
 
@@ -590,6 +596,33 @@ export class YouTubePlayService {
     }
     const elapsed = Date.now() - startMs;
     logger.info(`${TAG} Dash PoToken injected for ${injected} streams video=${videoInfo.videoId} elapsed=${elapsed}ms`);
+  }
+
+  /**
+   * SABR-only extractions: mint the per-video pot ahead of playback so the
+   * UMP session's first protected response finds it cached instead of paying
+   * a mid-session mint + server backoff round-trip. Fire-and-forget: failure
+   * just falls back to the session's own in-band mint path.
+   */
+  private prewarmSabrPoToken(videoInfo: VideoInfo): void {
+    const visitorData = YoutubeJavaScriptPlayerManager.getSessionVisitorData(
+      videoInfo.playerResponse?.responseContext?.visitorData);
+    if (!visitorData || visitorData.length === 0) {
+      logger.info(`${TAG} no visitorData, skipping SABR PoToken prewarm video=${videoInfo.videoId}`);
+      return;
+    }
+    const startMs = Date.now();
+    SabrWebViewPoTokenProvider.getInstance().getDashPoToken(visitorData, videoInfo.videoId)
+      .then((potStr: string | undefined) => {
+        if (potStr) {
+          logger.info(`${TAG} SABR PoToken prewarmed video=${videoInfo.videoId} elapsed=${Date.now() - startMs}ms`);
+        } else {
+          logger.info(`${TAG} SABR PoToken prewarm unavailable video=${videoInfo.videoId}`);
+        }
+      })
+      .catch((e: Error) => {
+        logger.warn(`${TAG} SABR PoToken prewarm failed video=${videoInfo.videoId}: ${(e as Error).message}`);
+      });
   }
 
   private determineNoStreamsErrorCode(videoInfo: VideoInfo): YouTubeErrorCode {

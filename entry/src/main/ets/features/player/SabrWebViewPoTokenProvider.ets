@@ -59,8 +59,10 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
   private static readonly MINT_TIMEOUT_MS: number = 30000;
   private static readonly MINT_BREAKER_MS: number = 30000;
   private static readonly MINT_BREAKER_STREAK: number = 2;
-  /** Player PoToken mint cap: runtime is warm here, so mintIdentifier must be fast. */
-  private static readonly PLAYER_MINT_TIMEOUT_MS: number = 5000;
+  /** Player PoToken mint cap. Usually warm-runtime fast, but logs show real
+   *  cold/contended WebView mints blowing past 5s; 15s stays under the UMP
+   *  backoff scale and the mint breaker still bounds repeat wedges. */
+  private static readonly PLAYER_MINT_TIMEOUT_MS: number = 15000;
 
   static getInstance(): SabrWebViewPoTokenProvider {
     return SabrWebViewPoTokenProvider.instance;

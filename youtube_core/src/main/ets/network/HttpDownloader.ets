@@ -751,8 +751,10 @@ export class HttpDownloader {
       header: requestHeaders,
       extraData: bodyCopy,
       connectTimeout: 30000,
-      // Large SABR UMP payloads (init + many media segs) need a long read window.
-      readTimeout: 180000,
+      // Normal SABR UMP POSTs complete in well under a second; a POST hanging
+      // past a minute is a dead link, and failing it fast lets the session's
+      // network-retry path re-send instead of freezing playback for minutes.
+      readTimeout: 60000,
       usingCache: false,
       // API 26 连接池复用：SABR 反复 POST 同一 UMP 端点，流式结束后连接可入池复用
       reuseConnections: true,
@@ -771,7 +773,7 @@ export class HttpDownloader {
       // Overall watchdog: an empty-body response may never fire dataEnd, which
       // would leave this Promise (and the SABR pump lock) unsettled forever.
       // Budget = readTimeout + 5s grace.
-      const watchdogMs = 180000 + 5000;
+      const watchdogMs = 60000 + 5000;
       let watchdogTimer: number = -1;
 
       const clearWatchdog = (): void => {
