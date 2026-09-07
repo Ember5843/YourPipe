@@ -3145,6 +3145,10 @@
             "value": "予期しない HTTP ステータス"
         },
         {
+            "name": "yt_proxy_test_auth_failed",
+            "value": "プロキシ認証に失敗しました — ユーザー名とパスワードを確認してください"
+        },
+        {
             "name": "yt_proxy_test_disabled",
             "value": "先にプロキシを有効にしてください"
         },

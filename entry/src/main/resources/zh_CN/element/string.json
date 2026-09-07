@@ -3145,6 +3145,10 @@
             "value": "HTTP 状态异常"
         },
         {
+            "name": "yt_proxy_test_auth_failed",
+            "value": "代理认证失败，请检查用户名和密码"
+        },
+        {
             "name": "yt_proxy_test_disabled",
             "value": "请先启用代理"
         },

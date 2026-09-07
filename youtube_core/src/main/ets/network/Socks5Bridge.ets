@@ -16,6 +16,8 @@ interface Socks5Config {
   port: number;
   username: string;
   password: string;
+  /** 上游代理类型：socks5（手写 RFC1928/1929）或 http（CONNECT + Basic 认证）。 */
+  upstreamKind: 'socks5' | 'http';
 }
 
 const CRLF: string = '\r\n';
@@ -68,6 +70,20 @@ export class SocksHandshakeError extends Error {
     this.authFailed = authFailed;
   }
 }
+
+/** HTTP 上游代理失败。authFailed=true（上游 407）表示认证类失败——同样凭据重试无意义。 */
+export class HttpUpstreamError extends Error {
+  readonly authFailed: boolean;
+
+  constructor(message: string, authFailed: boolean = false) {
+    super(message);
+    this.name = 'HttpUpstreamError';
+    this.authFailed = authFailed;
+  }
+}
+
+/** 上游 HTTP 代理 CONNECT 应答头块上限（超出即视为异常代理，拒绝继续读）。 */
+const HTTP_UPSTREAM_MAX_HEAD_BYTES: number = 8192;
 
 /** SOCKS5 CONNECT 应答 rep 码 → 可读描述。 */
 function socksRepText(rep: number): string {
@@ -266,6 +282,7 @@ function socksTargetBytes(target: Socks5Target): number[] {
 class HandshakeReader {
   private pending: number[] = [];
   private waiter: HandshakeWaiter | null = null;
+  private headWaiter: HttpHeadWaiter | null = null;
   private failure: Object | null = null;
   /** 非 null 即转发模式：之后每个 message 直接进 sink，不再走握手缓冲。 */
   private pipeSink: ((bytes: Uint8Array) => void) | null = null;
@@ -278,6 +295,10 @@ class HandshakeReader {
     }
     for (let i = 0; i < chunk.length; i++) {
       this.pending.push(chunk[i]);
+    }
+    if (this.headWaiter) {
+      this.pumpHeadWaiter();
+      return;
     }
     const w = this.waiter;
     if (w && this.pending.length >= w.needed) {
@@ -311,6 +332,11 @@ class HandshakeReader {
     if (w) {
       w.reject(this.failure);
     }
+    const hw = this.headWaiter;
+    this.headWaiter = null;
+    if (hw) {
+      hw.reject(this.failure);
+    }
   }
 
   readExactly(n: number): Promise<Uint8Array> {
@@ -320,12 +346,49 @@ class HandshakeReader {
     if (this.pending.length >= n) {
       return Promise.resolve(new Uint8Array(this.pending.splice(0, n)));
     }
-    if (this.waiter) {
+    if (this.waiter || this.headWaiter) {
       return Promise.reject(new Error('concurrent handshake read not supported'));
     }
     return new Promise<Uint8Array>((resolve, reject) => {
       this.waiter = { needed: n, resolve, reject };
     });
+  }
+
+  /**
+   * 读到一个完整 HTTP 响应头块（含结尾 CRLFCRLF）为止；超出 maxBytes 仍未
+   * 结束即失败。头之后的多余字节留在 pending，切 pipe 时由 switchToPipe 按序
+   * 冲刷，不会丢上游在挂接窗口内送达的字节。
+   */
+  readHttpHead(maxBytes: number): Promise<Uint8Array> {
+    if (this.failure) {
+      return Promise.reject(this.failure);
+    }
+    if (this.waiter || this.headWaiter) {
+      return Promise.reject(new Error('concurrent handshake read not supported'));
+    }
+    return new Promise<Uint8Array>((resolve, reject) => {
+      this.headWaiter = { maxBytes, resolve, reject };
+      this.pumpHeadWaiter();
+    });
+  }
+
+  private pumpHeadWaiter(): void {
+    const hw = this.headWaiter;
+    if (!hw) {
+      return;
+    }
+    const p = this.pending;
+    for (let i = 0; i + 3 < p.length; i++) {
+      if (p[i] === 13 && p[i + 1] === 10 && p[i + 2] === 13 && p[i + 3] === 10) {
+        this.headWaiter = null;
+        hw.resolve(new Uint8Array(p.splice(0, i + 4)));
+        return;
+      }
+    }
+    if (p.length > hw.maxBytes) {
+      this.headWaiter = null;
+      hw.reject(new HttpUpstreamError(`upstream response head exceeds ${hw.maxBytes} bytes`));
+    }
   }
 
   /**
@@ -345,6 +408,12 @@ class HandshakeReader {
 
 interface HandshakeWaiter {
   needed: number;
+  resolve: (v: Uint8Array) => void;
+  reject: (e: Object) => void;
+}
+
+interface HttpHeadWaiter {
+  maxBytes: number;
   resolve: (v: Uint8Array) => void;
   reject: (e: Object) => void;
 }
@@ -483,6 +552,166 @@ async function openSocksTunnel(cfg: Socks5Config, target: Socks5Target): Promise
     await new Promise<void>((r) => setTimeout(r, 300));
     return openSocksTunnelOnce(cfg, target);
   }
+}
+
+// ── HTTP 上游代理（CONNECT + Basic 认证）─────────────────────────────────────
+// ArkWeb ProxyController 的 insertProxyRule 只接受 [scheme://]host[:port]，不
+// 支持 userinfo——带用户名/密码的 HTTP 代理因此也经本桥 egress：127.0.0.1 侧
+// 永远免认证，桥在上游请求里注入 Proxy-Authorization: Basic。凭据只存在于桥
+// 内存，绝不落日志。
+
+/** CONNECT authority 文本；IPv6 literal 加方括号。 */
+function authorityOf(target: Socks5Target): string {
+  const host = target.host.indexOf(':') >= 0 ? `[${target.host}]` : target.host;
+  return `${host}:${target.port}`;
+}
+
+/** Basic 认证头行（仅此函数接触凭据，调用方不得记录其返回值）。 */
+function proxyAuthorizationLine(cfg: Socks5Config): string {
+  const raw = encodeTextBytes(`${cfg.username}:${cfg.password}`);
+  const b64 = new util.Base64Helper().encodeToStringSync(raw);
+  return `Proxy-Authorization: Basic ${b64}`;
+}
+
+/**
+ * 向上游 HTTP 代理发 CONNECT 并校验应答：有界读响应头（≤8KB），要求 2xx。
+ * 407 → HttpUpstreamError(authFailed=true)，同样凭据重试无意义；其他非 2xx
+ * 也抛错。成功后隧道就绪，剩余字节走 reader 的 pipe 冲刷。
+ */
+async function doHttpConnectHandshake(tcp: socket.TCPSocket, reader: HandshakeReader,
+  cfg: Socks5Config, target: Socks5Target): Promise<void> {
+  const authority = authorityOf(target);
+  const lines: string[] = [
+    `CONNECT ${authority} HTTP/1.1`,
+    `Host: ${authority}`
+  ];
+  if (cfg.username.length > 0) {
+    lines.push(proxyAuthorizationLine(cfg));
+  }
+  await tcp.send({ data: encodeText(lines.join(CRLF) + CRLF + CRLF) });
+  const headBytes = await reader.readHttpHead(HTTP_UPSTREAM_MAX_HEAD_BYTES);
+  const headText = new util.TextDecoder().decode(headBytes.slice());
+  const statusLine = (headText.split(CRLF)[0] || '').trim();
+  const m = /^HTTP\/\d(?:\.\d)?\s+(\d{3})/.exec(statusLine);
+  if (!m) {
+    throw new HttpUpstreamError(`malformed CONNECT response from ${cfg.host}:${cfg.port}`);
+  }
+  const status = parseInt(m[1], 10);
+  if (status === 407) {
+    throw new HttpUpstreamError(`proxy authentication failed (407) at ${cfg.host}:${cfg.port}`, true);
+  }
+  if (status < 200 || status >= 300) {
+    throw new HttpUpstreamError(`CONNECT rejected status=${status} by ${cfg.host}:${cfg.port}`);
+  }
+}
+
+/** TCP 直连上游 HTTP 代理（无握手；absolute-URI 普通转发用）。 */
+async function connectHttpUpstreamOnce(cfg: Socks5Config): Promise<OpenedTunnel> {
+  const tcp = socket.constructTCPSocketInstance();
+  const reader = new HandshakeReader();
+  tcp.on('message', reader.onMessage);
+  tcp.on('close', reader.onClose);
+  tcp.on('error', reader.onError);
+  try {
+    await tcp.connect({
+      address: { address: cfg.host, port: cfg.port, family: familyForHost(cfg.host) },
+      timeout: SOCKS_HANDSHAKE_TIMEOUT_MS
+    });
+    return { sock: tcp, reader };
+  } catch (e) {
+    try {
+      tcp.off('message');
+      tcp.off('close');
+      tcp.off('error');
+      tcp.close();
+    } catch (_e) {
+    }
+    throw e as Error;
+  }
+}
+
+/** Single attempt: TCP to the HTTP proxy + CONNECT handshake (15s budget, 与 socks5 握手一致). */
+async function openHttpTunnelOnce(cfg: Socks5Config, target: Socks5Target): Promise<OpenedTunnel> {
+  const tunnel = await connectHttpUpstreamOnce(cfg);
+  let timeoutId: number = -1;
+  try {
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeoutId = setTimeout(() => {
+        const err = new HttpUpstreamError('HTTP CONNECT handshake timeout');
+        tunnel.reader.fail(err);
+        reject(err);
+      }, SOCKS_HANDSHAKE_TIMEOUT_MS);
+    });
+    await Promise.race([doHttpConnectHandshake(tunnel.sock, tunnel.reader, cfg, target), timeoutPromise]);
+    clearTimeout(timeoutId);
+    timeoutId = -1;
+    return tunnel;
+  } catch (e) {
+    if (timeoutId >= 0) {
+      clearTimeout(timeoutId);
+    }
+    try {
+      tunnel.sock.off('message');
+      tunnel.sock.off('close');
+      tunnel.sock.off('error');
+      tunnel.sock.close();
+    } catch (_e) {
+    }
+    throw e as Error;
+  }
+}
+
+/**
+ * openSocksTunnel 的 HTTP 版：瞬时失败 300ms 后重试一次；上游 407
+ * （HttpUpstreamError.authFailed）立即失败，不重试。
+ */
+async function openHttpTunnel(cfg: Socks5Config, target: Socks5Target): Promise<OpenedTunnel> {
+  try {
+    return await openHttpTunnelOnce(cfg, target);
+  } catch (e) {
+    if (e instanceof HttpUpstreamError && e.authFailed) {
+      logger.warn(TAG, `upstream proxy authentication failed (407) at ${cfg.host}:${cfg.port}`);
+      throw e;
+    }
+    logger.warn(TAG, `http tunnel to ${target.host}:${target.port} failed, retry once in 300ms: ${describeErr(e)}`);
+    await new Promise<void>((r) => setTimeout(r, 300));
+    return openHttpTunnelOnce(cfg, target);
+  }
+}
+
+/** absolute-URI 普通请求的 HTTP 上游连接：瞬时失败 300ms 后重试一次。 */
+async function openHttpPlain(cfg: Socks5Config): Promise<OpenedTunnel> {
+  try {
+    return await connectHttpUpstreamOnce(cfg);
+  } catch (e) {
+    logger.warn(TAG, `http upstream connect failed, retry once in 300ms: ${describeErr(e)}`);
+    await new Promise<void>((r) => setTimeout(r, 300));
+    return connectHttpUpstreamOnce(cfg);
+  }
+}
+
+/**
+ * absolute-URI 请求经 HTTP 代理转发的头块：保持 absolute-form 请求行（正是
+ * HTTP 代理期望的格式），剥掉 Proxy-Connection 与客户端自带的
+ * Proxy-Authorization（127.0.0.1 侧永远无认证），需要时注入桥自己的
+ * Proxy-Authorization。
+ */
+function buildHttpProxyForwardHead(requestLine: string, headerLines: string[], cfg: Socks5Config): string {
+  const out: string[] = [requestLine];
+  for (let i = 0; i < headerLines.length; i++) {
+    const h = headerLines[i];
+    if (!h) {
+      continue;
+    }
+    if (/^proxy-connection:/i.test(h) || /^proxy-authorization:/i.test(h)) {
+      continue;
+    }
+    out.push(h);
+  }
+  if (cfg.username.length > 0) {
+    out.push(proxyAuthorizationLine(cfg));
+  }
+  return out.join(CRLF) + CRLF + CRLF;
 }
 
 /**
@@ -690,7 +919,9 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
           // handshake stalls until timeout.
           const early = raw.subarray(headerEnd + 4).slice();
           try {
-            const tunnel = await openSocksTunnel(cfg, addr);
+            const tunnel = cfg.upstreamKind === 'http'
+              ? await openHttpTunnel(cfg, addr)
+              : await openSocksTunnel(cfg, addr);
             await sendRaw(conn, encodeText('HTTP/1.1 200 Connection Established' + CRLF + CRLF));
             if (early.length > 0) {
               await tunnel.sock.send({ data: early.buffer });
@@ -719,16 +950,28 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
         const isHttps = target.toLowerCase().startsWith('https:');
         const port = urlMatch[2] ? parseInt(urlMatch[2], 10) : (isHttps ? 443 : 80);
         const pathAndQuery = (urlMatch[3] || '/') + (urlMatch[4] || '');
-        const addr: Socks5Target = parseAuthority(`${host}:${port}`) ?? { host, port, isDomain: true };
         const body = raw.subarray(headerEnd + 4).slice().buffer;
         try {
-          const tunnel = await openSocksTunnel(cfg, addr);
-          const head = buildForwardHead(requestLine, headLines.slice(1), pathAndQuery);
-          await tunnel.sock.send({ data: encodeText(head) });
-          if (body.byteLength > 0) {
-            await tunnel.sock.send({ data: body });
+          if (cfg.upstreamKind === 'http') {
+            // HTTP 上游：absolute-form 请求行原样转发（代理自行解析目标），
+            // 仅注入桥的 Proxy-Authorization，无需先建 CONNECT 隧道。
+            const tunnel = await openHttpPlain(cfg);
+            const head = buildHttpProxyForwardHead(requestLine, headLines.slice(1), cfg);
+            await tunnel.sock.send({ data: encodeText(head) });
+            if (body.byteLength > 0) {
+              await tunnel.sock.send({ data: body });
+            }
+            pipeConnections(conn, tunnel.sock, tunnel.reader);
+          } else {
+            const addr: Socks5Target = parseAuthority(`${host}:${port}`) ?? { host, port, isDomain: true };
+            const tunnel = await openSocksTunnel(cfg, addr);
+            const head = buildForwardHead(requestLine, headLines.slice(1), pathAndQuery);
+            await tunnel.sock.send({ data: encodeText(head) });
+            if (body.byteLength > 0) {
+              await tunnel.sock.send({ data: body });
+            }
+            pipeConnections(conn, tunnel.sock, tunnel.reader);
           }
-          pipeConnections(conn, tunnel.sock, tunnel.reader);
         } catch (e) {
           logger.warn(TAG, `forward ${target} failed: ${describeErr(e)}`);
           await sendRaw(conn, encodeText('HTTP/1.1 502 Bad Gateway' + CRLF + 'Connection: close' + CRLF + CRLF));
@@ -755,7 +998,7 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
 }
 
 /**
- * Loopback HTTP CONNECT bridge → SOCKS5.
+ * Loopback egress 桥（127.0.0.1 微型 HTTP 代理 → socks5 或带认证的 http 上游）。
  *
  * ArkWeb ProxyController / RCP / MPV(FFmpeg http_proxy env) / app 级代理的
  * 消费方都只能说 HTTP 代理，所以用户选 SOCKS5 时本桥在 127.0.0.1 暴露一个
@@ -764,6 +1007,12 @@ function handleConnection(conn: socket.TCPSocketConnection, cfg: Socks5Config): 
  * 不再使用 netstack 的 socket.ProxyTypes.SOCKS5——该实现在部分系统版本上
  * （如 7.0.0.105）能建通隧道但会损毁/重置字节流。认证信息只留在桥上，
  * 127.0.0.1 侧永远无认证。
+ *
+ * HTTP 上游模式（upstreamKind='http'）服务于带用户名/密码的 HTTP 代理：
+ * ArkWeb insertProxyRule 不支持 userinfo，带认证时 ArkWeb 也走本桥——CONNECT
+ * 翻译成上游 HTTP 代理的 CONNECT + Proxy-Authorization: Basic（2xx 才通，
+ * 407 抛 HttpUpstreamError.authFailed 不重试）；absolute-URI 普通请求则保持
+ * absolute-form 原样转发并注入同一认证头。socks5 模式行为不变。
  *
  * Self-heal: a listening server that reports an 'error' event is torn down and
  * re-listened with the same config, up to MAX_SELF_HEAL_RESTARTS times with a
@@ -806,7 +1055,8 @@ export class Socks5Bridge {
   private portChangeListener?: Socks5BridgePortChangeListener;
   private static readonly MAX_SELF_HEAL_RESTARTS: number = 3;
 
-  async start(host: string, port: number, username: string, password: string): Promise<boolean> {
+  async start(host: string, port: number, username: string, password: string,
+    upstreamKind: 'socks5' | 'http' = 'socks5'): Promise<boolean> {
     const h = (host || '').trim();
     const p = Number(port);
     if (!h || !(Number.isFinite(p) && p > 0 && p <= 65535)) {
@@ -817,11 +1067,18 @@ export class Socks5Bridge {
       && this.config.host === h
       && this.config.port === p
       && this.config.username === (username || '')
-      && this.config.password === (password || '')) {
+      && this.config.password === (password || '')
+      && this.config.upstreamKind === upstreamKind) {
       return true;
     }
     this.stop();
-    const cfg: Socks5Config = { host: h, port: p, username: username || '', password: password || '' };
+    const cfg: Socks5Config = {
+      host: h,
+      port: p,
+      username: username || '',
+      password: password || '',
+      upstreamKind
+    };
     this.selfHealAttempts = 0;
     const gen = this.generation;
     return this.listenOnce(cfg, gen);
@@ -860,7 +1117,7 @@ export class Socks5Bridge {
         this.lastKnownGoodPort = this.localPort;
       }
       this.running = true;
-      logger.info(TAG + ` started localPort=${this.localPort} socks5=${cfg.host}:${cfg.port} auth=${cfg.username.length > 0}`);
+      logger.info(TAG + ` started localPort=${this.localPort} upstream=${cfg.upstreamKind}://${cfg.host}:${cfg.port} auth=${cfg.username.length > 0}`);
       server.on('connect', (conn: socket.TCPSocketConnection) => {
         handleConnection(conn, cfg).catch((e: Error) => logger.warn(TAG + ` conn error: ${describeErr(e)}`));
       });

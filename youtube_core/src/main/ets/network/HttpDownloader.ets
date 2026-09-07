@@ -168,6 +168,10 @@ export class HttpError extends Error {
           const result: ErrorAnalysisResult = { errorType: HttpErrorType.NOT_FOUND, isRecoverable: false };
           return result;
         }
+        case 407: {
+          const result: ErrorAnalysisResult = { errorType: HttpErrorType.PROXY_AUTH_REQUIRED, isRecoverable: false };
+          return result;
+        }
         case 408: {
           const result: ErrorAnalysisResult = { errorType: HttpErrorType.TIMEOUT, isRecoverable: true };
           return result;
@@ -219,6 +223,7 @@ export class HttpError extends Error {
       [HttpErrorType.BAD_REQUEST]: 'Bad request format',
       [HttpErrorType.FORBIDDEN]: 'Access denied (403), IP may be blocked or link expired',
       [HttpErrorType.NOT_FOUND]: 'Resource not found (404)',
+      [HttpErrorType.PROXY_AUTH_REQUIRED]: 'Proxy authentication failed (407), please check the proxy username and password',
       [HttpErrorType.TIMEOUT]: 'Request timeout (408)',
       [HttpErrorType.RANGE_NOT_SATISFIABLE]: 'Invalid request range (416)',
       [HttpErrorType.TOO_MANY_REQUESTS]: 'Too many requests, please try again later (429)',
@@ -263,6 +268,7 @@ export enum HttpErrorType {
   BAD_REQUEST = 'BAD_REQUEST',           // 400
   FORBIDDEN = 'FORBIDDEN',               // 401, 403
   NOT_FOUND = 'NOT_FOUND',               // 404
+  PROXY_AUTH_REQUIRED = 'PROXY_AUTH_REQUIRED',  // 407 代理认证失败（凭据错误，重试无意义）
   TIMEOUT = 'TIMEOUT',                   // 408
   RANGE_NOT_SATISFIABLE = 'RANGE_NOT_SATISFIABLE',  // 416
   TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',  // 429
@@ -310,6 +316,25 @@ export class HttpDownloader {
 
   static setSetCookieObserver(obs?: SetCookieObserver): void {
     HttpDownloader.setCookieObserver = obs;
+  }
+
+  /**
+   * Wrap a netstack BusinessError into HttpError. HTTPS proxy auth failures
+   * surface as a thrown curl-style error (CURLE_RECV_ERROR → 2300056) with no
+   * response object. Some netstack versions include "407" in the message —
+   * map those to responseCode 407 so analyzeErrorType yields
+   * PROXY_AUTH_REQUIRED (non-recoverable, no pointless credential retries).
+   * Current netstack sanitizes the message to "Failed to receive data from
+   * the peer", so precise auth-failure detection lives in the Options proxy
+   * test's plain-HTTP probe instead; do NOT map bare 2300056 here — a proxy
+   * dropping the CONNECT would be misreported as an auth failure.
+   */
+  private static fromNetworkError(err: BusinessError, url: string, method: string): HttpError {
+    const message = err.message || 'Network error';
+    if (message.includes('407')) {
+      return new HttpError(message, url, method, 407);
+    }
+    return new HttpError(message, url, method);
   }
 
   /** 拿到响应即通知（不看状态码）；观察者抛错只记日志，不影响请求链路。 */
@@ -491,6 +516,7 @@ export class HttpDownloader {
             case 401: statusMessage = 'Unauthorized'; break;
             case 403: statusMessage = 'Forbidden'; break;
             case 404: statusMessage = 'Not Found'; break;
+            case 407: statusMessage = 'Proxy Authentication Required (proxy authentication failed)'; break;
             case 408: statusMessage = 'Request Timeout'; break;
             case 416: statusMessage = 'Range Not Satisfiable'; break;
             case 429: statusMessage = 'Too Many Requests'; break;
@@ -532,16 +558,9 @@ export class HttpDownloader {
         }
 
         const businessError = err as BusinessError;
-        
-        // 网络层错误（连接失败、超时等）
-        const httpError = new HttpError(
-          businessError.message || 'Network error',
-          url,
-          method,
-          undefined,
-          undefined,
-          undefined
-        );
+
+        // 网络层错误（连接失败、超时、CONNECT 阶段代理 407 等）
+        const httpError = HttpDownloader.fromNetworkError(businessError, url, method);
 
         lastError = httpError;
 
@@ -716,7 +735,7 @@ export class HttpDownloader {
           throw err;
         }
         const businessError = err as BusinessError;
-        lastError = new HttpError(businessError.message || 'Network error', url, 'POST');
+        lastError = HttpDownloader.fromNetworkError(businessError, url, 'POST');
         if (lastError.isRecoverable && attempt < HttpDownloader.MAX_RETRIES) {
           if (abortToken?.aborted) {
             throw new HttpError('request aborted', url, 'POST');

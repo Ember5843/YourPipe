@@ -148,9 +148,10 @@ mediaservice/src/main/ets/
   `127.0.0.1,localhost` so the loopback proxy stays direct). The vendored
   libmpv has **no** `network-proxy` property — do not reintroduce that
   `setProperty` call. The env is only written at `load()`; when the socks5
-  bridge self-heals onto a new ephemeral port,
+  bridge self-heals onto a new ephemeral port, or when entry finishes
+  applying a new proxy config,
   `MpvPlaybackEngine.refreshNetworkProxy()` re-applies it for the current
-  source (wired from entry's bridge port-change hook via
+  source (wired from entry's bridge port-change / apply hooks via
   `AvPlayerController.refreshNetworkProxy`).
 
 ## 4. Local proxy architecture
@@ -176,7 +177,9 @@ for which RCP streaming has been 403-prone on range probes — use buffered
 `@ohos.net.http` GET. Connect timeout is 10s (PipePipe OkHttp parity); transfer/read stays 30s
 (RCP `transferMs` covers the whole stream). YouTube streaming fetches share a
 long-lived RCP session per proxy session via `RcpSessionPool` (key =
-`sessionId|proxy-fingerprint`, LRU cap 32 — far below the system 1024-session
+`sessionId|proxy-fingerprint`; the fingerprint covers host/port/username plus
+a weak hash of the password so a password-only change also rekeys. LRU cap 32
+— far below the system 1024-session
 limit; evict/destroy closes sessions, wired into `wireSessionCancel`), so the
 API-24 `connectOnly` pre-connect fired at source commit
 (`LocalProxyServer.createSession` / `addPreparedSession` →

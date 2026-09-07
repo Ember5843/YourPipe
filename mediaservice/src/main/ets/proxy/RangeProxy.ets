@@ -263,7 +263,10 @@ function createYoutubePostSession(url: string): rcp.Session {
 /**
  * Fingerprint of the app-proxy decision for a URL, folded into the pooled
  * RCP session key so a proxy-config change lands on a fresh session instead
- * of reusing one built with stale proxy settings.
+ * of reusing one built with stale proxy settings. The password enters as a
+ * weak hash only: a password-only change must still rekey the session (the
+ * pooled session would otherwise keep sending the old credentials and 407),
+ * but raw credentials never appear in key material that may be logged.
  */
 function rcpProxyFingerprint(rawUrl: string): string {
   const snap = HttpProxyOptions.getSnapshot();
@@ -271,12 +274,21 @@ function rcpProxyFingerprint(rawUrl: string): string {
     return 'direct';
   }
   if (snap.kind === 'socks5') {
-    return `socks5:${snap.socks5LocalPort ?? 0}`;
+    return `socks5:${snap.socks5LocalPort ?? 0}:${weakHash(snap.username)}:${weakHash(snap.password)}`;
   }
   if (snap.kind === 'http') {
-    return `http:${snap.host.trim()}:${snap.port}:${snap.username}`;
+    return `http:${snap.host.trim()}:${snap.port}:${snap.username}:${weakHash(snap.password)}`;
   }
   return 'direct';
+}
+
+/** 非加密指纹，仅供会话 key 区分凭据变化；绝不是安全用途。 */
+function weakHash(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
 }
 
 function uaKind(resource: StreamResource): string {

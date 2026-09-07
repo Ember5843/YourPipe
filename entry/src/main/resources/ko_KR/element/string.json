@@ -3145,6 +3145,10 @@
             "value": "예기치 않은 HTTP 상태"
         },
         {
+            "name": "yt_proxy_test_auth_failed",
+            "value": "프록시 인증에 실패했습니다 — 사용자 이름과 비밀번호를 확인하세요"
+        },
+        {
             "name": "yt_proxy_test_disabled",
             "value": "먼저 프록시를 활성화하세요"
         },

@@ -249,7 +249,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       }
       setHttpProxyEnv(proxyUrl);
       if (proxyUrl.length > 0) {
-        Logger.info(TAG, `http_proxy env on kind=${snap.kind} url=${proxyUrl.length > 8 ? proxyUrl.substring(0, 8) + '***' : proxyUrl}`);
+        // 凭据绝不落日志：只记 kind / 上游 host:port / 是否带认证。
+        Logger.info(TAG, `http_proxy env on kind=${snap.kind} target=${snap.host.trim()}:${snap.port} auth=${snap.username.length > 0}`);
       }
     } catch (e) {
       Logger.warn(TAG, `applyNetworkProxy failed: ${e instanceof Error ? e.message : String(e)}`);

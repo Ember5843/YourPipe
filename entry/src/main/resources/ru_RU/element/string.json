@@ -3145,6 +3145,10 @@
             "value": "Unexpected HTTP status"
         },
         {
+            "name": "yt_proxy_test_auth_failed",
+            "value": "Ошибка аутентификации прокси — проверьте имя пользователя и пароль"
+        },
+        {
             "name": "yt_proxy_test_disabled",
             "value": "Enable proxy first"
         },

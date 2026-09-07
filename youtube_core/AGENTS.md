@@ -74,7 +74,7 @@ youtube_core/src/main/
       HttpDownloader.ets
       CookieJar.ets
       HttpProxyOptions.ets             — injected from entry NetworkProxyConfig
-      Socks5Bridge.ets                 — loopback HTTP CONNECT bridge → SOCKS5
+      Socks5Bridge.ets                 — loopback egress bridge → SOCKS5 / credentialed HTTP upstream
     service/
       YoutubeApi.ets
     model/
@@ -384,7 +384,8 @@ Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
   and a FINAL_RESPONSE interceptor fires the Set-Cookie observer.
   Interceptors do NOT apply to `requestInStream`, so
   `postBinary`/`postBinaryStreamOnce` keep the manual observer call.
-- `Socks5Bridge` — loopback HTTP CONNECT bridge → SOCKS5. As of API 26 the
+- `Socks5Bridge` — loopback egress bridge (127.0.0.1 micro HTTP proxy →
+  socks5 or credentialed-http upstream). As of API 26 the
   netstack paths (`HttpDownloader.applyProxyToOptions`, incl. the PipePipe
   decoder calls) no longer use it: they set
   `HttpRequestOptions.usingSocks5Proxy` with the real upstream proxy
@@ -398,9 +399,16 @@ Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
   it must NOT go back to netstack's socket-level `socket.ProxyTypes.SOCKS5`:
   that layer establishes the tunnel yet corrupts/resets the byte stream (TLS
   fatal alert / CONN_RESET through the tunnel; netstack logs "remove socks5
-  udp header failed"). Self-heals: a server `error` event schedules bounded
+  udp header failed"). HTTP-upstream mode (`start(..., 'http')`) serves
+  credentialed HTTP proxies for ArkWeb (`insertProxyRule` accepts no
+  userinfo): CONNECT is translated into an upstream `CONNECT` +
+  `Proxy-Authorization: Basic` (bounded 8KB head read, 2xx required, a 407
+  throws `HttpUpstreamError` with `authFailed=true` and is never retried),
+  and absolute-URI plain requests are forwarded in absolute-form with the
+  same injected auth header. Self-heals: a server `error` event schedules bounded
   re-listens (1s/2s/4s, generation-guarded); tunnel connects retry once
-  except for handshake auth failures (`SocksHandshakeError.authFailed`). `getPort()` reports a
+  except for handshake auth failures (`SocksHandshakeError.authFailed` /
+  `HttpUpstreamError.authFailed`). `getPort()` reports a
   last-known-good port: it is NOT cleared during the self-heal re-listen
   window, so proxy consumers keep routing at the dead loopback port and fail
   fast (connect-refused) instead of silently going direct. When self-heal

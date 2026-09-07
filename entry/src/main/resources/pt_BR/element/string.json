@@ -3145,6 +3145,10 @@
             "value": "Status HTTP inesperado"
         },
         {
+            "name": "yt_proxy_test_auth_failed",
+            "value": "Falha na autenticação do proxy — verifique o nome de usuário e a senha"
+        },
+        {
             "name": "yt_proxy_test_disabled",
             "value": "Ative o proxy primeiro"
         },

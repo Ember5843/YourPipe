@@ -80,10 +80,24 @@ Persistent state and shared singletons:
   (registered by `PlayerSession`) to re-apply MPV's process-level
   `http_proxy` env for the current source — the env is written only at
   `load()` and would otherwise keep hitting the dead port
-  (`AvPlayerController.refreshNetworkProxy`). On fuse-blown the `setFailureListener` hook
+  (`AvPlayerController.refreshNetworkProxy`). The same repoint hook also
+  fires at the end of every `applyInternal`, so mid-playback proxy config
+  changes (kind/host/auth/off) refresh MPV's env without waiting for the
+  next load. On fuse-blown the `setFailureListener` hook
   logs an ERROR and toasts `yt_proxy_bridge_unavailable`; no
   auto-restart — a user re-save re-applies and resets the fuse. The WebView
   override has **no** direct-fallback rules — a dead proxy fails visibly.
+  HTTP **with username/password** also uses the bridge for ArkWeb and the
+  app-level proxy
+  (HTTP-upstream mode — `insertProxyRule` accepts no userinfo and the ArkUI
+  Image fetcher does not answer proxy 407 challenges, so the bridge injects
+  `Proxy-Authorization: Basic` upstream and both point at the loopback
+  bridge, whose local side is auth-free); only the
+  `HttpProxyOptions` snapshot stays native credentialed, and a bridge start
+  failure removes the WebView override and clears the app proxy (fail
+  visible, never silent
+  direct). Unauthenticated HTTP needs no bridge and talks to the upstream
+  natively everywhere.
 - `NetworkHandoverService` — network-handover adaptation. Single
   subscription site (`connection` default-network `netAvailable` /
   `netUnavailable` events; the SDK kit set has no NetworkBoostKit

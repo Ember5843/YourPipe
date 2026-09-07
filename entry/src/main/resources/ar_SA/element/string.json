@@ -3145,6 +3145,10 @@
             "value": "Unexpected HTTP status"
         },
         {
+            "name": "yt_proxy_test_auth_failed",
+            "value": "فشل مصادقة الوكيل — تحقق من اسم المستخدم وكلمة المرور"
+        },
+        {
             "name": "yt_proxy_test_disabled",
             "value": "Enable proxy first"
         },

@@ -253,6 +253,20 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `setHttpProxyEnv`). ArkWeb / RCP / MPV route SOCKS5 through the
   self-healing loopback CONNECT bridge `Socks5Bridge`, so the bridge must
   run whenever socks5 is configured even though netstack no longer uses it.
+  An HTTP proxy with username/password auth routes **ArkWeb and the
+  app-level `setAppHttpProxy`** through
+  the same bridge in HTTP-upstream mode (the bridge injects
+  `Proxy-Authorization: Basic` towards the upstream — ArkWeb
+  `insertProxyRule` accepts no userinfo, and the ArkUI Image fetcher does
+  not answer proxy 407 challenges, so both need the bridge's auth-free
+  loopback side); only the netstack request snapshot keeps the native
+  credentialed fields. Unauthenticated HTTP stays native everywhere.
+  Proxy-side 407 is
+  typed (`HttpErrorType.PROXY_AUTH_REQUIRED`, non-recoverable). Netstack
+  throws CONNECT-phase 407s as a sanitized generic receive error
+  (2300056, no "407" in the message), so the Options proxy test
+  distinguishes auth failure with a follow-up plain-HTTP probe through the
+  same proxy (407 returns as a normal response code there).
   The ArkWeb override has no direct-fallback rules — a failing proxy must
   fail, not silently go direct. Loopback stays direct. Startup prewarm
   chains gate on `NetworkProxyConfig.awaitReady()` so a proxy user's first

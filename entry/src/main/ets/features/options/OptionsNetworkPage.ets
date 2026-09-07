@@ -45,6 +45,38 @@ export struct OptionsNetworkPage {
     ];
   }
 
+  /**
+   * 二次探测：HTTPS 经代理时 407 发生在 CONNECT 阶段，netstack 只抛通用接收
+   * 错误（实测 code=2300056 "Failed to receive data from the peer"，消息不含
+   * 407），无法区分"密码错了"和"代理挂了"。带认证的 HTTP 代理追加一个纯
+   * HTTP 请求——absolute-form 路径下 407 会作为正常响应码返回，可精确判定。
+   */
+  private async probeHttpProxyAuthFailure(): Promise<boolean> {
+    if (this.networkProxyConfig.kind !== 'http' || this.networkProxyConfig.username.length === 0) {
+      return false;
+    }
+    const probeUrl = 'http://www.gstatic.com/generate_204';
+    const req = http.createHttp();
+    try {
+      const options: http.HttpRequestOptions = {
+        method: http.RequestMethod.GET,
+        connectTimeout: 8000,
+        readTimeout: 8000,
+        usingCache: false
+      };
+      HttpDownloader.applyProxyToOptions(options, probeUrl);
+      const response = await req.request(probeUrl, options);
+      logger.info(`proxy auth probe status=${response.responseCode}`);
+      return response.responseCode === 407;
+    } catch (e) {
+      const err = e as BusinessError;
+      logger.warn(`proxy auth probe failed: code=${err.code} msg=${err.message}`);
+      return false;
+    } finally {
+      req.destroy();
+    }
+  }
+
   private async runProxyTest(): Promise<void> {
     if (this.testing) {
       return;
@@ -78,13 +110,20 @@ export struct OptionsNetworkPage {
       logger.info(`proxy test status=${response.responseCode} elapsed=${elapsed}ms`);
       if (response.responseCode >= 200 && response.responseCode < 400) {
         this.testMessage = $r('app.string.yt_proxy_test_ok');
+      } else if (response.responseCode === 407) {
+        this.testMessage = $r('app.string.yt_proxy_test_auth_failed');
       } else {
         this.testMessage = $r('app.string.yt_proxy_test_http_error');
       }
     } catch (e) {
       const err = e as BusinessError;
       logger.warn(`proxy test failed: code=${err.code} msg=${err.message}`);
-      this.testMessage = $r('app.string.yt_proxy_test_failed');
+      const msg = err.message || '';
+      if (msg.includes('407') || await this.probeHttpProxyAuthFailure()) {
+        this.testMessage = $r('app.string.yt_proxy_test_auth_failed');
+      } else {
+        this.testMessage = $r('app.string.yt_proxy_test_failed');
+      }
     } finally {
       req.destroy();
       this.testing = false;
@@ -109,6 +148,7 @@ export struct OptionsNetworkPage {
               transparentBackground: true,
               onChange: (val: boolean) => {
                 this.networkProxyConfig.enabled = val;
+                this.testMessage = '';
                 this.persist();
               }
             })
@@ -128,6 +168,7 @@ export struct OptionsNetworkPage {
               transparentBackground: true,
               onChange: (index: number) => {
                 this.networkProxyConfig.kind = index === 1 ? 'socks5' : 'http';
+                this.testMessage = '';
                 this.persist();
               }
             })
@@ -156,6 +197,7 @@ export struct OptionsNetworkPage {
               .backgroundColor(Color.Transparent)
               .onChange((v: string) => {
                 this.networkProxyConfig.host = v.trim();
+                this.testMessage = '';
               })
               .onSubmit(() => {
                 this.persist();
@@ -179,6 +221,7 @@ export struct OptionsNetworkPage {
                 if (Number.isFinite(n)) {
                   this.networkProxyConfig.port = Math.max(1, Math.min(65535, n));
                 }
+                this.testMessage = '';
               })
               .onSubmit(() => {
                 this.persist();
@@ -209,6 +252,7 @@ export struct OptionsNetworkPage {
               .backgroundColor(Color.Transparent)
               .onChange((v: string) => {
                 this.networkProxyConfig.username = v;
+                this.testMessage = '';
               })
               .onSubmit(() => {
                 this.persist();
@@ -229,6 +273,7 @@ export struct OptionsNetworkPage {
               .backgroundColor(Color.Transparent)
               .onChange((v: string) => {
                 this.networkProxyConfig.password = v;
+                this.testMessage = '';
               })
               .onSubmit(() => {
                 this.persist();

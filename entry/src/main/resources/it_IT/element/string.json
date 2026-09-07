@@ -3145,6 +3145,10 @@
             "value": "Stato HTTP imprevisto"
         },
         {
+            "name": "yt_proxy_test_auth_failed",
+            "value": "Autenticazione proxy non riuscita — controlla nome utente e password"
+        },
+        {
             "name": "yt_proxy_test_disabled",
             "value": "Abilita prima il proxy"
         },

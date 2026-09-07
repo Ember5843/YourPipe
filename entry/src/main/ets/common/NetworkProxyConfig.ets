@@ -170,14 +170,27 @@ export class NetworkProxyConfig {
   private static bridgeListenersRegistered: boolean = false;
 
   /**
-   * 桥自愈换端口后的额外动作（单槽）。PlayerSession 注册它来刷新 MPV 的
-   * http_proxy 进程 env——env 只在 load() 时写入，不随 provider 快照惰性更新，
-   * 不刷新会让进行中的直播直连抓取继续打死掉的旧端口。
+   * 代理落地后的 MPV env 刷新钩子（单槽）。PlayerSession 注册它来重刷 MPV 的
+   * http_proxy 进程 env——env 只在 load() 时写入，不随 provider 快照惰性更新。
+   * 两个触发点：桥自愈换端口（onBridgePortChanged，仅 socks5——http+认证的
+   * MPV env 内嵌真实上游，与桥端口无关），以及每次 applyInternal 完成
+   * （fireRepointListener），覆盖播放中改 host/认证/类型/关闭代理的场景。
    */
   private static bridgeRepointListener?: () => void;
 
   static setBridgeRepointListener(listener?: () => void): void {
     NetworkProxyConfig.bridgeRepointListener = listener;
+  }
+
+  private static fireRepointListener(): void {
+    const repointListener = NetworkProxyConfig.bridgeRepointListener;
+    if (repointListener) {
+      try {
+        repointListener();
+      } catch (e) {
+        logger.warn(`bridge repoint listener failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
   }
 
   /**
@@ -204,7 +217,14 @@ export class NetworkProxyConfig {
    * app proxy; the setting is applied best-effort. On bridge failure/stop the
    * app proxy is cleared (no silent direct half-configured state).
    * The app-level system proxy stays HTTP-only and carries the user proxy
-   * directly for kind==='http'.
+   * directly for unauthenticated kind==='http'. HTTP with credentials starts
+   * the same bridge in HTTP-upstream mode and points BOTH the WebView override
+   * and the app-level proxy at 127.0.0.1:{bridgePort} (insertProxyRule does
+   * not accept userinfo, and the ArkUI Image fetcher does not answer proxy 407
+   * challenges — the bridge's loopback side is auth-free, so thumbnails work);
+   * only the netstack request snapshot (HttpProxyOptions) keeps the native
+   * credentialed fields. A bridge start failure removes the WebView override
+   * and clears the app proxy — fail visible, never silent direct.
    */
   static applySystemAndProviders(cfg: NetworkProxyConfig): Promise<void> {
     NetworkProxyConfig.ensureBridgeListeners();
@@ -223,10 +243,11 @@ export class NetworkProxyConfig {
   }
 
   /**
-   * Register the single-slot socks5Bridge listeners exactly once. Port change:
-   * a self-heal re-listen lands on a NEW ephemeral port, so the app-level proxy
-   * and the ArkWeb override (pointed at the old port by applyInternal) must be
-   * re-pointed — only those two pieces, never a full re-apply (that would
+   * Register the single-slot socks5Bridge listeners exactly once (the bridge
+   * serves both socks5 and credentialed-http configs). Port change:
+   * a self-heal re-listen lands on a NEW ephemeral port, so the ArkWeb override
+   * and the app-level proxy (both pointed at the old port by applyInternal)
+   * must be re-pointed. Never a full re-apply (that would
    * restart the bridge). Fuse blown: log an ERROR and surface a toast; no
    * auto-restart — a user re-save re-applies the config and resets the fuse.
    */
@@ -239,30 +260,36 @@ export class NetworkProxyConfig {
     socks5Bridge.setFailureListener((reason: string) => NetworkProxyConfig.onBridgeFuseBlown(reason));
   }
 
+  /** 当前配置是否经 loopback 桥 egress（socks5，或带用户名认证的 http）。 */
+  private static cfgUsesBridge(cfg: NetworkProxyConfig): boolean {
+    return cfg.kind === 'socks5' || (cfg.kind === 'http' && (cfg.username || '').length > 0);
+  }
+
   private static onBridgePortChanged(port: number): void {
     const cfg = NetworkProxyConfig.lastAppliedCfg;
-    if (!cfg || !cfg.isReady() || cfg.kind !== 'socks5' || !socks5Bridge.isRunning()) {
-      logger.warn(`socks5 bridge port change to ${port} ignored (socks5 no longer the active config)`);
+    if (!cfg || !cfg.isReady() || !NetworkProxyConfig.cfgUsesBridge(cfg) || !socks5Bridge.isRunning()) {
+      logger.warn(`bridge port change to ${port} ignored (bridge no longer the active config)`);
       return;
     }
-    logger.info(`socks5 bridge re-listened on new port=${port}, re-pointing app/webview proxy`);
+    logger.info(`bridge re-listened on new port=${port}, re-pointing webview/app proxy`);
     // HttpProxyOptions needs no update: the installed provider reads
     // socks5Bridge.getPort() lazily per snapshot, so downloaders/RangeProxy
-    // follow the new port on their own. MPV's process env was written at
-    // load() and must be re-applied explicitly via the repoint listener.
+    // follow the new port on their own.
     NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
+    // Both bridge-backed modes point the app-level proxy at the bridge, so it
+    // must follow the new port. (For credentialed http this is what lets ArkUI
+    // Image thumbnails work — the Image fetcher does not answer proxy 407
+    // challenges, while the loopback side of the bridge is auth-free.)
     NetworkProxyConfig.setAppProxy({
       host: '127.0.0.1',
       port: port,
       exclusionList: HttpProxyOptions.defaultExclusions()
-    } as connection.HttpProxy, `app http proxy re-applied on socks5 bridge port=${port}`);
-    const repointListener = NetworkProxyConfig.bridgeRepointListener;
-    if (repointListener) {
-      try {
-        repointListener();
-      } catch (e) {
-        logger.warn(`bridge repoint listener failed: ${e instanceof Error ? e.message : String(e)}`);
-      }
+    } as connection.HttpProxy, `app http proxy re-applied on bridge port=${port}`);
+    if (cfg.kind === 'socks5') {
+      // MPV's process env was written at load() pointing at the bridge and must
+      // be re-applied explicitly. Credentialed-http MPV env embeds the real
+      // upstream with userinfo instead, so it does not depend on the port.
+      NetworkProxyConfig.fireRepointListener();
     }
   }
 
@@ -305,21 +332,44 @@ export class NetworkProxyConfig {
         NetworkProxyConfig.clearAppProxy();
       }
     } else if (cfg.isReady() && cfg.kind === 'http') {
-      socks5Bridge.stop();
-      const auth = cfg.username && cfg.username.length > 0
-        ? `${encodeURIComponent(cfg.username)}:${encodeURIComponent(cfg.password || '')}@`
-        : '';
-      NetworkProxyConfig.applyWebViewProxy(`http://${auth}${cfg.host.trim()}:${cfg.port}`);
-      const proxy: connection.HttpProxy = {
-        host: cfg.host.trim(),
-        port: cfg.port,
-        exclusionList: HttpProxyOptions.defaultExclusions()
-      };
       if (cfg.username && cfg.username.length > 0) {
-        proxy.username = cfg.username;
-        proxy.password = cfg.password || '';
+        // ArkWeb insertProxyRule 只支持 [scheme://]host[:port]，不接受 userinfo；
+        // ArkUI Image 的 fetcher 同样不会应答代理 407 质询。带认证时 WebView
+        // override 和 app 级代理都指向 loopback 桥（桥向上游注入 Basic 认证，
+        // 127.0.0.1 侧免认证），netstack 请求快照（HttpProxyOptions）保持原生
+        // 带凭据字段，不随桥走。
+        NetworkProxyConfig.removeWebViewProxy();
+        const ok: boolean = await socks5Bridge.start(cfg.host.trim(), cfg.port, cfg.username, cfg.password || '', 'http')
+          .catch((e: Error) => {
+            logger.warn(`http proxy bridge start failed: ${e.message}`);
+            return false;
+          });
+        const bridgePort = socks5Bridge.getPort();
+        logger.info(`http proxy bridge start ok=${ok} localPort=${bridgePort}`);
+        if (ok && bridgePort > 0) {
+          NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${bridgePort}`);
+          NetworkProxyConfig.setAppProxy({
+            host: '127.0.0.1',
+            port: bridgePort,
+            exclusionList: HttpProxyOptions.defaultExclusions()
+          } as connection.HttpProxy, `app http proxy on http-auth bridge port=${bridgePort}`);
+        } else {
+          // 桥不可用时不留指向死端口的 override，也不装 direct 规则——WebView
+          // 明确失败，绝不静默直连。app 级代理同样清掉（与 socks5 失败路径一致）。
+          NetworkProxyConfig.removeWebViewProxy();
+          NetworkProxyConfig.clearAppProxy();
+          logger.error('http proxy bridge unavailable; WebView override and app proxy removed (no silent direct fallback)');
+        }
+      } else {
+        socks5Bridge.stop();
+        NetworkProxyConfig.applyWebViewProxy(`http://${cfg.host.trim()}:${cfg.port}`);
+        const proxy: connection.HttpProxy = {
+          host: cfg.host.trim(),
+          port: cfg.port,
+          exclusionList: HttpProxyOptions.defaultExclusions()
+        };
+        NetworkProxyConfig.setAppProxy(proxy, `app http proxy on host=${cfg.host.trim()} port=${cfg.port}`);
       }
-      NetworkProxyConfig.setAppProxy(proxy, `app http proxy on host=${cfg.host.trim()} port=${cfg.port}`);
     } else {
       socks5Bridge.stop();
       NetworkProxyConfig.removeWebViewProxy();
@@ -328,5 +378,9 @@ export class NetworkProxyConfig {
 
     HttpProxyOptions.setProvider((): AppHttpProxySnapshot => cfg.toSnapshot());
     NetworkProxyConfig.lastAppliedCfg = cfg;
+    // MPV 的 http_proxy 进程 env 只在 load() 写入：配置落地后立刻为当前源重刷，
+    // 否则播放中的直连抓取（直播 HLS）会继续用旧代理直到下一次 load。
+    // 无加载源时 refreshNetworkProxy 自身 no-op。
+    NetworkProxyConfig.fireRepointListener();
   }
 }
