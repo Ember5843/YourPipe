@@ -83,6 +83,10 @@ export class PlayerSession {
   private _pipHandoffPending: boolean = false;
   private _pipRestoring: boolean = false;
   private _explicitPageCloseHandled: boolean = false;
+  /** 播放链路已被拆除（release/closeForNavigation/forceReset 的 resetSession 链路）：
+   *  在 beginPrepare 武装新播放之前，队列驱动的切换（自动连播/分页续播）必须拒绝，
+   *  否则用户退出后会把新视频拉起到已销毁的页面之外（悬空播放器）。 */
+  private _playbackTornDown: boolean = false;
   /**
    * 会话级「仅音频」：关视频轨 + 页内封面层。
    * 不写 Preferences；release / forceReset 时清除。
@@ -262,6 +266,14 @@ export class PlayerSession {
     return this._isAudioOnlyMode;
   }
 
+  /**
+   * 是否有在飞的播放链路（流提取 / 源提交）：返回键 PiP 判定用。
+   * 切集中状态机是 IDLE，但用户语义上"正在换片继续看"，应放行小窗。
+   */
+  get hasInFlightPlayback(): boolean {
+    return this._preparePromise !== null || this._activePlayPromise !== null;
+  }
+
   get sleepTimerRemainingMinutes(): number {
     if (this._sleepTimerEndsAt <= Date.now()) {
       return 0;
@@ -399,6 +411,8 @@ export class PlayerSession {
   beginPrepare(video: VideoItem): void {
     const videoId = video.videoId || YOUTUBE_VIDEO_ID;
     if (!videoId) return;
+    // 显式的播放准备意图解除「已拆除」标记（外部打开/重试/换片都经此武装）。
+    this._playbackTornDown = false;
     const generation = this._playGeneration;
     if (this._preparePromise
       && this._prepareVideoId === videoId
@@ -512,6 +526,12 @@ export class PlayerSession {
   private _lastAutoAdvanceFromVideoId: string = '';
 
   private onPlaybackEnded = (): void => {
+    // 无当前视频 = 会话已被 release/forceReset 拆除（或中止加载后的迟到事件）：
+    // 绝不自动连播，否则页面销毁后会把下一个视频重新拉起来，形成悬空播放器。
+    if (!this._currentVideo) {
+      logger.warn(`${TAG} ended ignored: no current video (session already torn down)`);
+      return;
+    }
     // 切集窗口的假结束:新视频流尚未提交成功时收到的 End 必然来自旧媒体
     // (mpv 停旧源 / EDL 双轨收尾可能再次上报 End,relay 的边沿检测又已被
     // closeMediaSession 复位)。此时若跳转,会与首次 End 的跳转叠加成隔一个。
@@ -610,6 +630,12 @@ export class PlayerSession {
 
   private async switchToQueueVideo(video: VideoItem): Promise<void> {
     if (!video || !video.videoId) {
+      return;
+    }
+    // 排队期间播放已被拆除（典型：自动连播分页等待时用户退出播放页）：丢弃，
+    // 否则页面销毁后新视频仍会被拉起，形成无法控制的悬空播放器。
+    if (this._playbackTornDown) {
+      logger.warn(`${TAG} queue switch discarded: playback already torn down video=${video.videoId}`);
       return;
     }
     logger.info(`${TAG} queue switch -> ${video.videoId}`);
@@ -1098,6 +1124,7 @@ export class PlayerSession {
    */
   private resetSession(preserveAudioOnly: boolean = false, clearSurface: boolean = false, preservePiP: boolean = false): void {
     this._playGeneration++;
+    this._playbackTornDown = true;
     // [DISABLED] P3 实时 ASR 已禁用（入口全注释，服务不可能 active；重新启用时恢复）：
     // 源切换/页面退出/冷重置都必须停掉 PCM tap（幂等）：AsrLiveCaptionService.getInstance().stop();
     const keepAudioOnly = preserveAudioOnly && this._isAudioOnlyMode;

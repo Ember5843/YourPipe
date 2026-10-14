@@ -764,7 +764,10 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       this.lastErrorCategory = 'unknown';
     }
 
-    if (!wasReady && this.isReady) {
+    // sourceUrl 为空 = 没有已武装的加载（stop/closeMediaSession 已清空）：此时到达的
+    // Prepared 是被中止加载的迟到事件，绝不能重新打开原生时间轴，否则随后的迟到
+    // End 会穿透成 isEnded 边沿，触发上层自动连播（悬空播放器）。
+    if (!wasReady && this.isReady && this.sourceUrl.length > 0) {
       this.preparing = false;
       this.isBuffering = false;
       this.acceptsNativeTimeline = true;

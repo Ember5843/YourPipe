@@ -74,8 +74,12 @@ export class PlayerStateRelay {
     // 1. 状态机转换
     this.syncStateMachine(state);
 
-    // 2. 播放结束事件通知
-    if (state.isEnded && !this.prevIsEnded) {
+    // 2. 播放结束事件通知。无活动媒体会话（IDLE/RELEASED，例如 closeMediaSession
+    // 中止在飞加载后迟到的 End）不分发：否则会驱动上层自动连播在用户已退出后
+    // 重新拉起播放（悬空播放器）。
+    if (state.isEnded && !this.prevIsEnded
+      && this.stateMachine !== null
+      && !this.stateMachine.isOneOf(PlayerState.IDLE, PlayerState.RELEASED)) {
       for (const cb of this.endedSubscribers) {
         try { cb(); } catch (e) { Logger.warn(TAG, `endedSubscriber error: ${e}`); }
       }

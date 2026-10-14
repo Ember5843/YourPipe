@@ -102,6 +102,8 @@ export struct VideoPlayerPage {
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageProp('isAppBackground') @Watch('onAppBackgroundChange') isAppBackground: boolean = false;
   private windowUtil: WindowUtil = WindowUtil.getInstance();
+  /** 页面已销毁（aboutToDisappear 后置位）：销毁后到达的延迟重放一律丢弃。 */
+  private pageDestroyed: boolean = false;
   private handleExitFullscreen: () => void = () => {
     this.handleFullScreenExit();
   };
@@ -405,6 +407,7 @@ export struct VideoPlayerPage {
   };
 
   async aboutToAppear(): Promise<void> {
+    this.pageDestroyed = false;
     const session = PlayerSession.getInstance();
     this.controller = session.controller;
     this.vm = session.controller.vm;
@@ -480,6 +483,7 @@ export struct VideoPlayerPage {
   }
 
   aboutToDisappear(): void {
+    this.pageDestroyed = true;
     const session = PlayerSession.getInstance();
     session.unsubscribePlaybackExtras(this.playbackExtrasListener);
     this.controller.unsubscribePlaybackState(this.pagePlaybackStateListener);
@@ -620,7 +624,13 @@ export struct VideoPlayerPage {
       this.isVideoChanging = false;
       if (this.pendingVideoChange) {
         this.pendingVideoChange = false;
-        setTimeout(() => this.onVideoChange(), 0);
+        setTimeout(() => {
+          if (this.pageDestroyed) {
+            logger.info(`${TAG} pending onVideoChange dropped: page destroyed`);
+            return;
+          }
+          this.onVideoChange();
+        }, 0);
       }
     }
   }
