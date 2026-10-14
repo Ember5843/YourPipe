@@ -1358,35 +1358,58 @@ struct Index {
         } else {
           const session = PlayerSession.getInstance();
           const pip = PiPManager.getInstance();
-          // 返回键进入画中画：pipOnReturn 且设备支持且 PiP 已初始化且未激活且播放器处于可播状态
+          const backState = session.playerState;
+          // 返回键进入画中画：pipOnReturn 且设备支持且未激活且播放器处于可播或将播状态。
+          // 切集中同样放行：提取中（IDLE 且有在飞 prepare/play）与 LOADING 是合法的
+          // 「继续看」语义；走 release 分支反而会把在飞切换留成悬空播放器。
           // 仅音频会话：禁止 PiP，任何返回直接 release。
           const canEnterPiP = this.playbackConfig.pipOnReturn
             && pip.isPiPSupported()
-            && pip.isReady
             && !session.isPiPActive
             && !session.isAudioOnlyMode
-            && (session.playerState === PlayerState.PLAYING
-              || session.playerState === PlayerState.PAUSED
-              || session.playerState === PlayerState.BUFFERING
-              || session.playerState === PlayerState.READY);
-          logger.info(`onBackPressed canEnterPiP=${canEnterPiP} | pipOnReturn=${this.playbackConfig.pipOnReturn} supported=${pip.isPiPSupported()} isReady=${pip.isReady} isPiPActive=${session.isPiPActive} audioOnly=${session.isAudioOnlyMode} state=${session.playerState}`);
+            && (backState === PlayerState.PLAYING
+              || backState === PlayerState.PAUSED
+              || backState === PlayerState.BUFFERING
+              || backState === PlayerState.READY
+              || backState === PlayerState.LOADING
+              || (backState === PlayerState.IDLE && session.hasInFlightPlayback));
+          logger.info(`onBackPressed canEnterPiP=${canEnterPiP} | pipOnReturn=${this.playbackConfig.pipOnReturn} supported=${pip.isPiPSupported()} isReady=${pip.isReady} isPiPActive=${session.isPiPActive} audioOnly=${session.isAudioOnlyMode} state=${backState} inFlight=${session.hasInFlightPlayback}`);
           if (canEnterPiP) {
             // 返回 = 弹 PiP：先锁定 PIP 呈现态（视频保持 ON），再 startPiP + pop。
             PlayerPresentation.onPipStarted();
             session.beginPipHandoff();
-            pip.startPiP().then((started: boolean) => {
-              if (!started) {
-                session.cancelPipHandoff();
-                PlayerPresentation.onPipStopped(false);
-                logger.warn('startPiP on back failed; keeping PlayerPage visible');
-                return;
-              }
-              this.navPathStack.pop();
-            }).catch((e: Error) => {
+            const cancelPipStart = (reason: string): void => {
               session.cancelPipHandoff();
               PlayerPresentation.onPipStopped(false);
-              logger.warn(`startPiP on back failed: ${e.message}`);
-            });
+              logger.warn(`${reason}; keeping PlayerPage visible`);
+            };
+            const startAndPop = (): void => {
+              pip.startPiP().then((started: boolean) => {
+                if (!started) {
+                  cancelPipStart('startPiP on back failed');
+                  return;
+                }
+                this.navPathStack.pop();
+              }).catch((e: Error) => {
+                cancelPipStart(`startPiP on back failed: ${e.message}`);
+              });
+            };
+            if (pip.isReady) {
+              startAndPop();
+            } else {
+              // 切视频时旧 PiP 控制器已随 onVideoChange 销毁：趁页面还在，先补建
+              // （比例回退 16:9；新源流到达时播放页续传会 updateContentSize 修正）。
+              const hostContext = this.getUIContext()?.getHostContext() as common.UIAbilityContext;
+              pip.init(hostContext, 16, 9).then((ok: boolean) => {
+                if (ok && pip.isReady) {
+                  startAndPop();
+                  return;
+                }
+                cancelPipStart('PiP controller init on back failed');
+              }).catch((e: Error) => {
+                cancelPipStart(`PiP init on back failed: ${e.message}`);
+              });
+            }
             return true;
           }
           session.release(true);

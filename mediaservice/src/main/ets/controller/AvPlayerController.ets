@@ -1090,15 +1090,15 @@ export class AvPlayerController {
     // 直播与点播一致，统一跟随设置里的默认清晰度偏好。
     const maxHeight = this.resolveMaxHeight(prefs.defaultQuality);
     const underCap = streams.filter(s => this.resolutionLabelHeight(s) <= maxHeight);
-    // Prefer hardware-decodable codecs when the device reports capability.
-    // Avoid auto-picking 4K VP9 on devices without VP9 hardware (soft-decode heat).
-    const hwFriendly = underCap.filter(s => VideoHwCaps.isCodecHardwareFriendly(s.codecs));
-    const pool = hwFriendly.length > 0
-      ? hwFriendly
-      : (underCap.length > 0 ? underCap : streams);
+    // hwFriendly 是同高度内的排序权重，不是全局过滤：>1080p 的流基本只有
+    // VP9/AV1，全局剔除会让用户设置的 2K/4K/8K 上限永远封顶在 1080p H.264。
+    const pool = underCap.length > 0 ? underCap : streams;
     return pool.slice().sort((a: StreamInfo, b: StreamInfo): number => {
       const h = this.resolutionLabelHeight(b) - this.resolutionLabelHeight(a);
       if (h !== 0) return h;
+      const hw = Number(VideoHwCaps.isCodecHardwareFriendly(b.codecs))
+        - Number(VideoHwCaps.isCodecHardwareFriendly(a.codecs));
+      if (hw !== 0) return hw;
       const codec = this.codecPriority(b) - this.codecPriority(a);
       if (codec !== 0) return codec;
       return (b.bitrate || 0) - (a.bitrate || 0);
@@ -1122,17 +1122,19 @@ export class AvPlayerController {
     }
     const prefs = PlaybackPreferences.snapshot();
     const maxHeight = this.resolveMaxHeight(prefs.defaultQuality);
-    // Prefer hard-decode-friendly codecs at the target quality label.
-    // Skip VP9/AV1 when OHOS reports no hardware capability for that MIME.
+    // hwFriendly 是同高度内的排序权重，不是全局过滤：>1080p 的流基本只有
+    // VP9/AV1，全局剔除会让用户设置的 2K/4K/8K 上限永远封顶在 1080p H.264。
     const underCap = entries.filter(e => this.resolutionLabelHeight(e.stream) <= maxHeight);
-    const hwFriendly = underCap.filter(e => VideoHwCaps.isCodecHardwareFriendly(e.stream.codecs));
-    const pool = hwFriendly.length > 0
-      ? hwFriendly
-      : (underCap.length > 0 ? underCap : entries);
+    const pool = underCap.length > 0 ? underCap : entries;
     const selected = pool.slice().sort((a: VideoEntry, b: VideoEntry): number => {
       const h = this.resolutionLabelHeight(b.stream) - this.resolutionLabelHeight(a.stream);
       if (h !== 0) {
         return h;
+      }
+      const hw = Number(VideoHwCaps.isCodecHardwareFriendly(b.stream.codecs))
+        - Number(VideoHwCaps.isCodecHardwareFriendly(a.stream.codecs));
+      if (hw !== 0) {
+        return hw;
       }
       const codec = this.codecPriority(b.stream) - this.codecPriority(a.stream);
       if (codec !== 0) {
