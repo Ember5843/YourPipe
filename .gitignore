@@ -30,6 +30,7 @@ CLAUDE.md
 .qoder/
 .trae/
 .trae-cn/
+.zcode/
 
 # Trellis workflow (local-only, not shared)
 .trellis/
@@ -39,6 +40,7 @@ CLAUDE.md
 Crash_*.dmp
 **/Crash_*.dmp
 de_fix*.ps1
+/proxy-test-forwarder.py
 # tools directory: keep .py scripts, ignore generated reports
 tools/*.txt
 tools/*.ps1
