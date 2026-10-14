@@ -1,4 +1,4 @@
-import { BusinessError, cacheDownload } from '@kit.BasicServicesKit';
+import { BusinessError, cacheDownload, deviceInfo } from '@kit.BasicServicesKit';
 import { AppLog } from '../AppLog';
 import { MediaThumb } from '../components/MediaThumb';
 
@@ -61,8 +61,8 @@ function redactThumbUrl(url: string): string {
  * 底层走系统 cacheDownload：预下载进内存 + 文件缓存后，ArkUI Image 组件
  * 请求同一 URL 时直接命中该缓存（官方 arkts-graphics-display 指南确认的
  * Image ↔ cacheDownload 联动机制），无需自管磁盘缓存。
- * cacheStrategy=LAZY 让系统侧已缓存的 URL 直接跳过；retry=0 保持预取轻量，
- * 失败不补刀 —— 卡片出现时 Image 会按原有五级回退链自行加载。
+ * cacheStrategy=LAZY 让系统侧已缓存的 URL 直接跳过；预取失败不补刀 ——
+ * 卡片出现时 Image 会按原有五级回退链自行加载。
  */
 export class ThumbPrefetcher {
   private static readonly MAX_DONE: number = 2000;
@@ -99,11 +99,18 @@ export class ThumbPrefetcher {
     try {
       cacheDownload.onDownloadSuccess(url, handlers.onSuccess);
       cacheDownload.onDownloadError(url, handlers.onError);
-      cacheDownload.download(url, {
-        cacheStrategy: cacheDownload.CacheStrategy.LAZY,
-        retry: { maxRetryCount: 0 },
-        timeout: { httpTotalTimeout: 15 }
-      });
+      // retry/timeout 是 @since 26 的 DownloadOptions 字段：低版本运行时不支持，
+      // 且 compatibleSdkVersion 6.1.0(23) 下无法直接引用，按版本动态补齐。
+      // retry=0 保持预取轻量，失败不补刀 —— 卡片出现时 Image 会按原有五级回退链自行加载。
+      const dlOptions: cacheDownload.CacheDownloadOptions = {
+        cacheStrategy: cacheDownload.CacheStrategy.LAZY
+      };
+      if (deviceInfo.sdkApiVersion >= 26) {
+        const extra = dlOptions as Record<string, ESObject>;
+        extra['retry'] = { maxRetryCount: 0 };
+        extra['timeout'] = { httpTotalTimeout: 15 };
+      }
+      cacheDownload.download(url, dlOptions);
       this.inFlight.set(url, handlers);
       logger.debug(`thumb prefetch start ${redactThumbUrl(url)}`);
     } catch (e) {

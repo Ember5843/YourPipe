@@ -385,15 +385,14 @@ Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
   Interceptors do NOT apply to `requestInStream`, so
   `postBinary`/`postBinaryStreamOnce` keep the manual observer call.
 - `Socks5Bridge` — loopback egress bridge (127.0.0.1 micro HTTP proxy →
-  socks5 or credentialed-http upstream). As of API 26 the
-  netstack paths (`HttpDownloader.applyProxyToOptions`, incl. the PipePipe
-  decoder calls) no longer use it: they set
-  `HttpRequestOptions.usingSocks5Proxy` with the real upstream proxy
-  (`dnsStrategy: connection.Socks5DnsStrategy.PROXY_MODE` so DNS resolves
-  proxy-side, loopback exclusionList) instead of pointing `usingProxy` at the
-  bridge. The bridge still must run for its remaining consumers — ArkWeb
-  `ProxyController`, RCP `createTunnel`, and MPV's `http_proxy` env — entry
-  starts/stops it independently. The upstream SOCKS5 handshake is **hand-rolled
+  socks5 or credentialed-http upstream). Netstack socks5 is **version-gated**
+  in `HttpDownloader.applyProxyToOptions`: on API 26+ runtimes it uses the
+  native `usingSocks5Proxy` (`Socks5DnsStrategy.PROXY_MODE`, proxy-side DNS;
+  the field/enum are @since 26 and set dynamically under
+  compatibleSdkVersion 6.1.0(23)); below 26 it points `usingProxy` at
+  `127.0.0.1:{bridgePort}` (`socks5LocalPort` snapshot field). ArkWeb
+  `ProxyController`, RCP `createTunnel`, and MPV's `http_proxy` env always go
+  through the bridge — entry starts/stops it independently. The upstream SOCKS5 handshake is **hand-rolled
   in the bridge** (RFC 1928 CONNECT + optional RFC 1929 username/password auth
   over a plain direct TCPSocket, ATYP=domain → proxy-side DNS, 15s budget) —
   it must NOT go back to netstack's socket-level `socket.ProxyTypes.SOCKS5`:

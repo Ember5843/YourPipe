@@ -1,6 +1,6 @@
 import { YTCoreLogger } from '../common/YTCoreLogger';
 import { connection, http } from '@kit.NetworkKit';
-import { BusinessError } from '@kit.BasicServicesKit';
+import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { Localization } from '../model/Localization';
 import { AppHttpProxySnapshot, HttpProxyOptions } from './HttpProxyOptions';
 
@@ -384,27 +384,65 @@ export class HttpDownloader {
       options.usingProxy = proxy;
       return;
     }
-    // SOCKS5 (API 26): use the netstack-native SOCKS5 client with the real
-    // upstream proxy. PROXY_MODE lets the proxy resolve DNS (no local DNS
-    // leak); exclusionList mirrors the loopback bypass rules. The loopback
-    // HTTP CONNECT bridge (Socks5Bridge) is no longer used by netstack
-    // requests — it still serves ArkWeb ProxyController / RCP createTunnel /
-    // MPV env, so entry keeps it running independently.
+    // SOCKS5 dual path by runtime API level. API 26+: netstack-native
+    // usingSocks5Proxy with the real upstream proxy — PROXY_MODE lets the
+    // proxy resolve DNS (no local DNS leak), exclusionList mirrors the
+    // loopback bypass rules. Below 26: the loopback HTTP CONNECT bridge
+    // (Socks5Bridge) owns the native SOCKS5 tunnel (hand-rolled RFC 1928/1929
+    // handshake, proxy-side DNS via ATYP=domain), so the http stack only sees
+    // 127.0.0.1; during the bridge's self-heal re-listen window its snapshot
+    // keeps reporting the last-known-good port, so connects fail fast on the
+    // dead port instead of silently going direct, and port 0 (never started
+    // or explicitly stopped) is the only case that stays direct. The bridge
+    // stays running either way for ArkWeb / RCP / MPV.
+    // The usingSocks5Proxy field and Socks5DnsStrategy enum are @since 26
+    // symbols — under compatibleSdkVersion 6.1.0(23) they cannot be
+    // referenced directly, so the options field is set dynamically.
     if (snap.kind === 'socks5') {
-      const socks5: connection.Socks5Proxy = {
-        host: snap.host.trim(),
-        port: snap.port,
-        dnsStrategy: connection.Socks5DnsStrategy.PROXY_MODE,
-        exclusionList: HttpProxyOptions.defaultExclusions()
-      };
-      if (snap.username && snap.username.length > 0) {
-        socks5.username = snap.username;
-        socks5.password = snap.password || '';
+      if (deviceInfo.sdkApiVersion >= 26) {
+        const socks5: Record<string, ESObject> = {
+          'host': snap.host.trim(),
+          'port': snap.port,
+          // connection.Socks5DnsStrategy.PROXY_MODE
+          'dnsStrategy': 1,
+          'exclusionList': HttpProxyOptions.defaultExclusions()
+        };
+        if (snap.username && snap.username.length > 0) {
+          socks5['username'] = snap.username;
+          socks5['password'] = snap.password || '';
+        }
+        (options as Record<string, ESObject>)['usingSocks5Proxy'] = socks5;
+      } else {
+        const localPort = snap.socks5LocalPort;
+        if (localPort && localPort > 0) {
+          options.usingProxy = {
+            host: '127.0.0.1',
+            port: localPort,
+            exclusionList: []
+          };
+        } else {
+          options.usingProxy = false;
+        }
       }
-      options.usingSocks5Proxy = socks5;
       return;
     }
     options.usingProxy = false;
+  }
+
+  /**
+   * API 26 connection-pool reuse (`reuseConnections` / `inactivityMs`): cuts
+   * repeat TCP/TLS handshakes for callers hitting the same hosts. The fields
+   * are @since 26 and cannot be referenced under compatibleSdkVersion
+   * 6.1.0(23), so they are set dynamically and only on runtimes that support
+   * them; below API 26 this is a no-op.
+   */
+  public static applyConnectionPoolReuse(options: http.HttpRequestOptions): void {
+    if (deviceInfo.sdkApiVersion < 26) {
+      return;
+    }
+    const pooled = options as Record<string, ESObject>;
+    pooled['reuseConnections'] = true;
+    pooled['inactivityMs'] = 30000;
   }
 
   /**
@@ -475,11 +513,9 @@ export class HttpDownloader {
           // 超时按调用方分级：播放/提取默认 30s，UI 浏览类传更短
           'connectTimeout': timeoutMs,
           'readTimeout': timeoutMs,
-          'usingCache': false,
-          // API 26 连接池复用：减少重复请求的 TCP/TLS 握手开销
-          'reuseConnections': true,
-          'inactivityMs': 30000
+          'usingCache': false
         }
+        HttpDownloader.applyConnectionPoolReuse(httpOptions);
         HttpDownloader.applyProxyToOptions(httpOptions, url);
 
         // 4. 发送请求并获取响应
@@ -774,11 +810,9 @@ export class HttpDownloader {
       // past a minute is a dead link, and failing it fast lets the session's
       // network-retry path re-send instead of freezing playback for minutes.
       readTimeout: 60000,
-      usingCache: false,
-      // API 26 连接池复用：SABR 反复 POST 同一 UMP 端点，流式结束后连接可入池复用
-      reuseConnections: true,
-      inactivityMs: 30000
+      usingCache: false
     };
+    HttpDownloader.applyConnectionPoolReuse(httpOptions);
     HttpDownloader.applyProxyToOptions(httpOptions, url);
 
     return new Promise<http.HttpResponse>((resolve, reject) => {

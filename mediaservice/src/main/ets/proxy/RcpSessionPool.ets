@@ -17,11 +17,11 @@ export interface RcpSessionEntry {
 
 /**
  * Long-lived RCP sessions for the local proxy's YouTube media fetches.
- * RCP keeps a per-session connection pool: a connectOnly pre-connect only
- * pays off when the later range fetches run on the SAME session, so
- * RangeProxy acquires sessions here instead of creating/closing one per
- * range fetch. Keys are `${proxySessionId}|${proxy fingerprint}` — a changed
- * app-proxy config simply lands on a fresh entry.
+ * RCP keeps a per-session connection pool: an API 24+ connectOnly
+ * pre-connect only pays off when the later range fetches run on the SAME
+ * session, so RangeProxy acquires sessions here instead of creating/closing
+ * one per range fetch. Keys are `${proxySessionId}|${proxy fingerprint}` — a
+ * changed app-proxy config simply lands on a fresh entry.
  * Teardown: LocalProxyServer.wireSessionCancel → closeForSession(sessionId).
  */
 class RcpSessionPool {

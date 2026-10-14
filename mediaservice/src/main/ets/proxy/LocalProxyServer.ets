@@ -292,7 +292,8 @@ export class LocalProxyServer {
     this.wireSessionCancel(session);
     Logger.info(TAG, `createSession: id=${id} type=${session.type} videos=${session.videos.length} audios=${session.audios.length}`);
     // Source committed — warm the googlevideo host(s) on this session's pooled
-    // RCP session so MPV's first range fetch skips TCP/TLS (fire-and-forget).
+    // RCP session so MPV's first range fetch skips TCP/TLS (fire-and-forget;
+    // no-op below API 24, where rcp connectOnly does not exist).
     preconnectYoutubeHosts(id, this.preconnectUrls(session));
     return id;
   }

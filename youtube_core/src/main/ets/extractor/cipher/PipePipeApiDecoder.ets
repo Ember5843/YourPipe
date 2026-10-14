@@ -97,10 +97,9 @@ export class PipePipeApiDecoder {
         header: PipePipeApiDecoder.REQUEST_HEADERS,
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: 4000,
-        readTimeout: 4000,
-        reuseConnections: true,
-        inactivityMs: 30000
+        readTimeout: 4000
       };
+      HttpDownloader.applyConnectionPoolReuse(latestOptions);
       HttpDownloader.applyProxyToOptions(latestOptions, latestUrl);
       const response = await httpRequest.request(latestUrl, latestOptions);
       if (response.responseCode !== 200 || !response.result) {
@@ -189,10 +188,9 @@ export class PipePipeApiDecoder {
         header: PipePipeApiDecoder.REQUEST_HEADERS,
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: timeout,
-        readTimeout: timeout,
-        reuseConnections: true,
-        inactivityMs: 30000
+        readTimeout: timeout
       };
+      HttpDownloader.applyConnectionPoolReuse(decodeOptions);
       HttpDownloader.applyProxyToOptions(decodeOptions, url);
       const response = await httpRequest.request(url, decodeOptions);
 

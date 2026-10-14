@@ -65,7 +65,7 @@ mediaservice/src/main/ets/
   proxy/
     LocalProxyServer.ets         — loopback HTTP server
     RangeProxy.ets               — byte-range passthrough
-    RcpSessionPool.ets           — long-lived RCP sessions per proxy session (+ connectOnly pre-connect)
+    RcpSessionPool.ets           — long-lived RCP sessions per proxy session (+ connectOnly pre-connect, API 24+)
     UpstreamCancelRegistry.ets   — in-flight upstream op registry (conn/session cancel)
     ProxyTrafficMeter.ets        — upstream network traffic meter (networkSpeedBps)
     ProxyEncoding.ets            — shared UTF-8 TextEncoder singleton (encodeUtf8/encodeUtf8Bytes)
@@ -181,10 +181,11 @@ long-lived RCP session per proxy session via `RcpSessionPool` (key =
 a weak hash of the password so a password-only change also rekeys. LRU cap 32
 — far below the system 1024-session
 limit; evict/destroy closes sessions, wired into `wireSessionCancel`), so the
-API-24 `connectOnly` pre-connect fired at source commit
+API-24+ `connectOnly` pre-connect fired at source commit
 (`LocalProxyServer.createSession` / `addPreparedSession` →
 `preconnectYoutubeHosts`, video+audio hosts only, fire-and-forget, WARN-only
-on failure) warms the exact connection pool MPV's first range fetch then
+on failure; skipped entirely below API 24 where `connectOnly` does not
+exist) warms the exact connection pool MPV's first range fetch then
 reuses. Every RCP session — YouTube and
 non-YouTube alike — resolves the app proxy through the shared
 `resolveRcpProxy` (http → upstream URL with auth, socks5 → loopback bridge

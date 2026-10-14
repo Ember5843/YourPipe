@@ -1,6 +1,7 @@
 import { StreamResource } from './SessionStore';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { http, socket } from '@kit.NetworkKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { url } from '@kit.ArkTS';
 import { ClientsConstants, HttpDownloader, HttpProxyOptions } from 'youtube_core';
 import Logger from '../utils/Logger';
@@ -421,9 +422,12 @@ export async function fetchYoutubeRangeBytes(
  * http, so their hosts are skipped. Never blocks source commit; failure is
  * WARN-only and leaves playback untouched (the first fetch simply pays the
  * handshake as before).
+ * `connectOnly` is an rcp.Request field @since 6.1.1(24): below that runtime
+ * this whole warm-up is skipped (the field cannot be referenced under
+ * compatibleSdkVersion 6.1.0(23), so it is set dynamically).
  */
 export function preconnectYoutubeHosts(sessionId: string, urls: string[]): void {
-  if (!sessionId) {
+  if (!sessionId || deviceInfo.sdkApiVersion < 24) {
     return;
   }
   const hosts: string[] = [];
@@ -448,7 +452,7 @@ export function preconnectYoutubeHosts(sessionId: string, urls: string[]): void 
     }
     entry.warmedHosts.add(authority);
     const req = new rcp.Request(warmUrl, 'GET');
-    req.connectOnly = true;
+    (req as Record<string, ESObject>)['connectOnly'] = true;
     Logger.info(TAG, `preconnect start session=${sessionId} host=${authority}`);
     entry.session.fetch(req).then(() => {
       Logger.debug(TAG, `preconnect done session=${sessionId} host=${authority}`);
@@ -789,9 +793,9 @@ export async function serveRange(
       const method = usePost ? 'POST' : 'GET';
       let rcpSession: rcp.Session | null = null;
       // Pooled sessions are long-lived (shared per proxy session so the
-      // connectOnly pre-connect warms the very connection pool MPV's fetches
-      // hit) and must NOT be closed per attempt; only the legacy per-attempt
-      // fallback (no sessionId) is closed in cleanup.
+      // API 24+ connectOnly pre-connect warms the very connection pool MPV's
+      // fetches hit) and must NOT be closed per attempt; only the legacy
+      // per-attempt fallback (no sessionId) is closed in cleanup.
       let pooledSession = false;
       let abortHandle: UpstreamAbortHandle | null = null;
       await fetchUpstreamWithRetries({

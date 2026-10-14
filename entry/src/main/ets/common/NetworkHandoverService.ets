@@ -11,7 +11,7 @@ const DEBOUNCE_MS = 2000;
  * Network-handover adaptation (single subscription site, started by
  * EntryAbility).
  *
- * The SDK 26 kit set has no NetworkBoostKit (`netHandover`), so detection
+ * The kit set has no NetworkBoostKit (`netHandover`), so detection
  * uses `connection` default-network events (GET_NETWORK_INFO, already held):
  * - `netAvailable` with a changed NetHandle id → default network switched
  *   (Wi-Fi ↔ cellular, SIM switch);

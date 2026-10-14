@@ -12,8 +12,8 @@
 > write changelogs, commit history, or “recent change” bullet lists.
 
 ## 1. Project
-- **Name / package**: YourPipe (`com.talon.yourpipe`, vendor `talon`, v0.5.9,
-  versionCode 1000024).
+- **Name / package**: YourPipe (`com.talon.yourpipe`, vendor `talon`, v0.6.0,
+  versionCode 1000029).
 - **What it is**: YouTube client for OpenHarmony / HarmonyOS. Plays YouTube
   content through a native **MPV** pipeline (vendored `libmpv.so` + static
   `libav*` for mux/remux). Product VOD path is **direct-link DASH** for guest
@@ -29,8 +29,8 @@
   originally derived from the upstream `wang-bin/libmdk-napi` package
   (historical `mdk` names exist only in old commits) — there is no MDK
   Player runtime.
-- **Stage model**, `apiType: stageMode`. Target SDK `26.0.0` (HarmonyOS
-  7.0.0 / API 26), runtimeOS
+- **Stage model**, `apiType: stageMode`. Target SDK `26.0.0` (min
+  compatible `6.1.0(23)`), runtimeOS
   `HarmonyOS`. Native compiler: `BiSheng`.
 - **Devices**: phone / tablet / 2in1 / tv / car.
 - **Distribution / updates**: AppGallery test channel plus GitHub Releases
@@ -247,12 +247,14 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `HttpDownloader` response); a server-cleared SID/SAPISID marks the web
   rail rejected, and OAuth `invalid_grant` clears the refresh token.
 - **Proxy coverage**: one app proxy config (HTTP or SOCKS5) drives every
-  network stack — netstack `http` (API 26 native `usingSocks5Proxy`,
-  proxy-side DNS, no bridge hop), RCP sessions, ArkWeb `ProxyController`,
+  network stack — netstack `http`, RCP sessions, ArkWeb `ProxyController`,
   and MPV's direct fetches (`http_proxy`/`no_proxy` process env via
-  `setHttpProxyEnv`). ArkWeb / RCP / MPV route SOCKS5 through the
-  self-healing loopback CONNECT bridge `Socks5Bridge`, so the bridge must
-  run whenever socks5 is configured even though netstack no longer uses it.
+  `setHttpProxyEnv`). SOCKS5 is version-gated: on API 26+ netstack requests
+  use the native `usingSocks5Proxy` (PROXY_MODE, proxy-side DNS); below 26
+  they route through the self-healing loopback CONNECT bridge
+  `Socks5Bridge` (hand-rolled RFC 1928/1929 handshake, proxy-side DNS via
+  ATYP=domain), and ArkWeb / RCP / MPV always use the bridge,
+  so the bridge must run whenever socks5 is configured.
   An HTTP proxy with username/password auth routes **ArkWeb and the
   app-level `setAppHttpProxy`** through
   the same bridge in HTTP-upstream mode (the bridge injects
