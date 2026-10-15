@@ -4,7 +4,6 @@ import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 import { HttpAbortToken, HttpError } from '../../network/HttpDownloader';
 import { ClientsConstants } from '../../model/ClientsConstants';
 import { SabrDecodedResponse } from './SabrDecodedResponse';
-import { SabrMediaHeader } from './SabrMediaHeader';
 import { SabrMediaSegment, SabrSegmentRequest } from './SabrMediaSegment';
 import { SabrProtocolException } from './SabrProtocolException';
 import { isRecoverableIntegrityIssues, requireUmpContentType, sabrDecodeBody } from './SabrResponseDecoder';
@@ -16,6 +15,7 @@ import {
   SABR_MAX_ATTESTATION_IDENTITY_ROTATIONS,
   SABR_MAX_PO_TOKEN_REFRESHES,
   SABR_MAX_RELOADS_PER_SESSION,
+  SabrControlAction,
   SabrPolicyContext,
   SabrSessionPolicy
 } from './policy/SabrSessionPolicy';
@@ -61,10 +61,6 @@ const NETWORK_RETRY_BUDGET_MS = 75000;
 /** 主机不可达（DNS/连接/无路由）时的快速重试次数，发生在主机轮换之前。 */
 const MAX_DNS_RETRIES = 2;
 const DNS_RETRY_DELAY_MS = 500;
-/** SABR init HTTP Range 上限（PipePipe MAX_INITIALIZATION_BYTES）。 */
-const MAX_INITIALIZATION_BYTES = 4 * 1024 * 1024;
-/** init Range 请求的单次重试间隔。 */
-const INIT_RANGE_RETRY_DELAY_MS = 500;
 /**
  * 连续退避 / 无进展预算（PipePipe SabrRequestCoordinator）。两者互独立，
  * 任一到顶即抛类型化可恢复错误（kind='network'），交给上层既有的重建/停止路径，
@@ -268,16 +264,6 @@ export class YoutubeSabrSession {
     if (cached) {
       return cached;
     }
-    // Init segments come from a plain HTTP Range GET bound to the PoToken
-    // (&pot=, PipePipe fetchInitializationData), never from the UMP stream —
-    // routing them through the pump below would fight the media demand loop.
-    if (request.initSegment) {
-      const initFormat = request.itag === this.audioFormat.itag ? this.audioFormat
-        : (request.itag === this.videoFormat.itag ? this.videoFormat : undefined);
-      if (initFormat) {
-        return await this.fetchInitializationData(initFormat);
-      }
-    }
     if (this.isBeyondEnd(request)) {
       throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`, 'beyond_end');
     }
@@ -366,13 +352,8 @@ export class YoutubeSabrSession {
           }
           continue;
         }
-        if (action.type === 'reload_player') {
-          const reloaded = await this.executeReloadPlayer(action.message || 'policy');
-          if (reloaded) {
-            break;
-          }
-          continue;
-        }
+        // 'reload_player' never reaches the fetch phase: the pump policy decides
+        // and executes it for every response (see pumpOnceLocked).
         if (action.type === 'recover_hole') {
           if (!requestFormat) {
             break;
@@ -556,8 +537,22 @@ export class YoutubeSabrSession {
     const actions = this.policy.evaluate(decoded, pumpCtx);
 
     // Pre-ingest control: apply the redirect swap / fail on the redirect limit.
+    // A RELOAD_PLAYER action is captured here but executed after ingest — the
+    // response that asked for the reload must still be cached (PipePipe streams
+    // media before handleControlResponse decides), and the trailing FAIL of the
+    // reload chain fires only when the reload cannot handle the response.
+    let reloadAction: SabrControlAction | undefined = undefined;
+    let reloadFallback: SabrControlAction | undefined = undefined;
     for (const action of actions) {
+      if (action.type === 'reload_player') {
+        reloadAction = action;
+        continue;
+      }
       if (action.type === 'fail') {
+        if (reloadAction) {
+          reloadFallback = action;
+          break;
+        }
         throw new SabrProtocolException(action.message, action.kind);
       }
       if (action.type === 'apply_redirect') {
@@ -583,8 +578,12 @@ export class YoutubeSabrSession {
       this.epoch.redirectCount = 0;
       this.epoch.poTokenRefreshes = 0;
       // PipePipe handleControlResponse resets BOTH episode counters when media
-      // arrives (redirectCount + reloads); keep reload budget fresh per episode.
-      this.epoch.reloads = 0;
+      // arrives (redirectCount + reloads) — except on a response that itself
+      // carried the reload request (the reload check returns before the reset
+      // there), so a reload response's own media never re-arms the budget.
+      if (!reloadAction) {
+        this.epoch.reloads = 0;
+      }
       this.consecutiveNoMedia = 0;
       this.consecutiveAttestationPending = 0;
       this.continuousBackoffMs = 0;
@@ -618,6 +617,22 @@ export class YoutubeSabrSession {
           this.scheduleBackoff(action.ms);
           break;
         }
+      }
+    }
+
+    // RELOAD_PLAYER (decided by the pump policy for every response): swap the
+    // bootstrap in place so the fetch path AND the background read-ahead pump
+    // both recover. Success starts a fresh server session (empty streak
+    // cleared); failure falls through to the chain's terminal FAIL.
+    if (reloadAction) {
+      const reloaded = await this.executeReloadPlayer(
+        reloadAction.message || 'policy', reloadAction.token);
+      if (reloaded) {
+        this.consecutiveNoMedia = 0;
+      } else if (reloadFallback) {
+        throw new SabrProtocolException(reloadFallback.message, reloadFallback.kind);
+      } else {
+        logger.warn('[SABR] reload player failed without a fallback action');
       }
     }
 
@@ -758,93 +773,6 @@ export class YoutubeSabrSession {
       }
     }
     return candidates;
-  }
-
-  /**
-   * Fetch the initialization segment over plain HTTP Range (PipePipe
-   * fetchInitializationData) instead of a UMP POST. Requires a PoToken, bound to the
-   * googlevideo init request via {@code &pot=} (base64url, no padding); the extractor
-   * already merges indexRange.end into initRangeEnd, so the fetched range covers decoder
-   * init + SIDX. The result is ingested through the normal segment-cache/timeline path.
-   * One retry, then a recoverable typed network error.
-   */
-  async fetchInitializationData(format: YoutubeSabrFormatMeta): Promise<SabrMediaSegment> {
-    const request = SabrSegmentRequest.init(format.itag);
-    const cached = this.segmentCache.get(request.cacheKey());
-    if (cached) {
-      return cached;
-    }
-    const initUrl = format.initializationUrl;
-    const start = format.initRangeStart ?? -1;
-    const end = format.initRangeEnd ?? -1;
-    if (!initUrl || initUrl.length === 0 || start < 0 || end < start
-      || end - start >= MAX_INITIALIZATION_BYTES) {
-      throw new SabrProtocolException(
-        `Invalid SABR initialization range: itag=${format.itag} start=${start} end=${end}`,
-        'network');
-    }
-    let rawToken = this.streamState.getRawPoToken();
-    if (!rawToken || rawToken.length === 0) {
-      // Lazy mint: the Range URL is pot-bound and init never enters the UMP
-      // empty-response mint path, so a cold session mints here instead.
-      await this.maybeApplyPoToken(false);
-      rawToken = this.streamState.getRawPoToken();
-    }
-    if (!rawToken || rawToken.length === 0) {
-      throw new SabrProtocolException(
-        `Missing PO token for SABR initialization range: itag=${format.itag}`, 'network');
-    }
-    const url = appendQueryParamIfMissing(initUrl, 'pot', base64UrlNoPadding(rawToken));
-    const headers: Record<string, string> = {
-      'Range': `bytes=${start}-${end}`,
-      'Accept-Encoding': 'identity'
-    };
-    const expected = end - start + 1;
-    logger.info(`[SABR] init GET itag=${format.itag} start=${start} end=${end} `
-      + `expected=${expected} host=${hostOfUrl(url) || '-'}`);
-    let lastMessage = '';
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (this.closed) {
-        throw new SabrProtocolException('SABR session closed', 'closed');
-      }
-      try {
-        const response = await this.httpClient.getBinary(url, headers, this.useAuth, undefined, false);
-        const status = response.responseCode;
-        if (status !== 206 && !(status === 200 && start === 0)) {
-          throw new SabrProtocolException(
-            `SABR initialization range status=${status}`, 'network');
-        }
-        const bytes = toUint8Array(response.result);
-        if (bytes.length < expected) {
-          throw new SabrProtocolException(
-            `SABR initialization range truncated bytes=${bytes.length} expected=${expected}`, 'network');
-        }
-        const initData = bytes.length > expected ? bytes.subarray(0, expected) : bytes;
-        const header = new SabrMediaHeader();
-        header.headerId = 0;
-        header.itag = format.itag;
-        header.initSegment = true;
-        header.sequenceNumber = -1;
-        header.startMs = -1;
-        header.durationMs = -1;
-        header.contentLength = initData.length;
-        const segment = new SabrMediaSegment(header, initData);
-        this.ingestAndCacheSegment(segment);
-        logger.info(`[SABR] init OK itag=${format.itag} bytes=${initData.length} status=${status}`);
-        return segment;
-      } catch (e) {
-        lastMessage = e instanceof Error ? e.message : String(e);
-        logger.warn(`[SABR] init range attempt=${attempt + 1}/2 failed itag=${format.itag}: ${lastMessage}`);
-        if (this.closed) {
-          throw new SabrProtocolException('SABR session closed', 'closed');
-        }
-        if (attempt === 0) {
-          await this.sleepBackoffInterruptible(INIT_RANGE_RETRY_DELAY_MS);
-        }
-      }
-    }
-    throw new SabrProtocolException(
-      `SABR initialization range failed: itag=${format.itag} ${lastMessage}`, 'network');
   }
 
   /**
@@ -1059,24 +987,27 @@ export class YoutubeSabrSession {
   }
 
   /**
-   * RELOAD_PLAYER (PipePipe protected_no_media_reload): re-probe the SABR
-   * bootstrap and swap it in place — requestNumber/playerTime/bufferedRanges
-   * survive, only the url + redirect/token-refresh budgets reset. Returns
-   * false when the action is unavailable or the re-probe failed (the policy
-   * chain then falls through); throws kind='protocol' on a broken new info
-   * or when the identity changed but no fresh PO token could be minted.
+   * RELOAD_PLAYER (PipePipe applyReload): re-probe the SABR bootstrap and swap
+   * it in place — requestNumber/playerTime/bufferedRanges survive, the streaming
+   * URL / host candidates / redirect + token-refresh budgets are replaced, and
+   * the server-owned contexts are dropped (they belong to the dead session).
+   * `reloadToken` is echoed into the re-probe player request. Returns false when
+   * the action is unavailable or the re-probe failed (the policy chain then
+   * falls through); throws kind='protocol' on a broken new info or when the
+   * identity changed but no fresh PO token could be minted.
    */
-  private async executeReloadPlayer(reason: string): Promise<boolean> {
+  private async executeReloadPlayer(reason: string, reloadToken: string): Promise<boolean> {
     if (!this.infoReloader || this.epoch.reloads >= SABR_MAX_RELOADS_PER_SESSION) {
       return false;
     }
     this.epoch.reloads++;
     const videoId = this.info.videoId;
     logger.info(`[SABR] reload player video=${videoId} reason=${reason} `
+      + `token=${reloadToken.length > 0 ? 'present' : 'absent'} `
       + `attempt=${this.epoch.reloads}/${SABR_MAX_RELOADS_PER_SESSION} rn=${this.epoch.requestNumber}`);
     let newInfo: YoutubeSabrInfo | undefined = undefined;
     try {
-      newInfo = await this.infoReloader.reloadSabrInfo(this.info, reason);
+      newInfo = await this.infoReloader.reloadSabrInfo(this.info, reason, reloadToken);
     } catch (e) {
       logger.warn(`[SABR] reload player reloader threw video=${videoId}: ${String(e)}`);
       return false;
@@ -1093,8 +1024,16 @@ export class YoutubeSabrSession {
     const visitorChanged = (newInfo.visitorData || '') !== previousVisitorData;
     this.info = newInfo;
     this.epoch.serverAbrStreamingUrl = newInfo.serverAbrStreamingUrl;
+    // The fresh URL's mn/mvi are the only valid host-rotation candidates and
+    // the cursor must restart from the URL itself (PipePipe applyReload).
+    this.updateHostCandidates(newInfo.serverAbrStreamingUrl);
     this.epoch.redirectCount = 0;
     this.epoch.poTokenRefreshes = 0;
+    // PipePipe applyReload: contexts and the integrity-failure streak belong to
+    // the dead server session — clear them so the fresh session starts clean.
+    this.epoch.sabrContexts.clear();
+    this.epoch.activeSabrContextTypes.clear();
+    this.consecutiveIntegrityFailures = 0;
     this.consecutiveAttestationPending = 0;
     logger.info(`[SABR] reload player applied video=${videoId} visitorChanged=${visitorChanged} `
       + `rn=${this.epoch.requestNumber} urlLen=${newInfo.serverAbrStreamingUrl.length}`);
@@ -1141,7 +1080,7 @@ export class YoutubeSabrSession {
     }
     let newInfo: YoutubeSabrInfo | undefined = undefined;
     try {
-      newInfo = await this.infoReloader.reloadSabrInfo(this.info, 'rotate_identity');
+      newInfo = await this.infoReloader.reloadSabrInfo(this.info, 'rotate_identity', '');
     } catch (e) {
       logger.warn(`[SABR] rotate identity reloader threw video=${videoId}: ${String(e)}`);
       return false;
@@ -1245,34 +1184,6 @@ function replaceHostInUrl(url: string, newHost: string): string {
     return url;
   }
   return `${match[1]}${newHost}${match[3]}`;
-}
-
-/** Append `key=value` unless the parameter is already present. */
-function appendQueryParamIfMissing(url: string, key: string, value: string): string {
-  if (url.indexOf(`?${key}=`) >= 0 || url.indexOf(`&${key}=`) >= 0) {
-    return url;
-  }
-  return `${url}${url.indexOf('?') >= 0 ? '&' : '?'}${key}=${value}`;
-}
-
-/** base64url without padding (PipePipe `pot=` param encoding). */
-function base64UrlNoPadding(data: Uint8Array): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  let result = '';
-  for (let i = 0; i < data.length; i += 3) {
-    const b0 = data[i];
-    const b1 = i + 1 < data.length ? data[i + 1] : -1;
-    const b2 = i + 2 < data.length ? data[i + 2] : -1;
-    result += chars.charAt(b0 >> 2);
-    result += chars.charAt(((b0 & 0x03) << 4) | (b1 >= 0 ? (b1 >> 4) : 0));
-    if (b1 >= 0) {
-      result += chars.charAt(((b1 & 0x0f) << 2) | (b2 >= 0 ? (b2 >> 6) : 0));
-    }
-    if (b2 >= 0) {
-      result += chars.charAt(b2 & 0x3f);
-    }
-  }
-  return result;
 }
 
 function toUint8Array(result: Object | string | ArrayBuffer | undefined): Uint8Array {

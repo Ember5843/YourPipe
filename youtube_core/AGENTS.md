@@ -144,7 +144,17 @@ youtube_core/src/main/
 - **Bootstrap**: `YoutubeSabrInfo` from player response (`serverAbrStreamingUrl` + formats).
 - **Session**: `YoutubeSabrSession` POSTs UMP, parses with `UmpReader` /
   `SabrResponseDecoder` / `SabrProto`, caches segments, applies PoToken when
-  protected (via `SabrPoTokenProvider` implemented in entry). Init segments are fetched over a pot-bound HTTP Range GET (`fetchInitializationData`, `?pot=` base64url, 4MB cap, sig/n-resolved `initializationUrl` from `resolveSabrFormatUrls`) instead of the UMP stream; unreachable googlevideo hosts rotate across `mn`/`mvi` candidates with `rn` preserved (DNS retry 2×500ms first); continuous backoff / no-progress budgets (30s each, media arrival resets) end empty loops with a typed `kind='network'` error. UMP response
+  protected (via `SabrPoTokenProvider` implemented in entry). Init segments
+  arrive through the UMP stream like any other segment (PipePipe playback
+  parity — the server's init segment is ingested from the response; an init
+  request pumps the session, no special path): a pot-bound HTTP Range GET for
+  init was tried and reverted because googlevideo rejects it (HTTP 403 → the
+  whole SABR session fails to start), so do NOT revive `fetchInitializationData`
+  / `resolveSabrFormatUrls` without a device test proving the range GET is
+  accepted. Unreachable googlevideo hosts rotate across
+  `mn`/`mvi` candidates with `rn` preserved (DNS retry 2×500ms first);
+  continuous backoff / no-progress budgets (30s each, media arrival resets)
+  end empty loops with a typed `kind='network'` error. UMP response
   body bytes are reported as they arrive (per `dataReceive` chunk) through
   `setSabrNetworkTrafficSink` (wired by mediaservice to its proxy traffic
   meter for the stats UI). `abortInFlightPost(reason)` is the
@@ -231,14 +241,30 @@ youtube_core/src/main/
   empty-handed.
 - **Player reload** (`RELOAD_PLAYER` action): a `RELOAD_PLAYER_RESPONSE` part
   means the server's streaming URL / ustreamer config expired on a long watch.
-  The session calls its `SabrInfoReloader` (wired by entry through
-  `sabrSessionStore.setInfoReloader`, backed by `YouTubeExtractor.reprobeSabrInfo`
-  serialized through the extraction chain), swaps in the new bootstrap and
-  resumes in place — `requestNumber > 0` is kept so the next POST is a
-  follow-up on the new URL, never a restart. Bounded by
-  `SABR_MAX_RELOADS_PER_SESSION`; a visitorData change clears the PoToken and
-  re-mints before resuming (a failed re-mint is terminal, never a reuse of the
-  old token). If no reloader is wired or the budget is spent, reload fails.
+  The part's echo token is decoded (`SabrDecodedResponse.reloadToken`,
+  `decodeReloadToken`) and must be sent back in the re-probe /player body
+  (`playbackContext.reloadPlaybackContext.reloadPlaybackParams.token`, PipePipe
+  `appendReloadPlaybackContext`), threaded
+  `SabrControlAction.token` → `SabrInfoReloader.reloadSabrInfo(info, reason,
+  reloadToken)` → entry serialized reprobe → `reprobeSabrInfo(videoId,
+  reloadToken)` → `fetchSelectedStreamPlayer` → `ClientFetchContext.
+  reloadPlaybackToken` → `ConfiguredPlayerClient`; a missing echo token still
+  re-probes, only the body field is omitted. The decision and execution live
+  in the PUMP phase (`BuiltinSabrSessionPolicy.evaluatePump` →
+  `[reload_player, fail('reload_exhausted')]` chain), not the fetch phase, so
+  background read-ahead pumps and fetch cache-hit paths honor it too, and it
+  runs after ingest — a media-carrying reload response is still cached, and
+  that response's own media does not re-arm `epoch.reloads` (PipePipe's
+  return-before-reset parity). The session calls its `SabrInfoReloader` (wired
+  by entry through `sabrSessionStore.setInfoReloader`, backed by
+  `YouTubeExtractor.reprobeSabrInfo` serialized through the extraction chain),
+  swaps in the new bootstrap (URL + host-rotation candidates, redirect/token
+  budgets and server contexts cleared, integrity streak reset) and resumes in
+  place — `requestNumber > 0` is kept so the next POST is a follow-up on the
+  new URL, never a restart. Bounded by `SABR_MAX_RELOADS_PER_SESSION`; a
+  visitorData change clears the PoToken and re-mints before resuming (a failed
+  re-mint is terminal, never a reuse of the old token). If no reloader is
+  wired or the budget is spent, reload fails.
 - **Identity rotation re-probe**: `reprobeSabrInfo(videoId)` re-resolves the
   STS, re-fetches the mweb stream player, and rebuilds the bootstrap via
   `buildSabrInfo` — the fresh player-response visitorData is pinned through

@@ -847,12 +847,12 @@ export class AvPlayerController {
   }
 
   public syncSeekFast(seekTime: number): void {
-    this.resetStallBaseline();
+    this.resetStallBaselineTo(seekTime / 1000);
     if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, true);
   }
 
   public syncSeekExact(seekTime: number): void {
-    this.resetStallBaseline();
+    this.resetStallBaselineTo(seekTime / 1000);
     if (this.isActive()) this.playbackEngine.seek(seekTime / 1000, false);
   }
 
@@ -1907,9 +1907,15 @@ export class AvPlayerController {
     this.vm.isReady = state.isReady;
     this.vm.isSeeking = state.isSeeking;
     this.vm.isEnded = state.isEnded;
-    this.vm.currentTime = state.currentTime;
-    this.updateSubtitleOverlayText(state.currentTime);
-    this.vm.durationTime = state.duration;
+    // 同会话重载（SABR 重试 / 质量切换）在 !isReady 阶段会把位置与时长清零，直接
+    // 透传会让进度条/时间文案在恢复瞬间跳变。保留已知的正值直到新文件上报；
+    // 真正的新源走 resetPlaybackState() → vm.reset() 清零。
+    const keepLastTimeline = !state.isReady && this.vm.durationTime > 0;
+    this.vm.currentTime = keepLastTimeline && state.currentTime <= 0
+      ? this.vm.currentTime : state.currentTime;
+    this.updateSubtitleOverlayText(this.vm.currentTime);
+    this.vm.durationTime = keepLastTimeline && state.duration <= 0
+      ? this.vm.durationTime : state.duration;
     this.vm.playbackSpeed = state.playbackSpeed;
     this.vm.cachedPercent = state.bufferingPercent;
     this.vm.seekableRanges = state.seekableRanges;
@@ -2059,6 +2065,15 @@ export class AvPlayerController {
     this.stallBaselineAtMs = Date.now();
   }
 
+  /**
+   * 用户 seek 后把停滞窗口的基线钉在目标位置：跳转后位置应从目标处继续前进，
+   * 而不是从 seek 之前的旧位置算位移（否则回退 seek 会被读成负位移，20s 后误报冻结）。
+   */
+  private resetStallBaselineTo(posSec: number): void {
+    this.stallBaselinePosSec = posSec > 0 ? posSec : this.lastKnownGoodPosition;
+    this.stallBaselineAtMs = Date.now();
+  }
+
   private stallWatchdogTick(): void {
     if (!this.isActive() || this.isRecovering) {
       this.resetStallBaseline();
@@ -2087,7 +2102,12 @@ export class AvPlayerController {
       return;
     }
     const progressed = pos - this.stallBaselinePosSec;
-    if (progressed >= AvPlayerController.STALL_MIN_PROGRESS_SEC) {
+    // 位移在两个方向上都算"没有卡住"：回退 seek 后位置会低于基线（基线停在 seek
+    // 之前的位置），旧的单向判定把这种负位移读成"零进展"，会在 seek 后 ~20s 误
+    // 触发一次整源 reload（日志表现为 load + end-file、进度短暂跳变后回原位）。
+    // 任一方向超过阈值都重开窗口；只有位移 ≈ 0 才是真卡住。
+    if (progressed >= AvPlayerController.STALL_MIN_PROGRESS_SEC
+      || progressed <= -AvPlayerController.STALL_MIN_PROGRESS_SEC) {
       this.resetStallBaseline();
       return;
     }

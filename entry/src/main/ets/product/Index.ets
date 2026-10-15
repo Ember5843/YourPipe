@@ -1359,21 +1359,22 @@ struct Index {
           const session = PlayerSession.getInstance();
           const pip = PiPManager.getInstance();
           const backState = session.playerState;
-          // 返回键进入画中画：pipOnReturn 且设备支持且未激活且播放器处于可播或将播状态。
-          // 切集中同样放行：提取中（IDLE 且有在飞 prepare/play）与 LOADING 是合法的
-          // 「继续看」语义；走 release 分支反而会把在飞切换留成悬空播放器。
+          // 返回键进入画中画：pipOnReturn 且设备支持且未激活，且必须已有真实播放上下文——
+          // 正在播放/暂停/缓冲/就绪，或播放源已提交（URL 已获取并装入引擎，LOADING/IDLE
+          // 的「继续看」语义）。提取中、还没拿到 URL、或源提交失败时返回不弹 PiP（否则
+          // 会开出一个空画中画）；此时走 release 分支，代际守卫会丢弃迟到的在飞结果。
           // 仅音频会话：禁止 PiP，任何返回直接 release。
+          const hasLivePlaybackContext = backState === PlayerState.PLAYING
+            || backState === PlayerState.PAUSED
+            || backState === PlayerState.BUFFERING
+            || backState === PlayerState.READY
+            || session.hasCommittedSource;
           const canEnterPiP = this.playbackConfig.pipOnReturn
             && pip.isPiPSupported()
             && !session.isPiPActive
             && !session.isAudioOnlyMode
-            && (backState === PlayerState.PLAYING
-              || backState === PlayerState.PAUSED
-              || backState === PlayerState.BUFFERING
-              || backState === PlayerState.READY
-              || backState === PlayerState.LOADING
-              || (backState === PlayerState.IDLE && session.hasInFlightPlayback));
-          logger.info(`onBackPressed canEnterPiP=${canEnterPiP} | pipOnReturn=${this.playbackConfig.pipOnReturn} supported=${pip.isPiPSupported()} isReady=${pip.isReady} isPiPActive=${session.isPiPActive} audioOnly=${session.isAudioOnlyMode} state=${backState} inFlight=${session.hasInFlightPlayback}`);
+            && hasLivePlaybackContext;
+          logger.info(`onBackPressed canEnterPiP=${canEnterPiP} | pipOnReturn=${this.playbackConfig.pipOnReturn} supported=${pip.isPiPSupported()} isReady=${pip.isReady} isPiPActive=${session.isPiPActive} audioOnly=${session.isAudioOnlyMode} state=${backState} inFlight=${session.hasInFlightPlayback} committed=${session.hasCommittedSource}`);
           if (canEnterPiP) {
             // 返回 = 弹 PiP：先锁定 PIP 呈现态（视频保持 ON），再 startPiP + pop。
             PlayerPresentation.onPipStarted();

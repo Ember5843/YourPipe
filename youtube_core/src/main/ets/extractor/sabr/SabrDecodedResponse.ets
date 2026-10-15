@@ -65,6 +65,13 @@ export class SabrDecodedResponse {
   redirectUrl?: string;
   sabrError?: string;
   reloadRequested: boolean = false;
+  /**
+   * RELOAD_PLAYER token
+   * (`ReloadPlaybackContext.reload_playback_params.token`). Must be echoed in
+   * the re-probe player request so the server hands out a fresh streaming URL
+   * / ustreamer config for the same session (PipePipe decodeReloadToken).
+   */
+  reloadToken?: string;
   streamProtectionStatus: number = -1;
   streamProtectionMaxRetries: number = -1;
   /** SABR_SEEK part reason (-1 = no seek part). Decoded for diagnostics only. */
@@ -106,7 +113,7 @@ export class SabrDecodedResponse {
 
   summarizeNoMediaResponse(): string {
     return `protection=${this.streamProtectionStatus}/${this.streamProtectionMaxRetries} `
-      + `reload=${this.reloadRequested} seek=${this.sabrSeekReason} redirect=${!!this.redirectUrl} `
+      + `reload=${this.reloadRequested} tokenLen=${this.reloadToken?.length ?? 0} seek=${this.sabrSeekReason} redirect=${!!this.redirectUrl} `
       + `error=${this.sabrError || 'none'} policy=${this.nextRequestPolicy?.summarize() || 'none'}`;
   }
 }

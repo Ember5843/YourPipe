@@ -179,6 +179,16 @@ export class PlayerSession {
     this._cachedVideoSource = source;
   }
 
+  /**
+   * True once a fetched playback source was actually submitted to the engine
+   * for the current session (URL obtained + `updateVideoSource` issued).
+   * False while extraction is still running, after a failed prepare, or after
+   * `resetSession`. Gates PiP-on-back so back never opens an empty PiP window.
+   */
+  get hasCommittedSource(): boolean {
+    return this._submittedVideoId !== '';
+  }
+
   get lastPlayError(): ErrorInfo | null {
     return this._lastPlayError;
   }

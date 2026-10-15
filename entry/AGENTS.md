@@ -275,9 +275,19 @@ store caches (`favorites`, `playlists`, `subscriptions`, `watchHistory`,
      `awaitReady()`)
   5. Queue-next prefetch: once playback is stable, `YouTubePlayService.prefetch`
      extracts the next queue item's streams on idle bandwidth (TTL'd result
-     cache, consumed via `takePrefetched`). Extraction is serialized through
-     a mutex — the extractor is a stateful singleton; prefetch must never
-     run concurrently with real playback extraction.
+     cache, consumed via `takePrefetched`). The prefetch caches (results,
+     in-flight tasks, per-video DASH-pot injections) are **partitioned by the
+     effective playback-auth state** (`guest` | `auth`, via
+     `isAuthEnabledForPlayback`): entries are keyed `${partition}|${videoId}`
+     with the mode captured at extraction time and are only read/deduped inside
+     their own partition. Toggling 登录态用于播放 (or the master auth switch /
+     login / logout) switches which partition serves — the other side is kept,
+     never deleted (each side owns its own cache). Playback-endpoint config
+     changes and restore-defaults still clear BOTH partitions via
+     `clearPrefetchCache` (the extracted URL shape changes for that state).
+     Extraction is serialized through a mutex — the extractor is a stateful
+     singleton; prefetch must never run concurrently with real playback
+     extraction.
 - `LanguageManager.applyPersistedLanguage()`, `ColorModeManager.applyPersistedMode(context)`.
 - `NetworkHandoverService.start()` / `stop()` — network-handover listener
   lifecycle (see §3).

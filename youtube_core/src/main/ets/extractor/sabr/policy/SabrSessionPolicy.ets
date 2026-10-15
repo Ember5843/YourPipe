@@ -28,14 +28,17 @@ export class SabrControlAction {
   readonly ms: number;
   readonly kind: SabrErrorKind;
   readonly message: string;
+  /** RELOAD_PLAYER echo token ('' for every other action). */
+  readonly token: string;
 
   private constructor(type: SabrControlActionType, url: string, ms: number,
-    kind: SabrErrorKind, message: string) {
+    kind: SabrErrorKind, message: string, token: string = '') {
     this.type = type;
     this.url = url;
     this.ms = ms;
     this.kind = kind;
     this.message = message;
+    this.token = token;
   }
 
   static applyRedirect(url: string): SabrControlAction {
@@ -70,9 +73,13 @@ export class SabrControlAction {
     return new SabrControlAction('continue', '', 0, 'protocol', '');
   }
 
-  /** reason is carried in `message` for diagnostics. */
-  static reloadPlayer(reason: string): SabrControlAction {
-    return new SabrControlAction('reload_player', '', 0, 'protocol', reason);
+  /**
+   * reason is carried in `message` for diagnostics; `token` is the
+   * RELOAD_PLAYER_RESPONSE echo token handed to the info reloader ('' when the
+   * server did not provide one).
+   */
+  static reloadPlayer(reason: string, token: string = ''): SabrControlAction {
+    return new SabrControlAction('reload_player', '', 0, 'protocol', reason, token);
   }
 
   static rotateIdentity(): SabrControlAction {

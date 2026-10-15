@@ -258,6 +258,16 @@ non-product `youtube-dual` session, so it was dead traffic on the EDL path.
 
 Do not teach MPV remote SABR URLs directly; always go through the local proxy.
 
+**Stall recovery**: `AvPlayerController` runs an in-memory stall watchdog
+(5s tick / 20s window / ≥1s movement = healthy) that injects a synthetic
+network-class error into the standard recovery ladder (same-URL
+`retryPlayback` → fresh re-creation of the local session) when an active,
+non-seeking playback window stops advancing. Movement in **either** direction
+clears the window — a backward seek must never read as "frozen", and user
+seeks re-baseline the window at the seek target (`resetStallBaselineTo`) — and
+a same-session reload keeps the last positive `currentTime`/`durationTime` in
+the UI view-model so the progress bar does not jump during the recovery.
+
 **Live HLS** (demuxed YouTube master, `?mpd_version=7`): one master GET in
 `AvPlayerController.resolveLiveHlsStreams` picks the variant ≤ the quality
 cap **and** the top-bitrate audio rendition (EXT-X-MEDIA / audio-only

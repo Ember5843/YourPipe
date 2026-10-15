@@ -920,8 +920,6 @@ export class YouTubeExtractor implements CommentsBackend {
       logger.warn('[SABR] n-deobfuscate serverAbr failed:', e);
     }
 
-    await this.resolveSabrFormatUrls(sd);
-
     const formats = this.parseSabrFormats(sd);
     if (formats.length === 0) {
       return undefined;
@@ -951,12 +949,17 @@ export class YouTubeExtractor implements CommentsBackend {
    * Callers MUST serialize this against extractVideoStreams (entry extractChain)
    * — the extractor is a stateful singleton. STS reuses the normal cache path;
    * the stream /player call mirrors the mweb playback request (Cookie only when
-   * present). Returns undefined on any failure; the session falls through to
-   * the next policy action instead of hard-failing here.
+   * present). `reloadToken` echoes a server RELOAD_PLAYER request into the body
+   * (`playbackContext.reloadPlaybackContext.reloadPlaybackParams.token`), so
+   * the server can hand out a fresh streaming URL / ustreamer config for the
+   * same session (PipePipe fetchSabrInfoForReload). Returns undefined on any
+   * failure; the session falls through to the next policy action instead of
+   * hard-failing here.
    */
-  async reprobeSabrInfo(videoId: string): Promise<YoutubeSabrInfo | undefined> {
+  async reprobeSabrInfo(videoId: string, reloadToken?: string): Promise<YoutubeSabrInfo | undefined> {
     const startedAt = Date.now();
-    logger.info(`[SABR] reprobe start video=${videoId}`);
+    logger.info(`[SABR] reprobe start video=${videoId} `
+      + `reloadToken=${reloadToken && reloadToken.length > 0 ? 'present' : 'absent'}`);
     try {
       const sts = await this.resolveSignatureTimestamp(videoId, undefined, `sabr-reprobe-${videoId}`);
       if (sts === undefined || sts <= 0) {
@@ -964,7 +967,8 @@ export class YouTubeExtractor implements CommentsBackend {
         return undefined;
       }
       const webCookieAuth = this.shouldAttachWebCookieAuth();
-      const players = await this.fetchSelectedStreamPlayer(videoId, sts, 'mweb', webCookieAuth, false);
+      const players = await this.fetchSelectedStreamPlayer(
+        videoId, sts, 'mweb', webCookieAuth, false, reloadToken);
       if (!players.player?.streamingData) {
         logger.warn(`[SABR] reprobe failed video=${videoId} reason=no_streaming_data`);
         return undefined;
@@ -1056,136 +1060,6 @@ export class YouTubeExtractor implements CommentsBackend {
       out.push(meta);
     }
     return out;
-  }
-
-  /**
-   * PipePipe parseSabrFormats prerequisites (collectSabrDecodeParameters +
-   * deobfuscateBatch + resolveStreamingUrl): each SABR format exposes an
-   * `initializationUrl`, and since init segments are fetched over a pot-bound
-   * HTTP Range (YoutubeSabrSession.fetchInitializationData) that URL must be
-   * fully playable — cipher urls expanded (url/s/sp), signature and throttling
-   * `n` decoded in ONE batch. Resolved urls are written back onto
-   * sd.adaptiveFormats (cipher fields cleared); only the SABR path reads them.
-   * Failure is non-fatal here: an unresolved url surfaces later as a typed
-   * init-range error instead of breaking the whole extraction.
-   */
-  private async resolveSabrFormatUrls(sd: StreamingData): Promise<void> {
-    interface SabrUrlPending {
-      index: number;
-      baseUrl: string;
-      obfSig: string;
-      sp: string;
-      needsSig: boolean;
-    }
-    const formats = sd.adaptiveFormats || [];
-    const pending: SabrUrlPending[] = [];
-    const sigs: string[] = [];
-    const ns: string[] = [];
-    const seenSig: Set<string> = new Set();
-    const seenN: Set<string> = new Set();
-
-    for (let i = 0; i < formats.length; i++) {
-      const fmt = formats[i];
-      let url = fmt.url || '';
-      let obfSig = '';
-      let plainSig = '';
-      let sp = 'signature';
-      if (!url && (fmt.signatureCipher || fmt.cipher)) {
-        const cipher = fmt.signatureCipher || fmt.cipher || '';
-        const pairs = cipher.split('&');
-        for (const pair of pairs) {
-          const eq = pair.indexOf('=');
-          if (eq <= 0) {
-            continue;
-          }
-          const key = pair.substring(0, eq);
-          const raw = pair.substring(eq + 1);
-          if (key === 'url') {
-            try {
-              url = decodeURIComponent(raw);
-            } catch (_e) {
-              url = raw;
-            }
-          } else if (key === 's') {
-            try {
-              obfSig = decodeURIComponent(raw);
-            } catch (_e) {
-              obfSig = raw;
-            }
-          } else if (key === 'sig') {
-            plainSig = raw;
-          } else if (key === 'sp') {
-            sp = raw;
-          }
-        }
-        if (!url) {
-          logger.warn(`[SABR] cipher url missing itag=${fmt.itag}; initializationUrl skipped`);
-          continue;
-        }
-        if (plainSig && !obfSig) {
-          url += `${url.indexOf('?') >= 0 ? '&' : '?'}${sp}=${plainSig}`;
-        }
-      }
-      if (!url) {
-        continue;
-      }
-      const n = this.getThrottlingParamFromUrl(url);
-      if (n && !seenN.has(n)) {
-        seenN.add(n);
-        ns.push(n);
-      }
-      if (obfSig && !seenSig.has(obfSig)) {
-        seenSig.add(obfSig);
-        sigs.push(obfSig);
-      }
-      pending.push({ index: i, baseUrl: url, obfSig: obfSig, sp: sp, needsSig: obfSig.length > 0 });
-    }
-
-    if (sigs.length === 0 && ns.length === 0) {
-      // Plain urls without cipher/n: still write back expanded cipher urls.
-      for (const p of pending) {
-        if (p.baseUrl !== (formats[p.index].url || '')) {
-          formats[p.index].url = p.baseUrl;
-          formats[p.index].signatureCipher = undefined;
-          formats[p.index].cipher = undefined;
-        }
-      }
-      return;
-    }
-
-    try {
-      const result = await YoutubeJavaScriptPlayerManager.deobfuscateBatch(
-        sigs, ns, this.decoderPlayerId ?? undefined);
-      let resolved = 0;
-      for (const p of pending) {
-        let url = p.baseUrl;
-        if (p.needsSig) {
-          const decodedSig = result.sig[p.obfSig];
-          if (!decodedSig) {
-            logger.warn(`[SABR] init url sig decode failed itag=${formats[p.index].itag}`);
-            continue;
-          }
-          url += `${url.indexOf('?') >= 0 ? '&' : '?'}${p.sp}=${decodedSig}`;
-        }
-        const rawN = this.getThrottlingParamFromUrl(url);
-        if (rawN && result.n[rawN]) {
-          const decodedN = result.n[rawN];
-          if (decodedN) {
-            // Same percent-safe n replacement as the direct-url batch path.
-            url = url.replace(/([?&]n=)([^&]*)/, (_m: string, prefix: string): string => `${prefix}${decodedN}`);
-          }
-        }
-        formats[p.index].url = url;
-        formats[p.index].signatureCipher = undefined;
-        formats[p.index].cipher = undefined;
-        resolved++;
-      }
-      logger.info(`[SABR] init urls resolved=${resolved}/${pending.length} `
-        + `uniqueSigs=${sigs.length} uniqueNs=${ns.length}`);
-    } catch (e) {
-      logger.warn(`[SABR] init url batch decode failed: ${(e as Error).message || e}; `
-        + 'formats keep raw urls, init fetch will report typed errors');
-    }
   }
 
   private checkAggregatedErrors(players: InnertubePlayerResult): void {
@@ -1956,13 +1830,17 @@ export class YouTubeExtractor implements CommentsBackend {
    * @param useWebAuth Cookie+SAPISIDHASH on any client incl. tv_downgraded
    *   (PipePipe addLoggedInHeaders)
    * @param useTvAuth  Bearer on tv_downgraded only (OAuth-only fallback)
+   * @param reloadPlaybackToken RELOAD_PLAYER echo token for the mid-playback
+   *   re-probe (PipePipe appendReloadPlaybackContext); undefined for every
+   *   normal extraction request.
    */
   private async fetchSelectedStreamPlayer(
     videoId: string,
     sts: number | undefined,
     selectedClient: YoutubePlayerClientKey,
     useWebAuth: boolean = false,
-    useTvAuth: boolean = false
+    useTvAuth: boolean = false,
+    reloadPlaybackToken?: string
   ): Promise<InnertubePlayerResult> {
     const empty: InnertubePlayerResult = {
       player: undefined,
@@ -1970,7 +1848,7 @@ export class YouTubeExtractor implements CommentsBackend {
       sourceClient: selectedClient
     };
     logger.info(`[STREAM] fetchSelectedStreamPlayer client=${selectedClient} sts=${sts ?? '(none)'} `
-      + `webAuth=${useWebAuth} tvAuth=${useTvAuth}`);
+      + `webAuth=${useWebAuth} tvAuth=${useTvAuth} reloadToken=${reloadPlaybackToken ? 'present' : 'absent'}`);
     const ctx: ClientFetchContext = {
       videoId: videoId,
       hl: this.hl,
@@ -1981,7 +1859,8 @@ export class YouTubeExtractor implements CommentsBackend {
       visitorData: (selectedClient === 'tv_downgraded' || selectedClient === 'tv_samsung')
         ? undefined
         : YoutubeJavaScriptPlayerManager.getSessionVisitorData() || undefined,
-      signatureTimestamp: sts
+      signatureTimestamp: sts,
+      reloadPlaybackToken: reloadPlaybackToken
     };
     try {
       const fetched = await ConfiguredPlayerClient.fetch(

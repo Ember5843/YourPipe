@@ -140,6 +140,18 @@ export class ConfiguredPlayerClient {
         'signatureTimestamp': ctx.signatureTimestamp
       } as Record<string, Object>
     };
+    // RELOAD_PLAYER echo (PipePipe appendReloadPlaybackContext): the token of a
+    // server-requested player reload goes back into the re-probe request so the
+    // server can mint a fresh streaming URL / ustreamer config for this session.
+    // Only the mid-playback re-probe (reprobeSabrInfo) sets it.
+    if (ctx.reloadPlaybackToken && ctx.reloadPlaybackToken.length > 0) {
+      playbackContext['reloadPlaybackContext'] = {
+        'reloadPlaybackParams': {
+          'token': ctx.reloadPlaybackToken
+        } as Record<string, Object>
+      } as Record<string, Object>;
+      logger.info(`[${key}] reload playback token attached len=${ctx.reloadPlaybackToken.length}`);
+    }
 
     const payload: Record<string, Object> = {
       'context': { 'client': client } as Record<string, Object>,

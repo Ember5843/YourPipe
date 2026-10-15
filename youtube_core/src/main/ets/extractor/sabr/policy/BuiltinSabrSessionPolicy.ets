@@ -22,6 +22,9 @@ const MAX_POLICY_ONLY_RESPONSES = 3;
  *     with a hard FAIL(protection) after 3 consecutive pending responses;
  *   reloadRequested      → RELOAD_PLAYER → FAIL(reload_exhausted).
  * Every fallthrough means the previous action was unavailable or failed.
+ * reloadRequested is decided in the PUMP phase so background read-ahead
+ * responses honor it too (the previous fetch-phase-only decision was skipped
+ * by the fetch cache-hit early return and by the background pump).
  */
 export class BuiltinSabrSessionPolicy implements SabrSessionPolicy {
   evaluate(decoded: SabrDecodedResponse, ctx: SabrPolicyContext): SabrControlAction[] {
@@ -33,8 +36,6 @@ export class BuiltinSabrSessionPolicy implements SabrSessionPolicy {
     const actions: SabrControlAction[] = [];
     // PipePipe handleControlResponse throws on SABR_ERROR unconditionally —
     // a background free-pump must not swallow it into silent backoff.
-    // (reloadRequested stays fetch-phase only: our RELOAD_PLAYER recovery is
-    // in-session, and the pump policy runs on every fetch-path response too.)
     if (decoded.sabrError) {
       return [SabrControlAction.fail('protocol', `SABR error: ${decoded.sabrError}`)];
     }
@@ -45,6 +46,21 @@ export class BuiltinSabrSessionPolicy implements SabrSessionPolicy {
         return actions;
       }
       actions.push(SabrControlAction.applyRedirect(decoded.redirectUrl));
+    }
+    // RELOAD_PLAYER is decided in the pump phase, not the fetch phase: every
+    // response — background read-ahead included — must honor it, and the fetch
+    // cache-hit early return used to skip the fetch-phase decision. PipePipe
+    // handleControlResponse checks reload on every response (media included),
+    // before the media-driven budget reset. The token is echoed to the re-probe.
+    if (decoded.reloadRequested) {
+      const reloadActions: SabrControlAction[] = [];
+      if (ctx.hasInfoReloader && ctx.reloads < SABR_MAX_RELOADS_PER_SESSION) {
+        reloadActions.push(SabrControlAction.reloadPlayer(
+          'reload_requested', decoded.reloadToken || ''));
+      }
+      reloadActions.push(SabrControlAction.fail('reload_exhausted',
+        `SABR reload requested, reload budget exhausted: ${decoded.summarizeNoMediaResponse()}`));
+      return reloadActions;
     }
     if (decoded.segments.length > 0) {
       actions.push(SabrControlAction.continue());
@@ -67,15 +83,9 @@ export class BuiltinSabrSessionPolicy implements SabrSessionPolicy {
       return [SabrControlAction.fail('protocol',
         `SABR error while fetching ${ctx.requestKey}: ${decoded.sabrError}`)];
     }
-    if (decoded.reloadRequested) {
-      const actions: SabrControlAction[] = [];
-      if (ctx.hasInfoReloader && ctx.reloads < SABR_MAX_RELOADS_PER_SESSION) {
-        actions.push(SabrControlAction.reloadPlayer('reload_requested'));
-      }
-      actions.push(SabrControlAction.fail('reload_exhausted',
-        `SABR reload requested, reload budget exhausted: ${decoded.summarizeNoMediaResponse()}`));
-      return actions;
-    }
+    // reloadRequested is handled by the pump phase (evaluatePump) for every
+    // response — by the time the fetch phase runs, the reload has already been
+    // executed (or failed into 'reload_exhausted').
     if (ctx.holeRecoveryAvailable) {
       return [SabrControlAction.recoverHole()];
     }

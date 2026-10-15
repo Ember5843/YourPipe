@@ -117,6 +117,7 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
         }
         case PART_RELOAD_PLAYER_RESPONSE: {
           decoded.reloadRequested = true;
+          decoded.reloadToken = decodeReloadToken(part.data);
           break;
         }
         case PART_STREAM_PROTECTION_STATUS: {
@@ -300,6 +301,26 @@ function decodeSabrSeekReason(data: Uint8Array): number {
     }
   }
   return -1;
+}
+
+/**
+ * RELOAD_PLAYER_RESPONSE (46): extracts
+ * `ReloadPlaybackContext.reload_playback_params.token` — field 1
+ * (length-delimited) → nested message → field 1 (length-delimited string).
+ * PipePipe decodeReloadToken.
+ */
+function decodeReloadToken(data: Uint8Array): string | undefined {
+  for (const field of sabrReadFields(data)) {
+    if (field.number === 1 && field.wireType === WIRE_LENGTH_DELIMITED) {
+      for (const inner of sabrReadFields(field.getBytes())) {
+        if (inner.number === 1 && inner.wireType === WIRE_LENGTH_DELIMITED) {
+          const token = inner.getString();
+          return token.length > 0 ? token : undefined;
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 function decodeContextUpdate(data: Uint8Array): SabrContextUpdate {

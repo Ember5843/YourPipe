@@ -26,7 +26,7 @@ import {
   YoutubePlayerClientConfig
 } from 'youtube_core';
 import { StreamInfo, SubtitleTrack, sabrSessionStore, LocalMediaProxy } from 'mediaservice';
-import { buildAutoTranslatedTrack } from 'youtube_core';
+import { buildAutoTranslatedTrack, AuthSessionManager } from 'youtube_core';
 import { TranslationService } from '../../common/TranslationService';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
@@ -59,16 +59,16 @@ interface PrefetchedPlayResult {
  */
 class PlayServiceSabrInfoReloader implements SabrInfoReloader {
   private readonly reprobe:
-    (info: YoutubeSabrInfo, reason: string) => Promise<YoutubeSabrInfo | undefined>;
+    (info: YoutubeSabrInfo, reason: string, reloadToken?: string) => Promise<YoutubeSabrInfo | undefined>;
 
   constructor(
-    reprobe: (info: YoutubeSabrInfo, reason: string) => Promise<YoutubeSabrInfo | undefined>
+    reprobe: (info: YoutubeSabrInfo, reason: string, reloadToken?: string) => Promise<YoutubeSabrInfo | undefined>
   ) {
     this.reprobe = reprobe;
   }
 
-  reloadSabrInfo(info: YoutubeSabrInfo, reason: string): Promise<YoutubeSabrInfo | undefined> {
-    return this.reprobe(info, reason);
+  reloadSabrInfo(info: YoutubeSabrInfo, reason: string, reloadToken?: string): Promise<YoutubeSabrInfo | undefined> {
+    return this.reprobe(info, reason, reloadToken);
   }
 }
 
@@ -110,8 +110,9 @@ export class YouTubePlayService {
    * Written by play() and by takePrefetched() when a prefetch hit promotes its
    * video to current — never by a prefetch play() directly. */
   private pendingDashPotPromise: Promise<void> | null = null;
-  /** DASH pot injections keyed by videoId — lets a prefetched video's injection
-   * be promoted to the startup gate only when that video actually plays. */
+  /** DASH pot injections keyed by `${prefetch partition}|${videoId}` — lets a
+   * prefetched video's injection be promoted to the startup gate only when
+   * that video actually plays in the same auth partition. */
   private dashPotInjections: Map<string, Promise<void>> = new Map();
 
   /** Barrier used by the mediaservice startup gate: resolves when the pending
@@ -139,8 +140,30 @@ export class YouTubePlayService {
 
   // ── 队列预取（Layer 4）：播放稳定后提前提取下一个视频的流，切换时零网络 ──
   private static readonly PREFETCH_TTL_MS: number = 30 * 60 * 1000;
+  /**
+   * Prefetch caches partitioned by the effective playback-auth state
+   * (`guest` | `auth`). Prefetched stream URLs and DASH-pot injections are only
+   * valid for the client + auth attachment they were extracted with (guest
+   * tv_samsung direct URLs must never be served once 登录态用于播放 flips the
+   * endpoint to mweb SABR, and vice versa), so entries are keyed
+   * `${partition}|${videoId}` with the mode captured at extraction time and
+   * only the current partition is ever read or deduped. The two partitions are
+   * independent: toggling the playback-auth switch (or the master auth switch /
+   * login / logout) changes which partition serves next — the other side keeps
+   * its cache, it is never deleted and never consumed from the wrong side.
+   */
   private prefetchedResults: Map<string, PrefetchedPlayResult> = new Map();
   private prefetchInFlight: Map<string, Promise<YouTubePlayResult>> = new Map();
+
+  /** Effective playback-auth partition of the prefetch caches. */
+  private prefetchPartition(): string {
+    return AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true ? 'auth' : 'guest';
+  }
+
+  private prefetchCacheKey(videoId: string): string {
+    return `${this.prefetchPartition()}|${videoId}`;
+  }
+
   /** Extraction mutex: YouTubeExtractor is a stateful singleton — prefetch and
    *  real playback must never extract concurrently. */
   private extractChain: Promise<void> = Promise.resolve();
@@ -160,17 +183,21 @@ export class YouTubePlayService {
    * SABR RELOAD_PLAYER / ROTATE_IDENTITY re-probe. Serialized through the same
    * extraction mutex as play()/prefetch — the extractor is a stateful singleton,
    * so a mid-playback re-probe must never run beside a real extraction.
+   * `reloadToken` is the server RELOAD_PLAYER echo token, forwarded into the
+   * player request body (undefined for a ROTATE_IDENTITY re-probe).
    */
   private async reprobeSabrInfoSerialized(
     info: YoutubeSabrInfo,
-    reason: string
+    reason: string,
+    reloadToken?: string
   ): Promise<YoutubeSabrInfo | undefined> {
-    logger.info(`${TAG} sabr reprobe queued video=${info.videoId} reason=${reason}`);
+    logger.info(`${TAG} sabr reprobe queued video=${info.videoId} reason=${reason} `
+      + `reloadToken=${reloadToken && reloadToken.length > 0 ? 'present' : 'absent'}`);
     const run: Promise<YoutubeSabrInfo | undefined> = this.extractChain.then(() => {
       if (!this.extractor) {
         throw new Error('extractor not initialized');
       }
-      return this.extractor.reprobeSabrInfo(info.videoId);
+      return this.extractor.reprobeSabrInfo(info.videoId, reloadToken);
     });
     this.extractChain = run.then(() => undefined).catch(() => undefined);
     return run;
@@ -184,58 +211,66 @@ export class YouTubePlayService {
     if (!videoId) {
       return;
     }
-    const cached = this.prefetchedResults.get(videoId);
+    // Partition (guest | auth) is captured once at start: the result belongs to
+    // the auth mode that produced it, even if the user toggles mid-extraction.
+    const partition = this.prefetchPartition();
+    const key = `${partition}|${videoId}`;
+    const cached = this.prefetchedResults.get(key);
     if (cached && Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
       return;
     }
-    if (this.prefetchInFlight.has(videoId)) {
+    if (this.prefetchInFlight.has(key)) {
       return;
     }
-    logger.info(`${TAG} prefetch start video=${videoId}`);
+    logger.info(`${TAG} prefetch start video=${videoId} part=${partition}`);
     const task = this.play(videoId, `prefetch-${Date.now()}`, true);
-    this.prefetchInFlight.set(videoId, task);
+    this.prefetchInFlight.set(key, task);
     task.then((result: YouTubePlayResult) => {
-      this.prefetchInFlight.delete(videoId);
+      this.prefetchInFlight.delete(key);
       if (result.success) {
         const entry: PrefetchedPlayResult = { result: result, fetchedAtMs: Date.now() };
-        this.prefetchedResults.set(videoId, entry);
-        logger.info(`${TAG} prefetch done video=${videoId} streams=${result.playerStreams?.length || 0}`);
+        this.prefetchedResults.set(key, entry);
+        logger.info(`${TAG} prefetch done video=${videoId} part=${partition} streams=${result.playerStreams?.length || 0}`);
       } else {
-        logger.warn(`${TAG} prefetch failed video=${videoId} code=${result.errorCode || '-'}`);
+        logger.warn(`${TAG} prefetch failed video=${videoId} part=${partition} code=${result.errorCode || '-'}`);
       }
     }).catch((e: Error) => {
-      this.prefetchInFlight.delete(videoId);
-      logger.warn(`${TAG} prefetch exception video=${videoId}: ${e.message || e}`);
+      this.prefetchInFlight.delete(key);
+      logger.warn(`${TAG} prefetch exception video=${videoId} part=${partition}: ${e.message || e}`);
     });
   }
 
   /**
-   * Consume a prefetched result for videoId. A still-running prefetch is awaited
-   * (dedup) instead of starting a second extraction. undefined = nothing usable.
-   * A fresh entry is KEPT after a hit: queue revisits (switching back to a
-   * recently played video) reuse it until the TTL expires instead of paying a
-   * full re-extraction + PoToken mint.
+   * Consume a prefetched result for videoId FROM THE CURRENT auth partition.
+   * A still-running prefetch in the same partition is awaited (dedup) instead of
+   * starting a second extraction; result/in-flight entries of the other
+   * partition are deliberately invisible here (mode-tagged cache: a guest-mode
+   * entry must not be served once 登录态用于播放 switched the endpoint, and vice
+   * versa). undefined = nothing usable. A fresh entry is KEPT after a hit: queue
+   * revisits (switching back to a recently played video) reuse it until the TTL
+   * expires instead of paying a full re-extraction + PoToken mint.
    */
   async takePrefetched(videoId: string): Promise<YouTubePlayResult | undefined> {
-    const cached = this.prefetchedResults.get(videoId);
+    const key = this.prefetchCacheKey(videoId);
+    const cached = this.prefetchedResults.get(key);
     if (cached) {
       if (Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
-        logger.info(`${TAG} prefetch hit video=${videoId} age=${Date.now() - cached.fetchedAtMs}ms`);
+        logger.info(`${TAG} prefetch hit video=${videoId} part=${this.prefetchPartition()} age=${Date.now() - cached.fetchedAtMs}ms`);
         // Promote the prefetched video's pot injection to the startup gate:
         // it is now the currently playing video.
-        this.pendingDashPotPromise = this.dashPotInjections.get(videoId) ?? null;
+        this.pendingDashPotPromise = this.dashPotInjections.get(key) ?? null;
         return cached.result;
       }
-      this.prefetchedResults.delete(videoId);
+      this.prefetchedResults.delete(key);
     }
-    const inFlight = this.prefetchInFlight.get(videoId);
+    const inFlight = this.prefetchInFlight.get(key);
     if (inFlight) {
       logger.info(`${TAG} prefetch in-flight, awaiting video=${videoId}`);
       const result = await inFlight.catch(() => undefined);
-      this.prefetchInFlight.delete(videoId);
+      this.prefetchInFlight.delete(key);
       if (result && result.success) {
         logger.info(`${TAG} prefetch in-flight consumed video=${videoId}`);
-        this.pendingDashPotPromise = this.dashPotInjections.get(videoId) ?? null;
+        this.pendingDashPotPromise = this.dashPotInjections.get(key) ?? null;
         return result;
       }
     }
@@ -245,22 +280,24 @@ export class YouTubePlayService {
   /**
    * 卡片长按「下载」入口的流提取：不触碰播放器，也不改写
    * pendingDashPotPromise（forPrefetch=true）；经 extractChain 互斥串行。
-   * 命中 30 分钟 prefetch 缓存时零网络（不消费、不提升为播放会话）。
+   * 命中 30 分钟 prefetch 缓存时零网络（不消费、不提升为播放会话），命中范围
+   * 同样限定在当前播放鉴权分区（guest | auth）内——不能拿另一个模式的 URL。
    * 返回前等待该视频的 DASH PoToken 注入落地，保证交给下载器的直链已带 pot=。
    */
   async extractForDownload(videoId: string): Promise<YouTubePlayResult> {
     const trimmed = (videoId || '').trim();
-    const cached = this.prefetchedResults.get(trimmed);
+    const key = this.prefetchCacheKey(trimmed);
+    const cached = this.prefetchedResults.get(key);
     let result: YouTubePlayResult;
     if (cached && Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
-      logger.info(`${TAG} download extract prefetch hit video=${trimmed}`);
+      logger.info(`${TAG} download extract prefetch hit video=${trimmed} part=${this.prefetchPartition()}`);
       result = cached.result;
     } else {
-      logger.info(`${TAG} download extract start video=${trimmed}`);
+      logger.info(`${TAG} download extract start video=${trimmed} part=${this.prefetchPartition()}`);
       result = await this.play(trimmed, '', true);
     }
     if (result.success) {
-      const injection = this.dashPotInjections.get(trimmed);
+      const injection = this.dashPotInjections.get(key);
       if (injection) {
         // play() 内已对注入 Promise 挂 catch 兜底；await 只为时序（pot= 先于建任务）
         await injection;
@@ -270,13 +307,15 @@ export class YouTubePlayService {
   }
 
   /**
-   * Drop every cached/in-flight prefetch. Required on playback-endpoint
-   * changes: prefetched stream URLs were extracted with the old client and
-   * must not be served by takePrefetched under the new one.
+   * Drop every cached/in-flight prefetch — BOTH auth partitions. Required on
+   * playback-endpoint changes (the extracted URL shape changes for the affected
+   * state) and on restore-defaults / clear-data. A plain 登录态用于播放 toggle
+   * must NOT call this: the two partitions are independent caches and the
+   * inactive side is intentionally kept.
    */
   clearPrefetchCache(): void {
     if (this.prefetchedResults.size > 0 || this.prefetchInFlight.size > 0) {
-      logger.info(`${TAG} prefetch cache cleared results=${this.prefetchedResults.size} inFlight=${this.prefetchInFlight.size}`);
+      logger.info(`${TAG} prefetch cache cleared (both partitions) results=${this.prefetchedResults.size} inFlight=${this.prefetchInFlight.size}`);
     }
     this.prefetchedResults.clear();
     this.prefetchInFlight.clear();
@@ -312,8 +351,8 @@ export class YouTubePlayService {
     // the identity layer; the provider fast-skips while BotGuard is cold.
     SessionIdentityManager.setPlayerPoTokenHook(SabrWebViewPoTokenProvider.getInstance());
     sabrSessionStore.setInfoReloader(new PlayServiceSabrInfoReloader(
-      (info: YoutubeSabrInfo, reason: string): Promise<YoutubeSabrInfo | undefined> =>
-        this.reprobeSabrInfoSerialized(info, reason)));
+      (info: YoutubeSabrInfo, reason: string, reloadToken?: string): Promise<YoutubeSabrInfo | undefined> =>
+        this.reprobeSabrInfoSerialized(info, reason, reloadToken)));
     logger.info(`${TAG} YouTubePlayService initialized`);
   }
 
@@ -439,9 +478,10 @@ export class YouTubePlayService {
         const injection = this.injectDashPoToken(videoInfo).catch((e: Error) => {
           logger.warn(`${TAG} Dash PoToken injection failed, continuing without pot: ${String(e)}`);
         });
-        // Track per-videoId so a prefetch never clobbers the startup gate of
-        // the currently playing video; takePrefetched() promotes it on hit.
-        this.dashPotInjections.set(videoId, injection);
+        // Track per partition+videoId so a prefetch never clobbers the startup
+        // gate of the currently playing video; takePrefetched() promotes it on
+        // a hit inside the same auth partition.
+        this.dashPotInjections.set(this.prefetchCacheKey(videoId), injection);
         if (!forPrefetch) {
           this.pendingDashPotPromise = injection;
         }
