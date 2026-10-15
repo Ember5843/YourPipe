@@ -262,14 +262,16 @@ export class LocalMediaProxy {
     // Every other client retains the existing four-attempt policy.
     // With pot= now injected by YouTubePlayService, 403s are rare; keep a short
     // budget so genuinely invalid URLs fail fast instead of hanging 10s.
-    const isTvDowngraded = resource.sourceClient === 'tv_downgraded';
+    // tv_samsung (guest TVHTML5 default) gets the same bounded TV budget.
+    const isTvClient = resource.sourceClient === 'tv_downgraded'
+      || resource.sourceClient === 'tv_samsung';
     const retryStartedAt = Date.now();
     const tvRetryBudgetMs = 4000;
     let attempt = 0;
-    while (isTvDowngraded ? Date.now() - retryStartedAt < tvRetryBudgetMs : attempt < 4) {
+    while (isTvClient ? Date.now() - retryStartedAt < tvRetryBudgetMs : attempt < 4) {
       try {
         if (attempt > 0) {
-          const retryDelayMs = isTvDowngraded ? 250 : 250 * attempt;
+          const retryDelayMs = isTvClient ? 250 : 250 * attempt;
           await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
         }
         const bytes = await fetchYoutubeRangeBytes(resource, start, end);
@@ -540,6 +542,10 @@ export class LocalMediaProxy {
       case 'mweb':
       case 'MWEB':
         return ClientsConstants.MWEB_USER_AGENT;
+      case 'tv_samsung':
+        // PipePipe tv_samsung (Samsung Tizen SMART-TV) — extraction UA for
+        // token-free TVHTML5 direct URLs.
+        return ClientsConstants.TVHTML5_SAMSUNG_USER_AGENT;
       case 'tv_downgraded':
       case 'TVHTML5':
         return ClientsConstants.TVHTML5_DOWNGRADED_USER_AGENT;

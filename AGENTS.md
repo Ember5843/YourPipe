@@ -17,10 +17,11 @@
 - **What it is**: YouTube client for OpenHarmony / HarmonyOS. Plays YouTube
   content through a native **MPV** pipeline (vendored `libmpv.so` + static
   `libav*` for mux/remux). Product VOD path is **direct-link DASH** for guest
-  (`visionos` /player via the GAPIS endpoint, pot-free — PipePipe parity →
+  (`tv_samsung` TVHTML5 /player by default, pot-free — PipePipe parity;
+  `visionos` GAPIS remains selectable →
   adaptiveFormats direct URLs → dual-track local proxy → MPV); signed-in
   playback defaults to **mweb SABR/UMP**. Both states are user-selectable
-  (Options → 播放端点: guest `visionos|mweb`, signed-in
+  (Options → 播放端点: guest `tv_samsung|visionos|mweb`, signed-in
   `tv_downgraded|mweb`). `android_vr` and `web_safari` are unused endpoints,
   unreachable in product (no UI, kept for reference only); `android_vr`
   requires a session pot.
@@ -212,7 +213,8 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `AppLogStore`; do not scatter raw `console.log` / `hilog` in library code.
 - **Player stack**: product backend is MPV only (`libmpv_napi` +
   `MpvPlaybackEngine`). Do not reintroduce a second decoder/player path.
-- **Playback media path**: guest VOD is direct-link-first (`visionos` →
+- **Playback media path**: guest VOD is direct-link-first (`tv_samsung`
+  TVHTML5 by default, `visionos` selectable →
   adaptiveFormats direct URLs → local range/DASH proxy); signed-in VOD
   defaults to the mweb **SABR** path, with `tv_downgraded` direct links
   still selectable. `android_vr` and `web_safari` are unused endpoints,

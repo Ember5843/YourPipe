@@ -20,6 +20,8 @@ interface PlayerIdentity {
   clientId: string;
   userAgent: string;
   needsVrDeviceFields: boolean;
+  /** tv_samsung (PipePipe PlayerClient.forName Samsung/Tizen device fields). */
+  samsungDeviceFields?: boolean;
 }
 
 /**
@@ -46,6 +48,18 @@ export class ConfiguredPlayerClient {
           clientId: ClientsConstants.TVHTML5_DOWNGRADED_CLIENT_ID,
           userAgent: ClientsConstants.TVHTML5_DOWNGRADED_USER_AGENT,
           needsVrDeviceFields: false
+        };
+      case 'tv_samsung':
+        // PipePipe PlayerClient.forName('tv_samsung') (mirrors yt-dlp):
+        // TVHTML5 5.20260707 + Samsung Tizen SMART-TV UA + device fields.
+        return {
+          key: key,
+          clientName: ClientsConstants.TVHTML5_SAMSUNG_CLIENT_NAME,
+          clientVersion: ClientsConstants.TVHTML5_SAMSUNG_CLIENT_VERSION,
+          clientId: ClientsConstants.TVHTML5_SAMSUNG_CLIENT_ID,
+          userAgent: ClientsConstants.TVHTML5_SAMSUNG_USER_AGENT,
+          needsVrDeviceFields: false,
+          samsungDeviceFields: true
         };
       case 'web_safari':
         return {
@@ -110,6 +124,12 @@ export class ConfiguredPlayerClient {
       client['osName'] = 'Android';
       client['osVersion'] = ClientsConstants.ANDROID_VR_OS_VERSION;
     }
+    if (id.samsungDeviceFields) {
+      client['deviceMake'] = ClientsConstants.TVHTML5_SAMSUNG_DEVICE_MAKE;
+      client['deviceModel'] = ClientsConstants.TVHTML5_SAMSUNG_DEVICE_MODEL;
+      client['osName'] = ClientsConstants.TVHTML5_SAMSUNG_OS_NAME;
+      client['osVersion'] = ClientsConstants.TVHTML5_SAMSUNG_OS_VERSION;
+    }
     if (ctx.visitorData && ctx.visitorData.length > 0) {
       client['visitorData'] = ctx.visitorData;
     }
@@ -134,9 +154,11 @@ export class ConfiguredPlayerClient {
     // visitorData and, when the injected hook can mint one fast enough, a
     // player PoToken bound per the home page experiment flags (PipePipe 5.3.0:
     // content binding mints per videoId, session binding reuses the session
-    // token). tv_downgraded stays token-free (PipePipe 7673caed).
+    // token). TV clients stay token-free (PipePipe 7673caed for tv_downgraded;
+    // tv_samsung follows the same rule — upstream never pots TVHTML5).
     // A missing/slow/failed hook never blocks extraction.
-    if (key !== 'tv_downgraded') {
+    const isTokenFreeTvClient = key === 'tv_downgraded' || key === 'tv_samsung';
+    if (!isTokenFreeTvClient) {
       const identityVisitorData = SessionIdentityManager.current()?.visitorData || '';
       if (identityVisitorData) {
         client['visitorData'] = identityVisitorData;

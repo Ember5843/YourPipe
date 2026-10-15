@@ -115,6 +115,10 @@ export class HttpError extends Error {
   public readonly errorType: HttpErrorType;
   public readonly isRecoverable: boolean;
   public readonly responseBody?: string;
+  /** 保留的 netstack/curl 错误码（BusinessError.code）；HTTP 状态类错误为 undefined。 */
+  public readonly networkErrorCode?: number;
+  /** 传输层主机不可达（DNS 解析失败 / 无法连接 / 无路由）。SABR 据此轮换 googlevideo 主机。 */
+  public readonly isHostUnreachable: boolean;
 
   constructor(
     message: string,
@@ -122,7 +126,8 @@ export class HttpError extends Error {
     method: string,
     responseCode?: number,
     httpStatusMessage?: string,
-    responseBody?: string
+    responseBody?: string,
+    networkErrorCode?: number
   ) {
     super(message);
     this.name = 'HttpError';
@@ -131,11 +136,43 @@ export class HttpError extends Error {
     this.responseCode = responseCode;
     this.httpStatusMessage = httpStatusMessage;
     this.responseBody = responseBody;
-    
+    this.networkErrorCode = networkErrorCode;
+
     // 分析错误类型和可恢复性
     const analysis = this.analyzeErrorType(responseCode);
     this.errorType = analysis.errorType;
     this.isRecoverable = analysis.isRecoverable;
+    this.isHostUnreachable =
+      HttpError.classifyHostUnreachable(responseCode, networkErrorCode, message);
+  }
+
+  /**
+   * 传输层主机不可达分类（SABR 主机轮换判据）：
+   *   2300006 = 无法解析主机名（DNS），2300007 = 无法连接服务器 / 无路由。
+   * 排除 2300005（代理名解析失败）——那是代理配置问题，轮换 googlevideo 主机无意义。
+   * 无错误码时回退到消息关键字匹配。
+   */
+  private static classifyHostUnreachable(
+    responseCode: number | undefined,
+    networkErrorCode: number | undefined,
+    message: string
+  ): boolean {
+    if (responseCode) {
+      return false;
+    }
+    if (networkErrorCode === 2300006 || networkErrorCode === 2300007) {
+      return true;
+    }
+    if (networkErrorCode === 2300005) {
+      return false;
+    }
+    const lower = (message || '').toLowerCase();
+    return lower.includes("couldn't resolve host")
+      || lower.includes('could not resolve host')
+      || lower.includes('unknownhost')
+      || lower.includes('no route to host')
+      || lower.includes("couldn't connect to server")
+      || lower.includes('could not connect to server');
   }
 
   private analyzeErrorType(responseCode?: number): ErrorAnalysisResult {
@@ -334,7 +371,7 @@ export class HttpDownloader {
     if (message.includes('407')) {
       return new HttpError(message, url, method, 407);
     }
-    return new HttpError(message, url, method);
+    return new HttpError(message, url, method, undefined, undefined, undefined, err.code);
   }
 
   /** 拿到响应即通知（不看状态码）；观察者抛错只记日志，不影响请求链路。 */
@@ -783,6 +820,92 @@ export class HttpDownloader {
       }
     }
     throw lastError || new HttpError('Unknown error', url, 'POST');
+  }
+
+  /**
+   * Buffered binary GET (SABR initialization Range). Result is an ARRAY_BUFFER,
+   * unlike request() which returns a text body. Only small bounded payloads
+   * (≤4MB init) — the 50MB+ UMP stream path stays in postBinary.
+   */
+  async getBinary(
+    url: string,
+    headers?: Record<string, string[] | string>,
+    localization?: Localization,
+    enableRetry: boolean = true,
+    abortToken?: HttpAbortToken
+  ): Promise<http.HttpResponse> {
+    let lastError: HttpError | null = null;
+    let attempt = 0;
+    const maxAttempts = enableRetry ? HttpDownloader.MAX_RETRIES : 1;
+    while (attempt < maxAttempts) {
+      attempt++;
+      if (abortToken?.aborted) {
+        throw new HttpError('request aborted', url, 'GET');
+      }
+      let httpRequest: http.HttpRequest | null = null;
+      try {
+        const requestHeaders = this.processBinaryHeaders(headers, localization);
+        requestHeaders['Accept-Encoding'] = 'identity';
+        const request = http.createHttp();
+        httpRequest = request;
+        const httpOptions: http.HttpRequestOptions = {
+          method: http.RequestMethod.GET,
+          header: requestHeaders,
+          connectTimeout: 30000,
+          readTimeout: 60000,
+          usingCache: false,
+          expectDataType: http.HttpDataType.ARRAY_BUFFER
+        };
+        HttpDownloader.applyConnectionPoolReuse(httpOptions);
+        HttpDownloader.applyProxyToOptions(httpOptions, url);
+
+        const response = await new Promise<http.HttpResponse>((resolve, reject) => {
+          request.request(url, httpOptions, (err: BusinessError, data: http.HttpResponse) => {
+            if (!err) {
+              resolve(data);
+            } else {
+              reject(err);
+            }
+          });
+        });
+        HttpDownloader.notifySetCookie(response, url);
+
+        if (response.responseCode && response.responseCode >= 400) {
+          const httpError = new HttpError(
+            `HTTP ${response.responseCode}`, url, 'GET',
+            response.responseCode, `HTTP ${response.responseCode}`);
+          if (httpError.isRecoverable && attempt < maxAttempts) {
+            await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
+            continue;
+          }
+          throw httpError;
+        }
+        return response;
+      } catch (err) {
+        if (err instanceof HttpError) {
+          if (err.isRecoverable && attempt < maxAttempts) {
+            await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
+            continue;
+          }
+          throw err;
+        }
+        const businessError = err as BusinessError;
+        lastError = HttpDownloader.fromNetworkError(businessError, url, 'GET');
+        if (lastError.isRecoverable && attempt < maxAttempts) {
+          await this.sleep(HttpDownloader.RETRY_DELAY * attempt);
+          continue;
+        }
+        throw lastError;
+      } finally {
+        if (httpRequest) {
+          try {
+            httpRequest.destroy();
+          } catch (_e) {
+          }
+        }
+      }
+    }
+    throw lastError || new HttpError('Unknown error', url, 'GET');
   }
 
   /**

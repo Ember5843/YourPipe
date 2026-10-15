@@ -60,6 +60,21 @@ export class ClientsConstants {
     "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version";
 
   // =====================
+  // TVHTML5 Samsung (tv_samsung) — PipePipe 5.5.0 logged-out default stream
+  // client (555143dc, mirrors yt-dlp tv_samsung). Token-free direct URLs.
+  // =====================
+  static readonly TVHTML5_SAMSUNG_CLIENT_ID: string = "7";
+  static readonly TVHTML5_SAMSUNG_CLIENT_NAME: string = "TVHTML5";
+  static readonly TVHTML5_SAMSUNG_CLIENT_VERSION: string = "5.20260707";
+  static readonly TVHTML5_SAMSUNG_USER_AGENT: string =
+    "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) " +
+    "Version/2.4.0 TV Safari/538.1";
+  static readonly TVHTML5_SAMSUNG_DEVICE_MAKE: string = "Samsung";
+  static readonly TVHTML5_SAMSUNG_DEVICE_MODEL: string = "UKS9800";
+  static readonly TVHTML5_SAMSUNG_OS_NAME: string = "Tizen";
+  static readonly TVHTML5_SAMSUNG_OS_VERSION: string = "2.4.0";
+
+  // =====================
   // TVHTML5_SIMPLY_EMBEDDED_PLAYER ('tv')
   // =====================
   /** PS4 Safari UA (NewPipe TVHTML5_SIMPLY_EMBEDDED_PLAYER) — the only non-Cobalt TV UA. */

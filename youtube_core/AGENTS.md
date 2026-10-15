@@ -94,10 +94,12 @@ youtube_core/src/main/
 ## 3. Extractor flow (playback-critical path)
 1. **Resolve video ID** from URL or ID string.
 2. **Client selection** via `YoutubePlayerClientConfig` (single client):
-   - allow-list: `mweb` | `web_safari` | `visionos` | `android_vr` | `tv_downgraded`
+   - allow-list: `mweb` | `web_safari` | `visionos` | `android_vr` | `tv_downgraded` | `tv_samsung`
    - **per-state configurable** (entry Options → 播放端点 →
-     `setConfiguredClients(guest, auth)`): guest allow-list `visionos|mweb`
-     (default `visionos`, pot-free GAPIS endpoint `youtubei.googleapis.com`,
+     `setConfiguredClients(guest, auth)`): guest allow-list `tv_samsung|visionos|mweb`
+     (default `tv_samsung` — pot-free TVHTML5 direct adaptiveFormats URLs with
+     Samsung Tizen device fields, PipePipe `61b077779` logged-out default;
+     `visionos` keeps the pot-free GAPIS endpoint `youtubei.googleapis.com`,
      no sts/pot), signed-in allow-list `tv_downgraded|mweb` (default
      `mweb` SABR; `tv_downgraded` stays the token-free direct-URL option);
      direct clients resolve to direct adaptiveFormats URLs. `applyAuthDefault` / `resetToAuthDefault` pick the
@@ -119,11 +121,11 @@ youtube_core/src/main/
      (`WebClientVersionResolver` / `sw.js`) runs on empty-`streamingData` recovery
    - `buildAndCacheStreams`:
      - `mweb` + VOD + `serverAbrStreamingUrl` → **SABR** streams (`deliveryMethod: SABR`)
-     - else adaptiveFormats (not `formats[]`), skip for `tv_downgraded`+LIVE
+     - else adaptiveFormats (not `formats[]`), skip for TV client+LIVE (`tv_downgraded`|`tv_samsung`, PipePipe isTvClient)
      - visionos with zero streams + no HLS → ANDROID `reel/reel_item_watch`
        muxed `formats[]` fallback (PipePipe fetchAndroidReelMuxedFormats, but
        deferred: fired only when the primary path is empty, not per extraction)
-      - HLS only when: post-live | live+`tv_downgraded` | `web_safari`;
+      - HLS only when: post-live | live+TV client | `web_safari`;
         live HLS masters are background-parsed into per-variant quality
         streams (variant `bitrate` carries BANDWIDTH/AVERAGE-BANDWIDTH; audio-only
         STREAM-INF entries without RESOLUTION whose CODECS resolves to no
@@ -142,7 +144,7 @@ youtube_core/src/main/
 - **Bootstrap**: `YoutubeSabrInfo` from player response (`serverAbrStreamingUrl` + formats).
 - **Session**: `YoutubeSabrSession` POSTs UMP, parses with `UmpReader` /
   `SabrResponseDecoder` / `SabrProto`, caches segments, applies PoToken when
-  protected (via `SabrPoTokenProvider` implemented in entry). UMP response
+  protected (via `SabrPoTokenProvider` implemented in entry). Init segments are fetched over a pot-bound HTTP Range GET (`fetchInitializationData`, `?pot=` base64url, 4MB cap, sig/n-resolved `initializationUrl` from `resolveSabrFormatUrls`) instead of the UMP stream; unreachable googlevideo hosts rotate across `mn`/`mvi` candidates with `rn` preserved (DNS retry 2×500ms first); continuous backoff / no-progress budgets (30s each, media arrival resets) end empty loops with a typed `kind='network'` error. UMP response
   body bytes are reported as they arrive (per `dataReceive` chunk) through
   `setSabrNetworkTrafficSink` (wired by mediaservice to its proxy traffic
   meter for the stats UI). `abortInFlightPost(reason)` is the

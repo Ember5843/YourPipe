@@ -563,10 +563,10 @@ export class YouTubePlayService {
 
   /** Inject pot= into DASH/progressive stream URLs (not SABR). */
   private async injectDashPoToken(videoInfo: VideoInfo): Promise<void> {
-    // PipePipe: tv_downgraded and visionos are fully token-free — /player
-    // carries no pot and media URLs never get pot= either.
+    // PipePipe: tv_downgraded, tv_samsung and visionos are fully token-free —
+    // /player carries no pot and media URLs never get pot= either.
     const clientKey = YoutubePlayerClientConfig.getYoutubePlayerClient();
-    if (clientKey === 'tv_downgraded' || clientKey === 'visionos') {
+    if (clientKey === 'tv_downgraded' || clientKey === 'tv_samsung' || clientKey === 'visionos') {
       logger.info(`${TAG} ${clientKey} is token-free; skipping Dash PoToken injection`);
       return;
     }

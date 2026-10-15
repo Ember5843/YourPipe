@@ -56,15 +56,18 @@ export const DEMUXER_MAX_BYTES_LABELS: DemuxerMaxBytes[] = ['10', '20', '50', '1
 
 export const GPU_API_LABELS: GpuApi[] = ['auto', 'opengl', 'vulkan'];
 
-/** 游客态播放端点（PipePipe per-state allow-list: visionos | mweb） */
-export type GuestPlayerClient = 'visionos' | 'mweb';
+/** 游客态播放端点（PipePipe per-state allow-list HEAD: tv_samsung | visionos | mweb） */
+export type GuestPlayerClient = 'tv_samsung' | 'visionos' | 'mweb';
 /** 登录态播放端点（PipePipe per-state allow-list: tv_downgraded | mweb） */
 export type AuthPlayerClient = 'tv_downgraded' | 'mweb';
 
-export const GUEST_PLAYER_CLIENT_LABELS: GuestPlayerClient[] = ['visionos', 'mweb'];
+export const GUEST_PLAYER_CLIENT_LABELS: GuestPlayerClient[] = ['tv_samsung', 'visionos', 'mweb'];
 export const AUTH_PLAYER_CLIENT_LABELS: AuthPlayerClient[] = ['tv_downgraded', 'mweb'];
 
 export function getPlayerClientDisplay(value: string): Resource {
+  if (value === 'tv_samsung') {
+    return $r('app.string.yt_setting_client_tv_samsung');
+  }
   if (value === 'tv_downgraded') {
     return $r('app.string.yt_setting_client_tv_downgraded');
   }
@@ -192,7 +195,7 @@ export class PlaybackConfig {
   /** GPU 渲染 API */
   gpuApi: GpuApi = 'auto';
   /** 游客（未登录/未启用播放鉴权）时的 YouTube 播放端点 */
-  guestPlayerClient: GuestPlayerClient = 'visionos';
+  guestPlayerClient: GuestPlayerClient = 'tv_samsung';
   /** 登录（且启用播放鉴权）时的 YouTube 播放端点 */
   authPlayerClient: AuthPlayerClient = 'mweb';
   /** 覆盖层字幕字号倍率 */
@@ -272,9 +275,22 @@ export class PlaybackConfig {
     cfg.demuxerMaxBytes = DEMUXER_MAX_BYTES_LABELS.includes(maxBytes as DemuxerMaxBytes) ? maxBytes as DemuxerMaxBytes : '20';
     const gpuApi = PreferencesStore.getString('cfg_pb_gpuApi', 'auto');
     cfg.gpuApi = GPU_API_LABELS.includes(gpuApi as GpuApi) ? gpuApi as GpuApi : 'auto';
-    const guestClient = PreferencesStore.getString('cfg_pb_guestPlayerClient', 'visionos');
-    cfg.guestPlayerClient = GUEST_PLAYER_CLIENT_LABELS.includes(guestClient as GuestPlayerClient)
-      ? guestClient as GuestPlayerClient : 'visionos';
+    // PipePipe MIGRATION_6_7 parity: visionos was the persisted logged-out
+    // default; migrate stored visionos → tv_samsung exactly once (marker pref,
+    // so a deliberate post-migration visionos choice is never overridden again).
+    const guestEpMigrated = PreferencesStore.getString('cfg_migrated_guest_ep_tv_samsung', '') === 'true';
+    const guestClient = PreferencesStore.getString('cfg_pb_guestPlayerClient', 'tv_samsung');
+    let resolvedGuestClient = GUEST_PLAYER_CLIENT_LABELS.includes(guestClient as GuestPlayerClient)
+      ? guestClient as GuestPlayerClient : 'tv_samsung';
+    if (!guestEpMigrated) {
+      if (guestClient === 'visionos') {
+        resolvedGuestClient = 'tv_samsung';
+        PreferencesStore.setString('cfg_pb_guestPlayerClient', 'tv_samsung');
+        logger.info('guest endpoint migrated visionos -> tv_samsung (PipePipe MIGRATION_6_7 parity)');
+      }
+      PreferencesStore.setString('cfg_migrated_guest_ep_tv_samsung', 'true');
+    }
+    cfg.guestPlayerClient = resolvedGuestClient;
     const authClient = PreferencesStore.getString('cfg_pb_authPlayerClient', 'mweb');
     cfg.authPlayerClient = AUTH_PLAYER_CLIENT_LABELS.includes(authClient as AuthPlayerClient)
       ? authClient as AuthPlayerClient : 'mweb';

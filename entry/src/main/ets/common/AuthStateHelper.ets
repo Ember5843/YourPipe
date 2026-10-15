@@ -20,13 +20,16 @@ export class AuthStateHelper {
 
   /**
    * 登录态/鉴权开关变化后的统一后置动作：按当前有效播放鉴权重置 stream
-   * client 选择（PipePipe reconcileYoutubePlayerClient：登录 → tv_downgraded，
-   * 游客 → visionos；清除手动 pin）。启动、登录、登出、鉴权开关都必须走这里，
+   * client 选择（PipePipe reconcileYoutubePlayerClient：登录 → 配置的 auth
+   * 端点（默认 mweb SABR），游客 → 配置的 guest 端点（默认 tv_samsung）；
+   * 清除手动 pin）。启动、登录、登出、鉴权开关都必须走这里，
    * 不要在调用点散落 resetToAuthDefault 及其参数推导。
    */
   static reconcilePlaybackClient(): void {
     const usePlaybackAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
     YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);
+    logger.info(`playback client reconciled state=${usePlaybackAuth ? 'auth' : 'guest'} `
+      + `client=${YoutubePlayerClientConfig.getYoutubePlayerClient()}`);
   }
 
   /**
@@ -40,7 +43,8 @@ export class AuthStateHelper {
     AuthStateHelper.reconcilePlaybackClient();
     YoutubeJavaScriptPlayerManager.resetSessionVisitorData();
     SabrWebViewPoTokenProvider.getInstance().resetForAuthChange();
-    logger.info(`player client config applied guest=${guestClient} auth=${authClient}`);
+    logger.info(`player client config applied guest=${guestClient} auth=${authClient} `
+      + `active=${YoutubePlayerClientConfig.getYoutubePlayerClient()}`);
   }
 
   /**

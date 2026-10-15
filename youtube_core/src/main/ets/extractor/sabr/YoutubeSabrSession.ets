@@ -4,6 +4,7 @@ import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 import { HttpAbortToken, HttpError } from '../../network/HttpDownloader';
 import { ClientsConstants } from '../../model/ClientsConstants';
 import { SabrDecodedResponse } from './SabrDecodedResponse';
+import { SabrMediaHeader } from './SabrMediaHeader';
 import { SabrMediaSegment, SabrSegmentRequest } from './SabrMediaSegment';
 import { SabrProtocolException } from './SabrProtocolException';
 import { isRecoverableIntegrityIssues, requireUmpContentType, sabrDecodeBody } from './SabrResponseDecoder';
@@ -57,6 +58,20 @@ const SEEK_KEEP_WINDOW_MS = 8000;
 const EVICT_BEHIND_MS = 10000;
 /** Total wall-clock budget for in-pump network-error retries of one POST. */
 const NETWORK_RETRY_BUDGET_MS = 75000;
+/** 主机不可达（DNS/连接/无路由）时的快速重试次数，发生在主机轮换之前。 */
+const MAX_DNS_RETRIES = 2;
+const DNS_RETRY_DELAY_MS = 500;
+/** SABR init HTTP Range 上限（PipePipe MAX_INITIALIZATION_BYTES）。 */
+const MAX_INITIALIZATION_BYTES = 4 * 1024 * 1024;
+/** init Range 请求的单次重试间隔。 */
+const INIT_RANGE_RETRY_DELAY_MS = 500;
+/**
+ * 连续退避 / 无进展预算（PipePipe SabrRequestCoordinator）。两者互独立，
+ * 任一到顶即抛类型化可恢复错误（kind='network'），交给上层既有的重建/停止路径，
+ * 绝不无限空转。计数在锁内（pumpOnceLocked）推进，故等待本地串行锁的时间不计入。
+ */
+const MAX_CONTINUOUS_BACKOFF_MS = 30000;
+const MAX_CONTINUOUS_NO_PROGRESS_MS = 30000;
 
 /**
  * Stateful SABR media session (PipePipe YoutubeSabrSession subset for VOD).
@@ -93,6 +108,12 @@ export class YoutubeSabrSession {
   private attestationRotations: number = 0;
   private consecutiveAttestationPending: number = 0;
   private poTokenWarmup?: Promise<boolean>;
+  /** Equivalent googlevideo host variants (index 0 = current URL, preserved). */
+  private hostCandidates: string[] = [];
+  private hostCandidateIndex: number = 0;
+  /** 连续退避 / 无进展累计（ms）；有媒体到达时清零。 */
+  private continuousBackoffMs: number = 0;
+  private continuousNoProgressMs: number = 0;
 
   constructor(
     info: YoutubeSabrInfo,
@@ -121,6 +142,8 @@ export class YoutubeSabrSession {
     this.infoReloader = infoReloader;
     this.epoch = new SabrServerEpoch(info.serverAbrStreamingUrl);
     this.streamState = new YoutubeSabrStreamState(audioFormat, videoFormat, this.epoch);
+    this.hostCandidates = YoutubeSabrSession.buildHostCandidates(info.serverAbrStreamingUrl);
+    this.hostCandidateIndex = 0;
   }
 
   getStreamState(): YoutubeSabrStreamState {
@@ -244,6 +267,16 @@ export class YoutubeSabrSession {
     const cached = this.segmentCache.get(request.cacheKey());
     if (cached) {
       return cached;
+    }
+    // Init segments come from a plain HTTP Range GET bound to the PoToken
+    // (&pot=, PipePipe fetchInitializationData), never from the UMP stream —
+    // routing them through the pump below would fight the media demand loop.
+    if (request.initSegment) {
+      const initFormat = request.itag === this.audioFormat.itag ? this.audioFormat
+        : (request.itag === this.videoFormat.itag ? this.videoFormat : undefined);
+      if (initFormat) {
+        return await this.fetchInitializationData(initFormat);
+      }
     }
     if (this.isBeyondEnd(request)) {
       throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`, 'beyond_end');
@@ -414,6 +447,9 @@ export class YoutubeSabrSession {
     if (this.closed) {
       throw new SabrProtocolException('SABR session closed', 'closed');
     }
+    // 锁内起点：以下计入的“无进展/退避”时间不含等待本地串行锁的时间
+    // （pumpOnceLocked 只在获得 pumpBusy 之后进入）。
+    const lockedStartMs = Date.now();
 
     // Always honor server backoff before the next POST (prevents rn++ storm).
     // Logged-in sessions can get an empty first response with a multi-second
@@ -421,10 +457,17 @@ export class YoutubeSabrSession {
     // keeps returning the remaining cooldown anyway.
     const waitMs = this.getBackoffRemainingMs();
     if (waitMs > 0) {
+      const sleptMs = Math.min(waitMs, MAX_BACKOFF_MS);
       logger.info(`[SABR] honor backoff ${waitMs}ms before rn=${this.epoch.requestNumber}`);
-      await this.sleepBackoffInterruptible(Math.min(waitMs, MAX_BACKOFF_MS));
+      await this.sleepBackoffInterruptible(sleptMs);
       if (this.closed) {
         throw new SabrProtocolException('SABR session closed', 'closed');
+      }
+      // 连续退避预算：累计等待超过上限即失败，避免无限冷启动循环。
+      this.continuousBackoffMs += sleptMs;
+      if (this.continuousBackoffMs > MAX_CONTINUOUS_BACKOFF_MS) {
+        throw new SabrProtocolException(
+          `SABR continuous backoff exceeded ${MAX_CONTINUOUS_BACKOFF_MS}ms`, 'network');
       }
     }
 
@@ -520,6 +563,8 @@ export class YoutubeSabrSession {
       if (action.type === 'apply_redirect') {
         this.epoch.redirectCount++;
         this.epoch.serverAbrStreamingUrl = action.url;
+        // 新 URL 的 mn/mvi 才是有效候选 —— 重建候选并回到 index 0。
+        this.updateHostCandidates(action.url);
         logger.info(`[SABR] redirect #${this.epoch.redirectCount} urlLen=${action.url.length}`);
       }
     }
@@ -537,13 +582,24 @@ export class YoutubeSabrSession {
     if (decoded.segments.length > 0) {
       this.epoch.redirectCount = 0;
       this.epoch.poTokenRefreshes = 0;
+      // PipePipe handleControlResponse resets BOTH episode counters when media
+      // arrives (redirectCount + reloads); keep reload budget fresh per episode.
+      this.epoch.reloads = 0;
       this.consecutiveNoMedia = 0;
       this.consecutiveAttestationPending = 0;
+      this.continuousBackoffMs = 0;
+      this.continuousNoProgressMs = 0;
       if (decoded.streamProtectionStatus >= 2 && !this.streamState.getRawPoToken()) {
         this.startPoTokenWarmup();
       }
     } else {
       this.consecutiveNoMedia++;
+      // 无进展预算：锁内运行时间（不含等待本地锁）累计，超过上限即失败。
+      this.continuousNoProgressMs += Math.max(0, Date.now() - lockedStartMs);
+      if (this.continuousNoProgressMs > MAX_CONTINUOUS_NO_PROGRESS_MS) {
+        throw new SabrProtocolException(
+          `SABR continuous no-progress exceeded ${MAX_CONTINUOUS_NO_PROGRESS_MS}ms`, 'network');
+      }
       // Post-ingest control for an empty response: try PoToken, else back off.
       for (const action of actions) {
         if (action.type === 'apply_po_token') {
@@ -551,6 +607,8 @@ export class YoutubeSabrSession {
           if (applied) {
             this.consecutiveNoMedia = 0;
             this.epoch.backoffUntilMs = 0;
+            this.continuousBackoffMs = 0;
+            this.continuousNoProgressMs = 0;
             logger.info('[SABR] empty response: PoToken applied, retrying without backoff');
             break;
           }
@@ -588,7 +646,8 @@ export class YoutubeSabrSession {
     headers: Record<string, string[] | string>, abortToken: HttpAbortToken): Promise<http.HttpResponse> {
     const deadline = Date.now() + NETWORK_RETRY_BUDGET_MS;
     let attempt = 0;
-    let lastNetworkError: Error | undefined = undefined;
+    let dnsRetries = 0;
+    let postUrl = url;
     while (true) {
       if (this.closed) {
         throw new SabrProtocolException('SABR session closed', 'closed');
@@ -598,12 +657,39 @@ export class YoutubeSabrSession {
       }
       attempt++;
       try {
-        return await this.httpClient.postBinary(url, body, headers, this.useAuth,
-          (bytes: number) => networkTrafficSink?.(bytes), abortToken);
+        // Inner downloader retry disabled: this method owns the retry policy so
+        // DNS retries + host rotation are not stacked on the downloader's 3x loop.
+        return await this.httpClient.postBinary(postUrl, body, headers, this.useAuth,
+          (bytes: number) => networkTrafficSink?.(bytes), abortToken, false);
       } catch (e) {
         if (this.closed) {
           throw new SabrProtocolException('SABR session closed', 'closed');
         }
+        const hostUnreachable = e instanceof HttpError && e.isHostUnreachable;
+        // 1) 传输层主机不可达（DNS/连接/无路由）：轮换之前先做几次快速重试 ——
+        //    负 DNS 缓存/瞬时抖动常常重试即通，不必换节点。
+        if (hostUnreachable && dnsRetries < MAX_DNS_RETRIES) {
+          dnsRetries++;
+          logger.warn(`[SABR] host unreachable, DNS retry ${dnsRetries}/${MAX_DNS_RETRIES} `
+            + `host=${hostOfUrl(postUrl) || '-'} rn=${this.epoch.requestNumber}`);
+          await this.sleepBackoffInterruptible(DNS_RETRY_DELAY_MS);
+          continue;
+        }
+        // 2) 重试仍不可达 → 换一个 googlevideo 节点（rn/epoch 不变，无响应即同一逻辑请求）。
+        if (hostUnreachable) {
+          const from = hostOfUrl(postUrl) || '-';
+          if (this.rotateHost()) {
+            postUrl = this.epoch.serverAbrStreamingUrl;
+            dnsRetries = 0;
+            logger.warn(`[SABR] host_rotate from=${from} to=${hostOfUrl(postUrl) || '-'} `
+              + `rn=${this.epoch.requestNumber}`);
+            continue;
+          }
+          logger.error(`[SABR] host candidates exhausted host=${from} rn=${this.epoch.requestNumber}`);
+          throw new SabrProtocolException(
+            `SABR host unreachable: ${(e as Error).message}`, 'network');
+        }
+        // 3) 其他网络类错误：在总预算内退避重试；预算耗尽→类型化可恢复错误。
         const isNetworkClass = e instanceof HttpError && e.responseCode !== 403 && e.isRecoverable;
         if (!isNetworkClass || Date.now() >= deadline) {
           if (isNetworkClass) {
@@ -613,13 +699,152 @@ export class YoutubeSabrSession {
           }
           throw e instanceof Error ? e : new Error(String(e));
         }
-        lastNetworkError = e instanceof Error ? e : new Error(String(e));
         const waitMs = Math.min(1000 * attempt, 5000);
         logger.warn(`[SABR] network retry attempt=${attempt} waitMs=${waitMs} `
-          + `rn=${this.epoch.requestNumber} error=${lastNetworkError.message}`);
+          + `rn=${this.epoch.requestNumber} error=${(e as Error).message}`);
         await this.sleepBackoffInterruptible(waitMs);
       }
     }
+  }
+
+  /** Advance to the next equivalent host; false when the candidate list is exhausted. */
+  private rotateHost(): boolean {
+    if (this.hostCandidateIndex + 1 >= this.hostCandidates.length) {
+      return false;
+    }
+    this.hostCandidateIndex++;
+    this.epoch.serverAbrStreamingUrl = this.hostCandidates[this.hostCandidateIndex];
+    return true;
+  }
+
+  /** Rebuild the candidate list for a new URL and reset the cursor to the original. */
+  private updateHostCandidates(url: string): void {
+    this.hostCandidates = YoutubeSabrSession.buildHostCandidates(url);
+    this.hostCandidateIndex = 0;
+  }
+
+  /**
+   * Build equivalent googlevideo URLs by rewriting the host to each node advertised in the
+   * {@code mn} query parameter (PipePipe buildHostCandidates). The current URL stays first;
+   * the node index comes from {@code mvi} when numeric, else from the current host's
+   * {@code rr<digits>} prefix. All other parameters — including the signature — are preserved
+   * (not bound to the host). Returns a single-element list when the URL is not rotatable.
+   */
+  private static buildHostCandidates(url: string): string[] {
+    const host = hostOfUrl(url);
+    if (!host) {
+      return [url];
+    }
+    const match = /^rr(\d+)---[^/]+\.googlevideo\.com$/.exec(host);
+    const mn = queryParamOf(url, 'mn');
+    if (!match || !mn || mn.length === 0) {
+      return [url];
+    }
+    const mvi = queryParamOf(url, 'mvi');
+    const rrIndex = mvi && /^\d+$/.test(mvi) ? mvi : match[1];
+    const candidates: string[] = [url];
+    for (const node of mn.split(',')) {
+      const trimmed = node.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      const candidateHost = `rr${rrIndex}---${trimmed}.googlevideo.com`;
+      if (candidateHost === host) {
+        continue;
+      }
+      const candidateUrl = replaceHostInUrl(url, candidateHost);
+      if (candidates.indexOf(candidateUrl) < 0) {
+        candidates.push(candidateUrl);
+      }
+    }
+    return candidates;
+  }
+
+  /**
+   * Fetch the initialization segment over plain HTTP Range (PipePipe
+   * fetchInitializationData) instead of a UMP POST. Requires a PoToken, bound to the
+   * googlevideo init request via {@code &pot=} (base64url, no padding); the extractor
+   * already merges indexRange.end into initRangeEnd, so the fetched range covers decoder
+   * init + SIDX. The result is ingested through the normal segment-cache/timeline path.
+   * One retry, then a recoverable typed network error.
+   */
+  async fetchInitializationData(format: YoutubeSabrFormatMeta): Promise<SabrMediaSegment> {
+    const request = SabrSegmentRequest.init(format.itag);
+    const cached = this.segmentCache.get(request.cacheKey());
+    if (cached) {
+      return cached;
+    }
+    const initUrl = format.initializationUrl;
+    const start = format.initRangeStart ?? -1;
+    const end = format.initRangeEnd ?? -1;
+    if (!initUrl || initUrl.length === 0 || start < 0 || end < start
+      || end - start >= MAX_INITIALIZATION_BYTES) {
+      throw new SabrProtocolException(
+        `Invalid SABR initialization range: itag=${format.itag} start=${start} end=${end}`,
+        'network');
+    }
+    let rawToken = this.streamState.getRawPoToken();
+    if (!rawToken || rawToken.length === 0) {
+      // Lazy mint: the Range URL is pot-bound and init never enters the UMP
+      // empty-response mint path, so a cold session mints here instead.
+      await this.maybeApplyPoToken(false);
+      rawToken = this.streamState.getRawPoToken();
+    }
+    if (!rawToken || rawToken.length === 0) {
+      throw new SabrProtocolException(
+        `Missing PO token for SABR initialization range: itag=${format.itag}`, 'network');
+    }
+    const url = appendQueryParamIfMissing(initUrl, 'pot', base64UrlNoPadding(rawToken));
+    const headers: Record<string, string> = {
+      'Range': `bytes=${start}-${end}`,
+      'Accept-Encoding': 'identity'
+    };
+    const expected = end - start + 1;
+    logger.info(`[SABR] init GET itag=${format.itag} start=${start} end=${end} `
+      + `expected=${expected} host=${hostOfUrl(url) || '-'}`);
+    let lastMessage = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (this.closed) {
+        throw new SabrProtocolException('SABR session closed', 'closed');
+      }
+      try {
+        const response = await this.httpClient.getBinary(url, headers, this.useAuth, undefined, false);
+        const status = response.responseCode;
+        if (status !== 206 && !(status === 200 && start === 0)) {
+          throw new SabrProtocolException(
+            `SABR initialization range status=${status}`, 'network');
+        }
+        const bytes = toUint8Array(response.result);
+        if (bytes.length < expected) {
+          throw new SabrProtocolException(
+            `SABR initialization range truncated bytes=${bytes.length} expected=${expected}`, 'network');
+        }
+        const initData = bytes.length > expected ? bytes.subarray(0, expected) : bytes;
+        const header = new SabrMediaHeader();
+        header.headerId = 0;
+        header.itag = format.itag;
+        header.initSegment = true;
+        header.sequenceNumber = -1;
+        header.startMs = -1;
+        header.durationMs = -1;
+        header.contentLength = initData.length;
+        const segment = new SabrMediaSegment(header, initData);
+        this.ingestAndCacheSegment(segment);
+        logger.info(`[SABR] init OK itag=${format.itag} bytes=${initData.length} status=${status}`);
+        return segment;
+      } catch (e) {
+        lastMessage = e instanceof Error ? e.message : String(e);
+        logger.warn(`[SABR] init range attempt=${attempt + 1}/2 failed itag=${format.itag}: ${lastMessage}`);
+        if (this.closed) {
+          throw new SabrProtocolException('SABR session closed', 'closed');
+        }
+        if (attempt === 0) {
+          await this.sleepBackoffInterruptible(INIT_RANGE_RETRY_DELAY_MS);
+        }
+      }
+    }
+    throw new SabrProtocolException(
+      `SABR initialization range failed: itag=${format.itag} ${lastMessage}`, 'network');
   }
 
   /**
@@ -981,6 +1206,73 @@ function summarizeSegmentSequences(decoded: SabrDecodedResponse): string {
     groups.push(`${itag}:${values.join(',')}`);
   });
   return groups.length > 0 ? groups.join('|') : '-';
+}
+
+/** Hostname of an absolute URL (lowercase, no port strip needed for googlevideo); '' when unparseable. */
+function hostOfUrl(url: string): string {
+  const match = /^[a-z]+:\/\/([^/?#]+)/i.exec(url);
+  return match ? match[1] : '';
+}
+
+/** First value of a query parameter ('' when absent); value is percent-decoded. */
+function queryParamOf(url: string, key: string): string {
+  const qIdx = url.indexOf('?');
+  if (qIdx < 0) {
+    return '';
+  }
+  const fragmentIdx = url.indexOf('#', qIdx);
+  const query = fragmentIdx >= 0 ? url.substring(qIdx + 1, fragmentIdx) : url.substring(qIdx + 1);
+  const pairs = query.split('&');
+  for (const pair of pairs) {
+    const eq = pair.indexOf('=');
+    const name = eq >= 0 ? pair.substring(0, eq) : pair;
+    if (name === key) {
+      const raw = eq >= 0 ? pair.substring(eq + 1) : '';
+      try {
+        return decodeURIComponent(raw);
+      } catch (_e) {
+        return raw;
+      }
+    }
+  }
+  return '';
+}
+
+/** Rewrite only the host of an absolute URL; scheme, port, path and query stay byte-identical. */
+function replaceHostInUrl(url: string, newHost: string): string {
+  const match = /^([a-z]+:\/\/)([^/?#]+)(.*)$/i.exec(url);
+  if (!match) {
+    return url;
+  }
+  return `${match[1]}${newHost}${match[3]}`;
+}
+
+/** Append `key=value` unless the parameter is already present. */
+function appendQueryParamIfMissing(url: string, key: string, value: string): string {
+  if (url.indexOf(`?${key}=`) >= 0 || url.indexOf(`&${key}=`) >= 0) {
+    return url;
+  }
+  return `${url}${url.indexOf('?') >= 0 ? '&' : '?'}${key}=${value}`;
+}
+
+/** base64url without padding (PipePipe `pot=` param encoding). */
+function base64UrlNoPadding(data: Uint8Array): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let result = '';
+  for (let i = 0; i < data.length; i += 3) {
+    const b0 = data[i];
+    const b1 = i + 1 < data.length ? data[i + 1] : -1;
+    const b2 = i + 2 < data.length ? data[i + 2] : -1;
+    result += chars.charAt(b0 >> 2);
+    result += chars.charAt(((b0 & 0x03) << 4) | (b1 >= 0 ? (b1 >> 4) : 0));
+    if (b1 >= 0) {
+      result += chars.charAt(((b1 & 0x0f) << 2) | (b2 >= 0 ? (b2 >> 6) : 0));
+    }
+    if (b2 >= 0) {
+      result += chars.charAt(b2 & 0x3f);
+    }
+  }
+  return result;
 }
 
 function toUint8Array(result: Object | string | ArrayBuffer | undefined): Uint8Array {

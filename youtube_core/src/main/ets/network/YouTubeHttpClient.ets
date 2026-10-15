@@ -175,7 +175,8 @@ export class YouTubeHttpClient implements ClientVersionGet {
     customHeaders?: Record<string, string | string[]>,
     withAuth: boolean = false,
     onData?: (bytes: number) => void,
-    abortToken?: HttpAbortToken
+    abortToken?: HttpAbortToken,
+    enableRetry: boolean = true
   ): Promise<http.HttpResponse> {
     const requestId = YouTubeHttpClient.nextRequestId();
     const target = YouTubeHttpClient.safeRequestTarget(url);
@@ -195,12 +196,54 @@ export class YouTubeHttpClient implements ClientVersionGet {
       await this.injectWebAuthHeaders(headers);
     }
     try {
-      const response = await this.downloader.postBinary(url, data, headers, this.localization, true, onData, abortToken);
+      const response = await this.downloader.postBinary(url, data, headers, this.localization,
+        enableRetry, onData, abortToken);
       this.saveCookiesFromResponse(response, url);
       logger.info(`[NET] id=${requestId} phase=complete method=POST_BINARY target=${target} status=${response.responseCode} elapsed=${Date.now() - startedAt}ms`);
       return response;
     } catch (e) {
       logger.error(`[NET] id=${requestId} phase=failed method=POST_BINARY target=${target} elapsed=${Date.now() - startedAt}ms error=${String(e)}`);
+      if (e instanceof HttpError) {
+        throw e;
+      }
+      throw new Error(String(e));
+    }
+  }
+
+  /**
+   * Binary GET (SABR initialization Range). Result is an ARRAY_BUFFER, unlike
+   * get() which returns a text body. Caller owns headers (Range / Accept-Encoding).
+   * enableRetry=false lets the SABR session own the single-retry policy.
+   */
+  async getBinary(
+    url: string,
+    customHeaders?: Record<string, string | string[]>,
+    withAuth: boolean = false,
+    abortToken?: HttpAbortToken,
+    enableRetry: boolean = true
+  ): Promise<http.HttpResponse> {
+    const requestId = YouTubeHttpClient.nextRequestId();
+    const target = YouTubeHttpClient.safeRequestTarget(url);
+    const startedAt = Date.now();
+    logger.info(`[NET] id=${requestId} phase=start method=GET_BINARY target=${target} webAuth=${withAuth}`);
+    const headers: Record<string, string | string[]> = {};
+    if (customHeaders) {
+      const keys = Object.keys(customHeaders);
+      for (let i = 0; i < keys.length; i++) {
+        headers[keys[i]] = customHeaders[keys[i]];
+      }
+    }
+    if (withAuth) {
+      await this.injectWebAuthHeaders(headers);
+    }
+    try {
+      const response = await this.downloader.getBinary(url, headers, this.localization,
+        enableRetry, abortToken);
+      this.saveCookiesFromResponse(response, url);
+      logger.info(`[NET] id=${requestId} phase=complete method=GET_BINARY target=${target} status=${response.responseCode} elapsed=${Date.now() - startedAt}ms`);
+      return response;
+    } catch (e) {
+      logger.error(`[NET] id=${requestId} phase=failed method=GET_BINARY target=${target} elapsed=${Date.now() - startedAt}ms error=${String(e)}`);
       if (e instanceof HttpError) {
         throw e;
       }

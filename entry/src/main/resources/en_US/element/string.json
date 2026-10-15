@@ -1689,6 +1689,10 @@
             "value": "TV Downgraded"
         },
         {
+            "name": "yt_setting_client_tv_samsung",
+            "value": "TV (Samsung)"
+        },
+        {
             "name": "yt_setting_client_mweb",
             "value": "MWEB (SABR)"
         },
