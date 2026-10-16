@@ -2157,6 +2157,18 @@
             "value": "Версия файла резервной копии не поддерживается"
         },
         {
+            "name": "yt_local_play",
+            "value": "Воспроизвести"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "Файл не найден"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "Экспортировать в Загрузки"
+        },
+        {
             "name": "yt_download_title",
             "value": "Скачать видео"
         },

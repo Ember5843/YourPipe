@@ -15,6 +15,7 @@ import { LocalStore } from '../common/LocalStore';
 import { PreferencesStore } from '../common/PreferencesStore';
 import { PlaylistItem, StoredLocalQueue } from '../common/PlaylistModel';
 import { WatchHistoryItem, WatchHistoryStore } from '../common/WatchHistoryStore';
+import { LocalMediaProgressStore } from '../common/LocalMediaProgressStore';
 import { DownloadManager, DownloadTask } from '../common/DownloadManager';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
 import { AppLogStore } from '../common/AppLogStore';
@@ -394,8 +395,9 @@ struct Index {
     AppStorage.setOrCreate('playlists', []);
     WatchHistoryStore.clear();
     this.watchHistory = [];
+    LocalMediaProgressStore.clearAll();
+    // 下载条目刻意保留：它是 filesDir/downloads 下文件的唯一索引；clearAllTasks 自身会刷新 AppStorage。
     DownloadManager.getInstance().clearAllTasks();
-    AppStorage.setOrCreate('downloadTasks', []);
     SearchHistoryStore.clearSearchHistory();
     AppLogStore.clear();
 
@@ -430,6 +432,8 @@ struct Index {
 
   aboutToAppear() {
     this.ensureStores();
+    // 重启对账：从持久化索引恢复已完成下载条目（文件缺失的条目自动丢弃）。
+    DownloadManager.getInstance().restoreTasks();
     this.buildPickerItems();
     // 默认首页：Options「启动时进入订阅」→ 首帧后切到订阅 tab（0=首页，1=订阅）。
     if (PreferencesStore.getString('cfg_default_home_tab', 'home') === 'subs') {
@@ -957,7 +961,10 @@ struct Index {
 
     // Start extraction/engine/proxy work immediately after the click reset. The
     // player page consumes this exact task and remains the only owner of source submission.
-    session.beginPrepare(video);
+    // 本地文件没有可提取的流：跳过预热，PlayerPage 的 session.play() 直接走 doPlayLocal。
+    if (!video.localMediaPath) {
+      session.beginPrepare(video);
+    }
 
     const movedIndex = this.navPathStack.moveToTop('PlayerPage');
     if (movedIndex === -1) {

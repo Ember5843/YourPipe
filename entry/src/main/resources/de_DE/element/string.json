@@ -1405,6 +1405,18 @@
             "value": "Herunterladen"
         },
         {
+            "name": "yt_local_play",
+            "value": "Wiedergeben"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "Datei nicht gefunden"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "Nach Downloads exportieren"
+        },
+        {
             "name": "yt_download_title",
             "value": "Video herunterladen"
         },

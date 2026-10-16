@@ -2157,6 +2157,18 @@
             "value": "إصدار ملف النسخة الاحتياطية غير مدعوم"
         },
         {
+            "name": "yt_local_play",
+            "value": "تشغيل"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "الملف غير موجود"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "تصدير إلى التنزيلات"
+        },
+        {
             "name": "yt_download_title",
             "value": "تنزيل الفيديو"
         },

@@ -118,6 +118,8 @@ export struct VideoDetails {
   @State sleepPickerDate: Date = new Date(0, 0, 0, 0, 30, 0, 0);
   /** 会话级仅音频（封面层 + 关视频轨） */
   @StorageLink('isAudioOnlyMode') isAudioOnlyMode: boolean = false;
+  /** 本地文件模式：隐藏 YouTube 专属行（统计/频道/标签/下载/收藏/分享）。 */
+  @StorageLink('isLocalMode') isLocalMode: boolean = false;
 
   // ── mpv 实时播放流信息（与 AVPlayer 同一范式：ArkUI V1 的 @Track 不会穿透到
   // 嵌套 @Observed，vm 必须由组件自己 @Link，字段变化才能触发 UI 重渲染）──
@@ -519,6 +521,10 @@ export struct VideoDetails {
   }
 
   private hasStatsRow(): boolean {
+    // 本地文件没有 YouTube 统计信息。
+    if (this.isLocalMode) {
+      return false;
+    }
     return this.viewCount > 0
       || !!(this.publishDate && this.publishDate.length > 0)
       || this.hasLikeCount()
@@ -594,17 +600,21 @@ export struct VideoDetails {
     Scroll() {
       Row({ space: 10 }) {
         this.SleepTimerActionButton()
-        if (!this.isCurrentlyLive()) {
+        if (!this.isCurrentlyLive() && !this.isLocalMode) {
           this.ActionButton($r('sys.symbol.arrowshape_down_to_line_fill'),
             $r('app.string.yt_action_download'), () => { this.openDownloadDialog(); })
         }
         this.ActionButton($r('sys.symbol.info_circle'),
           $r('app.string.yt_stream_info_title'), () => { this.openSheet(2); })
-        this.ActionButton($r('sys.symbol.bookmark'),
-          $r('app.string.yt_action_save_to_playlist'), () => { this.openSheet(1); })
+        if (!this.isLocalMode) {
+          this.ActionButton($r('sys.symbol.bookmark'),
+            $r('app.string.yt_action_save_to_playlist'), () => { this.openSheet(1); })
+        }
         this.AudioOnlyActionButton()
-        this.ActionButton($r('sys.symbol.share'),
-          $r('app.string.yt_action_share'), () => { this.shareVideo(); })
+        if (!this.isLocalMode) {
+          this.ActionButton($r('sys.symbol.share'),
+            $r('app.string.yt_action_share'), () => { this.shareVideo(); })
+        }
       }
     }
     .scrollable(ScrollDirection.Horizontal)
@@ -723,20 +733,22 @@ export struct VideoDetails {
           Column().height(12)
         }
 
-        // ── 频道信息行（不修改）──
-        if (this.channelInfoError) {
-          TabErrorPanel({
-            errorMessage: this.channelInfoError,
-            showRetry: true,
-            onRetry: () => { this.fetchChannelInfo(); }
-          })
-        } else {
-          ChannelCard({
-            channel: this.channelInfo,
-            typeLabel: '',
-            showDescription: false
-          })
-            .margin({ bottom: 12 })
+        // ── 频道信息行（本地文件无频道）──
+        if (!this.isLocalMode) {
+          if (this.channelInfoError) {
+            TabErrorPanel({
+              errorMessage: this.channelInfoError,
+              showRetry: true,
+              onRetry: () => { this.fetchChannelInfo(); }
+            })
+          } else {
+            ChannelCard({
+              channel: this.channelInfo,
+              typeLabel: '',
+              showDescription: false
+            })
+              .margin({ bottom: 12 })
+          }
         }
 
         // ── 功能按钮行（横向滚动 + 渐变遮罩）──
@@ -745,8 +757,8 @@ export struct VideoDetails {
         // ── 视频描述（完整显示）──
         this.DescriptionSection()
 
-        // ── 视频标签 ──
-        if (this.tags && this.tags.length > 0) {
+        // ── 视频标签（YouTube 标签，本地文件不适用）──
+        if (!this.isLocalMode && this.tags && this.tags.length > 0) {
           this.TagsSection()
         }
       }

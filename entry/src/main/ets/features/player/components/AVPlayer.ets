@@ -147,6 +147,8 @@ export struct VideoPlayer {
   @StorageProp('isAppBackground') @Watch('onPageVisibilityChange') isAppBackground: boolean = false;
   /** 会话级仅音频：封面层在播控之下，不挡进度条/手势 */
   @StorageLink('isAudioOnlyMode') isAudioOnlyMode: boolean = false;
+  /** 本地文件模式：隐藏在线字幕 / 章节 / 音轨 / 画质等 YouTube 专属入口。 */
+  @StorageLink('isLocalMode') isLocalMode: boolean = false;
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageProp('selectedVideo') selectedVideo: VideoItem | null = null;
   @Prop index: number = 0;
@@ -1715,17 +1717,18 @@ export struct VideoPlayer {
   /** 章节 / 字幕 / 音轨 / 画质 / 倍速 是否作为顶部独立图标展示 */
   private getTopToolCount(): number {
     let count = this.curSource.isLive ? 0 : 1; // 倍速点播常驻，直播禁用
-    if (this.chapters.length > 0) {
+    if (!this.isLocalMode && this.chapters.length > 0) {
       count++;
     }
     // 字幕菜单对 VOD 常驻：无原生轨时仍有 AI 翻译（P2）/ AI 生成字幕（P3）入口
-    if (!this.curSource.isLive) {
+    // 本地文件没有在线字幕轨与 AI 翻译入口，不计入。
+    if (!this.curSource.isLive && !this.isLocalMode) {
       count++;
     }
-    if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
+    if (!this.curSource.isLive && !this.isLocalMode && this.controller.getAudioStreamList().length > 1) {
       count++;
     }
-    if (this.controller.getMergedVideoList().length > 0
+    if (!this.isLocalMode && this.controller.getMergedVideoList().length > 0
       && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
       count++;
     }
@@ -2246,7 +2249,7 @@ export struct VideoPlayer {
           .contentFont({ size: 14 })
           .onClick(() => this.onShowInfoPanel?.())
       }
-      if (this.chapters.length > 0) {
+      if (!this.isLocalMode && this.chapters.length > 0) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.list_bullet_square')),
           content: $r('app.string.yt_player_chapters'),
@@ -2257,7 +2260,7 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
       }
-      if (!this.curSource.isLive) {
+      if (!this.curSource.isLive && !this.isLocalMode) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.AI_subtitles')),
           content: $r('app.string.yt_player_subtitles'),
@@ -2268,7 +2271,7 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
       }
-      if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
+      if (!this.curSource.isLive && !this.isLocalMode && this.controller.getAudioStreamList().length > 1) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.speaker_wave_2')),
           content: $r('app.string.yt_player_audio_track'),
@@ -2279,7 +2282,7 @@ export struct VideoPlayer {
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
       }
-      if (this.controller.getMergedVideoList().length > 0
+      if (!this.isLocalMode && this.controller.getMergedVideoList().length > 0
       && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.resolution_video')),
@@ -2344,7 +2347,7 @@ export struct VideoPlayer {
           .onClick(() => this.onShowInfoPanel?.())
       }
 
-      if (this.chapters.length > 0) {
+      if (!this.isLocalMode && this.chapters.length > 0) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.list_bullet_square'))
             .fontSize(CONTROL_ICON_SIZE)
@@ -2356,7 +2359,7 @@ export struct VideoPlayer {
           .bindMenu(this.ChapterMenu())
       }
 
-      if (!this.curSource.isLive) {
+      if (!this.curSource.isLive && !this.isLocalMode) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.AI_subtitles'))
             .fontSize(CONTROL_ICON_SIZE)
@@ -2367,7 +2370,7 @@ export struct VideoPlayer {
           .bindMenu(this.SubtitleMenu())
       }
 
-      if (!this.curSource.isLive && this.controller.getAudioStreamList().length > 1) {
+      if (!this.curSource.isLive && !this.isLocalMode && this.controller.getAudioStreamList().length > 1) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.speaker_wave_2'))
             .fontSize(CONTROL_ICON_SIZE)
@@ -2378,7 +2381,7 @@ export struct VideoPlayer {
           .bindMenu(this.AudioMenu())
       }
 
-      if (this.controller.getMergedVideoList().length > 0
+      if (!this.isLocalMode && this.controller.getMergedVideoList().length > 0
       && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.resolution_video'))

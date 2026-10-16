@@ -1,10 +1,11 @@
 import { DownloadManager, DownloadTask, DownloadStatus } from '../../common/DownloadManager';
-import { fileUri, picker } from '@kit.CoreFileKit';
+import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 import { MediaThumb } from '../../common/components/MediaThumb';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { VideoItem } from 'youtube_core';
+import { ActionHub } from '../../common/ActionHub';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { customVibrator } from '../../common/VibratorUtil';
 import { VideoItemContextMenu, VideoMenuExtraItem } from '../../common/components/VideoItemContextMenu';
@@ -82,6 +83,7 @@ export struct DownloadPage {
 struct DownloadTaskRow {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @Consume('actionHub') actionHub: ActionHub;
   @ObjectLink task: DownloadTask;
   private downloadManager: DownloadManager = DownloadManager.getInstance();
   @State exporting: boolean = false;
@@ -120,6 +122,19 @@ struct DownloadTaskRow {
       };
       items.push(cancelItem);
     } else {
+      if (this.task.status === DownloadStatus.COMPLETED) {
+        const exportItem: VideoMenuExtraItem = {
+          symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.arrowshape_down_to_line_fill'))
+            .fontSize(16)
+            .fontColor([$r('sys.color.font_primary')]),
+          content: $r('app.string.yt_download_export'),
+          callback: () => {
+            this.isShowContextMenu = false;
+            this.exportTaskToDownloads();
+          }
+        };
+        items.push(exportItem);
+      }
       const deleteItem: VideoMenuExtraItem = {
         symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
           .fontSize(16)
@@ -209,7 +224,7 @@ struct DownloadTaskRow {
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .onClick(() => {
       if (this.task.status === DownloadStatus.COMPLETED) {
-        this.exportTaskToDownloads();
+        this.playTask();
       }
     })
     .bindContextMenu(this.isShowContextMenu, this.taskMenuBuilder, {
@@ -288,8 +303,8 @@ struct DownloadTaskRow {
           this.downloadManager.cancelTask(this.task.id);
         })
     } else if (this.task.status === DownloadStatus.COMPLETED) {
-      // Same action button tokens as VideoMediaCard.ActionButton
-      Button($r('app.string.yt_download_status_completed'))
+      // 主操作 = 应用内播放；导出降为长按菜单里的次操作。
+      Button($r('app.string.yt_local_play'))
         .fontSize(12)
         .fontColor($r('app.color.yourtube_text_inverse'))
         .backgroundColor(this.themePrimary)
@@ -297,7 +312,7 @@ struct DownloadTaskRow {
         .padding({ left: 10, right: 10 })
         .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
         .onClick(() => {
-          this.exportTaskToDownloads();
+          this.playTask();
         })
     } else {
       Button($r('app.string.yt_action_delete'))
@@ -336,6 +351,31 @@ struct DownloadTaskRow {
       return $r('app.string.yt_download_status_cancelled');
     }
     return '';
+  }
+
+  /** 主操作：在应用内直接播放已下载的文件（沙箱路径交给 MPV，不经过代理）。 */
+  private playTask(): void {
+    if (this.task.status !== DownloadStatus.COMPLETED || !this.task.outputPath) {
+      return;
+    }
+    let exists = true;
+    try {
+      exists = fs.accessSync(this.task.outputPath);
+    } catch (_e) {
+      exists = false;
+    }
+    if (!exists) {
+      this.getUIContext().getPromptAction().showToast({
+        message: $r('app.string.yt_local_file_missing'),
+        duration: 2000
+      });
+      return;
+    }
+    const video = this.toVideoItem();
+    // 本地条目用独立 id：既不与在线视频的观看历史冲突，也作为续播进度的键。
+    video.videoId = `local:${this.task.id}`;
+    video.localMediaPath = this.task.outputPath;
+    this.actionHub.openVideo(video, undefined, false);
   }
 
   private async exportTaskToDownloads(): Promise<void> {

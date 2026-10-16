@@ -141,6 +141,15 @@ mediaservice/src/main/ets/
 - Source submission has a **single writer** — entry `PlayerSession.play()`;
   duplicate suppression lives there, so a controller submission always
   means a real load.
+- **Local files bypass the proxy.** A `StreamInfo` carrying
+  `deliveryMethod: 'LOCAL_FILE'` (or a `file://` url) is returned verbatim by
+  `AvPlayerController.createPlaybackUrl` — no `LocalMediaProxy` session, no
+  network, no timeline arming. `MpvPlaybackEngine.normalizeSourceUrl` turns a
+  bare absolute sandbox path into `file://`, and the native `ResolveMediaUri`
+  maps `file://` back to a real path for mpv's `loadfile`, so the engine needs
+  no local-specific plumbing. `HttpProxyOptions.shouldBypass` already treats a
+  non-`http(s)` host as direct, so MPV's `http_proxy` env never applies to a
+  local source.
 - MPV direct network fetches (HLS masters/segments, `sub-add` subtitle
   URLs) follow the app proxy through the process environment:
   `MpvPlaybackEngine.applyNetworkProxy` (on `load()`) calls libmpv_napi

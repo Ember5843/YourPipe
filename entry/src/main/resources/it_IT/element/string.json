@@ -1209,6 +1209,18 @@
             "value": "Scarica"
         },
         {
+            "name": "yt_local_play",
+            "value": "Riproduci"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "File non trovato"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "Esporta in Download"
+        },
+        {
             "name": "yt_download_title",
             "value": "Scarica video"
         },

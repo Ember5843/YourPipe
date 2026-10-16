@@ -2157,6 +2157,18 @@
             "value": "Version du fichier de sauvegarde non prise en charge"
         },
         {
+            "name": "yt_local_play",
+            "value": "Lire"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "Fichier introuvable"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "Exporter vers Téléchargements"
+        },
+        {
             "name": "yt_download_title",
             "value": "Télécharger la vidéo"
         },

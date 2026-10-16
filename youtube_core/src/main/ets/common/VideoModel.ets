@@ -22,6 +22,11 @@ export class VideoItem {
   viewCountExact: string = '';
   /** 频道是否带官方认证徽章 */
   uploaderVerified: boolean = false;
+  /**
+   * 本地视频文件在应用沙箱内的绝对路径（已下载 / 已导入的媒体）。
+   * 非空表示这是一个本地源条目：播放时跳过 YouTube 提取，直接交给 MPV 打开该文件。
+   */
+  localMediaPath?: string;
 
   constructor(
     id: number,

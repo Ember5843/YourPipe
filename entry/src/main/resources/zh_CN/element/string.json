@@ -1209,6 +1209,18 @@
             "value": "下载"
         },
         {
+            "name": "yt_local_play",
+            "value": "播放"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "文件已丢失"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "导出到 Downloads"
+        },
+        {
             "name": "yt_download_title",
             "value": "下载视频"
         },

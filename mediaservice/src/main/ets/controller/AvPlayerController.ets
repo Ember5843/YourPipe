@@ -1344,6 +1344,14 @@ export class AvPlayerController {
 
     const delivery = (video.deliveryMethod || '').toUpperCase();
     const kind = (video.kind || '').toLowerCase();
+    // Local file (downloaded/imported media): MPV opens the sandbox path directly.
+    // No LocalMediaProxy session and no network — the raw path goes to load()
+    // (normalizeSourceUrl turns an absolute path into file://; the native
+    // ResolveMediaUri maps it back to a real path for mpv's loadfile).
+    if (delivery === 'LOCAL_FILE' || kind === 'local_file' || video.url.startsWith('file://')) {
+      Logger.info(TAG, `createPlaybackUrl: local file direct url=${this.describePlaybackUrl(video.url)}`);
+      return video.url;
+    }
     if (delivery === 'SABR' || kind === 'sabr') {
       if (audio) {
         return await this.buildSabrDualEdlUrl(video, audio, generation);

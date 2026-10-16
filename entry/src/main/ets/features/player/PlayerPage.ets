@@ -161,7 +161,8 @@ export struct VideoPlayerPage {
   private knockShareCallback = (sharableTarget: harmonyShare.SharableTarget): void => {
     try {
       const video = PlayerSession.getInstance().currentVideo;
-      if (!video || !video.videoId) {
+      // 本地文件没有 YouTube 链接可分享。
+      if (!video || !video.videoId || video.localMediaPath) {
         return;
       }
       const url = `https://www.youtube.com/watch?v=${video.videoId}`;

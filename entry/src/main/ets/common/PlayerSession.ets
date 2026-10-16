@@ -6,6 +6,7 @@ import { YouTubePlayResult, YouTubePlayService } from '../features/player/YouTub
 // [DISABLED] P3：import { AsrLiveCaptionService } from '../features/player/asr/AsrLiveCaptionService';
 import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueManager';
 import { WatchHistoryStore } from './WatchHistoryStore';
+import { LocalMediaProgressStore } from './LocalMediaProgressStore';
 import { PreferencesStore } from './PreferencesStore';
 import { NetworkProxyConfig } from './NetworkProxyConfig';
 import { TranslationService } from './TranslationService';
@@ -92,6 +93,11 @@ export class PlayerSession {
    * 不写 Preferences；release / forceReset 时清除。
    */
   private _isAudioOnlyMode: boolean = false;
+  /**
+   * 会话级「本地文件」：跳过 YouTube 提取，播放页只显示本地信息。
+   * 不写 Preferences；release / forceReset / 媒体切换时清除。
+   */
+  private _isLocalMode: boolean = false;
   /** release() 时调用，用于停止 PiP（避免循环 import，由 PiPManager 注入） */
   onStopPiP: (() => Promise<void>) | null = null;
 
@@ -276,6 +282,10 @@ export class PlayerSession {
     return this._isAudioOnlyMode;
   }
 
+  get isLocalMode(): boolean {
+    return this._isLocalMode;
+  }
+
   /**
    * 是否有在飞的播放链路（流提取 / 源提交）：返回键 PiP 判定用。
    * 切集中状态机是 IDLE，但用户语义上"正在换片继续看"，应放行小窗。
@@ -354,6 +364,16 @@ export class PlayerSession {
     this._isAudioOnlyMode = false;
     AppStorage.setOrCreate('isAudioOnlyMode', false);
     logger.info(`${TAG} isAudioOnlyMode cleared`);
+  }
+
+  private setLocalMode(enabled: boolean): void {
+    this._isLocalMode = enabled;
+    AppStorage.setOrCreate('isLocalMode', enabled);
+    logger.info(`${TAG} isLocalMode=${enabled}`);
+  }
+
+  private clearLocalMode(): void {
+    this.setLocalMode(false);
   }
 
   setContinuationRestoreOptions(progressSec: number, shouldPlay: boolean): void {
@@ -727,7 +747,86 @@ export class PlayerSession {
     return generation === this._playGeneration && this._currentVideo?.videoId === videoId;
   }
 
+  /**
+   * 本地文件播放：跳过 YouTube 提取与本地代理，直接把沙箱路径交给 MPV。
+   * 合成一条 progressive 流（hasVideo+hasAudio），复用与点播一致的
+   * updateVideoSource → selectInitialStreams → createPlaybackUrl(LOCAL_FILE) → load 链路。
+   */
+  private async doPlayLocal(video: VideoItem, videoId: string, generation: number,
+    localPath: string): Promise<VideoData | null> {
+    const startedAt = Date.now();
+    this.setLocalMode(true);
+    this._failureRetryCount = 0;
+    this._lastPlayError = null;
+    const videoSource: VideoData = {
+      name: this._defaultSource.name,
+      description: video.title || '',
+      time: '',
+      auto: true,
+      head: this._defaultSource.head,
+      likeCount: '',
+      commentCount: '',
+      shareCount: '',
+      author: video.author || '',
+      channelId: '',
+      videoDescription: video.videoDescription || '',
+      play: true,
+      index: 0,
+      error: undefined,
+      streams: [{
+        url: localPath,
+        kind: 'progressive',
+        deliveryMethod: 'LOCAL_FILE',
+        hasVideo: true,
+        hasAudio: true
+      }],
+      subtitleTracks: [],
+      chapters: [],
+      isLive: false,
+      thumbnailUrl: video.thumbnailUrl || '',
+      videoId: videoId,
+      viewCount: 0,
+      publishDate: '',
+      tags: []
+    };
+    this._defaultSource = videoSource;
+    this._watchVideoId = videoId;
+    const resumeSec: number = this._pendingResumeSec >= 0
+      ? this._pendingResumeSec
+      : LocalMediaProgressStore.getProgress(videoId);
+    const shouldPlay = this._pendingAutoPlay ?? true;
+    this._pendingResumeSec = -1;
+    this._pendingAutoPlay = null;
+    if (resumeSec > 0) {
+      logger.info(`${TAG} local will resume at ${resumeSec}s`);
+      this._controller.setPendingStartFromSec(resumeSec);
+    }
+    videoSource.play = shouldPlay;
+    videoSource.auto = shouldPlay;
+    logger.info(`${TAG} local source ready file=${PlayerSession.fileNameOf(localPath)} play=${shouldPlay}`);
+    await this._controller.updateVideoSource(videoSource);
+    if (!this.isPlayContextCurrent(generation, videoId)) {
+      logger.info(`${TAG} local source discarded: session changed during submission`);
+      return null;
+    }
+    this._submittedVideoId = videoId;
+    this._cachedVideoSource = videoSource;
+    this.notifyPlaybackSourceChanged(videoSource, 'local-source-ready');
+    this.startWatchSaveTimer();
+    logger.info(`${TAG} [TIMING] local video=${videoId} load elapsed=${Date.now() - startedAt}ms`);
+    return videoSource;
+  }
+
+  /** 日志用：只取文件名，避免打印完整沙箱路径。 */
+  private static fileNameOf(path: string): string {
+    const idx = path.lastIndexOf('/');
+    return idx >= 0 ? path.substring(idx + 1) : path;
+  }
+
   private async doPlay(video: VideoItem, videoId: string, generation: number): Promise<VideoData | null> {
+    if (video.localMediaPath) {
+      return this.doPlayLocal(video, videoId, generation, video.localMediaPath);
+    }
     try {
       const playService = YouTubePlayService.getInstance(this._context);
       const startedAt = Date.now();
@@ -1024,6 +1123,14 @@ export class PlayerSession {
       logger.info(`${TAG} saveWatchHistory skipped: controller state=${state} (already released)`);
       return;
     }
+    // 本地文件：进度独立于 YouTube 观看历史，按本地条目 id 记录。
+    if (this._isLocalMode) {
+      const localProgressSec = this._controller.vm.currentTime;
+      const localDurationSec = this._controller.vm.durationTime;
+      LocalMediaProgressStore.record(this._watchVideoId, localProgressSec, localDurationSec);
+      logger.info(`${TAG} Saved local progress: ${this._watchVideoId} at ${localProgressSec.toFixed(1)}s`);
+      return;
+    }
     try {
       // 播放列表/本地队列来源：历史记录列表本身，点击回到列表而非单个视频
       const queue = PlayQueueManager.getInstance();
@@ -1174,6 +1281,7 @@ export class PlayerSession {
     if (!keepAudioOnly) {
       this.clearAudioOnlyMode();
     }
+    this.clearLocalMode();
     this._defaultSource = this.createDefaultSource();
     if (keepAudioOnly) {
       // Re-arm after clear: AppStorage + deferred vid=no on the new controller.

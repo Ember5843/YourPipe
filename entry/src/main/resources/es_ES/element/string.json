@@ -2157,6 +2157,18 @@
             "value": "Versión del archivo de copia no compatible"
         },
         {
+            "name": "yt_local_play",
+            "value": "Reproducir"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "Archivo no encontrado"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "Exportar a Descargas"
+        },
+        {
             "name": "yt_download_title",
             "value": "Descargar vídeo"
         },

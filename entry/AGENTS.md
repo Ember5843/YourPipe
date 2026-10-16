@@ -107,7 +107,34 @@ Persistent state and shared singletons:
   `LocalMediaProxy.abortAllUpstreamFetches` (local-proxy upstream fetches)
   and `sabrSessionStore.abortAllInFlightPosts` (SABR UMP in-flight POST
   only — sessions stay open, their own retry/backoff paths recover).
+- `DownloadManager` — offline download queue + the **download library index**.
+  Tasks are memory-resident while downloading; finished entries persist through
+  `DownloadTaskStore` (Preferences key `download_tasks_json`, DTO only —
+  `StreamInfo`/context are not serializable). `restoreTasks()` runs from
+  `Index.aboutToAppear` and rebuilds completed entries, dropping any whose
+  `outputPath` no longer exists on disk — this is what keeps
+  `filesDir/downloads` from turning into orphans across restarts. A finished
+  entry **is** the playable video entry: tap plays it in-app, delete removes the
+  entry plus its sandbox `filesDir/downloads/<taskId>` directory, and export
+  (row menu) writes a second, user-owned copy without deleting the entry
+  (`exportedPath` records the correspondence). There is **no** auto-export at
+  task end. `clearAllAppData` keeps completed entries and their files.
+- `DownloadTaskStore` — `PreferencesStore` key `download_tasks_json`; the only
+  index that can reach `filesDir/downloads`, so it deliberately survives
+  "clear all app data".
+- `LocalMediaProgressStore` — `PreferencesStore` key `local_media_progress`;
+  per-local-item resume position keyed by the local entry id (`local:<taskId>`).
+  Deliberately **separate** from `WatchHistoryStore`, which is keyed by YouTube
+  `videoId` and never records per-item progress for local sources. Cleared by
+  "clear all app data" together with watch history.
 - `PlayerSession` — singleton player state for the active `AvPlayerController`.
+  Two session-level modes ride here and are published to `AppStorage` for the
+  player UI: `isAudioOnlyMode` and `isLocalMode`. A `VideoItem` with
+  `localMediaPath` set plays as a local file: `doPlay` branches to
+  `doPlayLocal`, which skips `YouTubePlayService`/`beginPrepare` entirely and
+  submits one synthetic `LOCAL_FILE` progressive stream; the sandbox path is
+  handed to MPV untouched. `isLocalMode` is what gates the player UI down to
+  local-only chrome (see §4 and `VideoDetails`/`PlayerInfoPanel`/`AVPlayer`).
 - `PlayerPresentation` — foreground / background / share / cast / PiP presentation
   mode; drives when video may be disabled for background audio-only.
 - `WatchHistoryStore`, `SearchHistoryStore`, `DownloadManager`, `LocalStore`,
@@ -219,7 +246,7 @@ geometry (`deviceWidth`/`deviceHeight`, `statusBarHeight`, `navBarHeight`,
 `windowStatus`), theme (`themePrimaryColor`, `currentColorMode` /
 `effectiveColorMode`), PiP / window-mode flags (`isPiPActive`,
 `isPipHandoffPending`, `isFloatingWindow`, `isSplitScreen`, `isMultiWindow`,
-`isAudioOnlyMode`, `playerPageVisible`, `selectedVideo`), and collection
+`isAudioOnlyMode`, `isLocalMode`, `playerPageVisible`, `selectedVideo`), and collection
 store caches (`favorites`, `playlists`, `subscriptions`, `watchHistory`,
 `localQueues`, `downloadTasks`, `authStatus`).
 

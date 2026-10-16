@@ -1209,6 +1209,18 @@
             "value": "ダウンロード"
         },
         {
+            "name": "yt_local_play",
+            "value": "再生"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "ファイルが見つかりません"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "ダウンロードにエクスポート"
+        },
+        {
             "name": "yt_download_title",
             "value": "動画をダウンロード"
         },

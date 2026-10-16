@@ -2157,6 +2157,18 @@
             "value": "備份檔案版本不受支援"
         },
         {
+            "name": "yt_local_play",
+            "value": "播放"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "檔案已遺失"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "匯出到 Downloads"
+        },
+        {
             "name": "yt_download_title",
             "value": "下載影片"
         },

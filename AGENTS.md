@@ -316,7 +316,10 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   recovery action and reset matching in-memory/native caches as well. The
   deliberate exception is user-downloaded media under `filesDir/downloads`,
   which must survive "clear all app data" unless product requirements and the
-  confirmation copy explicitly change.
+  confirmation copy explicitly change. The download index
+  (`download_tasks_json`) belongs to that same exception — it is the only path
+  back to those files — while local playback progress (`local_media_progress`)
+  is cleared with watch history.
 
 ### Logging architecture and requirements
 - `entry` code logs through `AppLog.getInstance(<stable component tag>)`.

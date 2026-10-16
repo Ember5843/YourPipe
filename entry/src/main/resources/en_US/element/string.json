@@ -1017,6 +1017,18 @@
             "value": "Download"
         },
         {
+            "name": "yt_local_play",
+            "value": "Play"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "File not found"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "Export to Downloads"
+        },
+        {
             "name": "yt_download_title",
             "value": "Download Video"
         },

@@ -6,12 +6,13 @@ import {
   SabrOfflineProgress
 } from 'mediaservice';
 import common from '@ohos.app.ability.common';
-import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
+import { fileIo as fs } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
 import { notificationManager } from '@kit.NotificationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { taskpool } from '@kit.ArkTS';
 import { UIConfig } from './AppState';
+import { DownloadTaskRecord, DownloadTaskStore } from './DownloadTaskStore';
 import { formatBytes } from './utils/FormatUtils';
 import { AuthSessionManager, HttpDownloader, parseHlsMasterManifest } from 'youtube_core';
 
@@ -77,6 +78,8 @@ export class DownloadTask {
   @Track outputPath: string = '';
   @Track taskDir: string = '';
   @Track createdAt: number = Date.now();
+  /** 手动导出到的路径（条目与导出文件对应；删除条目不触碰该副本）。 */
+  @Track exportedPath: string = '';
 
   _cancelled: boolean = false;
   _videoFilePath: string = '';
@@ -396,7 +399,6 @@ export class DownloadManager {
   private static instance: DownloadManager;
   private tasks: DownloadTask[] = [];
   private activeTaskIds: Set<string> = new Set();
-  private exportTail: Promise<void> = Promise.resolve();
   private context: common.UIAbilityContext | null = null;
   private notificationDispatcher: DownloadNotificationDispatcher;
 
@@ -470,9 +472,9 @@ export class DownloadManager {
   }
 
   /**
-   * Clear-all-app-data hook: cancel every in-flight task and drop the task
-   * list (AppStorage 'downloadTasks' is refreshed via notifyTasksChanged).
-   * Downloaded files under filesDir/downloads intentionally survive.
+   * Clear-all-app-data hook: cancel every in-flight task, keep finished entries
+   * (AppStorage 'downloadTasks' is refreshed via notifyTasksChanged).
+   * Both the downloaded files under filesDir/downloads and their index survive.
    */
   clearAllTasks(): void {
     this.tasks.forEach((task: DownloadTask) => {
@@ -482,8 +484,9 @@ export class DownloadManager {
       }
       this.cancelDownloadNotification(task);
     });
-    logger.info(`All download tasks cleared: count=${this.tasks.length} active=${this.activeTaskIds.size}`);
-    this.tasks = [];
+    // 已完成条目刻意保留：文件在 filesDir/downloads 存活，而索引是唯一能到达它们的入口。
+    this.tasks = this.tasks.filter((task: DownloadTask) => task.status === DownloadStatus.COMPLETED);
+    logger.info(`Download tasks cleared (completed retained): count=${this.tasks.length} active=${this.activeTaskIds.size}`);
     this.notifyTasksChanged();
   }
 
@@ -511,8 +514,10 @@ export class DownloadManager {
       counter++;
     }
     fs.copyFileSync(task.outputPath, outputPath);
+    // 导出不再删除条目：条目与导出文件保持对应，删除条目也只动沙箱副本。
+    task.exportedPath = outputPath;
     logger.info(`Task ${task.id} exported to downloads: ${outputPath}`);
-    this.deleteTask(task.id);
+    this.notifyTasksChanged();
     return outputPath;
   }
 
@@ -539,6 +544,79 @@ export class DownloadManager {
 
   private notifyTasksChanged(): void {
     AppStorage.setOrCreate('downloadTasks', [...this.tasks]);
+    this.persistTasks();
+  }
+
+  /** 只持久化终态条目：下载中/排队中的任务带运行时状态，重启后无意义。 */
+  private persistTasks(): void {
+    const records: DownloadTaskRecord[] = this.tasks
+      .filter((task: DownloadTask) => task.status === DownloadStatus.COMPLETED
+        || task.status === DownloadStatus.FAILED)
+      .map((task: DownloadTask): DownloadTaskRecord => ({
+        id: task.id,
+        videoId: task.videoId,
+        title: task.title,
+        author: task.author,
+        thumbnailUrl: task.thumbnailUrl,
+        outputPath: task.outputPath,
+        taskDir: task.taskDir,
+        createdAt: task.createdAt,
+        totalSize: task.totalSize,
+        status: task.status,
+        exportedPath: task.exportedPath
+      }));
+    DownloadTaskStore.save(records);
+  }
+
+  /**
+   * 启动对账：从持久化索引重建已完成条目，并丢弃磁盘上已不存在的文件，
+   * 消除"重启即丢 + filesDir/downloads 成孤儿"的结构性缺陷。
+   */
+  restoreTasks(): void {
+    if (this.tasks.length > 0) {
+      return;
+    }
+    const records = DownloadTaskStore.load();
+    if (records.length === 0) {
+      return;
+    }
+    const restored: DownloadTask[] = [];
+    let dropped = 0;
+    records.forEach((record: DownloadTaskRecord) => {
+      let exists = true;
+      try {
+        exists = record.outputPath.length > 0 && fs.accessSync(record.outputPath);
+      } catch (_e) {
+        exists = false;
+      }
+      if (!exists) {
+        dropped++;
+        return;
+      }
+      const task = new DownloadTask(
+        record.id,
+        record.videoId,
+        record.title,
+        record.author,
+        record.thumbnailUrl,
+        { url: record.outputPath, kind: 'progressive', deliveryMethod: 'LOCAL_FILE', hasVideo: true, hasAudio: true },
+        null
+      );
+      task.status = record.status === DownloadStatus.FAILED ? DownloadStatus.FAILED : DownloadStatus.COMPLETED;
+      task.outputPath = record.outputPath;
+      task.taskDir = record.taskDir;
+      task.createdAt = record.createdAt;
+      task.totalSize = record.totalSize;
+      task.exportedPath = record.exportedPath || '';
+      task.progress = 100;
+      if (this.context) {
+        task._context = this.context;
+      }
+      restored.push(task);
+    });
+    this.tasks = restored;
+    logger.info(`restoreTasks: restored=${restored.length} dropped(missing file)=${dropped}`);
+    this.notifyTasksChanged();
   }
 
   private processQueue(): void {
@@ -711,12 +789,7 @@ export class DownloadManager {
       this.cleanupTaskFiles(task, false);
       logger.info(`Task ${task.id} SABR completed: output=${task.outputPath}`);
       this.publishDownloadNotification(task, true);
-      const exportedPath = await this.runAutoExportAtTaskEnd(task);
-      if (exportedPath) {
-        this.showToast(this.tr($r('app.string.yt_download_saved_format'), this.truncateNotificationText(this.getFileName(exportedPath), 36)));
-      } else {
-        this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
-      }
+      this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
     } catch (error) {
       if (task._cancelled || this.getErrorMessage(error) === 'cancelled') {
         task.status = DownloadStatus.CANCELLED;
@@ -1035,53 +1108,7 @@ export class DownloadManager {
     this.cleanupTaskFiles(task, false);
     logger.info(`Task ${task.id} completed: output=${task.outputPath}`);
     this.publishDownloadNotification(task, true);
-    const exportedPath = await this.runAutoExportAtTaskEnd(task);
-    if (exportedPath) {
-      this.showToast(this.tr($r('app.string.yt_download_saved_format'), this.truncateNotificationText(this.getFileName(exportedPath), 36)));
-    } else {
-      this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
-    }
-  }
-
-  private async runAutoExportAtTaskEnd(task: DownloadTask): Promise<string | null> {
-    const previousExport = this.exportTail;
-    let releaseExport: () => void = () => {};
-    this.exportTail = new Promise<void>((resolve: () => void) => {
-      releaseExport = resolve;
-    });
-
-    await previousExport;
-    try {
-      return await this.autoExportCompletedTask(task);
-    } finally {
-      releaseExport();
-    }
-  }
-
-  private async autoExportCompletedTask(task: DownloadTask): Promise<string | null> {
-    if (!this.tasks.includes(task) || !task._context || task.status !== DownloadStatus.COMPLETED || !task.outputPath) {
-      return null;
-    }
-
-    try {
-      logger.info(`Task ${task.id} auto export prompt opening`);
-      const documentViewPicker = new picker.DocumentViewPicker(task._context);
-      const documentSaveOptions = new picker.DocumentSaveOptions();
-      documentSaveOptions.pickerMode = picker.DocumentPickerMode.DOWNLOAD;
-      const result = await documentViewPicker.save(documentSaveOptions);
-      if (!result || result.length === 0) {
-        logger.info(`Task ${task.id} auto export cancelled`);
-        return null;
-      }
-
-      const destinationDir = new fileUri.FileUri(result[0]).path;
-      const exportedPath = await this.exportCompletedTask(task.id, destinationDir);
-      logger.info(`Task ${task.id} auto export completed: ${exportedPath}`);
-      return exportedPath;
-    } catch (error) {
-      logger.warn(`Task ${task.id} auto export failed: ${this.getErrorMessage(error)}`);
-      return null;
-    }
+    this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
   }
 
   private async downloadStream(

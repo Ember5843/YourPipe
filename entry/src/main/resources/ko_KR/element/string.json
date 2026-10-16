@@ -1209,6 +1209,18 @@
             "value": "다운로드"
         },
         {
+            "name": "yt_local_play",
+            "value": "재생"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "파일을 찾을 수 없음"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "다운로드로 내보내기"
+        },
+        {
             "name": "yt_download_title",
             "value": "동영상 다운로드"
         },

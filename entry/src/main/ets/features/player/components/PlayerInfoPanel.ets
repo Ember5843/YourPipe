@@ -30,6 +30,15 @@ export struct PlayerInfoPanel {
   @Link vm: PlayerUiViewModel;
   @State tabArray: Array<TabItem> = initTabData();
   @State currentTabIndex: number = 0;
+  @StorageLink('isLocalMode') isLocalMode: boolean = false;
+
+  /** 本地文件只保留「简介」Tab：评论与播放队列都是在线/YouTube 语义。 */
+  private visibleTabs(): Array<TabItem> {
+    if (this.isLocalMode) {
+      return this.tabArray.filter((item: TabItem) => item.id === 0);
+    }
+    return this.tabArray;
+  }
 
   @Builder
   tabBuilder(index: number, name: string | Resource) {
@@ -39,7 +48,7 @@ export struct PlayerInfoPanel {
   build() {
     Column() {
       Tabs({ barPosition: BarPosition.Start }) {
-        ForEach(this.tabArray, (item: TabItem) => {
+        ForEach(this.visibleTabs(), (item: TabItem) => {
           TabContent() {
             Column() {
               if (item.id === 0) {

@@ -1209,6 +1209,18 @@
             "value": "Baixar"
         },
         {
+            "name": "yt_local_play",
+            "value": "Reproduzir"
+        },
+        {
+            "name": "yt_local_file_missing",
+            "value": "Arquivo não encontrado"
+        },
+        {
+            "name": "yt_download_export",
+            "value": "Exportar para Downloads"
+        },
+        {
             "name": "yt_download_title",
             "value": "Baixar vídeo"
         },
