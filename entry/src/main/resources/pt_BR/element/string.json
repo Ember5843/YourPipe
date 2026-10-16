@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "Redefinir zoom"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "Esquema de interação"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "Esquema de gestos"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "Player aprimorado"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "YouTube clássico"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "Personalizado"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "As predefinições mudam tudo de uma vez; qualquer alteração vira «Personalizado»"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "Toque duplo"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "Retroceder / avançar"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "Reproduzir / pausar"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "Sem ação"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "Passo do toque duplo"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "Guia de gestos"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "Toque simples"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "Mostrar / ocultar controles"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "Deslizar na horizontal"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "Deslizar à esquerda"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "Deslizar à direita"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "Pressionar e segurar"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "Brilho"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "Volume"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "Desativado"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "Privacidade"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "Registrar histórico"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "Desativado, nenhum histórico novo é salvo (registros existentes são mantidos)"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "Limpar histórico"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "Exclui todo o histórico local e o progresso"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "Histórico limpo"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "Abrir em Inscrições"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "Abre o app direto na aba Inscrições"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "Animações"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "Animações da interface"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "Desativa zooms de entrada e efeitos de ícones"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Bilibili clássico"
         }
     ]
 }

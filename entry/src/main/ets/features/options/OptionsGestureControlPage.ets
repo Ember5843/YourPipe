@@ -6,6 +6,9 @@ import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 import {
   PlaybackConfig,
   HOLD_SPEED_VALUES, HOLD_SPEED_DELAYS, getHoldSpeedDelayDisplay,
+  GESTURE_SCHEME_LABELS, getGestureSchemeDisplay,
+  DOUBLE_TAP_ACTION_LABELS, getDoubleTapActionDisplay,
+  DOUBLE_TAP_SEEK_SECONDS, getDoubleTapSeekDisplay,
 } from '../../common/PlaybackConfig';
 
 interface OptionsGestureControlPageParams {
@@ -25,6 +28,18 @@ export struct OptionsGestureControlPage {
     updatePlaybackConfig: () => {}
   };
 
+  private getSchemeOptions(): SelectOption[] {
+    return GESTURE_SCHEME_LABELS.map(s => ({ value: getGestureSchemeDisplay(s) } as SelectOption));
+  }
+
+  private getDoubleTapOptions(): SelectOption[] {
+    return DOUBLE_TAP_ACTION_LABELS.map(s => ({ value: getDoubleTapActionDisplay(s) } as SelectOption));
+  }
+
+  private getDoubleTapSeekOptions(): SelectOption[] {
+    return DOUBLE_TAP_SEEK_SECONDS.map(s => ({ value: getDoubleTapSeekDisplay(s) } as SelectOption));
+  }
+
   private getHoldSpeedOptions(): SelectOption[] {
     return HOLD_SPEED_VALUES.map(v => ({ value: `${v}x` } as SelectOption));
   }
@@ -33,9 +48,126 @@ export struct OptionsGestureControlPage {
     return HOLD_SPEED_DELAYS.map(v => ({ value: getHoldSpeedDelayDisplay(v) } as SelectOption));
   }
 
+  /**
+   * 结构项改动（双击动作 / 滑动组 / 长按开关）：按改动后的组合回推方案——
+   * 仍与某预设一致就显示该预设，都不一致才标「自定义」。
+   * 参数项（双击步长、长按倍速与触发延迟）不走这里，改它们不改变方案选择。
+   * 预设应用时 Toggle 的 isOn 程序化变化也会触发 onChange，走"组合回推"而不是
+   * 无条件置 custom，正是为了让它保持预设、不被误改回自定义。
+   */
+  private markCustom(updater: (cfg: PlaybackConfig) => void): void {
+    this.params.updatePlaybackConfig(cfg => {
+      updater(cfg);
+      cfg.gestureScheme = PlaybackConfig.schemeForGestureConfig(cfg);
+    });
+  }
+
+  /** 手势说明：按当前配置动态生成（关闭项显示「已关闭」）。 */
+  private helpLines(): string[] {
+    const t = (res: Resource): string => getContext().resourceManager.getStringSync(res.id);
+    const off = t($r('app.string.yt_gesture_help_off'));
+    const seekValue = t($r('app.string.yt_gesture_double_tap_seek'));
+    const lines: string[] = [];
+
+    lines.push(`${t($r('app.string.yt_gesture_help_single_tap'))}：`
+      + t($r('app.string.yt_gesture_help_single_tap_value')));
+
+    const action = this.playbackConfig.doubleTapAction;
+    const actionValue = action === 'seek'
+      ? `${seekValue} · ${this.playbackConfig.doubleTapSeekSeconds}s`
+      : (action === 'playpause'
+        ? t($r('app.string.yt_gesture_double_tap_playpause'))
+        : t($r('app.string.yt_gesture_double_tap_off')));
+    lines.push(`${t($r('app.string.yt_gesture_double_tap'))}：${actionValue}`);
+
+    lines.push(`${t($r('app.string.yt_gesture_help_swipe_horizontal'))}：`
+      + (this.playbackConfig.gestureSeekEnabled ? seekValue : off));
+    lines.push(`${t($r('app.string.yt_gesture_help_swipe_left'))}：`
+      + (this.playbackConfig.gestureBrightnessEnabled ? t($r('app.string.yt_gesture_help_brightness')) : off));
+    lines.push(`${t($r('app.string.yt_gesture_help_swipe_right'))}：`
+      + (this.playbackConfig.gestureVolumeEnabled ? t($r('app.string.yt_gesture_help_volume')) : off));
+    lines.push(`${t($r('app.string.yt_gesture_help_hold'))}：`
+      + (this.playbackConfig.holdSpeedEnabled
+        ? `${this.playbackConfig.holdSpeedValue}x · ${getHoldSpeedDelayDisplay(this.playbackConfig.holdSpeedDelayMs)}`
+        : off));
+    return lines;
+  }
+
   build() {
     Column() {
       List({ space: 6 }) {
+        // ── 交互方案（预设：增强 / 经典 YouTube / 自定义） ──
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_gesture_scheme_title') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_gesture_scheme_label'),
+              options: this.getSchemeOptions(),
+              selectedIndex: GESTURE_SCHEME_LABELS.indexOf(this.playbackConfig.gestureScheme),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const scheme = GESTURE_SCHEME_LABELS[index];
+                // 程序化回显 / 重复选择：不再重复应用（避免自触发回环）
+                if (scheme === this.playbackConfig.gestureScheme) {
+                  return;
+                }
+                this.params.updatePlaybackConfig(cfg => PlaybackConfig.applyGesturePreset(cfg, scheme));
+              }
+            })
+          }
+
+          ListItem() {
+            Row() {
+              Text($r('app.string.yt_gesture_scheme_subtitle'))
+                .fontSize(12)
+                .fontColor($r('app.color.yourtube_text_quaternary'))
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 8, bottom: 10 })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_gesture_double_tap'),
+              options: this.getDoubleTapOptions(),
+              selectedIndex: DOUBLE_TAP_ACTION_LABELS.indexOf(this.playbackConfig.doubleTapAction),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const action = DOUBLE_TAP_ACTION_LABELS[index];
+                this.markCustom(cfg => cfg.doubleTapAction = action);
+              }
+            })
+          }
+
+          if (this.playbackConfig.doubleTapAction === 'seek') {
+            ListItem() {
+              PlaybackSelectRow({
+                title: $r('app.string.yt_gesture_double_tap_seek_seconds'),
+                options: this.getDoubleTapSeekOptions(),
+                selectedIndex: DOUBLE_TAP_SEEK_SECONDS.indexOf(this.playbackConfig.doubleTapSeekSeconds),
+                fontColor: this.params.themeColor,
+                transparentBackground: true,
+                onChange: (index: number) => {
+                  // 步长是方案的调节参数：改动它不改变方案选择（不标记自定义）
+                  const secs = DOUBLE_TAP_SEEK_SECONDS[index];
+                  this.params.updatePlaybackConfig(cfg => cfg.doubleTapSeekSeconds = secs);
+                }
+              })
+            }
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        // ── 分项开关（滑动组 / 长按组） ──
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_playback_gestures') })
         }
@@ -50,7 +182,7 @@ export struct OptionsGestureControlPage {
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
-                this.params.updatePlaybackConfig(cfg => cfg.gestureSeekEnabled = val);
+                this.markCustom(cfg => cfg.gestureSeekEnabled = val);
               }
             })
           }
@@ -63,7 +195,7 @@ export struct OptionsGestureControlPage {
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
-                this.params.updatePlaybackConfig(cfg => cfg.gestureBrightnessEnabled = val);
+                this.markCustom(cfg => cfg.gestureBrightnessEnabled = val);
               }
             })
           }
@@ -76,7 +208,7 @@ export struct OptionsGestureControlPage {
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
-                this.params.updatePlaybackConfig(cfg => cfg.gestureVolumeEnabled = val);
+                this.markCustom(cfg => cfg.gestureVolumeEnabled = val);
               }
             })
           }
@@ -89,7 +221,7 @@ export struct OptionsGestureControlPage {
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
-                this.params.updatePlaybackConfig(cfg => cfg.holdSpeedEnabled = val);
+                this.markCustom(cfg => cfg.holdSpeedEnabled = val);
               }
             })
           }
@@ -104,6 +236,7 @@ export struct OptionsGestureControlPage {
                 transparentBackground: true,
                 onChange: (index: number) => {
                   const v = HOLD_SPEED_VALUES[index];
+                  // 参数项：不参与方案判定（改它不改变方案选择）
                   this.params.updatePlaybackConfig(cfg => cfg.holdSpeedValue = v);
                 }
               })
@@ -118,6 +251,7 @@ export struct OptionsGestureControlPage {
                 transparentBackground: true,
                 onChange: (index: number) => {
                   const v = HOLD_SPEED_DELAYS[index];
+                  // 参数项：不参与方案判定
                   this.params.updatePlaybackConfig(cfg => cfg.holdSpeedDelayMs = v);
                 }
               })
@@ -128,6 +262,30 @@ export struct OptionsGestureControlPage {
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        // ── 手势说明（随当前配置动态生成） ──
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_gesture_help_title') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            Column({ space: 6 }) {
+              ForEach(this.helpLines(), (line: string) => {
+                Text(line)
+                  .fontSize(13)
+                  .fontColor($r('app.color.yourtube_text_secondary'))
+                  .width('100%')
+              }, (line: string) => line)
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
 
         ListItem() {
           Column().height(24)

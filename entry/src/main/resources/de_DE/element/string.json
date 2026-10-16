@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "Zoom zurücksetzen"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "Bedienschema"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "Gestenschema"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "Erweiterter Player"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "Klassisches YouTube"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "Benutzerdefiniert"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "Voreinstellungen schalten alle Gesten um; jede Änderung ergibt „Benutzerdefiniert“"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "Doppeltippen"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "Zurückspulen / Vorspulen"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "Wiedergabe / Pause"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "Keine Aktion"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "Doppeltipp-Schritt"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "Gestenübersicht"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "Einfachtippen"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "Steuerung ein-/ausblenden"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "Horizontal wischen"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "Links vertikal wischen"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "Rechts vertikal wischen"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "Lange drücken"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "Helligkeit"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "Lautstärke"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "Aus"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "Privatsphäre"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "Wiedergabeverlauf aufzeichnen"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "Wenn aus, wird kein neuer Verlauf gespeichert (bestehende Einträge bleiben)"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "Verlauf löschen"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "Löscht den gesamten lokalen Verlauf und Fortschritt"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "Verlauf gelöscht"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "Mit Abos starten"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "Die App startet direkt im Tab „Abos“"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "Animationen"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "UI-Animationen"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "Deaktiviert Einblend-Zooms und Icon-Effekte"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Klassisches Bilibili"
         }
     ]
 }

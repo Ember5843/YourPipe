@@ -1300,6 +1300,14 @@ export struct VideoPlayer {
     this.syncPlaybackStateFromController();
   }
 
+  /**
+   * 暂停时显示中央播放按钮（Bilibili 风格）：已就绪、未在播放/缓冲、
+   * 非拖动进度条、无错误。ended 状态同样显示（点击 = 从头重播）。
+   */
+  private showCenterPlayButton(): boolean {
+    return this.vm.isReady && !this.vm.isPlaying && !this.vm.isBuffering
+      && !this.isSliderDragging && !this.hasError;
+  }
 
   @Builder
   SpeedMenu() {
@@ -2042,7 +2050,10 @@ export struct VideoPlayer {
         }
         if (this.showBackwardHint) {
           Column() {
-            SymbolGlyph($r('sys.symbol.gobackward_15')).fontSize(48).fontColor([Color.White])
+            // 步长可配（YouTube 5–60s），提示必须显示真实步长
+            Text(`‹ ${this.playbackConfig.doubleTapSeekSeconds}s`)
+              .fontColor(Color.White).fontSize(26).fontWeight(FontWeight.Medium)
+              .textShadow({ radius: 8, color: Color.Black })
           }
           .width('50%').height('100%')
           .justifyContent(FlexAlign.Center)
@@ -2051,7 +2062,9 @@ export struct VideoPlayer {
         }
         if (this.showForwardHint) {
           Column() {
-            SymbolGlyph($r('sys.symbol.goforward_15')).fontSize(48).fontColor([Color.White])
+            Text(`${this.playbackConfig.doubleTapSeekSeconds}s ›`)
+              .fontColor(Color.White).fontSize(26).fontWeight(FontWeight.Medium)
+              .textShadow({ radius: 8, color: Color.Black })
           }
           .width('50%').height('100%')
           .justifyContent(FlexAlign.Center)
@@ -2088,6 +2101,30 @@ export struct VideoPlayer {
         }
       }
       .width('100%').height('100%').hitTestBehavior(HitTestMode.None).zIndex(CommonConstants.Z_INDEX_BASE + 3)
+
+      // 2.5 中央播放按钮（暂停时）：点击恢复播放（ended 时 = 从头重播）
+      if (this.showCenterPlayButton()) {
+        Stack({ alignContent: Alignment.Center }) {
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.play_fill'))
+              .fontSize(34)
+              .fontColor([Color.White])
+          }
+          .width(72)
+          .height(72)
+          .borderRadius(36)
+          .backgroundColor('#66000000')
+          .border({ width: 1, color: '#33FFFFFF' })
+          .onClick(() => {
+            this.togglePlayback();
+          })
+        }
+        .width('100%')
+        .height('100%')
+        // Transparent：空白处仍可命中下层（单击显隐控件/手势组），按钮自身优先响应
+        .hitTestBehavior(HitTestMode.Transparent)
+        .zIndex(CommonConstants.Z_INDEX_MAX)
+      }
 
       // 3. 播控层
       Column() {
@@ -2126,20 +2163,31 @@ export struct VideoPlayer {
       GestureGroup(GestureMode.Exclusive,
         TapGesture({ count: 2, fingers: 1 })
           .onAction((event: GestureEvent) => {
-            // 双击 ±15s 属于「隐藏态也放行」的进度控制（会顺手点亮 UI）
+            // 双击行为可配（Actions 互斥单选，天然避免与其它手势冲突）：
+            // seek=左右半屏快退/快进（步长可配）| playpause=播放/暂停 | off=不响应
             this.registerDoubleTapActivity();
+            const action = this.playbackConfig.doubleTapAction;
+            if (action === 'off') {
+              return;
+            }
+            if (action === 'playpause') {
+              this.togglePlayback();
+              return;
+            }
+            const step = this.playbackConfig.doubleTapSeekSeconds > 0
+              ? this.playbackConfig.doubleTapSeekSeconds : 15;
             const x: number = event.fingerList[0]?.localX ?? 0;
             if (x > this.containerVpWidth / 2) {
-              Logger.info(TAG, 'Double-tap forward +15s');
-              this.controller.syncSeek(Math.min(this.currentTime + 15, this.durationTime) * 1000);
+              Logger.info(TAG, `Double-tap forward +${step}s`);
+              this.controller.syncSeek(Math.min(this.currentTime + step, this.durationTime) * 1000);
               this.showForwardHint = true;
               this.forwardHintTimerId = setTimeout(() => {
                 this.forwardHintTimerId = -1;
                 this.showForwardHint = false;
               }, DOUBLE_TAP_HINT_HIDE_DELAY);
             } else {
-              Logger.info(TAG, 'Double-tap backward -15s');
-              this.controller.syncSeek(Math.max(this.currentTime - 15, 0) * 1000);
+              Logger.info(TAG, `Double-tap backward -${step}s`);
+              this.controller.syncSeek(Math.max(this.currentTime - step, 0) * 1000);
               this.showBackwardHint = true;
               this.backwardHintTimerId = setTimeout(() => {
                 this.backwardHintTimerId = -1;

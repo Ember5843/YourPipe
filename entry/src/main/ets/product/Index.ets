@@ -37,9 +37,7 @@ import { PlayerPresentation } from '../common/PlayerPresentation';
 import { SabrPoTokenWebRuntime } from '../features/player/SabrPoTokenWebRuntime';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
 import { AuthStateHelper } from '../common/AuthStateHelper';
-import { customAnimationUtil } from '../common/AnimationUtil';
 import { sharePlainText } from '../common/utils/ShareUtil';
-import { ThemeColorUtil } from '../common/ThemeColorUtil';
 import { LanguageManager } from '../common/LanguageManager';
 import { FeedServiceProvider } from '../common/FeedServiceProvider';
 import { YoutubeData } from '../common/model/SupportedCountry';
@@ -60,7 +58,7 @@ import {
   HdsNavigationTitleMode,
   SystemMaterialParams
 } from '@kit.UIDesignKit';
-import { TipsDialog, curves } from '@kit.ArkUI';
+import { TipsDialog, curves, SymbolGlyphModifier } from '@kit.ArkUI';
 import { UIConfig, YourtubeDarkMode } from '../common/AppState';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../common/components/HdsTitleBar';
@@ -433,6 +431,13 @@ struct Index {
   aboutToAppear() {
     this.ensureStores();
     this.buildPickerItems();
+    // 默认首页：Options「启动时进入订阅」→ 首帧后切到订阅 tab（0=首页，1=订阅）。
+    if (PreferencesStore.getString('cfg_default_home_tab', 'home') === 'subs') {
+      logger.info('default home tab = subscriptions, switching after first layout');
+      setTimeout(() => {
+        this.switchRootTab(1);
+      }, 60);
+    }
     // 首次启动帮助引导：只看 cfg_help_seen 持久化变量，与是否首次安装无关。
     // 延迟到首帧之后置位：aboutToAppear 里同步置 true 时 bindContentCover 可能不弹出。
     if (PreferencesStore.getString(PREF_HELP_GUIDE_SEEN, 'false') !== 'true') {
@@ -1212,9 +1217,13 @@ struct Index {
       materialType: hdsMaterial.MaterialType.IMMERSIVE,
       materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
     };
+    // 悬浮页签栏与屏幕底边的间距：有手势条时贴在其上方；无手势条（记为 0）时给 24vp
+    // 下限——原 8vp 会让整条栏"沉"在屏幕底边（观感重心向下）。
+    const bottomMargin = this.naviIndicatorHeight > 0
+      ? Math.max(this.naviIndicatorHeight, 16)
+      : 24;
     const base: HdsTabsFloatingStyle = {
-      barBottomMargin: this.naviIndicatorHeight > 0 ? this.naviIndicatorHeight :
-        $r('sys.float.padding_level8'),
+      barBottomMargin: bottomMargin,
       systemMaterialEffect: effect
     };
     return base;
@@ -1225,22 +1234,29 @@ struct Index {
       Stack({ alignContent: Alignment.TopStart }) {
         HdsTabs({ controller: this.tabsController }) {
           TabContent() { this.TabContentSection(0) }
-            .tabBar(this.TabBarBuilder($r('sys.symbol.house_fill'), $r('app.string.yt_tab_home'), 0))
+            .tabBar(this.buildTabStyle(0))
 
           TabContent() { this.TabContentSection(1) }
-            .tabBar(this.TabBarBuilder($r('sys.symbol.person_2_fill'), $r('app.string.yt_tab_subscriptions'), 1))
+            .tabBar(this.buildTabStyle(1))
 
           TabContent() { this.TabContentSection(2) }
-            .tabBar(this.TabBarBuilder($r('sys.symbol.heart_fill'), $r('app.string.yt_tab_favorites'), 2))
+            .tabBar(this.buildTabStyle(2))
 
           TabContent() { this.TabContentSection(3) }
-            .tabBar(this.TabBarBuilder($r('sys.symbol.folder_fill'), $r('app.string.yt_tab_local'), 3))
+            .tabBar(this.buildTabStyle(3))
         }
         .barPosition(BarPosition.End)
         .vertical(false)
         .scrollable(true)
         .barOverlap(true)
         .blurStrategy(BlurStrategy.ADAPTIVE)
+        // 内容页切换动画：系统规定"页签用 BottomTabBarStyle 时 animationDuration 默认 0"
+        // （表现为直接闪现）。这里显式恢复 300ms——点击切换的默认曲线即官方非线性
+        // cubicBezierCurve(0.2, 0.0, 0.1, 1.0)。
+        // 换 spring 等自定义曲线需要原生 Tabs 的 animationCurve（API 20+），
+        // 但 HdsTabsAttribute 未声明该属性（applyNormalAttribute 也只收 HdsTabsAttribute，
+        // TabsOptions 构造参数无曲线字段），故 HdsTabs 下不可设置；关闭「界面动画」时置 0。
+        .animationDuration(this.uiConfig.isAnimation ? 300 : 0)
         .barFloatingStyle(this.buildHdsTabsFloatingStyle())
         .width('100%')
         .height('100%')
@@ -1513,32 +1529,32 @@ struct Index {
     });
   }
 
-  @Builder TabBarBuilder(iconRes: Resource, label: ResourceStr, index: number) {
-    Column({ space: 2 }) {
-      SymbolGlyph(iconRes)
-        .fontSize(24)
-        .fontColor([this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary')])
-        .symbolEffect(customAnimationUtil.isIconEffect(this.uiConfig), this.activeTabIndex === index)
-
-      Text(label)
-        .fontSize(11)
-        .fontColor(this.activeTabIndex === index ? this.themePrimary : $r('app.color.yourtube_text_primary'))
-        .fontWeight(this.activeTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-    }
-    .width(70)
-    .height(54)
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
-    .borderRadius(18)
-    .backgroundColor(this.activeTabIndex === index ?
-      ThemeColorUtil.selectedBackground(this.themePrimary) : Color.Transparent)
-    .shadow(this.activeTabIndex === index ?
-      { radius: 10, color: '#33000000', offsetX: 0, offsetY: 3 } :
-      { radius: 0, color: '#00000000', offsetX: 0, offsetY: 0 })
-    .translate({ x: 0, y: this.activeTabIndex === index ? -5 : -2 })
-    .animation({ duration: 220, curve: Curve.EaseOut })
+  /**
+   * 官方底部页签样式（BottomTabBarStyle + TabBarSymbol）：
+   * - normal / selected 各给一版 symbol（线框 → 实心），切页签时由系统播放
+   *   自带的图标切换动效（无需手写 symbolEffect）；
+   * - 图标与文字的选中/未选中颜色仍走本 App 主题色；
+   * - 不再使用自定义 tabBar 画法（主色底块 / 阴影 / 位移），保持官方观感。
+   */
+  private buildTabStyle(index: number): BottomTabBarStyle {
+    const normalIcons: Resource[] = [
+      $r('sys.symbol.house'), $r('sys.symbol.person_2'), $r('sys.symbol.heart'), $r('sys.symbol.folder')
+    ];
+    const selectedIcons: Resource[] = [
+      $r('sys.symbol.house_fill'), $r('sys.symbol.person_2_fill'),
+      $r('sys.symbol.heart_fill'), $r('sys.symbol.folder_fill')
+    ];
+    const normal = new SymbolGlyphModifier(normalIcons[index])
+      .fontColor([$r('app.color.yourtube_text_primary')]);
+    const selected = new SymbolGlyphModifier(selectedIcons[index])
+      .fontColor([this.themePrimary]);
+    const style = new BottomTabBarStyle({ normal: normal, selected: selected }, this.getTabLabel(index));
+    style.labelStyle({
+      unselectedColor: $r('app.color.yourtube_text_primary'),
+      selectedColor: this.themePrimary,
+      font: { size: 11 }
+    });
+    return style;
   }
 
   private savePlaybackConfig(next: PlaybackConfig): void {

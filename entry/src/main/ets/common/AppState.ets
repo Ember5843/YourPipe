@@ -96,6 +96,7 @@ export class UIConfig {
     config.subtitleTranslateLanguage = PreferencesStore.getString('cfg_subtitleTranslateLanguage', 'default');
     config.colorPreset = PreferencesStore.getString('cfg_colorPreset', 'default');
     config.enableLogger = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
+    config.isAnimation = PreferencesStore.getString('cfg_isAnimation', 'true') !== 'false';
     config.homeLayoutMode = PreferencesStore.getString('cfg_homeLayoutMode', 'list');
     config.homeGridDensity = UIConfig.normalizeHomeGridDensity(
       PreferencesStore.getString('cfg_homeGridDensity', 'auto')
@@ -124,6 +125,7 @@ export class UIConfig {
     PreferencesStore.setString('cfg_subtitleTranslateLanguage', config.subtitleTranslateLanguage);
     PreferencesStore.setString('cfg_colorPreset', config.colorPreset);
     PreferencesStore.setString('cfg_enableLogger', config.enableLogger ? 'true' : 'false');
+    PreferencesStore.setString('cfg_isAnimation', config.isAnimation !== false ? 'true' : 'false');
     PreferencesStore.setString('cfg_homeLayoutMode', config.homeLayoutMode);
     PreferencesStore.setString('cfg_homeGridDensity', UIConfig.normalizeHomeGridDensity(config.homeGridDensity));
     PreferencesStore.setString('cfg_homeFeedStyle', UIConfig.normalizeHomeFeedStyle(config.homeFeedStyle));

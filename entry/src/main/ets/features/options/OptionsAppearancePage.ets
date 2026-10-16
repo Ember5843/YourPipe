@@ -189,6 +189,29 @@ export struct OptionsAppearancePage {
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
         }
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_section_animation') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_option_interface_animation'),
+              subtitle: $r('app.string.yt_option_interface_animation_subtitle'),
+              isOn: this.uiConfig.isAnimation,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updateUiConfig(cfg => { cfg.isAnimation = val; });
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
       }
       .width('100%')
       .layoutWeight(1)

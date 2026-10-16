@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "Restablecer zoom"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "Esquema de interacción"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "Esquema de gestos"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "Reproductor mejorado"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "YouTube clásico"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "Personalizado"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "Los ajustes predefinidos cambian todo a la vez; cualquier cambio pasa a «Personalizado»"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "Doble toque"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "Retroceder / avanzar"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "Reproducir / pausar"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "Sin acción"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "Paso del doble toque"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "Guía de gestos"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "Toque simple"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "Mostrar / ocultar controles"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "Deslizar en horizontal"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "Deslizar a la izquierda"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "Deslizar a la derecha"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "Mantener pulsado"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "Brillo"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "Volumen"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "Desactivado"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "Privacidad"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "Guardar historial"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "Si se desactiva, no se guarda historial nuevo (los registros existentes se conservan)"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "Borrar historial"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "Elimina todo el historial local y el progreso"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "Historial borrado"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "Iniciar en Suscripciones"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "Abre la app directamente en la pestaña Suscripciones"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "Animaciones"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "Animaciones de la interfaz"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "Desactiva los zooms de entrada y los efectos de iconos"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Bilibili clásico"
         }
     ]
 }

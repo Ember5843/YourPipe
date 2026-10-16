@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "Сбросить масштаб"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "Схема управления"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "Схема жестов"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "Улучшенный плеер"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "Классический YouTube"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "Свой вариант"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "Пресеты переключают всё сразу; любое изменение — «Свой вариант»"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "Двойное касание"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "Назад / вперёд"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "Воспроизведение / пауза"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "Без действия"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "Шаг двойного касания"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "Подсказка по жестам"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "Одно касание"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "Показать / скрыть элементы управления"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "Свайп по горизонтали"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "Свайп слева"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "Свайп справа"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "Долгое нажатие"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "Яркость"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "Громкость"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "Выключено"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "Конфиденциальность"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "Вести историю просмотров"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "Если выключено, новая история не записывается (старые записи сохраняются)"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "Очистить историю"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "Удалить всю локальную историю и прогресс"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "История очищена"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "Открывать «Подписки» при запуске"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "Приложение сразу открывает вкладку «Подписки»"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "Анимации"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "Анимации интерфейса"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "Отключает анимации появления списков и эффекты значков"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Классический Bilibili"
         }
     ]
 }

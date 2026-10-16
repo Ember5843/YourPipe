@@ -25,6 +25,8 @@ export interface WatchHistoryItem {
 
 export class WatchHistoryStore {
   private static readonly KEY: string = 'watch_history';
+  /** 观看历史记录开关（PreferencesStore）：'false' = 停止写入新的观看历史（既有记录保留）。 */
+  private static readonly RECORD_ENABLED_KEY: string = 'cfg_record_history';
   private static readonly MAX_COUNT: number = 100;
   /** 播放列表来源的历史条目：videoId 以此前缀编码（playlist:<playlistId>） */
   static readonly PLAYLIST_KEY_PREFIX: string = 'playlist:';
@@ -52,6 +54,9 @@ export class WatchHistoryStore {
    * 历史保存列表本身而不是单个视频。按 playlistId 去重并置顶。
    */
   static recordPlaylist(playlistId: string, playlistName: string, thumbnailUrl: string): void {
+    if (!WatchHistoryStore.isRecordEnabled()) {
+      return;
+    }
     const id = (playlistId || '').trim();
     if (!id) return;
     const key = WatchHistoryStore.PLAYLIST_KEY_PREFIX + id;
@@ -74,6 +79,15 @@ export class WatchHistoryStore {
     WatchHistoryStore.syncToAppStorage();
   }
 
+  /** 是否允许写入新的观看历史（隐私开关）。默认开启；关闭不影响既有记录与订阅。 */
+  static isRecordEnabled(): boolean {
+    return PreferencesStore.getString(WatchHistoryStore.RECORD_ENABLED_KEY, 'true') !== 'false';
+  }
+
+  static setRecordEnabled(enabled: boolean): void {
+    PreferencesStore.setString(WatchHistoryStore.RECORD_ENABLED_KEY, enabled ? 'true' : 'false');
+  }
+
   /**
    * 记录/更新一条观看历史，并保存当前进度。
    * 每次调用会将该视频移至列表顶部。
@@ -89,6 +103,9 @@ export class WatchHistoryStore {
     channelAvatarUrl: string = '',
     channelHandle: string = ''
   ): void {
+    if (!WatchHistoryStore.isRecordEnabled()) {
+      return;
+    }
     if (!videoId || videoId.trim().length === 0) return;
 
     const all = WatchHistoryStore.getAll();

@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "Réinitialiser le zoom"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "Schéma d'interaction"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "Schéma gestuel"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "Lecteur amélioré"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "YouTube classique"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "Personnalisé"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "Les préréglages basculent tout d'un coup ; toute modification passe en « Personnalisé »"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "Double appui"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "Retour / avance"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "Lecture / pause"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "Aucune action"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "Pas du double appui"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "Guide des gestes"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "Appui simple"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "Afficher / masquer les commandes"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "Balayage horizontal"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "Balayage à gauche"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "Balayage à droite"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "Appui long"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "Luminosité"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "Volume"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "Désactivé"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "Confidentialité"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "Enregistrer l'historique"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "Désactivé, aucun nouvel historique n'est écrit (les données existantes restent)"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "Effacer l'historique"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "Supprime tout l'historique local et la progression"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "Historique effacé"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "Démarrer sur Abonnements"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "Ouvre l'app directement sur l'onglet Abonnements"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "Animations"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "Animations de l'interface"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "Désactive les zooms d'apparition et effets d'icônes"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Bilibili classique"
         }
     ]
 }

@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "还原缩放"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "交互方案"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "手势方案"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "播放器增强"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "YouTube 经典"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "自定义"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "预设一键切换；改动任一分项后会变成「自定义」"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "双击屏幕"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "快退 / 快进"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "播放 / 暂停"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "不响应"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "双击步长"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "手势说明"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "单击"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "显示 / 隐藏控制栏"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "横向滑动"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "左侧上下滑"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "右侧上下滑"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "长按画面"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "亮度"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "音量"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "已关闭"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "隐私"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "记录观看历史"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "关闭后不再写入新的观看历史，已有记录保留"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "清除观看历史"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "删除全部本地观看历史与播放进度"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "观看历史已清除"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "启动时进入订阅"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "打开应用后直接进入订阅页"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "动画"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "界面动画"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "关闭后移除列表缩放入场与图标动效等动画"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Bilibili 经典"
         }
     ]
 }

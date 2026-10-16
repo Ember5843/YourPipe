@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "Reimposta zoom"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "Schema di interazione"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "Schema gesti"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "Lettore avanzato"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "YouTube classico"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "Personalizzato"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "I preset cambiano tutto insieme; ogni modifica passa a «Personalizzato»"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "Doppio tocco"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "Indietro / avanti"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "Riproduci / pausa"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "Nessuna azione"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "Passo del doppio tocco"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "Guida ai gesti"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "Tocco singolo"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "Mostra / nascondi controlli"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "Scorri in orizzontale"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "Scorri a sinistra"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "Scorri a destra"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "Tieni premuto"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "Luminosità"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "Volume"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "Disattivato"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "Privacy"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "Registra cronologia"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "Se disattivato, non viene salvata nuova cronologia (i dati esistenti restano)"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "Cancella cronologia"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "Elimina tutta la cronologia locale e i progressi"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "Cronologia cancellata"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "Avvia su Iscrizioni"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "Apre l'app direttamente nella scheda Iscrizioni"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "Animazioni"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "Animazioni dell'interfaccia"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "Disattiva zoom di ingresso ed effetti delle icone"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Bilibili classico"
         }
     ]
 }

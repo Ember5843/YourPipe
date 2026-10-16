@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "Reset zoom"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "Interaction scheme"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "Gesture scheme"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "Enhanced player"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "Classic YouTube"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "Custom"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "Presets switch all gestures at once; changing any item marks it Custom"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "Double tap"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "Rewind / forward"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "Play / pause"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "Do nothing"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "Double-tap step"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "Gesture guide"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "Single tap"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "Show / hide controls"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "Swipe horizontally"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "Swipe left side"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "Swipe right side"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "Long press"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "Brightness"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "Volume"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "Off"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "Privacy"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "Record watch history"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "When off, no new watch history is written; existing records are kept"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "Clear watch history"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "Delete all local watch history and playback progress"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "Watch history cleared"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "Start on Subscriptions"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "Open the app directly on the Subscriptions tab"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "Animation"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "UI animations"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "Turns off list entrance zoom, icon effects and other animations"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Classic Bilibili"
         }
     ]
 }

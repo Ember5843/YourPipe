@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "ズームをリセット"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "操作スキーム"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "ジェスチャー設定"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "プレーヤー強化"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "YouTube クラシック"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "カスタム"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "プリセットで一括切替。個別に変更すると「カスタム」になります"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "ダブルタップ"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "巻き戻し / 早送り"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "再生 / 一時停止"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "無効"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "ダブルタップ幅"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "ジェスチャーの説明"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "シングルタップ"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "コントロールの表示 / 非表示"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "横向きスワイプ"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "左側を上下スワイプ"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "右側を上下スワイプ"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "画面を長押し"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "明るさ"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "音量"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "オフ"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "プライバシー"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "視聴履歴を記録"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "オフにすると新しい視聴履歴は保存されません（既存の記録は保持）"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "視聴履歴を削除"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "ローカルの視聴履歴と再生位置をすべて削除します"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "視聴履歴を削除しました"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "起動時に登録チャンネルを開く"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "アプリ起動後すぐに登録チャンネルタブを開きます"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "アニメーション"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "UI アニメーション"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "オフにするとリストの拡大登場やアイコンエフェクトなどのアニメーションを無効にします"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Bilibili クラシック"
         }
     ]
 }

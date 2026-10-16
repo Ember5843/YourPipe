@@ -18,6 +18,7 @@ import { BackupItemKey, AppBackupData, ALL_BACKUP_ITEM_KEYS } from '../../common
 import { AuthStateHelper } from '../../common/AuthStateHelper';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { PreferencesStore } from '../../common/PreferencesStore';
+import { WatchHistoryStore } from '../../common/WatchHistoryStore';
 import { AppLog } from '../../common/AppLog';
 
 const logger = AppLog.getInstance('OptionsDataAccountPage');
@@ -62,6 +63,8 @@ export struct OptionsDataAccountPage {
 
   @State isBusy: boolean = false;
   @State private isFeedFastMode: boolean = PreferencesStore.getString('cfg_feed_fast_mode', 'false') === 'true';
+  @State private recordHistoryEnabled: boolean = WatchHistoryStore.isRecordEnabled();
+  @State private startInSubscriptions: boolean = PreferencesStore.getString('cfg_default_home_tab', 'home') === 'subs';
   @State private showCookieImport: boolean = false;
   @State private cookieInput: string = '';
   @State private cookieImportMessage: string = '';
@@ -397,6 +400,36 @@ export struct OptionsDataAccountPage {
       cfg.homeFeedStyle = style;
     });
     this.params.onHomeFeedStyleChanged();
+  }
+
+  private clearWatchHistory(): void {
+    WatchHistoryStore.clear();
+    this.showToast($r('app.string.yt_toast_history_cleared'));
+  }
+
+  private confirmClearHistory(): void {
+    const uiContext = this.getUIContext();
+    uiContext.showAlertDialog({
+      title: $r('app.string.yt_option_clear_history'),
+      message: $r('app.string.yt_confirm_clear_history'),
+      autoCancel: true,
+      alignment: DialogAlignment.Center,
+      offset: { dx: 0, dy: -20 },
+      buttonDirection: DialogButtonDirection.HORIZONTAL,
+      buttons: [
+        {
+          value: $r('app.string.yt_action_cancel'),
+          action: () => {}
+        },
+        {
+          value: $r('app.string.yt_action_confirm'),
+          action: () => {
+            this.clearWatchHistory();
+          }
+        }
+      ],
+      cancel: () => {}
+    });
   }
 
   private showToast(message: ResourceStr): void {
@@ -764,6 +797,57 @@ export struct OptionsDataAccountPage {
                 this.isFeedFastMode = val;
                 PreferencesStore.setString('cfg_feed_fast_mode', val ? 'true' : 'false');
               }
+            })
+          }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_option_start_in_subs'),
+              subtitle: $r('app.string.yt_option_start_in_subs_subtitle'),
+              isOn: this.startInSubscriptions,
+              themeColor: this.themePrimary,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.startInSubscriptions = val;
+                PreferencesStore.setString('cfg_default_home_tab', val ? 'subs' : 'home');
+              }
+            })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_section_privacy') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_option_record_history'),
+              subtitle: $r('app.string.yt_option_record_history_subtitle'),
+              isOn: this.recordHistoryEnabled,
+              themeColor: this.themePrimary,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.recordHistoryEnabled = val;
+                WatchHistoryStore.setRecordEnabled(val);
+              }
+            })
+          }
+
+          ListItem() {
+            OptionItem({
+              icon: $r('sys.symbol.trash'),
+              title: $r('app.string.yt_option_clear_history'),
+              subtitle: $r('app.string.yt_option_clear_history_subtitle'),
+              iconColor: this.themePrimary,
+              clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
+              transparentBackground: true,
+              onClickAction: () => { this.confirmClearHistory(); }
             })
           }
         }

@@ -3343,6 +3343,139 @@
         {
             "name": "yt_aspect_reset",
             "value": "إعادة تعيين التكبير"
+        },
+        {
+            "name": "yt_gesture_scheme_title",
+            "value": "نظام التفاعل"
+        },
+        {
+            "name": "yt_gesture_scheme_label",
+            "value": "إعداد الإيماءات"
+        },
+        {
+            "name": "yt_gesture_scheme_enhanced",
+            "value": "مشغّل محسّن"
+        },
+        {
+            "name": "yt_gesture_scheme_youtube",
+            "value": "YouTube الكلاسيكي"
+        },
+        {
+            "name": "yt_gesture_scheme_custom",
+            "value": "مخصص"
+        },
+        {
+            "name": "yt_gesture_scheme_subtitle",
+            "value": "تُغيّر الإعدادات المسبقة كل شيء دفعة واحدة؛ أي تعديل يصبح «مخصصًا»"
+        },
+        {
+            "name": "yt_gesture_double_tap",
+            "value": "النقر المزدوج"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek",
+            "value": "ترجيع / تقديم"
+        },
+        {
+            "name": "yt_gesture_double_tap_playpause",
+            "value": "تشغيل / إيقاف مؤقت"
+        },
+        {
+            "name": "yt_gesture_double_tap_off",
+            "value": "بلا إجراء"
+        },
+        {
+            "name": "yt_gesture_double_tap_seek_seconds",
+            "value": "خطوة النقر المزدوج"
+        },
+        {
+            "name": "yt_gesture_help_title",
+            "value": "دليل الإيماءات"
+        },
+        {
+            "name": "yt_gesture_help_single_tap",
+            "value": "نقرة واحدة"
+        },
+        {
+            "name": "yt_gesture_help_single_tap_value",
+            "value": "إظهار / إخفاء عناصر التحكم"
+        },
+        {
+            "name": "yt_gesture_help_swipe_horizontal",
+            "value": "السحب أفقيًا"
+        },
+        {
+            "name": "yt_gesture_help_swipe_left",
+            "value": "السحب على اليسار"
+        },
+        {
+            "name": "yt_gesture_help_swipe_right",
+            "value": "السحب على اليمين"
+        },
+        {
+            "name": "yt_gesture_help_hold",
+            "value": "الضغط المطوّل"
+        },
+        {
+            "name": "yt_gesture_help_brightness",
+            "value": "السطوع"
+        },
+        {
+            "name": "yt_gesture_help_volume",
+            "value": "مستوى الصوت"
+        },
+        {
+            "name": "yt_gesture_help_off",
+            "value": "معطّل"
+        },
+        {
+            "name": "yt_section_privacy",
+            "value": "الخصوصية"
+        },
+        {
+            "name": "yt_option_record_history",
+            "value": "تسجيل سجل المشاهدة"
+        },
+        {
+            "name": "yt_option_record_history_subtitle",
+            "value": "عند التعطيل لن يُكتب سجل جديد (تبقى السجلات الحالية)"
+        },
+        {
+            "name": "yt_option_clear_history",
+            "value": "مسح سجل المشاهدة"
+        },
+        {
+            "name": "yt_option_clear_history_subtitle",
+            "value": "حذف كل سجل المشاهدة المحلي والتقدّم"
+        },
+
+        {
+            "name": "yt_toast_history_cleared",
+            "value": "تم مسح سجل المشاهدة"
+        },
+        {
+            "name": "yt_option_start_in_subs",
+            "value": "البدء على «الاشتراكات»"
+        },
+        {
+            "name": "yt_option_start_in_subs_subtitle",
+            "value": "يفتح التطبيق مباشرة على تبويب الاشتراكات"
+        },
+        {
+            "name": "yt_section_animation",
+            "value": "الحركات"
+        },
+        {
+            "name": "yt_option_interface_animation",
+            "value": "حركات الواجهة"
+        },
+        {
+            "name": "yt_option_interface_animation_subtitle",
+            "value": "يعطّل حركات ظهور القوائم وتأثيرات الأيقونات"
+        },
+        {
+            "name": "yt_gesture_scheme_bilibili",
+            "value": "Bilibili الكلاسيكي"
         }
     ]
 }
