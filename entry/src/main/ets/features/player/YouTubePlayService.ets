@@ -168,6 +168,13 @@ export class YouTubePlayService {
    *  real playback must never extract concurrently. */
   private extractChain: Promise<void> = Promise.resolve();
 
+  /**
+   * Endpoint of the extraction that produced the current error. The SABR
+   * fallback writes 'tv_downgraded' here so the error panel names the endpoint
+   * that actually failed, not the one that is configured.
+   */
+  private lastExtractionEndpoint: string = '';
+
   private async extractSerialized(videoId: string, attemptId: string): Promise<VideoInfo> {
     const run: Promise<VideoInfo> = this.extractChain.then(() => {
       if (!this.extractor) {
@@ -453,7 +460,7 @@ export class YouTubePlayService {
     try {
       logger.info(`${TAG} 开始提取视频流及元数据 (包含 Player JS 和解密)...`);
       const extractStartMs = Date.now();
-      const videoInfo = await this.extractSerialized(videoId, attemptId);
+      const videoInfo = await this.extractWithEndpointFallback(videoId, attemptId);
       const extractElapsed = Date.now() - extractStartMs;
       logger.info(`${TAG} 提取完成 elapsed=${extractElapsed}ms streams=${videoInfo.streams.length} subtitles=${videoInfo.subtitleTracks.length} isLive=${videoInfo.isLive}`);
       if (videoInfo.streams.length === 0) {
@@ -514,6 +521,71 @@ export class YouTubePlayService {
       const errorCode = this.analyzeErrorCode(e as Error);
       logger.error(`${TAG} play() extraction exception: errorCode=${errorCode} message=${(e as Error).message}`);
       return { success: false, error: this.getErrorMessage(errorCode, undefined, e as Error), errorCode: errorCode };
+    }
+  }
+
+  /**
+   * Extract with a one-shot endpoint fallback.
+   *
+   * <p>When the SABR endpoint (`mweb`) cannot produce a playable stream — the
+   * extraction throws, or it returns without any stream — the extraction is
+   * retried once through `tv_downgraded`, the token-free TVHTML5 direct-URL
+   * endpoint. That endpoint needs no PoToken and no UMP session, so it keeps
+   * playback alive when SABR is blocked (bot check, attestation wall, expired
+   * session). The fallback is attempted at most once per play call and never
+   * changes the user's configured client.
+   */
+  private async extractWithEndpointFallback(videoId: string, attemptId: string): Promise<VideoInfo> {
+    let info: VideoInfo;
+    try {
+      this.lastExtractionEndpoint = YoutubePlayerClientConfig.getYoutubePlayerClient();
+      info = await this.extractSerialized(videoId, attemptId);
+    } catch (e) {
+      const fallback = await this.retryWithFallbackEndpoint(videoId, attemptId, e as Error);
+      if (!fallback) {
+        throw e instanceof Error ? e : new Error(String(e));
+      }
+      return fallback;
+    }
+    if (info.streams.length > 0) {
+      return info;
+    }
+    const fallback = await this.retryWithFallbackEndpoint(videoId, attemptId, undefined);
+    return fallback ?? info;
+  }
+
+  /**
+   * Retry the extraction through the token-free direct-URL endpoint.
+   * Returns undefined when the fallback does not apply or does not help.
+   */
+  private async retryWithFallbackEndpoint(
+    videoId: string,
+    attemptId: string,
+    cause?: Error
+  ): Promise<VideoInfo | undefined> {
+    const current = YoutubePlayerClientConfig.getYoutubePlayerClient();
+    if (current !== 'mweb') {
+      // Only the SABR endpoint has a token-free counterpart to fall back to.
+      return undefined;
+    }
+    logger.warn(`${TAG} endpoint fallback mweb→tv_downgraded video=${videoId} `
+      + `cause=${cause ? cause.message : 'no-streams'}`);
+    YoutubePlayerClientConfig.setExtractionClientOverride('tv_downgraded');
+    this.lastExtractionEndpoint = 'tv_downgraded';
+    try {
+      const info = await this.extractSerialized(videoId, attemptId);
+      if (info.streams.length === 0) {
+        logger.warn(`${TAG} endpoint fallback produced no streams video=${videoId}`);
+        return undefined;
+      }
+      logger.info(`${TAG} endpoint fallback succeeded video=${videoId} `
+        + `streams=${info.streams.length} endpoint=tv_downgraded`);
+      return info;
+    } catch (e) {
+      logger.warn(`${TAG} endpoint fallback failed video=${videoId}: ${(e as Error).message}`);
+      return undefined;
+    } finally {
+      YoutubePlayerClientConfig.clearExtractionClientOverride();
     }
   }
 
@@ -826,7 +898,11 @@ export class YouTubePlayService {
       isRetryable,
       openInBrowserUrl,
       actionHint,
-      exception: error
+      exception: error,
+      // PipePipe ErrorActivity.getEndpoint: surface the extraction endpoint that
+      // was in effect so a failed playback can be attributed before switching it.
+      endpoint: this.lastExtractionEndpoint
+        || YoutubePlayerClientConfig.getYoutubePlayerClient()
     });
   }
 

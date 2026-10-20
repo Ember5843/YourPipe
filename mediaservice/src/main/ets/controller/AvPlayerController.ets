@@ -724,6 +724,7 @@ export class AvPlayerController {
     // 不门控 isActive：引擎层会缓存几何，供 LOADING 阶段 bindSurface 时套用，
     // 否则 mpv video chain 初始化拿不到宽高（typeNode surface 早于引擎就绪）。
     this.playbackEngine.resizeSurface(widthPx, heightPx);
+    this.logDiagSnapshot(`surface-size:${widthPx}x${heightPx}`);
   }
 
   public setSurfaceID(surfaceID: string): void {
@@ -732,6 +733,7 @@ export class AvPlayerController {
     // 不门控 isActive：始终把 surfaceId 透传给引擎缓存，使引擎 initialize()/load() 时能据此重绑，
     // 避免 typeNode surface 早于引擎就绪导致的丢绑、无画面。
     this.playbackEngine.attachSurface(surfaceID);
+    this.logDiagSnapshot('surface-bind');
   }
 
   public syncPlay(): void {
@@ -744,6 +746,7 @@ export class AvPlayerController {
     // Activate the default MEDIA AudioSession before play so other media yields focus.
     this.avSessionManager.activateForPlayback();
     this.playbackEngine.play();
+    this.logDiagSnapshot('sync-play');
   }
 
   public syncPause(): void {
@@ -752,6 +755,7 @@ export class AvPlayerController {
     this.playbackEngine.pause();
     // Release focus so background audio can resume.
     this.avSessionManager.deactivateForPause();
+    this.logDiagSnapshot('sync-pause');
   }
 
   public syncStop(): void {
@@ -759,6 +763,7 @@ export class AvPlayerController {
     this.clearFocusInterruptFlags('user_stop');
     this.playbackEngine.stop();
     this.avSessionManager.deactivateForPause();
+    this.logDiagSnapshot('sync-stop');
   }
 
   /**
@@ -773,14 +778,19 @@ export class AvPlayerController {
    */
   private handleAudioFocusHint(hint: audio.AudioSessionStateChangeHint): void {
     const name = AvSessionManager.focusHintName(hint);
+    this.logDiagSnapshot(`focus-in:${name}`);
     switch (hint) {
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_PAUSE:
         this.systemPausedByFocus = true;
         this.systemStoppedByFocus = false;
         this.playbackEngine.pause();
         Logger.info(TAG, `[AudioFocus] action=pause kind=temporary hint=${name}`);
+        this.logDiagSnapshot(`focus-pause:${name}`);
         break;
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_STOP:
+        // 遵从系统接口：STOP = 永久失去音频焦点。必须停，并且**不能**自行重新
+        // 激活会话去抢焦点——那会打断正在放音的其它应用。只有系统后续的
+        // RESUME 提示、或用户主动按播放，才允许恢复。
         this.systemPausedByFocus = false;
         this.systemStoppedByFocus = true;
         this.playbackEngine.pause();
@@ -802,6 +812,7 @@ export class AvPlayerController {
         this.avSessionManager.activateForPlayback();
         this.playbackEngine.play();
         Logger.info(TAG, `[AudioFocus] action=resume hint=${name}`);
+        this.logDiagSnapshot(`focus-resume:${name}`);
         break;
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_DUCK:
         // AudioSession path: system FORCE-ducks stream gain (~20%). Do NOT also
@@ -858,6 +869,66 @@ export class AvPlayerController {
 
   private videoOutputEnabled: boolean = true;
 
+  /**
+   * 诊断快照：把「焦点标志 / 会话状态 / 引擎状态 / 播放位置 / 音量 / 视频输出
+   * 开关 / surface 绑定」放在同一行里对照。
+   *
+   * <p>「暂停恢复后无声」和「有声无画」这两类问题单看任何一个标志位都无法
+   * 归因——必须能看到同一时刻的完整状态链。统一前缀 `[Diag]` 便于过滤。
+   */
+  private logDiagSnapshot(tag: string): void {
+    // 引擎状态与会话激活都是**异步**的（play() 的状态回调、activate 的 await）。
+    // 同步打快照会读到旧值（play 之后仍显示 paused）——延迟一拍再打。
+    setTimeout(() => this.logDiagSnapshotNow(tag), 80);
+  }
+
+  private logDiagSnapshotNow(tag: string): void {
+    try {
+      const state = this.playbackEngine.getState();
+      const stats = this.playbackEngine.getPlaybackStats();
+      Logger.info(TAG, `[Diag][${tag}] engine=${state.engineState} `
+        + `play=${state.isPlaying ? 1 : 0} ready=${state.isReady ? 1 : 0} `
+        + `buf=${state.isBuffering ? 1 : 0} end=${state.isEnded ? 1 : 0} `
+        + `pos=${state.currentTime.toFixed(2)}s `
+        + `vstr=${state.videoStreamCount} astr=${state.audioStreamCount} `
+        + `size=${state.videoWidth}x${state.videoHeight} `
+        + `vol=${this.playbackEngine.getVolume()} duck=${this.duckActive ? 1 : 0} `
+        + `focus=t${this.systemPausedByFocus ? 1 : 0}/p${this.systemStoppedByFocus ? 1 : 0} `
+        + `appFg=${this.isAppForeground() ? 1 : 0} `
+        + `session=${this.avSessionManager.isSessionActive() ? 'active' : 'inactive'} `
+        + `vidOut=${this.videoOutputEnabled ? 1 : 0} `
+        + `surface=${this.surfaceID.length > 0 ? 'bound' : 'none'} `
+        + `dropped=${stats.droppedFrames} cache=${stats.demuxerCacheDurationSec.toFixed(1)}s`);
+    } catch (e) {
+      Logger.warn(TAG, `[Diag][${tag}] snapshot failed: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * 应用是否在前台（entry 注入）。
+   *
+   * <p>**只用于诊断**，不参与任何播放决策：系统发来的焦点提示怎么处理，一律
+   * 按系统接口的语义来（STOP = 永久失去焦点，停，且不自行抢回）。这个状态
+   * 只是让日志能回答「STOP 是不是迟到了」——系统切后台后通常延迟几秒才发
+   * STOP，这段时间里用户可能已经切回前台。
+   */
+  private appForegroundProvider?: () => boolean;
+
+  setAppForegroundProvider(provider: () => boolean): void {
+    this.appForegroundProvider = provider;
+  }
+
+  private isAppForeground(): boolean {
+    if (!this.appForegroundProvider) {
+      return true;
+    }
+    try {
+      return this.appForegroundProvider();
+    } catch (_e) {
+      return true;
+    }
+  }
+
   public setVideoOutputEnabled(enabled: boolean): void {
     // Always remember desired flag (session audio-only survives load/LOADING).
     const changed = this.videoOutputEnabled !== enabled;
@@ -872,6 +943,7 @@ export class AvPlayerController {
     this.playbackEngine.setVideoOutputEnabled(enabled);
     if (changed) {
       Logger.info(TAG, `setVideoOutputEnabled=${enabled}`);
+      this.logDiagSnapshot(`video-output:${enabled ? 'on' : 'off'}`);
     }
   }
 

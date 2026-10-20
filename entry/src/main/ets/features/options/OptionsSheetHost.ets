@@ -388,7 +388,8 @@ export struct OptionsSheetHost {
             params: {
               themeColor: this.themePrimary,
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
-              updatePlaybackConfig: this.params.updatePlaybackConfig
+              updatePlaybackConfig: this.params.updatePlaybackConfig,
+              updateUiConfig: this.params.updateUiConfig
             }
           })
       }

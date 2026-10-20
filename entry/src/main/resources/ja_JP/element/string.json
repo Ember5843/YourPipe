@@ -1129,6 +1129,10 @@
             "value": "動画情報の解析に失敗しました"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "現在のエンドポイント：%s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "動画の再生データを取得できません"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "コントロールの表示 / 非表示"
+            "value": "コントロールを表示（3 秒後に自動で隠れる）"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "Bilibili クラシック"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "ダウンロードがタイムアウトしました"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "再試行に失敗しました。後でもう一度お試しください"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "再試行中…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "ダウンロードのタイムアウト"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "タイムアウトなし"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d 分"
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "再生を停止"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "接続状態"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "未有効"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "接続済み（ローカルブリッジ %d）"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "接続済み（上流へ直接）"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "ブリッジ切断、再適用が必要です"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "適用に失敗しました"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "再適用して再起動"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "代理を再適用しました"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "例：HTTP なら 127.0.0.1 とポート（例 7890）を入力。SOCKS5 も同じ。ユーザー名・パスワードを設定するとローカルブリッジ経由で、橋が失敗しても直結にはフォールバックしません。"
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "中央の再生ボタン"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "一時停止中に画面中央へ大きな再生ボタンを表示します。オフにすると画面中央はそのまま、画面のタップか下部バーで操作します。"
         }
     ]
 }

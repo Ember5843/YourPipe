@@ -1,4 +1,6 @@
 import { DownloadManager, DownloadTask, DownloadStatus } from '../../common/DownloadManager';
+import { StreamInfo, PlayerModel } from 'mediaservice';
+import { YouTubePlayService } from '../player/YouTubePlayService';
 import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 import { MediaThumb } from '../../common/components/MediaThumb';
@@ -6,6 +8,8 @@ import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { VideoItem } from 'youtube_core';
 import { ActionHub } from '../../common/ActionHub';
+import { AppLog } from '../../common/AppLog';
+import { PlayQueueSourceHint } from '../player/PlayQueueManager';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { customVibrator } from '../../common/VibratorUtil';
 import { VideoItemContextMenu, VideoMenuExtraItem } from '../../common/components/VideoItemContextMenu';
@@ -22,6 +26,8 @@ import {
   MEDIA_TITLE_SIZE
 } from '../../common/components/MediaCardTokens';
 
+const logger = AppLog.getInstance('DownloadPage');
+
 /** Match VideoMediaCard list action geometry. */
 const ACTION_BTN_HEIGHT: number = 28;
 const ACTION_BTN_WIDTH: number = 72;
@@ -32,6 +38,39 @@ function isActiveStatus(status: DownloadStatus): boolean {
     status === DownloadStatus.DOWNLOADING_AUDIO ||
     status === DownloadStatus.MERGING ||
     status === DownloadStatus.PENDING;
+}
+
+interface RetryStreams {
+  video: StreamInfo | undefined;
+  audio: StreamInfo | null;
+}
+
+/**
+ * 重试时挑选要用的流：优先选回原来的 itag（分辨率 / 音轨不变），
+ * 取不到就退回该分类里最佳的一条。SABR 的直链同样按 itag 选，
+ * 重新提取带来的新鲜 sabrInfo 会替换掉过期的 bootstrap。
+ */
+function pickRetryStreams(streams: StreamInfo[], task: DownloadTask): RetryStreams {
+  const categories = PlayerModel.classifyForDownload(streams);
+  const wantVideoItag = task.videoStream?.itag;
+  const wantAudioItag = task.audioStream?.itag;
+  let video: StreamInfo | undefined;
+  if (wantVideoItag !== undefined) {
+    video = categories.video.find((s: StreamInfo) => s.itag === wantVideoItag)
+      || categories.progressive.find((s: StreamInfo) => s.itag === wantVideoItag)
+      || categories.hlsManifest.find((s: StreamInfo) => s.itag === wantVideoItag);
+  }
+  if (!video) {
+    video = categories.progressive[0] || categories.video[0] || categories.hlsManifest[0];
+  }
+  let audio: StreamInfo | null = null;
+  if (wantAudioItag !== undefined) {
+    audio = categories.audio.find((s: StreamInfo) => s.itag === wantAudioItag) || null;
+  }
+  if (!audio && task.audioStream) {
+    audio = categories.audio[0] || null;
+  }
+  return { video: video, audio: audio };
 }
 
 @Component
@@ -88,10 +127,11 @@ struct DownloadTaskRow {
   private downloadManager: DownloadManager = DownloadManager.getInstance();
   @State exporting: boolean = false;
   @State isShowContextMenu: boolean = false;
+  @State retrying: boolean = false;
 
   /** 任务行 → 视频语义（channelId 未入库，"查看作者"项会自动隐藏）。 */
   private toVideoItem(): VideoItem {
-    return new VideoItem(
+    const item = new VideoItem(
       0,
       this.task.videoId,
       this.task.title,
@@ -104,6 +144,17 @@ struct DownloadTaskRow {
       '',
       ''
     );
+    // 菜单里的「仅音频播放」等动作要落在本地文件上，而不是再去线上提取一遍。
+    if (this.task.outputPath) {
+      item.localMediaPath = this.task.outputPath;
+    }
+    return item;
+  }
+
+  /** 扫盘回收的条目没有 YouTube id：收藏 / 分享这类线上动作不适用。 */
+  private hasYouTubeId(): boolean {
+    const id = (this.task.videoId || '').trim();
+    return id.length > 0 && !id.startsWith('local:');
   }
 
   /** 任务特有项：进行中 = 取消任务；其它 = 删除任务（主题色强调）。 */
@@ -157,6 +208,8 @@ struct DownloadTaskRow {
     VideoItemContextMenu({
       video: this.toVideoItem(),
       showDownload: false,
+      showFavorite: this.hasYouTubeId(),
+      showShare: this.hasYouTubeId(),
       extraItems: this.buildTaskMenuExtras()
     })
   }
@@ -314,13 +367,26 @@ struct DownloadTaskRow {
         .onClick(() => {
           this.playTask();
         })
+    } else if (this.task.status === DownloadStatus.FAILED) {
+      // 失败任务：主操作 = 重试（重新提取新鲜流后再入队），删除降为长按菜单。
+      Button(this.retrying ? $r('app.string.yt_download_retrying') : $r('app.string.yt_action_retry'))
+        .fontSize(12)
+        .fontColor($r('app.color.yourtube_text_inverse'))
+        .backgroundColor(this.retrying
+          ? $r('app.color.yourtube_button_disabled')
+          : $r('app.color.yourtube_error'))
+        .height(ACTION_BTN_HEIGHT)
+        .padding({ left: 10, right: 10 })
+        .enabled(!this.retrying)
+        .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+        .onClick(() => {
+          this.retryFailedTask();
+        })
     } else {
       Button($r('app.string.yt_action_delete'))
         .fontSize(12)
         .fontColor($r('app.color.yourtube_text_inverse'))
-        .backgroundColor(this.task.status === DownloadStatus.FAILED
-          ? $r('app.color.yourtube_error')
-          : $r('app.color.yourtube_button_disabled'))
+        .backgroundColor($r('app.color.yourtube_button_disabled'))
         .height(ACTION_BTN_HEIGHT)
         .padding({ left: 10, right: 10 })
         .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
@@ -328,6 +394,52 @@ struct DownloadTaskRow {
           this.downloadManager.deleteTask(this.task.id);
         })
     }
+  }
+
+  /**
+   * 重试失败任务：先重新提取一次拿到**新鲜**的流地址（googlevideo 直链带
+   * `expire`，SABR bootstrap 的流地址也很短命），再把任务放回队列。
+   * 分辨率优先选回原来的 itag，取不到就退回最佳可用流。
+   */
+  private async retryFailedTask(): Promise<void> {
+    if (this.retrying) {
+      return;
+    }
+    const task = this.task;
+    if (task.status !== DownloadStatus.FAILED) {
+      return;
+    }
+    this.retrying = true;
+    try {
+      const ctx = getContext(this) as common.UIAbilityContext;
+      const result = await YouTubePlayService.getInstance(ctx).extractForDownload(task.videoId);
+      if (!result.success || !result.playerStreams || result.playerStreams.length === 0) {
+        this.showRetryFailed();
+        return;
+      }
+      const picked = pickRetryStreams(result.playerStreams, task);
+      if (!picked.video) {
+        this.showRetryFailed();
+        return;
+      }
+      if (!this.downloadManager.retryTask(task.id, picked.video, picked.audio)) {
+        this.showRetryFailed();
+        return;
+      }
+      logger.info(`retry queued video=${task.videoId} itag=${picked.video.itag}`);
+    } catch (e) {
+      logger.warn(`retry exception video=${task.videoId}: ${(e as Error).message || e}`);
+      this.showRetryFailed();
+    } finally {
+      this.retrying = false;
+    }
+  }
+
+  private showRetryFailed(): void {
+    this.getUIContext().getPromptAction().showToast({
+      message: $r('app.string.yt_download_retry_failed'),
+      duration: 2000
+    });
   }
 
   private getProgressValue(): number {
@@ -353,7 +465,29 @@ struct DownloadTaskRow {
     return '';
   }
 
-  /** 主操作：在应用内直接播放已下载的文件（沙箱路径交给 MPV，不经过代理）。 */
+  /** 已下载条目 → 可播放 VideoItem（独立 videoId 兼作续播键，路径直交 MPV）。 */
+  private static toLocalVideoItem(task: DownloadTask, path: string): VideoItem {
+    const item = new VideoItem(
+      0,
+      `local:${task.id}`,
+      task.title,
+      task.author,
+      '',
+      task.thumbnailUrl,
+      false,
+      '#1A1A1A',
+      '',
+      '',
+      ''
+    );
+    item.localMediaPath = path;
+    return item;
+  }
+
+  /**
+   * 主操作：在应用内直接播放已下载的文件（沙箱路径交给 MPV，不经过代理）。
+   * 整份下载库一起入队、点击项为起点 —— 打开「自动连播」后会顺着列表放下去。
+   */
   private playTask(): void {
     if (this.task.status !== DownloadStatus.COMPLETED || !this.task.outputPath) {
       return;
@@ -371,11 +505,40 @@ struct DownloadTaskRow {
       });
       return;
     }
-    const video = this.toVideoItem();
-    // 本地条目用独立 id：既不与在线视频的观看历史冲突，也作为续播进度的键。
-    video.videoId = `local:${this.task.id}`;
-    video.localMediaPath = this.task.outputPath;
-    this.actionHub.openVideo(video, undefined, false);
+    const all = AppStorage.get<DownloadTask[]>('downloadTasks') ?? [];
+    const items: VideoItem[] = [];
+    let startIndex = 0;
+    all.forEach((task: DownloadTask) => {
+      if (task.status !== DownloadStatus.COMPLETED || !task.outputPath) {
+        return;
+      }
+      let playable = true;
+      try {
+        playable = fs.accessSync(task.outputPath);
+      } catch (_e) {
+        playable = false;
+      }
+      if (!playable) {
+        return;
+      }
+      if (task.id === this.task.id) {
+        startIndex = items.length;
+      }
+      items.push(DownloadTaskRow.toLocalVideoItem(task, task.outputPath));
+    });
+    if (items.length === 0) {
+      items.push(DownloadTaskRow.toLocalVideoItem(this.task, this.task.outputPath));
+      startIndex = 0;
+    }
+    const hint: PlayQueueSourceHint = {
+      type: 'downloads',
+      playlistId: 'downloads',
+      playlistName: 'downloads',
+      loadedItems: items,
+      startIndex
+    };
+    logger.info(`DownloadPage play start index=${startIndex}/${items.length}`);
+    this.actionHub.openVideo(items[startIndex], hint, false);
   }
 
   private async exportTaskToDownloads(): Promise<void> {

@@ -3,6 +3,7 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
+import { UIConfig } from '../../common/AppState';
 import {
   PlaybackConfig,
   HOLD_SPEED_VALUES, HOLD_SPEED_DELAYS, getHoldSpeedDelayDisplay,
@@ -15,17 +16,20 @@ interface OptionsGestureControlPageParams {
   themeColor: ResourceColor;
   clickEffectEnabled: ClickEffect | null;
   updatePlaybackConfig: (updater: (cfg: PlaybackConfig) => void) => void;
+  updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
 }
 
 @Component
 export struct OptionsGestureControlPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
   @Prop params: OptionsGestureControlPageParams = {
     themeColor: '#E53935',
     clickEffectEnabled: null,
-    updatePlaybackConfig: () => {}
+    updatePlaybackConfig: () => {},
+    updateUiConfig: () => {}
   };
 
   private getSchemeOptions(): SelectOption[] {
@@ -183,6 +187,19 @@ export struct OptionsGestureControlPage {
               transparentBackground: true,
               onChange: (val: boolean) => {
                 this.markCustom(cfg => cfg.gestureSeekEnabled = val);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_playback_center_play_button'),
+              subtitle: $r('app.string.yt_playback_center_play_button_subtitle'),
+              isOn: this.uiConfig.showCenterPlayButton !== false,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updateUiConfig(cfg => cfg.showCenterPlayButton = val);
               }
             })
           }

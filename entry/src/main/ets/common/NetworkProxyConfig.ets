@@ -19,6 +19,30 @@ const KEY_USER = 'cfg_proxy_username';
 const KEY_PASS = 'cfg_proxy_password';
 
 @Observed
+/**
+ * 代理连接状态（设置页常驻显示）。用 @Observed 挂在 AppStorage 上，
+ * 桥接熔断 / 换端口 / apply 结果都能实时反映到 UI。
+ */
+@Observed
+export class NetworkProxyStatus {
+  /** 配置是否启用。 */
+  enabled: boolean = false;
+  /** 走本地桥接时的端口（0 = 未走桥接，或桥接没起来）。 */
+  bridgePort: number = 0;
+  /** 桥接是否在监听。 */
+  bridgeRunning: boolean = false;
+  /** 桥接熔断：自愈失败，必须重新应用配置才能恢复。 */
+  bridgeFuseBlown: boolean = false;
+  /** 最近一次 apply 的结果。 */
+  lastApplyOk: boolean = true;
+  lastApplyError: string = '';
+  lastApplyAtMs: number = 0;
+  /** 最近一次连接测试的结果（时间戳 0 = 没测过）。 */
+  lastTestOk: boolean = false;
+  lastTestAtMs: number = 0;
+  lastTestMessage: string = '';
+}
+
 export class NetworkProxyConfig {
   enabled: boolean = false;
   kind: AppProxyKind = 'http';
@@ -55,6 +79,38 @@ export class NetworkProxyConfig {
     NetworkProxyConfig.applySystemAndProviders(cfg)
       .catch((e: Error) => logger.warn(`resetToDefault apply proxy failed: ${e.message}`));
     return cfg;
+  }
+
+  /** AppStorage 上的状态镜像（单例，设置页 @StorageLink 订阅）。 */
+  private static readonly statusInstance: NetworkProxyStatus = new NetworkProxyStatus();
+  static readonly STATUS_KEY: string = 'networkProxyStatus';
+
+  /** 当前代理状态快照（不改动 UI 镜像）。 */
+  static getStatus(): NetworkProxyStatus {
+    const cfg = NetworkProxyConfig.lastAppliedCfg;
+    const status = NetworkProxyConfig.statusInstance;
+    status.enabled = cfg ? cfg.enabled : false;
+    status.bridgePort = socks5Bridge.getPort();
+    status.bridgeRunning = socks5Bridge.isRunning();
+    status.bridgeFuseBlown = socks5Bridge.isFuseBlown();
+    return status;
+  }
+
+  /** 把状态镜像挂到 AppStorage（首次调用时创建，之后原地更新）。 */
+  static ensureStatusMirror(): NetworkProxyStatus {
+    const existing = AppStorage.get<NetworkProxyStatus>(NetworkProxyConfig.STATUS_KEY);
+    if (existing) {
+      return existing;
+    }
+    AppStorage.setOrCreate(NetworkProxyConfig.STATUS_KEY, NetworkProxyConfig.statusInstance);
+    return NetworkProxyConfig.statusInstance;
+  }
+
+  /** 刷新状态镜像（apply 结束 / 桥接事件 / 测试结束后调用）。 */
+  static publishStatus(): NetworkProxyStatus {
+    const status = NetworkProxyConfig.ensureStatusMirror();
+    NetworkProxyConfig.getStatus();
+    return status;
   }
 
   toSnapshot(): AppHttpProxySnapshot {
@@ -295,6 +351,10 @@ export class NetworkProxyConfig {
 
   private static onBridgeFuseBlown(reason: string): void {
     logger.error(`socks5 bridge fuse blown, proxy unavailable until settings are re-applied: ${reason}`);
+    const status = NetworkProxyConfig.publishStatus();
+    status.lastApplyOk = false;
+    status.lastApplyError = reason;
+    status.lastApplyAtMs = Date.now();
     NetworkProxyConfig.showToast($r('app.string.yt_proxy_bridge_unavailable'));
   }
 
@@ -382,5 +442,19 @@ export class NetworkProxyConfig {
     // 否则播放中的直连抓取（直播 HLS）会继续用旧代理直到下一次 load。
     // 无加载源时 refreshNetworkProxy 自身 no-op。
     NetworkProxyConfig.fireRepointListener();
+    const status = NetworkProxyConfig.publishStatus();
+    status.lastApplyOk = true;
+    status.lastApplyError = '';
+    status.lastApplyAtMs = Date.now();
+  }
+
+  /**
+   * 记录一次连接测试结果（设置页「测试连接」按钮调用）。
+   * 只更新状态镜像，不改代理配置。
+   */
+  static recordTestResult(ok: boolean): void {
+    const status = NetworkProxyConfig.publishStatus();
+    status.lastTestOk = ok;
+    status.lastTestAtMs = Date.now();
   }
 }

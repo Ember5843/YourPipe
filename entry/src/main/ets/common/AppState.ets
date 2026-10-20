@@ -12,52 +12,42 @@ export enum YourtubeDarkMode {
   DARK = 'dark'
 }
 
+@Observed
 export class UIConfig {
-  darkMode: YourtubeDarkMode = YourtubeDarkMode.SYSTEM;
-  userLanguage: string = 'default';
-  systemLanguage: string = 'en-Latn';
-  searchLanguage: string = 'default';
-  searchCountry: string = 'default';
+  @Track darkMode: YourtubeDarkMode = YourtubeDarkMode.SYSTEM;
+  @Track userLanguage: string = 'default';
+  @Track systemLanguage: string = 'en-Latn';
+  @Track searchLanguage: string = 'default';
+  @Track searchCountry: string = 'default';
   /** Comment translation target: 'default' follows the app UI language. */
-  translationLanguage: string = 'default';
+  @Track translationLanguage: string = 'default';
   /** tlang 自动翻译字幕目标语言：'default' 跟随翻译语言设置（translationLanguage）。 */
-  subtitleTranslateLanguage: string = 'default';
-  colorPreset: string = 'default';
-  isVibrate: boolean = true;
-  isAnimation: boolean = true;
-  animationSpeed: number = 300;
-  enableLogger: boolean = false;
-  homeLayoutMode: string = 'list';
+  @Track subtitleTranslateLanguage: string = 'default';
+  @Track colorPreset: string = 'default';
+  @Track isVibrate: boolean = true;
+  @Track isAnimation: boolean = true;
+  @Track animationSpeed: number = 300;
+  @Track enableLogger: boolean = false;
+  @Track homeLayoutMode: string = 'list';
   /** 网格卡片密度：'compact'(+1 列) | 'auto'(随宽度阈值) | 'cozy'(-1 列)。 */
-  homeGridDensity: string = 'auto';
+  @Track homeGridDensity: string = 'auto';
   /** After login: 'recommended' | 'kiosk'. Signed-out always uses kiosk. */
-  homeFeedStyle: string = 'recommended';
+  @Track homeFeedStyle: string = 'recommended';
   /** When signed in: pull cloud history + subscription list on app launch (one-way). */
-  syncUserLibraryOnLaunch: boolean = true;
-  maxConcurrentDownloads: number = 1;
+  @Track syncUserLibraryOnLaunch: boolean = true;
+  @Track maxConcurrentDownloads: number = 1;
+  /**
+   * Download task wall-clock budget in minutes. 0 = no timeout.
+   * A task that exceeds it is failed so a stuck transfer cannot hold a
+   * concurrency slot forever.
+   */
+  @Track downloadTimeoutMinutes: number = 30;
+  /**
+   * 暂停时画面中央的大播放按钮。关掉后只靠"点画面"切换播放/暂停，
+   * 画面中央保持干净（适合已经习惯点按操作的用户）。
+   */
+  @Track showCenterPlayButton: boolean = true;
   constructor() {
-  }
-
-  clone(): UIConfig {
-    const next = new UIConfig();
-    next.darkMode = this.darkMode;
-    next.userLanguage = this.userLanguage;
-    next.systemLanguage = this.systemLanguage;
-    next.searchLanguage = this.searchLanguage;
-    next.searchCountry = this.searchCountry;
-    next.translationLanguage = this.translationLanguage;
-    next.subtitleTranslateLanguage = this.subtitleTranslateLanguage;
-    next.colorPreset = this.colorPreset;
-    next.isVibrate = this.isVibrate;
-    next.isAnimation = this.isAnimation;
-    next.animationSpeed = this.animationSpeed;
-    next.enableLogger = this.enableLogger;
-    next.homeLayoutMode = this.homeLayoutMode;
-    next.homeGridDensity = this.homeGridDensity;
-    next.homeFeedStyle = this.homeFeedStyle;
-    next.syncUserLibraryOnLaunch = this.syncUserLibraryOnLaunch;
-    next.maxConcurrentDownloads = this.maxConcurrentDownloads;
-    return next;
   }
 
   static normalizeHomeFeedStyle(value: string): string {
@@ -110,6 +100,12 @@ export class UIConfig {
     config.maxConcurrentDownloads = Number.isFinite(maxConcurrentDownloads)
       ? Math.max(1, Math.min(4, maxConcurrentDownloads))
       : 1;
+    const downloadTimeoutMinutes = parseInt(PreferencesStore.getString('cfg_downloadTimeoutMinutes', '30'), 10);
+    config.downloadTimeoutMinutes = Number.isFinite(downloadTimeoutMinutes)
+      ? Math.max(0, Math.min(240, downloadTimeoutMinutes))
+      : 30;
+    config.showCenterPlayButton =
+      PreferencesStore.getString('cfg_showCenterPlayButton', 'true') !== 'false';
     logger.info(`Loaded UIConfig from Preferences: ${JSON.stringify(config)}`);
     return config;
   }
@@ -134,6 +130,8 @@ export class UIConfig {
       config.syncUserLibraryOnLaunch !== false ? 'true' : 'false'
     );
     PreferencesStore.setString('cfg_maxConcurrentDownloads', `${Math.max(1, Math.min(4, Math.round(config.maxConcurrentDownloads || 1)))}`);
+    PreferencesStore.setString('cfg_downloadTimeoutMinutes', `${Math.max(0, Math.min(240, Math.round(config.downloadTimeoutMinutes ?? 30)))}`);
+    PreferencesStore.setString('cfg_showCenterPlayButton', config.showCenterPlayButton !== false ? 'true' : 'false');
   }
 }
 

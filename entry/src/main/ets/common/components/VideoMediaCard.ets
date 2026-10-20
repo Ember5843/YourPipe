@@ -208,8 +208,8 @@ export struct VideoMediaCard {
           .margin({ bottom: 2 })
       }
 
-      if (this.showViewCount && this.video.viewCount && this.video.viewCount.length > 0) {
-        Text(this.video.viewCount)
+      if (this.showViewCount && this.listMetaText().length > 0) {
+        Text(this.listMetaText())
           .fontSize(MEDIA_META_SIZE)
           .fontColor($r('app.color.yourtube_text_hint'))
           .maxLines(1)
@@ -263,6 +263,21 @@ export struct VideoMediaCard {
   /** grid meta 行的作者段（showAuthor 关闭或缺失时为空）。 */
   private gridMetaAuthor(): string {
     return this.showAuthor && this.video.author ? this.video.author : '';
+  }
+
+  /**
+   * 列表模式第三行：播放量 · 发布时间。
+   * 列表模式原先只显示播放量（网格模式才有日期兜底），这里补上发布时间。
+   */
+  private listMetaText(): string {
+    const parts: string[] = [];
+    if (this.video.viewCount && this.video.viewCount.length > 0) {
+      parts.push(this.video.viewCount);
+    }
+    if (this.video.publishedTimeText && this.video.publishedTimeText.length > 0) {
+      parts.push(this.video.publishedTimeText);
+    }
+    return parts.join(' · ');
   }
 
   /**

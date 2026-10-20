@@ -214,17 +214,22 @@ struct Index {
     this.contentCountryItems = [defaultCountryItem].concat(countryMapped);
   }
 
-  /** 克隆 UIConfig 并直接赋值给 @StorageLink 属性，确保响应式重绘和持久化同时生效 */
+  /**
+   * 就地修改 UIConfig 并持久化。
+   *
+   * <p>UIConfig 是 `@Observed` + `@Track` 的响应式对象：直接改字段就会让
+   * 读该字段的组件重绘，**不需要** clone + 整体替换。旧写法（clone 出新
+   * 对象再赋值）有两个坑：clone 逐字段手抄，**漏抄的字段会被静默重置**；
+   * 整体替换会让整棵子树重渲染，开关的动画被重启（表现为"打开又关闭"）。
+   */
   private updateUiConfig(mutator: (cfg: UIConfig) => void): void {
-    const next = this.uiConfig.clone();
-    mutator(next);
-    this.applyAndSaveConfig(next);
+    mutator(this.uiConfig);
+    this.applyAndSaveConfig(this.uiConfig);
   }
 
   private updatePlaybackConfig(mutator: (cfg: PlaybackConfig) => void): void {
-    const next = this.playbackConfig.clone();
-    mutator(next);
-    this.savePlaybackConfig(next);
+    mutator(this.playbackConfig);
+    this.savePlaybackConfig(this.playbackConfig);
   }
 
   /** 播放端点变更：应用 per-state 配置、重置身份/pot 缓存、清 prefetch（旧端点抓的流 URL 不可复用）。 */
@@ -236,9 +241,8 @@ struct Index {
     }
   }
 
-  /** 赋值新配置并持久化到 Preferences */
+  /** 持久化到 Preferences（配置对象本身已是响应式的，这里只落盘）。 */
   private applyAndSaveConfig(next: UIConfig): void {
-    this.uiConfig = next;
     UIConfig.saveToPreferences(next);
     DownloadManager.getInstance().refreshTaskPool();
   }
@@ -919,6 +923,15 @@ struct Index {
         || queueManager.getCurrent()?.videoId !== video.videoId) {
         queueManager.setAdhocQueue([video], 0);
       }
+    } else if (sourceHint && sourceHint.type === 'downloads') {
+      // 下载库整份注入队列：点击项为起点，开启「自动连播」即顺放整个列表。
+      const items = sourceHint.loadedItems ?? [];
+      if (items.length > 0) {
+        const startIndex = sourceHint.startIndex ?? items.findIndex((it: VideoItem) => it.videoId === video.videoId);
+        queueManager.setAdhocQueue(items, startIndex >= 0 ? startIndex : 0);
+      } else {
+        queueManager.setAdhocQueue([video], 0);
+      }
     } else if (sourceHint && sourceHint.type === 'playlist') {
       if (sourceHint.loadedItems && sourceHint.loadedItems.length > 0) {
         queueManager.setRemotePlaylistSnapshot(
@@ -1565,7 +1578,7 @@ struct Index {
   }
 
   private savePlaybackConfig(next: PlaybackConfig): void {
-    this.playbackConfig = next;
+    // 配置对象是响应式的（@Observed + @Track），这里只落盘 + 同步会话级开关。
     PlaybackConfig.saveToPreferences(next);
     // 设置变更立即对当前会话的队列自动播放开关生效
     AppStorage.setOrCreate('autoPlayQueue', next.autoPlayNext);

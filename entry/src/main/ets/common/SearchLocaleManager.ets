@@ -38,37 +38,28 @@ export class SearchLocaleManager {
 
   static setSearchLanguage(languageCode: string): void {
     const config = SearchLocaleManager.getConfig();
-    const next = SearchLocaleManager.cloneConfig(config);
-    next.searchLanguage = SearchLocaleManager.normalizeLanguageSelection(languageCode);
-    AppStorage.setOrCreate('uiConfig', next);
+    config.searchLanguage = SearchLocaleManager.normalizeLanguageSelection(languageCode);
+    UIConfig.saveToPreferences(config);
   }
 
   static setSearchCountry(countryCode: string): void {
     const config = SearchLocaleManager.getConfig();
-    const next = SearchLocaleManager.cloneConfig(config);
-    next.searchCountry = SearchLocaleManager.normalizeCountrySelection(countryCode);
-    AppStorage.setOrCreate('uiConfig', next);
+    config.searchCountry = SearchLocaleManager.normalizeCountrySelection(countryCode);
+    UIConfig.saveToPreferences(config);
   }
 
   static setSearchLocale(languageCode: string, countryCode: string): void {
     const config = SearchLocaleManager.getConfig();
-    const next = SearchLocaleManager.cloneConfig(config);
-    next.searchLanguage = SearchLocaleManager.normalizeLanguageSelection(languageCode);
-    next.searchCountry = SearchLocaleManager.normalizeCountrySelection(countryCode);
-    AppStorage.setOrCreate('uiConfig', next);
+    config.searchLanguage = SearchLocaleManager.normalizeLanguageSelection(languageCode);
+    config.searchCountry = SearchLocaleManager.normalizeCountrySelection(countryCode);
+    UIConfig.saveToPreferences(config);
   }
 
   static resetSearchLocale(): void {
     const config = SearchLocaleManager.getConfig();
-    const next = SearchLocaleManager.cloneConfig(config);
-    next.searchLanguage = SearchLocaleManager.DEFAULT_SEARCH_LANGUAGE;
-    next.searchCountry = SearchLocaleManager.DEFAULT_SEARCH_COUNTRY;
-    AppStorage.setOrCreate('uiConfig', next);
-  }
-
-  /** 克隆 UIConfig，确保 AppStorage 得到新的对象引用，触发 @StorageLink 响应更新 */
-  private static cloneConfig(src: UIConfig): UIConfig {
-    return src.clone();
+    config.searchLanguage = SearchLocaleManager.DEFAULT_SEARCH_LANGUAGE;
+    config.searchCountry = SearchLocaleManager.DEFAULT_SEARCH_COUNTRY;
+    UIConfig.saveToPreferences(config);
   }
 
   private static getConfig(uiConfig?: UIConfig): UIConfig {

@@ -1129,6 +1129,10 @@
             "value": "解析视频信息失败"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "当前端点：%s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "无法获取视频播放数据"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "显示 / 隐藏控制栏"
+            "value": "显示控制栏（3 秒后自动收起）"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "Bilibili 经典"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "下载超时"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "重试失败，请稍后再试"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "重试中…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "下载超时"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "不超时"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d 分钟"
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "停止播放"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "连接状态"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "未启用"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "已连接（本地桥接 %d）"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "已连接（直连上游）"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "桥接已断开，需重新应用"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "应用失败"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "重新应用并重启"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "代理已重新应用"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "示例：HTTP 填 127.0.0.1 与端口（如 7890）；SOCKS5 同理。填了用户名密码时走本地桥接，桥接失败不会静默直连。"
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "中央播放按钮"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "暂停时在画面中央显示大播放按钮。关闭后画面中央保持干净，只用点击画面或底部按钮控制。"
         }
     ]
 }

@@ -1129,6 +1129,10 @@
             "value": "Analisi delle informazioni del video non riuscita"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "Endpoint: %s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "Impossibile ottenere i dati di riproduzione del video"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "Mostra / nascondi controlli"
+            "value": "Mostra i controlli (si nascondono da soli dopo 3 s)"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "Bilibili classico"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "Download scaduto"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "Riprova non riuscita, riprova più tardi"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "Riprova…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "Timeout download"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "Nessun timeout"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d min"
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "Interrompi riproduzione"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "Stato della connessione"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "Disattivato"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "Connesso (bridge locale %d)"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "Connesso (diretto a monte)"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "Bridge disconnesso, serve riapplicare"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "Applicazione non riuscita"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "Riapplica e riavvia"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "Proxy riapplicato"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "Esempio: per HTTP inserisci 127.0.0.1 e la porta (es. 7890); SOCKS5 allo stesso modo. Con nome utente e password il traffico passa da un bridge locale che fallisce in modo visibile invece di tornare diretto."
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "Pulsante di riproduzione centrale"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "Mostra un grande pulsante di riproduzione al centro durante la pausa. Disattivato il fotogramma resta pulito; si controlla toccando o con la barra inferiore."
         }
     ]
 }

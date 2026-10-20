@@ -45,17 +45,74 @@ comes from `OptionsNavScaffold`'s custom `backIcon`.
 | `subscription` | Subscription manage + feed service (bottom tab) |
 | `favorites` | `FavoritesPage` |
 | `local` | Local library + downloads |
-| `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`；无入口的 app_lang/content_lang/content_country picker destination 已移除），Index 经单对象 params 传回调。Main（一级菜单分 通用/个性化/播放/其他 四组）/ appearance / playback（拆分为四页：播放 `OptionsPlaybackPage`（含 下载 并发 picker）/ 手势与操控 `OptionsGestureControlPage`（长按倍速 `HOLD_SPEED_VALUES` 等手势项）/ 字幕 `OptionsSubtitlePage`（字幕样式：字号/底边距/颜色/背景/偏移/翻译语言）/ 性能与缓冲 `OptionsPerformancePage`（后台纯音频、硬解、GPU 渲染、内存缓存/预读/缓冲大小调参）；播放端点 per-state: guest `tv_samsung|visionos|mweb` (default tv_samsung), signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network** / log_page（应用日志页）/ data-account（页尾含 恢复 组：恢复所有配置 / 清除应用全部数据；独立 `OptionsRecoveryPage` 已删除，回调经 data_account destination 透传）/ ai-subtitle **[DISABLED]**（`ai_translate` destination 与 OptionsMainPage 入口行均已注释，产品只保留 P0 tlang；`OptionsAiTranslatePage` — 端侧识别模型下载/删除管理，标题 `yt_option_ai_subtitle`，页内 P2 gtx/LLM 配置区同处注释块） / about-update (GitHub Releases check + AppGallery test link; the update-check call site is inline in `OptionsMainPage`, `UpdateChecker` + `APPGALLERY_TEST_URL` live in `common/UpdateChecker.ets`; the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
+| `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`；无入口的 app_lang/content_lang/content_country picker destination 已移除），Index 经单对象 params 传回调。Main（一级菜单分 通用/个性化/播放/其他 四组）/ appearance / playback（拆分为四页：播放 `OptionsPlaybackPage`（含 下载 并发 picker + **下载超时 picker**）/ 手势与操控 `OptionsGestureControlPage`（长按倍速 `HOLD_SPEED_VALUES` 等手势项 + **中央播放按钮开关** + **点击画面切换播放/暂停开关**）/ 字幕 `OptionsSubtitlePage`（字幕样式：字号/底边距/颜色/背景/偏移/翻译语言）/ 性能与缓冲 `OptionsPerformancePage`（后台纯音频、硬解、GPU 渲染、内存缓存/预读/缓冲大小调参）；播放端点 per-state: guest `tv_samsung|visionos|mweb` (default tv_samsung), signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network**（含**常驻连接状态条** + **重新应用并重启**按钮 + 地址格式示例）/ log_page（应用日志页）/ data-account（页尾含 恢复 组：恢复所有配置 / 清除应用全部数据；独立 `OptionsRecoveryPage` 已删除，回调经 data_account destination 透传）/ ai-subtitle **[DISABLED]**（`ai_translate` destination 与 OptionsMainPage 入口行均已注释，产品只保留 P0 tlang；`OptionsAiTranslatePage` — 端侧识别模型下载/删除管理，标题 `yt_option_ai_subtitle`，页内 P2 gtx/LLM 配置区同处注释块） / about-update (GitHub Releases check + AppGallery test link; the update-check call site is inline in `OptionsMainPage`, `UpdateChecker` + `APPGALLERY_TEST_URL` live in `common/UpdateChecker.ets`; the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
 | `help` | `HelpGuidePage` — 6-page onboarding/help swiper (welcome + sign-in, account data, network proxy, quality/cache, downloads). Two entries: first-launch full-screen overlay on `Index` (an `if`-mounted layer in the root Stack, shown while `PreferencesStore` key `cfg_help_seen` != `'true'` with a 500 ms delay; bindSheet/bindContentCover on Navigation-hosted nodes do NOT present at app-start timing — do not revert to them) and Options main page "帮助" item (`help_page` destination in the options sheet). `resetAllConfigs` resets the flag; `clearAllAppData` clears it via `PreferencesStore.clearAll()`. Illustrations are `resources/base/media/guide_*.png` (welcome page uses `app_icon.png`). |
 | `user` | User / channel info; Library saved playlists (WEB classic renderers + TV lockup view models) |
 | `auth` | WebView cookie login (`WebViewLoginPage`) + device/QR OAuth (`DeviceQrLoginPage`) |
 
+**播放器交互规则**（`features/player/components/AVPlayer.ets`，改手势前必读）:
+- 容器上是一个 `parallelGesture(GestureGroup(Exclusive, 双击, 单击, 滑动, 长按))`；
+  **子节点的 `onClick` 与容器的单击手势会同时收到同一次点击**（不同节点的
+  手势默认并行识别）。中央播放按钮因此必须自己"去重"：
+  `isCenterButtonTap(event)` 用点击坐标判定是否落在按钮上，落在按钮上时
+  `onCenterTap` 只重置自动隐藏计时器、**不**切换控件显隐——否则用户点中央
+  按钮恢复播放的瞬间，控件反而被单击手势收起来。
+- 交互进行中（`activeInteraction !== NONE`：菜单已打开 / 正在拖进度条 /
+  正在滑动）时，单击不再处理控件显隐，否则"点开更多菜单"会连带收起控件。
+- **画面手势挂在独立图层，不挂容器**（`GestureLayer()`，zIndex `BASE+2.2`）。
+  播控层整层是 `HitTestMode.Transparent`，手势若挂在容器（播控层的祖先）上，
+  **控件上的每一次点击都会一并落进画面的手势组**：按一下播放键 → 单击手势
+  把控件收走（正在操作却 UI 消失）；连点按钮两下 → 双击手势触发 ±15s 跳转。
+  独立成层后，控件点击的命中路径里根本没有这一层，泄漏从根上消失。
+  层级约束：必须在**字幕拖动层（BASE+2.5）之下**（字幕层用自己的 PanGesture
+  拖动，被压住就拖不动），又必须在**缓冲提示层（BASE+2.0）之上**（那个是
+  全屏层，压住它画面空白处就点不到了）。
+- **单击画面空白处 = 切换控件显隐**（`onCenterTap`）：点一下收起、再点一下
+  唤出。收起只发生在「控件可见且用户明确点了空白处」时——按播放键、拖进度条、
+  开菜单这些控件上的操作不再连带收起控件。暂停态下 `canAutoHideControls()`
+  为 false → 单击只显示不收起，"看清时间码再精确暂停"的形态始终可用。
+- **双击在中央播放按钮上不响应**（`isCenterButtonTap` 判定）：那里是"恢复
+  播放"的单击目标，双击误触发快进会让人以为画面自己跳了。
+- 两个独立开关：
+  - `UIConfig.showCenterPlayButton`（默认开）——暂停时画面中央的大播放按钮；
+    关闭后画面中央保持干净。
+  - `PlaybackConfig.tapToTogglePlayback`（默认关）——单击画面直接播放/暂停，
+    控件显隐跟随播放状态（暂停时常驻、恢复后按节奏自动收起）。它是**手势
+    方案的参数项**（和双击步长一样）：`enhanced` 预设关、`youtube` / `bilibili`
+    预设开，改动它不会把手势方案标成"自定义"。
+- 底部播放/暂停键在**缓冲中也必须可点**（缓冲是网络侧问题，不该锁掉用户的
+  停止手段）；中央按钮在缓冲中不显示（此时中央已有 LoadingProgress）。
+- 播放结束时中央按钮换成"重播"图标（`sys.symbol.arrow_counterclockwise`）。
+- `PlayerSession.stopPlayback()`：保存进度 → 停 PiP → 释放媒体（引擎、AVSession、
+  连续后台任务随之结束）→ 清空队列。播放器菜单里的「停止播放」用它，并同时
+  `actionHub.closePage()`（留在播放页只会看到一个已释放的空壳）。
+
 ## 3. Common stores / singletons (`common/`)
 Persistent state and shared singletons:
 - `PreferencesStore.init(context)` — key/value store; init in `EntryAbility.onCreate`.
+- **配置是响应式的，不要 clone**：`UIConfig` / `PlaybackConfig` 都是
+  `@Observed` 类、字段全部 `@Track`，存放在 AppStorage 的 `uiConfig` /
+  `playbackConfig`。改设置的标准写法是**就地改字段**再落盘：
+  ```ts
+  this.params.updateUiConfig(cfg => cfg.showCenterPlayButton = val);
+  ```
+  `Index.updateUiConfig` / `updatePlaybackConfig` 负责 `saveToPreferences`。
+  **不要再写 `clone()` + 整体替换**：那份逐字段手抄的拷贝漏一个字段就会
+  静默把该配置重置回默认（已经踩过一次），而且整体替换会让整棵子树重渲染、
+  开关动画被重启（表现为"打开又关闭"）。ArkTS 禁 `Object.assign` / 按下标取
+  属性，想做全量拷贝只能手抄——所以更好的做法是**根本不拷贝**。
+  官方依据：class/Object 类型的 `@StorageLink` 可观察到「对象整体赋值和属性变化」。
+- **开关组件本地自持状态**：`PlaybackToggleRow` 用 `@State localOn` + `$$` 双向
+  绑定持有真实状态，父级只下发意图。原因：ArkUI 的 `Toggle` 在 `isOn` 被
+  **程序化**改写时同样会回调 `onChange`，受控写法会形成
+  「回写→回调→再回写」的回路并重启动画（用户看到"快速打开然后关闭"）。
+  `PlaybackSelectRow` 同理屏蔽了程序化 `onSelect`（`index === selectedIndex`
+  时直接返回）。
+
 - `AppState`, `UIConfig`, `PlaybackConfig` — `AppStorage`-backed config models
   (playback quality/cache/GPU, background video-off delay, system AI caption
-  (`systemAiCaption` + `systemAiCaptionSource`), etc.).
+  (`systemAiCaption` + `systemAiCaptionSource`), **下载超时 `downloadTimeoutMinutes`**,
+  **中央播放按钮 `showCenterPlayButton`**, etc.).
 - `LlmTranslateConfig` — AI 字幕翻译引擎配置（gtx/llm、baseUrl/model/apiKey、双语），
   `PreferencesStore` 持久化（`cfg_ai_translate_*`），`resetAllConfigs` 复位（含 key）；
   翻译缓存 `cacheDir/ai_subtitle/` 与 ASR 模型/缓存（`filesDir/asr_models/`、
@@ -98,6 +155,7 @@ Persistent state and shared singletons:
   visible, never silent
   direct). Unauthenticated HTTP needs no bridge and talks to the upstream
   natively everywhere.
+  **常驻状态**：`NetworkProxyStatus`（`@Observed`，挂在 AppStorage `networkProxyStatus`）记录 enabled / bridgePort / bridgeRunning / bridgeFuseBlown / lastApplyOk / lastTestOk；设置页「网络」顶部常驻状态条 实时显示，熔断或上次应用失败时出现「重新应用并重启」按钮（`restartProxy` → 重新 apply → 复位熔断）。
 - `NetworkHandoverService` — network-handover adaptation. Single
   subscription site (`connection` default-network `netAvailable` /
   `netUnavailable` events; the SDK kit set has no NetworkBoostKit
@@ -110,15 +168,27 @@ Persistent state and shared singletons:
 - `DownloadManager` — offline download queue + the **download library index**.
   Tasks are memory-resident while downloading; finished entries persist through
   `DownloadTaskStore` (Preferences key `download_tasks_json`, DTO only —
-  `StreamInfo`/context are not serializable). `restoreTasks()` runs from
+  `StreamInfo`/context are not serializable). Terminal states are written from
+  `runTask`'s `finally` via `notifyTasksChanged()`. `restoreTasks()` runs from
   `Index.aboutToAppear` and rebuilds completed entries, dropping any whose
-  `outputPath` no longer exists on disk — this is what keeps
-  `filesDir/downloads` from turning into orphans across restarts. A finished
+  `outputPath` no longer exists on disk; it then scans `filesDir/downloads/*`
+  and revives directories with no index record (`recoverOrphanedDownloads`,
+  title taken from the file name, no YouTube id — favorite/share are hidden for
+  those), so files can never become unreachable. A finished
   entry **is** the playable video entry: tap plays it in-app, delete removes the
   entry plus its sandbox `filesDir/downloads/<taskId>` directory, and export
   (row menu) writes a second, user-owned copy without deleting the entry
   (`exportedPath` records the correspondence). There is **no** auto-export at
-  task end. `clearAllAppData` keeps completed entries and their files.
+  task end. The whole library goes into the play queue as one list
+  (`PlayQueueSourceHint.type === 'downloads'` → `setAdhocQueue`), so tapping an
+  entry starts there and autoplay continues through the list.
+  `clearAllAppData` keeps completed entries and their files.
+  **重试与超时**：失败任务在「本地 → 下载视频」里主按钮是「重试」——重试前
+  会**重新提取一次**拿到新鲜流地址（googlevideo 直链带 `expire`，SABR 的
+  bootstrap 同样短命），并优先选回原来的 itag（分辨率/音轨不变），
+  `DownloadManager.retryTask` 最多接受 `MAX_RETRIES=3` 次重试。
+  另有**看门狗**：单个任务超过「下载超时」预算（`UIConfig.downloadTimeoutMinutes`，
+  默认 30 分钟，0 = 不超时）即判失败并让出并发槽位，避免卡死任务堵住整个队列。
 - `DownloadTaskStore` — `PreferencesStore` key `download_tasks_json`; the only
   index that can reach `filesDir/downloads`, so it deliberately survives
   "clear all app data".
@@ -265,13 +335,29 @@ store caches (`favorites`, `playlists`, `subscriptions`, `watchHistory`,
 - `AuthStateHelper.reconcilePlaybackClient()` — 登录态/鉴权开关变化后的唯一
   入口（内部调用 `YoutubePlayerClientConfig.resetToAuthDefault`，落到
   per-state configured 值）。Configured defaults: `mweb` (SABR) signed-in,
-  `tv_samsung` guest (pot-free TVHTML5 direct adaptiveFormats URLs, PipePipe
-  logged-out default; `visionos` GAPIS stays selectable); **tv_downgraded**
-  (token-free direct URLs) stays selectable in
-  Options → 播放端点 for the signed-in state. Endpoint changes go through
+  `tv_samsung` guest (pot-free TVHTML5 direct adaptiveFormats URLs; `visionos`
+  GAPIS stays selectable); **tv_downgraded** (token-free direct URLs) stays
+  selectable in Options → 播放端点 for the signed-in state — a deliberate
+  divergence from upstream PipePipe, which restricts a signed-in session to
+  `mweb` only. Endpoint changes go through
   `AuthStateHelper.applyPlayerClientConfig` (config + identity/pot reset);
   `EntryAbility.onCreate` pushes the persisted values via
   `YoutubePlayerClientConfig.setConfiguredClients` before reconcile.
+- **Endpoint visibility on failure**: the player error panel shows the endpoint
+  that was in effect (`ErrorInfo.endpoint` ← the endpoint of the extraction
+  that failed, falling back to `YoutubePlayerClientConfig.getYoutubePlayerClient()`,
+  rendered as `yt_error_endpoint_hint`) so a failed playback can be attributed
+  to a client before the user switches it (PipePipe `ErrorActivity.getEndpoint`
+  parity).
+- **Endpoint auto-fallback** (`YouTubePlayService.extractWithEndpointFallback`):
+  when the SABR endpoint (`mweb`) yields no playable stream — the extraction
+  throws or returns without a stream — the extraction is retried **once**
+  through `tv_downgraded` (token-free TVHTML5 direct URLs, no PoToken, no UMP
+  session). The retry uses `YoutubePlayerClientConfig.setExtractionClientOverride`
+  (one-shot; the configured client and the explicit pin are untouched) and
+  clears it in a `finally`. `prefetch` and `extractForDownload` go through
+  `play()` and therefore inherit the fallback. The failure reason stays in the
+  log (`endpoint fallback mweb→tv_downgraded …`).
 - SABR wiring in `YouTubePlayService.initialize()`:
   `sabrSessionStore.setPoTokenProvider(...)` (UMP per-video pot),
   `sabrSessionStore.setInfoReloader(...)` (mid-playback re-probe, serialized

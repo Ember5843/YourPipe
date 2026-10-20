@@ -8,6 +8,8 @@ import { UIConfig } from '../../../common/AppState';
 import { TabErrorPanel } from '../../../common/components/TabErrorPanel';
 import { CommentTranslateButton, CommentTranslatedText, CommentTranslateStateStore } from './CommentTranslateSection';
 import { TranslationService } from '../../../common/TranslationService';
+import { PlayerSession } from '../../../common/PlayerSession';
+import { RichTextSegment, SegmentKind, buildRichTextSegments } from '../../../common/utils/RichTextSegment';
 
 const logger = AppLog.getInstance('CommentList');
 
@@ -26,6 +28,19 @@ export struct CommentList {
   @Consume('commentPageInfo') pageInfo: NavPathStack;
   @Consume('actionHub') actionHub: ActionHub;
   private activeRequestKey: string = '';
+
+  /** 评论内时间戳点击 → 复用与简介一致的精确 seek 通道。 */
+  private seekToCommentTimestamp(seconds: number): void {
+    try {
+      const controller = PlayerSession.getInstance().controller;
+      const duration = controller.vm.durationTime;
+      const targetSeconds = duration > 0 ? Math.min(seconds, duration) : seconds;
+      logger.info(`comment timestamp seek videoId=${this.videoId} targetSec=${targetSeconds}`);
+      controller.syncSeekExact(targetSeconds * 1000);
+    } catch (e) {
+      logger.warn(`comment timestamp seek failed: ${e}`);
+    }
+  }
 
   aboutToAppear() {
     this.loadComments(true);
@@ -240,13 +255,23 @@ export struct CommentList {
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
-      // 评论内容
-      Text(item.commentText)
-        .fontSize(14)
-        .fontColor($r('app.color.yourtube_text_secondary'))
-        .margin({ top: 8, left: 48 })
-        .lineHeight(20)
-        .textAlign(TextAlign.Start)
+      // 评论内容：其中的时间戳（如 1:23）可点，跳到该位置
+      Text() {
+        ForEach(buildRichTextSegments(item.commentText), (segment: RichTextSegment) => {
+          if (segment.kind === SegmentKind.TIMESTAMP) {
+            Span(segment.text)
+              .fontColor(this.themePrimary)
+              .onClick(() => { this.seekToCommentTimestamp(segment.seconds); })
+          } else {
+            Span(segment.text)
+              .fontColor($r('app.color.yourtube_text_secondary'))
+          }
+        })
+      }
+      .fontSize(14)
+      .margin({ top: 8, left: 48 })
+      .lineHeight(20)
+      .textAlign(TextAlign.Start)
 
       if (TranslationService.shouldOfferTranslation(item.commentText)) {
         CommentTranslatedText({ state: CommentTranslateStateStore.get(item.id, item.commentText) })

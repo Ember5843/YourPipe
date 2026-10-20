@@ -146,6 +146,11 @@ export class PlayerSession {
     };
 
     this._controller = new AvPlayerController(this._defaultSource);
+    // 应用是否在前台：mediaservice 需要它区分「切后台被系统中断」与
+    // 「用户正在看却被系统中断」——后者绝不能暂停（见 AvPlayerController）。
+    this._controller.setAppForegroundProvider((): boolean => {
+      return AppStorage.get<boolean>('isAppBackground') !== true;
+    });
     this.bindControllerQueueControls();
     this.bindQueueSwitchHandler();
     this.registerContinueStateListener();
@@ -755,6 +760,9 @@ export class PlayerSession {
   private async doPlayLocal(video: VideoItem, videoId: string, generation: number,
     localPath: string): Promise<VideoData | null> {
     const startedAt = Date.now();
+    // 本地播放不需要 beginPrepare（无提取），但它承担着「显式播放意图解除已拆除标记」
+    // 的职责——不清这里，switchToQueueVideo 会把之后所有队列切换（点队列条目/自动连播）全部丢弃。
+    this._playbackTornDown = false;
     this.setLocalMode(true);
     this._failureRetryCount = 0;
     this._lastPlayError = null;
@@ -1204,6 +1212,16 @@ export class PlayerSession {
     }
   }
 
+  /**
+   * 显式停止播放（不是暂停）：保存进度 → 停 PiP → 释放媒体（引擎、AVSession、
+   * 连续后台任务都会随之结束）→ 清空队列。用于「后台播放难以停止」——用户要
+   * 的是彻底停掉，而不是把会话留在后台继续占着通知栏。
+   */
+  stopPlayback(): void {
+    logger.info(`${TAG} stopPlayback() called`);
+    this.release(true);
+  }
+
   /** Normal navigation away from PlayerPage: close media but retain the queue. */
   closeForNavigation(): void {
     if (this.shouldRetainMediaOnPageDisappear()) {
@@ -1319,6 +1337,11 @@ export class PlayerSession {
     const keepAudioOnly = preserveAudioOnly && this._isAudioOnlyMode;
     this._defaultSource = this.createDefaultSource();
     this._controller = new AvPlayerController(this._defaultSource);
+    // 应用是否在前台：mediaservice 需要它区分「切后台被系统中断」与
+    // 「用户正在看却被系统中断」——后者绝不能暂停（见 AvPlayerController）。
+    this._controller.setAppForegroundProvider((): boolean => {
+      return AppStorage.get<boolean>('isAppBackground') !== true;
+    });
     this.bindControllerQueueControls();
     this.bindQueueSwitchHandler();
     this.registerContinueStateListener();

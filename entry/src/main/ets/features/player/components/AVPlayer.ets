@@ -21,6 +21,7 @@ import { AICaptionComponent, AICaptionController, AICaptionOptions } from '@kit.
 import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
 import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
+import { UIConfig } from '../../../common/AppState';
 import {
   AvPlayerController,
   VideoData,
@@ -60,6 +61,8 @@ const SEEK_HINT_HIDE_DELAY: number = 200;
 const DOUBLE_TAP_HINT_HIDE_DELAY: number = 800;
 const CONTROL_SLOT_SIZE: number = 40;
 const CONTROL_ICON_SIZE: number = 24;
+/** 中央播放按钮的可点判定半径（72vp 直径的一半 + 容差）。 */
+const CENTER_PLAY_BUTTON_HIT_RADIUS: number = 44;
 const SPEED_CONTROL_WIDTH: number = 48;
 const CONTROL_SIDE_MIN: number = 24;
 const CONTROL_SIDE_MAX: number = 36;
@@ -126,6 +129,7 @@ enum PlayerInteractionKind {
 @Component
 export struct VideoPlayer {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
+  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('actionHub') actionHub: ActionHub;
   @StorageProp('navBarHeight') navBarHeight: number = 0;
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
@@ -627,15 +631,41 @@ export struct VideoPlayer {
     }
   }
 
-  private onCenterTap(): void {
+  /**
+   * 画面区域的单击（只在**画面空白处**触发——控件的点击不再漏进手势层）。
+   *
+   * <p>语义 = **切换**控件显隐：点一下收起、再点一下唤出。收起只发生在
+   * 「控件可见」且用户明确点了空白处时；按播放键、拖进度条、开菜单这些
+   * **控件上的操作**都不会再把控件收走（它们根本不进手势层）。
+   *
+   * <p>暂停态下 `canAutoHideControls()` 为 false → 单击只会把控件显示出来，
+   * 不会收起：这样"看清时间码/画面再精确暂停"的形态始终可用。
+   */
+  private onCenterTap(event: GestureEvent): void {
+    // 交互进行中（菜单已打开 / 正在拖进度条 / 正在滑动）：单击不再处理控件显隐，
+    // 否则"点开更多菜单"这类操作会连带把控件收起来，菜单上方空一片。
+    if (this.activeInteraction !== PlayerInteractionKind.NONE) {
+      return;
+    }
     this.interactionEpoch++;
     this.clearHideTimer();
+    if (this.isCenterButtonTap(event)) {
+      // 中央按钮自己处理这次点击（切换播放/暂停），这里只重置自动隐藏
+      // 计时器：用户刚操作过，控件按正常节奏消失，但**不**切换显隐。
+      this.scheduleHideControls();
+      return;
+    }
     if (!this.canAutoHideControls()) {
       this.showControls = true;
       return;
     }
     this.showControls = !this.showControls;
-    if (this.showControls) { this.scheduleHideControls(); } else { this.clearHideTimer(); this.clearGestureHints(); }
+    if (this.showControls) {
+      this.scheduleHideControls();
+    } else {
+      this.clearHideTimer();
+      this.clearGestureHints();
+    }
   }
 
   private canAutoHideControls(): boolean {
@@ -1305,10 +1335,38 @@ export struct VideoPlayer {
   /**
    * 暂停时显示中央播放按钮（Bilibili 风格）：已就绪、未在播放/缓冲、
    * 非拖动进度条、无错误。ended 状态同样显示（点击 = 从头重播）。
+   * 用户可以在「手势与操控」里关掉它，只保留"点画面"切换。
    */
   private showCenterPlayButton(): boolean {
+    if (!this.uiConfig.showCenterPlayButton) {
+      return false;
+    }
     return this.vm.isReady && !this.vm.isPlaying && !this.vm.isBuffering
       && !this.isSliderDragging && !this.hasError;
+  }
+
+  /**
+   * 判断这次点击是否落在中央播放按钮上。
+   *
+   * <p>中央按钮是容器里的子节点，而容器的单击手势是 parallelGesture：
+   * 两者会同时收到同一次点击。若不去重，用户点中央按钮恢复播放时，
+   * 容器单击又会"显隐控件"，控件反而在操作瞬间消失——这正是反馈里
+   * "明明在点屏幕交互，UI 却主动消失"的成因。
+   */
+  private isCenterButtonTap(event: GestureEvent): boolean {
+    if (!this.showCenterPlayButton()) {
+      return false;
+    }
+    const x: number = event.fingerList[0]?.localX ?? -1;
+    const y: number = event.fingerList[0]?.localY ?? -1;
+    if (x < 0 || y < 0) {
+      return false;
+    }
+    const cx: number = this.containerVpWidth / 2;
+    const cy: number = this.containerVpHeight / 2;
+    // 按钮 72vp 直径 + 容差，覆盖整个可点区域。
+    return Math.abs(x - cx) <= CENTER_PLAY_BUTTON_HIT_RADIUS
+      && Math.abs(y - cy) <= CENTER_PLAY_BUTTON_HIT_RADIUS;
   }
 
   @Builder
@@ -1990,9 +2048,11 @@ export struct VideoPlayer {
         .position({ bottom: this.subtitleBottomVp() })
         .offset({ x: this.subtitleDragOffsetXRatio * this.containerVpWidth, y: 0 })
         .zIndex(CommonConstants.Z_INDEX_BASE + 2.5)
-        // Transparent 命中：拖动用自身 PanGesture 处理，点按/双击穿透到根手势
+        // Transparent 命中：拖动用自身 PanGesture 处理，点按/双击穿透到下方的手势层
         // （Block 会让整条横带吞掉点击，和「单击点亮 UI」的总闸门冲突）。
-        // 根容器是 parallelGesture 会同时收到本次拖动，由 subtitleDragging 标志早退。
+        // 手势层已下沉到本层之下（BASE+2.2 < BASE+2.5），所以本层的拖动
+        // 不会再和画面手势抢同一次触摸——旧的「根容器 parallelGesture 同时收到
+        // 拖动、由 subtitleDragging 早退」的补丁已不再需要。
         // 控制层隐藏时整个播放器手势体系是锁定的（需先点按点亮 UI），这里同步锁定。
         .hitTestBehavior(HitTestMode.Transparent)
         .gesture(
@@ -2105,11 +2165,24 @@ export struct VideoPlayer {
       }
       .width('100%').height('100%').hitTestBehavior(HitTestMode.None).zIndex(CommonConstants.Z_INDEX_BASE + 3)
 
+      // 2.6 手势层：透明全屏，承载画面手势（单击/双击/滑动/长按）
+      //
+      // **必须独立成层、且位于播控层之下。** 之前手势挂在容器上（播控层的
+      // 祖先），而播控层整层是 HitTestMode.Transparent —— 控件上的点击会一并
+      // 落进画面的手势组：按播放键的瞬间控件被收走、连点按钮触发双击快进
+      // （±15s 跳转）。独立成层后，控件点击的命中路径里根本没有这一层，
+      // 泄漏从根上消失；画面空白处仍然命中本层，手势照常。
+      this.GestureLayer()
+
       // 2.5 中央播放按钮（暂停时）：点击恢复播放（ended 时 = 从头重播）
       if (this.showCenterPlayButton()) {
         Stack({ alignContent: Alignment.Center }) {
           Stack({ alignContent: Alignment.Center }) {
-            SymbolGlyph($r('sys.symbol.play_fill'))
+            // 播放结束用"重播"图标，避免和"继续播放"混淆。
+            // arrow_clockwise 是项目内已验证存在的系统符号（重试用同一枚）。
+            SymbolGlyph(this.vm.isEnded
+              ? $r('sys.symbol.arrow_clockwise')
+              : $r('sys.symbol.play_fill'))
               .fontSize(34)
               .fontColor([Color.White])
           }
@@ -2162,73 +2235,106 @@ export struct VideoPlayer {
       this.clampVideoPan();
       Logger.debug(TAG, `Control layout size=${Math.round(w)}x${Math.round(h)} fullscreen=${this.isFullLandscapeScreen}`);
     })
-    .parallelGesture(
-      GestureGroup(GestureMode.Exclusive,
-        TapGesture({ count: 2, fingers: 1 })
-          .onAction((event: GestureEvent) => {
-            // 双击行为可配（Actions 互斥单选，天然避免与其它手势冲突）：
-            // seek=左右半屏快退/快进（步长可配）| playpause=播放/暂停 | off=不响应
-            this.registerDoubleTapActivity();
-            const action = this.playbackConfig.doubleTapAction;
-            if (action === 'off') {
-              return;
-            }
-            if (action === 'playpause') {
-              this.togglePlayback();
-              return;
-            }
-            const step = this.playbackConfig.doubleTapSeekSeconds > 0
-              ? this.playbackConfig.doubleTapSeekSeconds : 15;
-            const x: number = event.fingerList[0]?.localX ?? 0;
-            if (x > this.containerVpWidth / 2) {
-              Logger.info(TAG, `Double-tap forward +${step}s`);
-              this.controller.syncSeek(Math.min(this.currentTime + step, this.durationTime) * 1000);
-              this.showForwardHint = true;
-              this.forwardHintTimerId = setTimeout(() => {
-                this.forwardHintTimerId = -1;
-                this.showForwardHint = false;
-              }, DOUBLE_TAP_HINT_HIDE_DELAY);
-            } else {
-              Logger.info(TAG, `Double-tap backward -${step}s`);
-              this.controller.syncSeek(Math.max(this.currentTime - step, 0) * 1000);
-              this.showBackwardHint = true;
-              this.backwardHintTimerId = setTimeout(() => {
-                this.backwardHintTimerId = -1;
-                this.showBackwardHint = false;
-              }, DOUBLE_TAP_HINT_HIDE_DELAY);
-            }
-          }),
-        TapGesture({ count: 1, fingers: 1 })
-          .onAction((_event: GestureEvent) => {
-            this.onCenterTap();
-          }),
-        PanGesture({ direction: PanDirection.All, fingers: 1, distance: 8 })
-          .onActionStart((_e: GestureEvent) => {
-            this.onPlayerPanStart(_e);
-          })
-          .onActionUpdate((event: GestureEvent) => {
-            this.onPlayerPanUpdate(event);
-          })
-          .onActionEnd((_e: GestureEvent) => {
-            this.onPlayerPanEnd(false);
-          })
-          .onActionCancel((_e: GestureEvent) => {
-            this.onPlayerPanEnd(true);
-          }),
-        LongPressGesture({ fingers: 1, duration: this.playbackConfig.holdSpeedDelayMs, repeat: false })
-          .onAction((_e: GestureEvent) => {
-            this.onHoldSpeedStart();
-          })
-          .onActionEnd((_e: GestureEvent) => {
-            this.onHoldSpeedEnd('release');
-          })
-          .onActionCancel((_e: GestureEvent) => {
-            this.onHoldSpeedEnd('cancel');
-          })
-      )
-    )
+
     // 双指缩放在触摸层处理（PinchGesture 在 Exclusive 组内会被单指 pan 竞争掉）
     .onTouch((event: TouchEvent) => this.onPinchTouch(event))
+  }
+
+  /**
+   * 画面手势层：透明全屏，承载单击 / 双击 / 滑动 / 长按。
+   *
+   * <p>**独立成层、位于播控层之下**是这套交互可靠的关键。播控层整层是
+   * `HitTestMode.Transparent`，如果手势挂在容器（播控层的祖先）上，控件上
+   * 的每一次点击都会一并落进画面的手势组：
+   * <ul>
+   *   <li>按一下播放键 → 单击手势把控件收走（正在操作却 UI 消失）；</li>
+   *   <li>连点按钮两下 → 双击手势触发快进/快退（±15s 跳转）。</li>
+   * </ul>
+   * 独立成层之后，控件点击的命中路径里根本没有这一层，泄漏从根上消失；
+   * 画面空白处仍然命中本层，手势照常。控件层的点击只由控件自己处理。
+   */
+  @Builder
+  GestureLayer() {
+    Column() {
+    }
+      .width('100%')
+      .height('100%')
+      // 透明背景：让本层成为画面空白处的命中目标（不透明层会挡住视频画面）。
+      .backgroundColor(Color.Transparent)
+      // 层级：必须在**字幕拖动层（BASE+2.5）之下**——字幕层用自己的 PanGesture
+      // 处理拖动，被手势层压在上面会抢走命中、字幕就拖不动了；又必须在
+      // 缓冲提示层（BASE+2.0）之上，否则那个全屏层会挡住画面空白处的命中。
+      .zIndex(CommonConstants.Z_INDEX_BASE + 2.2)
+      .parallelGesture(
+        GestureGroup(GestureMode.Exclusive,
+          TapGesture({ count: 2, fingers: 1 })
+            .onAction((event: GestureEvent) => {
+              // 双击行为可配（Actions 互斥单选，天然避免与其它手势冲突）：
+              // seek=左右半屏快退/快进（步长可配）| playpause=播放/暂停 | off=不响应
+              // 中央播放按钮上不响应双击：那里是"恢复播放"的单击目标，
+              // 双击误触发快进会让用户以为画面自己跳了。
+              if (this.isCenterButtonTap(event)) {
+                return;
+              }
+              this.registerDoubleTapActivity();
+              const action = this.playbackConfig.doubleTapAction;
+              if (action === 'off') {
+                return;
+              }
+              if (action === 'playpause') {
+                this.togglePlayback();
+                return;
+              }
+              const step = this.playbackConfig.doubleTapSeekSeconds > 0
+                ? this.playbackConfig.doubleTapSeekSeconds : 15;
+              const x: number = event.fingerList[0]?.localX ?? 0;
+              if (x > this.containerVpWidth / 2) {
+                Logger.info(TAG, `Double-tap forward +${step}s`);
+                this.controller.syncSeek(Math.min(this.currentTime + step, this.durationTime) * 1000);
+                this.showForwardHint = true;
+                this.forwardHintTimerId = setTimeout(() => {
+                  this.forwardHintTimerId = -1;
+                  this.showForwardHint = false;
+                }, DOUBLE_TAP_HINT_HIDE_DELAY);
+              } else {
+                Logger.info(TAG, `Double-tap backward -${step}s`);
+                this.controller.syncSeek(Math.max(this.currentTime - step, 0) * 1000);
+                this.showBackwardHint = true;
+                this.backwardHintTimerId = setTimeout(() => {
+                  this.backwardHintTimerId = -1;
+                  this.showBackwardHint = false;
+                }, DOUBLE_TAP_HINT_HIDE_DELAY);
+              }
+            }),
+          TapGesture({ count: 1, fingers: 1 })
+            .onAction((event: GestureEvent) => {
+              this.onCenterTap(event);
+            }),
+          PanGesture({ direction: PanDirection.All, fingers: 1, distance: 8 })
+            .onActionStart((_e: GestureEvent) => {
+              this.onPlayerPanStart(_e);
+            })
+            .onActionUpdate((event: GestureEvent) => {
+              this.onPlayerPanUpdate(event);
+            })
+            .onActionEnd((_e: GestureEvent) => {
+              this.onPlayerPanEnd(false);
+            })
+            .onActionCancel((_e: GestureEvent) => {
+              this.onPlayerPanEnd(true);
+            }),
+          LongPressGesture({ fingers: 1, duration: this.playbackConfig.holdSpeedDelayMs, repeat: false })
+            .onAction((_e: GestureEvent) => {
+              this.onHoldSpeedStart();
+            })
+            .onActionEnd((_e: GestureEvent) => {
+              this.onHoldSpeedEnd('release');
+            })
+            .onActionCancel((_e: GestureEvent) => {
+              this.onHoldSpeedEnd('cancel');
+            })
+        )
+      )
   }
 
   private menuSymbol(icon: Resource): SymbolGlyphModifier {
@@ -2320,6 +2426,18 @@ export struct VideoPlayer {
         .contentFont({ size: 14 })
         .labelFont({ size: 14, weight: FontWeight.Medium })
         .labelFontColor($r('sys.color.font_primary'))
+      // 显式停止：后台播放时通知栏只有「暂停」，用户真正想要的是彻底停掉。
+      MenuItem({
+        symbolStartIcon: this.menuSymbol($r('sys.symbol.xmark_circle')),
+        content: $r('app.string.yt_player_stop_playback')
+      })
+        .contentFontColor($r('sys.color.font_primary'))
+        .contentFont({ size: 14 })
+        .onClick(() => {
+          // 停止播放并离开播放页：留在播放页只会看到一个已释放的空壳。
+          PlayerSession.getInstance().stopPlayback();
+          this.actionHub.closePage();
+        })
     }
     .onAppear(() => this.onControlMenuAppear())
     .onDisAppear(() => this.onControlMenuDisappear())
@@ -2484,7 +2602,8 @@ export struct VideoPlayer {
         .width(CONTROL_SLOT_SIZE)
         .height(CONTROL_SLOT_SIZE)
         .opacity(this.vm.isReady && this.hasStreams ? 1 : 0.4)
-        .enabled(this.vm.isReady && this.hasStreams && !this.vm.isBuffering)
+        // 缓冲中也要能暂停：缓冲是网络侧的问题，不该把用户的停止手段也锁掉。
+        .enabled(this.vm.isReady && this.hasStreams)
         .onClick(() => this.togglePlayback())
 
       if (this.curSource.isLive) {

@@ -801,6 +801,15 @@ export struct VideoPlayerPage {
               .padding({ left: 24, right: 24 })
           }
 
+          if (this.errorInfo.endpoint) {
+            Text($r('app.string.yt_error_endpoint_hint', this.errorInfo.endpoint))
+              .fontColor('#80FFFFFF')
+              .fontSize(11)
+              .textAlign(TextAlign.Center)
+              .maxLines(1)
+              .padding({ left: 24, right: 24 })
+          }
+
           Row({ space: 12 }) {
             if (this.errorInfo.isRetryable) {
               Button() {

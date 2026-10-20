@@ -181,102 +181,69 @@ export function getGpuApiDisplay(value: GpuApi): Resource {
   return $r(`app.string.yt_label_${value}`);
 }
 
+@Observed
 export class PlaybackConfig {
-  defaultQuality: VideoQualityCap = '480p';
-  mobileQuality: VideoQualityCap = '480p';
+  @Track defaultQuality: VideoQualityCap = '480p';
+  @Track mobileQuality: VideoQualityCap = '480p';
   /** Full-surface swipe shortcuts. Visible controls remain available when disabled. */
-  gestureSeekEnabled: boolean = true;
-  gestureBrightnessEnabled: boolean = true;
-  gestureVolumeEnabled: boolean = true;
+  @Track gestureSeekEnabled: boolean = true;
+  @Track gestureBrightnessEnabled: boolean = true;
+  @Track gestureVolumeEnabled: boolean = true;
   /** 长按屏幕临时加速（松手恢复原倍速） */
-  holdSpeedEnabled: boolean = true;
+  @Track holdSpeedEnabled: boolean = true;
   /** 长按加速的目标倍速 */
-  holdSpeedValue: number = 2.0;
+  @Track holdSpeedValue: number = 2.0;
   /** 长按多久触发加速（毫秒） */
-  holdSpeedDelayMs: number = 500;
+  @Track holdSpeedDelayMs: number = 500;
   /** 手势交互方案预设（改任一分项开关后自动变为 custom） */
-  gestureScheme: GestureScheme = 'enhanced';
+  @Track gestureScheme: GestureScheme = 'enhanced';
   /** 双击屏幕的动作：左右快进退 / 播放暂停 / 关闭 */
-  doubleTapAction: DoubleTapAction = 'seek';
+  @Track doubleTapAction: DoubleTapAction = 'seek';
   /** 双击快进退步长（秒），仅 doubleTapAction='seek' 时生效 */
-  doubleTapSeekSeconds: number = 15;
+  @Track doubleTapSeekSeconds: number = 15;
   /** 返回键/home 键时是否自动进入画中画（设备不支持时强制 false） */
-  pipOnReturn: boolean = true;
+  @Track pipOnReturn: boolean = true;
   /**
    * 真后台时延迟关闭视频解码，仅保留音频（省电）。
    * 分享/投屏/PiP 不会关视频。回前台自动恢复。
    */
-  backgroundAudioOnly: boolean = true;
+  @Track backgroundAudioOnly: boolean = true;
   /** 进入后台后多久关视频（秒），0=立即 */
-  backgroundVideoOffDelaySec: BackgroundVideoOffDelay = '15';
+  @Track backgroundVideoOffDelaySec: BackgroundVideoOffDelay = '15';
   /** 是否继续播放下一个视频（每次启动时作为队列自动播放会话开关的默认值） */
-  autoPlayNext: boolean = true;
+  @Track autoPlayNext: boolean = true;
 
   // MPV 播放器设置
   /** 硬件解码开关 */
-  hwdecEnabled: boolean = true;
+  @Track hwdecEnabled: boolean = true;
   /** 内存缓存时长（秒） */
-  cacheSecs: CacheSecs = '10';
+  @Track cacheSecs: CacheSecs = '10';
   /** 预读缓冲时长（秒） */
-  demuxerReadaheadSecs: DemuxerReadahead = '8';
+  @Track demuxerReadaheadSecs: DemuxerReadahead = '8';
   /** 解封装器最大缓冲区（MB） */
-  demuxerMaxBytes: DemuxerMaxBytes = '20';
+  @Track demuxerMaxBytes: DemuxerMaxBytes = '20';
   /** GPU 渲染 API */
-  gpuApi: GpuApi = 'auto';
+  @Track gpuApi: GpuApi = 'auto';
   /** 游客（未登录/未启用播放鉴权）时的 YouTube 播放端点 */
-  guestPlayerClient: GuestPlayerClient = 'tv_samsung';
+  @Track guestPlayerClient: GuestPlayerClient = 'tv_samsung';
   /** 登录（且启用播放鉴权）时的 YouTube 播放端点 */
-  authPlayerClient: AuthPlayerClient = 'mweb';
+  @Track authPlayerClient: AuthPlayerClient = 'mweb';
   /** 覆盖层字幕字号倍率 */
-  subtitleFontScale: SubtitleFontScale = '1';
+  @Track subtitleFontScale: SubtitleFontScale = '1';
   /** 覆盖层字幕底部间距（vp） */
-  subtitleBottomMarginVp: SubtitleBottomMargin = '48';
+  @Track subtitleBottomMarginVp: SubtitleBottomMargin = '48';
   /** 覆盖层字幕字体颜色 */
-  subtitleFontColor: SubtitleFontColor = 'white';
+  @Track subtitleFontColor: SubtitleFontColor = 'white';
   /** 覆盖层字幕背景样式 */
-  subtitleBackground: SubtitleBackground = 'semi';
+  @Track subtitleBackground: SubtitleBackground = 'semi';
   /** 字幕延迟（毫秒，正值 = 延后显示） */
-  subtitleOffsetMs: number = 0;
+  @Track subtitleOffsetMs: number = 0;
   /** 系统 AI 字幕（Speech Kit AICaptionComponent 自动捕获应用音频；仅支持的机型/地区生效） */
-  systemAiCaption: boolean = false;
+  @Track systemAiCaption: boolean = false;
   /** 系统 AI 字幕源语言（'zh'|'en'；英文源输出中英双语） */
-  systemAiCaptionSource: string = 'en';
+  @Track systemAiCaptionSource: string = 'en';
 
   constructor() {}
-
-  clone(): PlaybackConfig {
-    const next = new PlaybackConfig();
-    next.defaultQuality = this.defaultQuality;
-    next.mobileQuality = this.mobileQuality;
-    next.gestureSeekEnabled = this.gestureSeekEnabled;
-    next.gestureBrightnessEnabled = this.gestureBrightnessEnabled;
-    next.gestureVolumeEnabled = this.gestureVolumeEnabled;
-    next.holdSpeedEnabled = this.holdSpeedEnabled;
-    next.holdSpeedValue = this.holdSpeedValue;
-    next.holdSpeedDelayMs = this.holdSpeedDelayMs;
-    next.gestureScheme = this.gestureScheme;
-    next.doubleTapAction = this.doubleTapAction;
-    next.doubleTapSeekSeconds = this.doubleTapSeekSeconds;
-    next.pipOnReturn = this.pipOnReturn;
-    next.backgroundAudioOnly = this.backgroundAudioOnly;
-    next.backgroundVideoOffDelaySec = this.backgroundVideoOffDelaySec;
-    next.autoPlayNext = this.autoPlayNext;
-    next.hwdecEnabled = this.hwdecEnabled;
-    next.cacheSecs = this.cacheSecs;
-    next.demuxerReadaheadSecs = this.demuxerReadaheadSecs;
-    next.demuxerMaxBytes = this.demuxerMaxBytes;
-    next.gpuApi = this.gpuApi;
-    next.guestPlayerClient = this.guestPlayerClient;
-    next.authPlayerClient = this.authPlayerClient;
-    next.subtitleFontScale = this.subtitleFontScale;
-    next.subtitleBottomMarginVp = this.subtitleBottomMarginVp;
-    next.subtitleFontColor = this.subtitleFontColor;
-    next.subtitleBackground = this.subtitleBackground;
-    next.subtitleOffsetMs = this.subtitleOffsetMs;
-    next.systemAiCaption = this.systemAiCaption;
-    next.systemAiCaptionSource = this.systemAiCaptionSource;
-    return next;
-  }
 
   /**
    * 手势方案预设：一次性写回各分项开关（双击单选 + 滑动组 + 长按组）。

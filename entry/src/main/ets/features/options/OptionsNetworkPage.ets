@@ -4,7 +4,7 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
-import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
+import { NetworkProxyConfig, NetworkProxyStatus } from '../../common/NetworkProxyConfig';
 import { UIConfig } from '../../common/AppState';
 import { HttpDownloader } from 'youtube_core';
 import { SelectOption } from 'mediaservice';
@@ -22,6 +22,7 @@ export struct OptionsNetworkPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('networkProxyConfig') networkProxyConfig: NetworkProxyConfig = new NetworkProxyConfig();
+  @StorageLink('networkProxyStatus') proxyStatus: NetworkProxyStatus = new NetworkProxyStatus();
 
   @Prop params: OptionsNetworkPageParams = {
     themeColor: '#E53935',
@@ -30,6 +31,61 @@ export struct OptionsNetworkPage {
 
   @State private testing: boolean = false;
   @State private testMessage: ResourceStr = '';
+
+  /** 重新应用配置（重启本地桥接、复位熔断）。 */
+  private async restartProxy(): Promise<void> {
+    if (this.testing) {
+      return;
+    }
+    this.testing = true;
+    try {
+      this.persist();
+      await NetworkProxyConfig.awaitReady();
+      const status = NetworkProxyConfig.publishStatus();
+      status.lastApplyAtMs = Date.now();
+      this.testMessage = $r('app.string.yt_proxy_restart_done');
+    } catch (e) {
+      logger.warn(`proxy restart failed: ${(e as Error).message}`);
+      this.testMessage = $r('app.string.yt_proxy_test_failed');
+    } finally {
+      this.testing = false;
+    }
+  }
+
+  /** 状态条文案：把「代理到底通没通」摆在明面上，而不是只靠一次测试按钮。 */
+  private getStatusText(): ResourceStr {
+    const status = this.proxyStatus;
+    if (!this.networkProxyConfig.enabled) {
+      return $r('app.string.yt_proxy_status_off');
+    }
+    if (status.bridgeFuseBlown) {
+      return $r('app.string.yt_proxy_status_fuse');
+    }
+    if (!status.lastApplyOk) {
+      return $r('app.string.yt_proxy_status_failed');
+    }
+    if (status.bridgeRunning && status.bridgePort > 0) {
+      return $r('app.string.yt_proxy_status_ready', status.bridgePort);
+    }
+    return $r('app.string.yt_proxy_status_direct');
+  }
+
+  private getStatusColor(): ResourceColor {
+    const status = this.proxyStatus;
+    if (!this.networkProxyConfig.enabled) {
+      return $r('app.color.yourtube_text_quaternary');
+    }
+    if (status.bridgeFuseBlown || !status.lastApplyOk) {
+      return $r('app.color.yourtube_error');
+    }
+    return $r('app.color.yourtube_text_secondary');
+  }
+
+  /** 需要提示用户手动重启的条件：桥接熔断 / 上次应用失败。 */
+  private needRestart(): boolean {
+    const status = this.proxyStatus;
+    return this.networkProxyConfig.enabled && (status.bridgeFuseBlown || !status.lastApplyOk);
+  }
 
   private persist(): void {
     NetworkProxyConfig.save(this.networkProxyConfig);
@@ -110,10 +166,13 @@ export struct OptionsNetworkPage {
       logger.info(`proxy test status=${response.responseCode} elapsed=${elapsed}ms`);
       if (response.responseCode >= 200 && response.responseCode < 400) {
         this.testMessage = $r('app.string.yt_proxy_test_ok');
+        NetworkProxyConfig.recordTestResult(true);
       } else if (response.responseCode === 407) {
         this.testMessage = $r('app.string.yt_proxy_test_auth_failed');
+        NetworkProxyConfig.recordTestResult(false);
       } else {
         this.testMessage = $r('app.string.yt_proxy_test_http_error');
+        NetworkProxyConfig.recordTestResult(false);
       }
     } catch (e) {
       const err = e as BusinessError;
@@ -124,6 +183,7 @@ export struct OptionsNetworkPage {
       } else {
         this.testMessage = $r('app.string.yt_proxy_test_failed');
       }
+      NetworkProxyConfig.recordTestResult(false);
     } finally {
       req.destroy();
       this.testing = false;
@@ -152,6 +212,43 @@ export struct OptionsNetworkPage {
                 this.persist();
               }
             })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
+
+        // 常驻状态条：代理是否真的通、桥接是否活着，一眼可见。
+        ListItemGroup() {
+          ListItem() {
+            Column({ space: 6 }) {
+              Row() {
+                Text($r('app.string.yt_proxy_status_title'))
+                  .fontSize(14)
+                  .fontColor($r('app.color.yourtube_text_primary'))
+                Blank()
+                Text(this.getStatusText())
+                  .fontSize(13)
+                  .fontColor(this.getStatusColor())
+              }
+              .width('100%')
+
+              if (this.needRestart()) {
+                Button($r('app.string.yt_proxy_restart'))
+                  .height(36)
+                  .fontSize(14)
+                  .fontColor(Color.White)
+                  .backgroundColor(this.themePrimary)
+                  .borderRadius(18)
+                  .width('100%')
+                  .enabled(!this.testing)
+                  .onClick(() => {
+                    this.restartProxy();
+                  })
+              }
+            }
+            .width('100%')
+            .padding({ top: 14, bottom: 14, left: 16, right: 16 })
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
@@ -232,6 +329,15 @@ export struct OptionsNetworkPage {
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        // 地址格式示例：降低第一次配置代理的门槛。
+        ListItem() {
+          Text($r('app.string.yt_proxy_example_hint'))
+            .fontSize(12)
+            .fontColor($r('app.color.yourtube_text_quaternary'))
+            .width('100%')
+            .padding({ left: 4, right: 4, top: 8 })
+        }
 
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_proxy_auth_optional') })
@@ -333,6 +439,10 @@ export struct OptionsNetworkPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
+    .onAppear(() => {
+      // 打开设置页就刷新一次状态镜像：桥接可能在上次离开后熔断过。
+      NetworkProxyConfig.publishStatus();
+    })
     .onDisAppear(() => {
       this.persist();
     })

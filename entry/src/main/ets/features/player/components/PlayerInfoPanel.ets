@@ -32,10 +32,10 @@ export struct PlayerInfoPanel {
   @State currentTabIndex: number = 0;
   @StorageLink('isLocalMode') isLocalMode: boolean = false;
 
-  /** 本地文件只保留「简介」Tab：评论与播放队列都是在线/YouTube 语义。 */
+  /** 本地文件没有评论 Tab；播放队列保留（下载库整份入队，可顺放）。 */
   private visibleTabs(): Array<TabItem> {
     if (this.isLocalMode) {
-      return this.tabArray.filter((item: TabItem) => item.id === 0);
+      return this.tabArray.filter((item: TabItem) => item.id !== 1);
     }
     return this.tabArray;
   }
@@ -48,7 +48,7 @@ export struct PlayerInfoPanel {
   build() {
     Column() {
       Tabs({ barPosition: BarPosition.Start }) {
-        ForEach(this.visibleTabs(), (item: TabItem) => {
+        ForEach(this.visibleTabs(), (item: TabItem, index: number) => {
           TabContent() {
             Column() {
               if (item.id === 0) {
@@ -78,7 +78,9 @@ export struct PlayerInfoPanel {
             }
             .width(Const.WIDTH_FULL_PERCENT)
             .height(Const.HEIGHT_FULL_PERCENT)
-          }.tabBar(this.tabBuilder(item.id, item.name))
+          // tabBar 的高亮按「位置索引」比较，TabContent 的内容按 tab id 分派 ——
+          // 本地模式过滤掉评论 tab 后 id≠位置，必须用 index，否则选中态错位。
+          }.tabBar(this.tabBuilder(index, item.name))
         }, (item: TabItem, index: number) => JSON.stringify(item) + index)
       }
       .borderRadius({ topLeft: 16, topRight: 16 })

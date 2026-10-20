@@ -1989,6 +1989,10 @@
             "value": "Не удалось разобрать информацию о видео"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "Текущая конечная точка: %s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "Не удалось получить данные воспроизведения видео"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "Показать / скрыть элементы управления"
+            "value": "Показывает элементы управления (скрываются сами через 3 с)"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "Классический Bilibili"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "Истекло время загрузки"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "Не удалось повторить, попробуйте позже"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "Повтор…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "Тайм-аут загрузки"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "Без тайм-аута"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d мин"
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "Остановить воспроизведение"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "Состояние подключения"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "Отключено"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "Подключено (локальный мост %d)"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "Подключено (напрямую к апстриму)"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "Мост разорван, требуется повторное применение"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "Не удалось применить"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "Применить заново и перезапустить"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "Прокси применён заново"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "Пример: для HTTP укажите 127.0.0.1 и порт (например, 7890); для SOCKS5 так же. С логином и паролем трафик идёт через локальный мост, который явно завершается с ошибкой, а не переходит на прямой доступ."
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "Кнопка воспроизведения по центру"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "Показывает большую кнопку воспроизведения в центре кадра на паузе. Если выключено, кадр остаётся чистым; управление касанием или нижней панелью."
         }
     ]
 }

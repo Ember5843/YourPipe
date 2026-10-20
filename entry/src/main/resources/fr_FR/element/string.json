@@ -1989,6 +1989,10 @@
             "value": "Échec de l'analyse des informations vidéo"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "Point de terminaison : %s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "Impossible de récupérer les données de lecture vidéo"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "Afficher / masquer les commandes"
+            "value": "Affiche les commandes (masquage auto après 3 s)"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "Bilibili classique"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "Délai de téléchargement dépassé"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "Échec de la nouvelle tentative, réessayez plus tard"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "Nouvelle tentative…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "Délai de téléchargement"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "Aucun délai"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d min"
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "Arrêter la lecture"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "État de la connexion"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "Désactivé"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "Connecté (pont local %d)"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "Connecté (direct vers l'amont)"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "Pont déconnecté, réapplication requise"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "Échec de l'application"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "Réappliquer et redémarrer"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "Proxy réappliqué"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "Exemple : pour HTTP, saisissez 127.0.0.1 et le port (ex. 7890) ; SOCKS5 de même. Avec identifiant/mot de passe, le trafic passe par un pont local qui échoue visiblement au lieu de basculer en direct."
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "Bouton de lecture central"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "Affiche un grand bouton de lecture au centre de l'image en pause. Désactivé, l'image reste nette ; contrôle par appui ou barre inférieure."
         }
     ]
 }

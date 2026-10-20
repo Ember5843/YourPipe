@@ -1989,6 +1989,10 @@
             "value": "فشل تحليل معلومات الفيديو"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "نقطة النهاية الحالية: %s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "تعذر جلب بيانات تشغيل الفيديو"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "إظهار / إخفاء عناصر التحكم"
+            "value": "يعرض عناصر التحكم (تُخفى تلقائيًا بعد 3 ثوانٍ)"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "Bilibili الكلاسيكي"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "انتهت مهلة التنزيل"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "فشلت إعادة المحاولة، حاول مرة أخرى لاحقًا"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "جارٍ إعادة المحاولة…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "مهلة التنزيل"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "بلا مهلة"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d دقيقة"
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "إيقاف التشغيل"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "حالة الاتصال"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "معطّل"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "متصل (جسر محلي %d)"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "متصل (مباشر بالمصدر)"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "انقطع الجسر، يلزم إعادة التطبيق"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "فشل التطبيق"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "إعادة التطبيق والتشغيل"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "أُعيد تطبيق الوكيل"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "مثال: لحالة HTTP أدخل 127.0.0.1 والمنفذ (مثل 7890)؛ أما SOCKS5 فبنفس الطريقة. مع اسم المستخدم وكلمة المرور يمرّ المرور عبر جسر محلي يفشل بشكل ظاهر بدل التحول إلى الاتصال المباشر."
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "زر التشغيل في المنتصف"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "يعرض زر تشغيل كبيرًا في منتصف الإطار أثناء الإيقاف المؤقت. عند إيقافه يبقى الإطار نظيفًا، والتحكم باللمس أو الشريط السفلي."
         }
     ]
 }

@@ -11,6 +11,8 @@ import { UIConfig } from '../../common/AppState';
 import { PiPManager } from '../player/pip/PiPManager';
 
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
+/** 下载整体超时（分钟）。0 = 不超时。 */
+const DOWNLOAD_TIMEOUT_VALUES: number[] = [0, 5, 10, 15, 30, 60, 120];
 
 interface OptionsPlaybackPageParams {
   themeColor: ResourceColor;
@@ -51,6 +53,14 @@ export struct OptionsPlaybackPage {
 
   private getConcurrencyOptions(): SelectOption[] {
     return DOWNLOAD_CONCURRENCY_VALUES.map(value => ({ value: value.toString() } as SelectOption));
+  }
+
+  private getTimeoutOptions(): SelectOption[] {
+    return DOWNLOAD_TIMEOUT_VALUES.map((value: number) => ({
+      value: value === 0
+        ? $r('app.string.yt_download_timeout_off')
+        : $r('app.string.yt_download_timeout_minutes', value)
+    } as SelectOption));
   }
 
   build() {
@@ -176,6 +186,21 @@ export struct OptionsPlaybackPage {
               onChange: (index: number) => {
                 const value = DOWNLOAD_CONCURRENCY_VALUES[index] || 1;
                 this.params.updateUiConfig(cfg => cfg.maxConcurrentDownloads = value);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackSelectRow({
+              title: $r('app.string.yt_download_timeout_title'),
+              options: this.getTimeoutOptions(),
+              selectedIndex: Math.max(0, DOWNLOAD_TIMEOUT_VALUES.indexOf(
+                this.uiConfig.downloadTimeoutMinutes ?? 30)),
+              fontColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (index: number) => {
+                const value = DOWNLOAD_TIMEOUT_VALUES[index] ?? 30;
+                this.params.updateUiConfig(cfg => cfg.downloadTimeoutMinutes = value);
               }
             })
           }

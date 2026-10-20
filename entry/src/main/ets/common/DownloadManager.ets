@@ -24,6 +24,8 @@ const DOWNLOAD_NOTIFICATION_MIN_INTERVAL_MS: number = 1200;
 const DOWNLOAD_NOTIFICATION_MIN_PROGRESS_DELTA: number = 2;
 const DOWNLOAD_NOTIFICATION_RATE_LIMIT_BACKOFF_MS: number = 5000;
 const DOWNLOAD_NOTIFICATION_GLOBAL_INTERVAL_MS: number = 800;
+/** 墙钟无进展看门狗：这么久没收到任何字节就判死（见 requestStreamToFile）。 */
+const DOWNLOAD_STALL_TIMEOUT_MS: number = 30000;
 
 @Concurrent
 function muxTask(videoPath: string, audioPath: string, outPath: string): void {
@@ -80,8 +82,12 @@ export class DownloadTask {
   @Track createdAt: number = Date.now();
   /** 手动导出到的路径（条目与导出文件对应；删除条目不触碰该副本）。 */
   @Track exportedPath: string = '';
+  /** 已重试次数（UI 展示 + 防止无限重试）。 */
+  @Track retryCount: number = 0;
 
   _cancelled: boolean = false;
+  /** 本次尝试的开始时间（超时预算用）。 */
+  _startedAtMs: number = 0;
   _videoFilePath: string = '';
   _audioFilePath: string = '';
   _context: common.UIAbilityContext | null = null;
@@ -397,10 +403,16 @@ class DownloadNotificationDispatcher {
 
 export class DownloadManager {
   private static instance: DownloadManager;
+  /** 每个任务最多重试次数（超过后不再重试，条目仍保留可删除）。 */
+  static readonly MAX_RETRIES: number = 3;
+  /** 超时看门狗的检查间隔。 */
+  private static readonly WATCHDOG_INTERVAL_MS: number = 15000;
   private tasks: DownloadTask[] = [];
   private activeTaskIds: Set<string> = new Set();
   private context: common.UIAbilityContext | null = null;
   private notificationDispatcher: DownloadNotificationDispatcher;
+  /** 卡死任务看门狗（下载整体超时）。 */
+  private watchdogTimer: number = -1;
 
   private tr(resource: Resource, ...args: Array<string | number>): string {
     if (!this.context) {
@@ -456,6 +468,65 @@ export class DownloadManager {
       this.cancelDownloadNotification(task);
       this.processQueue();
     }
+  }
+
+  /**
+   * Retry a failed task in place: the entry keeps its identity (id / title /
+   * artwork) and re-enters the queue with a fresh attempt.
+   *
+   * The caller normally passes freshly extracted streams — a googlevideo URL
+   * carries an `expire` stamp and a SABR bootstrap a short-lived streaming URL,
+   * so replaying the old ones would just fail again. Without new streams the
+   * previous ones are reused (still fine for a direct URL that has not
+   * expired yet).
+   *
+   * Returns false when the task is not retryable (not failed / already
+   * running / over the retry budget).
+   */
+  retryTask(
+    taskId: string,
+    videoStream?: StreamInfo,
+    audioStream?: StreamInfo | null
+  ): boolean {
+    const task = this.tasks.find((item: DownloadTask) => item.id === taskId);
+    if (!task) {
+      return false;
+    }
+    if (task.status !== DownloadStatus.FAILED) {
+      return false;
+    }
+    if (task.retryCount >= DownloadManager.MAX_RETRIES) {
+      logger.warn(`Task ${task.id} retry refused: budget spent (${task.retryCount}/${DownloadManager.MAX_RETRIES})`);
+      return false;
+    }
+    if (videoStream) {
+      task.videoStream = videoStream;
+    }
+    if (audioStream !== undefined) {
+      task.audioStream = audioStream;
+    }
+    task.totalSize = (task.videoStream.contentLength || 0) + (task.audioStream?.contentLength || 0);
+    task.retryCount++;
+    task._cancelled = false;
+    task.status = DownloadStatus.PENDING;
+    task.progress = 0;
+    task.videoProgress = 0;
+    task.audioProgress = 0;
+    task.mergeProgress = 0;
+    task.downloadedSize = 0;
+    task.videoDownloadedSize = 0;
+    task.audioDownloadedSize = 0;
+    task.errorMessage = '';
+    task.outputPath = '';
+    task._startedAtMs = 0;
+    task._videoFilePath = '';
+    task._audioFilePath = '';
+    logger.info(`Task ${task.id} retry queued (${task.retryCount}/${DownloadManager.MAX_RETRIES}) `
+      + `video=${this.getStreamLogLabel(task.videoStream)} `
+      + `audio=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'}`);
+    this.notifyTasksChanged();
+    this.processQueue();
+    return true;
   }
 
   deleteTask(taskId: string): void {
@@ -577,9 +648,6 @@ export class DownloadManager {
       return;
     }
     const records = DownloadTaskStore.load();
-    if (records.length === 0) {
-      return;
-    }
     const restored: DownloadTask[] = [];
     let dropped = 0;
     records.forEach((record: DownloadTaskRecord) => {
@@ -614,9 +682,85 @@ export class DownloadManager {
       }
       restored.push(task);
     });
-    this.tasks = restored;
-    logger.info(`restoreTasks: restored=${restored.length} dropped(missing file)=${dropped}`);
+
+    const knownIds = new Set<string>();
+    restored.forEach((task: DownloadTask) => knownIds.add(task.id));
+    // 索引外的目录（历史遗留 / 索引丢失）扫盘回收，否则文件永久不可达。
+    const recovered = this.recoverOrphanedDownloads(knownIds);
+
+    this.tasks = restored.concat(recovered);
+    logger.info(`restoreTasks: restored=${restored.length} recovered=${recovered.length} dropped(missing file)=${dropped}`);
     this.notifyTasksChanged();
+  }
+
+  /**
+   * 扫盘回收 filesDir/downloads 下没有索引记录的目录：取其中的合并产物重建条目。
+   * 只能拿回文件名当标题（无法还原标题/作者/封面，也拿不到 YouTube id）。
+   */
+  private recoverOrphanedDownloads(knownTaskIds: Set<string>): DownloadTask[] {
+    const recovered: DownloadTask[] = [];
+    if (!this.context) {
+      return recovered;
+    }
+    const root = `${this.context.filesDir}/${DOWNLOAD_ROOT}`;
+    let entries: string[] = [];
+    try {
+      if (!fs.accessSync(root)) {
+        return recovered;
+      }
+      entries = fs.listFileSync(root);
+    } catch (e) {
+      logger.warn(`recoverOrphanedDownloads: cannot list ${root}: ${e}`);
+      return recovered;
+    }
+    entries.forEach((name: string) => {
+      if (knownTaskIds.has(name)) {
+        return;
+      }
+      const dir = `${root}/${name}`;
+      let fileNames: string[] = [];
+      try {
+        if (!fs.statSync(dir).isDirectory()) {
+          return;
+        }
+        fileNames = fs.listFileSync(dir);
+      } catch (_e) {
+        return;
+      }
+      const output = fileNames.find((file: string) =>
+        !file.startsWith('video.') && !file.startsWith('audio.')
+          && /\.(mp4|mkv|webm|m4a|mp3|ts|m4s|mov|flv)$/i.test(file));
+      if (!output) {
+        return;
+      }
+      const outputPath = `${dir}/${output}`;
+      const dot = output.lastIndexOf('.');
+      const title = dot > 0 ? output.substring(0, dot) : output;
+      const task = new DownloadTask(
+        name,
+        '',
+        title,
+        '',
+        '',
+        { url: outputPath, kind: 'progressive', deliveryMethod: 'LOCAL_FILE', hasVideo: true, hasAudio: true },
+        null
+      );
+      task.status = DownloadStatus.COMPLETED;
+      task.outputPath = outputPath;
+      task.taskDir = dir;
+      try {
+        task.totalSize = fs.statSync(outputPath).size;
+      } catch (_e) {
+        task.totalSize = 0;
+      }
+      task.progress = 100;
+      task._context = this.context;
+      recovered.push(task);
+    });
+    if (recovered.length > 0) {
+      logger.info(`recoverOrphanedDownloads: recovered=${recovered.length} dirs without an index record`);
+    }
+    return recovered;
   }
 
   private processQueue(): void {
@@ -634,6 +778,8 @@ export class DownloadManager {
   }
 
   private async runTask(task: DownloadTask): Promise<void> {
+    task._startedAtMs = Date.now();
+    this.startWatchdog();
     try {
       await this.executeTask(task);
     } catch (error) {
@@ -645,8 +791,71 @@ export class DownloadManager {
       logger.error(`Task ${task.id} failed: ${this.getErrorMessage(error)}`);
     } finally {
       this.activeTaskIds.delete(task.id);
+      // 终态落盘：完成/失败都要写索引，否则重启后只剩"下次 addTask 时恰好已完成"的那几条。
+      this.notifyTasksChanged();
       this.processQueue();
+      if (this.activeTaskIds.size === 0) {
+        this.stopWatchdog();
+      }
     }
+  }
+
+  /**
+   * 卡死任务看门狗：一个下载如果超过「下载超时」预算仍没结束（连接挂死、
+   * 服务端不再发数据、合并阶段卡住），就把它判失败并让出并发槽位，
+   * 否则它会一直占着 slot 让整个下载队列停摆。
+   */
+  private startWatchdog(): void {
+    if (this.watchdogTimer >= 0) {
+      return;
+    }
+    this.watchdogTimer = setTimeout(() => {
+      this.watchdogTimer = -1;
+      this.checkTaskTimeouts();
+      if (this.activeTaskIds.size > 0) {
+        this.startWatchdog();
+      }
+    }, DownloadManager.WATCHDOG_INTERVAL_MS);
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogTimer >= 0) {
+      clearTimeout(this.watchdogTimer);
+      this.watchdogTimer = -1;
+    }
+  }
+
+  private getDownloadTimeoutMs(): number {
+    const uiConfig = AppStorage.get<UIConfig>('uiConfig');
+    const minutes = uiConfig?.downloadTimeoutMinutes ?? 30;
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return 0; // 0 = 不超时
+    }
+    return minutes * 60 * 1000;
+  }
+
+  private checkTaskTimeouts(): void {
+    const budget = this.getDownloadTimeoutMs();
+    if (budget <= 0) {
+      return;
+    }
+    const now = Date.now();
+    for (const task of this.tasks) {
+      if (!this.activeTaskIds.has(task.id) || task._startedAtMs <= 0) {
+        continue;
+      }
+      const elapsed = now - task._startedAtMs;
+      if (elapsed <= budget) {
+        continue;
+      }
+      task._cancelled = true;
+      task.status = DownloadStatus.FAILED;
+      task.errorMessage = this.tr($r('app.string.yt_download_timeout_failed'));
+      logger.error(`Task ${task.id} timed out after ${Math.round(elapsed / 1000)}s `
+        + `(budget=${Math.round(budget / 1000)}s) — marked failed`);
+      this.publishDownloadNotification(task, true);
+    }
+    this.notifyTasksChanged();
   }
 
   private getMaxConcurrentDownloads(): number {
@@ -1264,7 +1473,30 @@ export class DownloadManager {
       let settled = false;
       let redirectLocation: string | null = null;
 
+      let stallTimer: number = -1;
+      const clearStallTimer = (): void => {
+        if (stallTimer !== -1) {
+          clearTimeout(stallTimer);
+          stallTimer = -1;
+        }
+      };
+      /**
+       * 墙钟无进展看门狗：只要长时间收不到任何字节就判死。
+       * readTimeout 只管"完全读不到"，连接被 keepalive 吊住、偶尔滴一个字节时
+       * 永远不会触发，任务就会以近乎为零的进度无限挂着。
+       */
+      const armStallTimer = (): void => {
+        clearStallTimer();
+        stallTimer = setTimeout(() => {
+          stallTimer = -1;
+          const message = `download stalled: no data for ${DOWNLOAD_STALL_TIMEOUT_MS / 1000}s (received ${bytesWritten} B)`;
+          logger.warn(`Task ${task.id} ${message}`);
+          finishReject(new Error(message));
+        }, DOWNLOAD_STALL_TIMEOUT_MS);
+      };
+
       const cleanup = (): void => {
+        clearStallTimer();
         try {
           httpRequest.off('headersReceive');
           httpRequest.off('dataReceive');
@@ -1345,6 +1577,8 @@ export class DownloadManager {
             fs.writeSync(file.fd, data);
             bytesWritten += data.byteLength;
             onProgress(bytesWritten);
+            // 有字节就重置看门狗：只按"无进展"计时，不按"总时长"。
+            armStallTimer();
           }
         } catch (error) {
           finishReject(error as Error);
@@ -1364,6 +1598,7 @@ export class DownloadManager {
         usingCache: false
       };
       HttpDownloader.applyProxyToOptions(streamOptions, url);
+      armStallTimer();
       httpRequest.requestInStream(
         url,
         streamOptions

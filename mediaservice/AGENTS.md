@@ -267,6 +267,29 @@ non-product `youtube-dual` session, so it was dead traffic on the EDL path.
 
 Do not teach MPV remote SABR URLs directly; always go through the local proxy.
 
+- **诊断快照 `[Diag]`**：`AvPlayerController.logDiagSnapshot(tag)` 在
+  音频焦点（focus-in / focus-pause / focus-resume）、播放暂停（sync-play /
+  sync-pause / sync-stop）、surface 绑定与尺寸、视频输出开关这些边界上打一条
+  完整状态：`engine / play / ready / buf / pos / vstr / astr / size / vol /
+  duck / focus(临时,永久) / session / vidOut / surface / dropped / cache`。
+  「暂停恢复后无声」「有声无画」这类问题单看任一标志位都无法归因，必须把
+  焦点标志、会话激活态、引擎状态、位置、音量、视频输出开关、surface 绑定放在
+  同一行对照——快照就是为此存在的。`AvSessionManager.isSessionActive()` 是配套
+  新增的会话状态查询。
+- **音频焦点严格遵从系统接口**（不要自己抢焦点）：
+  - `PAUSE`（临时）→ 暂停；`STOP`（永久）→ 暂停**且不自动恢复**；
+    `DUCK/UNDUCK` → 只让系统调流增益，不动 mpv 音量；`RESUME` → 才恢复。
+  - 收到 `STOP` 后**禁止**自行 `activateAudioSession()` 去抢回焦点——那会直接
+    打断正在放音的其它应用（实测：切回本应用就把别的应用的音频断掉）。
+    唯一允许重新激活音频会话的路径是**系统发的 `RESUME`** 和**用户主动按播放**
+    （`syncPlay`）。前台/后台回调里不做任何焦点动作。
+  - `setAppForegroundProvider`（entry 注入 `isAppBackground`）**只用于诊断**，
+    不参与播放决策：快照里的 `appFg` 只是用来回答「系统那个迟到的 STOP 是不是
+    在应用已经回前台后才到的」。
+- **会话停用失败降级**：收到系统 STOP 时系统**已经**停用了音频会话，我们再调
+  `deactivateAudioSession()` 会报 6800301 —— 这不是错误，日志降级为 WARN
+  （`[AudioFocus] deactivate skipped`），本地状态照常按「已停用」处理。
+
 **Stall recovery**: `AvPlayerController` runs an in-memory stall watchdog
 (5s tick / 20s window / ≥1s movement = healthy) that injects a synthetic
 network-class error into the standard recovery ladder (same-URL

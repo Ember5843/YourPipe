@@ -252,12 +252,11 @@ export struct LogPage {
   }
 
   private toggleLogger(): void {
-    const next = this.uiConfig.clone();
-    next.enableLogger = !this.uiConfig.enableLogger;
-    this.uiConfig = next;
-    UIConfig.saveToPreferences(next);
+    // UIConfig 是响应式的（@Observed + @Track）：就地改字段即可，无需 clone。
+    this.uiConfig.enableLogger = !this.uiConfig.enableLogger;
+    UIConfig.saveToPreferences(this.uiConfig);
 
-    if (next.enableLogger) {
+    if (this.uiConfig.enableLogger) {
       AppLogStore.startListening();
     } else {
       AppLogStore.stopListening();

@@ -45,6 +45,15 @@ export class AvSessionManager {
   public onStopCommand: (() => void) | undefined = undefined;
 
   /**
+   * 音频会话当前是否处于激活态。
+   * 诊断用：会话已停用时若系统又发了焦点暂停/恢复，播放会静默卡住
+   * （「暂停恢复后无声」的一类成因），需要和引擎状态放在一起看。
+   */
+  isSessionActive(): boolean {
+    return this.audioSessionActivated;
+  }
+
+  /**
    * Unified audio-focus entry for the player controller (scheme A).
    * AvSessionManager only forwards system hints; policy lives in AvPlayerController.
    * Stable log tag for filtering: [AudioFocus]
@@ -485,7 +494,10 @@ export class AvSessionManager {
       this.audioSessionManager.deactivateAudioSession().then(() => {
         Logger.info(TAG, '[AudioFocus] sessionDeactivated reason=user_or_controller');
       }).catch((e: BusinessError) => {
-        Logger.error(TAG, `[AudioFocus] deactivate failed code=${e.code} message=${e.message}`);
+        // 收到系统 STOP 时系统**已经**停用了音频会话，这时再调 deactivate
+        // 会报 6800301（Deactivate audio session fail）——不是我们的错误，
+        // 降级为 WARN：本地状态照样按「已停用」处理。
+        Logger.warn(TAG, `[AudioFocus] deactivate skipped code=${e.code} message=${e.message}`);
       });
       this.audioSessionActivated = false;
     }

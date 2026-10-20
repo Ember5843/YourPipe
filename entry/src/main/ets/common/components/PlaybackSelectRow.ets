@@ -57,6 +57,12 @@ export struct PlaybackSelectRow {
         .optionFont({ size: 14 })
         .backgroundColor(Color.Transparent)
         .onSelect((index: number) => {
+          // 父级改了 selectedIndex（预设套用 / 组合回推）也会触发 onSelect。
+          // 用户主动选择时 index 与当前 prop 不等；程序化回写时两者相等——
+          // 后者必须忽略，否则设置页会形成 回写→回调→再回写 的回路。
+          if (index === this.selectedIndex) {
+            return;
+          }
           if (this.onChange) {
             this.onChange(index);
           }

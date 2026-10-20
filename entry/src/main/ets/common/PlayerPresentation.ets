@@ -36,6 +36,9 @@ export class PlayerPresentation {
       PlayerPresentation.enter(PresentationMode.PIP, 'ability-fg-pip');
       return;
     }
+    // 注意：这里**不**做任何音频焦点相关的动作。系统收回焦点（STOP）后，只有
+    // 系统的 RESUME 提示或用户主动按播放才允许恢复；自行 activateAudioSession
+    // 会抢走正在放音的其它应用的焦点。
     PlayerPresentation.enter(PresentationMode.PAGE, 'ability-fg');
   }
 

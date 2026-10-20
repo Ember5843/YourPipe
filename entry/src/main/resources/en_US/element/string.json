@@ -2113,6 +2113,10 @@
             "value": "Failed to parse video info"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "Endpoint: %s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "Unable to fetch video playback data"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "Show / hide controls"
+            "value": "Shows the controls (auto-hide after 3 s)"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "Classic Bilibili"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "Download timed out"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "Retry failed, please try again later"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "Retrying…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "Download timeout"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "No timeout"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d min"
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "Stop playback"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "Connection status"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "Disabled"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "Connected (local bridge %d)"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "Connected (direct to upstream)"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "Bridge disconnected, re-apply required"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "Apply failed"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "Re-apply and restart"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "Proxy re-applied"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "Example: for HTTP enter 127.0.0.1 and the port (e.g. 7890); SOCKS5 is the same. With a username/password the traffic goes through a local bridge, which fails visibly instead of falling back to direct."
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "Center play button"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "Shows a large play button in the middle of the frame while paused. Turn it off to keep the frame clean and control playback by tapping or the bottom bar."
         }
     ]
 }

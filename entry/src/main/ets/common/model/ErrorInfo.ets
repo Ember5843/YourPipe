@@ -8,6 +8,12 @@ export interface ErrorInfoOptions {
   openInBrowserUrl?: string;
   actionHint?: string | Resource;
   exception?: Error;
+  /**
+   * The YouTube extraction endpoint that was in effect when the error happened
+   * (PipePipe ErrorActivity.getEndpoint). Shown so a failed playback can be
+   * attributed to a specific client before the user changes it.
+   */
+  endpoint?: string;
 }
 
 export class ErrorInfo {
@@ -29,6 +35,9 @@ export class ErrorInfo {
   /** 原始异常对象（可选，用于调试和报告） */
   exception?: Error;
 
+  /** 失败时使用的 YouTube 提取端点（可选，用于自诊断） */
+  endpoint?: string;
+
   constructor(
     errorCode: string,
     message: string | Resource,
@@ -40,6 +49,7 @@ export class ErrorInfo {
     this.openInBrowserUrl = options?.openInBrowserUrl;
     this.actionHint = options?.actionHint;
     this.exception = options?.exception;
+    this.endpoint = options?.endpoint;
   }
 
   /**

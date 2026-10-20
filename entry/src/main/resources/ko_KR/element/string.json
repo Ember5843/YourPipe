@@ -1129,6 +1129,10 @@
             "value": "동영상 정보 파싱 실패"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "현재 에니드포인트: %s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "동영상 재생 데이터를 가져올 수 없습니다"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "컨트롤 표시 / 숨기기"
+            "value": "컨트롤 표시 (3초 후 자동 숨김)"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "클래식 Bilibili"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "다운로드 시간이 초과되었습니다"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "다시 시도하지 못했습니다. 잠시 후 다시 시도하세요"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "다시 시도 중…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "다운로드 시간 초과"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "시간 초과 없음"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d분"
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "재생 중지"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "연결 상태"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "사용 안 함"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "연결됨 (로컬 브리지 %d)"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "연결됨 (상류 직접 연결)"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "브리지 연결이 끊어져 다시 적용해야 합니다"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "적용 실패"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "다시 적용하고 다시 시작"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "프록시를 다시 적용했습니다"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "예: HTTP는 127.0.0.1과 포트(예: 7890)를 입력하세요. SOCKS5도 동일합니다. 아이디/비밀번호를 넣으면 로컬 브리지를 거치며, 브리지가 실패해도 직결로 fallback 하지 않습니다."
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "중앙 재생 버튼"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "일시정지 중 화면 중앙에 큰 재생 버튼을 표시합니다. 끄면 화면 중앙이 그대로 유지되며 화면 탭이나 하단 바로 제어합니다."
         }
     ]
 }

@@ -1349,6 +1349,10 @@
             "value": "Video-Info-Aufschlüsselung fehlgeschlagen"
         },
         {
+            "name": "yt_error_endpoint_hint",
+            "value": "Endpunkt: %s"
+        },
+        {
             "name": "yt_error_extraction_failed_hint",
             "value": "Video-Wiedergabedaten konnten nicht abgerufen werden"
         },
@@ -3410,7 +3414,7 @@
         },
         {
             "name": "yt_gesture_help_single_tap_value",
-            "value": "Steuerung ein-/ausblenden"
+            "value": "Zeigt die Bedienelemente (Blendet nach 3 s automatisch aus)"
         },
         {
             "name": "yt_gesture_help_swipe_horizontal",
@@ -3488,6 +3492,78 @@
         {
             "name": "yt_gesture_scheme_bilibili",
             "value": "Klassisches Bilibili"
+        },
+        {
+            "name": "yt_download_timeout_failed",
+            "value": "Zeitüberschreitung beim Download"
+        },
+        {
+            "name": "yt_download_retry_failed",
+            "value": "Wiederholung fehlgeschlagen, bitte später erneut versuchen"
+        },
+        {
+            "name": "yt_download_retrying",
+            "value": "Neuer Versuch…"
+        },
+        {
+            "name": "yt_download_timeout_title",
+            "value": "Zeitüberschreitung beim Download"
+        },
+        {
+            "name": "yt_download_timeout_off",
+            "value": "Kein Zeitlimit"
+        },
+        {
+            "name": "yt_download_timeout_minutes",
+            "value": "%d Min."
+        },
+        {
+            "name": "yt_player_stop_playback",
+            "value": "Wiedergabe beenden"
+        },
+        {
+            "name": "yt_proxy_status_title",
+            "value": "Verbindungsstatus"
+        },
+        {
+            "name": "yt_proxy_status_off",
+            "value": "Deaktiviert"
+        },
+        {
+            "name": "yt_proxy_status_ready",
+            "value": "Verbunden (lokale Bridge %d)"
+        },
+        {
+            "name": "yt_proxy_status_direct",
+            "value": "Verbunden (direkt zum Upstream)"
+        },
+        {
+            "name": "yt_proxy_status_fuse",
+            "value": "Bridge getrennt, erneutes Anwenden nötig"
+        },
+        {
+            "name": "yt_proxy_status_failed",
+            "value": "Anwenden fehlgeschlagen"
+        },
+        {
+            "name": "yt_proxy_restart",
+            "value": "Erneut anwenden und neu starten"
+        },
+        {
+            "name": "yt_proxy_restart_done",
+            "value": "Proxy erneut angewendet"
+        },
+        {
+            "name": "yt_proxy_example_hint",
+            "value": "Beispiel: bei HTTP 127.0.0.1 und Port (z. B. 7890) eintragen; SOCKS5 genauso. Mit Benutzername/Passwort läuft der Verkehr über eine lokale Bridge, die sichtbar fehlschlägt statt direkt zu fallen."
+        },
+        {
+            "name": "yt_playback_center_play_button",
+            "value": "Wiedergabe-Taste in der Mitte"
+        },
+        {
+            "name": "yt_playback_center_play_button_subtitle",
+            "value": "Zeigt während der Pause eine große Wiedergabe-Taste in der Bildmitte. Ausgeschaltet bleibt das Bild frei; Steuerung über Tippen oder die untere Leiste."
         }
     ]
 }
