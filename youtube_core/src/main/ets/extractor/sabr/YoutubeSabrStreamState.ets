@@ -236,6 +236,12 @@ export class YoutubeSabrStreamState {
   private selectVideoFormat: boolean = true;
   private writeTopLevelPlayerTimeMs: boolean = true;
   private playbackRate: number = 1.0;
+  /**
+   * Measured downlink throughput in bits/s (PipePipe updateBandwidthEstimate).
+   * -1 = not measured yet; the UMP request then falls back to the static
+   * bitrate estimate (PipePipe activeBitrateEstimate).
+   */
+  private bandwidthEstimateBps: number = -1;
 
   constructor(audioFormat: YoutubeSabrFormatMeta, videoFormat: YoutubeSabrFormatMeta,
     epoch: SabrServerEpoch) {
@@ -282,6 +288,20 @@ export class YoutubeSabrStreamState {
   ingestSegment(segment: SabrMediaSegment): boolean {
     const progress = this.findProgressForItag(segment.header.itag);
     return progress ? progress.observeSegment(segment) : false;
+  }
+
+  /**
+   * Deliver the format initialization metadata as soon as its UMP part shows
+   * up. The metadata carries the index range the init segment's SIDX parse
+   * needs, so in the streaming path it must be known BEFORE the init segment
+   * arrives — waiting for the end of the response would drop the segment
+   * index and fall back to the duration/count estimate.
+   */
+  observeFormatInitMeta(meta: SabrFormatInitMeta): void {
+    const progress = this.findProgressForItag(meta.itag);
+    if (progress) {
+      progress.observeMetadata(meta);
+    }
   }
 
   private ingestContextUpdate(update: SabrContextUpdate): void {
@@ -425,6 +445,33 @@ export class YoutubeSabrStreamState {
     return this.playbackRate;
   }
 
+  /**
+   * Last measured downlink throughput in bits/s, or -1 when nothing was measured yet.
+   * PipePipe YoutubeSabrSession.getBandwidthEstimate — the UMP request prefers this
+   * over the static bitrate estimate so the server can pick a matching ABR level.
+   */
+  getBandwidthEstimateBps(): number {
+    return this.bandwidthEstimateBps;
+  }
+
+  /**
+   * Fold one measured response into the bandwidth estimate.
+   * PipePipe updateBandwidthEstimate: sample = bytes*8000/elapsedMs (bits/s),
+   * smoothed as (estimate*3 + sample)/4 so one slow response cannot collapse the hint.
+   */
+  updateBandwidthEstimate(responseBytes: number, elapsedMs: number): void {
+    if (responseBytes <= 0 || elapsedMs <= 0) {
+      return;
+    }
+    const sample = Math.floor((responseBytes * 8000) / elapsedMs);
+    if (sample <= 0) {
+      return;
+    }
+    this.bandwidthEstimateBps = this.bandwidthEstimateBps <= 0
+      ? sample
+      : Math.floor((this.bandwidthEstimateBps * 3 + sample) / 4);
+  }
+
   // DORMANT: 全仓零调用——倍速不下发到 UMP 请求（builder 读到的恒为 1.0）；
   // 启用条件：对齐 PipePipe 倍速行为后由播放引擎接线调用。
   setPlaybackRate(rate: number): void {
@@ -459,9 +506,19 @@ export class YoutubeSabrStreamState {
   }
 
   getUnsentSabrContextTypes(): number[] {
-    // PipePipe echoes types that server asked but are not yet in active set.
-    // MVP: empty (contexts with sendByDefault already active).
-    return [];
+    // PipePipe getUnsentSabrContextTypes: the context types the server sent that
+    // are not in the active set yet. They are echoed in streamerContext field 6
+    // so the server knows the client is holding them — without that the server
+    // cannot tell whether the context was received, and a later
+    // SABR_CONTEXT_SENDING_POLICY (activate) would never turn it into an
+    // echoed context.
+    const unsent: number[] = [];
+    this.epoch.sabrContexts.forEach((_value: SabrContextUpdate, type: number) => {
+      if (!this.epoch.activeSabrContextTypes.has(type)) {
+        unsent.push(type);
+      }
+    });
+    return unsent;
   }
 
   prepareForSeek(targetMs: number): void {

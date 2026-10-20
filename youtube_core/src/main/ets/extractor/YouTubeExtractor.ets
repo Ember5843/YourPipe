@@ -1055,7 +1055,9 @@ export class YouTubeExtractor implements CommentsBackend {
         initRangeStart: initStart,
         initRangeEnd: initEnd,
         contentLength: contentLength,
-        approxDurationMs: approxDurationMs
+        approxDurationMs: approxDurationMs,
+        // PipePipe parseSabrFormats: formatData.getBoolean("isDrc", false).
+        drc: fmt.isDrc === true
       };
       out.push(meta);
     }

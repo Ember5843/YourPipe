@@ -62,7 +62,7 @@ export class BuiltinSabrSessionPolicy implements SabrSessionPolicy {
         `SABR reload requested, reload budget exhausted: ${decoded.summarizeNoMediaResponse()}`));
       return reloadActions;
     }
-    if (decoded.segments.length > 0) {
+    if (decoded.segmentCount > 0) {
       actions.push(SabrControlAction.continue());
       return actions;
     }

@@ -3,10 +3,11 @@ import { http } from '@kit.NetworkKit';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 import { HttpAbortToken, HttpError } from '../../network/HttpDownloader';
 import { ClientsConstants } from '../../model/ClientsConstants';
-import { SabrDecodedResponse } from './SabrDecodedResponse';
+import { SabrDecodedResponse, SabrFormatInitMeta } from './SabrDecodedResponse';
 import { SabrMediaSegment, SabrSegmentRequest } from './SabrMediaSegment';
 import { SabrProtocolException } from './SabrProtocolException';
-import { isRecoverableIntegrityIssues, requireUmpContentType, sabrDecodeBody } from './SabrResponseDecoder';
+import { isRecoverableIntegrityIssues, requireUmpContentType, SabrPartProcessor } from './SabrResponseDecoder';
+import { UmpStreamReader } from './UmpStreamReader';
 import { SabrInfoReloader } from './SabrInfoReloader';
 import { SabrPoTokenProvider } from './SabrPoTokenProvider';
 import { SabrServerEpoch } from './SabrServerEpoch';
@@ -456,6 +457,8 @@ export class YoutubeSabrSession {
     // ingested — recoverable issues retry the POST (budget
     // MAX_INCOMPLETE_MEDIA_RESPONSES), anything else is fatal.
     let decoded: SabrDecodedResponse | undefined = undefined;
+    /** Sequence numbers of the segments delivered by the accepted response. */
+    const deliveredSeq = new Map<number, number[]>();
     while (true) {
       const isFirst = this.epoch.requestNumber === 0
         && !this.streamState.isInitialized(this.audioFormat)
@@ -481,8 +484,48 @@ export class YoutubeSabrSession {
       const abortToken = new HttpAbortToken();
       this.activePostAbort = abortToken;
       let response: http.HttpResponse;
+      const postStartedMs = Date.now();
+      let receivedBytes = 0;
+      // PipePipe SabrStreamingResponseReader: the UMP reply is decoded while it
+      // downloads. A completed segment is handed to the segment cache right
+      // away, so the player can start on the first segment instead of waiting
+      // for the whole response — and a 4K reply is never held in memory.
+      const reader = new UmpStreamReader();
+      deliveredSeq.clear();
+      let firstSegmentLogged = false;
+      const processor = new SabrPartProcessor(
+        (segment: SabrMediaSegment) => {
+          this.ingestAndCacheSegment(segment);
+          if (!segment.header.initSegment && segment.header.sequenceNumber >= 0) {
+            const values = deliveredSeq.get(segment.header.itag) ?? [];
+            values.push(segment.header.sequenceNumber);
+            deliveredSeq.set(segment.header.itag, values);
+          }
+          if (!segment.header.initSegment && !firstSegmentLogged) {
+            firstSegmentLogged = true;
+            // Streaming TTFF marker: the first MEDIA segment reached the cache
+            // this many ms after the POST started — the response itself is still
+            // downloading. Compare with the "[SABR] response status=…" line to
+            // see how much earlier playback can start. The init segment is not
+            // counted: it is metadata, not playable media.
+            logger.info(`[SABR] first segment delivered +${Date.now() - postStartedMs}ms `
+              + `itag=${segment.header.itag} seq=${segment.header.sequenceNumber} `
+              + `bytes=${segment.getLength()}`);
+          }
+        },
+        (meta: SabrFormatInitMeta) => { this.streamState.observeFormatInitMeta(meta); }
+      );
       try {
-        response = await this.postBinaryWithNetworkRetry(url, body, headers, abortToken);
+        response = await this.postBinaryWithNetworkRetry(url, body, headers, abortToken,
+          (chunk: Uint8Array) => {
+            receivedBytes += chunk.length;
+            reader.push(chunk);
+            let part = reader.nextPart();
+            while (part !== undefined) {
+              processor.acceptPart(part);
+              part = reader.nextPart();
+            }
+          });
       } finally {
         if (this.activePostAbort === abortToken) {
           this.activePostAbort = undefined;
@@ -492,13 +535,20 @@ export class YoutubeSabrSession {
       const contentType = extractContentType(response.header);
       requireUmpContentType(contentType, status);
 
-      const bodyBytes = toUint8Array(response.result);
-      logger.info(`[SABR] response status=${status} bytes=${bodyBytes.length} ct=${contentType}`);
+      // Truncated reply: the last part never completed. Treat it as a
+      // recoverable incomplete-media response so the re-POST below asks the
+      // server for a clean batch.
+      const trailingBytes = reader.pendingBytes();
+      this.streamState.updateBandwidthEstimate(receivedBytes, Date.now() - postStartedMs);
+      logger.info(`[SABR] response status=${status} bytes=${receivedBytes} ct=${contentType} `
+        + `trailing=${trailingBytes}`);
 
-      const attemptDecoded = sabrDecodeBody(bodyBytes);
+      const attemptDecoded = processor.finish();
       this.epoch.requestNumber++;
 
-      const issues = attemptDecoded.integrityIssues;
+      const issues = trailingBytes > 0
+        ? attemptDecoded.integrityIssues.concat([`truncated-ump-response:${trailingBytes}`])
+        : attemptDecoded.integrityIssues;
       if (issues.length === 0) {
         this.consecutiveIntegrityFailures = 0;
         decoded = attemptDecoded;
@@ -569,12 +619,11 @@ export class YoutubeSabrSession {
     // server backoff above the limit is fatal — media must not silently
     // discard a cooldown the server attached to it.
     this.applyServerBackoff(decoded.backoffTimeMs);
-    for (const segment of decoded.segments) {
-      this.ingestAndCacheSegment(segment);
-    }
+    // The media segments were already handed to the segment cache while the
+    // response streamed in (PipePipe streaming parity) — nothing to re-ingest.
     this.evictCacheIfNeeded();
 
-    if (decoded.segments.length > 0) {
+    if (decoded.segmentCount > 0) {
       this.epoch.redirectCount = 0;
       this.epoch.poTokenRefreshes = 0;
       // PipePipe handleControlResponse resets BOTH episode counters when media
@@ -636,9 +685,9 @@ export class YoutubeSabrSession {
       }
     }
 
-    logger.info(`[SABR] pump segments=${decoded.segments.length} `
+    logger.info(`[SABR] pump segments=${decoded.segmentCount} `
       + `cache=${this.segmentCache.size}/${this.cachedBytes} `
-      + `seq=${summarizeSegmentSequences(decoded)} `
+      + `seq=${summarizeSequenceMap(deliveredSeq)} `
       + `protection=${decoded.streamProtectionStatus} `
       + `policy=${decoded.nextRequestPolicy?.summarize() || 'none'} `
       + `reload=${decoded.reloadRequested} seek=${decoded.sabrSeekReason} `
@@ -658,7 +707,8 @@ export class YoutubeSabrSession {
    * controller's recovery ladder) instead of hanging the read forever.
    */
   private async postBinaryWithNetworkRetry(url: string, body: Uint8Array,
-    headers: Record<string, string[] | string>, abortToken: HttpAbortToken): Promise<http.HttpResponse> {
+    headers: Record<string, string[] | string>, abortToken: HttpAbortToken,
+    onChunk?: (chunk: Uint8Array) => void): Promise<http.HttpResponse> {
     const deadline = Date.now() + NETWORK_RETRY_BUDGET_MS;
     let attempt = 0;
     let dnsRetries = 0;
@@ -674,8 +724,11 @@ export class YoutubeSabrSession {
       try {
         // Inner downloader retry disabled: this method owns the retry policy so
         // DNS retries + host rotation are not stacked on the downloader's 3x loop.
-        return await this.httpClient.postBinary(postUrl, body, headers, this.useAuth,
-          (bytes: number) => networkTrafficSink?.(bytes), abortToken, false);
+        return onChunk
+          ? await this.httpClient.postBinaryStreaming(postUrl, body, headers, this.useAuth,
+            onChunk, (bytes: number) => networkTrafficSink?.(bytes), abortToken, false)
+          : await this.httpClient.postBinary(postUrl, body, headers, this.useAuth,
+            (bytes: number) => networkTrafficSink?.(bytes), abortToken, false);
       } catch (e) {
         if (this.closed) {
           throw new SabrProtocolException('SABR session closed', 'closed');
@@ -1129,16 +1182,8 @@ export class YoutubeSabrSession {
   }
 }
 
-function summarizeSegmentSequences(decoded: SabrDecodedResponse): string {
-  const byItag: Map<number, number[]> = new Map();
-  for (const segment of decoded.segments) {
-    if (segment.header.initSegment || segment.header.sequenceNumber < 0) {
-      continue;
-    }
-    const values = byItag.get(segment.header.itag) ?? [];
-    values.push(segment.header.sequenceNumber);
-    byItag.set(segment.header.itag, values);
-  }
+/** Per-itag sequence summary of the segments delivered by one response. */
+function summarizeSequenceMap(byItag: Map<number, number[]>): string {
   const groups: string[] = [];
   byItag.forEach((values: number[], itag: number) => {
     values.sort((a: number, b: number): number => a - b);
@@ -1184,29 +1229,6 @@ function replaceHostInUrl(url: string, newHost: string): string {
     return url;
   }
   return `${match[1]}${newHost}${match[3]}`;
-}
-
-function toUint8Array(result: Object | string | ArrayBuffer | undefined): Uint8Array {
-  if (!result) {
-    return new Uint8Array(0);
-  }
-  if (result instanceof ArrayBuffer) {
-    return new Uint8Array(result);
-  }
-  if (typeof result === 'string') {
-    // Treat as binary string
-    const out = new Uint8Array(result.length);
-    for (let i = 0; i < result.length; i++) {
-      out[i] = result.charCodeAt(i) & 0xff;
-    }
-    return out;
-  }
-  // Uint8Array-like
-  const maybe = result as Uint8Array;
-  if (maybe && maybe.buffer && typeof maybe.length === 'number') {
-    return new Uint8Array(maybe.buffer, maybe.byteOffset, maybe.byteLength);
-  }
-  return new Uint8Array(0);
 }
 
 function extractContentType(header: Object | undefined): string | undefined {

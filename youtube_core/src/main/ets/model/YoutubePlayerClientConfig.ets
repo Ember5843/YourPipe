@@ -23,6 +23,10 @@ export class YoutubePlayerClientConfig {
   // True once setYoutubePlayerClient pins a client explicitly; applyAuthDefault
   // must not clobber a manual selection on every extraction attempt.
   private static explicitOverride: boolean = false;
+  // One-shot extraction override (SABR → token-free direct fallback). It does
+  // NOT touch `explicitOverride`: the user's configured client stays the truth
+  // and the override is cleared as soon as the fallback attempt finished.
+  private static extractionOverride?: YoutubePlayerClientKey;
 
   private constructor() {}
 
@@ -41,7 +45,21 @@ export class YoutubePlayerClientConfig {
   }
 
   static getYoutubePlayerClient(): YoutubePlayerClientKey {
-    return YoutubePlayerClientConfig.selected;
+    return YoutubePlayerClientConfig.extractionOverride ?? YoutubePlayerClientConfig.selected;
+  }
+
+  /**
+   * One-shot extraction override (entry's SABR → tv_downgraded endpoint
+   * fallback). The override applies to the next extraction only and never
+   * changes the configured per-state client, so the user's setting stays the
+   * source of truth.
+   */
+  static setExtractionClientOverride(client: YoutubePlayerClientKey): void {
+    YoutubePlayerClientConfig.extractionOverride = client;
+  }
+
+  static clearExtractionClientOverride(): void {
+    YoutubePlayerClientConfig.extractionOverride = undefined;
   }
 
   /**

@@ -34,6 +34,14 @@ export { SabrMediaSegment, SabrSegmentRequest } from './src/main/ets/extractor/s
 export { SabrInfoReloader } from './src/main/ets/extractor/sabr/SabrInfoReloader';
 export { SabrPoTokenProvider } from './src/main/ets/extractor/sabr/SabrPoTokenProvider';
 export { SabrProtocolException } from './src/main/ets/extractor/sabr/SabrProtocolException';
+export { UmpStreamReader } from './src/main/ets/extractor/sabr/UmpStreamReader';
+export { UmpPart, umpReadAll } from './src/main/ets/extractor/sabr/UmpReader';
+export {
+  SabrPartProcessor,
+  sabrDecodeBody,
+  sabrDecodeParts,
+  isRecoverableIntegrityIssues
+} from './src/main/ets/extractor/sabr/SabrResponseDecoder';
 export { SessionIdentityManager, SessionPoTokenHook } from './src/main/ets/extractor/identity/SessionIdentityManager';
 
 // ── cipher ──

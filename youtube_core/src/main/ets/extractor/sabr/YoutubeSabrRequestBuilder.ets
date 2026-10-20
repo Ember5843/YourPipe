@@ -105,16 +105,30 @@ export class YoutubeSabrRequestBuilder {
     }
     state.writeInt32(21, Math.max(videoFormat.height ?? 0, 360));
     if (includeFollowUpState) {
-      const audioBr = audioFormat.bitrate ?? 0;
-      const videoBr = videoFormat.bitrate ?? 0;
-      if (audioBr > 0 && videoBr > 0) {
-        state.writeUInt64(23, (audioBr + videoBr) * 2);
+      // PipePipe buildClientAbrState: the measured downlink throughput wins over
+      // the static bitrate sum, so the server can pick a matching ABR level.
+      // Fallback (PipePipe activeBitrateEstimate) needs every selected track's
+      // bitrate, otherwise no estimate is sent.
+      const measured = streamState ? streamState.getBandwidthEstimateBps() : -1;
+      if (measured > 0) {
+        state.writeUInt64(23, measured);
+      } else {
+        const audioBr = audioFormat.bitrate ?? 0;
+        const videoBr = videoFormat.bitrate ?? 0;
+        if (audioBr > 0 && videoBr > 0) {
+          state.writeUInt64(23, (audioBr + videoBr) * 2);
+        }
       }
     }
     state.writeInt32(34, 1);
     state.writeFloat(35, streamState ? streamState.getPlaybackRate() : 1.0);
     if (enabledTrackTypesBitfield !== SABR_TRACK_BOTH) {
       state.writeInt32(40, enabledTrackTypesBitfield);
+    }
+    // PipePipe buildClientAbrState: tell the server the selected audio track is a
+    // DRC (dynamic range control) rendition so it does not re-send the plain one.
+    if (audioFormat.drc) {
+      state.writeBool(46, true);
     }
     state.writeUInt64(28, playerTimeMs);
     if (audioFormat.audioTrackId) {

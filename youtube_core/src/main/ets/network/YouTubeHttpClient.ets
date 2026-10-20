@@ -178,11 +178,45 @@ export class YouTubeHttpClient implements ClientVersionGet {
     abortToken?: HttpAbortToken,
     enableRetry: boolean = true
   ): Promise<http.HttpResponse> {
+    return this.postBinaryInner(
+      url, data, customHeaders, withAuth, onData, abortToken, enableRetry, undefined, false);
+  }
+
+  /**
+   * Binary POST whose response body is delivered chunk-by-chunk to `onChunk`
+   * and never buffered (PipePipe postStreaming parity). The returned response
+   * carries status/headers only.
+   */
+  async postBinaryStreaming(
+    url: string,
+    data: Uint8Array,
+    customHeaders?: Record<string, string | string[]>,
+    withAuth: boolean = false,
+    onChunk?: (chunk: Uint8Array) => void,
+    onData?: (bytes: number) => void,
+    abortToken?: HttpAbortToken,
+    enableRetry: boolean = true
+  ): Promise<http.HttpResponse> {
+    return this.postBinaryInner(
+      url, data, customHeaders, withAuth, onData, abortToken, enableRetry, onChunk, true);
+  }
+
+  private async postBinaryInner(
+    url: string,
+    data: Uint8Array,
+    customHeaders?: Record<string, string | string[]>,
+    withAuth: boolean = false,
+    onData?: (bytes: number) => void,
+    abortToken?: HttpAbortToken,
+    enableRetry: boolean = true,
+    onChunk?: (chunk: Uint8Array) => void,
+    streaming: boolean = false
+  ): Promise<http.HttpResponse> {
     const requestId = YouTubeHttpClient.nextRequestId();
     const target = YouTubeHttpClient.safeRequestTarget(url);
     const startedAt = Date.now();
     logger.info(`[NET] id=${requestId} phase=start method=POST_BINARY target=${target} `
-      + `webAuth=${withAuth} bytes=${data.length}`);
+      + `webAuth=${withAuth} bytes=${data.length} streaming=${streaming}`);
     // Minimal cookie/auth only — SABR googlevideo rejects wrong browser/API defaults.
     const headers: Record<string, string | string[]> = {};
     if (customHeaders) {
@@ -196,8 +230,11 @@ export class YouTubeHttpClient implements ClientVersionGet {
       await this.injectWebAuthHeaders(headers);
     }
     try {
-      const response = await this.downloader.postBinary(url, data, headers, this.localization,
-        enableRetry, onData, abortToken);
+      const response = streaming
+        ? await this.downloader.postBinaryStreaming(url, data, headers, this.localization,
+          enableRetry, onChunk, onData, abortToken)
+        : await this.downloader.postBinary(url, data, headers, this.localization,
+          enableRetry, onData, abortToken);
       this.saveCookiesFromResponse(response, url);
       logger.info(`[NET] id=${requestId} phase=complete method=POST_BINARY target=${target} status=${response.responseCode} elapsed=${Date.now() - startedAt}ms`);
       return response;

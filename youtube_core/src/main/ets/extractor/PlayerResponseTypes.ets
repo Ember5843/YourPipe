@@ -185,6 +185,11 @@ export interface Format {
   audioTrack?: AudioTrackInfo;
   /** SABR / adaptiveFormat opaque tags (e.g. audio track type). */
   xtags?: string;
+  /**
+   * True for a dynamic-range-control audio rendition (PipePipe `isDrc`).
+   * The UMP request advertises it so the server serves the DRC track.
+   */
+  isDrc?: boolean;
 }
 
 export interface AudioTrackInfo {

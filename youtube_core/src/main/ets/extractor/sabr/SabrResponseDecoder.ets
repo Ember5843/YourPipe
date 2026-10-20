@@ -50,7 +50,8 @@ class FormatByteRange {
 
 /**
  * Decode buffered UMP body into control fields + assembled media segments.
- * MVP: whole-body path (acceptable for lower resolutions; stream later for 4K).
+ * Whole-body path — kept for the offline downloader and tests. The playback
+ * path uses {@link SabrPartProcessor} over a streamed response instead.
  */
 export function sabrDecodeBody(data: Uint8Array): SabrDecodedResponse {
   const parts = umpReadAll(data);
@@ -58,27 +59,67 @@ export function sabrDecodeBody(data: Uint8Array): SabrDecodedResponse {
 }
 
 export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
-  const decoded = new SabrDecodedResponse();
-  const open = new Map<number, OpenMediaAssembly>();
-  /** Bytes per headerId across ALL media parts (PipePipe mediaBytesByHeaderId). */
-  const mediaBytesByHeaderId = new Map<number, number>();
-
+  const processor = new SabrPartProcessor();
   for (const part of parts) {
+    processor.acceptPart(part);
+  }
+  return processor.finish();
+}
+
+/**
+ * Incremental UMP part processor (PipePipe SabrStreamingResponseReader parity).
+ *
+ * <p>Parts are fed one at a time as the response arrives. Control parts are
+ * decoded into the {@link SabrDecodedResponse}; media parts are assembled into
+ * a segment and handed to {@code segmentSink} the moment the segment is
+ * complete, so the player can start on the first segment instead of waiting
+ * for the whole response.
+ *
+ * <p>Two invariants are preserved from the buffered path:
+ * <ul>
+ *   <li>a segment whose byte count disagrees with its header's contentLength
+ *       is never delivered — the response-level integrity check then re-POSTs
+ *       for a clean batch (a truncated segment must not reach the player);</li>
+ *   <li>the media byte accounting is kept per header id, so the integrity
+ *       check reports the same issues as the buffered decoder.</li>
+ * </ul>
+ */
+export class SabrPartProcessor {
+  private decoded: SabrDecodedResponse = new SabrDecodedResponse();
+  private open: Map<number, OpenMediaAssembly> = new Map();
+  /** Bytes per headerId across ALL media parts (PipePipe mediaBytesByHeaderId). */
+  private mediaBytesByHeaderId: Map<number, number> = new Map();
+  private segmentSink?: (segment: SabrMediaSegment) => void;
+  private formatMetaSink?: (meta: SabrFormatInitMeta) => void;
+  /** Segments retained only when no sink is attached. */
+  private retainedSegments: SabrMediaSegment[] = [];
+  private segmentCountValue: number = 0;
+
+  constructor(
+    segmentSink?: (segment: SabrMediaSegment) => void,
+    formatMetaSink?: (meta: SabrFormatInitMeta) => void
+  ) {
+    this.segmentSink = segmentSink;
+    this.formatMetaSink = formatMetaSink;
+  }
+
+  /** Process one UMP part. Never throws — a malformed part is logged and skipped. */
+  acceptPart(part: UmpPart): void {
     try {
       switch (part.type) {
         case PART_MEDIA_HEADER: {
           const header = SabrMediaHeader.decode(part.data);
-          decoded.mediaHeaders.push(header);
-          open.set(header.headerId, new OpenMediaAssembly(header));
+          this.decoded.mediaHeaders.push(header);
+          this.open.set(header.headerId, new OpenMediaAssembly(header));
           break;
         }
         case PART_MEDIA: {
           if (part.data.length > 0) {
             const headerId = part.data[0];
             const media = part.data.subarray(1);
-            mediaBytesByHeaderId.set(headerId,
-              (mediaBytesByHeaderId.get(headerId) ?? 0) + media.length);
-            const entry = open.get(headerId);
+            this.mediaBytesByHeaderId.set(headerId,
+              (this.mediaBytesByHeaderId.get(headerId) ?? 0) + media.length);
+            const entry = this.open.get(headerId);
             if (entry) {
               entry.chunks.push(media);
             }
@@ -88,61 +129,66 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
         case PART_MEDIA_END: {
           if (part.data.length > 0) {
             const headerId = part.data[0];
-            decoded.mediaEndHeaderIds.push(headerId);
-            const entry = open.get(headerId);
+            this.decoded.mediaEndHeaderIds.push(headerId);
+            const entry = this.open.get(headerId);
             if (entry) {
               const segmentData = concatChunks(entry.chunks);
-              decoded.segments.push(new SabrMediaSegment(entry.header, segmentData));
-              open.delete(headerId);
+              this.open.delete(headerId);
+              this.deliverSegment(new SabrMediaSegment(entry.header, segmentData));
             }
           }
           break;
         }
         case PART_NEXT_REQUEST_POLICY: {
           const policy = decodeNextRequestPolicy(part.data);
-          decoded.nextRequestPolicy = policy;
+          this.decoded.nextRequestPolicy = policy;
           if (policy.backoffTimeMs > 0) {
-            decoded.backoffTimeMs = policy.backoffTimeMs;
+            this.decoded.backoffTimeMs = policy.backoffTimeMs;
           }
           break;
         }
         case PART_SABR_REDIRECT: {
           const redirect = decodeRedirect(part.data);
-          decoded.redirectUrl = redirect.url;
+          this.decoded.redirectUrl = redirect.url;
           break;
         }
         case PART_SABR_ERROR: {
-          decoded.sabrError = summarizeOpaque(part.data, 'error');
+          this.decoded.sabrError = summarizeOpaque(part.data, 'error');
           break;
         }
         case PART_RELOAD_PLAYER_RESPONSE: {
-          decoded.reloadRequested = true;
-          decoded.reloadToken = decodeReloadToken(part.data);
+          this.decoded.reloadRequested = true;
+          this.decoded.reloadToken = decodeReloadToken(part.data);
           break;
         }
         case PART_STREAM_PROTECTION_STATUS: {
           const prot = decodeStreamProtection(part.data);
-          decoded.streamProtectionStatus = prot.status;
-          decoded.streamProtectionMaxRetries = prot.maxRetries;
+          this.decoded.streamProtectionStatus = prot.status;
+          this.decoded.streamProtectionMaxRetries = prot.maxRetries;
           break;
         }
         case PART_SABR_CONTEXT_UPDATE: {
-          decoded.sabrContextUpdates.push(decodeContextUpdate(part.data));
+          this.decoded.sabrContextUpdates.push(decodeContextUpdate(part.data));
           break;
         }
         case PART_SABR_CONTEXT_SENDING_POLICY: {
-          decoded.sabrContextSendingPolicy = decodeContextSendingPolicy(part.data);
+          this.decoded.sabrContextSendingPolicy = decodeContextSendingPolicy(part.data);
           break;
         }
         case PART_FORMAT_INITIALIZATION_METADATA: {
-          decoded.formatInitializationMetadata.push(decodeFormatInitMeta(part.data));
+          const meta = decodeFormatInitMeta(part.data);
+          this.decoded.formatInitializationMetadata.push(meta);
+          // The init metadata carries the index range the init segment's SIDX
+          // parse needs, so it must reach the stream state before the init
+          // segment arrives — not when the response ends.
+          this.formatMetaSink?.(meta);
           break;
         }
         case PART_SABR_SEEK: {
           // Minimal handling: decode the reason for diagnostics. We do not execute the
           // server-demanded reposition (PipePipe doesn't either); the response is still
           // counted as no-media by the pump, so repeated seeks hit the existing budgets.
-          decoded.sabrSeekReason = decodeSabrSeekReason(part.data);
+          this.decoded.sabrSeekReason = decodeSabrSeekReason(part.data);
           break;
         }
         default:
@@ -150,7 +196,7 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
             && part.type !== PART_MEDIA_HEADER) {
             // keep quiet for known optional parts
             if (part.type < 10 || part.type > 70) {
-              decoded.unknownPartTypes.push(part.type);
+              this.decoded.unknownPartTypes.push(part.type);
             }
           }
           break;
@@ -160,9 +206,43 @@ export function sabrDecodeParts(parts: UmpPart[]): SabrDecodedResponse {
       logger.warn(`[SABR-DECODE] part=${part.type} decode-failed: ${msg}`);
     }
   }
-  decoded.integrityIssues = computeIntegrityIssues(
-    decoded.mediaHeaders, mediaBytesByHeaderId, decoded.mediaEndHeaderIds);
-  return decoded;
+
+  /** Finalize the response (integrity issues) after the last part arrived. */
+  finish(): SabrDecodedResponse {
+    this.decoded.segmentCount = this.segmentCountValue;
+    if (!this.segmentSink) {
+      this.decoded.segments = this.retainedSegments;
+    }
+    this.decoded.integrityIssues = computeIntegrityIssues(
+      this.decoded.mediaHeaders, this.mediaBytesByHeaderId, this.decoded.mediaEndHeaderIds);
+    return this.decoded;
+  }
+
+  /**
+   * Hand a finished segment to the consumer. A segment shorter (or longer)
+   * than its header announces is withheld: the response-level integrity check
+   * reports the mismatch and the session re-POSTs for a clean batch, so a
+   * truncated segment never reaches the player.
+   */
+  private deliverSegment(segment: SabrMediaSegment): void {
+    const expected = segment.header.contentLength;
+    if (expected >= 0 && segment.getLength() !== expected) {
+      logger.warn(`[SABR-DECODE] withhold incomplete segment itag=${segment.header.itag} `
+        + `seq=${segment.header.sequenceNumber} expected=${expected} actual=${segment.getLength()}`);
+      return;
+    }
+    this.segmentCountValue++;
+    if (this.segmentSink) {
+      try {
+        this.segmentSink(segment);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logger.warn(`[SABR-DECODE] segment sink failed itag=${segment.header.itag}: ${msg}`);
+      }
+      return;
+    }
+    this.retainedSegments.push(segment);
+  }
 }
 
 /** PipePipe YoutubeSabrResponse.getIntegrityIssues. */
@@ -211,7 +291,9 @@ export function isRecoverableIntegrityIssues(issues: string[]): boolean {
       && !issue.startsWith('missing-media-end:')
       && !issue.startsWith('missing-media:')
       && !issue.startsWith('media-without-header:')
-      && !issue.startsWith('media-end-without-header:')) {
+      && !issue.startsWith('media-end-without-header:')
+      // Streaming path: the reply ended in the middle of a UMP part.
+      && !issue.startsWith('truncated-ump-response:')) {
       return false;
     }
   }

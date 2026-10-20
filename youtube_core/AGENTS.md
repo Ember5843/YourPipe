@@ -48,7 +48,7 @@ youtube_core/src/main/
           SabrSessionPolicy.ets        — action types + policy context + budgets
           BuiltinSabrSessionPolicy.ets — response → action-chain decisions
         YoutubeSabrRequestBuilder.ets
-        UmpReader.ets, SabrProto.ets, SabrResponseDecoder.ets
+        UmpReader.ets, UmpStreamReader.ets, SabrProto.ets, SabrResponseDecoder.ets
         SabrMediaSegment.ets, SabrMediaHeader.ets, SabrDecodedResponse.ets
         SabrMp4SegmentIndex.ets, SabrBufferedRange.ets
         SabrPoTokenProvider.ets        — interface (impl lives in entry)
@@ -98,9 +98,8 @@ youtube_core/src/main/
    - **per-state configurable** (entry Options → 播放端点 →
      `setConfiguredClients(guest, auth)`): guest allow-list `tv_samsung|visionos|mweb`
      (default `tv_samsung` — pot-free TVHTML5 direct adaptiveFormats URLs with
-     Samsung Tizen device fields, PipePipe `61b077779` logged-out default;
-     `visionos` keeps the pot-free GAPIS endpoint `youtubei.googleapis.com`,
-     no sts/pot), signed-in allow-list `tv_downgraded|mweb` (default
+     Samsung Tizen device fields; `visionos` keeps the pot-free GAPIS endpoint
+     `youtubei.googleapis.com`, no sts/pot), signed-in allow-list `tv_downgraded|mweb` (default
      `mweb` SABR; `tv_downgraded` stays the token-free direct-URL option);
      direct clients resolve to direct adaptiveFormats URLs. `applyAuthDefault` / `resetToAuthDefault` pick the
      configured value for the current auth state (entry 侧统一经
@@ -111,6 +110,20 @@ youtube_core/src/main/
      through the per-state config, not the pin.
    - `tv_downgraded` + Bearer doubles as the **restricted / OAuth recovery**
      path (skipped when the selected client already is tv_downgraded)
+   - **Upstream reference (PipePipe origin/main, checked 2026-10)**: the
+     extractor allow-list is `mweb|visionos|tv_downgraded|tv_samsung` with
+     `visionos` as the invalid-value fallback, and PipePipeClient narrows the
+     user-visible set further — **logged-in may only use `mweb`**, logged-out
+     may use `mweb|visionos|tv_samsung` with `visionos` as the default.
+     YourPipe deliberately diverges on both points: `tv_downgraded` stays
+     selectable while signed in (token-free direct URLs = the fallback when
+     SABR is unavailable), and the guest default is `tv_samsung` (the pot-free
+     TVHTML5 direct path). Re-check upstream before changing either default —
+     the guest default is the product's primary playback path.
+   - **One-shot extraction override** (`setExtractionClientOverride` /
+     `clearExtractionClientOverride`): entry's SABR → `tv_downgraded` endpoint
+     fallback switches the client for exactly one extraction without touching
+     the configured per-state client or the `explicitOverride` pin.
 3. **Critical path only** (`extractVideoStreams`):
    - STS: process cache → prewarm decoder metadata → watch HTML → remote latest-player
    - one stream `POST www.youtube.com/youtubei/v1/player?prettyPrint=false`
@@ -185,9 +198,47 @@ youtube_core/src/main/
   `Origin`/`Referer`/`Accept-Language`/`X-Goog-Visitor-Id`, and **no**
   `Cookie` or `Authorization` on UMP POSTs (login is bound through the
   /player request, never on the UMP rail).
+- **Streaming UMP decode** (PipePipe `SabrStreamingResponseReader` parity): the
+  UMP reply is decoded **while it downloads** — `HttpDownloader.postBinaryStreaming`
+  hands every `dataReceive` chunk to `UmpStreamReader`, which pulls complete
+  UMP parts out of the byte stream (a part header or payload split across
+  chunks is held until the rest arrives), and `SabrPartProcessor` assembles the
+  media segments and hands each finished segment to the session's segment
+  cache immediately. Consequences:
+  - the player can start on the first segment instead of waiting for the whole
+    response, and a 4K reply is never held whole (the old buffered path kept
+    the response **and** a second copy of the media in the segment assembly);
+  - a segment whose byte count disagrees with its header's `contentLength` is
+    **withheld** — the response-level integrity check then re-POSTs for a
+    clean batch, so a truncated segment never reaches the player;
+  - a truncated reply (the stream ended mid-part) is reported as the
+    `truncated-ump-response` integrity issue and is recoverable;
+  - the format initialization metadata is delivered to the stream state as
+    soon as its UMP part arrives, because the init segment's SIDX parse needs
+    its index range before the init segment shows up;
+  - `SabrDecodedResponse.segmentCount` is the authoritative "media arrived"
+    signal — in the streaming path the segments are not retained in
+    `decoded.segments`.
+  The buffered path (`sabrDecodeBody` / `umpReadAll`) stays for the offline
+  downloader and the unit tests.
 - **Request URL params**: `alr=yes` and `cpn` are append-if-missing (an
   existing value in the serverAbr URL wins), `rn` is replace-or-append and
   **0-based** (`rn = String(requestNumber)`, so `rn=0` for the first POST).
+- **UMP request body** (`YoutubeSabrRequestBuilder`, mirrors PipePipe
+  `YoutubeSabrRequestHelper.buildMediaRequest`): field 1 = clientAbrState,
+  2 = formatId per selected track, 3 = bufferedRange, 4 = playerTimeMs,
+  5 = ustreamerConfig (base64), 16/17 = preferred audio/video formats,
+  19 = streamerContext (1 = clientInfo, 2 = poToken, 3 = playbackCookie,
+  5 = active sabrContexts, 6 = unsent context types).
+  Inside clientAbrState the fields that matter for playback quality are
+  **18/19/21** (video size), **23** (bandwidth estimate — the measured
+  downlink throughput, EWMA-smoothed per PipePipe `updateBandwidthEstimate`
+  and kept on `YoutubeSabrStreamState`; the static `(audio+video)*2` bitrate
+  sum is only the fallback), **28** (playerTimeMs), **34/35** (flags /
+  playbackRate), **40** (enabled track types: 1 = audio only, 2 = video
+  only), **46** (DRC — the selected audio track is a dynamic-range-control
+  rendition; parsed from the player response's `adaptiveFormats[].isDrc`
+  and never sent for a plain track) and **69** (audio track id).
 - **Media integrity** (PipePipe `getIntegrityIssues` /
   `MAX_INCOMPLETE_MEDIA_RESPONSES=3`): every decoded UMP response is checked
   (duplicate-media-header / missing-media / length-mismatch vs
@@ -278,8 +329,11 @@ youtube_core/src/main/
   field 5 (active contexts). Sending-policy fields follow PipePipe
   `ingestContextSendingPolicy`: field 1 = activate, field 2 = deactivate,
   field 3 = dispose (drop from active set and stored contexts); values may be
-  single or packed varints. `getUnsentSabrContextTypes` is an MVP stub that
-  returns empty — field 6 is not yet echoed.
+  single or packed varints. Context types the server sent that are **not** in
+  the active set yet are reported in streamerContext field 6
+  (`getUnsentSabrContextTypes`, PipePipe parity) — without that the server
+  cannot tell the client is holding them, and a later activate policy would
+  never turn them into an echoed context.
 - **PoToken minting**: entry pre-initializes the BotGuard runtime at app
   startup (`warmRuntime` on the pinned visitorData), so a mid-playback mint is
   only `mintIdentifier`. The session mints lazily: on an empty response

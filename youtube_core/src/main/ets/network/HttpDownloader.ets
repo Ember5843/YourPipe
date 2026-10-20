@@ -743,6 +743,44 @@ export class HttpDownloader {
     onData?: (bytes: number) => void,
     abortToken?: HttpAbortToken
   ): Promise<http.HttpResponse> {
+    return this.postBinaryWithRetry(
+      url, data, headers, localization, enableRetry, onData, abortToken, undefined, true);
+  }
+
+  /**
+   * Binary POST whose response body is handed to `onChunk` as it arrives and
+   * is NOT retained (PipePipe postStreaming parity). The returned response
+   * carries the status and headers only — its `result` buffer is empty.
+   *
+   * <p>Used by the SABR pump so a 4K UMP reply (tens of MB) is decoded while
+   * it downloads instead of being buffered whole and copied again into the
+   * segment assembly.
+   */
+  async postBinaryStreaming(
+    url: string,
+    data: Uint8Array,
+    headers?: Record<string, string[] | string>,
+    localization?: Localization,
+    enableRetry: boolean = true,
+    onChunk?: (chunk: Uint8Array) => void,
+    onData?: (bytes: number) => void,
+    abortToken?: HttpAbortToken
+  ): Promise<http.HttpResponse> {
+    return this.postBinaryWithRetry(
+      url, data, headers, localization, enableRetry, onData, abortToken, onChunk, false);
+  }
+
+  private async postBinaryWithRetry(
+    url: string,
+    data: Uint8Array,
+    headers: Record<string, string[] | string> | undefined,
+    localization: Localization | undefined,
+    enableRetry: boolean,
+    onData: ((bytes: number) => void) | undefined,
+    abortToken: HttpAbortToken | undefined,
+    onChunk: ((chunk: Uint8Array) => void) | undefined,
+    accumulate: boolean
+  ): Promise<http.HttpResponse> {
     let lastError: HttpError | null = null;
     let attempt = 0;
     // SABR web-like posts must not inject default application/json Content-Type.
@@ -753,7 +791,8 @@ export class HttpDownloader {
       }
       try {
         logger.debug(`POST-BIN-STREAM ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
-        const response = await this.postBinaryStreamOnce(url, data, headers, localization, onData, abortToken);
+        const response = await this.postBinaryStreamOnce(
+          url, data, headers, localization, onData, abortToken, onChunk, accumulate);
         if (response.responseCode && response.responseCode >= 400) {
           let errBody = '';
           try {
@@ -823,8 +862,11 @@ export class HttpDownloader {
   }
 
   /**
-   * One streamed binary POST. Accumulates dataReceive chunks into ArrayBuffer result
-   * (same shape callers expect from buffered request).
+   * One streamed binary POST. With `accumulate` the dataReceive chunks are
+   * collected into the ArrayBuffer result (same shape callers expect from a
+   * buffered request). Without it the chunks are only forwarded to `onChunk`
+   * and the body is dropped — the SABR pump decodes the reply while it
+   * arrives, so a 4K UMP response is never held whole.
    */
   private postBinaryStreamOnce(
     url: string,
@@ -832,7 +874,9 @@ export class HttpDownloader {
     headers?: Record<string, string[] | string>,
     localization?: Localization,
     onData?: (bytes: number) => void,
-    abortToken?: HttpAbortToken
+    abortToken?: HttpAbortToken,
+    onChunk?: (chunk: Uint8Array) => void,
+    accumulate: boolean = true
   ): Promise<http.HttpResponse> {
     const requestHeaders = this.processBinaryHeaders(headers, localization);
     const httpRequest = http.createHttp();
@@ -895,16 +939,20 @@ export class HttpDownloader {
           return;
         }
         settled = true;
-        const result = new ArrayBuffer(totalBytes);
-        const out = new Uint8Array(result);
-        let offset = 0;
-        for (let i = 0; i < chunks.length; i++) {
-          const part = new Uint8Array(chunks[i]);
-          out.set(part, offset);
-          offset += part.length;
+        let result = new ArrayBuffer(0);
+        if (accumulate) {
+          result = new ArrayBuffer(totalBytes);
+          const out = new Uint8Array(result);
+          let offset = 0;
+          for (let i = 0; i < chunks.length; i++) {
+            const part = new Uint8Array(chunks[i]);
+            out.set(part, offset);
+            offset += part.length;
+          }
         }
         cleanup();
-        logger.debug(`POST-BIN-STREAM complete status=${responseCode} bytes=${totalBytes}`);
+        logger.debug(`POST-BIN-STREAM complete status=${responseCode} bytes=${totalBytes} `
+          + `accumulated=${accumulate}`);
         const resp: http.HttpResponse = {
           result: result,
           responseCode: responseCode,
@@ -938,8 +986,21 @@ export class HttpDownloader {
         if (chunk && chunk.byteLength > 0) {
           // Copy — framework may reuse the buffer on next callback.
           const copy = new ArrayBuffer(chunk.byteLength);
-          new Uint8Array(copy).set(new Uint8Array(chunk));
-          chunks.push(copy);
+          const bytes = new Uint8Array(copy);
+          bytes.set(new Uint8Array(chunk));
+          if (accumulate) {
+            chunks.push(copy);
+          } else {
+            // Streaming consumer: hand the chunk over and drop the body. The
+            // consumer owns the copy from here on.
+            try {
+              onChunk?.(bytes);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              logger.error(`POST-BIN-STREAM chunk consumer failed: ${msg}`);
+              finishErr(new HttpError(`chunk consumer failed: ${msg}`, url, 'POST'));
+            }
+          }
           totalBytes += chunk.byteLength;
           // Arrival-time traffic sample for the connection-speed meter.
           onData?.(chunk.byteLength);

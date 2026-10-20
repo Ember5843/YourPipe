@@ -82,11 +82,18 @@ export class SabrDecodedResponse {
   backoffTimeMs: number = -1;
   unknownPartTypes: number[] = [];
   segments: SabrMediaSegment[] = [];
+  /**
+   * Number of media segments the response carried. In the streaming path the
+   * segments are handed to the consumer as they complete and are NOT retained
+   * in {@link segments}, so this counter is the authoritative "media arrived"
+   * signal (PipePipe YoutubeSabrResponse.getSegmentCount).
+   */
+  segmentCount: number = 0;
   /** PipePipe YoutubeSabrResponse.getIntegrityIssues — empty means media-complete. */
   integrityIssues: string[] = [];
 
   hasMedia(): boolean {
-    return this.mediaHeaders.length > 0 || this.segments.length > 0;
+    return this.mediaHeaders.length > 0 || this.segments.length > 0 || this.segmentCount > 0;
   }
 
   isNoMediaResponse(): boolean {
