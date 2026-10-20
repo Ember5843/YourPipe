@@ -189,6 +189,7 @@ export class SabrTrackBuffer {
 
   async ensureReady(): Promise<void> {
     if (!this.init) {
+      const startedAt = Date.now();
       this.init = await sabrSessionStore.ensureInit(this.lease, this.isAudio);
       this.totalKnownBytes = this.init.getLength();
       this.mediaBaseByte = this.init.getLength();
@@ -196,7 +197,8 @@ export class SabrTrackBuffer {
       if (this.estimatedTotalBytes <= 0) {
         this.estimatedTotalBytes = this.computeEstimatedTotal();
       }
-      Logger.info(TAG, `init ready itag=${this.getItag()} bytes=${this.init.getLength()} `
+      Logger.info(TAG, `[TTFF] sabr_init track=${this.isAudio ? 'audio' : 'video'} `
+        + `itag=${this.getItag()} bytes=${this.init.getLength()} elapsed=${Date.now() - startedAt}ms `
         + `estTotal=${this.estimatedTotalBytes} durMs=${this.durationMs}`);
     }
   }

@@ -515,6 +515,24 @@ export struct VideoPlayerPage {
       logger.info(`${TAG} explicit page close already handled`);
       return;
     }
+    // A new source may have been opened between this page's pop and its
+    // aboutToDisappear callback. openVideoDetail() force-resets the session and
+    // starts beginPrepare(B) before the old page's lifecycle runs, so an
+    // unconditional closeForNavigation() here would tear down B's generation
+    // (observed: doPlay() result discarded right after source_submit, first
+    // switch fails, re-entering works). Only the page that still owns the
+    // session may close it.
+    const pageVideoId = this.video?.videoId || '';
+    const currentVideoId = session.currentVideo?.videoId || '';
+    const preparingVideoId = session.preparingVideoId;
+    if (pageVideoId.length > 0
+      && ((currentVideoId.length > 0 && currentVideoId !== pageVideoId)
+        || (preparingVideoId.length > 0 && preparingVideoId !== pageVideoId))) {
+      logger.info(`${TAG} stale page disappear: page=${pageVideoId} `
+        + `current=${currentVideoId || '-'} preparing=${preparingVideoId || '-'}; keep session`);
+      pip.destroy();
+      return;
+    }
     session.closeForNavigation();
     pip.destroy();
   }

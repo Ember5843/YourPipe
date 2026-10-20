@@ -62,9 +62,14 @@ class SabrSessionStoreImpl {
     profile: string,
     audioItag: number,
     audioTrackId: string | undefined,
-    videoItag: number
+    videoItag: number,
+    useAuth: boolean = false
   ): string {
-    return `${videoId}|p${profile}|a${audioItag}|t${audioTrackId || '-'}|v${videoItag}`;
+    // Auth state is part of the identity: a UMP session created under one
+    // credential rail carries that rail's cookies / PoToken / identity and must
+    // never be reused by the other state (login ↔ logout, or an account switch).
+    return `${videoId}|p${profile}|a${audioItag}|t${audioTrackId || '-'}|v${videoItag}`
+      + `|${useAuth ? 'auth' : 'guest'}`;
   }
 
   /**
@@ -82,7 +87,8 @@ class SabrSessionStoreImpl {
     keySuffix: string = ''
   ): SabrLease {
     const key = this.makeKey(
-      info.videoId, info.profile, audioFormat.itag, audioFormat.audioTrackId, videoFormat.itag)
+      info.videoId, info.profile, audioFormat.itag, audioFormat.audioTrackId, videoFormat.itag,
+      useAuth)
       + keySuffix;
     const existing = this.leases.get(key);
     if (existing) {

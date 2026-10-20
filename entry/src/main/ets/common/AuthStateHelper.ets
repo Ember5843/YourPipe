@@ -1,4 +1,5 @@
 import { AuthSessionManager, AuthAccountStatus, YoutubeJavaScriptPlayerManager, YoutubePlayerClientConfig } from 'youtube_core';
+import web_webview from '@ohos.web.webview';
 import { SabrWebViewPoTokenProvider } from '../features/player/SabrWebViewPoTokenProvider';
 import { AppLog } from './AppLog';
 
@@ -43,6 +44,9 @@ export class AuthStateHelper {
     AuthStateHelper.reconcilePlaybackClient();
     YoutubeJavaScriptPlayerManager.resetSessionVisitorData();
     SabrWebViewPoTokenProvider.getInstance().resetForAuthChange();
+    // The reset drops the warm flag; re-warm in the background so the next
+    // play does not pay the cold BotGuard bootstrap on the /player path.
+    SabrWebViewPoTokenProvider.getInstance().warmRuntime();
     logger.info(`player client config applied guest=${guestClient} auth=${authClient} `
       + `active=${YoutubePlayerClientConfig.getYoutubePlayerClient()}`);
   }
@@ -64,6 +68,25 @@ export class AuthStateHelper {
     logger.info(`auth credential rail changed (${previous} → ${fingerprint}); resetting session identity + pot caches`);
     YoutubeJavaScriptPlayerManager.resetSessionVisitorData();
     SabrWebViewPoTokenProvider.getInstance().resetForAuthChange();
+    // Re-warm against the new credential state in the background.
+    SabrWebViewPoTokenProvider.getInstance().warmRuntime();
+  }
+
+  /**
+   * Drop the ArkWeb cookie store. The login page detects an existing session
+   * from WebCookieManager; leaving the previous account's cookies behind makes
+   * a post-sign-out login silently reuse that account (and re-save it).
+   * The PoToken runtime is a loadData page in the same store — it re-bootstraps
+   * on the next mint, which is exactly what the caller's warmRuntime does.
+   */
+  static clearWebViewCookies(reason: string): void {
+    try {
+      web_webview.WebCookieManager.clearAllCookiesSync();
+      web_webview.WebCookieManager.clearSessionCookieSync();
+      logger.info(`webview cookies cleared reason=${reason}`);
+    } catch (e) {
+      logger.warn(`clearWebViewCookies failed reason=${reason}: ${String(e)}`);
+    }
   }
 
   private static credentialFingerprint(session?: AuthSessionManager): string {

@@ -54,7 +54,12 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
   private mintBrokenUntilMs: number = 0;
   /** Layer 1: BotGuard runtime pre-init state (startup warm-up). */
   private runtimeWarmed: boolean = false;
+  private pendingWarm: boolean = false;
   private pendingWarmVisitorData: string = '';
+  /** Auth/identity epoch. Bumped by resetForAuthChange / invalidatePoTokenIdentity;
+   *  a mint that resolves across the bump belongs to the old account and must not
+   *  be cached or returned to the new one. */
+  private authEpoch: number = 0;
   /** Hard cap for one mint; covers cold BotGuard init (att/get + interpreter + GenerateIT). */
   private static readonly MINT_TIMEOUT_MS: number = 30000;
   private static readonly MINT_BREAKER_MS: number = 30000;
@@ -63,6 +68,11 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
    *  cold/contended WebView mints blowing past 5s; 15s stays under the UMP
    *  backoff scale and the mint breaker still bounds repeat wedges. */
   private static readonly PLAYER_MINT_TIMEOUT_MS: number = 15000;
+  /** Cold-runtime /player budget: never let the first play eat the whole
+   *  BotGuard bootstrap (measured ~3.8s). On timeout the request proceeds
+   *  without the session pot while the bootstrap keeps running in background;
+   *  a later request/retry picks the token up. */
+  private static readonly PLAYER_COLD_MINT_TIMEOUT_MS: number = 2000;
 
   static getInstance(): SabrWebViewPoTokenProvider {
     return SabrWebViewPoTokenProvider.instance;
@@ -71,8 +81,9 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
   setMinter(mint?: LocalDomMintFn, invalidate?: LocalDomInvalidateFn): void {
     this.mint = mint;
     this.invalidateMinter = invalidate;
-    if (mint && this.pendingWarmVisitorData) {
+    if (mint && this.pendingWarm) {
       const visitorData = this.pendingWarmVisitorData;
+      this.pendingWarm = false;
       this.pendingWarmVisitorData = '';
       this.warmRuntime(visitorData);
     }
@@ -84,20 +95,24 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
    * Runs OUTSIDE the shared mintPromise so a concurrent real mint is never
    * handed a token minted for the warmup identifier.
    */
-  warmRuntime(visitorData: string): void {
-    if (!visitorData) {
-      return;
-    }
+  warmRuntime(visitorData: string = ''): void {
     if (this.runtimeWarmed) {
       return;
     }
     if (!this.mint) {
       // WebView not attached yet; setMinter will re-trigger once it is.
+      this.pendingWarm = true;
       this.pendingWarmVisitorData = visitorData;
+      logger.info('warmRuntime: queued until WebView attaches');
       return;
     }
     this.runtimeWarmed = true;
-    logger.info('warmRuntime: BotGuard pre-init start');
+    // The local-DOM generator ignores this visitorData and re-parses the home
+    // page, pinning the fresh identity itself (SabrLocalDomPoTokenGenerator
+    // .doInitialize → SessionIdentityManager.pin). So starting the warm-up
+    // before any visitorData is known is safe: it is the runtime/attestation
+    // bootstrap we need, not an identity-bound token.
+    logger.info(`warmRuntime: BotGuard pre-init start hasVisitorData=${visitorData.length > 0}`);
     this.mint(visitorData, '__warmup__', false).then((token: Uint8Array | undefined) => {
       logger.info(`warmRuntime: BotGuard pre-init done ok=${!!token}`);
     }).catch((e: Error) => {
@@ -114,10 +129,12 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
    * pinned session identity (YoutubeJavaScriptPlayerManager.resetSessionVisitorData).
    */
   resetForAuthChange(): void {
+    this.authEpoch++;
     this.cache.clear();
     this.dashCache.clear();
     this.playerTokenCache = undefined;
     this.runtimeWarmed = false;
+    this.pendingWarm = false;
     this.pendingWarmVisitorData = '';
     this.mintTimeoutStreak = 0;
     this.mintBrokenUntilMs = 0;
@@ -136,10 +153,12 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
    */
   async invalidatePoTokenIdentity(info: YoutubeSabrInfo): Promise<boolean> {
     YoutubeJavaScriptPlayerManager.resetSessionVisitorData();
+    this.authEpoch++;
     this.cache.delete(info.videoId);
     this.dashCache.delete(info.videoId);
     this.playerTokenCache = undefined;
     this.runtimeWarmed = false;
+    this.pendingWarm = false;
     this.pendingWarmVisitorData = '';
     this.mintTimeoutStreak = 0;
     this.mintBrokenUntilMs = 0;
@@ -194,26 +213,34 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
       logger.info('getPlayerPoToken: BotGuard runtime cold, attempting bounded cold mint');
       this.runtimeWarmed = true;
     }
-    logger.info(`getPlayerPoToken: mint start client=${clientName} version=${clientVersion}`);
+    const epoch = this.authEpoch;
+    const mintBudgetMs = coldStart
+      ? SabrWebViewPoTokenProvider.PLAYER_COLD_MINT_TIMEOUT_MS
+      : SabrWebViewPoTokenProvider.PLAYER_MINT_TIMEOUT_MS;
+    logger.info(`getPlayerPoToken: mint start client=${clientName} version=${clientVersion} `
+      + `cold=${coldStart} budgetMs=${mintBudgetMs}`);
     let timerId: number = -1;
     let raw: Uint8Array | undefined = undefined;
     try {
       const timeout = new Promise<never>((_resolve, reject) => {
-        timerId = setTimeout(() => reject(new Error('mint timeout')),
-          SabrWebViewPoTokenProvider.PLAYER_MINT_TIMEOUT_MS);
+        timerId = setTimeout(() => reject(new Error('mint timeout')), mintBudgetMs);
       });
       raw = await Promise.race([this.mint(visitorData, videoId, false), timeout]);
     } catch (e) {
       if (coldStart) {
         this.runtimeWarmed = false;
       }
-      logger.warn(`getPlayerPoToken: mint error client=${clientName}: ${String(e)}`);
+      logger.warn(`getPlayerPoToken: mint error client=${clientName} cold=${coldStart}: ${String(e)}`);
       return undefined;
     } finally {
       clearTimeout(timerId);
     }
     if (!raw || raw.length === 0) {
       logger.warn(`getPlayerPoToken: mint returned empty client=${clientName}`);
+      return undefined;
+    }
+    if (epoch !== this.authEpoch) {
+      logger.info(`getPlayerPoToken: discard token minted across auth reset client=${clientName}`);
       return undefined;
     }
     const tokenStr = poTokenBytesToString(raw);
@@ -251,10 +278,12 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
       logger.warn(`mint breaker open video=${info.videoId} remaining=${this.mintBrokenUntilMs - Date.now()}ms`);
       return undefined;
     }
+    const epoch = this.authEpoch;
     if (!this.mintPromise) {
       logger.info(`mint start video=${info.videoId} force=${forceRefresh}`);
       this.mintVideoId = info.videoId;
-      const tracked = this.awaitMint(this.mint(info.visitorData, info.videoId, forceRefresh), info.videoId);
+      const tracked = this.awaitMint(
+        this.mint(info.visitorData, info.videoId, forceRefresh), info.videoId, epoch);
       this.mintPromise = tracked;
       try {
         return await tracked;
@@ -268,7 +297,8 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     if (this.mintVideoId === info.videoId) {
       // Same content binding: join the in-flight mint; awaitMint caches the
       // result under the initiating videoId only.
-      return await this.mintPromise;
+      const joined = await this.mintPromise;
+      return epoch === this.authEpoch ? joined : undefined;
     }
     // Different videoId: a content-bound token minted for another video is
     // invalid for this one, and caching it under this videoId would poison the
@@ -291,7 +321,8 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
    */
   private async awaitMint(
     promise: Promise<Uint8Array | undefined>,
-    videoId: string
+    videoId: string,
+    epoch: number
   ): Promise<Uint8Array | undefined> {
     let timerId: number = -1;
     try {
@@ -300,6 +331,10 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
           SabrWebViewPoTokenProvider.MINT_TIMEOUT_MS);
       });
       const token = await Promise.race([promise, timeout]);
+      if (epoch !== this.authEpoch) {
+        logger.info(`mint result discarded across auth reset video=${videoId}`);
+        return undefined;
+      }
       if (token && token.length > 0) {
         this.cache.set(videoId, { token: token, mintedAtMs: Date.now() });
         this.mintTimeoutStreak = 0;
@@ -349,6 +384,7 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
         + `remaining=${this.mintBrokenUntilMs - Date.now()}ms`);
       return undefined;
     }
+    const epoch = this.authEpoch;
     logger.info(`getDashPoToken: mint start video=${videoId}`);
     let timerId: number = -1;
     let raw: Uint8Array | undefined = undefined;
@@ -366,6 +402,10 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     }
     if (!raw || raw.length === 0) {
       logger.warn(`getDashPoToken: mint returned empty video=${videoId}`);
+      return undefined;
+    }
+    if (epoch !== this.authEpoch) {
+      logger.info(`getDashPoToken: discard token minted across auth reset video=${videoId}`);
       return undefined;
     }
     const tokenStr = poTokenBytesToString(raw);

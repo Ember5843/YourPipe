@@ -59,6 +59,10 @@ const CONTROLS_HIDE_DELAY: number = 3000;
 const SIDE_HINT_HIDE_DELAY: number = 800;
 const SEEK_HINT_HIDE_DELAY: number = 200;
 const DOUBLE_TAP_HINT_HIDE_DELAY: number = 800;
+/** Max gap between two taps that still counts as one double-tap. TapGesture's
+ *  fixed count cannot express "2nd, 4th, 6th …"; we count a single-tap stream
+ *  manually so every pair fires (see onCenterTap). */
+const DOUBLE_TAP_WINDOW_MS: number = 300;
 const CONTROL_SLOT_SIZE: number = 40;
 const CONTROL_ICON_SIZE: number = 24;
 /** 中央播放按钮的可点判定半径（72vp 直径的一半 + 容差）。 */
@@ -334,6 +338,9 @@ export struct VideoPlayer {
   private gestureStartY: number = 0;
   private interactionEpoch: number = 0;
   private seekHintHideTimerId: number = -1;
+  /** Manual tap-pair state: last tap timestamp + the deferred single-tap action. */
+  private lastTapAtMs: number = 0;
+  private pendingSingleTapTimerId: number = -1;
   // brightness/volume hints
   @State showBrightnessHint: boolean = false;
   @State showVolumeHint: boolean = false;
@@ -641,20 +648,63 @@ export struct VideoPlayer {
    * <p>暂停态下 `canAutoHideControls()` 为 false → 单击只会把控件显示出来，
    * 不会收起：这样"看清时间码/画面再精确暂停"的形态始终可用。
    */
+  /**
+   * Single tap stream with manual pair counting.
+   *
+   * <p>ArkUI's TapGesture(count:2) cannot fire repeatedly for 2nd/4th/6th taps:
+   * after a successful double-tap the recognizer stays in its sequence until the
+   * multi-tap window lapses, so a fast follow-up pair is swallowed (the hint
+   * lifetime made it look like "wait for the hint"). HarmonyOS exposes no
+   * per-event tap counter (TapRecognizer.getTapCount() returns the configured
+   * count, not the actual one), so we use ONE count:1 recognizer and pair taps
+   * by timestamp here. Every even tap seeks; an unpaired tap falls back to the
+   * normal controls toggle after the double-tap window.
+   */
   private onCenterTap(event: GestureEvent): void {
     // 交互进行中（菜单已打开 / 正在拖进度条 / 正在滑动）：单击不再处理控件显隐，
     // 否则"点开更多菜单"这类操作会连带把控件收起来，菜单上方空一片。
     if (this.activeInteraction !== PlayerInteractionKind.NONE) {
       return;
     }
-    this.interactionEpoch++;
-    this.clearHideTimer();
     if (this.isCenterButtonTap(event)) {
       // 中央按钮自己处理这次点击（切换播放/暂停），这里只重置自动隐藏
       // 计时器：用户刚操作过，控件按正常节奏消失，但**不**切换显隐。
+      // 按钮上的点击永远不参与双击配对。
+      this.lastTapAtMs = 0;
+      this.clearPendingSingleTap();
+      this.interactionEpoch++;
+      this.clearHideTimer();
       this.scheduleHideControls();
       return;
     }
+    const now: number = Date.now();
+    if (this.lastTapAtMs > 0 && now - this.lastTapAtMs <= DOUBLE_TAP_WINDOW_MS) {
+      // 第 2/4/6… 次：取消待执行的单击动作，立即快进/快退。
+      this.lastTapAtMs = 0;
+      this.clearPendingSingleTap();
+      this.performDoubleTap(event);
+      return;
+    }
+    // 第 1/3/5… 次：等双击窗口过去再执行单击动作；第二下会取消这个定时器。
+    this.lastTapAtMs = now;
+    this.clearPendingSingleTap();
+    this.pendingSingleTapTimerId = setTimeout(() => {
+      this.pendingSingleTapTimerId = -1;
+      this.lastTapAtMs = 0;
+      this.applySingleTapToggle();
+    }, DOUBLE_TAP_WINDOW_MS);
+  }
+
+  private clearPendingSingleTap(): void {
+    if (this.pendingSingleTapTimerId >= 0) {
+      clearTimeout(this.pendingSingleTapTimerId);
+      this.pendingSingleTapTimerId = -1;
+    }
+  }
+
+  private applySingleTapToggle(): void {
+    this.interactionEpoch++;
+    this.clearHideTimer();
     if (!this.canAutoHideControls()) {
       this.showControls = true;
       return;
@@ -665,6 +715,40 @@ export struct VideoPlayer {
     } else {
       this.clearHideTimer();
       this.clearGestureHints();
+    }
+  }
+
+  /** The double-tap action itself (seek / play-pause / off), shared by every
+   *  even tap of the manual pair counter. */
+  private performDoubleTap(event: GestureEvent): void {
+    this.registerDoubleTapActivity();
+    const action = this.playbackConfig.doubleTapAction;
+    if (action === 'off') {
+      return;
+    }
+    if (action === 'playpause') {
+      this.togglePlayback();
+      return;
+    }
+    const step = this.playbackConfig.doubleTapSeekSeconds > 0
+      ? this.playbackConfig.doubleTapSeekSeconds : 15;
+    const x: number = event.fingerList[0]?.localX ?? 0;
+    if (x > this.containerVpWidth / 2) {
+      Logger.info(TAG, `Double-tap forward +${step}s`);
+      this.controller.syncSeek(Math.min(this.currentTime + step, this.durationTime) * 1000);
+      this.showForwardHint = true;
+      this.forwardHintTimerId = setTimeout(() => {
+        this.forwardHintTimerId = -1;
+        this.showForwardHint = false;
+      }, DOUBLE_TAP_HINT_HIDE_DELAY);
+    } else {
+      Logger.info(TAG, `Double-tap backward -${step}s`);
+      this.controller.syncSeek(Math.max(this.currentTime - step, 0) * 1000);
+      this.showBackwardHint = true;
+      this.backwardHintTimerId = setTimeout(() => {
+        this.backwardHintTimerId = -1;
+        this.showBackwardHint = false;
+      }, DOUBLE_TAP_HINT_HIDE_DELAY);
     }
   }
 
@@ -710,6 +794,9 @@ export struct VideoPlayer {
       clearTimeout(this.backwardHintTimerId);
       this.backwardHintTimerId = -1;
     }
+    // A deferred single-tap toggle must not fire after another interaction or a
+    // page/source reset.
+    this.clearPendingSingleTap();
   }
 
   /** 清空全部手势提示（seek/亮度/音量/双击/倍速），计时器一并取消。
@@ -1175,8 +1262,22 @@ export struct VideoPlayer {
     this.scheduleHideControls();
   }
 
+  /**
+   * Reset the transient interaction bookkeeping for a double-tap WITHOUT
+   * waking the control layer. beginInteraction() forces showControls=true;
+   * with the controls visible, the full-width Blank between the top and bottom
+   * bars sat on top of the gesture layer and swallowed the next double-tap, so
+   * repeated fast-forward/rewind only worked again after the 3s auto-hide.
+   * Keep the current visibility (hidden stays hidden) and just re-arm the hint
+   * timers; the hint layer itself is HitTestMode.None.
+   */
   private registerDoubleTapActivity(): number {
-    this.beginInteraction(PlayerInteractionKind.NONE);
+    this.interactionEpoch++;
+    this.clearHideTimer();
+    this.clearTransientHintTimers();
+    this.showForwardHint = false;
+    this.showBackwardHint = false;
+    this.activeInteraction = PlayerInteractionKind.NONE;
     this.scheduleHideControls();
     return this.interactionEpoch;
   }
@@ -2163,7 +2264,15 @@ export struct VideoPlayer {
           .alignRules({ center: { anchor: '__container__', align: VerticalAlign.Center }, start: { anchor: '__container__', align: HorizontalAlign.Center }, end: { anchor: '__container__', align: HorizontalAlign.End } })
         }
       }
-      .width('100%').height('100%').hitTestBehavior(HitTestMode.None).zIndex(CommonConstants.Z_INDEX_BASE + 3)
+      .width('100%').height('100%')
+      // HitTestMode.None only exempts THIS node; its children still respond
+      // (SDK: "Self not respond ... but children respond"). The left/right hint
+      // Columns cover 50% x 100% each, so while a +/-step hint was visible they
+      // swallowed the next double-tap. Keep the whole visual hint layer BELOW
+      // the gesture layer (2.2) but above the buffering overlay (2.0): the
+      // transparent gesture layer is the top hit target and draws nothing, so
+      // the hint stays visible while taps always reach the gesture layer.
+      .zIndex(CommonConstants.Z_INDEX_BASE + 2.1)
 
       // 2.6 手势层：透明全屏，承载画面手势（单击/双击/滑动/长按）
       //
@@ -2205,7 +2314,10 @@ export struct VideoPlayer {
       // 3. 播控层
       Column() {
         this.TopControl()
-        Blank().width('100%').layoutWeight(1)
+        // Middle spacer must not be a hit target: when the controls are visible
+        // it would sit above the gesture layer and eat the second/third
+        // double-tap (the buttons themselves stay interactive).
+        Blank().width('100%').layoutWeight(1).hitTestBehavior(HitTestMode.None)
         this.PlayControl()
       }
       .width('100%').height('100%')
@@ -2267,45 +2379,9 @@ export struct VideoPlayer {
       .zIndex(CommonConstants.Z_INDEX_BASE + 2.2)
       .parallelGesture(
         GestureGroup(GestureMode.Exclusive,
-          TapGesture({ count: 2, fingers: 1 })
-            .onAction((event: GestureEvent) => {
-              // 双击行为可配（Actions 互斥单选，天然避免与其它手势冲突）：
-              // seek=左右半屏快退/快进（步长可配）| playpause=播放/暂停 | off=不响应
-              // 中央播放按钮上不响应双击：那里是"恢复播放"的单击目标，
-              // 双击误触发快进会让用户以为画面自己跳了。
-              if (this.isCenterButtonTap(event)) {
-                return;
-              }
-              this.registerDoubleTapActivity();
-              const action = this.playbackConfig.doubleTapAction;
-              if (action === 'off') {
-                return;
-              }
-              if (action === 'playpause') {
-                this.togglePlayback();
-                return;
-              }
-              const step = this.playbackConfig.doubleTapSeekSeconds > 0
-                ? this.playbackConfig.doubleTapSeekSeconds : 15;
-              const x: number = event.fingerList[0]?.localX ?? 0;
-              if (x > this.containerVpWidth / 2) {
-                Logger.info(TAG, `Double-tap forward +${step}s`);
-                this.controller.syncSeek(Math.min(this.currentTime + step, this.durationTime) * 1000);
-                this.showForwardHint = true;
-                this.forwardHintTimerId = setTimeout(() => {
-                  this.forwardHintTimerId = -1;
-                  this.showForwardHint = false;
-                }, DOUBLE_TAP_HINT_HIDE_DELAY);
-              } else {
-                Logger.info(TAG, `Double-tap backward -${step}s`);
-                this.controller.syncSeek(Math.max(this.currentTime - step, 0) * 1000);
-                this.showBackwardHint = true;
-                this.backwardHintTimerId = setTimeout(() => {
-                  this.backwardHintTimerId = -1;
-                  this.showBackwardHint = false;
-                }, DOUBLE_TAP_HINT_HIDE_DELAY);
-              }
-            }),
+          // 只用 count:1，单击/双击都在这一个回调里按时间窗计数（见
+          // onCenterTap）：ArkUI 的 count:2 识别器在一次成功双击后要等
+          // 多击窗口结束才会重新计数，连续双击会被吞掉。
           TapGesture({ count: 1, fingers: 1 })
             .onAction((event: GestureEvent) => {
               this.onCenterTap(event);

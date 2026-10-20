@@ -52,6 +52,8 @@ export interface OptionsSheetHostParams {
   applyDarkModeSelection: (mode: YourtubeDarkMode) => void;
   reloadHomeForSearchLocaleChange: () => void;
   refreshHomeAfterAuthChange: () => void;
+  /** 首页内容源（推荐/直播）变更：始终重载，不受当前 tab 限制。 */
+  refreshHomeAfterFeedStyleChange: () => void;
   handleLoginSuccess: () => void;
   onPlayerClientChanged: (guest: string, auth: string) => void;
   onResetSettings: () => void;
@@ -78,6 +80,7 @@ export struct OptionsSheetHost {
     applyDarkModeSelection: () => {},
     reloadHomeForSearchLocaleChange: () => {},
     refreshHomeAfterAuthChange: () => {},
+    refreshHomeAfterFeedStyleChange: () => {},
     handleLoginSuccess: () => {},
     onPlayerClientChanged: () => {},
     onResetSettings: () => {},
@@ -233,7 +236,7 @@ export struct OptionsSheetHost {
             onLoginClick: () => { this.pushOptionsPath('webview_login'); },
             onDeviceQrLoginClick: () => { this.pushOptionsPath('device_qr_login'); },
             updateUiConfig: this.params.updateUiConfig,
-            onHomeFeedStyleChanged: () => { this.params.refreshHomeAfterAuthChange(); },
+            onHomeFeedStyleChanged: () => { this.params.refreshHomeAfterFeedStyleChange(); },
             onAuthChanged: () => { this.params.refreshHomeAfterAuthChange(); },
             onLoginSuccess: () => { this.params.handleLoginSuccess(); },
             onResetSettings: () => { this.params.onResetSettings(); },

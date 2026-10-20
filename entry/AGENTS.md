@@ -502,9 +502,14 @@ store caches (`favorites`, `playlists`, `subscriptions`, `watchHistory`,
   `useAuthForUserData` / `useAuthForPlayback` live in Options Data & Account.
   A failed signed-in home rail (`AuthExpiredError` or otherwise) falls back
   to the guest kiosk in `HomeFeedService` — the feed is never dead-ended;
-  an auth rejection additionally raises the
-  `yt_home_auth_expired_notice` banner via `homeModeNoticeMessage` in
-  `features/home/HomeTabContent.ets`.
+  an auth rejection raises the `yt_home_auth_expired_notice` banner, and a
+  non-auth recommended failure raises `yt_home_recommended_error`, both via
+  `homeModeNoticeMessage` in `features/home/HomeTabContent.ets`. The
+  recommended/live selector is only interactive when
+  `AuthAccountStatus.canPersonalizedHome` is true (otherwise it renders a
+  “sign in first” hint), because signed-out users always get the live kiosk.
+  Home feed loads carry a generation counter so a late kiosk response cannot
+  overwrite a newer recommended result.
 
 ## 9. Player navigation and UI regression checks
 - Before adding a navigation path from `PlayerPage`, trace the comparable

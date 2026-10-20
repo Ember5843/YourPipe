@@ -559,18 +559,24 @@ class TcpWriter implements rcp.WriteStream {
   private total: number;
   private contentType: string;
   private standalone: boolean;
+  private tag: string;
+  private startedAt: number;
+  private firstByteLogged: boolean = false;
   bytesEmitted: number = 0;
   /** Fired once when a send failure marks the connection dead (MPV went away). */
   onClosed?: () => void;
 
   constructor(conn: socket.TCPSocketConnection, start: number, end: number, total: number,
-    contentType: string, standalone: boolean = false) {
+    contentType: string, standalone: boolean = false, tag: string = '',
+    startedAt: number = Date.now()) {
     this.conn = conn;
     this.start = start;
     this.end = end;
     this.total = total;
     this.contentType = contentType;
     this.standalone = standalone;
+    this.tag = tag;
+    this.startedAt = startedAt;
   }
 
   hasEmittedAny(): boolean {
@@ -584,6 +590,15 @@ class TcpWriter implements rcp.WriteStream {
   async write(buffer: ArrayBuffer): Promise<void | number> {
     if (this.closed) return 0;
     try {
+      if (!this.firstByteLogged) {
+        this.firstByteLogged = true;
+        if (this.tag.length > 0) {
+          // TTFF probe: time from serveRange entry to the first body chunk being
+          // handed to MPV. For the buffered http path this equals the whole
+          // upstream body download; for streaming paths it is the true first byte.
+          Logger.info(TAG, `[TTFF] proxy_first_byte ${this.tag} waitMs=${Date.now() - this.startedAt} chunkBytes=${buffer.byteLength}`);
+        }
+      }
       if (!this.headerSent) {
         const contentLength = (this.end >= this.start) ? (this.end - this.start + 1) : buffer.byteLength;
         const totalStr = this.total > 0 ? String(this.total) : '*';
@@ -770,7 +785,12 @@ export async function serveRange(
   }
 
   const rangeSpec = `${start}-${end}`;
-  const writer = new TcpWriter(conn, start, end, total, contentType, standaloneResponse);
+  const serveStartedAt = Date.now();
+  const ttffTag = `itag=${resource.id} range=${rangeSpec} total=${total} `
+    + `client=${resource.sourceClient || '-'}`;
+  const writer = new TcpWriter(conn, start, end, total, contentType, standaloneResponse,
+    ttffTag, serveStartedAt);
+  Logger.info(TAG, `[TTFF] serve_start ${ttffTag} mime=${contentType} headOnly=${headOnly}`);
   // Set once the connection/session teardown cancels an in-flight upstream op;
   // the retry loop treats it as quiet teardown (no retry, no error response).
   let aborted = false;
@@ -822,8 +842,14 @@ export async function serveRange(
             aborted = true;
             sessionRef.cancel(req);
           });
+          const fetchStartedAt = Date.now();
           const resp = await rcpSession.fetch(req);
           if (resp.statusCode === 200 || resp.statusCode === 206) {
+            // Streaming path: first_byte already fired from the write() callback;
+            // this records the full transfer tail for comparison.
+            Logger.info(TAG, `[TTFF] upstream_stream ${ttffTag} transport=rcp `
+              + `status=${resp.statusCode} attempt=${attempt} totalMs=${Date.now() - fetchStartedAt} `
+              + `servedBytes=${writer.bytesEmitted}`);
             return { outcome: 'success' };
           }
           Logger.warn(TAG, `serveRange: upstream ${resp.statusCode} resource=${resource.id} `
@@ -883,9 +909,14 @@ export async function serveRange(
           usingCache: false,
         };
         HttpDownloader.applyProxyToOptions(options, fetchUrl);
+        const requestStartedAt = Date.now();
         const response = await req.request(fetchUrl, options);
         if (response.responseCode === 200 || response.responseCode === 206) {
           const bytes = responseBodyToBytes(response.result);
+          // TTFF probe: buffered path waits for the WHOLE range body here.
+          Logger.info(TAG, `[TTFF] upstream_body ${ttffTag} transport=http `
+            + `status=${response.responseCode} attempt=${attempt} waitMs=${Date.now() - requestStartedAt} `
+            + `bytes=${bytes.length}`);
           if (bytes.length === 0) {
             return { outcome: 'retry', error: `empty body status=${response.responseCode}` };
           }

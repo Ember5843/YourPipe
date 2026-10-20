@@ -1,6 +1,7 @@
 import { YTCoreLogger } from '../common/YTCoreLogger';
 import { preferences } from '@kit.ArkData';
 import { url } from '@kit.ArkTS';
+import { isAccountCookieName } from '../auth/AuthCookieNames';
 
 const logger = YTCoreLogger.getInstance('CookieJar');
 
@@ -226,6 +227,15 @@ export class CookieJar {
       const name = nameValue.substring(0, equalIndex).trim();
       const value = nameValue.substring(equalIndex + 1).trim();
 
+      // Account cookies are credential material, not anonymous jar state. They
+      // are merged into AuthSessionManager separately; storing them here would
+      // leak the account onto every later withAuth=false request (the jar is
+      // attached unconditionally in YouTubeHttpClient.prepareHeaders).
+      if (isAccountCookieName(name)) {
+        logger.debug(`Skip account cookie in anonymous jar: ${name}`);
+        continue;
+      }
+
       // 解析其他属性
       let domain = '';
       let path = '/';
@@ -308,6 +318,11 @@ export class CookieJar {
     const matchingCookies: Cookie[] = [];
 
     for (const cookie of this.cookies.values()) {
+      // Defense in depth for jars persisted by older builds: never replay
+      // account cookies on the anonymous path, even if they are still stored.
+      if (isAccountCookieName(cookie.name)) {
+        continue;
+      }
       if (!cookie.isExpired() && cookie.matches(targetUrl)) {
         matchingCookies.push(cookie);
       }

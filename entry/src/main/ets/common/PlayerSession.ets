@@ -200,6 +200,15 @@ export class PlayerSession {
     return this._submittedVideoId !== '';
   }
 
+  /**
+   * VideoId of the in-flight beginPrepare() extraction ('' when none). Used by
+   * a page that is disappearing to tell "I am the old page, a newer source is
+   * already being prepared" from "I am the current page, close the session".
+   */
+  get preparingVideoId(): string {
+    return this._prepareVideoId;
+  }
+
   get lastPlayError(): ErrorInfo | null {
     return this._lastPlayError;
   }

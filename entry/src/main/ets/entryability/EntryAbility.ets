@@ -118,17 +118,25 @@ export default class EntryAbility extends UIAbility {
       // watch fetch), and running it inside the async proxy-apply window would
       // go direct and leak the exit IP for proxy users. warmRuntime rides the
       // same chain and is gated with it.
+      // Late visitorData arrival (background watch verify) also triggers the
+      // BotGuard warm-up; warmRuntime is idempotent.
+      YoutubeJavaScriptPlayerManager.setVisitorDataListener((visitorData: string) => {
+        SabrWebViewPoTokenProvider.getInstance().warmRuntime(visitorData);
+      });
       logger.debug('cipher prewarm gated on proxy readiness');
       NetworkProxyConfig.awaitReady()
         .then(() => YoutubeJavaScriptPlayerManager.startAppPrewarm(this.context))
         .then(() => {
           // Layer 1: BotGuard init belongs to app startup, not mid-playback.
+          // Do NOT gate this on getPrewarmedVisitorData(): the cipher disk fast
+          // path resolves before the background watch verify captures
+          // visitorData, so the old check silently skipped the warm-up and the
+          // first /player paid the whole cold mint (measured ~3.8s). The
+          // local-DOM generator re-parses the home page and pins the fresh
+          // identity itself, so starting without a known visitorData is safe.
           // The WebView may still be attaching; the provider queues the warm-up
           // until setMinter fires.
-          const visitorData = YoutubeJavaScriptPlayerManager.getPrewarmedVisitorData();
-          if (visitorData) {
-            SabrWebViewPoTokenProvider.getInstance().warmRuntime(visitorData);
-          }
+          SabrWebViewPoTokenProvider.getInstance().warmRuntime();
         })
         .catch((e: Error) => logger.warn(`Cipher prewarm failed: ${e.message || e}`));
       this.startPlaybackPrewarm();

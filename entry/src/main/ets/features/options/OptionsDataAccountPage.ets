@@ -344,6 +344,9 @@ export struct OptionsDataAccountPage {
 
   private signOut(): void {
     AuthSessionManager.getInstance()?.signOut();
+    // Clear the ArkWeb session too: the login page reads WebCookieManager and
+    // would otherwise re-detect (and re-save) the previous account.
+    AuthStateHelper.clearWebViewCookies('sign-out');
     AuthStateHelper.refresh();
     AuthStateHelper.reconcilePlaybackClient();
     this.params.onAuthChanged();
@@ -748,16 +751,26 @@ export struct OptionsDataAccountPage {
 
         ListItemGroup() {
           ListItem() {
-            PlaybackSelectRow({
-              title: $r('app.string.yt_setting_home_feed_after_login'),
-              options: this.getHomeFeedStyleOptions(),
-              selectedIndex: this.getHomeFeedStyleIndex(),
-              fontColor: this.themePrimary,
-              transparentBackground: true,
-              onChange: (index: number) => {
-                this.applyHomeFeedStyle(index);
-              }
-            })
+            if (this.authStatus.canPersonalizedHome) {
+              PlaybackSelectRow({
+                title: $r('app.string.yt_setting_home_feed_after_login'),
+                options: this.getHomeFeedStyleOptions(),
+                selectedIndex: this.getHomeFeedStyleIndex(),
+                fontColor: this.themePrimary,
+                transparentBackground: true,
+                onChange: (index: number) => {
+                  this.applyHomeFeedStyle(index);
+                }
+              })
+            } else {
+              // 没有 WEB/TV 用户数据权限时“推荐”不会生效：明确提示，避免误以为设置坏了。
+              OptionItem({
+                title: $r('app.string.yt_setting_home_feed_after_login'),
+                subtitle: $r('app.string.yt_auth_subtitle_sign_in'),
+                showChevron: false,
+                transparentBackground: true
+              })
+            }
           }
 
           ListItem() {

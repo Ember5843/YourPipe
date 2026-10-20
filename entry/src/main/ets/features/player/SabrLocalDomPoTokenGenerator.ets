@@ -42,6 +42,9 @@ export class SabrLocalDomPoTokenGenerator {
   private expiresAtMs: number = 0;
   /** In-flight initialize() guard: concurrent mints share one bootstrap pass. */
   private initPromise?: Promise<void>;
+  /** Auth/identity epoch. invalidate() bumps it; an initialize() that resolves
+   *  across the bump must not pin the old identity or install its bootstrap. */
+  private epoch: number = 0;
 
   constructor(controller: web_webview.WebviewController, resourceManager: resourceManager.ResourceManager) {
     this.controller = controller;
@@ -50,7 +53,11 @@ export class SabrLocalDomPoTokenGenerator {
 
   async mint(_visitorData: string, identifier: string, forceRefresh: boolean): Promise<Uint8Array | undefined> {
     if (forceRefresh || !this.bootstrap || Date.now() >= this.expiresAtMs) {
+      const epoch = this.epoch;
       await this.initialize();
+      if (epoch !== this.epoch) {
+        throw new Error('attestation bootstrap invalidated during initialize');
+      }
     }
     const bootstrap = this.bootstrap!;
     if (bootstrap.binding === 'session') {
@@ -65,6 +72,9 @@ export class SabrLocalDomPoTokenGenerator {
    * attestation session (identity rotation / credential change).
    */
   invalidate(): void {
+    // Bump first: an initialize() already in flight will see the mismatch and
+    // refuse to install its bootstrap / pin the old identity.
+    this.epoch++;
     this.bootstrap = undefined;
     this.sessionPoToken = undefined;
     this.expiresAtMs = 0;
@@ -94,6 +104,7 @@ export class SabrLocalDomPoTokenGenerator {
   }
 
   private async doInitialize(): Promise<void> {
+    const epoch = this.epoch;
     logger.info('initialization start');
     const helperBytes: Uint8Array = this.resourceManager.getRawFileContentSync('sabr_po_token.js');
     const helper = new util.TextDecoder('utf-8').decodeWithStream(helperBytes);
@@ -111,6 +122,9 @@ export class SabrLocalDomPoTokenGenerator {
         'Accept-Language': 'en-US',
         'Cookie': loginCookie.length > 0 ? loginCookie : ANONYMOUS_COOKIE
       });
+    if (epoch !== this.epoch) {
+      throw new Error('attestation bootstrap invalidated during home fetch');
+    }
     const bootstrap = parseYoutubePageAttestationBootstrap(pageHtml);
     if (bootstrap.binding === 'none') {
       throw new Error('YouTube home does not enable a supported PO token binding');
@@ -163,6 +177,9 @@ export class SabrLocalDomPoTokenGenerator {
       sessionPoToken = await this.mintIdentifier(sessionBinding);
     }
 
+    if (epoch !== this.epoch) {
+      throw new Error('attestation bootstrap invalidated during minter setup');
+    }
     this.bootstrap = bootstrap;
     this.sessionPoToken = sessionPoToken;
     this.expiresAtMs = Date.now()

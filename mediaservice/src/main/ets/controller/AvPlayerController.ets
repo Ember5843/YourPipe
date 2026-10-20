@@ -541,6 +541,9 @@ export class AvPlayerController {
   public async updateVideoSource(newSource: VideoData): Promise<void> {
     if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
     const generation = this.mediaSessionGeneration;
+    const submitStartedAt = Date.now();
+    Logger.info(TAG, `[TTFF] submit_start videoId=${newSource.videoId || 'N/A'} `
+      + `streams=${newSource.streams?.length || 0} live=${newSource.isLive === true}`);
 
     if (!newSource.streams || newSource.streams.length === 0) {
       Logger.debug(TAG, `updateVideoSource ignored: no streams videoId=${newSource.videoId || 'N/A'}`);
@@ -589,8 +592,10 @@ export class AvPlayerController {
       this.setError('[API] NO_SUPPORTED_STREAM');
       return;
     }
+    Logger.info(TAG, `[TTFF] select_streams elapsed=${Date.now() - submitStartedAt}ms`);
 
     await this.initPlaybackEngine();
+    Logger.info(TAG, `[TTFF] engine_ready elapsed=${Date.now() - submitStartedAt}ms`);
     if (!this.isMediaSessionCurrent(generation)
       || this.stateMachine.isOneOf(PlayerState.RELEASED, PlayerState.IDLE)) return;
 
@@ -608,6 +613,8 @@ export class AvPlayerController {
       const maxHeight = this.resolveMaxHeight(prefs.defaultQuality || 'best');
       const hls = await this.resolveLiveHlsStreams(maxHeight);
       if (!this.isMediaSessionCurrent(generation)) return;
+      Logger.info(TAG, `[TTFF] hls_variant_ready elapsed=${Date.now() - submitStartedAt}ms `
+        + `selected=${hls?.videoUrl ? 'yes' : 'master-fallback'} itag=${hls?.itag ?? '-'}`);
       const liveUrl = hls?.videoUrl || newSource.hlsUrl;
       this.currentHlsAudioUrl = hls?.audioUrl || '';
       this.livePlayingVariantItag = hls?.itag;
@@ -615,6 +622,7 @@ export class AvPlayerController {
       this.updateAvSessionMetadata(false);
       this.vm.isBuffering = true;
       this.loadPlaybackSource(liveUrl, 0, generation);
+      Logger.info(TAG, `[TTFF] load_submitted elapsed=${Date.now() - submitStartedAt}ms live=true`);
       if (newSource.play || newSource.auto) {
         this.avSessionManager.activateForPlayback();
         this.playbackEngine.play();
@@ -625,6 +633,9 @@ export class AvPlayerController {
     const current = this.vm.playerModel.getCurrentStreams();
     const playbackUrl = await this.createPlaybackUrl(current.video, current.audio, generation);
     if (!this.isMediaSessionCurrent(generation)) return;
+    Logger.info(TAG, `[TTFF] url_ready elapsed=${Date.now() - submitStartedAt}ms `
+      + `kind=${current.video?.kind || '-'} delivery=${current.video?.deliveryMethod || '-'} `
+      + `ok=${playbackUrl.length > 0}`);
     if (!playbackUrl) {
       this.setError('[PLAYER] LOCAL_PROXY_FAILED');
       return;
@@ -639,6 +650,7 @@ export class AvPlayerController {
       `load mpv: ${current.video?.height}p codec=${current.video?.codecs} ` +
       `hw=${VideoHwCaps.isCodecHardwareFriendly(current.video?.codecs)}`);
     this.loadPlaybackSource(playbackUrl, startPos, generation);
+    Logger.info(TAG, `[TTFF] load_submitted elapsed=${Date.now() - submitStartedAt}ms live=false`);
     if (newSource.play || newSource.auto) {
       this.avSessionManager.activateForPlayback();
       this.playbackEngine.play();
@@ -1296,7 +1308,9 @@ export class AvPlayerController {
   private async resolveLiveHlsStreams(targetHeight: number, picked?: StreamInfo): Promise<HlsTrackPair | null> {
     const masterUrl = this.curSource?.hlsUrl || '';
     if (!masterUrl) return null;
+    const masterStartedAt = Date.now();
     const text = await this.fetchText(masterUrl);
+    Logger.info(TAG, `[TTFF] hls_master elapsed=${Date.now() - masterStartedAt}ms len=${text.length}`);
     if (!text.includes('#EXT-X-STREAM-INF')) return null;
     // HLS 解析统一走 youtube_core HlsManifestParser（本类只保留 HTTP 拉取，
     // 网络层归收到 youtube_core 属后续 P4 项）。

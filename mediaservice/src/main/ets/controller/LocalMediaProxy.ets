@@ -158,6 +158,7 @@ export class LocalMediaProxy {
   }
 
   static async createSingleUrlSession(url: string, metadata?: StreamInfo): Promise<string> {
+    const startedAt = Date.now();
     if (!await LocalMediaProxy.ensureServer()) return '';
     const ua = LocalMediaProxy.userAgentForClient(metadata?.sourceClient);
     Logger.info(TAG, `createSingleUrlSession: itag=${metadata?.itag} mimeType=${metadata?.mimeType} contentLength=${metadata?.contentLength} client=${metadata?.sourceClient}`);
@@ -181,7 +182,10 @@ export class LocalMediaProxy {
         sourceClient: metadata?.sourceClient,
       },
     };
-    return LocalMediaProxy.createSession(JSON.stringify(input));
+    const sessionId = await LocalMediaProxy.createSession(JSON.stringify(input));
+    Logger.info(TAG, `[TTFF] single_session itag=${metadata?.itag} client=${metadata?.sourceClient || '-'} `
+      + `elapsed=${Date.now() - startedAt}ms ok=${sessionId.length > 0}`);
+    return sessionId;
   }
 
   static async createYoutubeDualUrlSession(

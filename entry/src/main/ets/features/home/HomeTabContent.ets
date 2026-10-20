@@ -75,6 +75,11 @@ export struct HomeTabContent {
   /** 首页信息流 LazyForEach 数据源：videoList 变更后由 syncHomeFeedDataSource 同步 */
   private homeFeedDataSource: FeedDataSource = new FeedDataSource();
   private homeBannerMax: number = 6;
+  /**
+   * 首页 feed 请求代次：每次 reset/刷新递增。旧请求晚返回时不得覆盖新结果
+   * （登录态/内容源切换与启动加载并发时，旧的 kiosk 响应会把推荐列表顶掉）。
+   */
+  private homeLoadGeneration: number = 0;
 
   aboutToAppear() {
     this.controller.registerReset((clearList: boolean, reload: boolean) => {
@@ -106,6 +111,7 @@ export struct HomeTabContent {
 
   private async loadLiveVideos(reset: boolean = false) {
     if (reset) {
+      this.homeLoadGeneration += 1;
       this.isLoadingMore = false;
       this.isInitialLoading = this.videoList.length === 0;
       this.homeErrorMessage = '';
@@ -114,6 +120,7 @@ export struct HomeTabContent {
         return;
       }
     }
+    const generation = this.homeLoadGeneration;
 
     const startId = reset ? 1 : (this.videoList.length + 1);
     const loadStartedAt = Date.now();
@@ -139,6 +146,11 @@ export struct HomeTabContent {
             useAuthContinuation,
             this.homeFeedSource
           );
+        if (generation !== this.homeLoadGeneration) {
+          logger.info(`[HomeFeed] stage=stale_drop reset=${reset} generation=${generation} `
+            + `current=${this.homeLoadGeneration}`);
+          return;
+        }
         if (reset) {
           this.videoList = kioskResult.items;
           this.homeFeedSource = kioskResult.source || 'kiosk';
@@ -154,13 +166,18 @@ export struct HomeTabContent {
         }
         this.homeErrorMessage = '';
         this.homeModeNoticeMessage = '';
-        if (reset
-          && kioskResult.source === 'kiosk'
-          && feedStyle === 'recommended'
-          && AuthSessionManager.getInstance()?.consumeAuthRejectionNotice() === true) {
-          // 登录态被拒后已回落到游客 kiosk，提示用户重新登录。
-          this.homeModeNoticeMessage = getContext().resourceManager.getStringSync(
-            $r('app.string.yt_home_auth_expired_notice').id);
+        if (reset && kioskResult.source === 'kiosk' && feedStyle === 'recommended') {
+          const authRejected = AuthSessionManager.getInstance()?.consumeAuthRejectionNotice() === true;
+          if (authRejected) {
+            // 登录态被拒后已回落到游客 kiosk，提示用户重新登录。
+            this.homeModeNoticeMessage = getContext().resourceManager.getStringSync(
+              $r('app.string.yt_home_auth_expired_notice').id);
+          } else if (AuthSessionManager.getInstance()?.hasAuthForUserData() === true) {
+            // 有用户数据权限但推荐源失败/为空时已回退 kiosk：明确提示，
+            // 否则用户会以为「推荐/直播」设置没有生效。
+            this.homeModeNoticeMessage = getContext().resourceManager.getStringSync(
+              $r('app.string.yt_home_recommended_error').id);
+          }
         }
         logger.info(`[HomeFeed] stage=load_done reset=${reset} mode=kiosk source=${this.homeFeedSource} `
           + `items=${kioskResult.items.length} listLen=${this.videoList.length} `
@@ -168,6 +185,11 @@ export struct HomeTabContent {
         return;
       }
     } catch (err) {
+      if (generation !== this.homeLoadGeneration) {
+        logger.info(`[HomeFeed] stage=stale_error_drop reset=${reset} generation=${generation} `
+          + `current=${this.homeLoadGeneration}`);
+        return;
+      }
       // Never JSON.stringify(Error) alone — enumerable fields are empty → "{}" in user logs.
       logger.error(`[HomeFeed] stage=failed reset=${reset} mode=${this.homeMode} `
         + `source=${this.homeFeedSource} ${this.describeThrowable(err)}`);
@@ -190,9 +212,12 @@ export struct HomeTabContent {
       }
       // 保留已有列表，避免加载失败时清空
     } finally {
-      this.isLoadingMore = false;
-      if (reset) {
-        this.isInitialLoading = false;
+      // 旧代次的收尾不得清掉新请求的 loading 状态。
+      if (generation === this.homeLoadGeneration) {
+        this.isLoadingMore = false;
+        if (reset) {
+          this.isInitialLoading = false;
+        }
       }
     }
   }

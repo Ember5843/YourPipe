@@ -306,8 +306,9 @@ struct Index {
     // 1. 停止本地媒体代理服务器
     LocalMediaProxy.stopAll();
 
-    // 2. 清除登录状态（独立的 Preferences 数据库）
+    // 2. 清除登录状态（独立的 Preferences 数据库 + ArkWeb cookie 存储）
     AuthSessionManager.getInstance()?.signOut();
+    AuthStateHelper.clearWebViewCookies('clear-all-data');
     AuthStateHelper.refresh();
     this.refreshHomeAfterAuthChange();
 
@@ -572,6 +573,11 @@ struct Index {
   }
 
   private refreshHomeAfterAuthChange(): void {
+    this.homeTabController.resetFeed(true, true);
+  }
+
+  /** 首页内容源（推荐/直播）变更：无论当前在哪个 tab 都立即重载，回来即可看到新源。 */
+  private refreshHomeAfterFeedStyleChange(): void {
     this.homeTabController.resetFeed(true, true);
   }
 
@@ -1515,6 +1521,9 @@ struct Index {
         },
         refreshHomeAfterAuthChange: () => {
           this.refreshHomeAfterAuthChange();
+        },
+        refreshHomeAfterFeedStyleChange: () => {
+          this.refreshHomeAfterFeedStyleChange();
         },
         handleLoginSuccess: () => {
           this.handleLoginSuccess();

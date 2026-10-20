@@ -66,6 +66,26 @@ export class YoutubeJavaScriptPlayerManager {
   /** visitorData parsed from the prewarm watch page; consumed by the PoToken
    *  runtime warm-up so BotGuard init happens at app start, not mid-playback. */
   private static prewarmedVisitorData: string = '';
+  /** Optional sink for entry's BotGuard warm-up: fires when a visitorData is
+   *  captured. The cipher disk fast path resolves before the background watch
+   *  verify, so an entry-side startup warm may start without one; this lets the
+   *  provider warm as soon as the identity actually arrives. */
+  private static visitorDataListener?: (visitorData: string) => void;
+
+  static setVisitorDataListener(listener?: (visitorData: string) => void): void {
+    YoutubeJavaScriptPlayerManager.visitorDataListener = listener;
+  }
+
+  private static notifyVisitorData(visitorData: string): void {
+    if (!visitorData || !YoutubeJavaScriptPlayerManager.visitorDataListener) {
+      return;
+    }
+    try {
+      YoutubeJavaScriptPlayerManager.visitorDataListener(visitorData);
+    } catch (e) {
+      logger.warn('[CipherWarmup] visitorData listener failed', e);
+    }
+  }
 
   static getPrewarmedVisitorData(): string {
     return YoutubeJavaScriptPlayerManager.prewarmedVisitorData;
@@ -203,6 +223,7 @@ export class YoutubeJavaScriptPlayerManager {
       if (vdMatch?.[1]) {
         YoutubeJavaScriptPlayerManager.prewarmedVisitorData = vdMatch[1];
         logger.info('[CipherWarmup] stage=visitorData captured');
+        YoutubeJavaScriptPlayerManager.notifyVisitorData(vdMatch[1]);
       }
       if (signatureTimestamp > 0) {
         PipePipeApiDecoder.setLocalMetadata({

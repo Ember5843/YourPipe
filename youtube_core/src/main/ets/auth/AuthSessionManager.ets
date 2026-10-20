@@ -6,6 +6,7 @@ import { CookieAuthCredential } from './CookieAuthCredential';
 import { SapisidHashUtil } from './SapisidHashUtil';
 import { HttpDownloader } from '../network/HttpDownloader';
 import { splitSetCookieHeader } from '../network/CookieJar';
+import { isAccountCookieName } from './AuthCookieNames';
 
 const logger = YTCoreLogger.getInstance('AuthSessionManager');
 
@@ -61,14 +62,6 @@ export class AuthSessionManager {
   private deviceLastErrorCode: string = '';
   private deviceStage: AuthStage = AuthStage.SIGNED_OUT;
 
-  /** 账号 cookie 白名单：仅这些 Set-Cookie 会合并进 cookieCredential。 */
-  private static readonly ACCOUNT_COOKIE_NAMES: string[] = [
-    'SID', 'HSID', 'SSID', 'APISID', 'SAPISID',
-    '__Secure-1PAPISID', '__Secure-3PAPISID',
-    '__Secure-1PSID', '__Secure-3PSID',
-    'LOGIN_INFO',
-    'SIDCC', '__Secure-1PSIDCC', '__Secure-3PSIDCC'
-  ];
   /** 服务端清除这些 cookie 视为登录态失效。 */
   private static readonly AUTH_CLEAR_COOKIE_NAMES: string[] = [
     'SID', 'SAPISID', '__Secure-1PAPISID', '__Secure-3PAPISID', 'LOGIN_INFO'
@@ -185,7 +178,7 @@ export class AuthSessionManager {
         }
         continue;
       }
-      if (AuthSessionManager.ACCOUNT_COOKIE_NAMES.indexOf(name) < 0) {
+      if (!isAccountCookieName(name)) {
         continue;
       }
       this.cookieCredential.cookies =
