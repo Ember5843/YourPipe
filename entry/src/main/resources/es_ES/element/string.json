@@ -3693,6 +3693,46 @@
         {
             "name": "yt_local_empty_media_hint",
             "value": "Descarga un vídeo o toca «Importar vídeos»"
+        },
+        {
+            "name": "yt_changelog_0_7_0_1",
+            "value": "Versión mínima rebajada a HarmonyOS 6.1.0(23); SOCKS5, reutilización de conexiones y preconexión RCP ahora dependen de la versión del sistema"
+        },
+        {
+            "name": "yt_changelog_0_7_0_2",
+            "value": "El endpoint de invitado usa visionos por defecto y se elimina Samsung; los errores muestran el endpoint y SABR vuelve a enlaces directos sin token"
+        },
+        {
+            "name": "yt_changelog_0_7_0_3",
+            "value": "SABR decodifica mientras descarga y alinea los campos de solicitud con PipePipe; la rotación de nodos, la recarga y los vigilantes reducen la espera inicial y los cortes en vídeos largos"
+        },
+        {
+            "name": "yt_changelog_0_7_0_4",
+            "value": "Gestos y controles del reproductor renovados: preajustes, acción de doble toque, mantener para velocidad, tocar para pausar, ayuda de gestos; corregidos toques erróneos y doble toque repetido"
+        },
+        {
+            "name": "yt_changelog_0_7_0_5",
+            "value": "Descargas: reproducción en la app, índice persistente con recuperación al reiniciar, transferencias reanudables, pausa/reanudar, reintento y vigilantes de tiempo/sin progreso"
+        },
+        {
+            "name": "yt_changelog_0_7_0_6",
+            "value": "Medios locales: importar vídeos desde archivos del sistema, unir descargas e importaciones en una lista y una cola de reproducción compartida (descargas primero, importaciones después)"
+        },
+        {
+            "name": "yt_changelog_0_7_0_7",
+            "value": "Nueva pestaña de chat en directo de solo lectura: comentarios en tiempo real, Super Chat e insignias de miembro; solo consulta visible y se pausa en segundo plano"
+        },
+        {
+            "name": "yt_changelog_0_7_0_8",
+            "value": "Inicio con cambio largo/corto y recarga de Shorts; la búsqueda expande estanterías; las marcas de tiempo de comentarios y descripciones son pulsables"
+        },
+        {
+            "name": "yt_changelog_0_7_0_9",
+            "value": "Ajustes y UX: configuración reactiva corrige el parpadeo de interruptores; historial, pestaña de suscripciones por defecto, animaciones, barra inferior oficial y estado del proxy/reaplicar"
+        },
+        {
+            "name": "yt_changelog_0_7_0_10",
+            "value": "Corregidos: fuga de estado de sesión, fallo al cambiar el primer vídeo, PiP vacío al volver, archivos de descarga residuales; textos de 14 idiomas completados"
         }
     ]
 }

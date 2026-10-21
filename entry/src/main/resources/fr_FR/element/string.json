@@ -3693,6 +3693,46 @@
         {
             "name": "yt_local_empty_media_hint",
             "value": "Téléchargez une vidéo ou touchez « Importer des vidéos »"
+        },
+        {
+            "name": "yt_changelog_0_7_0_1",
+            "value": "Version minimale abaissée à HarmonyOS 6.1.0(23) ; SOCKS5, réutilisation de connexion et préconnexion RCP sont désormais conditionnés à la version du système"
+        },
+        {
+            "name": "yt_changelog_0_7_0_2",
+            "value": "Point de terminaison invité par défaut sur visionos, Samsung supprimé ; les erreurs affichent le point de terminaison et SABR bascule vers des liens directs sans token"
+        },
+        {
+            "name": "yt_changelog_0_7_0_3",
+            "value": "SABR décode pendant le téléchargement et aligne les champs de requête sur PipePipe ; rotation de nœuds, reprise après rechargement et chiens de garde réduisent l'attente de démarrage et les coupures des longues vidéos"
+        },
+        {
+            "name": "yt_changelog_0_7_0_4",
+            "value": "Gestes et contrôles du lecteur repensés : préréglages, action du double-tap, maintien pour la vitesse, tap pour pause, aide gestuelle ; correction des faux appuis et du double-tap répété"
+        },
+        {
+            "name": "yt_changelog_0_7_0_5",
+            "value": "Téléchargements : lecture dans l'app, index persistant avec reprise au redémarrage, transferts reprenables, pause/reprise, nouvelle tentative, délais d'expiration et chiens de garde"
+        },
+        {
+            "name": "yt_changelog_0_7_0_6",
+            "value": "Médias locaux : import de vidéos depuis les fichiers système, téléchargements et imports réunis dans une liste et une file de lecture commune (téléchargements d'abord, imports ensuite)"
+        },
+        {
+            "name": "yt_changelog_0_7_0_7",
+            "value": "Nouvel onglet chat en direct en lecture seule : commentaires en temps réel, Super Chat et badges de membre ; interrogation uniquement visible, pause en arrière-plan"
+        },
+        {
+            "name": "yt_changelog_0_7_0_8",
+            "value": "Accueil avec bascule longues/courtes vidéos et complément Shorts ; la recherche développe les rayons ; les horodatages des commentaires et descriptions sont cliquables"
+        },
+        {
+            "name": "yt_changelog_0_7_0_9",
+            "value": "Réglages et UX : configuration réactive corrige le clignotement des interrupteurs ; historique, onglet abonnements par défaut, animations, barre inférieure officielle et état du proxy/réapplication"
+        },
+        {
+            "name": "yt_changelog_0_7_0_10",
+            "value": "Corrections : fuite d'état de connexion, échec du premier changement de vidéo, PiP vide au retour, fichiers de téléchargement résiduels ; textes des 14 langues complétés"
         }
     ]
 }

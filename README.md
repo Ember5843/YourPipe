@@ -7,7 +7,7 @@
 
 **YouTube client for OpenHarmony / HarmonyOS**
 
-[![Version](https://img.shields.io/badge/version-0.6.0-blue?style=flat-square)](AppScope/app.json5)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue?style=flat-square)](AppScope/app.json5)
 [![HarmonyOS](https://img.shields.io/badge/HarmonyOS-6.1.0(23)-black?style=flat-square)](https://developer.huawei.com/consumer/en/harmonyos/)
 [![Player](https://img.shields.io/badge/player-MPV-brightgreen?style=flat-square)](https://github.com/mpv-player/mpv)
 [![License](https://img.shields.io/badge/license-GPL--3.0-yellow?style=flat-square)](LICENSE)
@@ -25,11 +25,11 @@ YourPipe is a YouTube client for **OpenHarmony / HarmonyOS**. It extracts stream
 | | |
 |---|---|
 | **Package** | `com.talon.yourpipe` |
-| **Version** | `0.6.0` |
+| **Version** | `0.7.0` |
 | **Target SDK** | `26.0.0` (min `6.1.0(23)`) · HarmonyOS · stage model |
 | **Devices** | phone · tablet · 2in1 · tv · car |
 
-Product VOD typically goes through a **SABR** dual-track local proxy into MPV (mweb player client). Playback is **MPV only**: the `libmpv_napi` module is a NAPI bridge over a vendored `libmpv.so`, originally derived from [libmdk-napi](https://github.com/wang-bin/libmdk-napi) (historical `mdk` names exist only in old commits).
+Guest VOD uses direct-link DASH through the **visionos** endpoint into MPV by default; signed-in playback defaults to the **SABR** dual-track local proxy (mweb). Playback is **MPV only**: the `libmpv_napi` module is a NAPI bridge over a vendored `libmpv.so`, originally derived from [libmdk-napi](https://github.com/wang-bin/libmdk-napi) (historical `mdk` names exist only in old commits).
 
 ---
 

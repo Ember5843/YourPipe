@@ -75,6 +75,21 @@ const AI_MODELS: AiModelItem[] = [
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.0', date: '2026-10-21',
+    changes: [
+      $r('app.string.yt_changelog_0_7_0_1'),
+      $r('app.string.yt_changelog_0_7_0_2'),
+      $r('app.string.yt_changelog_0_7_0_3'),
+      $r('app.string.yt_changelog_0_7_0_4'),
+      $r('app.string.yt_changelog_0_7_0_5'),
+      $r('app.string.yt_changelog_0_7_0_6'),
+      $r('app.string.yt_changelog_0_7_0_7'),
+      $r('app.string.yt_changelog_0_7_0_8'),
+      $r('app.string.yt_changelog_0_7_0_9'),
+      $r('app.string.yt_changelog_0_7_0_10'),
+    ],
+  },
+  {
     version: '0.6.0', date: '2026-09-06',
     changes: [
       $r('app.string.yt_changelog_0_6_0_1'),

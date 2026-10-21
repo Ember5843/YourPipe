@@ -3693,6 +3693,46 @@
         {
             "name": "yt_local_empty_media_hint",
             "value": "Baixe um vídeo ou toque em \"Importar vídeos\""
+        },
+        {
+            "name": "yt_changelog_0_7_0_1",
+            "value": "Versão mínima reduzida para HarmonyOS 6.1.0(23); SOCKS5, reutilização de conexão e pré-conexão RCP agora dependem da versão do sistema"
+        },
+        {
+            "name": "yt_changelog_0_7_0_2",
+            "value": "Endpoint de convidado padrão visionos e Samsung removido; falhas mostram o endpoint e o SABR cai para links diretos sem token"
+        },
+        {
+            "name": "yt_changelog_0_7_0_3",
+            "value": "SABR decodifica durante o download e alinha campos de requisição ao PipePipe; rotação de nós, recarga e watchdogs reduzem a espera inicial e interrupções em vídeos longos"
+        },
+        {
+            "name": "yt_changelog_0_7_0_4",
+            "value": "Gestos e controles do player reformulados: predefinições, ação de toque duplo, segurar para velocidade, tocar para pausar, ajuda de gestos; corrigidos toques errados e toque duplo repetido"
+        },
+        {
+            "name": "yt_changelog_0_7_0_5",
+            "value": "Downloads: reprodução no app, índice persistente com recuperação ao reiniciar, transferências retomáveis, pausar/continuar, nova tentativa e watchdogs de tempo/sem progresso"
+        },
+        {
+            "name": "yt_changelog_0_7_0_6",
+            "value": "Mídia local: importar vídeos dos arquivos do sistema, unir downloads e importações em uma lista e fila de reprodução compartilhada (downloads primeiro, importações depois)"
+        },
+        {
+            "name": "yt_changelog_0_7_0_7",
+            "value": "Nova aba de chat ao vivo somente leitura: comentários em tempo real, Super Chat e selos de membro; consulta apenas visível e pausa em segundo plano"
+        },
+        {
+            "name": "yt_changelog_0_7_0_8",
+            "value": "Início com alternância longo/curto e reposição de Shorts; a busca expande prateleiras; timestamps em comentários e descrições são clicáveis"
+        },
+        {
+            "name": "yt_changelog_0_7_0_9",
+            "value": "Ajustes e UX: configuração reativa corrige o piscar dos interruptores; histórico, aba de inscrições padrão, animações, barra inferior oficial e status do proxy/re aplicar"
+        },
+        {
+            "name": "yt_changelog_0_7_0_10",
+            "value": "Corrigidos: vazamento de estado de login, falha na primeira troca de vídeo, PiP vazio ao voltar, arquivos de download residuais; textos em 14 idiomas completos"
         }
     ]
 }

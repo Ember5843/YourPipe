@@ -3693,6 +3693,46 @@
         {
             "name": "yt_local_empty_media_hint",
             "value": "Download a video or tap \"Import videos\" to add local files"
+        },
+        {
+            "name": "yt_changelog_0_7_0_1",
+            "value": "Minimum runtime lowered to HarmonyOS 6.1.0(23); SOCKS5, connection reuse, and RCP pre-connect are now gated by OS version"
+        },
+        {
+            "name": "yt_changelog_0_7_0_2",
+            "value": "Guest endpoint defaults to visionos and Samsung is removed; failures show the endpoint in use and SABR falls back to token-free direct links"
+        },
+        {
+            "name": "yt_changelog_0_7_0_3",
+            "value": "SABR now decodes while downloading and aligns request fields with PipePipe; node rotation, reload continuation, and stall watchdogs reduce startup waits and long-video interruptions"
+        },
+        {
+            "name": "yt_changelog_0_7_0_4",
+            "value": "Reworked player gestures and controls: gesture presets, double-tap action, hold-to-speed, tap-to-pause, gesture help; fixed control mis-taps and repeated double-tap"
+        },
+        {
+            "name": "yt_changelog_0_7_0_5",
+            "value": "Download improvements: in-app playback, persistent task index with restart recovery, resumable transfers, pause/resume, retry, and timeout/no-progress watchdogs"
+        },
+        {
+            "name": "yt_changelog_0_7_0_6",
+            "value": "Local media: import videos from system files, merge downloads and imports into one list, and share one playback queue (downloads first, imports last)"
+        },
+        {
+            "name": "yt_changelog_0_7_0_7",
+            "value": "New read-only live chat tab with realtime comments, Super Chat and member badges; polling only while visible and paused in the background"
+        },
+        {
+            "name": "yt_changelog_0_7_0_8",
+            "value": "Home feed gains long/short dimension switching and Shorts top-up; search expands shelf containers; timestamps in comments and descriptions are tappable"
+        },
+        {
+            "name": "yt_changelog_0_7_0_9",
+            "value": "Settings and UX: reactive config fixes switch flicker; adds watch-history switch, default subscriptions tab, animation master switch, official bottom bar, and proxy status/reapply"
+        },
+        {
+            "name": "yt_changelog_0_7_0_10",
+            "value": "Fixed login-state leakage, first-video switch failures, empty PiP on back, leftover download files, and completed 14-locale copy"
         }
     ]
 }

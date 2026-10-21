@@ -3693,6 +3693,46 @@
         {
             "name": "yt_local_empty_media_hint",
             "value": "Lade ein Video herunter oder tippe auf „Videos importieren“"
+        },
+        {
+            "name": "yt_changelog_0_7_0_1",
+            "value": "Mindestlaufzeit auf HarmonyOS 6.1.0(23) gesenkt; SOCKS5, Verbindungswiederverwendung und RCP-Vorverbindung sind jetzt versionsabhängig"
+        },
+        {
+            "name": "yt_changelog_0_7_0_2",
+            "value": "Gast-Endpunkt standardmäßig visionos, Samsung entfernt; Fehler zeigen den Endpunkt, SABR fällt auf tokenfreie Direktlinks zurück"
+        },
+        {
+            "name": "yt_changelog_0_7_0_3",
+            "value": "SABR dekodiert während des Downloads und gleicht Anfragefelder an PipePipe an; Knotenrotation, Reload-Fortsetzung und Stall-Watchdogs verkürzen Startzeiten und reduzieren Abbrüche bei langen Videos"
+        },
+        {
+            "name": "yt_changelog_0_7_0_4",
+            "value": "Player-Gesten und -Steuerung überarbeitet: Gestenprofile, Doppeltipp-Aktion, Halten für Geschwindigkeit, Tippen zum Pausieren, Gestenhilfe; Fehlbedienung und wiederholtes Doppeltippen behoben"
+        },
+        {
+            "name": "yt_changelog_0_7_0_5",
+            "value": "Download-Verbesserungen: Wiedergabe in der App, dauerhafter Aufgabenindex mit Neustart-Wiederherstellung, fortsetzbare Übertragungen, Pause/Fortsetzen, Wiederholen sowie Timeout-/Fortschritts-Watchdogs"
+        },
+        {
+            "name": "yt_changelog_0_7_0_6",
+            "value": "Lokale Medien: Videos aus Systemdateien importieren, Downloads und Importe in einer Liste zusammenführen und eine gemeinsame Warteschlange nutzen (Downloads zuerst, Importe danach)"
+        },
+        {
+            "name": "yt_changelog_0_7_0_7",
+            "value": "Neuer schreibgeschützter Live-Chat-Tab mit Echtzeitkommentaren, Super Chat und Mitgliedsabzeichen; Abfrage nur bei Sichtbarkeit, Pause im Hintergrund"
+        },
+        {
+            "name": "yt_changelog_0_7_0_8",
+            "value": "Startseite mit Lang-/Kurzvideo-Umschaltung und Shorts-Nachladen; Suche löst Regalcontainer auf; Zeitstempel in Kommentaren und Beschreibungen sind antippbar"
+        },
+        {
+            "name": "yt_changelog_0_7_0_9",
+            "value": "Einstellungen und UX: reaktive Konfiguration behebt Schalterflackern; Watch-History-Schalter, Standard-Abonnements-Tab, Animationsschalter, offizielle Bottom-Bar sowie Proxy-Status/Neuanwenden"
+        },
+        {
+            "name": "yt_changelog_0_7_0_10",
+            "value": "Behoben: Login-Zustandsleck, Fehler beim ersten Videowechsel, leeres PiP beim Zurückgehen, zurückbleibende Download-Dateien; 14-Sprachen-Texte vervollständigt"
         }
     ]
 }

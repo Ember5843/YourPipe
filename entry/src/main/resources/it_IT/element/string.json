@@ -3693,6 +3693,46 @@
         {
             "name": "yt_local_empty_media_hint",
             "value": "Scarica un video o tocca \"Importa video\""
+        },
+        {
+            "name": "yt_changelog_0_7_0_1",
+            "value": "Versione minima abbassata a HarmonyOS 6.1.0(23); SOCKS5, riuso delle connessioni e pre-connessione RCP ora dipendono dalla versione del sistema"
+        },
+        {
+            "name": "yt_changelog_0_7_0_2",
+            "value": "Endpoint ospite predefinito visionos e Samsung rimosso; gli errori mostrano l'endpoint e SABR passa ai link diretti senza token"
+        },
+        {
+            "name": "yt_changelog_0_7_0_3",
+            "value": "SABR decodifica durante il download e allinea i campi delle richieste a PipePipe; rotazione nodi, ricarica e watchdog riducono l'attesa iniziale e le interruzioni nei video lunghi"
+        },
+        {
+            "name": "yt_changelog_0_7_0_4",
+            "value": "Gesti e controlli del player rinnovati: preset, azione doppio tocco, pressione per velocità, tocco per pausa, guida gesti; corretti tocchi errati e doppio tocco ripetuto"
+        },
+        {
+            "name": "yt_changelog_0_7_0_5",
+            "value": "Download: riproduzione nell'app, indice persistente con recupero al riavvio, trasferimenti riprendibili, pausa/ripresa, nuovo tentativo e watchdog di timeout/nessun progresso"
+        },
+        {
+            "name": "yt_changelog_0_7_0_6",
+            "value": "Media locali: importa video dai file di sistema, unisci download e import in un unico elenco e coda di riproduzione (download prima, import dopo)"
+        },
+        {
+            "name": "yt_changelog_0_7_0_7",
+            "value": "Nuova scheda chat live in sola lettura: commenti in tempo reale, Super Chat e badge membri; polling solo se visibile e in pausa in background"
+        },
+        {
+            "name": "yt_changelog_0_7_0_8",
+            "value": "Home con cambio video lunghi/corti e rifornimento Shorts; la ricerca espande gli scaffali; timestamp di commenti e descrizioni cliccabili"
+        },
+        {
+            "name": "yt_changelog_0_7_0_9",
+            "value": "Impostazioni e UX: configurazione reattiva corregge lo sfarfallio degli interruttori; cronologia, scheda iscrizioni predefinita, animazioni, barra inferiore ufficiale e stato proxy/riapplica"
+        },
+        {
+            "name": "yt_changelog_0_7_0_10",
+            "value": "Corretti: fuga dello stato di accesso, errore al primo cambio video, PiP vuoto al ritorno, file di download residui; completati i testi in 14 lingue"
         }
     ]
 }

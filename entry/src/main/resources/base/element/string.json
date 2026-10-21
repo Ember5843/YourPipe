@@ -3693,6 +3693,46 @@
         {
             "name": "yt_local_empty_media_hint",
             "value": "Download a video or tap \"Import videos\" to add local files"
+        },
+        {
+            "name": "yt_changelog_0_7_0_1",
+            "value": "最低运行版本降至 HarmonyOS 6.1.0(23)，按系统版本启用 SOCKS5、连接复用与 RCP 预连接"
+        },
+        {
+            "name": "yt_changelog_0_7_0_2",
+            "value": "游客端点改为 visionos 默认并移除 Samsung；失败时显示端点，SABR 不可用会自动降级到免 token 直链"
+        },
+        {
+            "name": "yt_changelog_0_7_0_3",
+            "value": "SABR 改为边下边解并对齐 PipePipe 请求参数，完善节点轮换、重载续播和卡顿看门狗，缩短起播等待并减少长视频中断"
+        },
+        {
+            "name": "yt_changelog_0_7_0_4",
+            "value": "播放器手势与控件重做：手势预设、双击动作、长按倍速、点击暂停、手势说明，修复控件误触和重复双击"
+        },
+        {
+            "name": "yt_changelog_0_7_0_5",
+            "value": "下载管理增强：应用内播放、任务索引与重启恢复、断点续传、暂停/继续、失败重试、超时与无进展看门狗"
+        },
+        {
+            "name": "yt_changelog_0_7_0_6",
+            "value": "本地媒体：新增系统文件导入，下载与导入合为一个列表并共享播放队列（下载在前、导入在后）"
+        },
+        {
+            "name": "yt_changelog_0_7_0_7",
+            "value": "新增只读直播聊天 Tab：实时评论、Super Chat 与会员标识，仅在可见时轮询，切后台自动暂停"
+        },
+        {
+            "name": "yt_changelog_0_7_0_8",
+            "value": "首页新增长/短视频维度切换与 Shorts 补货，搜索可解析货架；评论和简介中的时间戳可点击跳转"
+        },
+        {
+            "name": "yt_changelog_0_7_0_9",
+            "value": "设置与体验：配置响应式修复开关闪烁，新增观看历史开关、默认订阅页、动画总开关、官方底栏和代理状态条/一键重启"
+        },
+        {
+            "name": "yt_changelog_0_7_0_10",
+            "value": "修复登录态串号、首个视频切换失败、返回时空画中画、下载文件残留等问题，并补齐 14 语言文案"
         }
     ]
 }
