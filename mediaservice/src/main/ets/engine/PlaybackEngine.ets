@@ -89,6 +89,8 @@ export interface PlaybackEngine {
   stop(): void;
   seek(positionSec: number, keyframe: boolean): void;
   setPlaybackSpeed(speed: number): void;
+  /** 单文件循环（Shorts 单条循环）：loop-file=inf/no，跨 load 保持。 */
+  setFileLoop(enabled: boolean): void;
   setVolume(volume: number): void;
   getVolume(): number;
 

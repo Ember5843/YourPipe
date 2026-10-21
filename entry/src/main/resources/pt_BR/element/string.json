@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "Mostra um grande botão de reprodução no centro do quadro durante a pausa. Desativado, o quadro fica limpo; controle tocando ou pela barra inferior."
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "Abrir Shorts"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "Vídeos longos"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "Vídeos longos"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "Pausar"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "Retomar"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "Retomando…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "Parar e excluir"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "Pausado"
+        }]
 }

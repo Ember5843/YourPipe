@@ -56,10 +56,15 @@ export struct OptionsPlaybackPage {
   }
 
   private getTimeoutOptions(): SelectOption[] {
+    const resourceManager = getContext().resourceManager;
     return DOWNLOAD_TIMEOUT_VALUES.map((value: number) => ({
+      // 注意：$r('app.string.x', 参数) 返回的是**带格式化参数的 Resource**。
+      // Text 渲染 Resource 时会套用参数，但 ArkUI 的 Select 解析 Resource 走的是
+      // getStringSync(id)（不带参数）→ 选项里会原样显示 "%d 分钟"。
+      // 这里直接取已格式化的字符串。
       value: value === 0
-        ? $r('app.string.yt_download_timeout_off')
-        : $r('app.string.yt_download_timeout_minutes', value)
+        ? resourceManager.getStringSync($r('app.string.yt_download_timeout_off').id)
+        : resourceManager.getStringSync($r('app.string.yt_download_timeout_minutes').id, value)
     } as SelectOption));
   }
 

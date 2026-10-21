@@ -13,6 +13,8 @@ interface OptionsAppearancePageParams {
   themeColor: ResourceColor;
   applyDarkModeSelection: (mode: YourtubeDarkMode) => void;
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
+  /** 首页内容相关设置变更后重载首页信息流（首页条目集合本身变了）。 */
+  refreshHomeFeed: () => void;
 }
 
 @Component
@@ -23,7 +25,8 @@ export struct OptionsAppearancePage {
   @Prop params: OptionsAppearancePageParams = {
     themeColor: '#E53935',
     applyDarkModeSelection: () => {},
-    updateUiConfig: () => {}
+    updateUiConfig: () => {},
+    refreshHomeFeed: () => {}
   };
 
   private getDarkModeOptions(): SelectOption[] {
@@ -212,6 +215,9 @@ export struct OptionsAppearancePage {
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
+        // 原「Shorts」分组（悬浮球开关 + 首页显示短视频）随全屏 Shorts 模式
+        // 一起下线：短视频现在是**首页标题栏的一个切换维度**（长视频 / 短视频），
+        // 不需要设置项。组件代码保留在 features/shorts/，要恢复就把分组放回。
       }
       .width('100%')
       .layoutWeight(1)

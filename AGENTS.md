@@ -287,6 +287,19 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   aborted.
 - **Dependency direction**: never import `entry` from HARs; never import
   `mediaservice` from `youtube_core`.
+- **Shorts 短视频**：不是独立模式，而是**首页信息流的一个维度** —— 标题栏（搜索图标
+  左侧）有切换符号，在「长视频 / 短视频」两份列表间切换。首页 feed 的每一页按
+  `VideoItem.isShort` 拆成 `longList` / `shortList`（同一份数据，切换不重新请求）。
+  **短视频只来自账号相关的内容，两条腿**：① 首页 feed 里的 Shorts 货架（位置不固定，
+  短视频维度下自动多翻 ≤5 页把它收进来）；② **feed 翻到顶后**（推荐流 continuation
+  有限，约 12 页）接「我的频道」的 `/shorts` 标签页（订阅频道 → 观看历史频道，去重
+  ≤12 个，独立分页，多频道条目**轮转交织**防"整屏同一作者"）。**不用泛搜索
+  （搜 "shorts"）补货**，那些内容与账号无关。维度持久化在 `UIConfig.homeFeedMode`。
+  **全屏 Shorts 页 + 主页悬浮球已停用**（`features/shorts/**` 的代码保留但无入口，
+  `mediaservice` 的 `setFileLoop`/`setMuted` 同理）；要恢复见 `shorts-design.md`
+  附录 A。搜索页要显示短视频时，解析必须递归展开货架容器（新版是
+  `gridShelfViewModel`，`contents` 不是 `items`；旧结构还有
+  `shelfRenderer`→`horizontalListRenderer` 等）。
 - **AI subtitles**: the only live path is P0, the server-side `tlang`
   translation track — built by `youtube_core`
   (`extractor/SubtitleTranslate.ets`, `SubtitleTrack.isAutoTranslated`),

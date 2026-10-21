@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "一時停止中に画面中央へ大きな再生ボタンを表示します。オフにすると画面中央はそのまま、画面のタップか下部バーで操作します。"
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "Shorts を開く"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "通常動画"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "ショート"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "通常の動画"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "一時停止"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "再開"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "再開中…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "停止して削除"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "一時停止中"
+        }]
 }

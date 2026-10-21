@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "Affiche un grand bouton de lecture au centre de l'image en pause. Désactivé, l'image reste nette ; contrôle par appui ou barre inférieure."
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "Ouvrir Shorts"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "Vidéos longues"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "Vidéos longues"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "Pause"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "Reprendre"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "Reprise…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "Arrêter et supprimer"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "En pause"
+        }]
 }

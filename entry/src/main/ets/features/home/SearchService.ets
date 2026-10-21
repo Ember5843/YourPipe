@@ -23,6 +23,8 @@ export class SearchService {
   private localization: Localization;
   private contentCountry: ContentCountry;
   private currentFilters: string[] = [];
+  /** 视频搜索解析时的条目 id 游标（递归展开时跨节点连续编号）。 */
+  private videoItemIdCursor: number = 0;
 
   constructor(localization: Localization, contentCountry: ContentCountry) {
     this.localization = localization;
@@ -204,7 +206,6 @@ export class SearchService {
   }
 
   private buildVideoItemsFromContents(sectionContents: Array<Record<string, Object>>, startId: number): Array<VideoItem> {
-    let idCounter = startId;
     const items: Array<VideoItem> = [];
     sectionContents.forEach((entry) => {
       const promo = entry["backgroundPromoRenderer"] as Record<string, Object>;
@@ -212,18 +213,112 @@ export class SearchService {
         const message = getTextFromRuns(promo["bodyText"]) || getContext().resourceManager.getStringSync($r('app.string.yt_search_no_results').id);
         throw new Error(message);
       }
-
-      const video = entry["videoRenderer"] as Record<string, Object>;
-      if (video) {
-        // 与混合搜索同走 builder，补齐 publishedTimeText/时长/精确播放数/认证等字段。
-        const videoItem = buildVideoItemFromRenderer(video, idCounter, '');
-        if (videoItem) {
-          items.push(videoItem);
-          idCounter += 1;
-        }
-      }
     });
+    this.videoItemIdCursor = startId;
+    this.collectVideoItemsFromContents(sectionContents, items);
     return items;
+  }
+
+  /**
+   * 递归展开搜索结果里的容器节点（货架 / itemSection / richItem），
+   * 收集叶子条目（videoRenderer / reelItemRenderer / shortsLockupViewModel）。
+   *
+   * 短视频（Shorts）在搜索结果里通常挂在 **货架** 里（richShelfRenderer →
+   * reelItemRenderer），只解析 sectionContents 的直接叶子会整条漏掉 ——
+   * 这正是 Shorts feed 搜索源一条都拿不到的原因。
+   */
+  private collectVideoItemsFromContents(contents: Array<Record<string, Object>> | undefined, out: Array<VideoItem>): void {
+    if (!contents || contents.length === 0) {
+      return;
+    }
+    for (let i = 0; i < contents.length; i++) {
+      const entry = contents[i];
+      if (!entry) {
+        continue;
+      }
+      const richItem = entry["richItemRenderer"] as Record<string, Object>;
+      if (richItem) {
+        const content = richItem["content"] as Record<string, Object>;
+        if (content) {
+          this.collectVideoItemFromNode(content, out);
+        }
+        continue;
+      }
+      // 新版搜索结果用 gridShelfViewModel 承载货架（contents 而不是 items）。
+      const gridShelfNode = entry["gridShelfViewModel"] as Record<string, Object>;
+      if (gridShelfNode) {
+        this.collectVideoItemsFromContents(gridShelfNode["contents"] as Array<Record<string, Object>>, out);
+        continue;
+      }
+      const richShelf = entry["richShelfRenderer"] as Record<string, Object>;
+      if (richShelf) {
+        this.collectVideoItemsFromContents(richShelf["contents"] as Array<Record<string, Object>>, out);
+        continue;
+      }
+      const shelf = entry["shelfRenderer"] as Record<string, Object>;
+      if (shelf) {
+        const shelfContent = shelf["content"] as Record<string, Object>;
+        if (shelfContent) {
+          const grid = shelfContent["gridRenderer"] as Record<string, Object>;
+          if (grid) {
+            this.collectVideoItemsFromContents(grid["items"] as Array<Record<string, Object>>, out);
+            continue;
+          }
+          // 搜索结果里的 Shorts 货架是**横向列表**（horizontalListRenderer），
+          // 不是 gridRenderer —— 漏了它，Shorts feed 的搜索源一条都拿不到。
+          const horizontal = shelfContent["horizontalListRenderer"] as Record<string, Object>;
+          if (horizontal) {
+            this.collectVideoItemsFromContents(horizontal["items"] as Array<Record<string, Object>>, out);
+            continue;
+          }
+          const expanded = shelfContent["expandedShelfContentsRenderer"] as Record<string, Object>;
+          if (expanded) {
+            this.collectVideoItemsFromContents(expanded["items"] as Array<Record<string, Object>>, out);
+          }
+        }
+        continue;
+      }
+      const itemSection = entry["itemSectionRenderer"] as Record<string, Object>;
+      if (itemSection) {
+        this.collectVideoItemsFromContents(itemSection["contents"] as Array<Record<string, Object>>, out);
+        continue;
+      }
+      this.collectVideoItemFromNode(entry, out);
+    }
+  }
+
+  /** 单个叶子节点 → VideoItem。 */
+  private collectVideoItemFromNode(node: Record<string, Object>, out: Array<VideoItem>): void {
+    const video = node["videoRenderer"] as Record<string, Object>;
+    if (video) {
+      // 与混合搜索同走 builder，补齐 publishedTimeText/时长/精确播放数/认证等字段。
+      const videoItem = buildVideoItemFromRenderer(video, this.videoItemIdCursor, '');
+      if (videoItem) {
+        out.push(videoItem);
+        this.videoItemIdCursor += 1;
+      }
+      return;
+    }
+    // 搜索结果里的 Shorts 货架走 reelItemRenderer / shortsLockupViewModel：
+    // 视频搜索路径（fetchInitial/fetchNext）必须和混合搜索路径一样解析它们，
+    // 否则 Shorts feed 的搜索源一条都拿不到。
+    const reelRenderer = node["reelItemRenderer"] as Record<string, Object>;
+    if (reelRenderer) {
+      const videoItem = buildVideoItemFromReelRenderer(reelRenderer, this.videoItemIdCursor);
+      if (videoItem) {
+        out.push(videoItem);
+        this.videoItemIdCursor += 1;
+      }
+      return;
+    }
+    const shortsLockup = node["shortsLockupViewModel"] as Record<string, Object>;
+    if (shortsLockup) {
+      const videoItem = buildVideoItemFromShortsLockupViewModel(shortsLockup, this.videoItemIdCursor);
+      if (videoItem) {
+        out.push(videoItem);
+        this.videoItemIdCursor += 1;
+      }
+    }
   }
 
   private buildSearchItemsFromContents(
@@ -314,6 +409,7 @@ export class SearchService {
           const author = getLockupUploaderName(lockup) || "";
           const channelId = getLockupChannelId(lockup);
           const videoItem = new VideoItem(idCounter, videoId, title, author, "", thumbnailUrl, false, placeholderColor, channelId, "", "", "");
+          videoItem.isShort = true;
           items.push(new SearchStreamItem(videoItem.id, videoItem));
           idCounter += 1;
           return;

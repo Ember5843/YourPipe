@@ -47,6 +47,18 @@ export class UIConfig {
    * 画面中央保持干净（适合已经习惯点按操作的用户）。
    */
   @Track showCenterPlayButton: boolean = true;
+  /** 主页 Shorts 悬浮球开关（默认开）。**全屏 Shorts 模式已停用**（代码保留，
+   *  入口改为首页的长/短视频切换），此开关随入口一起停用。 */
+  @Track shortsBallEnabled: boolean = true;
+  /** 悬浮球位置（归一化 0..1，按内容区左上角计）；-1 = 使用默认左下位置。 */
+  @Track shortsBallX: number = -1;
+  @Track shortsBallY: number = -1;
+  /**
+   * 首页信息流维度：'long' 只显示长视频，'short' 只显示短视频。
+   * 首页同时维护两个列表（同一份 feed 按 isShort 拆开），切换只换显示的列表，
+   * 不重新请求。
+   */
+  @Track homeFeedMode: string = 'long';
   constructor() {
   }
 
@@ -106,8 +118,30 @@ export class UIConfig {
       : 30;
     config.showCenterPlayButton =
       PreferencesStore.getString('cfg_showCenterPlayButton', 'true') !== 'false';
+    config.shortsBallEnabled =
+      PreferencesStore.getString('cfg_shortsBallEnabled', 'true') !== 'false';
+    config.shortsBallX = UIConfig.parseNormalizedCoord(
+      PreferencesStore.getString('cfg_shortsBallX', '-1'), -1);
+    config.shortsBallY = UIConfig.parseNormalizedCoord(
+      PreferencesStore.getString('cfg_shortsBallY', '-1'), -1);
+    config.homeFeedMode = UIConfig.normalizeHomeFeedMode(
+      PreferencesStore.getString('cfg_homeFeedMode', 'long'));
     logger.info(`Loaded UIConfig from Preferences: ${JSON.stringify(config)}`);
     return config;
+  }
+
+  /** 归一化球坐标：非法/缺失回退到 fallback（-1 = 默认位置）。 */
+  static parseNormalizedCoord(raw: string, fallback: number): number {
+    const value = parseFloat(raw);
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      return fallback;
+    }
+    return value;
+  }
+
+  /** 首页维度：'long' | 'short'，非法值回退 'long'。 */
+  static normalizeHomeFeedMode(value: string): string {
+    return value === 'short' ? 'short' : 'long';
   }
 
   /** 将需要持久化的字段写入 PreferencesStore */
@@ -132,6 +166,12 @@ export class UIConfig {
     PreferencesStore.setString('cfg_maxConcurrentDownloads', `${Math.max(1, Math.min(4, Math.round(config.maxConcurrentDownloads || 1)))}`);
     PreferencesStore.setString('cfg_downloadTimeoutMinutes', `${Math.max(0, Math.min(240, Math.round(config.downloadTimeoutMinutes ?? 30)))}`);
     PreferencesStore.setString('cfg_showCenterPlayButton', config.showCenterPlayButton !== false ? 'true' : 'false');
+    PreferencesStore.setString('cfg_shortsBallEnabled', config.shortsBallEnabled !== false ? 'true' : 'false');
+    PreferencesStore.setString('cfg_shortsBallX',
+      Number.isFinite(config.shortsBallX) && config.shortsBallX >= 0 ? `${config.shortsBallX}` : '-1');
+    PreferencesStore.setString('cfg_shortsBallY',
+      Number.isFinite(config.shortsBallY) && config.shortsBallY >= 0 ? `${config.shortsBallY}` : '-1');
+    PreferencesStore.setString('cfg_homeFeedMode', UIConfig.normalizeHomeFeedMode(config.homeFeedMode));
   }
 }
 

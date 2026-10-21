@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "일시정지 중 화면 중앙에 큰 재생 버튼을 표시합니다. 끄면 화면 중앙이 그대로 유지되며 화면 탭이나 하단 바로 제어합니다."
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "Shorts 열기"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "일반 동영상"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "일반 동영상"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "일시정지"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "계속"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "계속하는 중…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "중지 후 삭제"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "일시정지됨"
+        }]
 }

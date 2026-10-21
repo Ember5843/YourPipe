@@ -762,6 +762,105 @@ export class PlayerSession {
   }
 
   /**
+   * Shorts 换源：同一媒体会话内替换视频源，**不**走长视频的 resetSession
+   * （后者会 closeMediaSession → 拆代理/媒体会话，换条出现黑屏与额外建链）。
+   *
+   * 与 play() 的差异：
+   * - 不调用 resetSession，controller / MPV / AVSession / surface 全部复用；
+   * - 每次换条递增 _playGeneration：滑走后迟到的提取/提交结果被现有
+   *   generation 守卫丢弃（doPlay 提交前后的 isPlayContextCurrent 检查）；
+   * - 上一条进度在切换前落历史（saveWatchHistory 内部按 >1s 判定）。
+   *
+   * 返回 null 表示本条提取/提交失败（调用方展示封面 + 重试，不弹播放页错误）。
+   */
+  async playShorts(video: VideoItem): Promise<VideoData | null> {
+    if (this._controller.playerState === PlayerState.RELEASED) {
+      this.recreateReleasedController(true);
+      this._controller.setFileLoop(true);
+    }
+    const videoId = (video.videoId || '').trim();
+    if (!videoId) {
+      logger.warn(`${TAG} playShorts ignored: empty videoId`);
+      return null;
+    }
+
+    if (this._currentVideo?.videoId && this._currentVideo.videoId !== videoId) {
+      // 先结旧条目，再换 current，避免历史计时器把新元数据写到旧 ID。
+      this.saveWatchHistory();
+      this.stopWatchSaveTimer();
+      logger.info(`${TAG} shorts switch ${this._currentVideo.videoId} -> ${videoId}`);
+    }
+
+    if (this._activePlayVideoId === videoId && this._activePlayPromise) {
+      logger.info(`${TAG} playShorts dedup: ${videoId} already extracting`);
+      return this._activePlayPromise;
+    }
+    if (this._currentVideo?.videoId === videoId
+      && (this._controller.vm.isReady || this._submittedVideoId === videoId)) {
+      logger.info(`${TAG} playShorts skipped: ${videoId} already ready`);
+      return this._defaultSource;
+    }
+
+    // 换条即作废旧代际：上一条还在提取时，其结果不得再提交到控制器。
+    this._playGeneration += 1;
+    this._playbackTornDown = false;
+    this._failureRetryCount = 0;
+    this._failureRetryInFlight = false;
+    // Shorts 永远从头播放：不吃长视频的续播进度。
+    this._pendingResumeSec = 0;
+    this._pendingAutoPlay = true;
+    this._currentVideo = video;
+    this._activePlayVideoId = videoId;
+    logger.info(`${TAG} playShorts start video=${videoId} generation=${this._playGeneration}`);
+
+    const generation = this._playGeneration;
+    const promise = this.doPlay(video, videoId, generation);
+    this._activePlayPromise = promise;
+    try {
+      return await promise;
+    } finally {
+      if (this._activePlayPromise === promise) {
+        this._activePlayPromise = null;
+        this._activePlayVideoId = '';
+      }
+    }
+  }
+
+  /**
+   * 作废在飞的播放意图（Shorts 滑动换条时调用）。
+   *
+   * 递增代际 → 正在提取/准备提交的旧条目会在 doPlay 的守卫处被丢弃，
+   * **不会**把过期源提交给控制器。否则用户已经滑到下一条，屏幕上还在放
+   * 上一条（观感上就是"滑不动"）。
+   *
+   * 不会中断网络请求：提取本身不可取消（提取器是单例，串行执行），
+   * 这里只保证"过期结果不落地"。
+   */
+  invalidatePendingPlay(): void {
+    this._playGeneration += 1;
+    logger.info(`${TAG} invalidate_pending_play generation=${this._playGeneration}`);
+  }
+
+  /** 退出 Shorts 页：关闭单条循环/静音并停掉任何在飞提取代际。 */
+  exitShortsMode(): void {
+    this._playGeneration += 1;
+    if (this._controller.playerState !== PlayerState.RELEASED) {
+      this._controller.setFileLoop(false);
+      this._controller.setMuted(false);
+    }
+    logger.info(`${TAG} exitShortsMode generation=${this._playGeneration}`);
+  }
+
+  /** Shorts 预取入口：页面只持有 VideoItem，不接触 YouTubePlayService 的 context。 */
+  prefetchVideo(video: VideoItem): void {
+    const videoId = (video?.videoId || '').trim();
+    if (!videoId) {
+      return;
+    }
+    YouTubePlayService.getInstance(this._context).prefetch(videoId);
+  }
+
+  /**
    * 本地文件播放：跳过 YouTube 提取与本地代理，直接把沙箱路径交给 MPV。
    * 合成一条 progressive 流（hasVideo+hasAudio），复用与点播一致的
    * updateVideoSource → selectInitialStreams → createPlaybackUrl(LOCAL_FILE) → load 链路。
@@ -869,19 +968,22 @@ export class PlayerSession {
       if (result.success && result.videoInfo) {
         const videoStream = result.videoInfo.streams?.find((s) => s.hasVideo && s.width && s.height);
         if (this._currentVideo) {
-          if (result.videoInfo.title && this._currentVideo.title !== result.videoInfo.title) {
-            this._currentVideo.title = result.videoInfo.title;
+          // 回填用**本次播放的条目**（video），不是 this._currentVideo：
+          // Shorts 连滑时 _currentVideo 已经是下一条，用它会把这一条的
+          // 标题/作者写到下一条上。
+          if (result.videoInfo.title && video.title !== result.videoInfo.title) {
+            video.title = result.videoInfo.title;
           }
-          if (result.videoInfo.author && this._currentVideo.author !== result.videoInfo.author) {
-            this._currentVideo.author = result.videoInfo.author;
+          if (result.videoInfo.author && video.author !== result.videoInfo.author) {
+            video.author = result.videoInfo.author;
           }
-          if (result.videoInfo.channelId && this._currentVideo.channelId !== result.videoInfo.channelId) {
-            this._currentVideo.channelId = result.videoInfo.channelId;
+          if (result.videoInfo.channelId && video.channelId !== result.videoInfo.channelId) {
+            video.channelId = result.videoInfo.channelId;
           }
           if (result.videoInfo.uploaderAvatarUrl) {
             const avatarUrl = normalizeUrl(result.videoInfo.uploaderAvatarUrl);
-            if (this._currentVideo.channelAvatarUrl !== avatarUrl) {
-              this._currentVideo.channelAvatarUrl = avatarUrl;
+            if (video.channelAvatarUrl !== avatarUrl) {
+              video.channelAvatarUrl = avatarUrl;
             }
           }
           // Keep the thumbnail selected by the feed stable throughout startup.
@@ -890,13 +992,13 @@ export class PlayerSession {
           // Back-fill local history for cloud-synced rows missing author / channel meta.
           WatchHistoryStore.enrichMetadata(
             videoId,
-            this._currentVideo.title || '',
-            this._currentVideo.author || '',
-            this._currentVideo.thumbnailUrl || '',
+            video.title || '',
+            video.author || '',
+            video.thumbnailUrl || '',
             result.videoInfo.lengthSeconds || 0,
-            this._currentVideo.channelId || '',
-            this._currentVideo.channelAvatarUrl || '',
-            this._currentVideo.channelHandle || ''
+            video.channelId || '',
+            video.channelAvatarUrl || '',
+            video.channelHandle || ''
           );
         }
         const videoSource: VideoData = {

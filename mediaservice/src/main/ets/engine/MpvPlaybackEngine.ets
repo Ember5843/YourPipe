@@ -76,6 +76,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private lastLoggedHwdec: string = '';
   /** Mirror of vid on/off for background audio-only only (never used on load/seek). */
   private videoOutputOn: boolean = true;
+  /** Shorts 单条循环：loop-file=inf。跨 load 保持，进入/退出 Shorts 时切换。 */
+  private fileLoopEnabled: boolean = false;
   /** MediaInfo 快照的节流刷新时间戳（0 = 立即刷新） */
   private lastMediaInfoAtMs: number = 0;
   /** getMediaInfo 派生字段的缓存快照；见 buildState 的 2s 节流 */
@@ -356,6 +358,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     try {
       const isEdl = this.sourceUrl.startsWith('edl://');
       const directStartMs = isEdl ? 0 : this.pendingStartMs;
+      // Shorts 单条循环：引擎重建后属性会丢，load 前按当前意图重写。
+      ctrl.setProperty('loop-file', this.fileLoopEnabled ? 'inf' : 'no');
       ctrl.setMedia(this.sourceUrl, directStartMs);
       if (!isEdl) {
         // mpv's per-file start option performs the initial demuxer seek before the first frame.
@@ -452,6 +456,20 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl !== null && !this.destroyed) ctrl.setPlaybackRate(speed);
     this.emitCurrentState();
+  }
+
+  /**
+   * Shorts 单条循环：mpv `loop-file` 属性跨 loadfile 保持，因此这里只在
+   * 切换时写一次；load() 里再写一次兜底（引擎重建后属性会丢失）。
+   */
+  setFileLoop(enabled: boolean): void {
+    if (this.fileLoopEnabled === enabled) return;
+    this.fileLoopEnabled = enabled;
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl !== null && !this.destroyed) {
+      ctrl.setProperty('loop-file', enabled ? 'inf' : 'no');
+    }
+    Logger.info(TAG, `loop-file=${enabled ? 'inf' : 'no'}`);
   }
 
   setVolume(volume: number): void {

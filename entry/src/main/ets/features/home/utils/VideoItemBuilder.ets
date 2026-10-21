@@ -52,7 +52,49 @@ export function buildVideoItemFromRenderer(
   item.viewCountExact = getViewCountExactFromRenderer(renderer);
   item.uploaderVerified = getUploaderVerifiedFromRenderer(renderer);
   item.channelHandle = getChannelHandleFromRenderer(renderer);
+  item.isShort = isShortFormRenderer(renderer);
   return item;
+}
+
+/**
+ * 普通 videoRenderer 的 Shorts 判定（NewPipe `YoutubeStreamInfoItemExtractor
+ * .isShortFormContent` 同款）：搜索/首页里真正的 Shorts 仍以 videoRenderer
+ * 形式返回，只靠 renderer 类型无法区分。
+ */
+export function isShortFormRenderer(renderer: Record<string, Object>): boolean {
+  const nav = renderer["navigationEndpoint"] as Record<string, Object>;
+  if (nav) {
+    const command = nav["commandMetadata"] as Record<string, Object>;
+    const web = command ? (command["webCommandMetadata"] as Record<string, Object>) : undefined;
+    const pageType = web ? ((web["webPageType"] as string) || "") : "";
+    if (pageType === "WEB_PAGE_TYPE_SHORTS") {
+      return true;
+    }
+    if (nav["reelWatchEndpoint"]) {
+      return true;
+    }
+  }
+  const overlays = renderer["thumbnailOverlays"] as Array<Record<string, Object>>;
+  if (overlays) {
+    for (let i = 0; i < overlays.length; i++) {
+      const status = overlays[i]
+        ? (overlays[i]["thumbnailOverlayTimeStatusRenderer"] as Record<string, Object>)
+        : undefined;
+      if (!status) {
+        continue;
+      }
+      const style = ((status["style"] as string) || "").toUpperCase();
+      if (style === "SHORTS") {
+        return true;
+      }
+      const icon = status["icon"] as Record<string, Object>;
+      const iconType = icon ? ((icon["iconType"] as string) || "").toLowerCase() : "";
+      if (iconType.indexOf("shorts") >= 0) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /** lengthText 直取；退化到 thumbnailOverlayTimeStatusRenderer.text（gridVideoRenderer 等无 lengthText 的变体）。 */
@@ -184,7 +226,9 @@ export function buildVideoItemFromReelRenderer(renderer: Record<string, Object>,
     getTextFromRuns(shortBylineText) ||
     "";
   const channelId = getChannelId(renderer);
-  return new VideoItem(id, videoId, title, author, viewCountText, thumbnailUrl, false, placeholderColor, channelId, "", "", "");
+  const item = new VideoItem(id, videoId, title, author, viewCountText, thumbnailUrl, false, placeholderColor, channelId, "", "", "");
+  item.isShort = true;
+  return item;
 }
 
 /**
@@ -314,12 +358,13 @@ export function buildVideoItemFromTileRenderer(tile: Record<string, Object>, id:
   const channelId = '';
   const placeholderColor = ThumbnailPlaceholder.pickColor(videoId || title, id);
   // Shorts: still a playable video id
-  void style;
-  void contentType;
-  return new VideoItem(
+  const isShortTile = style.indexOf('SHORTS') >= 0 || contentType.indexOf('SHORTS') >= 0;
+  const item = new VideoItem(
     id, videoId, title, author, viewCount, thumbnailUrl, isLive, placeholderColor,
     channelId, '', '', '', null, false, false
   );
+  item.isShort = isShortTile;
+  return item;
 }
 
 export function buildVideoItemFromShortsLockupViewModel(lockup: Record<string, Object>, id: number): VideoItem | null {const onTap = lockup["onTap"] as Record<string, Object>;
@@ -348,7 +393,9 @@ export function buildVideoItemFromShortsLockupViewModel(lockup: Record<string, O
   const author = getLockupUploaderName(lockup) || "";
   const channelId = getLockupChannelId(lockup);
 
-  return new VideoItem(id, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor, channelId, "", "", "");
+  const item = new VideoItem(id, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor, channelId, "", "", "");
+  item.isShort = true;
+  return item;
 }
 
 /**

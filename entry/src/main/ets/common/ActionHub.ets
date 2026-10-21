@@ -12,6 +12,8 @@ export enum ActionHubEvent {
 
 export class ActionHub {
   openSearch: (initialQuery?: string) => void = () => {};
+  /** 主页 Shorts 悬浮球入口：push 全屏 Shorts 页。 */
+  openShorts: () => void = () => {};
   openVideo: (video: VideoItem, sourceHint?: PlayQueueSourceHint, audioOnly?: boolean) => void = () => {};
   openChannel: (channel: SearchChannelItem) => void = () => {};
   openChannelById: (channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string) => void = () => {};

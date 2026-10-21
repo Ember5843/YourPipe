@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "يعرض زر تشغيل كبيرًا في منتصف الإطار أثناء الإيقاف المؤقت. عند إيقافه يبقى الإطار نظيفًا، والتحكم باللمس أو الشريط السفلي."
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "فتح Shorts"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "فيديوهات طويلة"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "مقاطع طويلة"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "إيقاف مؤقت"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "متابعة"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "جارٍ الاستئناف…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "إيقاف وحذف"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "متوقف مؤقتًا"
+        }]
 }

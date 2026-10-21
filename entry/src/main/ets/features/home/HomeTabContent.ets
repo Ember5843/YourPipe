@@ -11,9 +11,42 @@ import { ErrorPage } from '../../common/components/ErrorPage';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { UIConfig } from '../../common/AppState';
+import { SubscriptionUser } from '../../common/SubscriptionModel';
+import { WatchHistoryStore } from '../../common/WatchHistoryStore';
 import { COLOR_PRESETS } from '../../common/ThemeManager';
 
 const logger = AppLog.getInstance('HomeTabContent');
+
+/** 短视频列表少于该条数时，继续翻首页 feed 去收短视频（短视频就在这份混合 feed 里）。 */
+const HOME_SHORTS_TOPUP_THRESHOLD: number = 12;
+/** 单次补收最多额外翻几页首页 feed。 */
+const HOME_SHORTS_HARVEST_PAGES: number = 5;
+/** 短视频攒够这个数就停手（首页 feed 的 Shorts 货架位置不固定，多翻几页才碰得到）。 */
+const HOME_SHORTS_HARVEST_TARGET: number = 24;
+/** feed 到顶后，最多取多少个"我的频道"的 /shorts 标签页。 */
+const HOME_SHORTS_MAX_CHANNELS: number = 20;
+/**
+ * 一轮补货同时查多少个频道。
+ * 频道池整体查一遍（串行 await）要十几秒，首屏会被拖死；这里改成
+ * **并发查 N 个**、频道池按游标轮转，每轮只花一两秒。
+ */
+const HOME_SHORTS_CHANNEL_FETCH_PER_ROUND: number = 6;
+/** 一轮频道补货最多并入多少条短视频。 */
+const HOME_SHORTS_CHANNEL_BATCH: number = 60;
+
+/** 短视频补收用的频道游标（每个频道独立分页）。 */
+interface ShortsChannelState {
+  channelId: string;
+  token: string;
+  visitor: string;
+  exhausted: boolean;
+}
+
+/** 一页 feed 按 isShort 拆分的结果。 */
+interface HomeFeedSplit {
+  long: VideoItem[];
+  short: VideoItem[];
+}
 
 /**
  * 首页 tab 与 Index 之间的控制句柄：feed 重置（启动 / 登录态变化 / 搜索地区
@@ -27,6 +60,7 @@ export class HomeTabController {
   private queuedClearList: boolean = false;
   private queuedReload: boolean = false;
   private hasQueuedReset: boolean = false;
+  private modeSwitchImpl: ((mode: string) => void) | null = null;
 
   registerReset(impl: (clearList: boolean, reload: boolean) => void): void {
     this.resetImpl = impl;
@@ -45,6 +79,20 @@ export class HomeTabController {
     this.queuedReload = reload;
     this.hasQueuedReset = true;
   }
+
+  /**
+   * 首页维度切换（长视频 / 短视频）：数据源要换一份（两个列表是分开的），
+   * 由首页内容侧同步 + 回到顶部。
+   */
+  registerModeSwitch(impl: (mode: string) => void): void {
+    this.modeSwitchImpl = impl;
+  }
+
+  switchMode(mode: string): void {
+    if (this.modeSwitchImpl) {
+      this.modeSwitchImpl(mode);
+    }
+  }
 }
 
 /**
@@ -60,7 +108,18 @@ export struct HomeTabContent {
   @StorageProp('themePrimaryColor') themePrimary: string = COLOR_PRESETS[0].primary;
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
-  @State videoList: VideoItem[] = [];
+  @State longList: VideoItem[] = [];
+  @State shortList: VideoItem[] = [];
+  /** 正在进行的 feed 拉取（"多翻几页收短视频"要串行等它）。 */
+  private feedLoadInFlight: Promise<void> = Promise.resolve();
+  /** 短视频补收（多翻 feed 页）的 in-flight 标记。 */
+  private shortsHarvestInFlight: boolean = false;
+  /** 频道补货（feed 到顶后接"我的频道"）的状态与 in-flight 标记。 */
+  private shortsChannels: ShortsChannelState[] = [];
+  private shortsChannelTopUpInFlight: boolean = false;
+  /** 频道池轮转游标：每轮从这里开始挑频道。 */
+  private shortsChannelCursor: number = 0;
+  private shortsIdCursor: number = 1000000;
   @State isLoadingMore: boolean = false;
   @State isInitialLoading: boolean = false;
   @State isHomeRefreshing: boolean = false;
@@ -72,7 +131,7 @@ export struct HomeTabContent {
   @State kioskVisitorData: string = '';
   @State homeFeedSource: string = 'kiosk';
   @State homeMode: string = 'kiosk';
-  /** 首页信息流 LazyForEach 数据源：videoList 变更后由 syncHomeFeedDataSource 同步 */
+  /** 首页信息流 LazyForEach 数据源：当前维度的列表变更后由 syncHomeFeedDataSource 同步 */
   private homeFeedDataSource: FeedDataSource = new FeedDataSource();
   private homeBannerMax: number = 6;
   /**
@@ -85,6 +144,27 @@ export struct HomeTabContent {
     this.controller.registerReset((clearList: boolean, reload: boolean) => {
       this.resetHomeFeed(clearList, reload);
     });
+    this.controller.registerModeSwitch((mode: string) => {
+      this.onHomeModeSwitched(mode);
+    });
+  }
+
+  /**
+   * 首页维度切换（长视频 ↔ 短视频）：两个列表是分开维护的，切换只换显示的
+   * 那一份（数据源换 key 序列 → 整列重建），不回顶部、不重新请求。
+   */
+  private onHomeModeSwitched(mode: string): void {
+    logger.info(`[HomeFeed] stage=mode_switch mode=${mode} `
+      + `long=${this.longList.length} short=${this.shortList.length}`);
+    this.syncHomeFeedDataSource();
+    this.scrollHomeFeedToTop();
+    if (mode === 'short') {
+      if (this.shortList.length < HOME_SHORTS_TOPUP_THRESHOLD) {
+        this.harvestShortsFromFeed().catch(() => undefined);
+      } else if (!this.kioskNextPageToken) {
+        this.topUpShortsFromChannels().catch(() => undefined);
+      }
+    }
   }
 
   /**
@@ -101,7 +181,8 @@ export struct HomeTabContent {
     this.homeErrorMessage = '';
     this.homeModeNoticeMessage = '';
     if (clearList) {
-      this.videoList = [];
+      this.longList = [];
+      this.shortList = [];
       this.syncHomeFeedDataSource();
     }
     if (reload) {
@@ -109,11 +190,18 @@ export struct HomeTabContent {
     }
   }
 
-  private async loadLiveVideos(reset: boolean = false) {
+  /** 记录在飞的 feed 请求：短视频补收要串行等它结束再要下一页。 */
+  private loadLiveVideos(reset: boolean = false): Promise<void> {
+    const task = this.doLoadLiveVideos(reset);
+    this.feedLoadInFlight = task;
+    return task;
+  }
+
+  private async doLoadLiveVideos(reset: boolean = false) {
     if (reset) {
       this.homeLoadGeneration += 1;
       this.isLoadingMore = false;
-      this.isInitialLoading = this.videoList.length === 0;
+      this.isInitialLoading = this.activeList().length === 0;
       this.homeErrorMessage = '';
     } else {
       if (this.isLoadingMore) {
@@ -122,10 +210,11 @@ export struct HomeTabContent {
     }
     const generation = this.homeLoadGeneration;
 
-    const startId = reset ? 1 : (this.videoList.length + 1);
+    const startId = reset ? 1 : (this.longList.length + this.shortList.length + 1);
     const loadStartedAt = Date.now();
     logger.info(`[HomeFeed] stage=load_start reset=${reset} mode=${this.homeMode} `
-      + `source=${this.homeFeedSource} startId=${startId} listLen=${this.videoList.length}`);
+      + `source=${this.homeFeedSource} startId=${startId} long=${this.longList.length} `
+      + `short=${this.shortList.length}`);
     try {
       if (this.homeMode === 'kiosk') {
         if (!reset) {
@@ -152,12 +241,16 @@ export struct HomeTabContent {
           return;
         }
         if (reset) {
-          this.videoList = kioskResult.items;
+          const split = this.splitByType(kioskResult.items);
+          this.longList = split.long;
+          this.shortList = split.short;
           this.homeFeedSource = kioskResult.source || 'kiosk';
           this.homeFeedEpoch += 1;
           this.scrollHomeFeedToTop();
         } else {
-          this.videoList = this.videoList.concat(kioskResult.items);
+          const split = this.splitByType(kioskResult.items);
+          this.longList = this.longList.concat(split.long);
+          this.shortList = this.shortList.concat(split.short);
         }
         this.syncHomeFeedDataSource();
         this.kioskNextPageToken = kioskResult.nextPageToken;
@@ -180,8 +273,18 @@ export struct HomeTabContent {
           }
         }
         logger.info(`[HomeFeed] stage=load_done reset=${reset} mode=kiosk source=${this.homeFeedSource} `
-          + `items=${kioskResult.items.length} listLen=${this.videoList.length} `
-          + `elapsed=${Date.now() - loadStartedAt}ms`);
+          + `items=${kioskResult.items.length} long=${this.longList.length} `
+          + `short=${this.shortList.length} elapsed=${Date.now() - loadStartedAt}ms`);
+        // 短视频维度：
+        // - 短视频还不够 → 往后再翻几页 feed，把 Shorts 货架收进来；
+        // - feed 已经翻到头（continuation 有限）→ 换「我的频道」的 /shorts 续上。
+        if (this.isShortMode()) {
+          if (this.shortList.length < HOME_SHORTS_TOPUP_THRESHOLD) {
+            this.harvestShortsFromFeed().catch(() => undefined);
+          } else if (!this.kioskNextPageToken) {
+            this.topUpShortsFromChannels().catch(() => undefined);
+          }
+        }
         return;
       }
     } catch (err) {
@@ -227,18 +330,18 @@ export struct HomeTabContent {
     // Always perform the work and clear it in finally.
     logger.info(`[HomeRefresh] stage=start mode=${this.homeMode} source=${this.homeFeedSource}`);
     const startedAt = Date.now();
-    const prevHead = this.videoList.length > 0
-      ? (this.videoList[0].videoId || this.videoList[0].id.toString())
+    const prevHead = this.activeList().length > 0
+      ? (this.activeList()[0].videoId || this.activeList()[0].id.toString())
       : '';
     try {
       this.kioskNextPageToken = null;
       this.kioskVisitorData = '';
       await this.loadLiveVideos(true);
-      const nextHead = this.videoList.length > 0
-        ? (this.videoList[0].videoId || this.videoList[0].id.toString())
+      const nextHead = this.activeList().length > 0
+        ? (this.activeList()[0].videoId || this.activeList()[0].id.toString())
         : '';
       logger.info(`[HomeRefresh] stage=complete mode=${this.homeMode} source=${this.homeFeedSource} `
-        + `elapsed=${Date.now() - startedAt}ms items=${this.videoList.length} head=${nextHead} `
+        + `elapsed=${Date.now() - startedAt}ms items=${this.activeList().length} head=${nextHead} `
         + `changed=${prevHead !== nextHead} error=${this.homeErrorMessage.length > 0 ? 'yes' : 'no'}`);
     } catch (e) {
       logger.error(`[HomeRefresh] stage=failed elapsed=${Date.now() - startedAt}ms ${this.describeThrowable(e)}`);
@@ -263,6 +366,257 @@ export struct HomeTabContent {
   private homeListItemKey(item: VideoItem): string {
     const videoId = (item.videoId || '').trim();
     return videoId.length > 0 ? videoId : item.id.toString();
+  }
+
+  /**
+   * feed 到顶后的续供：取「我的频道」的 /shorts 标签页。
+   *
+   * 频道池 = 订阅频道 → 观看历史里的频道（去重，最多 20 个）。这些频道跟账号
+   * 相关，不是泛搜索那种批量内容；每个频道的 Shorts 标签独立分页，能一直翻。
+   *
+   * **每轮只并发查 N 个频道**（`HOME_SHORTS_CHANNEL_FETCH_PER_ROUND`），
+   * 频道池按游标轮转 —— 把整个池子串行查一遍要十几秒，滑动会被拖死。
+   *
+   * 多频道的条目**轮转交织**后再并入列表 —— 否则一个频道的几十条会把
+   * 列表前半段刷成"同一个作者"（这正是全屏 Shorts 页当初的问题）。
+   */
+  private async topUpShortsFromChannels(): Promise<void> {
+    if (this.shortsChannelTopUpInFlight) {
+      return;
+    }
+    this.shortsChannelTopUpInFlight = true;
+    const startedAt = Date.now();
+    try {
+      if (this.shortsChannels.length === 0) {
+        this.shortsChannels = this.buildAccountChannelStates();
+        logger.info(`[HomeFeed] stage=shorts_channels pool=${this.shortsChannels.length}`);
+      }
+      if (this.shortsChannels.length === 0) {
+        return;
+      }
+      const picked = this.pickChannelsForRound();
+      if (picked.length === 0) {
+        logger.info(`[HomeFeed] stage=shorts_channel_topup skipped=all_exhausted`);
+        return;
+      }
+      const service = FeedServiceProvider.getInstance().getChannelService();
+      // 并发查本轮选中的频道（browse 请求彼此独立，可以并发）。
+      const pages: Array<Array<VideoItem>> = await Promise.all(
+        picked.map(async (state: ShortsChannelState): Promise<Array<VideoItem>> => {
+          try {
+            const result = state.token.length > 0
+              ? await service.fetchChannelShortsNext(state.token, state.visitor, this.shortsIdCursor)
+              : await service.fetchChannelShortsInitial(state.channelId, this.shortsIdCursor);
+            state.token = result.nextPageToken ?? '';
+            state.visitor = result.visitorData || state.visitor;
+            if (state.token.length === 0) {
+              state.exhausted = true;
+            }
+            // /shorts 标签页里的东西按定义就是短视频。
+            const shorts: Array<VideoItem> = [];
+            for (let k = 0; k < result.items.length; k++) {
+              result.items[k].isShort = true;
+              shorts.push(result.items[k]);
+            }
+            return shorts;
+          } catch (e) {
+            logger.warn(`[HomeFeed] stage=shorts_channel_failed channel=${state.channelId} `
+              + `${this.describeThrowable(e)}`);
+            state.exhausted = true;
+            return [];
+          }
+        })
+      );
+      const nonEmpty: Array<Array<VideoItem>> = [];
+      for (let i = 0; i < pages.length; i++) {
+        if (pages[i].length > 0) {
+          nonEmpty.push(pages[i]);
+        }
+      }
+      const merged = this.interleaveByChannel(nonEmpty, HOME_SHORTS_CHANNEL_BATCH);
+      const seen = new Set<string>();
+      for (let i = 0; i < this.shortList.length; i++) {
+        seen.add(this.shortList[i].videoId);
+      }
+      const added: Array<VideoItem> = [];
+      for (let i = 0; i < merged.length; i++) {
+        const videoId = merged[i].videoId;
+        if (!videoId || seen.has(videoId)) {
+          continue;
+        }
+        seen.add(videoId);
+        added.push(merged[i]);
+      }
+      if (added.length > 0) {
+        this.shortList = this.shortList.concat(added);
+        if (this.isShortMode()) {
+          this.syncHomeFeedDataSource();
+        }
+      }
+      logger.info(`[HomeFeed] stage=shorts_channel_topup added=${added.length} `
+        + `total=${this.shortList.length} channels=${nonEmpty.length}/${picked.length} `
+        + `elapsed=${Date.now() - startedAt}ms`);
+    } catch (e) {
+      logger.warn(`[HomeFeed] stage=shorts_channel_topup_failed ${this.describeThrowable(e)}`);
+    } finally {
+      this.shortsChannelTopUpInFlight = false;
+    }
+  }
+
+  /**
+   * 本轮要查的频道：从游标开始轮转，跳过已翻完的，最多 N 个。
+   * 游标推进 → 下一轮自然换一批频道（既能持续供给，作者也更多样）。
+   */
+  private pickChannelsForRound(): ShortsChannelState[] {
+    const picked: ShortsChannelState[] = [];
+    const total = this.shortsChannels.length;
+    for (let i = 0; i < total && picked.length < HOME_SHORTS_CHANNEL_FETCH_PER_ROUND; i++) {
+      const index = (this.shortsChannelCursor + i) % total;
+      const state = this.shortsChannels[index];
+      if (!state.exhausted) {
+        picked.push(state);
+      }
+    }
+    if (total > 0) {
+      this.shortsChannelCursor = (this.shortsChannelCursor + picked.length) % total;
+    }
+    return picked;
+  }
+
+  /** 频道池：订阅频道优先，其次观看历史里的频道（去重、限量）。 */
+  private buildAccountChannelStates(): ShortsChannelState[] {
+    const ids: string[] = [];
+    const push = (id: string): void => {
+      const trimmed = (id || '').trim();
+      if (trimmed.length > 0 && ids.indexOf(trimmed) < 0) {
+        ids.push(trimmed);
+      }
+    };
+    try {
+      const subs = AppStorage.get<Array<SubscriptionUser>>('subscriptions');
+      if (subs) {
+        for (let i = 0; i < subs.length; i++) {
+          push(subs[i].channelId);
+        }
+      }
+    } catch (e) {
+      logger.warn(`[HomeFeed] stage=shorts_channels_subs_failed ${this.describeThrowable(e)}`);
+    }
+    try {
+      const history = WatchHistoryStore.getAll();
+      for (let i = 0; i < history.length; i++) {
+        push(history[i].channelId);
+      }
+    } catch (e) {
+      logger.warn(`[HomeFeed] stage=shorts_channels_history_failed ${this.describeThrowable(e)}`);
+    }
+    const states: ShortsChannelState[] = [];
+    for (let i = 0; i < ids.length && states.length < HOME_SHORTS_MAX_CHANNELS; i++) {
+      states.push({ channelId: ids[i], token: '', visitor: '', exhausted: false });
+    }
+    return states;
+  }
+
+  /** 多个频道的条目轮转交织（每个频道轮流出一条），避免整屏同一个作者。 */
+  private interleaveByChannel(lists: Array<Array<VideoItem>>, limit: number): Array<VideoItem> {
+    const out: Array<VideoItem> = [];
+    let index = 0;
+    while (out.length < limit) {
+      let progressed = false;
+      for (let i = 0; i < lists.length; i++) {
+        if (index < lists[i].length) {
+          out.push(lists[i][index]);
+          progressed = true;
+        }
+        if (out.length >= limit) {
+          break;
+        }
+      }
+      if (!progressed) {
+        break;
+      }
+      index += 1;
+    }
+    return out;
+  }
+
+  /**
+   * 一页 feed 按 `isShort` 拆成两份：长视频列表 + 短视频列表。
+   *
+   * 两份列表来自**同一次请求**（首页 feed 的 Shorts 货架就在里面），所以切换
+   * 维度不需要重新请求；短视频那份的作者分布也跟首页一致（多作者），不会
+   * 出现"整页都是同一个频道"。
+   */
+  private splitByType(items: VideoItem[]): HomeFeedSplit {
+    const long: VideoItem[] = [];
+    const short: VideoItem[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].isShort === true) {
+        short.push(items[i]);
+      } else {
+        long.push(items[i]);
+      }
+    }
+    if (short.length > 0) {
+      logger.info(`[HomeFeed] stage=split long=${long.length} short=${short.length}`);
+    }
+    return { long: long, short: short };
+  }
+
+  /** 当前维度（'long' | 'short'）。 */
+  private isShortMode(): boolean {
+    return this.uiConfig.homeFeedMode === 'short';
+  }
+
+  /** 当前维度对应的列表。 */
+  private activeList(): VideoItem[] {
+    return this.isShortMode() ? this.shortList : this.longList;
+  }
+
+  /**
+   * 短视频补收：**只从首页那份混合 feed 里收**（长视频 + 短视频本来就混在一页里）。
+   *
+   * 首页 feed 的 Shorts 货架位置不固定（有时在首屏、有时要往后翻几页才碰到），
+   * 所以短视频维度下会自动多翻几页，把里面的短视频收进 `shortList`。
+   *
+   * 不用泛搜索（搜 "shorts" 的关键词结果）补货 —— 那些内容跟账号无关，
+   * 混进来会破坏"短视频列表 = 我的 feed 里的短视频"这个语义。
+   */
+  private async harvestShortsFromFeed(): Promise<void> {
+    if (this.shortsHarvestInFlight) {
+      return;
+    }
+    this.shortsHarvestInFlight = true;
+    const startedAt = Date.now();
+    let pages = 0;
+    try {
+      for (let i = 0; i < HOME_SHORTS_HARVEST_PAGES; i++) {
+        if (this.shortList.length >= HOME_SHORTS_HARVEST_TARGET) {
+          break;
+        }
+        // 等当前分页请求结束再要下一页（loadLiveVideos 对并发请求会直接返回）。
+        await this.feedLoadInFlight;
+        if (!this.kioskNextPageToken) {
+          // feed 翻到头了（YouTube 的推荐流 continuation 是有限的）→ 换成
+          // 「我的频道」的 /shorts 标签页续上（见 topUpShortsFromChannels）。
+          await this.topUpShortsFromChannels();
+          break;
+        }
+        const before = this.shortList.length;
+        await this.loadLiveVideos(false);
+        pages += 1;
+        if (this.shortList.length > before) {
+          // 这一页带出了短视频（Shorts 货架找到了）→ 不用再往后翻。
+          break;
+        }
+      }
+      logger.info(`[HomeFeed] stage=shorts_harvest short=${this.shortList.length} `
+        + `pages=${pages} elapsed=${Date.now() - startedAt}ms`);
+    } catch (e) {
+      logger.warn(`[HomeFeed] stage=shorts_harvest_failed ${this.describeThrowable(e)}`);
+    } finally {
+      this.shortsHarvestInFlight = false;
+    }
   }
 
   /** 首页列表数据（过滤 banner 后）→ LazyForEach 数据源；追加=增量，reset=全量刷新 */
@@ -365,20 +719,22 @@ export struct HomeTabContent {
     // Dual-rail sources: recommended | recommended-web | recommended-tv
     return this.homeMode === 'kiosk'
       && this.homeFeedSource.indexOf('recommended') === 0
-      && this.videoList.length > 0;
+      && !this.isShortMode()
+      && this.longList.length > 0;
   }
 
   private getHomeBannerVideos(): VideoItem[] {
     if (!this.shouldShowHomeRecommendBanner()) {
       return [];
     }
-    const limit = Math.min(this.homeBannerMax, this.videoList.length);
-    return this.videoList.slice(0, limit);
+    const limit = Math.min(this.homeBannerMax, this.longList.length);
+    return this.longList.slice(0, limit);
   }
 
   private getHomeListVideos(): VideoItem[] {
+    const list = this.activeList();
     if (!this.shouldShowHomeRecommendBanner()) {
-      return this.videoList;
+      return list;
     }
     const bannerIds: string[] = [];
     const banners = this.getHomeBannerVideos();
@@ -388,7 +744,7 @@ export struct HomeTabContent {
         bannerIds.push(id);
       }
     }
-    return this.videoList.filter((item: VideoItem) => {
+    return list.filter((item: VideoItem) => {
       const id = (item.videoId || item.id.toString()).trim();
       return bannerIds.indexOf(id) < 0;
     });
@@ -440,7 +796,7 @@ export struct HomeTabContent {
 
   build() {
     Stack() {
-      if (this.homeErrorMessage.length > 0 && this.videoList.length === 0) {
+      if (this.homeErrorMessage.length > 0 && this.activeList().length === 0) {
         // 显示完整页面的错误页面
         ErrorPage({
           errorMessage: this.homeErrorMessage,
@@ -468,6 +824,10 @@ export struct HomeTabContent {
             headerBuilder: this.HomeBannerHeader,
             onReachEnd: () => {
               this.loadLiveVideos(false);
+              // 短视频维度：往后再翻几页混合 feed，把里面的短视频收进来。
+              if (this.isShortMode()) {
+                this.harvestShortsFromFeed().catch(() => undefined);
+              }
             },
             params: {
               layoutPreference: this.uiConfig.homeLayoutMode,

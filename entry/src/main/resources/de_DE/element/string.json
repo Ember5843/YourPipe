@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "Zeigt während der Pause eine große Wiedergabe-Taste in der Bildmitte. Ausgeschaltet bleibt das Bild frei; Steuerung über Tippen oder die untere Leiste."
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "Shorts öffnen"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "Lange Videos"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "Lange Videos"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "Pausieren"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "Fortsetzen"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "Wird fortgesetzt…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "Stoppen und löschen"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "Pausiert"
+        }]
 }

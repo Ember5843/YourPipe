@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "暂停时在画面中央显示大播放按钮。关闭后画面中央保持干净，只用点击画面或底部按钮控制。"
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "打开 Shorts"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "长视频"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "短视频"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "长视频"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "暂停"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "继续"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "继续中…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "停止并删除"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "已暂停"
+        }]
 }

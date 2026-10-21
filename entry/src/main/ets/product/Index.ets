@@ -34,6 +34,8 @@ import { LocalPage } from '../features/local/LocalPage';
 import { UserPage } from '../features/user/UserPage';
 import { PlaylistDetailPage } from '../features/playlist/PlaylistDetailPage';
 import { VideoPlayerPage } from '../features/player/PlayerPage';
+import { ShortsPage } from '../features/shorts/ShortsPage';
+import { ShortsFeedService } from '../features/shorts/ShortsFeedService';
 import { PlayerPresentation } from '../common/PlayerPresentation';
 import { SabrPoTokenWebRuntime } from '../features/player/SabrPoTokenWebRuntime';
 import { YouTubePlayService } from '../features/player/YouTubePlayService';
@@ -294,6 +296,7 @@ struct Index {
   /** 恢复所有配置为默认值 */
   private resetAllConfigs(): void {
     this.applyDefaultConfigs();
+    ShortsFeedService.getInstance().invalidate('reset_configs');
     this.getUIContext().getPromptAction().showToast({
       message: $r('app.string.yt_toast_reset_settings_done'),
       duration: 2000
@@ -387,6 +390,7 @@ struct Index {
     AppStorage.setOrCreate('autoPlayQueue', defaultPlaybackConfig.autoPlayNext);
     const defaultProxy = NetworkProxyConfig.resetToDefault();
     AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
+    ShortsFeedService.getInstance().invalidate('clear_all_data');
 
     AuthStateHelper.applyPlayerClientConfig(defaultPlaybackConfig.guestPlayerClient, defaultPlaybackConfig.authPlayerClient);
 
@@ -752,6 +756,9 @@ struct Index {
     this.actionHub.openSearch = (initialQuery?: string) => {
       this.openSearchPage(initialQuery);
     };
+    this.actionHub.openShorts = () => {
+      this.openShortsPage();
+    };
     this.actionHub.openVideo = async (video: VideoItem, sourceHint?: PlayQueueSourceHint, audioOnly?: boolean) => {
       await this.openVideoDetail(video, sourceHint, false, audioOnly === true);
     };
@@ -1035,6 +1042,43 @@ struct Index {
     this.navPathStack.pushPath({ name: 'UserPage', param: channel });
   }
 
+  /**
+   * 主页维度切换（长视频 ↔ 短视频）。
+   *
+   * 首页同时维护两份列表（同一份 feed 按 isShort 拆开），切换只换显示的那
+   * 一份，不重新请求；数据源换 key 序列由首页内容侧同步。
+   * 这是原「主页 Shorts 悬浮球」的替代入口：全屏 Shorts 模式整体停用
+   * （ShortsPage / FloatingShortsBall 代码保留，入口不再挂载；恢复时把
+   *  build() 里那段挂载放回去 + 恢复 Options 里的开关）。
+   */
+  private isShortHomeMode(): boolean {
+    return this.uiConfig.homeFeedMode === 'short';
+  }
+
+  private homeModeMenuIcon(): Resource {
+    return this.isShortHomeMode()
+      ? $r('sys.symbol.list_bullet_square')
+      : $r('sys.symbol.play_round_rectangle');
+  }
+
+  private toggleHomeFeedMode(): void {
+    const next = this.isShortHomeMode() ? 'long' : 'short';
+    this.uiConfig.homeFeedMode = next;
+    UIConfig.saveToPreferences(this.uiConfig);
+    logger.info(`[HomeFeed] stage=mode_toggle mode=${next}`);
+    this.homeTabController.switchMode(next);
+  }
+
+  /**
+   * 主页悬浮球 → 全屏 Shorts 页。
+   * 只有一次 push；页面自己负责 feed 加载与会话复用。
+   */
+  private openShortsPage(): void {
+    this.showOptions = false;
+    logger.info('[Shorts] open_page from_tab=0');
+    this.navPathStack.pushPath({ name: 'ShortsPage' });
+  }
+
   private async openChannelById(channelId: string, channelName: string, channelAvatarUrl: string, channelHandle: string): Promise<void> {
     this.showOptions = false;
     // 只创建基本的频道对象，只填写ID和名称，其他信息由UserPage后期填充
@@ -1295,6 +1339,10 @@ struct Index {
           });
         })
 
+        // 主页 Shorts 悬浮球：**已停用**（全屏 Shorts 模式下线，入口改为
+        // 标题栏的长/短视频切换）。FloatingShortsBall 组件代码保留在
+        // features/shorts/components/，恢复时把这里的挂载放回去即可。
+
         // 首次启动帮助引导：全屏覆盖层（if 增删组件，不依赖模态系统的挂载时序；
         // 实测 bindSheet/bindContentCover 在启动早期绑 Navigation 体系节点均不生效）
         if (this.showHelpGuide) {
@@ -1337,6 +1385,9 @@ struct Index {
       materialEffect: this.immersiveMaterialEffect,
       avoidLayoutSafeArea: true,
       menus: [
+        ...(this.activeTabIndex === 0 ? [buildTitleMenu(this.homeModeMenuIcon(),
+          this.isShortHomeMode() ? $r('app.string.yt_home_mode_long') : $r('app.string.yt_home_mode_short'),
+          () => { this.toggleHomeFeedMode(); })] : []),
         buildTitleMenu($r('sys.symbol.magnifyingglass'), $r('app.string.yt_placeholder_search'), () => {
           this.openSearchPage();
         })
@@ -1365,6 +1416,34 @@ struct Index {
     if (name === 'SearchPage') {
       SearchPage({
         initialQuery: (param as SearchPageLaunchParams)?.initialQuery ?? ''
+      })
+    } else if (name === 'ShortsPage') {
+      HdsNavDestination() {
+        ShortsPage()
+      }
+      .hideTitleBar(true)
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
+      .onShown(() => {
+        AppStorage.setOrCreate('shortsPageVisible', true);
+        // 从频道页/分享页返回：恢复被 onHidden 暂停的短视频。
+        if (AppStorage.get<boolean>('shortsPausedOnHide') === true) {
+          AppStorage.setOrCreate('shortsPausedOnHide', false);
+          PlayerSession.getInstance().controller.syncPlay();
+        }
+      })
+      .onHidden(() => {
+        AppStorage.setOrCreate('shortsPageVisible', false);
+        // 打开二级页（频道/分享）时 Shorts 页只是隐藏，不销毁：显式暂停，
+        // 返回时再恢复，避免短视频音频在别的页面上继续播放。
+        const session = PlayerSession.getInstance();
+        if (session.controller.vm.isPlaying) {
+          session.controller.syncPause();
+          AppStorage.setOrCreate('shortsPausedOnHide', true);
+        }
+      })
+      .onDisAppear(() => {
+        AppStorage.setOrCreate('shortsPageVisible', false);
+        AppStorage.setOrCreate('shortsPausedOnHide', false);
       })
     } else if (name === 'PlayerPage') {
       HdsNavDestination() {

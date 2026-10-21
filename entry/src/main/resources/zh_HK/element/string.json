@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "暫停時在畫面中央顯示大播放按鈕。關閉後畫面中央保持乾淨，只用點擊畫面或底部按鈕控制。"
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "開啟 Shorts"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "長影片"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "短影片"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "長影片"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "暫停"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "繼續"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "繼續中…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "停止並刪除"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "已暫停"
+        }]
 }

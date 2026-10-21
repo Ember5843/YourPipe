@@ -309,7 +309,8 @@ export struct OptionsSheetHost {
             params: {
               themeColor: this.themePrimary,
               applyDarkModeSelection: this.params.applyDarkModeSelection,
-              updateUiConfig: this.params.updateUiConfig
+              updateUiConfig: this.params.updateUiConfig,
+              refreshHomeFeed: this.params.refreshHomeAfterFeedStyleChange
             }
           })
       }

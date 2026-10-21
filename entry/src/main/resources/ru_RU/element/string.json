@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "Показывает большую кнопку воспроизведения в центре кадра на паузе. Если выключено, кадр остаётся чистым; управление касанием или нижней панелью."
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "Открыть Shorts"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "Длинные видео"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "Длинные видео"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "Пауза"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "Продолжить"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "Возобновление…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "Остановить и удалить"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "Приостановлено"
+        }]
 }

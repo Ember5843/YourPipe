@@ -19,6 +19,8 @@ import { AuthSessionManager, HttpDownloader, parseHlsMasterManifest } from 'yout
 const logger = AppLog.getInstance('DownloadManager');
 const DOWNLOAD_ROOT: string = 'downloads';
 const HTTP_CHUNK_SIZE: number = 10 * 1024 * 1024;
+/** 续传时服务端无视 Range（回 200 + 整体）的特征标记。 */
+const DOWNLOAD_RANGE_IGNORED_MARKER: string = 'range-ignored-by-server';
 const DOWNLOAD_NOTIFICATION_TEMPLATE: string = 'downloadTemplate';
 const DOWNLOAD_NOTIFICATION_MIN_INTERVAL_MS: number = 1200;
 const DOWNLOAD_NOTIFICATION_MIN_PROGRESS_DELTA: number = 2;
@@ -42,6 +44,8 @@ export enum DownloadStatus {
   DOWNLOADING_VIDEO = 'downloading_video',
   DOWNLOADING_AUDIO = 'downloading_audio',
   MERGING = 'merging',
+  /** 用户暂停：分片文件保留，继续时从断点接着下（见 resumeTask）。 */
+  PAUSED = 'paused',
   COMPLETED = 'completed',
   FAILED = 'failed',
   CANCELLED = 'cancelled'
@@ -90,6 +94,13 @@ export class DownloadTask {
   _startedAtMs: number = 0;
   _videoFilePath: string = '';
   _audioFilePath: string = '';
+  /**
+   * 断点续传：分片文件对应的流 itag（首次尝试时记录）。
+   * 重试若换了 itag，半截文件的字节就属于旧流，不能接 → 记录保持首次的值，
+   * 续传时用它做校验。
+   */
+  _resumeVideoItag: number = -1;
+  _resumeAudioItag: number = -1;
   _context: common.UIAbilityContext | null = null;
   _notificationId: number = 0;
   _lastNotificationProgress: number = -1;
@@ -149,6 +160,7 @@ export class DownloadTask {
       case DownloadStatus.DOWNLOADING_VIDEO: return 'Downloading video';
       case DownloadStatus.DOWNLOADING_AUDIO: return 'Downloading audio';
       case DownloadStatus.MERGING: return 'Merging';
+      case DownloadStatus.PAUSED: return 'Paused';
       case DownloadStatus.COMPLETED: return 'Completed';
       case DownloadStatus.FAILED: return 'Failed';
       case DownloadStatus.CANCELLED: return 'Cancelled';
@@ -471,6 +483,72 @@ export class DownloadManager {
   }
 
   /**
+   * 暂停任务：停掉在飞的那次请求，但**保留条目与分片文件**。
+   *
+   * 继续时（resumeTask）从分片已有的字节接着下 —— 与失败重试共用同一条
+   * 断点续传路径。合并阶段（MERGING）不提供暂停：合并是一次性的原子步骤。
+   */
+  pauseTask(taskId: string): boolean {
+    const task = this.tasks.find((item) => item.id === taskId);
+    if (!task) {
+      return false;
+    }
+    const pausable = task.status === DownloadStatus.PENDING ||
+      task.status === DownloadStatus.DOWNLOADING_VIDEO ||
+      task.status === DownloadStatus.DOWNLOADING_AUDIO;
+    if (!pausable) {
+      logger.warn(`Task ${task.id} pause refused: status=${task.status}`);
+      return false;
+    }
+    task._cancelled = true;
+    task.status = DownloadStatus.PAUSED;
+    logger.info(`Task ${task.id} paused (progress=${task.progress}%)`);
+    this.cancelDownloadNotification(task);
+    this.notifyTasksChanged();
+    this.processQueue();
+    return true;
+  }
+
+  /**
+   * 继续一个暂停的任务：换上新提取的流地址重新入队。
+   *
+   * 直链带 `expire`、SABR bootstrap 的流地址也很短命，所以继续前要重新
+   * 提取一次（调用方负责）；分辨率优先选回原来的 itag —— itag 变了就接不上
+   * 原来的分片，DownloadManager 会拒绝续传并从头来。
+   */
+  resumeTask(
+    taskId: string,
+    videoStream?: StreamInfo,
+    audioStream?: StreamInfo | null
+  ): boolean {
+    const task = this.tasks.find((item) => item.id === taskId);
+    if (!task) {
+      return false;
+    }
+    if (task.status !== DownloadStatus.PAUSED) {
+      logger.warn(`Task ${task.id} resume refused: status=${task.status}`);
+      return false;
+    }
+    if (videoStream) {
+      task.videoStream = videoStream;
+    }
+    if (audioStream !== undefined) {
+      task.audioStream = audioStream;
+    }
+    task.totalSize = (task.videoStream.contentLength || 0) + (task.audioStream?.contentLength || 0);
+    task._cancelled = false;
+    task.status = DownloadStatus.PENDING;
+    task.errorMessage = '';
+    task._startedAtMs = 0;
+    logger.info(`Task ${task.id} resumed (progress=${task.progress}%) `
+      + `video=${this.getStreamLogLabel(task.videoStream)} `
+      + `audio=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'}`);
+    this.notifyTasksChanged();
+    this.processQueue();
+    return true;
+  }
+
+  /**
    * Retry a failed task in place: the entry keeps its identity (id / title /
    * artwork) and re-enters the queue with a fresh attempt.
    *
@@ -527,6 +605,20 @@ export class DownloadManager {
     this.notifyTasksChanged();
     this.processQueue();
     return true;
+  }
+
+  /**
+   * 被中断（_cancelled）时的终态：**暂停优先**。
+   *
+   * pauseTask 会先把状态置成 PAUSED，随后在飞的那次请求抛错/返回，
+   * 走到 catch 的 "_cancelled → CANCELLED" 分支就会把"已暂停"覆盖成"已取消"，
+   * 用户看到的就是"暂停中 → 立刻变已取消"。这里保住 PAUSED。
+   */
+  private applyCancelledStatus(task: DownloadTask): void {
+    if (task.status === DownloadStatus.PAUSED) {
+      return;
+    }
+    task.status = DownloadStatus.CANCELLED;
   }
 
   deleteTask(taskId: string): void {
@@ -597,6 +689,7 @@ export class DownloadManager {
       task.status === DownloadStatus.DOWNLOADING_VIDEO ||
       task.status === DownloadStatus.DOWNLOADING_AUDIO ||
       task.status === DownloadStatus.MERGING ||
+      task.status === DownloadStatus.PAUSED ||
       task.status === DownloadStatus.PENDING
     );
     this.tasks.forEach((task: DownloadTask) => {
@@ -622,7 +715,8 @@ export class DownloadManager {
   private persistTasks(): void {
     const records: DownloadTaskRecord[] = this.tasks
       .filter((task: DownloadTask) => task.status === DownloadStatus.COMPLETED
-        || task.status === DownloadStatus.FAILED)
+        || task.status === DownloadStatus.FAILED
+        || task.status === DownloadStatus.PAUSED)
       .map((task: DownloadTask): DownloadTaskRecord => ({
         id: task.id,
         videoId: task.videoId,
@@ -634,7 +728,9 @@ export class DownloadManager {
         createdAt: task.createdAt,
         totalSize: task.totalSize,
         status: task.status,
-        exportedPath: task.exportedPath
+        exportedPath: task.exportedPath,
+        resumeVideoItag: task._resumeVideoItag,
+        resumeAudioItag: task._resumeAudioItag
       }));
     DownloadTaskStore.save(records);
   }
@@ -651,9 +747,14 @@ export class DownloadManager {
     const restored: DownloadTask[] = [];
     let dropped = 0;
     records.forEach((record: DownloadTaskRecord) => {
+      // 暂停的条目没有产物，但**分片还在** taskDir 里 —— 按目录判断它是否还有效，
+      // 恢复后可以继续（断点续传）。
+      const isPaused = record.status === DownloadStatus.PAUSED;
       let exists = true;
       try {
-        exists = record.outputPath.length > 0 && fs.accessSync(record.outputPath);
+        exists = isPaused
+          ? (record.taskDir.length > 0 && fs.accessSync(record.taskDir))
+          : (record.outputPath.length > 0 && fs.accessSync(record.outputPath));
       } catch (_e) {
         exists = false;
       }
@@ -661,22 +762,44 @@ export class DownloadManager {
         dropped++;
         return;
       }
+      const videoItag = record.resumeVideoItag ?? -1;
       const task = new DownloadTask(
         record.id,
         record.videoId,
         record.title,
         record.author,
         record.thumbnailUrl,
-        { url: record.outputPath, kind: 'progressive', deliveryMethod: 'LOCAL_FILE', hasVideo: true, hasAudio: true },
+        {
+          url: record.outputPath,
+          kind: 'progressive',
+          deliveryMethod: 'LOCAL_FILE',
+          hasVideo: true,
+          hasAudio: true,
+          itag: videoItag > 0 ? videoItag : undefined
+        },
         null
       );
-      task.status = record.status === DownloadStatus.FAILED ? DownloadStatus.FAILED : DownloadStatus.COMPLETED;
+      if (isPaused) {
+        // 暂停：保留断点身份与进度，继续时从分片的字节接着下。
+        task.status = DownloadStatus.PAUSED;
+        task._resumeVideoItag = videoItag;
+        task._resumeAudioItag = record.resumeAudioItag ?? -1;
+        const partial = this.getTaskDirPartialSize(record.taskDir);
+        task.progress = record.totalSize > 0
+          ? Math.max(0, Math.min(99, Math.round((partial / record.totalSize) * 100)))
+          : 0;
+        task.videoDownloadedSize = partial;
+        logger.info(`restoreTasks: paused task restored id=${record.id} `
+          + `videoItag=${videoItag} partial=${partial} dir=${record.taskDir}`);
+      } else {
+        task.status = record.status === DownloadStatus.FAILED ? DownloadStatus.FAILED : DownloadStatus.COMPLETED;
+        task.progress = 100;
+      }
       task.outputPath = record.outputPath;
       task.taskDir = record.taskDir;
       task.createdAt = record.createdAt;
       task.totalSize = record.totalSize;
       task.exportedPath = record.exportedPath || '';
-      task.progress = 100;
       if (this.context) {
         task._context = this.context;
       }
@@ -844,6 +967,10 @@ export class DownloadManager {
       if (!this.activeTaskIds.has(task.id) || task._startedAtMs <= 0) {
         continue;
       }
+      if (task.status === DownloadStatus.PAUSED) {
+        // 暂停中的任务不判超时：它本来就该停在原地，继续时重新计时。
+        continue;
+      }
       const elapsed = now - task._startedAtMs;
       if (elapsed <= budget) {
         continue;
@@ -1001,7 +1128,7 @@ export class DownloadManager {
       this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
     } catch (error) {
       if (task._cancelled || this.getErrorMessage(error) === 'cancelled') {
-        task.status = DownloadStatus.CANCELLED;
+        this.applyCancelledStatus(task);
         return;
       }
       task.status = DownloadStatus.FAILED;
@@ -1103,7 +1230,7 @@ export class DownloadManager {
       this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
     } catch (error) {
       if (task._cancelled) {
-        task.status = DownloadStatus.CANCELLED;
+        this.applyCancelledStatus(task);
         return;
       }
       task.status = DownloadStatus.FAILED;
@@ -1284,6 +1411,14 @@ export class DownloadManager {
     const audioExt = task.audioStream ? this.getFileExtension(task.audioStream) : '';
     task._videoFilePath = `${task.taskDir}/video.${videoExt}`;
     task._audioFilePath = task.audioStream ? `${task.taskDir}/audio.${audioExt}` : '';
+    // 断点续传的"内容身份"：只记首次尝试的 itag。重试若换流（换了 itag），
+    // 磁盘上的半截文件属于旧流，不能接 —— 保持首次的值，续传时据此拒绝。
+    if (task._resumeVideoItag < 0) {
+      task._resumeVideoItag = task.videoStream.itag ?? -1;
+    }
+    if (task.audioStream && task._resumeAudioItag < 0) {
+      task._resumeAudioItag = task.audioStream.itag ?? -1;
+    }
     logger.info(`Task ${task.id} start: dir=${task.taskDir} totalSize=${task.totalSize || 'unknown'} video=${this.getStreamLogLabel(task.videoStream)} audio=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'}`);
     this.showToast(this.tr($r('app.string.yt_download_started_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
 
@@ -1320,27 +1455,58 @@ export class DownloadManager {
     this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
   }
 
+  /**
+   * 下载一条流到分片文件。
+   *
+   * **断点续传**：分片是 10MB 一块的 Range 请求，失败时半截文件留在磁盘上
+   * （失败不删分片），重试时从已下载的字节接着写，而不是从头再来。
+   * 续传的三条前提：
+   * 1. 流的 itag 与首次尝试一致（换流 → 旧字节属于旧流，不能接）；
+   * 2. 服务端支持 Range（回 200 + 整体 = 无视了 Range → 丢弃半截重来）；
+   * 3. 流的总长度已知（否则没法发 Range）。
+   */
   private async downloadStream(
     task: DownloadTask,
     stream: StreamInfo,
     filePath: string,
-    type: 'video' | 'audio'
+    type: 'video' | 'audio',
+    allowRestart: boolean = true
   ): Promise<void> {
     const totalBytes = stream.contentLength || 0;
-    const chunkCount = totalBytes > 0 ? Math.ceil(totalBytes / HTTP_CHUNK_SIZE) : 1;
-    logger.info(`Task ${task.id} ${type} download start: mode=${totalBytes > 0 ? 'chunked-stream' : 'stream'} chunks=${chunkCount} chunkSize=${HTTP_CHUNK_SIZE} size=${totalBytes || 'unknown'} stream=${this.getStreamLogLabel(stream)}`);
-
     if (!stream.url || stream.url.length === 0) {
       throw new Error(`Missing ${type} stream URL`);
     }
+    const resumeFrom = this.computeResumeOffset(task, stream, filePath, type);
+    const chunkCount = totalBytes > 0 ? Math.ceil(totalBytes / HTTP_CHUNK_SIZE) : 1;
+    logger.info(`Task ${task.id} ${type} download start: mode=${totalBytes > 0 ? 'chunked-stream' : 'stream'} `
+      + `chunks=${chunkCount} chunkSize=${HTTP_CHUNK_SIZE} size=${totalBytes || 'unknown'} `
+      + `resume=${resumeFrom} stream=${this.getStreamLogLabel(stream)}`);
 
-    const file = fs.openSync(filePath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+    const file = resumeFrom > 0
+      ? fs.openSync(filePath, fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE)
+      : fs.openSync(filePath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
     try {
+      if (resumeFrom > 0) {
+        // whence 省略即 SEEK_SET：把写入位置挪到断点处，接着往后写。
+        fs.lseek(file.fd, resumeFrom);
+        logger.info(`Task ${task.id} ${type} resume from byte ${resumeFrom}/${totalBytes || 'unknown'}`);
+        task.updateProgress(resumeFrom, totalBytes, type);
+        this.publishDownloadNotification(task);
+      }
       if (totalBytes > 0) {
-        await this.downloadChunkedStream(task, stream, file, type, totalBytes);
+        await this.downloadChunkedStream(task, stream, file, type, totalBytes, resumeFrom);
       } else {
         await this.downloadUnknownSizeStream(task, stream, file, type);
       }
+    } catch (error) {
+      // 续传时服务端无视了 Range（回 200 + 整体）：半截文件接不上，丢掉重来。
+      if (resumeFrom > 0 && allowRestart && this.isRangeIgnoredError(error)) {
+        logger.warn(`Task ${task.id} ${type} server ignored Range, restart from 0`);
+        this.safeUnlink(filePath);
+        await this.downloadStream(task, stream, filePath, type, false);
+        return;
+      }
+      throw error instanceof Error ? error : new Error(`${error}`);
     } finally {
       fs.closeSync(file);
     }
@@ -1368,6 +1534,45 @@ export class DownloadManager {
     logger.info(`Task ${task.id} ${type} stream download completed: ${filePath} bytes=${actualSize}`);
   }
 
+  /**
+   * 断点续传的起点 = 分片文件已在磁盘上的字节数。
+   * 不可续的情况：换了流（itag 不同）、流长度未知、分片比整个文件还大。
+   */
+  private computeResumeOffset(
+    task: DownloadTask,
+    stream: StreamInfo,
+    filePath: string,
+    type: 'video' | 'audio'
+  ): number {
+    const size = this.getLocalFileSize(filePath);
+    if (size <= 0) {
+      return 0;
+    }
+    const total = stream.contentLength || 0;
+    if (total <= 0) {
+      // 长度未知 → 发不出 Range，只能从头来。
+      return 0;
+    }
+    const recordedItag = type === 'video' ? task._resumeVideoItag : task._resumeAudioItag;
+    const currentItag = stream.itag ?? -1;
+    if (recordedItag >= 0 && currentItag >= 0 && recordedItag !== currentItag) {
+      logger.warn(`Task ${task.id} ${type} resume refused: stream changed `
+        + `${recordedItag} -> ${currentItag}, restart from 0`);
+      return 0;
+    }
+    if (size > total) {
+      logger.warn(`Task ${task.id} ${type} resume refused: partial ${size} > total ${total}, restart from 0`);
+      return 0;
+    }
+    return size;
+  }
+
+  /** 服务端无视 Range 的特征错误（回 200 + 整体，字节数与请求区间对不上）。 */
+  private isRangeIgnoredError(error: Object): boolean {
+    const message = error instanceof Error ? (error as Error).message : `${error}`;
+    return message.indexOf(DOWNLOAD_RANGE_IGNORED_MARKER) >= 0;
+  }
+
   private getLocalFileSize(path: string): number {
     try {
       if (!path || !fs.accessSync(path)) {
@@ -1380,14 +1585,36 @@ export class DownloadManager {
     }
   }
 
+  /** 任务目录里已落盘的分片总字节（暂停/重启后用来显示真实进度）。 */
+  private getTaskDirPartialSize(taskDir: string): number {
+    if (!taskDir) {
+      return 0;
+    }
+    let total = 0;
+    try {
+      const names = fs.listFileSync(taskDir);
+      for (let i = 0; i < names.length; i++) {
+        const name = names[i];
+        if (!name.startsWith('video.') && !name.startsWith('audio.')) {
+          continue;
+        }
+        total += this.getLocalFileSize(`${taskDir}/${name}`);
+      }
+    } catch (_e) {
+      return total;
+    }
+    return total;
+  }
+
   private async downloadChunkedStream(
     task: DownloadTask,
     stream: StreamInfo,
     file: fs.File,
     type: 'video' | 'audio',
-    totalBytes: number
+    totalBytes: number,
+    startFrom: number = 0
   ): Promise<void> {
-    let downloaded = 0;
+    let downloaded = startFrom;
     let chunkIndex = 0;
     while (downloaded < totalBytes) {
       if (task._cancelled) {
@@ -1414,6 +1641,10 @@ export class DownloadManager {
 
       if (task._cancelled) {
         return;
+      }
+      if (result.responseCode === 200 && start > 0) {
+        // 续传时服务端无视了 Range（回 200 + 整体）：半截文件接不上，交给上层重来。
+        throw new Error(`${DOWNLOAD_RANGE_IGNORED_MARKER}: ${type} range=${rangeSpec}`);
       }
       if (result.responseCode !== 206 && result.responseCode !== 200) {
         throw new Error(`Chunk request returned HTTP ${result.responseCode}`);

@@ -353,6 +353,9 @@ export class PlaylistService {
     item.durationText = getLockupDurationText(lockup);
     item.viewCountExact = getLockupViewCountExact(lockup);
     item.uploaderVerified = getLockupUploaderVerified(lockup);
+    if (contentType === "LOCKUP_CONTENT_TYPE_SHORTS") {
+      item.isShort = true;
+    }
     return item;
   }
 

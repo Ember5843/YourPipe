@@ -265,10 +265,12 @@ export function buildHomeKioskVideoItems(
           const channelId = getLockupChannelId(lockupInRich);
           const channelAvatarUrl = getLockupChannelAvatarUrl(lockupInRich);
           const viewCount = getLockupViewCount(lockupInRich);
-          items.push(new VideoItem(
+          const shortsItem = new VideoItem(
             idCounter, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor,
             channelId, channelAvatarUrl, "", "", ""
-          ));
+          );
+          shortsItem.isShort = true;
+          items.push(shortsItem);
           idCounter += 1;
           return;
         }
@@ -374,10 +376,12 @@ export function buildHomeKioskVideoItems(
         const channelId = getLockupChannelId(lockup);
         const channelAvatarUrl = getLockupChannelAvatarUrl(lockup);
         const viewCount = getLockupViewCount(lockup);
-        items.push(new VideoItem(
+        const shortsItem = new VideoItem(
           idCounter, videoId, title, author, viewCount, thumbnailUrl, false, placeholderColor,
           channelId, channelAvatarUrl, "", "", ""
-        ));
+        );
+        shortsItem.isShort = true;
+        items.push(shortsItem);
         idCounter += 1;
         return;
       }

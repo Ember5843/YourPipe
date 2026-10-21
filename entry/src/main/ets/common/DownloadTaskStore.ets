@@ -20,6 +20,9 @@ export interface DownloadTaskRecord {
   status: string;
   /** 手动导出到的路径（条目与导出文件对应；删除条目不触碰该副本）。 */
   exportedPath: string;
+  /** 暂停任务的断点续传身份：分片文件对应的流 itag（重启后仍能续）。 */
+  resumeVideoItag: number;
+  resumeAudioItag: number;
 }
 
 /**

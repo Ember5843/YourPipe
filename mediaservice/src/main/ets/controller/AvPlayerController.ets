@@ -91,6 +91,11 @@ export class AvPlayerController {
   private localTimelineExpectedStartMs: number = 0;
   private localTimelineMismatchLogged: boolean = false;
   private pendingStartFromSec: number = 0;
+  /** Shorts 单条循环意图；引擎重建/换源时由 MpvPlaybackEngine.load 重新应用。 */
+  private fileLoopEnabled: boolean = false;
+  /** Shorts 静音态与静音前音量（退出 Shorts 时恢复）。 */
+  private muted: boolean = false;
+  private volumeBeforeMute: number = 100;
   private startupAttemptId: string = '';
   private startupStartedAt: number = 0;
   private startupFileLoadedLogged: boolean = false;
@@ -730,6 +735,38 @@ export class AvPlayerController {
     const applied = this.curSource.isLive === true ? 1.0 : speed;
     this.vm.playbackSpeed = applied;
     this.playbackEngine.setPlaybackSpeed(applied);
+  }
+
+  /**
+   * Shorts 单条循环开关。只影响 mpv `loop-file`，不改播放状态、不影响长视频。
+   * 退出 Shorts 页必须显式关闭，否则后续长视频会在片尾无限重播。
+   */
+  public setFileLoop(enabled: boolean): void {
+    if (this.fileLoopEnabled === enabled) return;
+    this.fileLoopEnabled = enabled;
+    this.playbackEngine.setFileLoop(enabled);
+    Logger.info(TAG, `setFileLoop enabled=${enabled}`);
+  }
+
+  /**
+   * 静音开关（Shorts 顶栏）。mpv volume 跨 load 保持，因此静音态需要在
+   * 退出 Shorts 时显式解除；进入时按需重新设置。
+   */
+  public setMuted(muted: boolean): void {
+    if (this.muted === muted) return;
+    this.muted = muted;
+    if (muted) {
+      const current = this.playbackEngine.getVolume();
+      this.volumeBeforeMute = current > 0 ? current : 100;
+      this.playbackEngine.setVolume(0);
+    } else {
+      this.playbackEngine.setVolume(this.volumeBeforeMute > 0 ? this.volumeBeforeMute : 100);
+    }
+    Logger.info(TAG, `setMuted muted=${muted} volumeBeforeMute=${this.volumeBeforeMute}`);
+  }
+
+  public isMuted(): boolean {
+    return this.muted;
   }
 
   public resizeSurface(widthPx: number, heightPx: number): void {

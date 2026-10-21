@@ -38,7 +38,7 @@ comes from `OptionsNavScaffold`'s custom `backIcon`.
 ## 2. Features (`features/<feature>/`)
 | Feature | Contents |
 |---|---|
-| `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI; `HomeTabContent` — 首页 tab 内容宿主（feed 加载状态机 + 推荐位 banner + 三个 @LocalBuilder 卡片），Index 经 `HomeTabController` 触发 reset |
+| `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI; `HomeTabContent` — 首页 tab 内容宿主（feed 加载状态机 + 推荐位 banner + 三个 @LocalBuilder 卡片），Index 经 `HomeTabController` 触发 reset。**首页信息流按 `VideoItem.isShort` 拆成 `longList` / `shortList` 两份**（同一份 feed，切换维度不重新请求）：标题栏（搜索图标左侧）的切换符号在两者间切（`UIConfig.homeFeedMode`，持久化 `cfg_homeFeedMode`）。短视频只来自账号相关内容：① 首页 feed 的 Shorts 货架（`harvestShortsFromFeed` 自动多翻 ≤5 页去收）；② **feed 翻到顶后**接「我的频道」的 `/shorts`（`topUpShortsFromChannels`：订阅频道 → 观看历史频道，去重 ≤12 个，独立分页，`interleaveByChannel` 轮转交织防"整屏同一作者"）。**不用泛搜索补货**。推荐位 banner 只在长视频维度显示 |
 | `search` | `SearchPage` (NavDestination) |
 | `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **布局状态机**（PlayerPage 方法派生，输入 `@Env(WINDOW_SIZE/BREAK_POINT)` + 视频比例：竖向窗口 → 上视频+下信息；真横屏且容得下 → 左视频+右信息栏 `clamp(W/3, 320, 480)`；非竖向但容不下 → 挤压强制铺满，信息经播放器菜单"视频信息"以 CENTER sheet 打开；内容组件 `components/PlayerInfoPanel.ets` 三处复用；信息 sheet 必须 `showClose: false`（自带关闭按钮与面板 Tab 栏重叠，关闭走拖拽条/点空白）；强制全屏态（`isFullLandscapeScreen() && !isManualFullscreen`）必须 `VideoPlayer.showFullscreenButton=false`（仅用户手动全屏保留退出入口）；ArkUI V1 @Component 不支持 ES get 访问器——布局派生必须用普通方法）, **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/` + `workers/AsrStreamingWorker.ets`：`AsrLiveCaptionService` 真流式识别，MPV PCM tap + sherpa OnlineRecognizer 流式 zipformer 中英双语 int8；菜单项、Options 入口/设置页、PlayerSession/AVPlayer 接线、build-profile worker 注册均已注释，`AsrModelManager.clearAll`/`clearCaches` 的清数据接线保留以清理已下载模型）——入口/设置项均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
 | `playlist` | Playlist list + detail |
@@ -48,6 +48,7 @@ comes from `OptionsNavScaffold`'s custom `backIcon`.
 | `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`；无入口的 app_lang/content_lang/content_country picker destination 已移除），Index 经单对象 params 传回调。Main（一级菜单分 通用/个性化/播放/其他 四组）/ appearance / playback（拆分为四页：播放 `OptionsPlaybackPage`（含 下载 并发 picker + **下载超时 picker**）/ 手势与操控 `OptionsGestureControlPage`（长按倍速 `HOLD_SPEED_VALUES` 等手势项 + **中央播放按钮开关** + **点击画面切换播放/暂停开关**）/ 字幕 `OptionsSubtitlePage`（字幕样式：字号/底边距/颜色/背景/偏移/翻译语言）/ 性能与缓冲 `OptionsPerformancePage`（后台纯音频、硬解、GPU 渲染、内存缓存/预读/缓冲大小调参）；播放端点 per-state: guest `tv_samsung|visionos|mweb` (default tv_samsung), signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network**（含**常驻连接状态条** + **重新应用并重启**按钮 + 地址格式示例）/ log_page（应用日志页）/ data-account（页尾含 恢复 组：恢复所有配置 / 清除应用全部数据；独立 `OptionsRecoveryPage` 已删除，回调经 data_account destination 透传）/ ai-subtitle **[DISABLED]**（`ai_translate` destination 与 OptionsMainPage 入口行均已注释，产品只保留 P0 tlang；`OptionsAiTranslatePage` — 端侧识别模型下载/删除管理，标题 `yt_option_ai_subtitle`，页内 P2 gtx/LLM 配置区同处注释块） / about-update (GitHub Releases check + AppGallery test link; the update-check call site is inline in `OptionsMainPage`, `UpdateChecker` + `APPGALLERY_TEST_URL` live in `common/UpdateChecker.ets`; the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
 | `help` | `HelpGuidePage` — 6-page onboarding/help swiper (welcome + sign-in, account data, network proxy, quality/cache, downloads). Two entries: first-launch full-screen overlay on `Index` (an `if`-mounted layer in the root Stack, shown while `PreferencesStore` key `cfg_help_seen` != `'true'` with a 500 ms delay; bindSheet/bindContentCover on Navigation-hosted nodes do NOT present at app-start timing — do not revert to them) and Options main page "帮助" item (`help_page` destination in the options sheet). `resetAllConfigs` resets the flag; `clearAllAppData` clears it via `PreferencesStore.clearAll()`. Illustrations are `resources/base/media/guide_*.png` (welcome page uses `app_icon.png`). |
 | `user` | User / channel info; Library saved playlists (WEB classic renderers + TV lockup view models) |
+| `shorts` | **已停用（代码保留）**：全屏 Shorts 页 + 主页悬浮球 —— `ShortsPage`（NavDestination，纵向 Swiper + 常驻单 surface）、`ShortsFeedService`、`FloatingShortsBall`、`ShortsSurface`；播放走 `PlayerSession.playShorts`（同会话换源 + `AvPlayerController.setFileLoop` 单条循环 + `YouTubePlayService.prefetch` 预取）。入口已换成**首页标题栏的长/短视频切换**（见 `home` 行），`mediaservice` 的 `setFileLoop`/`setMuted` 也随之停用。恢复方式见 `shorts-design.md` 附录 A。已踩的坑（恢复时别再踩）：Swiper 页内容只声明 `parallelGesture(TapGesture)`、不声明 `LongPressGesture`（400ms 后无条件成立，会吃掉慢速拖动 → Swiper 不滚动），长按 2x 用 `onTouch` + 计时器自实现；滑动换条先调 `PlayerSession.invalidatePendingPlay()` 作废在飞代际，过期源不得提交；feed 条目非响应式，作者/头像要复制到 `@State` 才有 UI 刷新；搜索源必须递归展开货架容器 |
 | `auth` | WebView cookie login (`WebViewLoginPage`) + device/QR OAuth (`DeviceQrLoginPage`) |
 
 **播放器交互规则**（`features/player/components/AVPlayer.ets`，改手势前必读）:
@@ -112,7 +113,10 @@ Persistent state and shared singletons:
 - `AppState`, `UIConfig`, `PlaybackConfig` — `AppStorage`-backed config models
   (playback quality/cache/GPU, background video-off delay, system AI caption
   (`systemAiCaption` + `systemAiCaptionSource`), **下载超时 `downloadTimeoutMinutes`**,
-  **中央播放按钮 `showCenterPlayButton`**, etc.).
+  **中央播放按钮 `showCenterPlayButton`**,
+  **首页维度 `homeFeedMode`**（`long`/`short`，首页长视频/短视频两份列表）,
+  **Shorts 三件套 `shortsBallEnabled` / `shortsBallX` / `shortsBallY`**
+  （随全屏 Shorts 模式一起停用，字段保留便于恢复）, etc.).
 - `LlmTranslateConfig` — AI 字幕翻译引擎配置（gtx/llm、baseUrl/model/apiKey、双语），
   `PreferencesStore` 持久化（`cfg_ai_translate_*`），`resetAllConfigs` 复位（含 key）；
   翻译缓存 `cacheDir/ai_subtitle/` 与 ASR 模型/缓存（`filesDir/asr_models/`、
@@ -189,6 +193,28 @@ Persistent state and shared singletons:
   `DownloadManager.retryTask` 最多接受 `MAX_RETRIES=3` 次重试。
   另有**看门狗**：单个任务超过「下载超时」预算（`UIConfig.downloadTimeoutMinutes`，
   默认 30 分钟，0 = 不超时）即判失败并让出并发槽位，避免卡死任务堵住整个队列。
+- **下载**（`common/DownloadManager.ets`）：条目分 **video / audio 两条流**分别下到
+  `filesDir/downloads/<taskId>/`，最后合并成一个文件。两条流都是 **10MB 一块的
+  Range 请求**（`downloadChunkedStream`，YouTube 直链把区间写进 URL 的 `&range=`）。
+  - **断点续传**：失败时**不删分片**，重试从磁盘上已有的字节接着写
+    （`computeResumeOffset` → `fs.lseek(fd, offset)` 定位后继续追加）。三个前提：
+    ① 流的 itag 与首次尝试一致（`_resumeVideoItag`/`_resumeAudioItag` 只记首次，
+    重试换流就拒绝续传）；② 流总长度已知（否则发不出 Range）；③ 服务端认 Range ——
+    续传时若回 `200`（整体）而不是 `206`，说明服务端无视了 Range
+    （`DOWNLOAD_RANGE_IGNORED_MARKER`），此时丢弃半截文件从头再来。
+  - **暂停 / 继续**：下载条目上点一下 = **暂停**（`pauseTask`：停掉在飞请求，
+    **保留条目与分片**）；条目变「已暂停」+ 主按钮变「继续」（`resumeTask`：
+    重新提取新鲜流 → 从断点接着下）。**停止/删除只在长按菜单里**（`deleteTask`：
+    取消在飞请求 + 删条目 + 删分片）。暂停条目会落盘（`DownloadTaskRecord`
+    带 `resumeVideoItag`/`resumeAudioItag`），重启后仍能继续 —— 恢复时按
+    `taskDir` 判断分片是否还在，并用它算真实进度。
+  - 重试会**重新提取**拿新鲜直链（googlevideo 的 URL 会过期），但 itag 优先选回
+    原来那条（分辨率/音轨不变）→ 字节可续。
+  - **看门狗**：单次尝试超过「下载超时」预算（`UIConfig.downloadTimeoutMinutes`）判失败；
+    另有 30s「无进展」看门狗（连接吊住时只滴一个字节的场景）。失败条目**不落盘**，
+    重启后从索引里消失（已完成 / 已暂停的条目才持久化，见 `DownloadTaskStore`）。
+  - `SABR` / `HLS` 两条路径走各自的下载器（`downloadSabrStreams` /
+    `downloadHlsStream`），**不支持断点续传**（整段重来）。
 - `DownloadTaskStore` — `PreferencesStore` key `download_tasks_json`; the only
   index that can reach `filesDir/downloads`, so it deliberately survives
   "clear all app data".
@@ -318,7 +344,9 @@ geometry (`deviceWidth`/`deviceHeight`, `statusBarHeight`, `navBarHeight`,
 `isPipHandoffPending`, `isFloatingWindow`, `isSplitScreen`, `isMultiWindow`,
 `isAudioOnlyMode`, `isLocalMode`, `playerPageVisible`, `selectedVideo`), and collection
 store caches (`favorites`, `playlists`, `subscriptions`, `watchHistory`,
-`localQueues`, `downloadTasks`, `authStatus`).
+`localQueues`, `downloadTasks`, `authStatus`). Shorts internals:
+`shortsSurfaceId`（Shorts 常驻 surface，controller 重建后据此重绑）、
+`shortsPageVisible`。
 
 ## 5. Cross-module wiring (in `EntryAbility.onCreate`)
 - `PreferencesStore.init(context)` and `AppState.init()` (loads proxy + applies providers).
@@ -481,6 +509,13 @@ store caches (`favorites`, `playlists`, `subscriptions`, `watchHistory`,
 - **Config reads**: `entry` is the only place that calls `AppStorage.get`.
   `mediaservice` / `youtube_core` receive values through `setProvider`
   callbacks (playback, engine, HTTP proxy).
+- **`$r('app.string.x', 参数)` 返回的是「带格式化参数的 Resource」，不是已格式化的
+  字符串**（官方 `Resource` 定义：包含"资源 ID、资源类型和格式化参数"）。`Text(...)`
+  渲染 Resource 时会套用参数，但 **ArkUI 的 `Select` 解析 Resource 走的是
+  `getStringSync(id)`（不带参数）→ 选项里原样显示 "%d 分钟"**。
+  凡是把带参数字符串放进 **非 Text 组件**（`Select` 选项、存进对象的 `ResourceStr`），
+  一律改成 `resourceManager.getStringSync($r('app.string.x').id, 参数)` —— 直接拿到
+  已格式化的字符串。仓库里的既有写法（收藏页/订阅页/搜索页）都是这个模式。
 - **Permissions** (`module.json5`): `INTERNET`, `VIBRATE`, `GET_NETWORK_INFO`,
   `KEEP_BACKGROUND_RUNNING`.
 - **Background playback**: continuous task lifecycle is owned by

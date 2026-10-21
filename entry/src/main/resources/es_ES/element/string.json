@@ -3564,6 +3564,42 @@
         {
             "name": "yt_playback_center_play_button_subtitle",
             "value": "Muestra un botón grande de reproducción en el centro del fotograma al pausar. Desactivado, el fotograma queda limpio; se controla tocando o con la barra inferior."
+        },
+        {
+            "name": "yt_shorts_open",
+            "value": "Abrir Shorts"
+        },
+        {
+            "name": "yt_shorts_switch_long",
+            "value": "Vídeos largos"
+        },
+        {
+            "name": "yt_home_mode_short",
+            "value": "Shorts"
+        },
+        {
+            "name": "yt_home_mode_long",
+            "value": "Vídeos largos"
         }
-    ]
+    ,
+        {
+            "name": "yt_download_pause",
+            "value": "Pausar"
+        },
+        {
+            "name": "yt_download_resume",
+            "value": "Reanudar"
+        },
+        {
+            "name": "yt_download_resuming",
+            "value": "Reanudando…"
+        },
+        {
+            "name": "yt_download_stop_delete",
+            "value": "Detener y eliminar"
+        },
+        {
+            "name": "yt_download_status_paused",
+            "value": "En pausa"
+        }]
 }

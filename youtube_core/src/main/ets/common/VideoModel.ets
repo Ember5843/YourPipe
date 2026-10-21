@@ -27,6 +27,11 @@ export class VideoItem {
    * 非空表示这是一个本地源条目：播放时跳过 YouTube 提取，直接交给 MPV 打开该文件。
    */
   localMediaPath?: string;
+  /**
+   * 条目来自 Shorts 货架 / reel renderer / Shorts lockup。
+   * 仅作数据标记（Shorts feed 过滤、UI 角标用），不改变播放路径。
+   */
+  isShort: boolean = false;
 
   constructor(
     id: number,

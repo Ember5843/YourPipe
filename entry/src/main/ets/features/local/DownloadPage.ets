@@ -128,6 +128,7 @@ struct DownloadTaskRow {
   @State exporting: boolean = false;
   @State isShowContextMenu: boolean = false;
   @State retrying: boolean = false;
+  @State resuming: boolean = false;
 
   /** 任务行 → 视频语义（channelId 未入库，"查看作者"项会自动隐藏）。 */
   private toVideoItem(): VideoItem {
@@ -157,21 +158,26 @@ struct DownloadTaskRow {
     return id.length > 0 && !id.startsWith('local:');
   }
 
-  /** 任务特有项：进行中 = 取消任务；其它 = 删除任务（主题色强调）。 */
+  /**
+   * 任务特有项：进行中 / 已暂停 = 停止并删除（暂停/继续走主操作按钮，
+   * 破坏性动作只留在长按菜单里）；已完成 = 导出 + 删除。
+   */
   private buildTaskMenuExtras(): VideoMenuExtraItem[] {
     const items: VideoMenuExtraItem[] = [];
-    if (isActiveStatus(this.task.status)) {
-      const cancelItem: VideoMenuExtraItem = {
+    if (isActiveStatus(this.task.status) || this.task.status === DownloadStatus.PAUSED) {
+      const stopItem: VideoMenuExtraItem = {
         symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.xmark_circle'))
           .fontSize(16)
           .fontColor([$r('sys.color.font_primary')]),
-        content: $r('app.string.yt_action_cancel'),
+        content: $r('app.string.yt_download_stop_delete'),
+        contentColor: this.themePrimary,
         callback: () => {
-          this.downloadManager.cancelTask(this.task.id);
+          // 停止 = 取消在飞请求 + 删除条目与分片文件（分片留着只会占空间）。
+          this.downloadManager.deleteTask(this.task.id);
           this.isShowContextMenu = false;
         }
       };
-      items.push(cancelItem);
+      items.push(stopItem);
     } else {
       if (this.task.status === DownloadStatus.COMPLETED) {
         const exportItem: VideoMenuExtraItem = {
@@ -353,7 +359,24 @@ struct DownloadTaskRow {
         })
         .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
         .onClick(() => {
-          this.downloadManager.cancelTask(this.task.id);
+          // 主操作 = 暂停（可继续，分片保留 → 继续时从断点接着下）。
+          // 停止/删除只在长按菜单里。
+          this.downloadManager.pauseTask(this.task.id);
+        })
+    } else if (this.task.status === DownloadStatus.PAUSED) {
+      // 已暂停：主操作 = 继续（重新提取新鲜流 → 从断点接着下）。
+      Button(this.resuming ? $r('app.string.yt_download_resuming') : $r('app.string.yt_download_resume'))
+        .fontSize(12)
+        .fontColor($r('app.color.yourtube_text_inverse'))
+        .backgroundColor(this.resuming
+          ? $r('app.color.yourtube_button_disabled')
+          : this.themePrimary)
+        .height(ACTION_BTN_HEIGHT)
+        .padding({ left: 10, right: 10 })
+        .enabled(!this.resuming)
+        .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+        .onClick(() => {
+          this.resumePausedTask();
         })
     } else if (this.task.status === DownloadStatus.COMPLETED) {
       // 主操作 = 应用内播放；导出降为长按菜单里的次操作。
@@ -442,19 +465,58 @@ struct DownloadTaskRow {
     });
   }
 
+  /**
+   * 继续一个暂停的任务：重新提取一次拿到**新鲜**的流地址（直链带 `expire`），
+   * 再放回队列 —— 分片文件还在，DownloadManager 会从断点接着下。
+   */
+  private async resumePausedTask(): Promise<void> {
+    if (this.resuming) {
+      return;
+    }
+    const task = this.task;
+    if (task.status !== DownloadStatus.PAUSED) {
+      return;
+    }
+    this.resuming = true;
+    try {
+      const ctx = getContext(this) as common.UIAbilityContext;
+      const result = await YouTubePlayService.getInstance(ctx).extractForDownload(task.videoId);
+      if (!result.success || !result.playerStreams || result.playerStreams.length === 0) {
+        this.showRetryFailed();
+        return;
+      }
+      const picked = pickRetryStreams(result.playerStreams, task);
+      if (!picked.video) {
+        this.showRetryFailed();
+        return;
+      }
+      if (!this.downloadManager.resumeTask(task.id, picked.video, picked.audio)) {
+        this.showRetryFailed();
+        return;
+      }
+      logger.info(`resume queued video=${task.videoId} itag=${picked.video.itag}`);
+    } catch (e) {
+      logger.warn(`resume exception video=${task.videoId}: ${(e as Error).message || e}`);
+      this.showRetryFailed();
+    } finally {
+      this.resuming = false;
+    }
+  }
+
   private getProgressValue(): number {
     if (this.task.status === DownloadStatus.COMPLETED) {
       return 100;
     }
-    if (this.task.status === DownloadStatus.PENDING) {
-      return 0;
-    }
+    // PENDING 也保留已有进度：刚"继续"的暂停任务在排队时不该显示 0%。
     return Math.max(0, Math.min(100, this.task.progress || 0));
   }
 
   private getSubtitle(): ResourceStr {
     if (this.task.status === DownloadStatus.FAILED) {
       return this.task.errorMessage || $r('app.string.yt_download_status_failed');
+    }
+    if (this.task.status === DownloadStatus.PAUSED) {
+      return $r('app.string.yt_download_status_paused');
     }
     if (this.task.status === DownloadStatus.COMPLETED) {
       return $r('app.string.yt_download_status_completed');
@@ -574,6 +636,9 @@ struct DownloadTaskRow {
   private getStatusColor(): ResourceColor {
     if (this.task.status === DownloadStatus.FAILED) {
       return $r('app.color.yourtube_error');
+    }
+    if (this.task.status === DownloadStatus.PAUSED) {
+      return $r('app.color.yourtube_text_hint');
     }
     if (this.task.status === DownloadStatus.COMPLETED || isActiveStatus(this.task.status)) {
       return this.themePrimary;
