@@ -29,6 +29,7 @@ const MAX_AVATAR_URL_LENGTH: number = 2048;
 export struct LiveChatPanel {
   @Prop @Watch('onLifecycleChanged') videoId: string = '';
   @Prop @Watch('onLifecycleChanged') active: boolean = false;
+  @StorageProp('isAppBackground') @Watch('onLifecycleChanged') isAppBackground: boolean = false;
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @State private status: string = LiveChatStatus.IDLE;
   @State private messages: LiveChatMessage[] = [];
@@ -53,7 +54,7 @@ export struct LiveChatPanel {
   }
 
   private syncLifecycle(): void {
-    if (this.active && this.videoId.length > 0) {
+    if (this.active && !this.isAppBackground && this.videoId.length > 0) {
       this.start();
     } else {
       this.stop();
