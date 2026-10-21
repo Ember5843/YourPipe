@@ -2014,8 +2014,13 @@ export class DownloadManager {
     [task._videoFilePath, task._audioFilePath].forEach((path: string) => this.safeUnlink(path));
     this.safeRemoveDir(`${task.taskDir}/video_parts`);
     this.safeRemoveDir(`${task.taskDir}/audio_parts`);
-    if (includeOutput && task.taskDir) {
-      this.safeRemoveDir(task.taskDir);
+    if (includeOutput) {
+      // 恢复出来的条目可能没有 taskDir（只记录 outputPath），必须显式删输出文件；
+      // exportedPath 是用户导出的副本，不在这里处理。
+      this.safeUnlink(task.outputPath);
+      if (task.taskDir) {
+        this.safeRemoveDir(task.taskDir);
+      }
     }
   }
 
