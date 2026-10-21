@@ -238,9 +238,14 @@ export class LiveChatExtractor {
       }
       const emoji = run['emoji'] as Record<string, Object>;
       if (emoji) {
-        const shortcuts = emoji['shortcuts'] as Array<string>;
-        if (shortcuts && shortcuts.length > 0) {
-          parts.push(shortcuts[0]);
+        const emojiId = emoji['emojiId'] as string;
+        if (emojiId) {
+          parts.push(emojiId);
+        } else {
+          const shortcuts = emoji['shortcuts'] as Array<string>;
+          if (shortcuts && shortcuts.length > 0) {
+            parts.push(shortcuts[0]);
+          }
         }
       }
     }
