@@ -30,6 +30,12 @@ import {
 
 const logger = AppLog.getInstance('DownloadPage');
 
+/** 下载物 + 导入物共用的本地播放队列（下载在前、导入在后）。 */
+interface LocalPlayQueue {
+  items: VideoItem[];
+  startIndex: number;
+}
+
 /** Match VideoMediaCard list action geometry. */
 const ACTION_BTN_HEIGHT: number = 28;
 const ACTION_BTN_WIDTH: number = 72;
@@ -84,28 +90,76 @@ export struct DownloadPage {
   @Consume('actionHub') actionHub: ActionHub;
   @State importing: boolean = false;
 
-  /** 本地导入文件 → 播放队列（与下载库分开的 localFiles 来源）。 */
-  private playLocal(item: LocalMediaItem): void {
-    const all: VideoItem[] = [];
-    let startIndex = 0;
-    this.localItems.forEach((entry: LocalMediaItem) => {
-      if (entry.id === item.id) {
-        startIndex = all.length;
+  /**
+   * 下载物 + 导入物共用一个本地播放队列：
+   * 已完成的下载按列表顺序在前，导入文件按导入顺序追加在后。
+   * 点击任一条目都从这条统一的队列起播，自动连播可以顺放到导入条目。
+   */
+  private buildLocalQueue(anchorVideoId: string): LocalPlayQueue {
+    const items: VideoItem[] = [];
+    let startIndex = -1;
+
+    this.tasks.forEach((task: DownloadTask) => {
+      if (task.status !== DownloadStatus.COMPLETED || !task.outputPath) {
+        return;
       }
-      all.push(LocalMediaStore.toVideoItem(entry));
+      let playable = true;
+      try {
+        playable = fs.accessSync(task.outputPath);
+      } catch (_e) {
+        playable = false;
+      }
+      if (!playable) {
+        return;
+      }
+      const video = DownloadTaskRow.toLocalVideoItem(task, task.outputPath);
+      if (video.videoId === anchorVideoId) {
+        startIndex = items.length;
+      }
+      items.push(video);
     });
-    if (all.length === 0) {
+
+    this.localItems.forEach((entry: LocalMediaItem) => {
+      let playable = true;
+      try {
+        playable = fs.accessSync(entry.path);
+      } catch (_e) {
+        playable = false;
+      }
+      if (!playable) {
+        return;
+      }
+      const video = LocalMediaStore.toVideoItem(entry);
+      if (video.videoId === anchorVideoId) {
+        startIndex = items.length;
+      }
+      items.push(video);
+    });
+
+    if (startIndex < 0 && items.length > 0) {
+      startIndex = 0;
+    }
+    return { items, startIndex };
+  }
+
+  private playFromLocalQueue(anchorVideoId: string): void {
+    const queue = this.buildLocalQueue(anchorVideoId);
+    if (queue.items.length === 0 || queue.startIndex < 0) {
       return;
     }
     const hint: PlayQueueSourceHint = {
-      type: 'localFiles',
-      playlistId: 'local_files',
-      playlistName: 'local_files',
-      loadedItems: all,
-      startIndex
+      type: 'localMedia',
+      playlistId: 'local_media',
+      playlistName: 'local_media',
+      loadedItems: queue.items,
+      startIndex: queue.startIndex
     };
-    logger.info(`play local index=${startIndex}/${all.length}`);
-    this.actionHub.openVideo(all[startIndex], hint, false);
+    logger.info(`local media play start index=${queue.startIndex}/${queue.items.length} total`);
+    this.actionHub.openVideo(queue.items[queue.startIndex], hint, false);
+  }
+
+  private playLocal(item: LocalMediaItem): void {
+    this.playFromLocalQueue(`local:${item.id}`);
   }
 
   private async importFiles(): Promise<void> {
@@ -243,7 +297,10 @@ export struct DownloadPage {
           }
           ForEach(this.tasks, (task: DownloadTask) => {
             ListItem() {
-              DownloadTaskRow({ task: task })
+              DownloadTaskRow({
+                task,
+                onPlayTask: (t: DownloadTask) => { this.playFromLocalQueue(`local:${t.id}`); }
+              })
             }
             .transition(customAnimationUtil.isScaleTran(task.id, this.uiConfig))
           }, (task: DownloadTask) => task.id)
@@ -281,6 +338,8 @@ struct DownloadTaskRow {
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('actionHub') actionHub: ActionHub;
   @ObjectLink task: DownloadTask;
+  /** 由 DownloadPage 注入：用「下载在前、导入在后」的统一本地队列起播。 */
+  onPlayTask: (task: DownloadTask) => void = () => {};
   private downloadManager: DownloadManager = DownloadManager.getInstance();
   @State exporting: boolean = false;
   @State isShowContextMenu: boolean = false;
@@ -685,7 +744,7 @@ struct DownloadTaskRow {
   }
 
   /** 已下载条目 → 可播放 VideoItem（独立 videoId 兼作续播键，路径直交 MPV）。 */
-  private static toLocalVideoItem(task: DownloadTask, path: string): VideoItem {
+  static toLocalVideoItem(task: DownloadTask, path: string): VideoItem {
     const item = new VideoItem(
       0,
       `local:${task.id}`,
@@ -724,40 +783,8 @@ struct DownloadTaskRow {
       });
       return;
     }
-    const all = AppStorage.get<DownloadTask[]>('downloadTasks') ?? [];
-    const items: VideoItem[] = [];
-    let startIndex = 0;
-    all.forEach((task: DownloadTask) => {
-      if (task.status !== DownloadStatus.COMPLETED || !task.outputPath) {
-        return;
-      }
-      let playable = true;
-      try {
-        playable = fs.accessSync(task.outputPath);
-      } catch (_e) {
-        playable = false;
-      }
-      if (!playable) {
-        return;
-      }
-      if (task.id === this.task.id) {
-        startIndex = items.length;
-      }
-      items.push(DownloadTaskRow.toLocalVideoItem(task, task.outputPath));
-    });
-    if (items.length === 0) {
-      items.push(DownloadTaskRow.toLocalVideoItem(this.task, this.task.outputPath));
-      startIndex = 0;
-    }
-    const hint: PlayQueueSourceHint = {
-      type: 'downloads',
-      playlistId: 'downloads',
-      playlistName: 'downloads',
-      loadedItems: items,
-      startIndex
-    };
-    logger.info(`DownloadPage play start index=${startIndex}/${items.length}`);
-    this.actionHub.openVideo(items[startIndex], hint, false);
+    // 统一队列由 DownloadPage 构建：下载条目在前，导入条目在后。
+    this.onPlayTask(this.task);
   }
 
   private async exportTaskToDownloads(): Promise<void> {

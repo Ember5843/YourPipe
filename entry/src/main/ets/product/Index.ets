@@ -941,7 +941,8 @@ struct Index {
         || queueManager.getCurrent()?.videoId !== video.videoId) {
         queueManager.setAdhocQueue([video], 0);
       }
-    } else if (sourceHint && (sourceHint.type === 'downloads' || sourceHint.type === 'localFiles')) {
+    } else if (sourceHint && (sourceHint.type === 'downloads' || sourceHint.type === 'localFiles'
+      || sourceHint.type === 'localMedia')) {
       // 下载库 / 本地导入库整份注入队列：点击项为起点，开启「自动连播」即顺放整个列表。
       // 两类来源都只含本地文件，不会混入在线推荐。
       const items = sourceHint.loadedItems ?? [];

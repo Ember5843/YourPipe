@@ -19,8 +19,9 @@ export interface PlayQueueSourceHint {
   /**
    * 'downloads' = the download library injected wholesale as one playable list.
    * 'localFiles' = user-imported files (independent of downloads).
+   * 'localMedia' = one shared queue: completed downloads first, imported files after.
    */
-  type: 'playlist' | 'local' | 'downloads' | 'localFiles';
+  type: 'playlist' | 'local' | 'downloads' | 'localFiles' | 'localMedia';
   playlistId: string;
   playlistName: string;
   loadedItems?: VideoItem[];
