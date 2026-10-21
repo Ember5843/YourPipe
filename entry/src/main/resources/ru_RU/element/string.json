@@ -3685,6 +3685,18 @@
         {
             "name": "yt_local_empty_hint",
             "value": "Нажмите «Импорт видео», чтобы выбрать файлы"
+        },
+        {
+            "name": "yt_local_media",
+            "value": "Локальные медиа"
+        },
+        {
+            "name": "yt_local_empty_media",
+            "value": "Загрузок и локальных файлов пока нет"
+        },
+        {
+            "name": "yt_local_empty_media_hint",
+            "value": "Скачайте видео или нажмите «Импорт видео»"
         }
     ]
 }

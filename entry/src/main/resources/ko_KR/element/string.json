@@ -3685,6 +3685,18 @@
         {
             "name": "yt_local_empty_hint",
             "value": "\"동영상 가져오기\"를 눌러 파일 선택"
+        },
+        {
+            "name": "yt_local_media",
+            "value": "로컬 미디어"
+        },
+        {
+            "name": "yt_local_empty_media",
+            "value": "아직 다운로드 또는 로컬 파일이 없습니다"
+        },
+        {
+            "name": "yt_local_empty_media_hint",
+            "value": "동영상을 다운로드하거나 \"동영상 가져오기\"를 누르세요"
         }
     ]
 }

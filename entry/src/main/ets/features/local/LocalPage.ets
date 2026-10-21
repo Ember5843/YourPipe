@@ -7,7 +7,6 @@ import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { DownloadPage } from './DownloadPage';
-import { LocalMediaPage } from './LocalMediaPage';
 import { MediaThumb } from '../../common/components/MediaThumb';
 import { SubTabBarItem } from '../../common/components/SubTabBar';
 import { VideoItemContextMenu, VideoMenuExtraItem } from '../../common/components/VideoItemContextMenu';
@@ -263,8 +262,7 @@ export struct LocalPage {
 
   private readonly tabTitles: ResourceStr[] = [
     $r('app.string.yt_local_history'),
-    $r('app.string.yt_download_title'),
-    $r('app.string.yt_local_files')
+    $r('app.string.yt_local_media')
   ];
 
   private isSignedIn(): boolean {
@@ -471,17 +469,6 @@ export struct LocalPage {
         .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 88 })
       }
       .tabBar(this.TabBarBuilder(1))
-
-      // ── Tab 2: 本地文件（系统导入）──
-      TabContent() {
-        Column() {
-          LocalMediaPage()
-        }
-        .width('100%')
-        .height('100%')
-        .padding({ left: 12, right: 12, bottom: this.safeAreaBottom + 88 })
-      }
-      .tabBar(this.TabBarBuilder(2))
     }
     .barMode(BarMode.Fixed)
     .barWidth('100%')

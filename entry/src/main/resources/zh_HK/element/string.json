@@ -3685,6 +3685,18 @@
         {
             "name": "yt_local_empty_hint",
             "value": "點擊「匯入影片」從系統檔案中選擇"
+        },
+        {
+            "name": "yt_local_media",
+            "value": "本機媒體"
+        },
+        {
+            "name": "yt_local_empty_media",
+            "value": "尚無下載或本機檔案"
+        },
+        {
+            "name": "yt_local_empty_media_hint",
+            "value": "下載影片或點擊「匯入影片」加入本機檔案"
         }
     ]
 }

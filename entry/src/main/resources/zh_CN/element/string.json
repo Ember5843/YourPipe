@@ -3685,6 +3685,18 @@
         {
             "name": "yt_local_empty_hint",
             "value": "点击「导入视频」从系统文件中选择"
+        },
+        {
+            "name": "yt_local_media",
+            "value": "本地媒体"
+        },
+        {
+            "name": "yt_local_empty_media",
+            "value": "暂无下载或本地文件"
+        },
+        {
+            "name": "yt_local_empty_media_hint",
+            "value": "下载视频或点击「导入视频」添加本地文件"
         }
     ]
 }

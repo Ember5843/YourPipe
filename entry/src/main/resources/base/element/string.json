@@ -3685,6 +3685,18 @@
         {
             "name": "yt_local_empty_hint",
             "value": "Tap \"Import videos\" to pick files from the system"
+        },
+        {
+            "name": "yt_local_media",
+            "value": "Local media"
+        },
+        {
+            "name": "yt_local_empty_media",
+            "value": "No downloads or local files yet"
+        },
+        {
+            "name": "yt_local_empty_media_hint",
+            "value": "Download a video or tap \"Import videos\" to add local files"
         }
     ]
 }

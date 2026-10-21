@@ -9,6 +9,8 @@ import { customAnimationUtil } from '../../common/AnimationUtil';
 import { VideoItem } from 'youtube_core';
 import { ActionHub } from '../../common/ActionHub';
 import { AppLog } from '../../common/AppLog';
+import { LocalMediaItem, LocalMediaStore } from '../../common/LocalMediaStore';
+import { LocalMediaRow } from './LocalMediaRow';
 import { PlayQueueSourceHint } from '../player/PlayQueueManager';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { customVibrator } from '../../common/VibratorUtil';
@@ -77,22 +79,152 @@ function pickRetryStreams(streams: StreamInfo[], task: DownloadTask): RetryStrea
 export struct DownloadPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('downloadTasks') tasks: DownloadTask[] = [];
+  @StorageLink('localMedia') localItems: LocalMediaItem[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @Consume('actionHub') actionHub: ActionHub;
+  @State importing: boolean = false;
+
+  /** 本地导入文件 → 播放队列（与下载库分开的 localFiles 来源）。 */
+  private playLocal(item: LocalMediaItem): void {
+    const all: VideoItem[] = [];
+    let startIndex = 0;
+    this.localItems.forEach((entry: LocalMediaItem) => {
+      if (entry.id === item.id) {
+        startIndex = all.length;
+      }
+      all.push(LocalMediaStore.toVideoItem(entry));
+    });
+    if (all.length === 0) {
+      return;
+    }
+    const hint: PlayQueueSourceHint = {
+      type: 'localFiles',
+      playlistId: 'local_files',
+      playlistName: 'local_files',
+      loadedItems: all,
+      startIndex
+    };
+    logger.info(`play local index=${startIndex}/${all.length}`);
+    this.actionHub.openVideo(all[startIndex], hint, false);
+  }
+
+  private async importFiles(): Promise<void> {
+    if (this.importing) {
+      return;
+    }
+    this.importing = true;
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const filePicker = new picker.DocumentViewPicker(context);
+      const options = new picker.DocumentSelectOptions();
+      options.maxSelectNumber = 10;
+      options.fileSuffixFilters = ['.mp4', '.m4v', '.mkv', '.webm', '.mov', '.ts', '.flv', '.avi'];
+      const uris = await filePicker.select(options);
+      if (!uris || uris.length === 0) {
+        return;
+      }
+      const result = await LocalMediaStore.importFromUris(uris);
+      if (result.added > 0) {
+        const message = context.resourceManager.getStringSync(
+          $r('app.string.yt_local_import_success').id, result.added);
+        this.getUIContext().getPromptAction().showToast({ message, duration: 2000 });
+      } else {
+        this.getUIContext().getPromptAction().showToast({
+          message: $r('app.string.yt_local_import_failed'),
+          duration: 2000
+        });
+      }
+    } catch (e) {
+      logger.error(`import picker failed: ${(e as Error).message || e}`);
+      this.getUIContext().getPromptAction().showToast({
+        message: $r('app.string.yt_local_import_failed'),
+        duration: 2000
+      });
+    } finally {
+      this.importing = false;
+    }
+  }
+
+  private confirmDeleteLocal(item: LocalMediaItem): void {
+    AlertDialog.show({
+      title: $r('app.string.yt_local_delete_title'),
+      message: $r('app.string.yt_local_delete_message'),
+      primaryButton: {
+        value: $r('app.string.yt_action_delete'),
+        fontColor: this.themePrimary,
+        action: () => {
+          LocalMediaStore.delete(item);
+        }
+      },
+      secondaryButton: {
+        value: $r('app.string.yt_action_cancel'),
+        action: () => {}
+      }
+    });
+  }
+
+  @Builder
+  ImportHeader() {
+    Row() {
+      Text($r('app.string.yt_local_files_hint'))
+        .fontSize(12)
+        .fontColor($r('app.color.yourtube_text_hint'))
+        .layoutWeight(1)
+      Button(this.importing ? $r('app.string.yt_local_importing') : $r('app.string.yt_local_import'))
+        .fontSize(13)
+        .height(34)
+        .padding({ left: 14, right: 14 })
+        .backgroundColor(this.themePrimary)
+        .fontColor($r('app.color.yourtube_text_inverse'))
+        .enabled(!this.importing)
+        .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+        .onClick(() => { this.importFiles(); })
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Center)
+    .padding({ left: 4, right: 4, top: 8, bottom: 4 })
+  }
+
+  @Builder
+  SectionTitle(title: ResourceStr, count: number) {
+    Row() {
+      Text(title)
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.yourtube_text_secondary'))
+      Text(`${count}`)
+        .fontSize(11)
+        .fontColor($r('app.color.yourtube_text_hint'))
+        .margin({ left: 6 })
+    }
+    .width('100%')
+    .padding({ left: 4, right: 4, top: 14, bottom: 4 })
+  }
 
   build() {
-    if (this.tasks.length === 0) {
+    if (this.tasks.length === 0 && this.localItems.length === 0) {
       Column() {
         SymbolGlyph($r('sys.symbol.download_fill'))
           .fontSize(48)
           .fontColor([$r('app.color.yourtube_text_hint')])
           .margin({ bottom: 12 })
-        Text($r('app.string.yt_download_empty'))
+        Text($r('app.string.yt_local_empty_media'))
           .fontSize(14)
           .fontColor($r('app.color.yourtube_text_secondary'))
-        Text($r('app.string.yt_download_empty_hint'))
+        Text($r('app.string.yt_local_empty_media_hint'))
           .fontSize(12)
           .fontColor($r('app.color.yourtube_text_hint'))
           .margin({ top: 4 })
+        Button(this.importing ? $r('app.string.yt_local_importing') : $r('app.string.yt_local_import'))
+          .fontSize(13)
+          .height(34)
+          .padding({ left: 16, right: 16 })
+          .backgroundColor(this.themePrimary)
+          .fontColor($r('app.color.yourtube_text_inverse'))
+          .enabled(!this.importing)
+          .margin({ top: 16 })
+          .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+          .onClick(() => { this.importFiles(); })
       }
       .width('100%')
       .height('100%')
@@ -101,12 +233,37 @@ export struct DownloadPage {
       .padding({ bottom: 60 })
     } else {
       List({ space: 4 }) {
-        ForEach(this.tasks, (task: DownloadTask) => {
+        ListItem() {
+          this.ImportHeader()
+        }
+
+        if (this.tasks.length > 0) {
           ListItem() {
-            DownloadTaskRow({ task: task })
+            this.SectionTitle($r('app.string.yt_download_title'), this.tasks.length)
           }
-          .transition(customAnimationUtil.isScaleTran(task.id, this.uiConfig))
-        }, (task: DownloadTask) => task.id)
+          ForEach(this.tasks, (task: DownloadTask) => {
+            ListItem() {
+              DownloadTaskRow({ task: task })
+            }
+            .transition(customAnimationUtil.isScaleTran(task.id, this.uiConfig))
+          }, (task: DownloadTask) => task.id)
+        }
+
+        if (this.localItems.length > 0) {
+          ListItem() {
+            this.SectionTitle($r('app.string.yt_local_files'), this.localItems.length)
+          }
+          ForEach(this.localItems, (item: LocalMediaItem) => {
+            ListItem() {
+              LocalMediaRow({
+                item,
+                themePrimary: this.themePrimary,
+                onOpen: (it: LocalMediaItem) => { this.playLocal(it); },
+                onDelete: (it: LocalMediaItem) => { this.confirmDeleteLocal(it); }
+              })
+            }
+          }, (item: LocalMediaItem) => item.id)
+        }
       }
       .width('100%')
       .height('100%')

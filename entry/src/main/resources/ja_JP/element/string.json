@@ -3685,6 +3685,18 @@
         {
             "name": "yt_local_empty_hint",
             "value": "「動画をインポート」をタップしてファイルを選択"
+        },
+        {
+            "name": "yt_local_media",
+            "value": "ローカルメディア"
+        },
+        {
+            "name": "yt_local_empty_media",
+            "value": "ダウンロードまたはローカルファイルはまだありません"
+        },
+        {
+            "name": "yt_local_empty_media_hint",
+            "value": "動画をダウンロードするか「動画をインポート」をタップ"
         }
     ]
 }

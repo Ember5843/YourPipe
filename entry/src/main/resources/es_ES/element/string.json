@@ -3685,6 +3685,18 @@
         {
             "name": "yt_local_empty_hint",
             "value": "Toca «Importar vídeos» para elegir archivos"
+        },
+        {
+            "name": "yt_local_media",
+            "value": "Medios locales"
+        },
+        {
+            "name": "yt_local_empty_media",
+            "value": "Aún no hay descargas ni archivos locales"
+        },
+        {
+            "name": "yt_local_empty_media_hint",
+            "value": "Descarga un vídeo o toca «Importar vídeos»"
         }
     ]
 }

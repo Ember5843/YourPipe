@@ -3685,6 +3685,18 @@
         {
             "name": "yt_local_empty_hint",
             "value": "اضغط على \"استيراد مقاطع الفيديو\" لاختيار الملفات"
+        },
+        {
+            "name": "yt_local_media",
+            "value": "الوسائط المحلية"
+        },
+        {
+            "name": "yt_local_empty_media",
+            "value": "لا توجد تنزيلات أو ملفات محلية بعد"
+        },
+        {
+            "name": "yt_local_empty_media_hint",
+            "value": "نزّل فيديو أو اضغط على \"استيراد مقاطع الفيديو\""
         }
     ]
 }
