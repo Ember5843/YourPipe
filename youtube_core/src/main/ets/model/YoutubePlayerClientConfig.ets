@@ -4,10 +4,10 @@
  * (HEAD: mweb | visionos | tv_downgraded | tv_samsung).
  *
  * Per-state defaults are configurable (entry Options → setConfiguredClients):
- * guest defaults to tv_samsung (token-free TVHTML5 direct adaptiveFormats
- * URLs, PipePipe 61b077779 logged-out default) and signed-in to mweb (SABR);
- * tv_downgraded (token-free direct URLs) remains selectable when signed in.
- * visionos (token-free GAPIS direct URLs) stays selectable for guests.
+ * guest defaults to visionos (token-free GAPIS direct adaptiveFormats URLs)
+ * and signed-in to mweb (SABR); tv_downgraded (token-free direct URLs)
+ * remains selectable when signed in. tv_samsung is no longer offered as a
+ * guest endpoint (internal key kept only for dormant debug pinning).
  */
 // 'web_safari' and 'android_vr' are unused endpoints (no UI, unreachable in
 // product; android_vr was dropped upstream by PipePipe v5.3.0) — kept for
@@ -16,9 +16,9 @@ export type YoutubePlayerClientKey = 'mweb' | 'web_safari' | 'visionos' | 'andro
   | 'tv_downgraded' | 'tv_samsung';
 
 export class YoutubePlayerClientConfig {
-  private static selected: YoutubePlayerClientKey = 'tv_samsung';
+  private static selected: YoutubePlayerClientKey = 'visionos';
   // Per-state configured clients, pushed by entry from PlaybackConfig.
-  private static guestClient: YoutubePlayerClientKey = 'tv_samsung';
+  private static guestClient: YoutubePlayerClientKey = 'visionos';
   private static authClient: YoutubePlayerClientKey = 'mweb';
   // True once setYoutubePlayerClient pins a client explicitly; applyAuthDefault
   // must not clobber a manual selection on every extraction attempt.
@@ -40,7 +40,7 @@ export class YoutubePlayerClientConfig {
       YoutubePlayerClientConfig.explicitOverride = true;
       return;
     }
-    YoutubePlayerClientConfig.selected = 'tv_samsung';
+    YoutubePlayerClientConfig.selected = 'visionos';
     YoutubePlayerClientConfig.explicitOverride = true;
   }
 
@@ -63,22 +63,20 @@ export class YoutubePlayerClientConfig {
   }
 
   /**
-   * Entry injection point for the two Options settings. Per-state allow-lists
-   * mirror PipePipe HEAD: guest → tv_samsung|visionos|mweb (default
-   * tv_samsung), signed-in → tv_downgraded|mweb (default mweb);
-   * out-of-list values fall back to that state's product default.
+   * Entry injection point for the two Options settings. Guest allow-list is
+   * `visionos|mweb` (default visionos), signed-in `tv_downgraded|mweb`
+   * (default mweb); out-of-list values fall back to that state's default.
    */
   static setConfiguredClients(guest: string, auth: string): void {
     YoutubePlayerClientConfig.guestClient =
-      guest === 'mweb' ? 'mweb'
-        : guest === 'visionos' ? 'visionos' : 'tv_samsung';
+      guest === 'mweb' ? 'mweb' : 'visionos';
     YoutubePlayerClientConfig.authClient =
       auth === 'mweb' ? 'mweb' : 'tv_downgraded';
   }
 
   /**
    * Select the configured client for the current auth state (guest default
-   * tv_samsung, signed-in default mweb). No-op when a client was
+   * visionos, signed-in default mweb). No-op when a client was
    * explicitly pinned via setYoutubePlayerClient.
    */
   static applyAuthDefault(hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
@@ -105,6 +103,6 @@ export class YoutubePlayerClientConfig {
     if (hasYouTubeLogin) {
       return ['tv_downgraded', 'mweb'];
     }
-    return ['tv_samsung', 'visionos', 'mweb'];
+    return ['visionos', 'mweb'];
   }
 }

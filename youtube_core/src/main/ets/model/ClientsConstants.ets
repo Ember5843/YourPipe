@@ -60,8 +60,9 @@ export class ClientsConstants {
     "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version";
 
   // =====================
-  // TVHTML5 Samsung (tv_samsung) — PipePipe 5.5.0 logged-out default stream
-  // client (555143dc, mirrors yt-dlp tv_samsung). Token-free direct URLs.
+  // TVHTML5 Samsung (tv_samsung) — legacy PipePipe 5.5.0 logged-out default
+  // (555143dc, mirrors yt-dlp tv_samsung). No longer a guest UI endpoint;
+  // internal/dormant only. Token-free direct URLs.
   // =====================
   static readonly TVHTML5_SAMSUNG_CLIENT_ID: string = "7";
   static readonly TVHTML5_SAMSUNG_CLIENT_NAME: string = "TVHTML5";

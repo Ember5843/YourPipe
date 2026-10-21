@@ -22,7 +22,7 @@ export class AuthStateHelper {
   /**
    * 登录态/鉴权开关变化后的统一后置动作：按当前有效播放鉴权重置 stream
    * client 选择（PipePipe reconcileYoutubePlayerClient：登录 → 配置的 auth
-   * 端点（默认 mweb SABR），游客 → 配置的 guest 端点（默认 tv_samsung）；
+   * 端点（默认 mweb SABR），游客 → 配置的 guest 端点（默认 visionos）；
    * 清除手动 pin）。启动、登录、登出、鉴权开关都必须走这里，
    * 不要在调用点散落 resetToAuthDefault 及其参数推导。
    */

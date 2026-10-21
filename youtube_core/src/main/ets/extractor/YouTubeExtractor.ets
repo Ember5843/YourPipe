@@ -1120,7 +1120,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
 
     // PipePipe reconcileYoutubePlayerClient: signed-in (Cookie or OAuth-only)
     // → the configured auth client (default mweb SABR), guest → the configured
-    // guest client (default tv_samsung direct URLs). Cookie+SAPISIDHASH
+    // guest client (default visionos direct URLs). Cookie+SAPISIDHASH
     // attaches to whichever client is selected (PipePipe addLoggedInHeaders).
     const webCookieAuth = this.shouldAttachWebCookieAuth();
     const hasOauth = this.isOauthOnlyPlaybackAuth();

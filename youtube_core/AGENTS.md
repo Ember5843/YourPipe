@@ -96,20 +96,20 @@ youtube_core/src/main/
 ## 3. Extractor flow (playback-critical path)
 1. **Resolve video ID** from URL or ID string.
 2. **Client selection** via `YoutubePlayerClientConfig` (single client):
-   - allow-list: `mweb` | `web_safari` | `visionos` | `android_vr` | `tv_downgraded` | `tv_samsung`
+   - internal allow-list: `mweb` | `web_safari` | `visionos` | `android_vr` | `tv_downgraded` | `tv_samsung`
    - **per-state configurable** (entry Options → 播放端点 →
-     `setConfiguredClients(guest, auth)`): guest allow-list `tv_samsung|visionos|mweb`
-     (default `tv_samsung` — pot-free TVHTML5 direct adaptiveFormats URLs with
-     Samsung Tizen device fields; `visionos` keeps the pot-free GAPIS endpoint
-     `youtubei.googleapis.com`, no sts/pot), signed-in allow-list `tv_downgraded|mweb` (default
+     `setConfiguredClients(guest, auth)`): guest allow-list `visionos|mweb`
+     (default `visionos` — pot-free GAPIS endpoint
+     `youtubei.googleapis.com`, no sts/pot; `mweb` stays selectable for SABR
+     debugging), signed-in allow-list `tv_downgraded|mweb` (default
      `mweb` SABR; `tv_downgraded` stays the token-free direct-URL option);
      direct clients resolve to direct adaptiveFormats URLs. `applyAuthDefault` / `resetToAuthDefault` pick the
      configured value for the current auth state (entry 侧统一经
-     `AuthStateHelper.reconcilePlaybackClient`). `web_safari` / `android_vr`
-     are unused endpoints kept for reference (android_vr was dropped upstream
-     by PipePipe). The explicit pin (`setYoutubePlayerClient`) survives
-     per-extraction `applyAuthDefault` but is DORMANT — the settings UI goes
-     through the per-state config, not the pin.
+     `AuthStateHelper.reconcilePlaybackClient`). `web_safari`, `android_vr`,
+     and `tv_samsung` are unreachable in product (no UI; internal keys kept
+     for dormant debug pinning only). The explicit pin (`setYoutubePlayerClient`)
+     survives per-extraction `applyAuthDefault` but is DORMANT — the settings
+     UI goes through the per-state config, not the pin.
    - `tv_downgraded` + Bearer doubles as the **restricted / OAuth recovery**
      path (skipped when the selected client already is tv_downgraded)
    - **Upstream reference (PipePipe origin/main, checked 2026-10)**: the
@@ -117,11 +117,12 @@ youtube_core/src/main/
      `visionos` as the invalid-value fallback, and PipePipeClient narrows the
      user-visible set further — **logged-in may only use `mweb`**, logged-out
      may use `mweb|visionos|tv_samsung` with `visionos` as the default.
-     YourPipe deliberately diverges on both points: `tv_downgraded` stays
+     YourPipe deliberately diverges on two points: `tv_downgraded` stays
      selectable while signed in (token-free direct URLs = the fallback when
-     SABR is unavailable), and the guest default is `tv_samsung` (the pot-free
-     TVHTML5 direct path). Re-check upstream before changing either default —
-     the guest default is the product's primary playback path.
+     SABR is unavailable), and the guest product set is `visionos|mweb`
+     with `visionos` as the default — `tv_samsung` was removed from the guest
+     UI. Re-check upstream before changing either default — the guest default
+     is the product's primary playback path.
    - **One-shot extraction override** (`setExtractionClientOverride` /
      `clearExtractionClientOverride`): entry's SABR → `tv_downgraded` endpoint
      fallback switches the client for exactly one extraction without touching

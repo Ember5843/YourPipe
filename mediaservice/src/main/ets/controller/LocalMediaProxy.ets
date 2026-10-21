@@ -266,7 +266,7 @@ export class LocalMediaProxy {
     // Every other client retains the existing four-attempt policy.
     // With pot= now injected by YouTubePlayService, 403s are rare; keep a short
     // budget so genuinely invalid URLs fail fast instead of hanging 10s.
-    // tv_samsung (guest TVHTML5 default) gets the same bounded TV budget.
+    // TVHTML5 clients (tv_downgraded, dormant tv_samsung) get the same bounded budget.
     const isTvClient = resource.sourceClient === 'tv_downgraded'
       || resource.sourceClient === 'tv_samsung';
     const retryStartedAt = Date.now();

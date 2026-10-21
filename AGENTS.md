@@ -17,13 +17,13 @@
 - **What it is**: YouTube client for OpenHarmony / HarmonyOS. Plays YouTube
   content through a native **MPV** pipeline (vendored `libmpv.so` + static
   `libav*` for mux/remux). Product VOD path is **direct-link DASH** for guest
-  (`tv_samsung` TVHTML5 /player by default, pot-free — PipePipe parity;
-  `visionos` GAPIS remains selectable →
+  (`visionos` GAPIS /player by default, pot-free →
   adaptiveFormats direct URLs → dual-track local proxy → MPV); signed-in
-  playback defaults to **mweb SABR/UMP**. Both states are user-selectable
-  (Options → 播放端点: guest `tv_samsung|visionos|mweb`, signed-in
-  `tv_downgraded|mweb`). `android_vr` and `web_safari` are unused endpoints,
-  unreachable in product (no UI, kept for reference only); `android_vr`
+  playback defaults to **mweb SABR/UMP**. Guest endpoints are
+  `visionos|mweb` (mweb for SABR debugging); `tv_samsung` is no longer a
+  selectable guest endpoint. Signed-in endpoints are `tv_downgraded|mweb`.
+  `android_vr`, `web_safari`, and `tv_samsung` are unreachable in product
+  (no UI; internal keys kept for dormant debug pinning only); `android_vr`
   requires a session pot.
   The `libmpv_napi` module
   (`MpvPlayerView` / `MpvPlayerController`) is the NAPI bridge to MPV,
@@ -213,13 +213,14 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `AppLogStore`; do not scatter raw `console.log` / `hilog` in library code.
 - **Player stack**: product backend is MPV only (`libmpv_napi` +
   `MpvPlaybackEngine`). Do not reintroduce a second decoder/player path.
-- **Playback media path**: guest VOD is direct-link-first (`tv_samsung`
-  TVHTML5 by default, `visionos` selectable →
-  adaptiveFormats direct URLs → local range/DASH proxy); signed-in VOD
-  defaults to the mweb **SABR** path, with `tv_downgraded` direct links
-  still selectable. `android_vr` and `web_safari` are unused endpoints,
-  unreachable in product (no UI, kept for reference only); `android_vr`
-  requires a session pot. SABR ownership:
+- **Playback media path**: guest VOD is direct-link-first (`visionos`
+  GAPIS by default, pot-free → adaptiveFormats direct URLs → local
+  range/DASH proxy); guest endpoints are `visionos|mweb` (mweb for SABR
+  debugging). Signed-in VOD defaults to the mweb **SABR** path, with
+  `tv_downgraded` direct links still selectable. `android_vr`, `web_safari`,
+  and `tv_samsung` are unreachable in product (no UI; internal keys kept
+  for dormant debug pinning only); `android_vr` requires a session pot.
+  SABR ownership:
   extractor bootstraps SABR; `youtube_core` owns UMP session fetch;
   `mediaservice` owns lease/store/serve + MPV load URL; `entry` owns PoToken
   WebView mint.
