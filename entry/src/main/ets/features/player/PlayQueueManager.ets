@@ -16,8 +16,11 @@ export enum QueueSourceType {
 
 /** Hints passed from the caller to pre-configure the play queue before opening the player. */
 export interface PlayQueueSourceHint {
-  /** 'downloads' = the download library injected wholesale as one playable list. */
-  type: 'playlist' | 'local' | 'downloads';
+  /**
+   * 'downloads' = the download library injected wholesale as one playable list.
+   * 'localFiles' = user-imported files (independent of downloads).
+   */
+  type: 'playlist' | 'local' | 'downloads' | 'localFiles';
   playlistId: string;
   playlistName: string;
   loadedItems?: VideoItem[];

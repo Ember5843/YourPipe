@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "Приостановлено"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "Прямой эфир"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "Подключение к чату…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "Подключено"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "Прямой чат недоступен для этого видео"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "Прямой чат завершён"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "Ошибка подключения к чату"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "Сообщений пока нет"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "Только чтение"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "Участник"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "Автор"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "Модератор"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "Локальные файлы"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "Импорт видео"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "Импорт…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "Импортировано файлов: %d"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "Не удалось импортировать"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "Выберите видео из системных файлов. Импортированные видео воспроизводятся в приложении."
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "Удалить локальный файл"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "Файл будет удалён из приложения без возможности восстановления."
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "Локальных файлов пока нет"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "Нажмите «Импорт видео», чтобы выбрать файлы"
+        }
+    ]
 }

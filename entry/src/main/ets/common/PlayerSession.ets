@@ -452,6 +452,26 @@ export class PlayerSession {
    * stops before controller.updateVideoSource(), so MPV cannot load before the
    * player surface exists. play() consumes the same in-flight result.
    */
+  /**
+   * 本地文件在打开播放页前登记「正在打开」。
+   *
+   * 普通视频由 beginPrepare() 设置 `_prepareVideoId`，上一个播放页的
+   * aboutToDisappear 据此判定「会话已经属于新视频」而不再 closeForNavigation。
+   * 本地文件不需要网络提取，之前完全跳过 beginPrepare -> 没有任何标记，
+   * 于是「先播一个在线视频、再点下载条目」时旧页面的 disappear 会把刚建立的
+   * 本地会话拆掉（表现为打不开 / 残留在线视频的详情 Tab）。这里只做意图登记，
+   * 不触发提取。
+   */
+  beginLocalPrepare(video: VideoItem): void {
+    const videoId = (video.videoId || '').trim();
+    if (!videoId) return;
+    this._playbackTornDown = false;
+    this._prepareVideoId = videoId;
+    this._prepareGeneration = this._playGeneration;
+    this.setLocalMode(true);
+    logger.info(`${TAG} local prepare video=${videoId} generation=${this._playGeneration}`);
+  }
+
   beginPrepare(video: VideoItem): void {
     const videoId = video.videoId || YOUTUBE_VIDEO_ID;
     if (!videoId) return;
@@ -740,9 +760,12 @@ export class PlayerSession {
       return this._activePlayPromise;
     }
 
+    // 本地源在提交前就把会话模式切到 local，播放页首帧不会先渲染在线详情 Tab
+    // （评论 Tab 等），也避免依赖 doPlayLocal 的异步时序。
+    this.setLocalMode(!!video.localMediaPath);
     this._currentVideo = video;
     this._activePlayVideoId = videoId;
-    logger.info(`${TAG} play() called for ${videoId}`);
+    logger.info(`${TAG} play() called for ${videoId} local=${!!video.localMediaPath}`);
 
     const generation = this._playGeneration;
     const promise = this.doPlay(video, videoId, generation);

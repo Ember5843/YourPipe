@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "Pausado"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "Chat ao vivo"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "Conectando ao chat…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "Conectado"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "O chat ao vivo não está disponível para este vídeo"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "O chat ao vivo terminou"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "Falha na conexão do chat"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "Ainda não há mensagens"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "Somente leitura"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "Membro"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "Apresentador"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "Moderador"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "Arquivos locais"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "Importar vídeos"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "Importando…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "%d arquivo(s) importado(s)"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "Falha ao importar"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "Escolha vídeos dos arquivos do sistema. Os vídeos importados são reproduzidos no app."
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "Excluir arquivo local"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "O arquivo será removido do app e não poderá ser recuperado."
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "Ainda não há arquivos locais"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "Toque em \"Importar vídeos\" para escolher arquivos"
+        }
+    ]
 }

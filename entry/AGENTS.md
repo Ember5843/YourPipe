@@ -40,11 +40,11 @@ comes from `OptionsNavScaffold`'s custom `backIcon`.
 |---|---|
 | `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI; `HomeTabContent` — 首页 tab 内容宿主（feed 加载状态机 + 推荐位 banner + 三个 @LocalBuilder 卡片），Index 经 `HomeTabController` 触发 reset。**首页信息流按 `VideoItem.isShort` 拆成 `longList` / `shortList` 两份**（同一份 feed，切换维度不重新请求）：标题栏（搜索图标左侧）的切换符号在两者间切（`UIConfig.homeFeedMode`，持久化 `cfg_homeFeedMode`）。短视频只来自账号相关内容：① 首页 feed 的 Shorts 货架（`harvestShortsFromFeed` 自动多翻 ≤5 页去收）；② **feed 翻到顶后**接「我的频道」的 `/shorts`（`topUpShortsFromChannels`：订阅频道 → 观看历史频道，去重 ≤12 个，独立分页，`interleaveByChannel` 轮转交织防"整屏同一作者"）。**不用泛搜索补货**。推荐位 banner 只在长视频维度显示 |
 | `search` | `SearchPage` (NavDestination) |
-| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **布局状态机**（PlayerPage 方法派生，输入 `@Env(WINDOW_SIZE/BREAK_POINT)` + 视频比例：竖向窗口 → 上视频+下信息；真横屏且容得下 → 左视频+右信息栏 `clamp(W/3, 320, 480)`；非竖向但容不下 → 挤压强制铺满，信息经播放器菜单"视频信息"以 CENTER sheet 打开；内容组件 `components/PlayerInfoPanel.ets` 三处复用；信息 sheet 必须 `showClose: false`（自带关闭按钮与面板 Tab 栏重叠，关闭走拖拽条/点空白）；强制全屏态（`isFullLandscapeScreen() && !isManualFullscreen`）必须 `VideoPlayer.showFullscreenButton=false`（仅用户手动全屏保留退出入口）；ArkUI V1 @Component 不支持 ES get 访问器——布局派生必须用普通方法）, **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/` + `workers/AsrStreamingWorker.ets`：`AsrLiveCaptionService` 真流式识别，MPV PCM tap + sherpa OnlineRecognizer 流式 zipformer 中英双语 int8；菜单项、Options 入口/设置页、PlayerSession/AVPlayer 接线、build-profile worker 注册均已注释，`AsrModelManager.clearAll`/`clearCaches` 的清数据接线保留以清理已下载模型）——入口/设置项均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
+| `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **布局状态机**（PlayerPage 方法派生，输入 `@Env(WINDOW_SIZE/BREAK_POINT)` + 视频比例：竖向窗口 → 上视频+下信息；真横屏且容得下 → 左视频+右信息栏 `clamp(W/3, 320, 480)`；非竖向但容不下 → 挤压强制铺满，信息经播放器菜单"视频信息"以 CENTER sheet 打开；内容组件 `components/PlayerInfoPanel.ets` 三处复用；信息 sheet 必须 `showClose: false`（自带关闭按钮与面板 Tab 栏重叠，关闭走拖拽条/点空白）；强制全屏态（`isFullLandscapeScreen() && !isManualFullscreen`）必须 `VideoPlayer.showFullscreenButton=false`（仅用户手动全屏保留退出入口）；ArkUI V1 @Component 不支持 ES get 访问器——布局派生必须用普通方法）, **直播聊天/实时评论（只读）**：`PlayerInfoPanel` 在 `isLiveNow` 时追加第 4 个「聊天」Tab（`LiveChatPanel`），可见时才轮询、离开/切台/换视频即停；首访 `/next` 的 `conversationBar.liveChatRenderer` 取 continuation，之后按服务端 `timeoutMs`（1–15s 夹紧）轮询 `live_chat/get_live_chat`，失败 5s 重连；只解析文本 / Super Chat / 会员消息，不做发送或点赞（避免账号风控）。协议实现见 `youtube_core` `LiveChatExtractor`，网络走 `YouTubePlayService.fetchLiveChatInitial/fetchLiveChatPage`）, **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/` + `workers/AsrStreamingWorker.ets`：`AsrLiveCaptionService` 真流式识别，MPV PCM tap + sherpa OnlineRecognizer 流式 zipformer 中英双语 int8；菜单项、Options 入口/设置页、PlayerSession/AVPlayer 接线、build-profile worker 注册均已注释，`AsrModelManager.clearAll`/`clearCaches` 的清数据接线保留以清理已下载模型）——入口/设置项均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
 | `playlist` | Playlist list + detail |
 | `subscription` | Subscription manage + feed service (bottom tab) |
 | `favorites` | `FavoritesPage` |
-| `local` | Local library + downloads |
+| `local` | Local library + downloads + **本地导入**：`LocalMediaPage`（系统文件选择器导入、应用内播放、删除）挂在 `LocalPage` 的第 3 个 sub-tab（观看历史 / 下载视频 / 本地文件）。导入文件复制到 `filesDir/local_media/`，索引 `local_media_json`，与下载库完全独立（独立目录、独立索引、独立队列来源 `localFiles`）；播放复用 `PlayerSession` 的 `LOCAL_FILE` 通道与 `local:<id>` 续播键 |
 | `options` | `OptionsSheetHost` — options sheet 宿主（inner HdsNavigation + 全部子页 destination + `OptionsNavScaffold`；无入口的 app_lang/content_lang/content_country picker destination 已移除），Index 经单对象 params 传回调。Main（一级菜单分 通用/个性化/播放/其他 四组）/ appearance / playback（拆分为四页：播放 `OptionsPlaybackPage`（含 下载 并发 picker + **下载超时 picker**）/ 手势与操控 `OptionsGestureControlPage`（长按倍速 `HOLD_SPEED_VALUES` 等手势项 + **中央播放按钮开关** + **点击画面切换播放/暂停开关**）/ 字幕 `OptionsSubtitlePage`（字幕样式：字号/底边距/颜色/背景/偏移/翻译语言）/ 性能与缓冲 `OptionsPerformancePage`（后台纯音频、硬解、GPU 渲染、内存缓存/预读/缓冲大小调参）；播放端点 per-state: guest `tv_samsung|visionos|mweb` (default tv_samsung), signed-in `tv_downgraded|mweb`, persisted in `PlaybackConfig`, applied via `AuthStateHelper.applyPlayerClientConfig` + prefetch-cache clear) / language-region / **network**（含**常驻连接状态条** + **重新应用并重启**按钮 + 地址格式示例）/ log_page（应用日志页）/ data-account（页尾含 恢复 组：恢复所有配置 / 清除应用全部数据；独立 `OptionsRecoveryPage` 已删除，回调经 data_account destination 透传）/ ai-subtitle **[DISABLED]**（`ai_translate` destination 与 OptionsMainPage 入口行均已注释，产品只保留 P0 tlang；`OptionsAiTranslatePage` — 端侧识别模型下载/删除管理，标题 `yt_option_ai_subtitle`，页内 P2 gtx/LLM 配置区同处注释块） / about-update (GitHub Releases check + AppGallery test link; the update-check call site is inline in `OptionsMainPage`, `UpdateChecker` + `APPGALLERY_TEST_URL` live in `common/UpdateChecker.ets`; the About UI is `common/components/AboutPage.ets`, hosted as the `about_page` destination on `optionsNavStack` via `onAboutClick` — there is no `OptionsAboutPage`) |
 | `help` | `HelpGuidePage` — 6-page onboarding/help swiper (welcome + sign-in, account data, network proxy, quality/cache, downloads). Two entries: first-launch full-screen overlay on `Index` (an `if`-mounted layer in the root Stack, shown while `PreferencesStore` key `cfg_help_seen` != `'true'` with a 500 ms delay; bindSheet/bindContentCover on Navigation-hosted nodes do NOT present at app-start timing — do not revert to them) and Options main page "帮助" item (`help_page` destination in the options sheet). `resetAllConfigs` resets the flag; `clearAllAppData` clears it via `PreferencesStore.clearAll()`. Illustrations are `resources/base/media/guide_*.png` (welcome page uses `app_icon.png`). |
 | `user` | User / channel info; Library saved playlists (WEB classic renderers + TV lockup view models) |
@@ -223,6 +223,14 @@ Persistent state and shared singletons:
   Deliberately **separate** from `WatchHistoryStore`, which is keyed by YouTube
   `videoId` and never records per-item progress for local sources. Cleared by
   "clear all app data" together with watch history.
+- `LocalMediaStore` — **本地导入库**（`PreferencesStore` key `local_media_json`，
+  文件在 `filesDir/local_media/`）。`restore()` 启动对账并丢弃文件缺失的条目；
+  `importFromUris()` 从 `DocumentViewPicker` 复制最多 10 个视频进沙箱；
+  `delete()` 删文件 + 索引 + `LocalMediaProgressStore`。与下载库刻意分离：
+  独立目录/索引/队列来源（`localFiles`），不共享 `DownloadTask` 状态。
+  导入文件属于用户媒体，和 `filesDir/downloads` 一样在「清除应用全部数据」时
+  **保留**（`persistCurrent()` 在 Preferences 清空后重建索引）。UI 是
+  `features/local/LocalMediaPage.ets`（本地 tab 第 3 页）。
 - `PlayerSession` — singleton player state for the active `AvPlayerController`.
   Two session-level modes ride here and are published to `AppStorage` for the
   player UI: `isAudioOnlyMode` and `isLocalMode`. A `VideoItem` with
@@ -231,6 +239,12 @@ Persistent state and shared singletons:
   submits one synthetic `LOCAL_FILE` progressive stream; the sandbox path is
   handed to MPV untouched. `isLocalMode` is what gates the player UI down to
   local-only chrome (see §4 and `VideoDetails`/`PlayerInfoPanel`/`AVPlayer`).
+  `beginLocalPrepare(video)` must run in `Index.openVideoDetail` before a local
+  page opens: it sets `_prepareVideoId` + local mode so the previous player
+  page's `aboutToDisappear` sees a newer source and does not
+  `closeForNavigation()` the fresh local session (the old race left local
+  playback torn down / online detail tabs visible). `play()` also flips local
+  mode synchronously before submitting the source.
 - `PlayerPresentation` — foreground / background / share / cast / PiP presentation
   mode; drives when video may be disabled for background audio-only.
 - `WatchHistoryStore`, `SearchHistoryStore`, `DownloadManager`, `LocalStore`,
@@ -344,7 +358,7 @@ geometry (`deviceWidth`/`deviceHeight`, `statusBarHeight`, `navBarHeight`,
 `isPipHandoffPending`, `isFloatingWindow`, `isSplitScreen`, `isMultiWindow`,
 `isAudioOnlyMode`, `isLocalMode`, `playerPageVisible`, `selectedVideo`), and collection
 store caches (`favorites`, `playlists`, `subscriptions`, `watchHistory`,
-`localQueues`, `downloadTasks`, `authStatus`). Shorts internals:
+`localQueues`, `downloadTasks`, `localMedia`, `authStatus`). Shorts internals:
 `shortsSurfaceId`（Shorts 常驻 surface，controller 重建后据此重绑）、
 `shortsPageVisible`。
 

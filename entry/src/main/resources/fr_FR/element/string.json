@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "En pause"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "Chat en direct"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "Connexion au chat…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "Connecté"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "Chat en direct indisponible pour cette vidéo"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "Le chat en direct est terminé"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "Échec de la connexion au chat"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "Aucun message pour le moment"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "Lecture seule"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "Membre"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "Hôte"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "Modérateur"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "Fichiers locaux"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "Importer des vidéos"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "Importation…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "%d fichier(s) importé(s)"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "Échec de l'importation"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "Choisissez des vidéos dans les fichiers système. Les vidéos importées se lisent dans l'application."
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "Supprimer le fichier local"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "Le fichier sera supprimé de l'application et ne pourra pas être récupéré."
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "Aucun fichier local"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "Touchez « Importer des vidéos » pour choisir des fichiers"
+        }
+    ]
 }

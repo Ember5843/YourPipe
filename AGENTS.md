@@ -300,6 +300,16 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   附录 A。搜索页要显示短视频时，解析必须递归展开货架容器（新版是
   `gridShelfViewModel`，`contents` 不是 `items`；旧结构还有
   `shelfRenderer`→`horizontalListRenderer` 等）。
+- **本地导入与下载库分离**：`entry` 的 `LocalMediaStore` 管理
+  `filesDir/local_media/`（索引 `local_media_json`），播放走与下载物相同的
+  `LOCAL_FILE` 通道，但目录、索引、队列来源（`localFiles`）都独立，不共享
+  `DownloadTask` 状态。两者都属于用户媒体：`clearAllAppData` 保留文件并在
+  Preferences 清空后重建索引。
+- **直播聊天（只读）**：`youtube_core` `LiveChatExtractor` 从 `/next` 的
+  `conversationBar` 取 continuation 并轮询 `live_chat/get_live_chat`；
+  `entry` `LiveChatPanel` 只在播放页「聊天」Tab 可见时轮询（服务端
+  `timeoutMs` 夹紧 1–15s，失败 5s 重连），离开/换视频即停。只支持读取
+  文本 / Super Chat / 会员消息；发送、点赞、直播评论写操作不做（账号风控）。
 - **AI subtitles**: the only live path is P0, the server-side `tlang`
   translation track — built by `youtube_core`
   (`extractor/SubtitleTranslate.ets`, `SubtitleTrack.isAutoTranslated`),

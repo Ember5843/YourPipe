@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "已暫停"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "聊天室"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "正在連線聊天…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "已連線"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "此影片沒有可用的直播聊天"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "直播聊天已結束"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "聊天連線失敗"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "目前沒有聊天訊息"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "唯讀"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "會員"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "直播主"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "管理員"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "本機檔案"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "匯入影片"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "匯入中…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "已匯入 %d 個檔案"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "匯入失敗"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "從系統檔案中選擇影片，匯入後可在應用程式內播放"
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "刪除本機檔案"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "刪除後檔案將從應用程式移除，無法復原。"
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "還沒有本機檔案"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "點擊「匯入影片」從系統檔案中選擇"
+        }
+    ]
 }

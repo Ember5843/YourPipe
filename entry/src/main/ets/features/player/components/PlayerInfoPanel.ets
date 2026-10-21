@@ -6,6 +6,9 @@ import { SubTabBarItem } from '../../../common/components/SubTabBar';
 import { VideoDetails } from './VideoDetails';
 import { CommentNavWrapper } from './CommentNavWrapper';
 import { PlayQueueList } from './PlayQueueList';
+import { LiveChatPanel } from './LiveChatPanel';
+
+const LIVE_CHAT_TAB: TabItem = new TabItem(3, $r('app.string.yt_tab_live_chat'));
 
 /**
  * 播放器信息面板（简介 / 评论 / 播放列表三 Tab）。
@@ -14,11 +17,11 @@ import { PlayQueueList } from './PlayQueueList';
 @Component
 export struct PlayerInfoPanel {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
-  @Prop video: VideoItem | null = null;
+  @Prop @Watch('onTabSetChanged') video: VideoItem | null = null;
   @Prop videoDescription: string = '';
   @Prop streams: StreamInfo[] = [];
   /** True only for currently live broadcasts (not VOD of past lives). */
-  @Prop isLiveNow: boolean = false;
+  @Prop @Watch('onTabSetChanged') isLiveNow: boolean = false;
   @Prop viewCount: number = 0;
   @Prop likeCount: string = '0';
   @Prop dislikeCount: string = '';
@@ -30,12 +33,31 @@ export struct PlayerInfoPanel {
   @Link vm: PlayerUiViewModel;
   @State tabArray: Array<TabItem> = initTabData();
   @State currentTabIndex: number = 0;
-  @StorageLink('isLocalMode') isLocalMode: boolean = false;
+  @StorageLink('isLocalMode') @Watch('onTabSetChanged') isLocalMode: boolean = false;
 
-  /** 本地文件没有评论 Tab；播放队列保留（下载库整份入队，可顺放）。 */
+  /**
+   * 换视频 / 进入本地模式 / 直播状态变化后 Tab 集合可能变短：
+   * 当前索引越界会显示空白内容，统一收回「简介」。
+   */
+  private onTabSetChanged(): void {
+    const count = this.visibleTabs().length;
+    if (this.currentTabIndex >= count) {
+      this.currentTabIndex = 0;
+    }
+  }
+
+  /**
+   * 本地文件没有评论 / 聊天 Tab；播放队列保留（下载库整份入队，可顺放）。
+   * 正在直播的视频追加只读「聊天」Tab（点播 / 回放不显示）。
+   */
   private visibleTabs(): Array<TabItem> {
     if (this.isLocalMode) {
       return this.tabArray.filter((item: TabItem) => item.id !== 1);
+    }
+    if (this.isLiveNow) {
+      const tabs = this.tabArray.slice();
+      tabs.push(LIVE_CHAT_TAB);
+      return tabs;
     }
     return this.tabArray;
   }
@@ -72,6 +94,11 @@ export struct PlayerInfoPanel {
                 }
               } else if (item.id === 1) {
                 CommentNavWrapper({ videoId: this.video?.videoId || '' })
+              } else if (item.id === 3) {
+                LiveChatPanel({
+                  videoId: this.video?.videoId || '',
+                  active: this.currentTabIndex === index
+                })
               } else {
                 PlayQueueList()
               }
@@ -87,7 +114,7 @@ export struct PlayerInfoPanel {
       .barMode(BarMode.Fixed)
       .barWidth(Const.WIDTH_FULL_PERCENT)
       .barHeight(48)
-      .onAnimationStart((index: number, targetIndex: number) => {
+      .onAnimationStart((_index: number, targetIndex: number) => {
         this.currentTabIndex = targetIndex;
       })
       .backgroundColor($r('app.color.yourtube_bg_page'))

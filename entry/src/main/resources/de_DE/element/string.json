@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "Pausiert"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "Live-Chat"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "Verbinde mit Chat…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "Verbunden"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "Live-Chat für dieses Video nicht verfügbar"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "Live-Chat beendet"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "Chat-Verbindung fehlgeschlagen"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "Noch keine Chat-Nachrichten"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "Schreibgeschützt"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "Mitglied"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "Host"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "Moderator"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "Lokale Dateien"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "Videos importieren"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "Importiere…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "%d Datei(en) importiert"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "Import fehlgeschlagen"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "Videos aus Systemdateien auswählen. Importierte Videos werden in der App abgespielt."
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "Lokale Datei löschen"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "Die Datei wird aus der App entfernt und kann nicht wiederhergestellt werden."
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "Noch keine lokalen Dateien"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "Auf „Videos importieren“ tippen, um Dateien auszuwählen"
+        }
+    ]
 }

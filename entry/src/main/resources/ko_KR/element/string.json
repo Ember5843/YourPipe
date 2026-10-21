@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "일시정지됨"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "실시간 채팅"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "채팅 연결 중…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "연결됨"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "이 동영상에서는 실시간 채팅을 사용할 수 없습니다"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "실시간 채팅이 종료되었습니다"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "채팅 연결 실패"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "아직 채팅 메시지가 없습니다"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "읽기 전용"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "멤버"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "방송자"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "관리자"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "로컬 파일"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "동영상 가져오기"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "가져오는 중…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "파일 %d개를 가져왔습니다"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "가져오기 실패"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "시스템 파일에서 동영상을 선택하세요. 가져온 동영상은 앱에서 재생됩니다."
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "로컬 파일 삭제"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "파일이 앱에서 제거되며 복구할 수 없습니다."
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "아직 로컬 파일이 없습니다"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "\"동영상 가져오기\"를 눌러 파일 선택"
+        }
+    ]
 }

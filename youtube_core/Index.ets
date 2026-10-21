@@ -23,6 +23,7 @@ export {
   YoutubeMusicPremiumContentException
 } from './src/main/ets/extractor/YouTubeExceptions';
 export { CommentItem, CommentResponse } from './src/main/ets/extractor/CommentItem';
+export { LiveChatMessage, LiveChatPage } from './src/main/ets/extractor/LiveChatExtractor';
 export { parseHlsMasterManifest } from './src/main/ets/extractor/HlsManifestParser';
 export { ItagItem } from './src/main/ets/extractor/itag/ItagItem';
 

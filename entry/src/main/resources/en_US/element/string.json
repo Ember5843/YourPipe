@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "Paused"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "Live chat"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "Connecting to chat…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "Connected"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "Live chat is not available for this video"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "Live chat has ended"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "Chat connection failed"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "No chat messages yet"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "Read-only"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "Member"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "Host"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "Moderator"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "Local files"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "Import videos"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "Importing…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "Imported %d file(s)"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "Import failed"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "Pick videos from system files. Imported videos play inside the app."
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "Delete local file"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "The file will be removed from the app and cannot be recovered."
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "No local files yet"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "Tap \"Import videos\" to pick files from the system"
+        }
+    ]
 }

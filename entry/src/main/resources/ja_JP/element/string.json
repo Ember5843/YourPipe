@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "一時停止中"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "ライブチャット"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "チャットに接続中…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "接続済み"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "この動画ではライブチャットを利用できません"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "ライブチャットは終了しました"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "チャット接続に失敗しました"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "チャットメッセージはまだありません"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "読み取り専用"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "メンバー"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "配信者"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "モデレーター"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "ローカルファイル"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "動画をインポート"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "インポート中…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "%d 件のファイルをインポートしました"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "インポートに失敗しました"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "システムのファイルから動画を選択します。インポートした動画はアプリ内で再生できます。"
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "ローカルファイルを削除"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "ファイルはアプリから削除され、復元できません。"
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "ローカルファイルはまだありません"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "「動画をインポート」をタップしてファイルを選択"
+        }
+    ]
 }

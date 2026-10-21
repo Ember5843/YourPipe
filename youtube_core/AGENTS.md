@@ -23,6 +23,8 @@ youtube_core/src/main/
     extractor/
       YouTubeExtractor.ets             — main extraction flow
       CommentsExtractor.ets            — comments/replies (CommentsBackend 窄接口)
+      LiveChatExtractor.ets            — YouTube 直播聊天/实时评论（只读；
+                                         /next conversationBar → live_chat 轮询）
       PlayabilityChecker.ets           — playability 状态判定（无状态静态方法）
       VideoInfo.ets, StreamInfo.ets, ItagInfo.ets
       HlsManifestParser.ets            — HLS m3u8 parser
@@ -152,6 +154,17 @@ youtube_core/src/main/
    - `/next` (related, likes, chapters)
    - RYD dislikes
 5. Comments and channel profile fetch are UI-driven and must not race stream extract.
+6. **Live chat (read-only)**: `LiveChatExtractor` implements
+   `LiveChatBackend` on top of `YouTubeExtractor`. The initial continuation
+   comes from the WEB `/next` `contents.twoColumnWatchNextResults.conversationBar.liveChatRenderer.continuations[0].reloadContinuationData`
+   (same `/next` shape as comments). Polling POSTs
+   `youtubei/v1/live_chat/get_live_chat?prettyPrint=false` with the WEB
+   desktop context + pinned `visitorData`; `currentPlayerState.playerOffsetMs`
+   is only sent for replay (`>= 0`). Parse `continuationContents.liveChatContinuation.actions`
+   text/paid/membership items and the next `timedContinuationData` /
+   `invalidationContinuationData` (`timeoutMs`). Entry owns cadence/lifecycle
+   (`LiveChatPanel`); never let a hidden tab keep polling.
+   This path is **read-only** — no send/vote APIs.
 
 ## 4. SABR / UMP
 - **Bootstrap**: `YoutubeSabrInfo` from player response (`serverAbrStreamingUrl` + formats).

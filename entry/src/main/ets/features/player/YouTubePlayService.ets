@@ -7,6 +7,7 @@ import {
   VideoInfo,
   StreamInfo as YouTubeStreamInfo,
   CommentResponse,
+  LiveChatPage,
   AgeRestrictedContentException,
   PrivateContentException,
   PaidContentException,
@@ -405,6 +406,27 @@ export class YouTubePlayService {
     if (!this.extractor) await this.initialize();
     this.syncExtractorLocale();
     return await this.extractor!.fetchCommentReplies(replyContinuation);
+  }
+
+  /**
+   * 直播聊天首访（只读）：返回初始 continuation + 已到的消息。
+   * 非直播 / 聊天关闭时 available=false。
+   */
+  async fetchLiveChatInitial(videoId: string): Promise<LiveChatPage> {
+    if (!this.extractor) await this.initialize();
+    this.syncExtractorLocale();
+    try {
+      return await this.extractor!.fetchLiveChatInitial(videoId);
+    } catch (e) {
+      logger.warn(`${TAG} fetchLiveChatInitial failed video=${videoId}: ${(e as Error).message || e}`);
+      throw new Error(`live chat initial failed: ${(e as Error).message || e}`);
+    }
+  }
+
+  /** 直播聊天轮询一页。 */
+  async fetchLiveChatPage(continuation: string, playerOffsetMs: number = -1): Promise<LiveChatPage> {
+    if (!this.extractor) await this.initialize();
+    return await this.extractor!.fetchLiveChatPage(continuation, playerOffsetMs);
   }
 
   async fetchPlaybackExtras(videoId: string): Promise<VideoInfo | null> {

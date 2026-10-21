@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "متوقف مؤقتًا"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "الدردشة المباشرة"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "جارٍ الاتصال بالدردشة…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "متصل"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "الدردشة المباشرة غير متاحة لهذا الفيديو"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "انتهت الدردشة المباشرة"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "فشل الاتصال بالدردشة"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "لا توجد رسائل دردشة بعد"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "للقراءة فقط"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "عضو"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "المضيف"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "مشرف"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "الملفات المحلية"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "استيراد مقاطع الفيديو"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "جارٍ الاستيراد…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "تم استيراد %d ملف"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "فشل الاستيراد"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "اختر مقاطع فيديو من ملفات النظام. تُشغَّل المقاطع المستوردة داخل التطبيق."
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "حذف الملف المحلي"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "ستتم إزالة الملف من التطبيق ولا يمكن استرداده."
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "لا توجد ملفات محلية بعد"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "اضغط على \"استيراد مقاطع الفيديو\" لاختيار الملفات"
+        }
+    ]
 }

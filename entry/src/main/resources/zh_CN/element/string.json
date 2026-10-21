@@ -3601,5 +3601,90 @@
         {
             "name": "yt_download_status_paused",
             "value": "已暂停"
-        }]
+        },
+        {
+            "name": "yt_tab_live_chat",
+            "value": "聊天"
+        },
+        {
+            "name": "yt_live_chat_connecting",
+            "value": "正在连接聊天…"
+        },
+        {
+            "name": "yt_live_chat_connected",
+            "value": "已连接"
+        },
+        {
+            "name": "yt_live_chat_unavailable",
+            "value": "该视频没有可用的直播聊天"
+        },
+        {
+            "name": "yt_live_chat_ended",
+            "value": "直播聊天已结束"
+        },
+        {
+            "name": "yt_live_chat_error",
+            "value": "聊天连接失败"
+        },
+        {
+            "name": "yt_live_chat_empty",
+            "value": "暂时没有聊天消息"
+        },
+        {
+            "name": "yt_live_chat_readonly",
+            "value": "只读"
+        },
+        {
+            "name": "yt_live_chat_member",
+            "value": "会员"
+        },
+        {
+            "name": "yt_live_chat_owner",
+            "value": "主播"
+        },
+        {
+            "name": "yt_live_chat_moderator",
+            "value": "管理员"
+        },
+        {
+            "name": "yt_local_files",
+            "value": "本地文件"
+        },
+        {
+            "name": "yt_local_import",
+            "value": "导入视频"
+        },
+        {
+            "name": "yt_local_importing",
+            "value": "导入中…"
+        },
+        {
+            "name": "yt_local_import_success",
+            "value": "已导入 %d 个文件"
+        },
+        {
+            "name": "yt_local_import_failed",
+            "value": "导入失败"
+        },
+        {
+            "name": "yt_local_files_hint",
+            "value": "从系统文件中选择视频，导入后可在应用内播放"
+        },
+        {
+            "name": "yt_local_delete_title",
+            "value": "删除本地文件"
+        },
+        {
+            "name": "yt_local_delete_message",
+            "value": "删除后文件将从应用内移除，无法恢复。"
+        },
+        {
+            "name": "yt_local_empty_title",
+            "value": "还没有本地文件"
+        },
+        {
+            "name": "yt_local_empty_hint",
+            "value": "点击「导入视频」从系统文件中选择"
+        }
+    ]
 }

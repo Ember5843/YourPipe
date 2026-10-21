@@ -43,6 +43,8 @@ import {
 
 import { CommentResponse } from './CommentItem';
 import { CommentsExtractor, CommentsBackend } from './CommentsExtractor';
+import { LiveChatExtractor, LiveChatBackend, LiveChatPage } from './LiveChatExtractor';
+import { SessionIdentityManager } from './identity/SessionIdentityManager';
 import { PlayabilityChecker } from './PlayabilityChecker';
 
 const logger = YTCoreLogger.getInstance('YouTubeExtractor');
@@ -210,6 +212,17 @@ export interface InnerTubeNextPayload {
   continuation?: string;
 }
 
+/** live_chat/get_live_chat 请求体（实时直播不带 currentPlayerState）。 */
+export interface LiveChatPlayerState {
+  playerOffsetMs: string;
+}
+
+export interface LiveChatRequestPayload {
+  context: InnerTubeContext;
+  continuation: string;
+  currentPlayerState?: LiveChatPlayerState;
+}
+
 /**
  * Extraction error class
  */
@@ -223,11 +236,13 @@ export class ExtractError extends Error {
 /**
  * YouTube Video Extractor
  */
-export class YouTubeExtractor implements CommentsBackend {
+export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
   private client: YouTubeHttpClient;
   private context: common.UIAbilityContext;
   /** 评论区提取（拆分子模块）；fetchComments/fetchCommentReplies 委托给它 */
   private commentsExtractor: CommentsExtractor;
+  /** 直播聊天/实时评论（只读）；首访 /next + live_chat 轮询委托给它 */
+  private liveChatExtractor: LiveChatExtractor;
 
   // Process-level STS cache (watch HTML or remote latest-player).
   private static cachedSignatureTimestamp: number | undefined = undefined;
@@ -247,6 +262,7 @@ export class YouTubeExtractor implements CommentsBackend {
     this.context = context;
     this.client = new YouTubeHttpClient(context);
     this.commentsExtractor = new CommentsExtractor(this);
+    this.liveChatExtractor = new LiveChatExtractor(this);
     const authSession = AuthSessionManager.getInstance();
     if (authSession) {
       this.client.setAuthSession(authSession);
@@ -2486,6 +2502,45 @@ export class YouTubeExtractor implements CommentsBackend {
 
   async fetchCommentReplies(replyContinuation: string): Promise<CommentResponse> {
     return this.commentsExtractor.fetchCommentReplies(replyContinuation);
+  }
+
+  /** 直播聊天首访：/next 的 conversationBar → live_chat continuation。 */
+  async fetchLiveChatInitial(videoId: string): Promise<LiveChatPage> {
+    return this.liveChatExtractor.fetchInitial(videoId);
+  }
+
+  /** 直播聊天轮询；playerOffsetMs < 0 表示实时直播。 */
+  async fetchLiveChatPage(continuation: string, playerOffsetMs: number = -1): Promise<LiveChatPage> {
+    return this.liveChatExtractor.fetchPage(continuation, playerOffsetMs);
+  }
+
+  /**
+   * LiveChatBackend：POST youtubei/v1/live_chat/get_live_chat。
+   * WEB desktop body（与 /next 一致）；登录时带 Cookie + SAPISIDHASH。
+   * visitorData 走 context.client（读取直播聊天不要求 PoToken）。
+   */
+  async postLiveChatContinuation(continuation: string, playerOffsetMs: number): Promise<http.HttpResponse> {
+    const context = this.prepareInnerTubeContext('WEB');
+    const identity = SessionIdentityManager.current();
+    if (identity && identity.visitorData) {
+      context.client.visitorData = identity.visitorData;
+    }
+    const body: LiveChatRequestPayload = {
+      context,
+      continuation
+    };
+    if (playerOffsetMs >= 0) {
+      const state: LiveChatPlayerState = {
+        playerOffsetMs: `${Math.floor(playerOffsetMs)}`
+      };
+      body.currentPlayerState = state;
+    }
+    return this.client.postJson(
+      'https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?prettyPrint=false',
+      body,
+      this.webApiHeaders(),
+      this.shouldAttachWebCookieAuth()
+    );
   }
 
   /** CommentsBackend：带 continuation 的 WEB /next 翻页请求 */

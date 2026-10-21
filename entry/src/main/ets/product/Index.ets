@@ -17,6 +17,7 @@ import { PlaylistItem, StoredLocalQueue } from '../common/PlaylistModel';
 import { WatchHistoryItem, WatchHistoryStore } from '../common/WatchHistoryStore';
 import { LocalMediaProgressStore } from '../common/LocalMediaProgressStore';
 import { DownloadManager, DownloadTask } from '../common/DownloadManager';
+import { LocalMediaStore } from '../common/LocalMediaStore';
 import { SearchHistoryStore } from '../common/SearchHistoryStore';
 import { AppLogStore } from '../common/AppLogStore';
 import { LocalMediaProxy, PlayerState, PlayerModel } from 'mediaservice';
@@ -407,6 +408,8 @@ struct Index {
     LocalMediaProgressStore.clearAll();
     // 下载条目刻意保留：它是 filesDir/downloads 下文件的唯一索引；clearAllTasks 自身会刷新 AppStorage。
     DownloadManager.getInstance().clearAllTasks();
+    // 本地导入文件同样是用户媒体：clearAll 清掉了 Preferences 里的索引，这里重新落盘。
+    LocalMediaStore.persistCurrent();
     SearchHistoryStore.clearSearchHistory();
     AppLogStore.clear();
 
@@ -443,6 +446,8 @@ struct Index {
     this.ensureStores();
     // 重启对账：从持久化索引恢复已完成下载条目（文件缺失的条目自动丢弃）。
     DownloadManager.getInstance().restoreTasks();
+    // 本地导入库独立索引：文件缺失的条目启动时丢弃。
+    LocalMediaStore.restore();
     this.buildPickerItems();
     // 默认首页：Options「启动时进入订阅」→ 首帧后切到订阅 tab（0=首页，1=订阅）。
     if (PreferencesStore.getString('cfg_default_home_tab', 'home') === 'subs') {
@@ -936,8 +941,9 @@ struct Index {
         || queueManager.getCurrent()?.videoId !== video.videoId) {
         queueManager.setAdhocQueue([video], 0);
       }
-    } else if (sourceHint && sourceHint.type === 'downloads') {
-      // 下载库整份注入队列：点击项为起点，开启「自动连播」即顺放整个列表。
+    } else if (sourceHint && (sourceHint.type === 'downloads' || sourceHint.type === 'localFiles')) {
+      // 下载库 / 本地导入库整份注入队列：点击项为起点，开启「自动连播」即顺放整个列表。
+      // 两类来源都只含本地文件，不会混入在线推荐。
       const items = sourceHint.loadedItems ?? [];
       if (items.length > 0) {
         const startIndex = sourceHint.startIndex ?? items.findIndex((it: VideoItem) => it.videoId === video.videoId);
@@ -987,8 +993,11 @@ struct Index {
 
     // Start extraction/engine/proxy work immediately after the click reset. The
     // player page consumes this exact task and remains the only owner of source submission.
-    // 本地文件没有可提取的流：跳过预热，PlayerPage 的 session.play() 直接走 doPlayLocal。
-    if (!video.localMediaPath) {
+    // 本地文件没有可提取的流：跳过预热，PlayerPage 的 session.play() 直接走 doPlayLocal；
+    // 仍要登记「正在打开」，否则上一个播放页的 aboutToDisappear 会把新本地会话拆掉。
+    if (video.localMediaPath) {
+      session.beginLocalPrepare(video);
+    } else {
       session.beginPrepare(video);
     }
 
