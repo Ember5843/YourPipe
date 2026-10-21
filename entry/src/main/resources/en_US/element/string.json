@@ -2018,7 +2018,7 @@
         },
         {
             "name": "yt_confirm_clear_all_data",
-            "value": "Clear all app data? This will delete all history, favorites, subscriptions, and settings. This action cannot be undone."
+            "value": "Clear all app data? This will delete all history, favorites, subscriptions, settings, downloaded videos, and imported local files. This action cannot be undone."
         },
         {
             "name": "yt_error_age_restricted",

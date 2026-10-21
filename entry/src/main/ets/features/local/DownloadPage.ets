@@ -218,7 +218,7 @@ export struct DownloadPage {
   }
 
   @Builder
-  ImportHeader() {
+  ImportFooter() {
     Row() {
       Text($r('app.string.yt_local_files_hint'))
         .fontSize(12)
@@ -236,23 +236,7 @@ export struct DownloadPage {
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
-    .padding({ left: 4, right: 4, top: 8, bottom: 4 })
-  }
-
-  @Builder
-  SectionTitle(title: ResourceStr, count: number) {
-    Row() {
-      Text(title)
-        .fontSize(13)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.yourtube_text_secondary'))
-      Text(`${count}`)
-        .fontSize(11)
-        .fontColor($r('app.color.yourtube_text_hint'))
-        .margin({ left: 6 })
-    }
-    .width('100%')
-    .padding({ left: 4, right: 4, top: 14, bottom: 4 })
+    .padding({ left: 4, right: 4, top: 12, bottom: 8 })
   }
 
   build() {
@@ -287,39 +271,31 @@ export struct DownloadPage {
       .padding({ bottom: 60 })
     } else {
       List({ space: 4 }) {
+        // 一个连续列表：下载条目在前，导入条目追加在最后；不插分组标题。
+        ForEach(this.tasks, (task: DownloadTask) => {
+          ListItem() {
+            DownloadTaskRow({
+              task,
+              onPlayTask: (t: DownloadTask) => { this.playFromLocalQueue(`local:${t.id}`); }
+            })
+          }
+          .transition(customAnimationUtil.isScaleTran(task.id, this.uiConfig))
+        }, (task: DownloadTask) => task.id)
+
+        ForEach(this.localItems, (item: LocalMediaItem) => {
+          ListItem() {
+            LocalMediaRow({
+              item,
+              themePrimary: this.themePrimary,
+              onOpen: (it: LocalMediaItem) => { this.playLocal(it); },
+              onDelete: (it: LocalMediaItem) => { this.confirmDeleteLocal(it); }
+            })
+          }
+        }, (item: LocalMediaItem) => item.id)
+
+        // 导入入口放在列表最下方；导入后新条目出现在它上面。
         ListItem() {
-          this.ImportHeader()
-        }
-
-        if (this.tasks.length > 0) {
-          ListItem() {
-            this.SectionTitle($r('app.string.yt_download_title'), this.tasks.length)
-          }
-          ForEach(this.tasks, (task: DownloadTask) => {
-            ListItem() {
-              DownloadTaskRow({
-                task,
-                onPlayTask: (t: DownloadTask) => { this.playFromLocalQueue(`local:${t.id}`); }
-              })
-            }
-            .transition(customAnimationUtil.isScaleTran(task.id, this.uiConfig))
-          }, (task: DownloadTask) => task.id)
-        }
-
-        if (this.localItems.length > 0) {
-          ListItem() {
-            this.SectionTitle($r('app.string.yt_local_files'), this.localItems.length)
-          }
-          ForEach(this.localItems, (item: LocalMediaItem) => {
-            ListItem() {
-              LocalMediaRow({
-                item,
-                themePrimary: this.themePrimary,
-                onOpen: (it: LocalMediaItem) => { this.playLocal(it); },
-                onDelete: (it: LocalMediaItem) => { this.confirmDeleteLocal(it); }
-              })
-            }
-          }, (item: LocalMediaItem) => item.id)
+          this.ImportFooter()
         }
       }
       .width('100%')

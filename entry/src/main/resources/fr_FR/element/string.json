@@ -2042,7 +2042,7 @@
         },
         {
             "name": "yt_confirm_clear_all_data",
-            "value": "Effacer toutes les données de l'app ? Cela supprimera l'historique, les favoris, les abonnements et les paramètres. Cette action est irréversible."
+            "value": "Effacer toutes les données de l'app ? Cela supprimera l'historique, les favoris, les abonnements, les paramètres, les vidéos téléchargées et les fichiers locaux importés. Cette action est irréversible."
         },
         {
             "name": "yt_action_download",

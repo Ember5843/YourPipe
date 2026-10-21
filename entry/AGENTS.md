@@ -186,7 +186,8 @@ Persistent state and shared singletons:
   task end. The whole library goes into the play queue as one list
   (`PlayQueueSourceHint.type === 'downloads'` → `setAdhocQueue`), so tapping an
   entry starts there and autoplay continues through the list.
-  `clearAllAppData` keeps completed entries and their files.
+  `clearAllAppData` now deletes completed entries and their files via
+  `clearAllTasksAndFiles()`.
   **重试与超时**：失败任务在「本地 → 下载视频」里主按钮是「重试」——重试前
   会**重新提取一次**拿到新鲜流地址（googlevideo 直链带 `expire`，SABR 的
   bootstrap 同样短命），并优先选回原来的 itag（分辨率/音轨不变），
@@ -216,8 +217,8 @@ Persistent state and shared singletons:
   - `SABR` / `HLS` 两条路径走各自的下载器（`downloadSabrStreams` /
     `downloadHlsStream`），**不支持断点续传**（整段重来）。
 - `DownloadTaskStore` — `PreferencesStore` key `download_tasks_json`; the only
-  index that can reach `filesDir/downloads`, so it deliberately survives
-  "clear all app data".
+  index that can reach `filesDir/downloads`; "clear all app data" now deletes
+  the index together with the files.
 - `LocalMediaProgressStore` — `PreferencesStore` key `local_media_progress`;
   per-local-item resume position keyed by the local entry id (`local:<taskId>`).
   Deliberately **separate** from `WatchHistoryStore`, which is keyed by YouTube
@@ -230,9 +231,9 @@ Persistent state and shared singletons:
   独立目录/索引，不共享 `DownloadTask` 状态；但**播放队列共用**——
   `DownloadPage.buildLocalQueue()` 把完成下载放前、导入文件追加在后，
   统一切成 `localMedia` 队列。
-  导入文件属于用户媒体，和 `filesDir/downloads` 一样在「清除应用全部数据」时
-  **保留**（`persistCurrent()` 在 Preferences 清空后重建索引）。UI 是
-  `DownloadPage` 的「本地文件」段 + `LocalMediaRow`（与下载任务同页、同一滚动列表）。
+  「清除应用全部数据」会调用 `clearAll()` 删除导入文件与索引。
+  UI 是 `DownloadPage` 的连续列表后半段 + `LocalMediaRow`（与下载任务同页、
+  无分组标题，导入入口在该列表最下方）。
 - `PlayerSession` — singleton player state for the active `AvPlayerController`.
   Two session-level modes ride here and are published to `AppStorage` for the
   player UI: `isAudioOnlyMode` and `isLocalMode`. A `VideoItem` with

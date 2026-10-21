@@ -1402,7 +1402,7 @@
         },
         {
             "name": "yt_confirm_clear_all_data",
-            "value": "Gesamte App-Daten löschen? Dies löscht Verlauf, Favoriten, Abonnements und Einstellungen. Dies kann nicht rückgängig gemacht werden."
+            "value": "Gesamte App-Daten löschen? Dies löscht Verlauf, Favoriten, Abonnements, Einstellungen, heruntergeladene Videos und importierte lokale Dateien. Dies kann nicht rückgängig gemacht werden."
         },
         {
             "name": "yt_action_download",

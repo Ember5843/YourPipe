@@ -337,13 +337,12 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
 - **Persistence and recovery**: every new persistent preference, database,
   file, or cache must define how it participates in both "restore default
   settings" and "clear all app data". Wire disposable state into the relevant
-  recovery action and reset matching in-memory/native caches as well. The
-  deliberate exception is user-downloaded media under `filesDir/downloads`,
-  which must survive "clear all app data" unless product requirements and the
-  confirmation copy explicitly change. The download index
-  (`download_tasks_json`) belongs to that same exception — it is the only path
-  back to those files — while local playback progress (`local_media_progress`)
-  is cleared with watch history.
+  recovery action and reset matching in-memory/native caches as well.
+  **「清除应用全部数据」会删除本地媒体**：`DownloadManager.clearAllTasksAndFiles()`
+  删掉已完成下载的文件/分片目录/索引（`download_tasks_json`），
+  `LocalMediaStore.clearAll()` 删掉导入文件与索引（`local_media_json`）。
+  本地播放进度（`local_media_progress`）与观看历史一起清空。确认文案已
+  同步说明这一点；如需改回“保留下载物”，必须同时改实现与 14 语言文案。
 
 ### Logging architecture and requirements
 - `entry` code logs through `AppLog.getInstance(<stable component tag>)`.

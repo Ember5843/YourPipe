@@ -635,21 +635,21 @@ export class DownloadManager {
   }
 
   /**
-   * Clear-all-app-data hook: cancel every in-flight task, keep finished entries
-   * (AppStorage 'downloadTasks' is refreshed via notifyTasksChanged).
-   * Both the downloaded files under filesDir/downloads and their index survive.
+   * 「清除应用全部数据」：取消所有在飞任务，并删除已完成条目的沙箱文件、
+   * 分片目录与索引。用户明确要求 clear-all 同时清掉已下载内容。
    */
-  clearAllTasks(): void {
-    this.tasks.forEach((task: DownloadTask) => {
+  clearAllTasksAndFiles(): void {
+    const snapshot = this.tasks.slice();
+    snapshot.forEach((task: DownloadTask) => {
+      task._cancelled = true;
       if (task.status !== DownloadStatus.COMPLETED) {
-        task._cancelled = true;
         task.status = DownloadStatus.CANCELLED;
       }
       this.cancelDownloadNotification(task);
+      this.cleanupTaskFiles(task, true);
     });
-    // 已完成条目刻意保留：文件在 filesDir/downloads 存活，而索引是唯一能到达它们的入口。
-    this.tasks = this.tasks.filter((task: DownloadTask) => task.status === DownloadStatus.COMPLETED);
-    logger.info(`Download tasks cleared (completed retained): count=${this.tasks.length} active=${this.activeTaskIds.size}`);
+    this.tasks = [];
+    logger.info(`Download tasks + files cleared: count=${snapshot.length} active=${this.activeTaskIds.size}`);
     this.notifyTasksChanged();
   }
 

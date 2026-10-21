@@ -115,14 +115,21 @@ export class LocalMediaStore {
     return AppStorage.get<LocalMediaItem[]>('localMedia') ?? [];
   }
 
-  /**
-   * 「清除应用全部数据」会清空 Preferences；本地导入文件属于用户媒体，
-   * 与 downloads 一样保留。清空后把当前 AppStorage 里的索引重新落盘，
-   * 避免文件还在、索引丢了（不可达）。
-   */
-  static persistCurrent(): void {
-    LocalMediaStore.persist(LocalMediaStore.items());
-    logger.info(`persist after clear-all: items=${LocalMediaStore.items().length}`);
+  /** 「清除应用全部数据」：删除所有导入文件与索引。 */
+  static clearAll(): void {
+    const items = LocalMediaStore.items().slice();
+    items.forEach((item: LocalMediaItem) => {
+      try {
+        if (fs.accessSync(item.path)) {
+          fs.unlinkSync(item.path);
+        }
+      } catch (e) {
+        logger.warn(`clearAll unlink failed id=${item.id}: ${(e as Error).message || e}`);
+      }
+      LocalMediaProgressStore.remove(`local:${item.id}`);
+    });
+    LocalMediaStore.publish([]);
+    logger.info(`clearAll: removed=${items.length}`);
   }
 
   /** 系统文件选择器 → 复制进沙箱并落索引。 */

@@ -1194,7 +1194,7 @@
         },
         {
             "name": "yt_confirm_clear_all_data",
-            "value": "Limpar todos os dados do app? Isso excluirá histórico, favoritos, inscrições e configurações. Esta ação não pode ser desfeita."
+            "value": "Limpar todos os dados do app? Isso excluirá histórico, favoritos, inscrições, configurações, vídeos baixados e arquivos locais importados. Esta ação não pode ser desfeita."
         },
         {
             "name": "yt_setting_stream_buffer",

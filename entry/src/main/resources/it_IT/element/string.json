@@ -1194,7 +1194,7 @@
         },
         {
             "name": "yt_confirm_clear_all_data",
-            "value": "Cancellare tutti i dati dell'app? Verranno eliminati cronologia, preferiti, iscrizioni e impostazioni. L'operazione non può essere annullata."
+            "value": "Cancellare tutti i dati dell'app? Verranno eliminati cronologia, preferiti, iscrizioni, impostazioni, video scaricati e file locali importati. L'operazione non può essere annullata."
         },
         {
             "name": "yt_setting_stream_buffer",

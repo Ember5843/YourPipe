@@ -2042,7 +2042,7 @@
         },
         {
             "name": "yt_confirm_clear_all_data",
-            "value": "¿Borrar todos los datos de la app? Esto eliminará todo el historial, favoritos, suscripciones y ajustes. Esta acción no se puede deshacer."
+            "value": "¿Borrar todos los datos de la app? Esto eliminará todo el historial, favoritos, suscripciones, ajustes, vídeos descargados y archivos locales importados. Esta acción no se puede deshacer."
         },
         {
             "name": "yt_action_download",

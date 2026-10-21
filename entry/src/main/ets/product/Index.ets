@@ -406,10 +406,9 @@ struct Index {
     WatchHistoryStore.clear();
     this.watchHistory = [];
     LocalMediaProgressStore.clearAll();
-    // 下载条目刻意保留：它是 filesDir/downloads 下文件的唯一索引；clearAllTasks 自身会刷新 AppStorage。
-    DownloadManager.getInstance().clearAllTasks();
-    // 本地导入文件同样是用户媒体：clearAll 清掉了 Preferences 里的索引，这里重新落盘。
-    LocalMediaStore.persistCurrent();
+    // 用户明确要求「清除应用全部数据」同时删除已下载视频与本地导入文件。
+    DownloadManager.getInstance().clearAllTasksAndFiles();
+    LocalMediaStore.clearAll();
     SearchHistoryStore.clearSearchHistory();
     AppLogStore.clear();
 
