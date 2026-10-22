@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "修正登入狀態串號、首個影片切換失敗、返回時空子母畫面、下載檔案殘留等問題，並補齊 14 語言文案"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "翻譯服務"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory（免費）"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva（Google 代理）"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "自訂介面"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "介面位址"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "請求位址"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "請求方法"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "請求標頭（JSON 或每行 Key: Value）"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "請求內容範本"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "回應欄位路徑"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "可用佔位符：{text} {target} {source} {apiKey}；欄位路徑範例：data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "留言與簡介使用此介面；字幕仍預設使用 YouTube 自動翻譯"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud 翻譯（API Key）"
         }
     ]
 }

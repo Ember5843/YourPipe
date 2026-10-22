@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "修复登录态串号、首个视频切换失败、返回时空画中画、下载文件残留等问题，并补齐 14 语言文案"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "翻译服务"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory（免费）"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva（Google 代理）"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "自定义接口"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "接口地址"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "请求地址"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "请求方法"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "请求头（JSON 或每行 Key: Value）"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "请求体模板"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "响应字段路径"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "可用占位符：{text} {target} {source} {apiKey}；字段路径示例：data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "评论与简介使用此接口；字幕仍默认使用 YouTube 自动翻译"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud 翻译（API Key）"
         }
     ]
 }

@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "Corretti: fuga dello stato di accesso, errore al primo cambio video, PiP vuoto al ritorno, file di download residui; completati i testi in 14 lingue"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "Servizio di traduzione"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory (gratuito)"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva (proxy Google)"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "Endpoint personalizzato"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "Endpoint"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "URL richiesta"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "Metodo"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "Header (JSON o Key: Value per riga)"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "Template del corpo"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "Percorso del campo risposta"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "Placeholder: {text} {target} {source} {apiKey}; esempio: data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "Commenti e descrizioni usano questo servizio; i sottotitoli usano ancora la traduzione automatica di YouTube"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud Translation (chiave API)"
         }
     ]
 }

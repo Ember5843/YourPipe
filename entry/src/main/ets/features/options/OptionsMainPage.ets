@@ -3,6 +3,7 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
 import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
 import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
+import { getTranslationEngineDisplay, LlmTranslateConfig } from '../../common/LlmTranslateConfig';
 import { AuthAccountStatus, AuthStage } from 'youtube_core';
 // [DISABLED] P3 ASR 模型状态行已随 AI 字幕设置入口禁用
 // import { AsrModelManager } from '../player/asr/AsrModelManager';
@@ -24,6 +25,7 @@ interface OptionsMainPageParams {
   onPlaybackClick: () => void;
   onGestureControlClick: () => void;
   onSubtitleClick: () => void;
+  onTranslationServiceClick: () => void;
   onPerformanceClick: () => void;
   onNetworkClick: () => void;
   onAppearanceClick: () => void;
@@ -51,6 +53,7 @@ export struct OptionsMainPage {
     onPlaybackClick: () => {},
     onGestureControlClick: () => {},
     onSubtitleClick: () => {},
+    onTranslationServiceClick: () => {},
     onPerformanceClick: () => {},
     onNetworkClick: () => {},
     onAppearanceClick: () => {},
@@ -105,6 +108,10 @@ export struct OptionsMainPage {
   //   }
   //   return $r('app.string.yt_asr_model_status_none');
   // }
+
+  private getTranslationSubtitle(): ResourceStr {
+    return getTranslationEngineDisplay(LlmTranslateConfig.get().engine);
+  }
 
   private getAppearanceSubtitle(): ResourceStr {
     switch (this.uiConfig.darkMode) {
@@ -246,6 +253,18 @@ export struct OptionsMainPage {
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onLanguageClick
+          })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          OptionItem({
+            icon: $r('sys.symbol.translate'),
+            title: $r('app.string.yt_option_translation_service'),
+            subtitle: this.getTranslationSubtitle(),
+            iconColor: this.themePrimary,
+            clickEffectEnabled: this.params.clickEffectEnabled,
+            onClickAction: this.params.onTranslationServiceClick
           })
         }
         .padding({ left: 0, right: 0 })

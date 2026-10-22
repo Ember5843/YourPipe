@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "Corrections : fuite d'état de connexion, échec du premier changement de vidéo, PiP vide au retour, fichiers de téléchargement résiduels ; textes des 14 langues complétés"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "Service de traduction"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory (gratuit)"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva (proxy Google)"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "Point de terminaison personnalisé"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "Point de terminaison"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "URL de requête"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "Méthode"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "En-têtes (JSON ou Key: Value par ligne)"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "Modèle de corps"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "Chemin du champ de réponse"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "Placeholders : {text} {target} {source} {apiKey} ; exemple : data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "Les commentaires et descriptions utilisent ce service ; les sous-titres restent en traduction automatique YouTube"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud Translation (clé API)"
         }
     ]
 }

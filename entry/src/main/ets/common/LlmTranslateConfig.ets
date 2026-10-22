@@ -1,20 +1,56 @@
 import { PreferencesStore } from './PreferencesStore';
 
+/** 评论/简介/字幕翻译可选的接口。 */
+export const TRANSLATION_ENGINES: string[] = [
+  'gtx',
+  'google',
+  'mymemory',
+  'lingva',
+  'libretranslate',
+  'deepl',
+  'llm',
+  'custom'
+];
+
+export function getTranslationEngineDisplay(engine: string): Resource {
+  switch (engine) {
+    case 'google': return $r('app.string.yt_translation_engine_google');
+    case 'mymemory': return $r('app.string.yt_translation_engine_mymemory');
+    case 'lingva': return $r('app.string.yt_translation_engine_lingva');
+    case 'libretranslate': return $r('app.string.yt_translation_engine_libre');
+    case 'deepl': return $r('app.string.yt_translation_engine_deepl');
+    case 'llm': return $r('app.string.yt_ai_translate_engine_llm');
+    case 'custom': return $r('app.string.yt_translation_engine_custom');
+    case 'gtx':
+    default: return $r('app.string.yt_ai_translate_engine_gtx');
+  }
+}
+
 /**
- * AI 字幕翻译配置（P2）。PreferencesStore 持久化，内存单例缓存。
- * 目标语言不在此处：与评论翻译共用 TranslationService.targetLanguage()
- * （Options → 语言与地区 → 内容翻译语言）。
+ * 翻译服务配置（评论 / 简介 / AI 字幕共用）。
  *
- * 引擎：
- * - gtx：Google 免费翻译端点（复用 TranslationService 通道），零配置默认；
- * - llm：用户自带 key 的 OpenAI 兼容端点，质量更高。
+ * - gtx / mymemory / lingva：免 key 的公共端点；
+ * - libretranslate / deepl：自填实例地址或 API key；
+ * - llm：OpenAI 兼容 /v1/chat/completions；
+ * - custom：URL / 方法 / 请求头 / 请求体 / 响应路径全部由用户模板决定。
+ *
+ * 目标语言不在这里：与内容翻译共用 TranslationService.targetLanguage()。
  */
 export class LlmTranslateConfig {
   engine: string = 'gtx';
+  /** 非 LLM 接口的地址（LibreTranslate / Lingva / DeepL；空 = 使用默认实例）。 */
+  endpoint: string = '';
+  /** LLM 的 OpenAI 兼容 Base URL。 */
   baseUrl: string = 'https://api.deepseek.com';
   model: string = 'deepseek-chat';
   apiKey: string = '';
   bilingual: boolean = true;
+  /** 自定义接口。 */
+  customUrl: string = '';
+  customMethod: string = 'POST';
+  customHeaders: string = '{"Content-Type": "application/json"}';
+  customBody: string = '{"text":"{text}","target_lang":"{target}"}';
+  customResponsePath: string = 'translatedText';
 
   private static instance: LlmTranslateConfig | null = null;
 
@@ -25,13 +61,36 @@ export class LlmTranslateConfig {
     return LlmTranslateConfig.instance;
   }
 
+  /** 各接口的默认地址；UI 占位与 TranslationService 共用。 */
+  static defaultEndpoint(engine: string): string {
+    switch (engine) {
+      case 'google': return 'https://translation.googleapis.com/language/translate/v2';
+      case 'mymemory': return 'https://api.mymemory.translated.net';
+      case 'lingva': return 'https://lingva.ml';
+      case 'libretranslate': return 'https://libretranslate.com';
+      case 'deepl': return 'https://api-free.deepl.com';
+      case 'llm': return 'https://api.deepseek.com';
+      default: return '';
+    }
+  }
+
   static load(): LlmTranslateConfig {
     const cfg = new LlmTranslateConfig();
-    cfg.engine = PreferencesStore.getString('cfg_ai_translate_engine', 'gtx');
+    const engine = PreferencesStore.getString('cfg_ai_translate_engine', 'gtx');
+    cfg.engine = TRANSLATION_ENGINES.includes(engine) ? engine : 'gtx';
+    cfg.endpoint = PreferencesStore.getString('cfg_ai_translate_endpoint', '');
     cfg.baseUrl = PreferencesStore.getString('cfg_ai_translate_base_url', 'https://api.deepseek.com');
     cfg.model = PreferencesStore.getString('cfg_ai_translate_model', 'deepseek-chat');
     cfg.apiKey = PreferencesStore.getString('cfg_ai_translate_api_key', '');
     cfg.bilingual = PreferencesStore.getString('cfg_ai_translate_bilingual', 'true') === 'true';
+    cfg.customUrl = PreferencesStore.getString('cfg_ai_translate_custom_url', '');
+    cfg.customMethod = PreferencesStore.getString('cfg_ai_translate_custom_method', 'POST') === 'GET'
+      ? 'GET' : 'POST';
+    cfg.customHeaders = PreferencesStore.getString('cfg_ai_translate_custom_headers',
+      '{"Content-Type": "application/json"}');
+    cfg.customBody = PreferencesStore.getString('cfg_ai_translate_custom_body',
+      '{"text":"{text}","target_lang":"{target}"}');
+    cfg.customResponsePath = PreferencesStore.getString('cfg_ai_translate_custom_response_path', 'translatedText');
     return cfg;
   }
 
@@ -49,10 +108,16 @@ export class LlmTranslateConfig {
 
   save(): void {
     PreferencesStore.setString('cfg_ai_translate_engine', this.engine);
+    PreferencesStore.setString('cfg_ai_translate_endpoint', this.endpoint);
     PreferencesStore.setString('cfg_ai_translate_base_url', this.baseUrl);
     PreferencesStore.setString('cfg_ai_translate_model', this.model);
     PreferencesStore.setString('cfg_ai_translate_api_key', this.apiKey);
     PreferencesStore.setString('cfg_ai_translate_bilingual', this.bilingual ? 'true' : 'false');
+    PreferencesStore.setString('cfg_ai_translate_custom_url', this.customUrl);
+    PreferencesStore.setString('cfg_ai_translate_custom_method', this.customMethod);
+    PreferencesStore.setString('cfg_ai_translate_custom_headers', this.customHeaders);
+    PreferencesStore.setString('cfg_ai_translate_custom_body', this.customBody);
+    PreferencesStore.setString('cfg_ai_translate_custom_response_path', this.customResponsePath);
   }
 
   isLlmReady(): boolean {
@@ -60,5 +125,9 @@ export class LlmTranslateConfig {
       && this.baseUrl.trim().length > 0
       && this.model.trim().length > 0
       && this.apiKey.trim().length > 0;
+  }
+
+  isCustomReady(): boolean {
+    return this.engine === 'custom' && this.customUrl.trim().length > 0;
   }
 }

@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "Behoben: Login-Zustandsleck, Fehler beim ersten Videowechsel, leeres PiP beim Zurückgehen, zurückbleibende Download-Dateien; 14-Sprachen-Texte vervollständigt"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "Übersetzungsdienst"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory (kostenlos)"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva (Google-Proxy)"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "Benutzerdefinierter Endpunkt"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "Endpunkt"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "Anfrage-URL"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "Methode"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "Header (JSON oder Key: Value pro Zeile)"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "Body-Vorlage"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "Pfad des Antwortfelds"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "Platzhalter: {text} {target} {source} {apiKey}; Pfadbeispiel: data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "Kommentare und Beschreibungen nutzen diesen Dienst; Untertitel verwenden weiterhin die YouTube-Automatik"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud Translation (API-Schlüssel)"
         }
     ]
 }

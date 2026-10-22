@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "إصلاح تسرب حالة تسجيل الدخول، فشل أول تبديل فيديو، PiP فارغ عند الرجوع، وملفات التنزيل المتبقية؛ واستكمال نصوص 14 لغة"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "خدمة الترجمة"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory (مجاني)"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva (وكيل Google)"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "نقطة نهاية مخصصة"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "نقطة النهاية"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "عنوان الطلب"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "الطريقة"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "الرؤوس (JSON أو Key: Value لكل سطر)"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "قالب نص الطلب"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "مسار حقل الاستجابة"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "العناصر النائبة: {text} {target} {source} {apiKey}؛ مثال: data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "تستخدم التعليقات والأوصاف هذه الخدمة؛ تظل الترجمة التلقائية لليوتيوب مستخدمة للترجمة النصية"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "ترجمة Google Cloud (مفتاح API)"
         }
     ]
 }

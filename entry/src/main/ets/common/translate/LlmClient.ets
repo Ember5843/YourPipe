@@ -1,8 +1,8 @@
 import { http } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { HttpDownloader } from 'youtube_core';
-import { AppLog } from '../../../common/AppLog';
-import { LlmTranslateConfig } from '../../../common/LlmTranslateConfig';
+import { AppLog } from '../AppLog';
+import { LlmTranslateConfig } from '../LlmTranslateConfig';
 
 const logger = AppLog.getInstance('LlmClient');
 
@@ -41,7 +41,7 @@ export class LlmClient {
       messages: [
         {
           role: 'system',
-          content: `你是字幕翻译引擎。将用户给出的带编号字幕行翻译为 ${targetLang}。`
+          content: `你是翻译引擎。将用户给出的带编号文本行翻译为 ${targetLang}。`
             + '严格逐行输出 "<编号>\\t<译文>"；编号与输入一一对应；不得合并、拆分或增删行；'
             + '不输出任何解释、注释或 Markdown 代码块。'
         },

@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "ログイン状態の混線、最初の動画切替失敗、戻る時の空 PiP、ダウンロード残骸を修正し、14言語の文言を補完"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "翻訳サービス"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory（無料）"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva（Google プロキシ）"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "カスタムエンドポイント"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "エンドポイント"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "リクエスト URL"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "メソッド"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "ヘッダー（JSON または 1 行 1 つの Key: Value）"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "リクエスト本文テンプレート"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "レスポンスフィールドパス"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "プレースホルダー：{text} {target} {source} {apiKey}、パス例：data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "コメントと概要はこのサービスを使用。字幕は引き続き YouTube の自動翻訳を使用"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud Translation（API キー）"
         }
     ]
 }

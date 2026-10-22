@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "Corregidos: fuga de estado de sesión, fallo al cambiar el primer vídeo, PiP vacío al volver, archivos de descarga residuales; textos de 14 idiomas completados"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "Servicio de traducción"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory (gratis)"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva (proxy de Google)"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "Endpoint personalizado"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "Endpoint"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "URL de solicitud"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "Método"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "Cabeceras (JSON o Key: Value por línea)"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "Plantilla del cuerpo"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "Ruta del campo de respuesta"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "Marcadores: {text} {target} {source} {apiKey}; ejemplo: data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "Los comentarios y descripciones usan este servicio; los subtítulos siguen usando la traducción automática de YouTube"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud Translation (clave API)"
         }
     ]
 }

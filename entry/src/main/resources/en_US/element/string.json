@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "Fixed login-state leakage, first-video switch failures, empty PiP on back, leftover download files, and completed 14-locale copy"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "Translation service"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory (free)"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva (Google proxy)"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "Custom endpoint"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "Endpoint"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "Request URL"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "Method"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "Headers (JSON or one Key: Value per line)"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "Body template"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "Response field path"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "Placeholders: {text} {target} {source} {apiKey}; path example: data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "Comments and descriptions use this service; subtitles still default to YouTube auto-translation"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud Translation (API key)"
         }
     ]
 }

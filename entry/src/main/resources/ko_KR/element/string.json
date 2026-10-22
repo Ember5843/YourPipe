@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "로그인 상태 누수, 첫 영상 전환 실패, 뒤로 갈 때 빈 PiP, 다운로드 잔여 파일 수정 및 14개 언어 문구 보완"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "번역 서비스"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory(무료)"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva(Google 프록시)"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "사용자 지정 엔드포인트"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "엔드포인트"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "요청 URL"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "메서드"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "헤더(JSON 또는 줄마다 Key: Value)"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "요청 본문 템플릿"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "응답 필드 경로"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "자리표시자: {text} {target} {source} {apiKey}; 경로 예: data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "댓글과 설명은 이 서비스를 사용하며 자막은 계속 YouTube 자동 번역을 사용합니다"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud Translation(API 키)"
         }
     ]
 }

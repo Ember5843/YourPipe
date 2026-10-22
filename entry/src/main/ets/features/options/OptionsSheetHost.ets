@@ -13,6 +13,7 @@ import { OptionsAppearancePage } from './OptionsAppearancePage';
 import { OptionsPlaybackPage } from './OptionsPlaybackPage';
 import { OptionsGestureControlPage } from './OptionsGestureControlPage';
 import { OptionsSubtitlePage } from './OptionsSubtitlePage';
+import { OptionsTranslationPage } from './OptionsTranslationPage';
 import { OptionsPerformancePage } from './OptionsPerformancePage';
 import { OptionsLanguageAndRegionPage } from './OptionsLanguageAndRegionPage';
 import { OptionsDataAccountPage } from './OptionsDataAccountPage';
@@ -138,6 +139,7 @@ export struct OptionsSheetHost {
               onPlaybackClick: () => { this.pushOptionsPath('playback'); },
               onGestureControlClick: () => { this.pushOptionsPath('gesture_control'); },
               onSubtitleClick: () => { this.pushOptionsPath('subtitle'); },
+              onTranslationServiceClick: () => { this.pushOptionsPath('translation_service'); },
               onPerformanceClick: () => { this.pushOptionsPath('performance'); },
               onNetworkClick: () => { this.pushOptionsPath('network'); },
               // [DISABLED] P3：onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
@@ -213,6 +215,17 @@ export struct OptionsSheetHost {
               applyLanguageSelection: this.params.applyLanguageSelection
             }
           })
+      }
+    } else if (name === 'translation_service') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_option_translation_service'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+        OptionsTranslationPage({
+          params: {
+            themeColor: this.themePrimary
+          }
+        })
       }
     } else if (name === 'ai_translate') {
       // [DISABLED] P3 AI 字幕设置页 destination（入口已禁用，本分支不可达；代码保留）：

@@ -3733,6 +3733,66 @@
         {
             "name": "yt_changelog_0_7_0_10",
             "value": "Исправлены утечка состояния входа, сбой первого переключения видео, пустой PiP при возврате, остатки файлов загрузок; тексты на 14 языках дополнены"
+        },
+        {
+            "name": "yt_option_translation_service",
+            "value": "Сервис перевода"
+        },
+        {
+            "name": "yt_translation_engine_mymemory",
+            "value": "MyMemory (бесплатно)"
+        },
+        {
+            "name": "yt_translation_engine_lingva",
+            "value": "Lingva (прокси Google)"
+        },
+        {
+            "name": "yt_translation_engine_libre",
+            "value": "LibreTranslate"
+        },
+        {
+            "name": "yt_translation_engine_deepl",
+            "value": "DeepL"
+        },
+        {
+            "name": "yt_translation_engine_custom",
+            "value": "Пользовательский эндпоинт"
+        },
+        {
+            "name": "yt_translation_endpoint",
+            "value": "Эндпоинт"
+        },
+        {
+            "name": "yt_translation_custom_url",
+            "value": "URL запроса"
+        },
+        {
+            "name": "yt_translation_custom_method",
+            "value": "Метод"
+        },
+        {
+            "name": "yt_translation_custom_headers",
+            "value": "Заголовки (JSON или Key: Value в строке)"
+        },
+        {
+            "name": "yt_translation_custom_body",
+            "value": "Шаблон тела"
+        },
+        {
+            "name": "yt_translation_custom_response_path",
+            "value": "Путь к полю ответа"
+        },
+        {
+            "name": "yt_translation_custom_hint",
+            "value": "Плейсхолдеры: {text} {target} {source} {apiKey}; пример: data.translations.0.text"
+        },
+        {
+            "name": "yt_translation_note",
+            "value": "Комментарии и описания используют этот сервис; субтитры по-прежнему используют автоперевод YouTube"
+        },
+        {
+            "name": "yt_translation_engine_google",
+            "value": "Google Cloud Translation (ключ API)"
         }
     ]
 }

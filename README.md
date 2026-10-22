@@ -42,8 +42,10 @@ Guest VOD uses direct-link DASH through the **visionos** endpoint into MPV by de
 - Offline downloads into the local library
 - Cookie (WebView) login and device QR (OAuth) login
 - HTTP proxy settings
+- Multi-provider translation (gtx / Google Cloud / MyMemory / Lingva / LibreTranslate / DeepL / LLM / custom)
+- Live chat (read-only) on live videos
 - Light / dark / system appearance and multiple UI locales
-- Local library: downloads, watch history, playlists
+- Local library: downloads, imported files, watch history, playlists
 
 Main tabs: **Home · Subscriptions · Favorites · Local**. Search and Options open as separate pages/sheets.
 

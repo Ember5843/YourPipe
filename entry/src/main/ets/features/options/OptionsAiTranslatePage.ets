@@ -4,7 +4,7 @@ import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTit
 // import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 // import { LlmTranslateConfig } from '../../common/LlmTranslateConfig';
-// import { LlmClient } from '../player/translate/LlmClient';
+// import { LlmClient } from '../../common/translate/LlmClient';
 import { AsrModelManager, AsrModelStatus } from '../player/asr/AsrModelManager';
 // import { SelectOption } from 'mediaservice';
 import { AppLog } from '../../common/AppLog';

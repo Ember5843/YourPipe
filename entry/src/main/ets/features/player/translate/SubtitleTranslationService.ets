@@ -8,7 +8,6 @@ import { HttpDownloader } from 'youtube_core';
 import { AppLog } from '../../../common/AppLog';
 import { LlmTranslateConfig } from '../../../common/LlmTranslateConfig';
 import { TranslationService } from '../../../common/TranslationService';
-import { LlmClient } from './LlmClient';
 
 const logger = AppLog.getInstance('SubtitleTranslationService');
 
@@ -161,7 +160,7 @@ export class SubtitleTranslationService {
             return;
           }
           const batch = batches[nextBatch++];
-          const out = await this.translateBatchWithRetry(batch.texts, target, cfg);
+          const out = await this.translateBatchWithRetry(batch.texts, target);
           if (out === null) {
             failedBatches++;
             batch.texts.forEach((t: string, i: number) => {
@@ -283,17 +282,13 @@ export class SubtitleTranslationService {
   /** 批级重试一次；两次都失败返回 null（调用方回填原文并记失败）。 */
   private async translateBatchWithRetry(
     texts: string[],
-    target: string,
-    cfg: LlmTranslateConfig
+    target: string
   ): Promise<string[] | null> {
     for (let attempt = 0; attempt < 2; attempt++) {
       if (this.cancelled) {
         return null;
       }
       try {
-        if (cfg.engine === 'llm') {
-          return await LlmClient.translateBatch(texts, target, cfg);
-        }
         return await TranslationService.translateBatch(texts, target);
       } catch (e) {
         logger.warn(`batch translate attempt ${attempt + 1} failed: ${(e as Error).message || e}`);
