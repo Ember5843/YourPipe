@@ -3993,6 +3993,22 @@
         {
             "name": "yt_exp_ai_desc",
             "value": "Kanäle mit KI-generierten Inhalten markieren oder ausblenden"
+        },
+        {
+            "name": "yt_exp_da_replace_titles",
+            "value": "Titel ersetzen"
+        },
+        {
+            "name": "yt_exp_da_limit",
+            "value": "Titel pro Seite"
+        },
+        {
+            "name": "yt_exp_da_concurrency",
+            "value": "Gleichzeitige Anfragen"
+        },
+        {
+            "name": "yt_exp_da_footer",
+            "value": "Titel stammen aus DeArrow-Community-Einreichungen und können vom Videoinhalt abweichen."
         }
     ]
 }

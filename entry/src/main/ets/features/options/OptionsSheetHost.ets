@@ -20,6 +20,7 @@ import { OptionsLanguageAndRegionPage } from './OptionsLanguageAndRegionPage';
 import { OptionsDataAccountPage } from './OptionsDataAccountPage';
 import { OptionsExperimentalPage } from './OptionsExperimentalPage';
 import { OptionsSponsorBlockPage } from './OptionsSponsorBlockPage';
+import { OptionsDeArrowPage } from './OptionsDeArrowPage';
 import { ExperimentalComingSoonPage } from './ExperimentalComingSoonPage';
 import { OptionsNetworkPage } from './OptionsNetworkPage';
 // [DISABLED] P3：import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
@@ -415,7 +416,11 @@ export struct OptionsSheetHost {
         title: $r('app.string.yt_exp_da_title'),
         onBack: () => { this.popOptionsPath(); }
       }) {
-        ExperimentalComingSoonPage()
+        OptionsDeArrowPage({
+          params: {
+            updateConfig: this.params.updateExperimentalConfig
+          }
+        })
       }
     } else if (name === 'experimental_ailist') {
       OptionsNavScaffold({

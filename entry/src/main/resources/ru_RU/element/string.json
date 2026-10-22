@@ -3993,6 +3993,22 @@
         {
             "name": "yt_exp_ai_desc",
             "value": "Помечать или скрывать каналы с ИИ-контентом"
+        },
+        {
+            "name": "yt_exp_da_replace_titles",
+            "value": "Заменять заголовки"
+        },
+        {
+            "name": "yt_exp_da_limit",
+            "value": "Заголовков на страницу"
+        },
+        {
+            "name": "yt_exp_da_concurrency",
+            "value": "Одновременных запросов"
+        },
+        {
+            "name": "yt_exp_da_footer",
+            "value": "Заголовки берутся из отправок сообщества DeArrow и могут не совпадать с видео."
         }
     ]
 }

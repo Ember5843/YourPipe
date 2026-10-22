@@ -71,6 +71,7 @@ import { PlaybackConfig } from '../common/PlaybackConfig';
 import { ExperimentalConfig } from '../common/experimental/ExperimentalConfig';
 import { SponsorBlockSkipper } from '../common/experimental/SponsorBlockSkipper';
 import { SponsorBlockClient } from '../common/experimental/SponsorBlockClient';
+import { DeArrowClient } from '../common/experimental/DeArrowClient';
 import { LlmTranslateConfig } from '../common/LlmTranslateConfig';
 import { SubtitleTranslationService } from '../features/player/translate/SubtitleTranslationService';
 import { AsrModelManager } from '../features/player/asr/AsrModelManager';
@@ -288,6 +289,7 @@ struct Index {
     AppStorage.setOrCreate('experimentalConfig', defaultExperimentalConfig);
     SponsorBlockSkipper.getInstance().onPlaybackStopped();
     SponsorBlockClient.getInstance().clearCache();
+    DeArrowClient.getInstance().clearCache();
 
     // 播放端点恢复默认（visionos/tv_downgraded）并使身份/pot 缓存失效
     AuthStateHelper.applyPlayerClientConfig(defaultPlaybackConfig.guestPlayerClient, defaultPlaybackConfig.authPlayerClient);
@@ -418,6 +420,7 @@ struct Index {
     AppStorage.setOrCreate('experimentalConfig', defaultExperimentalConfig);
     SponsorBlockSkipper.getInstance().onPlaybackStopped();
     SponsorBlockClient.getInstance().clearCache();
+    DeArrowClient.getInstance().clearCache();
     const defaultProxy = NetworkProxyConfig.resetToDefault();
     AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
     ShortsFeedService.getInstance().invalidate('clear_all_data');

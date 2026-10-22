@@ -37,6 +37,8 @@ import common from '@ohos.app.ability.common';
 import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSession';
 import { systemShare } from '@kit.ShareKit';
 import { AppLog } from '../../../common/AppLog';
+import { ExperimentalConfig } from '../../../common/experimental/ExperimentalConfig';
+import { DeArrowClient } from '../../../common/experimental/DeArrowClient';
 import { sharePlainText } from '../../../common/utils/ShareUtil';
 import {
   SegmentKind as DescriptionSegmentKind,
@@ -64,6 +66,9 @@ export struct VideoDetails {
   @Prop @Watch('onChannelIdentityChanged') channelId: string = '';
   @Prop @Watch('onChannelIdentityChanged') channelAvatarUrl: string = '';
   @State isTitleExpanded: boolean = false;
+  /** DeArrow 众包标题；空串时展示原标题。 */
+  @State deArrowTitle: string = '';
+  private deArrowGeneration: number = 0;
   @State channelInfo: SearchChannelItem = new SearchChannelItem(
           0,
           this.item.channelId || '',
@@ -119,6 +124,35 @@ export struct VideoDetails {
       return this.videoDescriptionError;
     }
     return this.item?.videoDescriptionError || undefined;
+  }
+
+  private displayTitle(): string {
+    return this.deArrowTitle.length > 0 ? this.deArrowTitle : (this.item?.title || '');
+  }
+
+  /** DeArrow 标题：命中时覆盖展示标题；失败/无提交保持原标题。 */
+  private refreshDeArrowTitle(): void {
+    this.deArrowTitle = '';
+    const generation = ++this.deArrowGeneration;
+    const cfg = AppStorage.get<ExperimentalConfig>('experimentalConfig');
+    if (!cfg || !cfg.deArrowEnabled || !cfg.deArrowTitles || this.isLocalMode || this.isLiveNow) {
+      return;
+    }
+    const videoId = (this.item?.videoId || '').trim();
+    if (videoId.length === 0) {
+      return;
+    }
+    DeArrowClient.getInstance().getTitle(videoId)
+      .then((title: string) => {
+        if (generation !== this.deArrowGeneration || title.length === 0) {
+          return;
+        }
+        this.deArrowTitle = title;
+        logger.info(`dearrow title applied video=${videoId}`);
+      })
+      .catch((_e: Error) => {
+        // 无提交/网络失败都保持原标题，不打扰播放。
+      });
   }
 
   private openDescriptionLink(target: string): void {
@@ -194,6 +228,7 @@ export struct VideoDetails {
   aboutToAppear() {
     this.channelInfoService = new ChannelInfoService();
     this.resetForCurrentItem();
+    this.refreshDeArrowTitle();
     this.classifyStreamsForDownload();
     this.startSleepTimerUiUpdates();
 
@@ -205,6 +240,7 @@ export struct VideoDetails {
   }
 
   aboutToDisappear() {
+    this.deArrowGeneration += 1;
     if (this.descSkeletonTimer >= 0) {
       clearInterval(this.descSkeletonTimer);
     }
@@ -291,6 +327,7 @@ export struct VideoDetails {
   private onItemChanged(): void {
     this.isTitleExpanded = false;
     this.resetForCurrentItem();
+    this.refreshDeArrowTitle();
     this.classifyStreamsForDownload();
     // 自动连播切到下一集时清掉旧视频的统计曲线，避免新旧样本混在同一图表里。
     this.statsSpeedSamples = [];
@@ -641,7 +678,7 @@ export struct VideoDetails {
       Column() {
         // ── 标题 ──
         Column() {
-          Text(this.item.title)
+          Text(this.displayTitle())
             .fontSize($r('app.float.font_size_18'))
             .fontColor($r('app.color.yourtube_text_primary'))
             .maxLines(this.isTitleExpanded ? undefined : 2)
@@ -649,7 +686,7 @@ export struct VideoDetails {
             .lineHeight(26)
             .fontWeight(FontWeight.Bold)
 
-          if (!this.isTitleExpanded && this.item.title.length > 60) {
+          if (!this.isTitleExpanded && this.displayTitle().length > 60) {
             Text($r('app.string.yt_action_show_more'))
               .fontSize($r('app.float.font_size_12'))
               .fontColor(this.themePrimary)
@@ -1056,7 +1093,7 @@ export struct VideoDetails {
     // OVERLAY: share sheet may fire ability onBackground; keep video ON.
     PlayerPresentation.beginOverlay('share');
     const videoId = (this.item.videoId || '').trim();
-    const title = this.item.title || '';
+    const title = this.displayTitle();
     const url = videoId ? `https://www.youtube.com/watch?v=${videoId}` : '';
     sharePlainText(this.getUIContext(), title, url,
       { selectionMode: systemShare.SelectionMode.SINGLE },

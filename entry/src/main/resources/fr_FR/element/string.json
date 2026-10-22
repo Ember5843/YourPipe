@@ -3993,6 +3993,22 @@
         {
             "name": "yt_exp_ai_desc",
             "value": "Marquer ou masquer les chaînes à contenu généré par IA"
+        },
+        {
+            "name": "yt_exp_da_replace_titles",
+            "value": "Remplacer les titres"
+        },
+        {
+            "name": "yt_exp_da_limit",
+            "value": "Titres par page"
+        },
+        {
+            "name": "yt_exp_da_concurrency",
+            "value": "Requêtes simultanées"
+        },
+        {
+            "name": "yt_exp_da_footer",
+            "value": "Les titres proviennent de soumissions communautaires DeArrow et peuvent ne pas correspondre exactement à la vidéo."
         }
     ]
 }

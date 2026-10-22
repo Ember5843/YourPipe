@@ -3993,6 +3993,22 @@
         {
             "name": "yt_exp_ai_desc",
             "value": "Marcar ou ocultar canais com conteúdo gerado por IA"
+        },
+        {
+            "name": "yt_exp_da_replace_titles",
+            "value": "Substituir títulos"
+        },
+        {
+            "name": "yt_exp_da_limit",
+            "value": "Títulos por página"
+        },
+        {
+            "name": "yt_exp_da_concurrency",
+            "value": "Solicitações simultâneas"
+        },
+        {
+            "name": "yt_exp_da_footer",
+            "value": "Os títulos vêm de envios da comunidade DeArrow e podem não corresponder exatamente ao vídeo."
         }
     ]
 }

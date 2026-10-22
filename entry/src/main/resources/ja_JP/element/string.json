@@ -3993,6 +3993,22 @@
         {
             "name": "yt_exp_ai_desc",
             "value": "AI 生成コンテンツのチャンネルをマークまたは非表示"
+        },
+        {
+            "name": "yt_exp_da_replace_titles",
+            "value": "タイトルを置き換える"
+        },
+        {
+            "name": "yt_exp_da_limit",
+            "value": "ページあたりのタイトル数"
+        },
+        {
+            "name": "yt_exp_da_concurrency",
+            "value": "同時リクエスト数"
+        },
+        {
+            "name": "yt_exp_da_footer",
+            "value": "タイトルは DeArrow コミュニティの投稿によるもので、動画と完全には一致しない場合があります。"
         }
     ]
 }

@@ -3993,6 +3993,22 @@
         {
             "name": "yt_exp_ai_desc",
             "value": "標記或隱藏 AI 生成內容的頻道"
+        },
+        {
+            "name": "yt_exp_da_replace_titles",
+            "value": "替換標題"
+        },
+        {
+            "name": "yt_exp_da_limit",
+            "value": "每頁回填條數"
+        },
+        {
+            "name": "yt_exp_da_concurrency",
+            "value": "並行請求數"
+        },
+        {
+            "name": "yt_exp_da_footer",
+            "value": "標題來自 DeArrow 社群提交，可能與影片內容不完全一致。"
         }
     ]
 }

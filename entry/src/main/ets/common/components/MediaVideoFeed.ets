@@ -4,6 +4,9 @@ import { resolveResourceStr } from '../utils/ResourceStrUtil';
 import { FeedDataSource, FeedItemKeyOf } from '../model/FeedDataSource';
 import { BasicPrefetcher, IPrefetcher } from '@kit.ArkUI';
 import { defaultFeedThumbUrl, FeedThumbUrlOf } from '../model/ThumbPrefetcher';
+import { SearchStreamItem, VideoItem } from 'youtube_core';
+import { ExperimentalConfig } from '../experimental/ExperimentalConfig';
+import { DeArrowClient } from '../experimental/DeArrowClient';
 
 /** 卡片 builder 的单参数（§3 对象字面量范式：by-reference 刷新） */
 export interface MediaFeedItemSlot {
@@ -121,6 +124,14 @@ export struct MediaVideoFeed {
    */
   private entryAnimKeys: Set<string> = new Set();
   private entryAnimDone: Set<string> = new Set();
+  // ── DeArrow 标题回填（仅在实验性功能开启时工作）──
+  private enrichGeneration: number = 0;
+  private enrichProcessed: Set<string> = new Set();
+  private enrichQueue: string[] = [];
+  private enrichInflight: number = 0;
+  private enrichApplied: number = 0;
+  private enrichScheduled: boolean = false;
+  private enrichDisposed: boolean = false;
   private feedListener: DataChangeListener = {
     onDataReloaded: () => {
       this.armEntryAnim();
@@ -161,11 +172,16 @@ export struct MediaVideoFeed {
     this.prefetcher = new BasicPrefetcher(this.dataSource);
     // 挂载时数据源可能已有数据（如订阅 tab 缓存），补一次门控布防
     this.armEntryAnim();
+    this.scheduleEnrich(0, 9);
   }
 
   aboutToDisappear(): void {
     this.dataSource.unregisterDataChangeListener(this.feedListener);
     this.prefetcher = null;
+    this.enrichGeneration += 1;
+    this.enrichQueue = [];
+    this.enrichInflight = 0;
+    this.enrichDisposed = true;
   }
 
   /**
@@ -225,6 +241,130 @@ export struct MediaVideoFeed {
       this.lastFeedEmpty = empty;
       this.dataVersion += 1;
     }
+    this.scheduleEnrich(0, 9);
+  }
+
+  // ── DeArrow 标题回填 ──────────────────────────────────────────────────────
+
+  private deArrowConfig(): ExperimentalConfig | null {
+    const cfg = AppStorage.get<ExperimentalConfig>('experimentalConfig');
+    if (!cfg || !cfg.deArrowEnabled || !cfg.deArrowTitles) {
+      return null;
+    }
+    return cfg;
+  }
+
+  /** 防抖：一次滚动/数据变更只排一次回填。 */
+  private scheduleEnrich(first: number, last: number): void {
+    if (this.enrichDisposed || this.enrichScheduled || !this.deArrowConfig()) {
+      return;
+    }
+    this.enrichScheduled = true;
+    setTimeout(() => {
+      this.enrichScheduled = false;
+      if (this.enrichDisposed) {
+        return;
+      }
+      this.enrichRange(first, last);
+    }, 300);
+  }
+
+  private enrichRange(first: number, last: number): void {
+    const cfg = this.deArrowConfig();
+    if (!cfg) {
+      return;
+    }
+    const count = this.dataSource.totalCount();
+    if (count <= 0) {
+      return;
+    }
+    const limit = Math.max(1, cfg.deArrowLimit);
+    const start = Math.max(0, Math.min(first, count - 1));
+    // 可见区尾部再多取几条，滚动时不用每一条都重新排队。
+    const end = Math.max(start, Math.min(count - 1, Math.min(last, start + limit - 1) + 4));
+    for (let i = start; i <= end; i++) {
+      if (this.enrichApplied + this.enrichQueue.length + this.enrichInflight >= limit) {
+        break;
+      }
+      const video = this.videoItemAt(i);
+      if (!video) {
+        continue;
+      }
+      const id = (video.videoId || '').trim();
+      if (id.length === 0 || this.enrichProcessed.has(id)) {
+        continue;
+      }
+      this.enrichProcessed.add(id);
+      this.enrichQueue.push(id);
+    }
+    this.pumpEnrich();
+  }
+
+  private pumpEnrich(): void {
+    if (this.enrichDisposed) {
+      return;
+    }
+    const cfg = this.deArrowConfig();
+    if (!cfg) {
+      this.enrichQueue = [];
+      return;
+    }
+    const concurrency = Math.max(1, Math.min(6, cfg.deArrowConcurrency));
+    while (this.enrichInflight < concurrency && this.enrichQueue.length > 0) {
+      const id = this.enrichQueue.shift();
+      if (!id) {
+        break;
+      }
+      this.enrichInflight += 1;
+      const generation = this.enrichGeneration;
+      const done = (): void => {
+        if (generation !== this.enrichGeneration) {
+          return;
+        }
+        this.enrichInflight = Math.max(0, this.enrichInflight - 1);
+        this.pumpEnrich();
+      };
+      DeArrowClient.getInstance().getTitle(id)
+        .then((title: string) => {
+          if (generation === this.enrichGeneration && title.length > 0) {
+            this.applyTitle(id, title);
+          }
+          done();
+        })
+        .catch((_e: Error) => {
+          done();
+        });
+    }
+  }
+
+  private applyTitle(videoId: string, title: string): void {
+    const list: Object[] = this.dataSource.getDataList();
+    for (let i = 0; i < list.length; i++) {
+      const video = this.videoItemOf(list[i]);
+      if (!video || video.videoId !== videoId) {
+        continue;
+      }
+      if (video.title !== title) {
+        video.title = title;
+        this.dataSource.notifyDataChange(i);
+      }
+      this.enrichApplied += 1;
+      return;
+    }
+  }
+
+  private videoItemAt(index: number): VideoItem | null {
+    return this.videoItemOf(this.dataSource.getData(index));
+  }
+
+  private videoItemOf(item: Object): VideoItem | null {
+    if (item instanceof VideoItem) {
+      return item as VideoItem;
+    }
+    if (item instanceof SearchStreamItem) {
+      return (item as SearchStreamItem).video;
+    }
+    return null;
   }
 
   /** dataVersion<0 永不成立，仅建立 @State 依赖，保证空↔非空切换时骨架分支重算 */
@@ -275,6 +415,7 @@ export struct MediaVideoFeed {
       return;
     }
     this.prefetcher.visibleAreaChanged(min, max);
+    this.scheduleEnrich(min, max);
   }
 
   @Builder

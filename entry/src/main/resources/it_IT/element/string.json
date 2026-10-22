@@ -3993,6 +3993,22 @@
         {
             "name": "yt_exp_ai_desc",
             "value": "Contrassegna o nascondi i canali con contenuti generati dall’IA"
+        },
+        {
+            "name": "yt_exp_da_replace_titles",
+            "value": "Sostituisci i titoli"
+        },
+        {
+            "name": "yt_exp_da_limit",
+            "value": "Titoli per pagina"
+        },
+        {
+            "name": "yt_exp_da_concurrency",
+            "value": "Richieste simultanee"
+        },
+        {
+            "name": "yt_exp_da_footer",
+            "value": "I titoli provengono da invii della community DeArrow e potrebbero non corrispondere esattamente al video."
         }
     ]
 }

@@ -346,9 +346,11 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `CommunityHttp` → `SponsorBlockClient` (SHA-256 4-char hash prefix,
   in-memory cache) and skips via `SponsorBlockSkipper`, which subscribes to
   `AvPlayerController` progress from `PlayerSession` — never from the player
-  page UI, so background/PiP playback keeps skipping. DeArrow and AiSList
-  are placeholders (M0 skeleton) until their clients land. All requests use
-  `HttpDownloader` so the app proxy applies; no YouTube extractor changes.
+  page UI, so background/PiP playback keeps skipping. DeArrow titles are
+  implemented (`DeArrowClient` → `MediaVideoFeed` visible-range enrichment via
+  `notifyDataChange` + `VideoDetails` display override); DeArrow thumbnails
+  and AiSList remain placeholders. All requests use `HttpDownloader` so the
+  app proxy applies; no YouTube extractor changes.
 - **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, or build
   trees. `AGENTS.md` files are tracked project docs — keep them in sync
   with the code they describe, and never put machine-specific absolute

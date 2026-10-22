@@ -3993,6 +3993,22 @@
         {
             "name": "yt_exp_ai_desc",
             "value": "تعليم أو إخفاء القنوات ذات المحتوى المولّد بالذكاء الاصطناعي"
+        },
+        {
+            "name": "yt_exp_da_replace_titles",
+            "value": "استبدال العناوين"
+        },
+        {
+            "name": "yt_exp_da_limit",
+            "value": "عدد العناوين لكل صفحة"
+        },
+        {
+            "name": "yt_exp_da_concurrency",
+            "value": "الطلبات المتزامنة"
+        },
+        {
+            "name": "yt_exp_da_footer",
+            "value": "تأتي العناوين من مساهمات مجتمع DeArrow وقد لا تطابق الفيديو تمامًا."
         }
     ]
 }
