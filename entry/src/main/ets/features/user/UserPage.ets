@@ -152,8 +152,37 @@ export struct UserPage {
     );
   }
 
-  private fillChannelInfoList(videos: VideoItem[]): VideoItem[] {
-    // fillChannelInfo 重建 VideoItem 会丢构造参数之外的字段，补回发布时间。
+  /**
+   * 频道资料（含 @handle）通常比视频列表晚到；把 handle 回填进已加载的条目，
+   * 再换数组引用触发 ChannelVideoTab 的 @Watch → setData，让 AiSList 角标 /
+   * DeArrow 回填能作用到这些条目。
+   */
+  private backfillChannelHandle(handle: string): void {
+    const normalized = (handle || '').trim();
+    if (normalized.length === 0) {
+      return;
+    }
+    let changed = false;
+    const apply = (list: VideoItem[]): void => {
+      for (const video of list) {
+        if (video.channelHandle !== normalized) {
+          video.channelHandle = normalized;
+          changed = true;
+        }
+      }
+    };
+    apply(this.videoList);
+    apply(this.shortsList);
+    apply(this.liveList);
+    if (changed) {
+      this.videoList = this.videoList.slice();
+      this.shortsList = this.shortsList.slice();
+      this.liveList = this.liveList.slice();
+      logger.info(`channel handle backfilled handle=${normalized}`);
+    }
+  }
+
+  private fillChannelInfoList(videos: VideoItem[]): VideoItem[] {    // fillChannelInfo 重建 VideoItem 会丢构造参数之外的字段，补回发布时间。
     return videos.map(video => {
       const filled = this.fillChannelInfo(video);
       filled.publishedTimeText = video.publishedTimeText;
@@ -252,6 +281,7 @@ export struct UserPage {
           handle
         );
         this.displayChannel = next;
+        this.backfillChannelHandle(handle);
       }
     } catch (err) {
       logger.error('loadChannelInfo failed:', JSON.stringify(err));

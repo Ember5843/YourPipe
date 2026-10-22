@@ -8,6 +8,9 @@ import { SearchStreamItem, VideoItem } from 'youtube_core';
 import { ExperimentalConfig, EXP_AILIST_MODE_HIDE } from '../experimental/ExperimentalConfig';
 import { DeArrowClient, DeArrowBranding } from '../experimental/DeArrowClient';
 import { AiListStore } from '../experimental/AiListStore';
+import { AppLog } from '../AppLog';
+
+const logger = AppLog.getInstance('MediaVideoFeed');
 
 /** 卡片 builder 的单参数（§3 对象字面量范式：by-reference 刷新） */
 export interface MediaFeedItemSlot {
@@ -135,6 +138,7 @@ export struct MediaVideoFeed {
   private enrichScheduled: boolean = false;
   private enrichDisposed: boolean = false;
   private aiFlagsScheduled: boolean = false;
+  private aiFlagSampleLogged: boolean = false;
   private feedListener: DataChangeListener = {
     onDataReloaded: () => {
       this.armEntryAnim();
@@ -433,6 +437,15 @@ export struct MediaVideoFeed {
     }
     const store = AiListStore.getInstance();
     const list: Object[] = this.dataSource.getDataList();
+    let hits = 0;
+    if (!this.aiFlagSampleLogged && list.length > 0) {
+      this.aiFlagSampleLogged = true;
+      const sample = this.videoItemOf(list[0]);
+      if (sample) {
+        logger.info(`ai flag sample channelId=${sample.channelId} `
+          + `handle=${sample.channelHandle} flag=${store.flagFor(sample.channelId, sample.channelHandle)}`);
+      }
+    }
     for (let i = 0; i < list.length; i++) {
       const video = this.videoItemOf(list[i]);
       if (!video) {
@@ -441,8 +454,14 @@ export struct MediaVideoFeed {
       const flag = store.flagFor(video.channelId, video.channelHandle);
       if (video.aiListFlag !== flag) {
         video.aiListFlag = flag;
+        if (flag.length > 0) {
+          hits += 1;
+        }
         this.dataSource.notifyDataChange(i);
       }
+    }
+    if (hits > 0) {
+      logger.info(`ai flags applied count=${hits}`);
     }
   }
 
