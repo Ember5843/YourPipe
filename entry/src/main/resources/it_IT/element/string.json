@@ -3948,7 +3948,7 @@
         },
         {
             "name": "yt_exp_sb_unskip",
-            "value": "Finestra di annullamento"
+            "value": "Avviso anticipato"
         },
         {
             "name": "yt_exp_sb_unskip_value",
@@ -3964,7 +3964,7 @@
         },
         {
             "name": "yt_exp_sb_skipped",
-            "value": "Saltato: %s"
+            "value": "Salto imminente: %s"
         },
         {
             "name": "yt_exp_sb_undo",

@@ -3948,7 +3948,7 @@
         },
         {
             "name": "yt_exp_sb_unskip",
-            "value": "Janela de desfazer"
+            "value": "Aviso antecipado"
         },
         {
             "name": "yt_exp_sb_unskip_value",
@@ -3964,7 +3964,7 @@
         },
         {
             "name": "yt_exp_sb_skipped",
-            "value": "Pulado: %s"
+            "value": "Pulando em breve: %s"
         },
         {
             "name": "yt_exp_sb_undo",

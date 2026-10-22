@@ -3948,7 +3948,7 @@
         },
         {
             "name": "yt_exp_sb_unskip",
-            "value": "Ventana de deshacer"
+            "value": "Aviso previo"
         },
         {
             "name": "yt_exp_sb_unskip_value",
@@ -3964,7 +3964,7 @@
         },
         {
             "name": "yt_exp_sb_skipped",
-            "value": "Omitido: %s"
+            "value": "Se omitirá en breve: %s"
         },
         {
             "name": "yt_exp_sb_undo",

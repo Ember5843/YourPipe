@@ -3948,7 +3948,7 @@
         },
         {
             "name": "yt_exp_sb_unskip",
-            "value": "نافذة التراجع"
+            "value": "تنبيه مسبق"
         },
         {
             "name": "yt_exp_sb_unskip_value",
@@ -3964,7 +3964,7 @@
         },
         {
             "name": "yt_exp_sb_skipped",
-            "value": "تم التخطي: %s"
+            "value": "سيتم التخطي قريبًا: %s"
         },
         {
             "name": "yt_exp_sb_undo",

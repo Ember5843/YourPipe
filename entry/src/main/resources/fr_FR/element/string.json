@@ -3948,7 +3948,7 @@
         },
         {
             "name": "yt_exp_sb_unskip",
-            "value": "Fenêtre d’annulation"
+            "value": "Avertissement préalable"
         },
         {
             "name": "yt_exp_sb_unskip_value",
@@ -3964,7 +3964,7 @@
         },
         {
             "name": "yt_exp_sb_skipped",
-            "value": "Ignoré : %s"
+            "value": "Bientôt ignoré : %s"
         },
         {
             "name": "yt_exp_sb_undo",

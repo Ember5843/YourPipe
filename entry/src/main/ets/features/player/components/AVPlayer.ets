@@ -227,11 +227,13 @@ export struct VideoPlayer {
       return;
     }
     const config = AppStorage.get<ExperimentalConfig>('experimentalConfig');
-    const seconds = config ? Math.max(3, config.sponsorUnskipSeconds) : 5;
+    const seconds = config ? Math.max(1, config.sponsorUnskipSeconds) : 5;
+    // 提示最多提前 seconds 秒出现；真正跳过或撤销时由 skipper 主动收起。
+    // 这里的定时器只是兜底，避免异常路径下提示常驻。
     this.skipNoticeTimerId = setTimeout(() => {
       this.skipNotice = null;
       this.skipNoticeTimerId = -1;
-    }, seconds * 1000);
+    }, (seconds + 5) * 1000);
   };
 
   private skipCategoryLabel(category: string): string {
@@ -2055,7 +2057,7 @@ export struct VideoPlayer {
         .borderRadius(18)
         // 整条提示都可点撤销；Default 命中会挡住下层手势层，避免撤销点击被
         // 播放器的单击手势（收起控件）抢走。
-        .hitTestBehavior(HitTestMode.Default)
+        .hitTestBehavior(HitTestMode.Block)
         .onClick(() => this.undoSponsorSkip())
       }
       .width('100%')
@@ -2064,7 +2066,7 @@ export struct VideoPlayer {
       .alignItems(HorizontalAlign.Center)
       .padding({ bottom: 110 })
       .hitTestBehavior(HitTestMode.Transparent)
-      .zIndex(CommonConstants.Z_INDEX_BASE + 2.3)
+      .zIndex(CommonConstants.Z_INDEX_MAX + 1)
     }
   }
 

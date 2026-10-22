@@ -3948,7 +3948,7 @@
         },
         {
             "name": "yt_exp_sb_unskip",
-            "value": "元に戻せる時間"
+            "value": "事前の通知"
         },
         {
             "name": "yt_exp_sb_unskip_value",
@@ -3964,7 +3964,7 @@
         },
         {
             "name": "yt_exp_sb_skipped",
-            "value": "スキップしました：%s"
+            "value": "まもなくスキップ：%s"
         },
         {
             "name": "yt_exp_sb_undo",

@@ -3948,7 +3948,7 @@
         },
         {
             "name": "yt_exp_sb_unskip",
-            "value": "撤销窗口"
+            "value": "提前提示"
         },
         {
             "name": "yt_exp_sb_unskip_value",
@@ -3964,7 +3964,7 @@
         },
         {
             "name": "yt_exp_sb_skipped",
-            "value": "已跳过：%s"
+            "value": "即将跳过：%s"
         },
         {
             "name": "yt_exp_sb_undo",

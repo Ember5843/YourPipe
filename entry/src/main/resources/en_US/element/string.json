@@ -3948,7 +3948,7 @@
         },
         {
             "name": "yt_exp_sb_unskip",
-            "value": "Undo window"
+            "value": "Advance warning"
         },
         {
             "name": "yt_exp_sb_unskip_value",
@@ -3964,7 +3964,7 @@
         },
         {
             "name": "yt_exp_sb_skipped",
-            "value": "Skipped: %s"
+            "value": "Skipping soon: %s"
         },
         {
             "name": "yt_exp_sb_undo",
