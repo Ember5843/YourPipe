@@ -2302,27 +2302,59 @@
         },
         {
             "name": "yt_about_oss_newpipe_desc",
-            "value": "Клиент YouTube с открытым исходным кодом для Android; образец для просмотра, поиска и извлечения потоков"
+            "value": "YouTube-клиент с открытым кодом; справочник по просмотру и поиску"
         },
         {
             "name": "yt_about_oss_iplay_desc",
-            "value": "Кроссплатформенный медиаплеер с поддержкой Emby, Jellyfin, переключения между сайтами и настраиваемого воспроизведения"
+            "value": "Мультиплатформенный медиаплеер; справочник по воспроизведению с разных сайтов"
         },
         {
             "name": "yt_about_oss_ytdlp_desc",
-            "value": "Многофункциональный консольный загрузчик аудио/видео с поддержкой тысяч сайтов и форматов"
+            "value": "Консольный загрузчик; справочник по выбору форматов и процессу загрузки"
         },
         {
             "name": "yt_about_oss_finvideo_desc",
-            "value": "Видеоплеер Jellyfin / Emby / Plex на HarmonyOS NEXT"
+            "value": "Медиаплеер HarmonyOS; справочник по интерфейсу воспроизведения на ArkTS"
         },
         {
-            "name": "yt_about_oss_hmsamples_desc",
-            "value": "Примеры Huawei для длительного воспроизведения видео, AVPlayer и другие справочные коды HarmonyOS"
+            "name": "yt_about_oss_pipepipe_desc",
+            "value": "Форк NewPipe; справочник по эндпоинтам воспроизведения и авторизации"
         },
         {
-            "name": "yt_about_license_reference",
-            "value": "Справочно"
+            "name": "yt_about_oss_mpv_desc",
+            "value": "Ядро воспроизведения; справочник по поведению и API libmpv"
+        },
+        {
+            "name": "yt_about_oss_smarttube_desc",
+            "value": "YouTube-клиент для Android TV; справочник по ТВ-интерфейсу"
+        },
+        {
+            "name": "yt_about_oss_clashbox_desc",
+            "value": "Прокси-клиент HarmonyOS; справочник по настройке прокси"
+        },
+        {
+            "name": "yt_about_oss_tpc_desc",
+            "value": "Проект портирования C/C++ для OpenHarmony; справочник по нативным зависимостям"
+        },
+        {
+            "name": "yt_about_oss_vlc_desc",
+            "value": "Мультиплатформенный плеер; справочник по совместимости кодеков"
+        },
+        {
+            "name": "yt_label_vendors",
+            "value": "поставщиков"
+        },
+        {
+            "name": "yt_about_tap_to_open",
+            "value": "Нажмите на элемент, чтобы открыть его в браузере"
+        },
+        {
+            "name": "yt_about_link_unavailable",
+            "value": "Для этого элемента нет доступной ссылки"
+        },
+        {
+            "name": "yt_about_link_failed",
+            "value": "Не удалось открыть ссылку"
         },
         {
             "name": "yt_changelog_0_5_3_1",
@@ -2651,10 +2683,6 @@
         {
             "name": "yt_label_projects",
             "value": "проектов"
-        },
-        {
-            "name": "yt_label_models",
-            "value": "моделей"
         },
         {
             "name": "yt_label_latest_version",
@@ -3597,6 +3625,22 @@
         {
             "name": "yt_download_status_paused",
             "value": "Приостановлено"
+        },
+        {
+            "name": "yt_playlist_source_account",
+            "value": "Аккаунт"
+        },
+        {
+            "name": "yt_playlist_source_favorite",
+            "value": "Избранное"
+        },
+        {
+            "name": "yt_library_playlists_title",
+            "value": "Плейлисты аккаунта"
+        },
+        {
+            "name": "yt_empty_no_library_playlists",
+            "value": "В аккаунте пока нет плейлистов"
         },
         {
             "name": "yt_tab_live_chat",

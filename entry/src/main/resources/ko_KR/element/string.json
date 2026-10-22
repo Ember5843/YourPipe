@@ -2302,27 +2302,59 @@
         },
         {
             "name": "yt_about_oss_newpipe_desc",
-            "value": "오픈 소스 Android용 YouTube 클라이언트. 동영상 탐색, 검색, 스트림 추출의 참조 구현"
+            "value": "오픈 소스 YouTube 클라이언트. 탐색과 검색의 참고"
         },
         {
             "name": "yt_about_oss_iplay_desc",
-            "value": "크로스 플랫폼 미디어 플레이어. Emby, Jellyfin, 다중 사이트 전환 및 사용자 지정 재생 지원"
+            "value": "크로스 플랫폼 미디어 플레이어. 멀티 사이트 재생의 참고"
         },
         {
             "name": "yt_about_oss_ytdlp_desc",
-            "value": "수천 개 사이트와 형식을 지원하는 기능 풍부한 명령줄 오디오/비디오 다운로드 도구"
+            "value": "명령줄 다운로드 도구. 형식 선택과 다운로드 흐름의 참고"
         },
         {
             "name": "yt_about_oss_finvideo_desc",
-            "value": "HarmonyOS NEXT용 Jellyfin / Emby / Plex 동영상 플레이어"
+            "value": "HarmonyOS 미디어 플레이어. ArkTS 재생 UI의 참고"
         },
         {
-            "name": "yt_about_oss_hmsamples_desc",
-            "value": "Huawei 개발자 장편 동영상 재생, AVPlayer 등 HarmonyOS 참조 예제"
+            "name": "yt_about_oss_pipepipe_desc",
+            "value": "NewPipe 포크. 재생 엔드포인트와 인증 결정의 참고"
         },
         {
-            "name": "yt_about_license_reference",
-            "value": "Reference"
+            "name": "yt_about_oss_mpv_desc",
+            "value": "재생 엔진. libmpv 동작과 API의 기준"
+        },
+        {
+            "name": "yt_about_oss_smarttube_desc",
+            "value": "Android TV용 YouTube 클라이언트. TV 조작의 참고"
+        },
+        {
+            "name": "yt_about_oss_clashbox_desc",
+            "value": "HarmonyOS 프록시 클라이언트. 프록시 설정 UI의 참고"
+        },
+        {
+            "name": "yt_about_oss_tpc_desc",
+            "value": "OpenHarmony C/C++ 포팅 프로젝트. 네이티브 종속성 빌드의 참고"
+        },
+        {
+            "name": "yt_about_oss_vlc_desc",
+            "value": "크로스 플랫폼 플레이어. 코덱 호환성의 참고"
+        },
+        {
+            "name": "yt_label_vendors",
+            "value": "개 공급업체"
+        },
+        {
+            "name": "yt_about_tap_to_open",
+            "value": "항목을 탭하면 브라우저에서 열립니다"
+        },
+        {
+            "name": "yt_about_link_unavailable",
+            "value": "이 항목에 사용할 수 있는 링크가 없습니다"
+        },
+        {
+            "name": "yt_about_link_failed",
+            "value": "링크를 열 수 없습니다"
         },
         {
             "name": "yt_changelog_0_5_3_1",
@@ -2651,10 +2683,6 @@
         {
             "name": "yt_label_projects",
             "value": "개 프로젝트"
-        },
-        {
-            "name": "yt_label_models",
-            "value": "개 모델"
         },
         {
             "name": "yt_label_latest_version",
@@ -3597,6 +3625,22 @@
         {
             "name": "yt_download_status_paused",
             "value": "일시정지됨"
+        },
+        {
+            "name": "yt_playlist_source_account",
+            "value": "계정"
+        },
+        {
+            "name": "yt_playlist_source_favorite",
+            "value": "즐겨찾기"
+        },
+        {
+            "name": "yt_library_playlists_title",
+            "value": "계정 재생목록"
+        },
+        {
+            "name": "yt_empty_no_library_playlists",
+            "value": "계정에 재생목록이 아직 없습니다"
         },
         {
             "name": "yt_tab_live_chat",

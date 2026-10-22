@@ -3,10 +3,10 @@ import { customAnimationUtil } from '../AnimationUtil';
 import { OptionItem } from './OptionItem';
 import { PlaybackSectionTitle } from './PlaybackSectionTitle';
 import { pasteboard } from '@kit.BasicServicesKit';
-import { common } from '@kit.AbilityKit';
 import { AppLog } from '../AppLog';
 import { getAppVersion } from '../AppVersion';
 import { ThemeColorUtil } from '../ThemeColorUtil';
+import { openExternalUrl } from '../utils/ExternalLinkUtil';
 import { SECTION_CARD_RADIUS } from './MediaCardTokens';
 
 const GITHUB_REPO_URL = 'https://github.com/Ember5843/YourPipe';
@@ -16,14 +16,22 @@ const logger = AppLog.getInstance('AboutPage');
 
 interface OpenSourceItem {
   name: string;
+  /** 项目作者 / 维护团队。 */
+  author: string;
+  /** 简介（i18n）。 */
   desc: Resource;
-  license: string;
+  /** 官方图标。 */
   icon: Resource;
+  /** 项目主页。 */
+  url: string;
 }
 
-interface AiModelItem {
+interface AiProviderItem {
   name: string;
+  /** 品牌图标。 */
   icon: Resource;
+  /** 厂商官网。 */
+  url: string;
 }
 
 interface ChangelogEntry {
@@ -35,42 +43,138 @@ interface ChangelogEntry {
 const OPEN_SOURCE_ITEMS: OpenSourceItem[] = [
   {
     name: 'NewPipe',
+    author: 'Team NewPipe',
     desc: $r('app.string.yt_about_oss_newpipe_desc'),
-    license: 'GPL-3.0',
     icon: $r('app.media.about_logo_newpipe'),
+    url: 'https://github.com/TeamNewPipe/NewPipe',
+  },
+  {
+    name: 'PipePipe',
+    author: 'InfinityLoop1308',
+    desc: $r('app.string.yt_about_oss_pipepipe_desc'),
+    icon: $r('app.media.about_logo_pipepipe'),
+    url: 'https://github.com/InfinityLoop1308/PipePipe',
   },
   {
     name: 'iPlay',
+    author: 'saltpi',
     desc: $r('app.string.yt_about_oss_iplay_desc'),
-    license: 'MIT',
     icon: $r('app.media.about_logo_iplay'),
+    url: 'https://github.com/saltpi/iPlay',
   },
   {
-    name: 'yt-dlp',
-    desc: $r('app.string.yt_about_oss_ytdlp_desc'),
-    license: 'Unlicense',
-    icon: $r('app.media.about_logo_ytdlp'),
+    name: 'MPV',
+    author: 'mpv-player',
+    desc: $r('app.string.yt_about_oss_mpv_desc'),
+    icon: $r('app.media.about_logo_mpv'),
+    url: 'https://github.com/mpv-player/mpv',
   },
   {
     name: 'FinVideo',
+    author: 'OHPG',
     desc: $r('app.string.yt_about_oss_finvideo_desc'),
-    license: 'GPL-3.0',
     icon: $r('app.media.about_logo_finvideo'),
+    url: 'https://github.com/OHPG/FinVideo',
   },
   {
-    name: '华为开发者案例',
-    desc: $r('app.string.yt_about_oss_hmsamples_desc'),
-    license: '参考',
-    icon: $r('app.media.about_logo_hmsamples'),
+    name: 'yt-dlp',
+    author: 'yt-dlp contributors',
+    desc: $r('app.string.yt_about_oss_ytdlp_desc'),
+    icon: $r('app.media.about_logo_ytdlp'),
+    url: 'https://github.com/yt-dlp/yt-dlp',
+  },
+  {
+    name: 'SmartTube',
+    author: 'yuliskov',
+    desc: $r('app.string.yt_about_oss_smarttube_desc'),
+    icon: $r('app.media.about_logo_smarttube'),
+    url: 'https://github.com/yuliskov/SmartTube',
+  },
+  {
+    name: 'ClashBox',
+    author: 'xiaobaigroup',
+    desc: $r('app.string.yt_about_oss_clashbox_desc'),
+    icon: $r('app.media.about_logo_clashbox'),
+    url: 'https://github.com/xiaobaigroup/ClashBox',
+  },
+  {
+    name: 'tpc_c_cplusplus',
+    author: 'CPF-ApplicationTPC',
+    desc: $r('app.string.yt_about_oss_tpc_desc'),
+    // 该项目没有官方图标，使用同色系 TPC 徽标（about_logo_tpc.png）。
+    icon: $r('app.media.about_logo_tpc'),
+    url: 'https://gitcode.com/CPF-ApplicationTPC/tpc_c_cplusplus',
+  },
+  {
+    name: 'VLC',
+    author: 'VideoLAN',
+    desc: $r('app.string.yt_about_oss_vlc_desc'),
+    icon: $r('app.media.about_logo_vlc'),
+    url: 'https://www.videolan.org/',
   },
 ];
 
-const AI_MODELS: AiModelItem[] = [
-  { name: 'Kimi k2.6', icon: $r('app.media.about_logo_kimi') },
-  { name: 'Deepseek v4 pro', icon: $r('app.media.about_logo_deepseek') },
-  { name: 'Google Gemini 3.1', icon: $r('app.media.about_logo_gemini') },
-  { name: 'Claude Sonnet 4.7', icon: $r('app.media.about_logo_claude') },
-  { name: 'GPT 5.5', icon: $r('app.media.about_logo_openai') },
+const AI_PROVIDER_ITEMS: AiProviderItem[] = [
+  {
+    name: 'KIMI',
+    icon: $r('app.media.about_logo_kimi'),
+    url: 'https://kimi.moonshot.cn/',
+  },
+  {
+    name: 'Claude',
+    icon: $r('app.media.about_logo_claude'),
+    url: 'https://claude.ai/',
+  },
+  {
+    name: 'GPT',
+    icon: $r('app.media.about_logo_openai'),
+    url: 'https://openai.com/',
+  },
+  {
+    name: 'GLM',
+    icon: $r('app.media.about_logo_glm'),
+    url: 'https://www.bigmodel.cn/',
+  },
+  {
+    name: 'MiniMax',
+    icon: $r('app.media.about_logo_minimax'),
+    url: 'https://www.minimaxi.com/',
+  },
+  {
+    name: 'DeepSeek',
+    icon: $r('app.media.about_logo_deepseek'),
+    url: 'https://www.deepseek.com/',
+  },
+  {
+    name: 'Gemini',
+    icon: $r('app.media.about_logo_gemini'),
+    url: 'https://gemini.google.com/',
+  },
+  {
+    name: 'Qwen',
+    icon: $r('app.media.about_logo_qwen'),
+    url: 'https://tongyi.aliyun.com/',
+  },
+  {
+    name: 'OpenCode',
+    icon: $r('app.media.about_logo_opencode'),
+    url: 'https://opencode.ai/',
+  },
+  {
+    name: 'PackyAPI',
+    icon: $r('app.media.about_logo_packyapi'),
+    url: 'https://www.packyapi.com/',
+  },
+  {
+    name: 'CommandCode',
+    icon: $r('app.media.about_logo_commandcode'),
+    url: 'https://commandcode.ai/',
+  },
+  {
+    name: '火山引擎',
+    icon: $r('app.media.about_logo_volcano'),
+    url: 'https://www.volcengine.com/',
+  },
 ];
 
 const CHANGELOG: ChangelogEntry[] = [
@@ -358,6 +462,11 @@ struct SubPageHeader {
 
 @Component
 export struct OpenSourcePage {
+  /** 「作者」+ 换行 + 简介。 */
+  private formatSubtitle(item: OpenSourceItem): string {
+    const desc = getContext().resourceManager.getStringSync(item.desc.id);
+    return `${item.author}\n${desc}`;
+  }
 
   build() {
     Column() {
@@ -367,11 +476,28 @@ export struct OpenSourcePage {
             OptionItem({
               imageIcon: item.icon,
               title: item.name,
-              subtitle: `${item.license} · ${getContext().resourceManager.getStringSync(item.desc.id)}`,
-              showChevron: false,
-              subtitleMaxLines: 2,
+              subtitle: this.formatSubtitle(item),
+              showChevron: true,
+              subtitleMaxLines: 3,
+              onClickAction: () => {
+                logger.info(`open source link requested name=${item.name}`);
+                openExternalUrl(
+                  this.getUIContext(),
+                  item.url,
+                  item.name,
+                  $r('app.string.yt_about_link_unavailable'),
+                  $r('app.string.yt_about_link_failed')
+                );
+              }
             })
           }, (item: OpenSourceItem) => item.name)
+
+          Text($r('app.string.yt_about_tap_to_open'))
+            .fontSize(11)
+            .fontColor($r('app.color.yourtube_text_disabled'))
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .margin({ top: 10, bottom: 6 })
         }
         .width('100%')
         .padding({ left: 16, right: 16, bottom: 24, top: 8 })
@@ -395,13 +521,30 @@ export struct AiModelsPage {
     Column() {
       Scroll() {
         Column({ space: 6 }) {
-          ForEach(AI_MODELS, (model: AiModelItem) => {
+          ForEach(AI_PROVIDER_ITEMS, (item: AiProviderItem) => {
             OptionItem({
-              imageIcon: model.icon,
-              title: model.name,
-              showChevron: false,
+              imageIcon: item.icon,
+              title: item.name,
+              showChevron: true,
+              onClickAction: () => {
+                logger.info(`ai provider link requested name=${item.name}`);
+                openExternalUrl(
+                  this.getUIContext(),
+                  item.url,
+                  item.name,
+                  $r('app.string.yt_about_link_unavailable'),
+                  $r('app.string.yt_about_link_failed')
+                );
+              }
             })
-          }, (model: AiModelItem) => model.name)
+          }, (item: AiProviderItem) => item.name)
+
+          Text($r('app.string.yt_about_tap_to_open'))
+            .fontSize(11)
+            .fontColor($r('app.color.yourtube_text_disabled'))
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .margin({ top: 10, bottom: 6 })
         }
         .width('100%')
         .padding({ left: 16, right: 16, bottom: 24, top: 8 })
@@ -497,13 +640,14 @@ export struct AboutPage {
   }
 
   private openExternalLink(url: string): void {
-    try {
-      logger.info(`openExternalLink url=${url}`);
-      const context = getContext(this) as common.UIAbilityContext;
-      context.openLink(url, { appLinkingOnly: false });
-    } catch (e) {
-      logger.error(`openExternalLink failed: ${String(e)}`);
-    }
+    logger.info('about link requested name=github_repo');
+    openExternalUrl(
+      this.getUIContext(),
+      url,
+      'github_repo',
+      $r('app.string.yt_about_link_unavailable'),
+      $r('app.string.yt_about_link_failed')
+    );
   }
 
   // 关于主页内容
@@ -596,7 +740,7 @@ export struct AboutPage {
               OptionItem({
                 icon: $r('sys.symbol.star_fill'),
                 title: $r('app.string.yt_about_ai_models'),
-                subtitle: `${AI_MODELS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_models').id)}`,
+                subtitle: `${AI_PROVIDER_ITEMS.length} ${getContext().resourceManager.getStringSync($r('app.string.yt_label_vendors').id)}`,
                 iconColor: this.themePrimary,
                 transparentBackground: true,
                 onClickAction: () => { this.onNavigate('about_ai_models'); }

@@ -2302,27 +2302,59 @@
         },
         {
             "name": "yt_about_oss_newpipe_desc",
-            "value": "開源 Android YouTube 客戶端，提供影片瀏覽、搜尋與串流解析參考"
+            "value": "開源 YouTube 用戶端；瀏覽與搜尋的參考"
         },
         {
             "name": "yt_about_oss_iplay_desc",
-            "value": "跨平台媒體播放器，支援 Emby、Jellyfin 多站切換與自訂播放"
+            "value": "跨平台媒體播放器；多站點播放的參考"
         },
         {
             "name": "yt_about_oss_ytdlp_desc",
-            "value": "功能豐富的命令列音訊下載器，支援數千個網站與多種格式"
+            "value": "命令列下載工具；格式選擇與下載流程的參考"
         },
         {
             "name": "yt_about_oss_finvideo_desc",
-            "value": "HarmonyOS NEXT 上的 Jellyfin / Emby / Plex 影片播放器"
+            "value": "HarmonyOS 媒體播放器；ArkTS 播放控制介面的參考"
         },
         {
-            "name": "yt_about_oss_hmsamples_desc",
-            "value": "華為開發者案例，長影片播放控制、AVPlayer 構建等 HarmonyOS 官方開發參考"
+            "name": "yt_about_oss_pipepipe_desc",
+            "value": "NewPipe 分支；播放端點與驗證決策的參考"
         },
         {
-            "name": "yt_about_license_reference",
-            "value": "參考"
+            "name": "yt_about_oss_mpv_desc",
+            "value": "播放核心；libmpv 行為與 API 的依據"
+        },
+        {
+            "name": "yt_about_oss_smarttube_desc",
+            "value": "Android TV 端 YouTube 用戶端；電視端互動的參考"
+        },
+        {
+            "name": "yt_about_oss_clashbox_desc",
+            "value": "HarmonyOS 代理用戶端；代理設定介面的參考"
+        },
+        {
+            "name": "yt_about_oss_tpc_desc",
+            "value": "OpenHarmony C/C++ 移植工程；native 依賴建置的參考"
+        },
+        {
+            "name": "yt_about_oss_vlc_desc",
+            "value": "跨平台播放器；編解碼相容性的參考"
+        },
+        {
+            "name": "yt_label_vendors",
+            "value": "個廠商"
+        },
+        {
+            "name": "yt_about_tap_to_open",
+            "value": "點擊條目在瀏覽器中開啟"
+        },
+        {
+            "name": "yt_about_link_unavailable",
+            "value": "該條目暫無可用連結"
+        },
+        {
+            "name": "yt_about_link_failed",
+            "value": "無法開啟連結"
         },
         {
             "name": "yt_changelog_0_5_3_1",
@@ -2651,10 +2683,6 @@
         {
             "name": "yt_label_projects",
             "value": "個項目"
-        },
-        {
-            "name": "yt_label_models",
-            "value": "個模型"
         },
         {
             "name": "yt_label_latest_version",
@@ -3597,6 +3625,22 @@
         {
             "name": "yt_download_status_paused",
             "value": "已暫停"
+        },
+        {
+            "name": "yt_playlist_source_account",
+            "value": "帳號"
+        },
+        {
+            "name": "yt_playlist_source_favorite",
+            "value": "收藏"
+        },
+        {
+            "name": "yt_library_playlists_title",
+            "value": "帳號播放清單"
+        },
+        {
+            "name": "yt_empty_no_library_playlists",
+            "value": "帳號裡還沒有播放清單"
         },
         {
             "name": "yt_tab_live_chat",

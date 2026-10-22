@@ -2302,27 +2302,59 @@
         },
         {
             "name": "yt_about_oss_newpipe_desc",
-            "value": "Client YouTube open source per Android; riferimento per navigazione video, ricerca ed estrazione degli stream"
+            "value": "Client YouTube open source; riferimento per navigazione e ricerca"
         },
         {
             "name": "yt_about_oss_iplay_desc",
-            "value": "Lettore multimediale multipiattaforma con supporto per Emby, Jellyfin, cambio di sito e riproduzione personalizzata"
+            "value": "Lettore multimediale multipiattaforma; riferimento per la riproduzione multi-sito"
         },
         {
             "name": "yt_about_oss_ytdlp_desc",
-            "value": "Downloader audio/video da riga di comando ricco di funzionalità, con supporto per migliaia di siti e formati"
+            "value": "Downloader da riga di comando; riferimento per selezione formati e download"
         },
         {
             "name": "yt_about_oss_finvideo_desc",
-            "value": "Lettore video Jellyfin / Emby / Plex su HarmonyOS NEXT"
+            "value": "Lettore multimediale HarmonyOS; riferimento per l’interfaccia ArkTS"
         },
         {
-            "name": "yt_about_oss_hmsamples_desc",
-            "value": "Esempi Huawei per riproduzione di video lunghi, AVPlayer e altro codice di riferimento HarmonyOS"
+            "name": "yt_about_oss_pipepipe_desc",
+            "value": "Fork di NewPipe; riferimento per endpoint di riproduzione e autenticazione"
         },
         {
-            "name": "yt_about_license_reference",
-            "value": "Reference"
+            "name": "yt_about_oss_mpv_desc",
+            "value": "Motore di riproduzione; riferimento per comportamento e API di libmpv"
+        },
+        {
+            "name": "yt_about_oss_smarttube_desc",
+            "value": "Client YouTube per Android TV; riferimento per l’interazione TV"
+        },
+        {
+            "name": "yt_about_oss_clashbox_desc",
+            "value": "Client proxy HarmonyOS; riferimento per la configurazione del proxy"
+        },
+        {
+            "name": "yt_about_oss_tpc_desc",
+            "value": "Progetto di porting C/C++ OpenHarmony; riferimento per le dipendenze native"
+        },
+        {
+            "name": "yt_about_oss_vlc_desc",
+            "value": "Lettore multipiattaforma; riferimento per la compatibilità dei codec"
+        },
+        {
+            "name": "yt_label_vendors",
+            "value": "fornitori"
+        },
+        {
+            "name": "yt_about_tap_to_open",
+            "value": "Tocca una voce per aprirla nel browser"
+        },
+        {
+            "name": "yt_about_link_unavailable",
+            "value": "Nessun link disponibile per questa voce"
+        },
+        {
+            "name": "yt_about_link_failed",
+            "value": "Impossibile aprire il link"
         },
         {
             "name": "yt_changelog_0_5_3_1",
@@ -2651,10 +2683,6 @@
         {
             "name": "yt_label_projects",
             "value": "progetti"
-        },
-        {
-            "name": "yt_label_models",
-            "value": "modelli"
         },
         {
             "name": "yt_label_latest_version",
@@ -3597,6 +3625,22 @@
         {
             "name": "yt_download_status_paused",
             "value": "In pausa"
+        },
+        {
+            "name": "yt_playlist_source_account",
+            "value": "Account"
+        },
+        {
+            "name": "yt_playlist_source_favorite",
+            "value": "Preferito"
+        },
+        {
+            "name": "yt_library_playlists_title",
+            "value": "Playlist del tuo account"
+        },
+        {
+            "name": "yt_empty_no_library_playlists",
+            "value": "Nessuna playlist nel tuo account"
         },
         {
             "name": "yt_tab_live_chat",

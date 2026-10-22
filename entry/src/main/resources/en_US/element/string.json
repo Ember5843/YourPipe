@@ -2302,27 +2302,59 @@
         },
         {
             "name": "yt_about_oss_newpipe_desc",
-            "value": "Open-source Android YouTube client; reference for video browsing, search, and stream extraction"
+            "value": "Open-source YouTube client; reference for browsing and search"
         },
         {
             "name": "yt_about_oss_iplay_desc",
-            "value": "Cross-platform media player supporting Emby, Jellyfin, multi-site switching, and custom playback"
+            "value": "Cross-platform media player; reference for multi-site playback"
         },
         {
             "name": "yt_about_oss_ytdlp_desc",
-            "value": "Feature-rich command-line audio/video downloader supporting thousands of sites and formats"
+            "value": "Command-line downloader; reference for format selection and download flow"
         },
         {
             "name": "yt_about_oss_finvideo_desc",
-            "value": "Jellyfin / Emby / Plex video player on HarmonyOS NEXT"
+            "value": "HarmonyOS media player; reference for ArkTS playback UI"
         },
         {
-            "name": "yt_about_oss_hmsamples_desc",
-            "value": "Huawei developer samples for long-video playback, AVPlayer, and other HarmonyOS reference code"
+            "name": "yt_about_oss_pipepipe_desc",
+            "value": "NewPipe fork; reference for playback endpoints and auth decisions"
         },
         {
-            "name": "yt_about_license_reference",
-            "value": "Reference"
+            "name": "yt_about_oss_mpv_desc",
+            "value": "Playback engine; authoritative reference for libmpv behavior and API"
+        },
+        {
+            "name": "yt_about_oss_smarttube_desc",
+            "value": "YouTube client for Android TV; reference for TV interaction"
+        },
+        {
+            "name": "yt_about_oss_clashbox_desc",
+            "value": "HarmonyOS proxy client; reference for proxy configuration UI"
+        },
+        {
+            "name": "yt_about_oss_tpc_desc",
+            "value": "OpenHarmony C/C++ porting project; reference for native dependency builds"
+        },
+        {
+            "name": "yt_about_oss_vlc_desc",
+            "value": "Cross-platform player; compatibility reference for codecs"
+        },
+        {
+            "name": "yt_label_vendors",
+            "value": "vendors"
+        },
+        {
+            "name": "yt_about_tap_to_open",
+            "value": "Tap an entry to open it in your browser"
+        },
+        {
+            "name": "yt_about_link_unavailable",
+            "value": "No link available for this entry"
+        },
+        {
+            "name": "yt_about_link_failed",
+            "value": "Could not open the link"
         },
         {
             "name": "yt_changelog_0_5_3_1",
@@ -2651,10 +2683,6 @@
         {
             "name": "yt_label_projects",
             "value": "projects"
-        },
-        {
-            "name": "yt_label_models",
-            "value": "models"
         },
         {
             "name": "yt_label_latest_version",
@@ -3597,6 +3625,22 @@
         {
             "name": "yt_download_status_paused",
             "value": "Paused"
+        },
+        {
+            "name": "yt_playlist_source_account",
+            "value": "Account"
+        },
+        {
+            "name": "yt_playlist_source_favorite",
+            "value": "Favorite"
+        },
+        {
+            "name": "yt_library_playlists_title",
+            "value": "Your playlists"
+        },
+        {
+            "name": "yt_empty_no_library_playlists",
+            "value": "No playlists in your account yet"
         },
         {
             "name": "yt_tab_live_chat",

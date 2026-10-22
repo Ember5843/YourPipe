@@ -2302,27 +2302,59 @@
         },
         {
             "name": "yt_about_oss_newpipe_desc",
-            "value": "オープンソースの Android 向け YouTube クライアント。動画の閲覧・検索・ストリーム抽出の参考実装"
+            "value": "オープンソースの YouTube クライアント。閲覧と検索の参考"
         },
         {
             "name": "yt_about_oss_iplay_desc",
-            "value": "クロスプラットフォームのメディアプレーヤー。Emby、Jellyfin、複数サイトの切り替え、カスタム再生に対応"
+            "value": "クロスプラットフォームのメディアプレーヤー。マルチサイト再生の参考"
         },
         {
             "name": "yt_about_oss_ytdlp_desc",
-            "value": "高機能なコマンドライン音声・動画ダウンローダー。数千のサイトとフォーマットに対応"
+            "value": "コマンドラインのダウンロードツール。形式選択とダウンロード手順の参考"
         },
         {
             "name": "yt_about_oss_finvideo_desc",
-            "value": "HarmonyOS NEXT 向け Jellyfin / Emby / Plex 動画プレーヤー"
+            "value": "HarmonyOS のメディアプレーヤー。ArkTS 再生 UI の参考"
         },
         {
-            "name": "yt_about_oss_hmsamples_desc",
-            "value": "ファーウェイ開発者向け長編動画再生・AVPlayer などの HarmonyOS 参考サンプル"
+            "name": "yt_about_oss_pipepipe_desc",
+            "value": "NewPipe のフォーク。再生エンドポイントと認証判断の参考"
         },
         {
-            "name": "yt_about_license_reference",
-            "value": "リファレンス"
+            "name": "yt_about_oss_mpv_desc",
+            "value": "再生エンジン。libmpv の動作と API の基準"
+        },
+        {
+            "name": "yt_about_oss_smarttube_desc",
+            "value": "Android TV 向け YouTube クライアント。テレビ操作の参考"
+        },
+        {
+            "name": "yt_about_oss_clashbox_desc",
+            "value": "HarmonyOS のプロキシクライアント。プロキシ設定 UI の参考"
+        },
+        {
+            "name": "yt_about_oss_tpc_desc",
+            "value": "OpenHarmony の C/C++ 移植プロジェクト。ネイティブ依存関係のビルドの参考"
+        },
+        {
+            "name": "yt_about_oss_vlc_desc",
+            "value": "クロスプラットフォームプレーヤー。コーデック互換性の参考"
+        },
+        {
+            "name": "yt_label_vendors",
+            "value": "社"
+        },
+        {
+            "name": "yt_about_tap_to_open",
+            "value": "項目をタップするとブラウザで開きます"
+        },
+        {
+            "name": "yt_about_link_unavailable",
+            "value": "この項目で利用できるリンクはありません"
+        },
+        {
+            "name": "yt_about_link_failed",
+            "value": "リンクを開けませんでした"
         },
         {
             "name": "yt_changelog_0_5_3_1",
@@ -2651,10 +2683,6 @@
         {
             "name": "yt_label_projects",
             "value": "件のプロジェクト"
-        },
-        {
-            "name": "yt_label_models",
-            "value": "件のモデル"
         },
         {
             "name": "yt_label_latest_version",
@@ -3597,6 +3625,22 @@
         {
             "name": "yt_download_status_paused",
             "value": "一時停止中"
+        },
+        {
+            "name": "yt_playlist_source_account",
+            "value": "アカウント"
+        },
+        {
+            "name": "yt_playlist_source_favorite",
+            "value": "お気に入り"
+        },
+        {
+            "name": "yt_library_playlists_title",
+            "value": "アカウントの再生リスト"
+        },
+        {
+            "name": "yt_empty_no_library_playlists",
+            "value": "アカウントに再生リストはまだありません"
         },
         {
             "name": "yt_tab_live_chat",

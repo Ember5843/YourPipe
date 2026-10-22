@@ -2302,27 +2302,59 @@
         },
         {
             "name": "yt_about_oss_newpipe_desc",
-            "value": "عميل YouTube مفتوح المصدر لنظام Android؛ مرجع لتصفح الفيديو والبحث واستخراج التدفقات"
+            "value": "عميل YouTube مفتوح المصدر؛ مرجع للتصفح والبحث"
         },
         {
             "name": "yt_about_oss_iplay_desc",
-            "value": "مشغل وسائط متعدد المنصات يدعم Emby وJellyfin وتبديل المواقع المتعددة والتشغيل المخصص"
+            "value": "مشغل وسائط متعدد المنصات؛ مرجع لتشغيل المواقع المتعددة"
         },
         {
             "name": "yt_about_oss_ytdlp_desc",
-            "value": "أداة سطر أوامر غنية بالميزات لتنزيل الصوت والفيديو تدعم آلاف المواقع والتنسيقات"
+            "value": "أداة تنزيل بسطر الأوامر؛ مرجع لاختيار الصيغ وسير التنزيل"
         },
         {
             "name": "yt_about_oss_finvideo_desc",
-            "value": "مشغل فيديو Jellyfin / Emby / Plex على HarmonyOS NEXT"
+            "value": "مشغل وسائط HarmonyOS؛ مرجع لواجهة التشغيل ArkTS"
         },
         {
-            "name": "yt_about_oss_hmsamples_desc",
-            "value": "عينات مطوري Huawei لتشغيل الفيديو الطويل وAVPlayer ومراجع HarmonyOS الأخرى"
+            "name": "yt_about_oss_pipepipe_desc",
+            "value": "فرع NewPipe؛ مرجع لنقاط نهاية التشغيل وقرارات المصادقة"
         },
         {
-            "name": "yt_about_license_reference",
-            "value": "مرجع"
+            "name": "yt_about_oss_mpv_desc",
+            "value": "محرك التشغيل؛ مرجع سلوك وواجهة libmpv"
+        },
+        {
+            "name": "yt_about_oss_smarttube_desc",
+            "value": "عميل YouTube لأندرويد TV؛ مرجع للتفاعل على التلفاز"
+        },
+        {
+            "name": "yt_about_oss_clashbox_desc",
+            "value": "عميل وكيل HarmonyOS؛ مرجع لواجهة إعداد الوكيل"
+        },
+        {
+            "name": "yt_about_oss_tpc_desc",
+            "value": "مشروع نقل C/C++ إلى OpenHarmony؛ مرجع لبناء التبعيات الأصلية"
+        },
+        {
+            "name": "yt_about_oss_vlc_desc",
+            "value": "مشغل متعدد المنصات؛ مرجع لتوافق الترميزات"
+        },
+        {
+            "name": "yt_label_vendors",
+            "value": "مزوّدين"
+        },
+        {
+            "name": "yt_about_tap_to_open",
+            "value": "اضغط على عنصر لفتحه في المتصفح"
+        },
+        {
+            "name": "yt_about_link_unavailable",
+            "value": "لا يوجد رابط متاح لهذا العنصر"
+        },
+        {
+            "name": "yt_about_link_failed",
+            "value": "تعذر فتح الرابط"
         },
         {
             "name": "yt_changelog_0_5_3_1",
@@ -2651,10 +2683,6 @@
         {
             "name": "yt_label_projects",
             "value": "مشاريع"
-        },
-        {
-            "name": "yt_label_models",
-            "value": "نماذج"
         },
         {
             "name": "yt_label_latest_version",
@@ -3597,6 +3625,22 @@
         {
             "name": "yt_download_status_paused",
             "value": "متوقف مؤقتًا"
+        },
+        {
+            "name": "yt_playlist_source_account",
+            "value": "الحساب"
+        },
+        {
+            "name": "yt_playlist_source_favorite",
+            "value": "المفضلة"
+        },
+        {
+            "name": "yt_library_playlists_title",
+            "value": "قوائم تشغيل حسابك"
+        },
+        {
+            "name": "yt_empty_no_library_playlists",
+            "value": "لا توجد قوائم تشغيل في حسابك بعد"
         },
         {
             "name": "yt_tab_live_chat",

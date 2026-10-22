@@ -2,6 +2,7 @@ import {
   AuthSessionManager,
   ContentCountry,
   Localization,
+  SearchPlaylistItem,
   VideoItem,
   fetchBrowseContinuation,
   fetchBrowsePage,
@@ -19,11 +20,25 @@ import {
 } from '../home/utils/HomeFeedUtils';
 import { buildTvBrowseVideoItems, getTvVisitorData } from '../home/utils/TvBrowseUtils';
 import { getTextFromRuns } from '../home/utils/TextUtils';
+import { getPlaylistContinuationToken } from '../home/utils/ContinuationUtils';
+import {
+  getLockupPlaylistCoverUrl,
+  getLockupPlaylistId,
+  getLockupTitle,
+  getLockupUploaderName
+} from '../home/utils/LockupViewModelParser';
+import { getRendererThumbnailUrl } from '../home/utils/ThumbnailUtils';
 
 const logger = AppLog.getInstance('UserLibraryService');
 
 export interface UserVideoPageResult {
   items: Array<VideoItem>;
+  nextPageToken: string | null;
+  visitorData: string;
+}
+
+export interface UserPlaylistPageResult {
+  items: Array<SearchPlaylistItem>;
   nextPageToken: string | null;
   visitorData: string;
 }
@@ -35,6 +50,7 @@ export class UserLibraryService {
   private readonly SUBSCRIPTIONS_BROWSE_ID: string = 'FEsubscriptions';
   private readonly CHANNELS_BROWSE_ID: string = 'FEchannels';
   private readonly LIBRARY_BROWSE_ID: string = 'FElibrary';
+  private readonly PLAYLISTS_BROWSE_ID: string = 'FEplaylist_aggregation';
 
   constructor(localization: Localization, contentCountry: ContentCountry) {
     this.localization = localization;
@@ -85,6 +101,220 @@ export class UserLibraryService {
   async fetchLibrary(startId: number = 1): Promise<UserVideoPageResult> {
     this.requireSignedIn();
     return this.fetchAuthBrowse(this.LIBRARY_BROWSE_ID, startId);
+  }
+
+  /**
+   * Account playlists (Watch later / Liked videos / created / saved).
+   * FEplaylist_aggregation is the library playlists rail; both WEB and TV
+   * rail responses are flattened by the same playlist-node scan.
+   */
+  async fetchSavedPlaylists(startId: number = 1): Promise<UserPlaylistPageResult> {
+    this.requireSignedIn();
+    const tv = this.useTvRail();
+    logger.info(`[UserLibrary] stage=playlists rail=${tv ? 'tv' : 'web'} browseId=${this.PLAYLISTS_BROWSE_ID}`);
+    const response = tv
+      ? await fetchTvBrowsePage(
+        this.localization,
+        this.contentCountry,
+        this.PLAYLISTS_BROWSE_ID,
+        '',
+        undefined,
+        true
+      )
+      : await fetchBrowsePage(
+        this.localization,
+        this.contentCountry,
+        this.PLAYLISTS_BROWSE_ID,
+        '',
+        undefined,
+        true
+      );
+    if (!response) {
+      throw new Error('Empty playlists browse response');
+    }
+    return this.parsePlaylistsBrowse(response as Record<string, Object>, startId, '');
+  }
+
+  async fetchSavedPlaylistsNext(
+    nextPageToken: string,
+    visitorData: string,
+    startId: number
+  ): Promise<UserPlaylistPageResult> {
+    this.requireSignedIn();
+    const trimmed = (nextPageToken || '').trim();
+    if (!trimmed) {
+      return { items: [], nextPageToken: null, visitorData };
+    }
+    const tv = this.useTvRail();
+    const response = tv
+      ? await fetchTvBrowseContinuation(
+        this.localization,
+        this.contentCountry,
+        trimmed,
+        visitorData,
+        true
+      )
+      : await fetchBrowseContinuation(
+        this.localization,
+        this.contentCountry,
+        trimmed,
+        visitorData,
+        true
+      );
+    if (!response) {
+      throw new Error('Empty playlists continuation response');
+    }
+    return this.parsePlaylistsBrowse(response as Record<string, Object>, startId, visitorData);
+  }
+
+  private parsePlaylistsBrowse(
+    root: Record<string, Object>,
+    startId: number,
+    fallbackVisitor: string
+  ): UserPlaylistPageResult {
+    const items: Array<SearchPlaylistItem> = [];
+    const seen: Record<string, boolean> = {};
+    let nextPageToken: string | null = null;
+    let visitorData = fallbackVisitor;
+
+    const responseContext = root['responseContext'] as Record<string, Object>;
+    if (responseContext) {
+      const fresh = (responseContext['visitorData'] as string) || '';
+      if (fresh.length > 0) {
+        visitorData = fresh;
+      }
+    }
+
+    const maxNodes = 8000;
+    const queue: Array<Object> = [root];
+    let visited = 0;
+    while (queue.length > 0 && visited < maxNodes) {
+      const node = queue.shift();
+      if (!node) {
+        continue;
+      }
+      visited += 1;
+      if (node instanceof Array) {
+        const arr = node as Object[];
+        for (let i = 0; i < arr.length; i++) {
+          const child = arr[i];
+          if (child) {
+            queue.push(child);
+          }
+        }
+        continue;
+      }
+      const obj = node as Record<string, Object>;
+
+      const token = this.extractPlaylistContinuationToken(obj);
+      if (token) {
+        nextPageToken = token;
+      }
+
+      const built = this.buildPlaylistFromNode(obj, startId + items.length);
+      if (built) {
+        if (!seen[built.playlistId]) {
+          seen[built.playlistId] = true;
+          items.push(built);
+        }
+        continue;
+      }
+
+      const keys = Object.keys(obj);
+      for (let i = 0; i < keys.length; i++) {
+        const child = obj[keys[i]];
+        if (!child) {
+          continue;
+        }
+        if (child instanceof Array || child instanceof Object) {
+          queue.push(child);
+        }
+      }
+    }
+
+    logger.info(`[UserLibrary] playlists parsed count=${items.length} hasNext=${!!nextPageToken} nodes=${visited}`);
+    return { items, nextPageToken, visitorData };
+  }
+
+  private extractPlaylistContinuationToken(node: Record<string, Object>): string | null {
+    const cont = node['continuationItemRenderer'] as Record<string, Object>;
+    if (cont) {
+      const token = getPlaylistContinuationToken(cont);
+      if (token) {
+        return token;
+      }
+    }
+    return getPlaylistContinuationToken(node);
+  }
+
+  private buildPlaylistFromNode(node: Record<string, Object>, id: number): SearchPlaylistItem | null {
+    const grid = node['gridPlaylistRenderer'] as Record<string, Object>;
+    if (grid) {
+      return this.buildPlaylistFromRenderer(grid, id);
+    }
+    const renderer = node['playlistRenderer'] as Record<string, Object>;
+    if (renderer) {
+      return this.buildPlaylistFromRenderer(renderer, id);
+    }
+    const lockup = node['lockupViewModel'] as Record<string, Object>;
+    if (lockup) {
+      return this.buildPlaylistFromLockup(lockup, id);
+    }
+    return null;
+  }
+
+  private buildPlaylistFromRenderer(renderer: Record<string, Object>, id: number): SearchPlaylistItem | null {
+    let playlistId = (renderer['playlistId'] as string) || '';
+    if (playlistId.length === 0) {
+      playlistId = this.extractBrowseId(renderer);
+    }
+    if (playlistId.startsWith('VL')) {
+      playlistId = playlistId.substring(2);
+    }
+    if (playlistId.length === 0) {
+      return null;
+    }
+    const name = getTextFromRuns(renderer['title']) || 'Untitled';
+    const uploader = getTextFromRuns(renderer['longBylineText'])
+      || getTextFromRuns(renderer['shortBylineText']);
+    const countText = getTextFromRuns(renderer['videoCountText'])
+      || ((renderer['videoCount'] as string) || '');
+    const coverUrl = getRendererThumbnailUrl(renderer);
+    return new SearchPlaylistItem(
+      id,
+      playlistId,
+      name,
+      uploader,
+      countText,
+      coverUrl,
+      '',
+      ThumbnailPlaceholder.pickColor(playlistId || name, id)
+    );
+  }
+
+  private buildPlaylistFromLockup(lockup: Record<string, Object>, id: number): SearchPlaylistItem | null {
+    const contentType = (lockup['contentType'] as string) || '';
+    if (contentType !== 'LOCKUP_CONTENT_TYPE_PLAYLIST'
+      && contentType !== 'LOCKUP_CONTENT_TYPE_PODCAST') {
+      return null;
+    }
+    const playlistId = getLockupPlaylistId(lockup);
+    if (playlistId.length === 0) {
+      return null;
+    }
+    const name = getLockupTitle(lockup) || 'Untitled';
+    const uploader = getLockupUploaderName(lockup) || '';
+    const coverUrl = getLockupPlaylistCoverUrl(lockup);
+    return new SearchPlaylistItem(
+      id,
+      playlistId,
+      name,
+      uploader,
+      '',
+      coverUrl,
+      '',
+      ThumbnailPlaceholder.pickColor(playlistId || name, id)
+    );
   }
 
   async fetchSubscribedChannels(): Promise<Array<SubscriptionUser>> {

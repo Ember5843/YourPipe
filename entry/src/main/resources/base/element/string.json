@@ -2302,27 +2302,59 @@
         },
         {
             "name": "yt_about_oss_newpipe_desc",
-            "value": "开源 Android 版 YouTube 客户端；视频浏览、搜索与流媒体提取的参考实现"
+            "value": "开源 YouTube 客户端；浏览与搜索的参考"
         },
         {
             "name": "yt_about_oss_iplay_desc",
-            "value": "跨平台媒体播放器，支持 Emby、Jellyfin、多站点切换与自定义播放"
+            "value": "跨平台媒体播放器；多站点播放的参考"
         },
         {
             "name": "yt_about_oss_ytdlp_desc",
-            "value": "功能丰富的命令行音视频下载工具，支持数千个站点与格式"
+            "value": "命令行下载工具；格式选择与下载流程的参考"
         },
         {
             "name": "yt_about_oss_finvideo_desc",
-            "value": "HarmonyOS NEXT 上的 Jellyfin / Emby / Plex 视频播放器"
+            "value": "HarmonyOS 媒体播放器；ArkTS 播控界面的参考"
         },
         {
-            "name": "yt_about_oss_hmsamples_desc",
-            "value": "华为开发者长视频播放、AVPlayer 等 HarmonyOS 参考示例"
+            "name": "yt_about_oss_pipepipe_desc",
+            "value": "NewPipe 分支；播放端点与鉴权决策的参考"
         },
         {
-            "name": "yt_about_license_reference",
-            "value": "Reference"
+            "name": "yt_about_oss_mpv_desc",
+            "value": "播放内核；libmpv 行为与 API 的依据"
+        },
+        {
+            "name": "yt_about_oss_smarttube_desc",
+            "value": "Android TV 端 YouTube 客户端；电视端交互的参考"
+        },
+        {
+            "name": "yt_about_oss_clashbox_desc",
+            "value": "HarmonyOS 代理客户端；代理配置界面的参考"
+        },
+        {
+            "name": "yt_about_oss_tpc_desc",
+            "value": "OpenHarmony C/C++ 移植工程；native 依赖构建的参考"
+        },
+        {
+            "name": "yt_about_oss_vlc_desc",
+            "value": "跨平台播放器；编解码兼容性的参考"
+        },
+        {
+            "name": "yt_label_vendors",
+            "value": "个厂商"
+        },
+        {
+            "name": "yt_about_tap_to_open",
+            "value": "点击条目在浏览器中打开"
+        },
+        {
+            "name": "yt_about_link_unavailable",
+            "value": "该条目暂无可用链接"
+        },
+        {
+            "name": "yt_about_link_failed",
+            "value": "无法打开链接"
         },
         {
             "name": "yt_changelog_0_5_3_1",
@@ -2651,10 +2683,6 @@
         {
             "name": "yt_label_projects",
             "value": "个项目"
-        },
-        {
-            "name": "yt_label_models",
-            "value": "个模型"
         },
         {
             "name": "yt_label_latest_version",
@@ -3597,6 +3625,22 @@
         {
             "name": "yt_download_status_paused",
             "value": "Paused"
+        },
+        {
+            "name": "yt_playlist_source_account",
+            "value": "账号"
+        },
+        {
+            "name": "yt_playlist_source_favorite",
+            "value": "收藏"
+        },
+        {
+            "name": "yt_library_playlists_title",
+            "value": "Your playlists"
+        },
+        {
+            "name": "yt_empty_no_library_playlists",
+            "value": "No playlists in your account yet"
         },
         {
             "name": "yt_tab_live_chat",

@@ -1,6 +1,6 @@
 import { AppLog } from '../../common/AppLog';
 import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
-import { VideoItem } from 'youtube_core';
+import { AuthAccountStatus, VideoItem } from 'youtube_core';
 import { PlaylistItem, StoredLocalQueue } from '../../common/PlaylistModel';
 import { SearchPlaylistItem } from 'youtube_core';
 import { VideoCard } from '../../common/components/VideoCard';
@@ -19,6 +19,16 @@ import { FavoritesScrollCoordinator } from './FavoritesScrollCoordinator';
 
 const logger = AppLog.getInstance('FavoritesPage');
 
+class MergedPlaylistEntry {
+  item: SearchPlaylistItem;
+  typeLabel: ResourceStr;
+
+  constructor(item: SearchPlaylistItem, typeLabel: ResourceStr) {
+    this.item = item;
+    this.typeLabel = typeLabel;
+  }
+}
+
 @Component
 export struct FavoritesPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
@@ -29,19 +39,64 @@ export struct FavoritesPage {
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
   @StorageLink('subscriptionFeed') feedItems: SubscriptionFeedItem[] = [];
+  @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @Consume('safeAreaTop') safeAreaTop: number = 0;
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State overviewMap: Record<string, SearchPlaylistItem> = {};
   @State isLoading: boolean = false;
-
+  @State accountPlaylists: SearchPlaylistItem[] = [];
+  @State isLoadingAccountPlaylists: boolean = false;
+  @State accountPlaylistsError: string = '';
 
   aboutToAppear(): void {
     this.loadOverviews();
+    this.loadAccountPlaylists();
   }
 
   aboutToShow(): void {
     this.loadOverviews();
+    this.loadAccountPlaylists();
+  }
+
+  private async loadAccountPlaylists(): Promise<void> {
+    if (!this.authStatus.canPersonalizedHome) {
+      this.accountPlaylists = [];
+      this.accountPlaylistsError = '';
+      return;
+    }
+    if (this.isLoadingAccountPlaylists) {
+      return;
+    }
+    this.isLoadingAccountPlaylists = true;
+    this.accountPlaylistsError = '';
+    try {
+      const service = FeedServiceProvider.getInstance().getUserLibraryService();
+      let page = await service.fetchSavedPlaylists(1);
+      let items: SearchPlaylistItem[] = page.items.slice();
+      let token = page.nextPageToken;
+      let pages = 1;
+      while (token && pages < 5) {
+        const next = await service.fetchSavedPlaylistsNext(token, page.visitorData, items.length + 1);
+        if (next.items.length === 0) {
+          break;
+        }
+        items = items.concat(next.items);
+        page = next;
+        token = next.nextPageToken;
+        pages += 1;
+      }
+      this.accountPlaylists = items;
+      logger.info(`loadAccountPlaylists count=${items.length} pages=${pages}`);
+    } catch (err) {
+      logger.error('loadAccountPlaylists failed:', JSON.stringify(err));
+      const ctx = this.getUIContext().getHostContext();
+      this.accountPlaylistsError = ctx
+        ? ctx.resourceManager.getStringSync($r('app.string.yt_error_load_playlists').id)
+        : '';
+    } finally {
+      this.isLoadingAccountPlaylists = false;
+    }
   }
 
   private buildPlaceholder(item: PlaylistItem, index: number): SearchPlaylistItem {
@@ -127,6 +182,48 @@ export struct FavoritesPage {
     } finally {
       this.isLoading = false;
     }
+  }
+
+  /**
+   * 账号播放列表、收藏的播放列表、本地播放列表合并为一份：按 playlistId 去重，
+   * 账号库优先（元数据更全），其次仅收藏的条目，最后本地队列。
+   */
+  private getMergedPlaylists(): MergedPlaylistEntry[] {
+    const merged: MergedPlaylistEntry[] = [];
+    const seen: Record<string, boolean> = {};
+
+    this.accountPlaylists.forEach((item: SearchPlaylistItem) => {
+      const id = (item.playlistId || '').trim();
+      if (id.length === 0 || seen[id]) {
+        return;
+      }
+      seen[id] = true;
+      merged.push(new MergedPlaylistEntry(item, $r('app.string.yt_playlist_source_account')));
+    });
+
+    this.playlists.forEach((item: PlaylistItem) => {
+      const id = (item.playlistId || '').trim();
+      if (id.length === 0 || seen[id]) {
+        return;
+      }
+      seen[id] = true;
+      const overview = this.overviewMap[id];
+      const built = overview ? overview : this.buildPlaceholder(item, merged.length);
+      merged.push(new MergedPlaylistEntry(built, $r('app.string.yt_playlist_source_favorite')));
+    });
+
+    this.localQueues.forEach((queue: StoredLocalQueue) => {
+      const id = (queue.id || '').trim();
+      if (id.length === 0 || seen[id]) {
+        return;
+      }
+      seen[id] = true;
+      merged.push(new MergedPlaylistEntry(
+        this.buildLocalPlaylistItem(queue, merged.length),
+        $r('app.string.yt_local_playlists_tag')
+      ));
+    });
+    return merged;
   }
 
   /** 条式列表在宽屏（平板展开/2in1/电视）下的列数 */
@@ -299,9 +396,9 @@ export struct FavoritesPage {
         }
       }
 
-      // 收藏的播放列表部分
+      // 播放列表部分（账号库 + 收藏 + 本地，去重合并）
       ListItem() {
-        Text($r('app.string.yt_fav_playlists_title'))
+        Text($r('app.string.yt_tab_playlists'))
           .fontSize(20)
           .fontColor($r('app.color.yourtube_text_primary'))
           .fontWeight(FontWeight.Medium)
@@ -310,74 +407,36 @@ export struct FavoritesPage {
           .width('100%')
       }
 
-      if (!this.playlists || this.playlists.length === 0) {
+      if (this.accountPlaylistsError.length > 0) {
         ListItem() {
-          Column() {
-            Text($r('app.string.yt_empty_no_fav_playlists'))
-              .fontSize(14)
-              .fontColor($r('app.color.yourtube_text_secondary'))
-              .margin({ top: 20 })
-            Text($r('app.string.yt_empty_fav_playlists_hint'))
-              .fontSize(12)
-              .fontColor($r('app.color.yourtube_text_hint'))
-              .margin({ top: 6 })
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Center)
-          .padding({ bottom: 24 })
+          Text(this.accountPlaylistsError)
+            .fontSize(12)
+            .fontColor($r('app.color.yourtube_text_hint'))
+            .padding({ left: 16, right: 16, bottom: 8 })
+            .width('100%')
         }
-      } else {
-        ForEach(this.playlists, (item: PlaylistItem, index: number) => {
-          ListItem() {
-            PlaylistCard({
-              playlist: this.overviewMap[item.playlistId]
-                ? this.overviewMap[item.playlistId]
-                : this.buildPlaceholder(item, index),
-              typeLabel: $r('app.string.yt_filter_playlists'),
-              forceActionLabel: $r('app.string.yt_action_unfavorite')
-            })
-          }
-          .transition(customAnimationUtil.isScaleTran(item.playlistId, this.uiConfig))
-        }, (item: PlaylistItem) => item.playlistId)
       }
 
-      // 本地播放列表部分
-      ListItem() {
-        Text($r('app.string.yt_local_playlists_title'))
-          .fontSize(20)
-          .fontColor($r('app.color.yourtube_text_primary'))
-          .fontWeight(FontWeight.Medium)
-          .margin({ top: 24, bottom: 12 })
-          .padding({ left: 16, right: 16 })
-          .width('100%')
-      }
-
-      if (!this.localQueues || this.localQueues.length === 0) {
+      if (this.getMergedPlaylists().length === 0) {
         ListItem() {
-          Column() {
-            Text($r('app.string.yt_empty_no_local_playlists'))
-              .fontSize(14)
-              .fontColor($r('app.color.yourtube_text_secondary'))
-              .margin({ top: 20 })
-            Text($r('app.string.yt_empty_local_playlists_hint'))
-              .fontSize(12)
-              .fontColor($r('app.color.yourtube_text_hint'))
-              .margin({ top: 6 })
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Center)
-          .padding({ bottom: 24 })
+          Text($r('app.string.yt_empty_no_playlists'))
+            .fontSize(14)
+            .fontColor($r('app.color.yourtube_text_secondary'))
+            .margin({ top: 20 })
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ bottom: 24 })
         }
       } else {
-        ForEach(this.localQueues, (queue: StoredLocalQueue, index: number) => {
+        ForEach(this.getMergedPlaylists(), (entry: MergedPlaylistEntry) => {
           ListItem() {
             PlaylistCard({
-              playlist: this.buildLocalPlaylistItem(queue, index),
-              typeLabel: $r('app.string.yt_local_playlists_tag')
+              playlist: entry.item,
+              typeLabel: entry.typeLabel
             })
           }
-          .transition(customAnimationUtil.isScaleTran(queue.id, this.uiConfig))
-        }, (queue: StoredLocalQueue) => queue.id + queue.videos.length)
+          .transition(customAnimationUtil.isScaleTran(entry.item.playlistId, this.uiConfig))
+        }, (entry: MergedPlaylistEntry) => entry.item.playlistId)
       }
       }
       .width('100%')
