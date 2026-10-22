@@ -4089,6 +4089,54 @@
         {
             "name": "yt_exp_ai_status_label",
             "value": "حالة القائمة"
+        },
+        {
+            "name": "yt_update_page_title",
+            "value": "التحقق من التحديثات"
+        },
+        {
+            "name": "yt_update_enable",
+            "value": "التحقق من تحديثات GitHub"
+        },
+        {
+            "name": "yt_update_enable_desc",
+            "value": "عند الإيقاف لن يتم التحقق تلقائيًا أو يدويًا"
+        },
+        {
+            "name": "yt_update_on_startup",
+            "value": "التحقق عند بدء التشغيل"
+        },
+        {
+            "name": "yt_update_on_startup_desc",
+            "value": "يعمل بصمت دون تنبيه"
+        },
+        {
+            "name": "yt_update_last_check",
+            "value": "آخر تحقق"
+        },
+        {
+            "name": "yt_update_never_checked",
+            "value": "لم يتم التحقق بعد"
+        },
+        {
+            "name": "yt_update_check_now",
+            "value": "التحقق الآن"
+        },
+        {
+            "name": "yt_update_rate_limited",
+            "value": "GitHub يحدّ من الطلبات، حاول لاحقًا"
+        },
+        {
+            "name": "yt_update_available",
+            "value": "يتوفر إصدار جديد"
+        },
+        {
+            "name": "yt_update_disabled_hint",
+            "value": "فعّل «التحقق من تحديثات GitHub» أولاً"
+        },
+        {
+            "name": "yt_update_links",
+            "value": "روابط"
         }
     ]
 }

@@ -4089,6 +4089,54 @@
         {
             "name": "yt_exp_ai_status_label",
             "value": "Состояние списка"
+        },
+        {
+            "name": "yt_update_page_title",
+            "value": "Проверка обновлений"
+        },
+        {
+            "name": "yt_update_enable",
+            "value": "Проверять обновления GitHub"
+        },
+        {
+            "name": "yt_update_enable_desc",
+            "value": "Если выключено, автоматических и ручных проверок не будет"
+        },
+        {
+            "name": "yt_update_on_startup",
+            "value": "Проверять при запуске"
+        },
+        {
+            "name": "yt_update_on_startup_desc",
+            "value": "Выполняется тихо, без уведомлений"
+        },
+        {
+            "name": "yt_update_last_check",
+            "value": "Последняя проверка"
+        },
+        {
+            "name": "yt_update_never_checked",
+            "value": "Ещё не проверялось"
+        },
+        {
+            "name": "yt_update_check_now",
+            "value": "Проверить сейчас"
+        },
+        {
+            "name": "yt_update_rate_limited",
+            "value": "GitHub ограничивает запросы, повторите позже"
+        },
+        {
+            "name": "yt_update_available",
+            "value": "Доступна новая версия"
+        },
+        {
+            "name": "yt_update_disabled_hint",
+            "value": "Сначала включите «Проверять обновления GitHub»"
+        },
+        {
+            "name": "yt_update_links",
+            "value": "Ссылки"
         }
     ]
 }

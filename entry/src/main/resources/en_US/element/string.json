@@ -4089,6 +4089,54 @@
         {
             "name": "yt_exp_ai_status_label",
             "value": "List status"
+        },
+        {
+            "name": "yt_update_page_title",
+            "value": "Check for updates"
+        },
+        {
+            "name": "yt_update_enable",
+            "value": "Check GitHub updates"
+        },
+        {
+            "name": "yt_update_enable_desc",
+            "value": "When off, no automatic or manual checks"
+        },
+        {
+            "name": "yt_update_on_startup",
+            "value": "Check on startup"
+        },
+        {
+            "name": "yt_update_on_startup_desc",
+            "value": "Runs silently without a prompt"
+        },
+        {
+            "name": "yt_update_last_check",
+            "value": "Last check"
+        },
+        {
+            "name": "yt_update_never_checked",
+            "value": "Not checked yet"
+        },
+        {
+            "name": "yt_update_check_now",
+            "value": "Check now"
+        },
+        {
+            "name": "yt_update_rate_limited",
+            "value": "GitHub is rate limiting requests, try again later"
+        },
+        {
+            "name": "yt_update_available",
+            "value": "New version available"
+        },
+        {
+            "name": "yt_update_disabled_hint",
+            "value": "Enable “Check GitHub updates” first"
+        },
+        {
+            "name": "yt_update_links",
+            "value": "Links"
         }
     ]
 }

@@ -16,6 +16,7 @@ import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
 import { PlaybackContinuationService } from '../features/player/PlaybackContinuationService';
 import { NetworkProxyConfig } from '../common/NetworkProxyConfig';
+import { UpdateChecker, UpdateCheckResult } from '../common/UpdateChecker';
 import { NetworkHandoverService } from '../common/NetworkHandoverService';
 import { PlayerSession } from '../common/PlayerSession';
 import { WatchHistoryStore } from '../common/WatchHistoryStore';
@@ -146,6 +147,7 @@ export default class EntryAbility extends UIAbility {
       // in-flight proxy/SABR connections so playback fails fast and recovers
       // on the new network instead of stalling until timeouts.
       NetworkHandoverService.start();
+      this.scheduleStartupUpdateCheck();
       LanguageManager.applyPersistedLanguage();
       ColorModeManager.applyPersistedMode(this.context);
     } catch (err) {
@@ -154,8 +156,25 @@ export default class EntryAbility extends UIAbility {
     logger.info('Ability onCreate');
   }
 
-  private startPlaybackPrewarm(): void {
-    const startedAt = Date.now();
+  /** 启动 4s 后静默检查一次 GitHub Releases；不弹 toast/对话框。 */
+  private scheduleStartupUpdateCheck(): void {
+    const cfg = AppStorage.get<UIConfig>('uiConfig');
+    if (!cfg || cfg.checkGithubUpdates === false || cfg.checkUpdatesOnStartup === false) {
+      logger.info('startup update check skipped by config');
+      return;
+    }
+    setTimeout(() => {
+      NetworkProxyConfig.awaitReady()
+        .then(() => UpdateChecker.check())
+        .then((result: UpdateCheckResult) => {
+          logger.info(`startup update check status=${result.status} `
+            + `remote=${result.remoteVersionName} rateLimited=${result.rateLimited}`);
+        })
+        .catch((e: Error) => logger.warn(`startup update check failed: ${e.message}`));
+    }, 4000);
+  }
+
+  private startPlaybackPrewarm(): void {    const startedAt = Date.now();
     PlayerSession.getInstance().prewarmPlaybackEngine().then(() => {
       logger.info(`Playback prewarm MPV ready elapsed=${Date.now() - startedAt}ms`);
     }).catch((e: Error) => {

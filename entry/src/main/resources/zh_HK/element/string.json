@@ -4089,6 +4089,54 @@
         {
             "name": "yt_exp_ai_status_label",
             "value": "名單狀態"
+        },
+        {
+            "name": "yt_update_page_title",
+            "value": "檢查更新"
+        },
+        {
+            "name": "yt_update_enable",
+            "value": "檢查 GitHub 更新"
+        },
+        {
+            "name": "yt_update_enable_desc",
+            "value": "關閉後不會自動或手動檢查"
+        },
+        {
+            "name": "yt_update_on_startup",
+            "value": "啟動時檢查"
+        },
+        {
+            "name": "yt_update_on_startup_desc",
+            "value": "靜默進行，不彈出提示"
+        },
+        {
+            "name": "yt_update_last_check",
+            "value": "上次檢查"
+        },
+        {
+            "name": "yt_update_never_checked",
+            "value": "尚未檢查"
+        },
+        {
+            "name": "yt_update_check_now",
+            "value": "立即檢查"
+        },
+        {
+            "name": "yt_update_rate_limited",
+            "value": "GitHub 介面限流，請稍後重試"
+        },
+        {
+            "name": "yt_update_available",
+            "value": "發現新版本"
+        },
+        {
+            "name": "yt_update_disabled_hint",
+            "value": "請先開啟「檢查 GitHub 更新」"
+        },
+        {
+            "name": "yt_update_links",
+            "value": "相關連結"
         }
     ]
 }

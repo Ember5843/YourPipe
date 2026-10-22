@@ -4089,6 +4089,54 @@
         {
             "name": "yt_exp_ai_status_label",
             "value": "État de la liste"
+        },
+        {
+            "name": "yt_update_page_title",
+            "value": "Rechercher des mises à jour"
+        },
+        {
+            "name": "yt_update_enable",
+            "value": "Vérifier les mises à jour GitHub"
+        },
+        {
+            "name": "yt_update_enable_desc",
+            "value": "Si désactivé, aucune vérification automatique ou manuelle"
+        },
+        {
+            "name": "yt_update_on_startup",
+            "value": "Vérifier au démarrage"
+        },
+        {
+            "name": "yt_update_on_startup_desc",
+            "value": "S’exécute en silence, sans notification"
+        },
+        {
+            "name": "yt_update_last_check",
+            "value": "Dernière vérification"
+        },
+        {
+            "name": "yt_update_never_checked",
+            "value": "Pas encore vérifié"
+        },
+        {
+            "name": "yt_update_check_now",
+            "value": "Vérifier maintenant"
+        },
+        {
+            "name": "yt_update_rate_limited",
+            "value": "GitHub limite les requêtes, réessayez plus tard"
+        },
+        {
+            "name": "yt_update_available",
+            "value": "Nouvelle version disponible"
+        },
+        {
+            "name": "yt_update_disabled_hint",
+            "value": "Activez d’abord « Vérifier les mises à jour GitHub »"
+        },
+        {
+            "name": "yt_update_links",
+            "value": "Liens"
         }
     ]
 }

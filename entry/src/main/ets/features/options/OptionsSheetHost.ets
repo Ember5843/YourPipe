@@ -22,6 +22,7 @@ import { OptionsExperimentalPage } from './OptionsExperimentalPage';
 import { OptionsSponsorBlockPage } from './OptionsSponsorBlockPage';
 import { OptionsDeArrowPage } from './OptionsDeArrowPage';
 import { OptionsAiListPage } from './OptionsAiListPage';
+import { OptionsUpdatePage } from './OptionsUpdatePage';
 import { OptionsNetworkPage } from './OptionsNetworkPage';
 // [DISABLED] P3：import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
 import { HelpGuidePage } from '../help/HelpGuidePage';
@@ -153,6 +154,7 @@ export struct OptionsSheetHost {
               onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
               onLogClick: () => { this.pushOptionsPath('log_page'); },
               onHelpClick: () => { this.pushOptionsPath('help_page'); },
+              onUpdateClick: () => { this.pushOptionsPath('update_page'); },
               onAboutClick: () => { this.pushOptionsPath('about_page'); }
             }
           })
@@ -356,6 +358,17 @@ export struct OptionsSheetHost {
       }) {
         LogPage({
           onBack: () => { this.popOptionsPath(); }
+        })
+      }
+    } else if (name === 'update_page') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_update_page_title'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+        OptionsUpdatePage({
+          params: {
+            updateUiConfig: this.params.updateUiConfig
+          }
         })
       }
     } else if (name === 'about_page') {

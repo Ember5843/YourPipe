@@ -4089,6 +4089,54 @@
         {
             "name": "yt_exp_ai_status_label",
             "value": "リストの状態"
+        },
+        {
+            "name": "yt_update_page_title",
+            "value": "アップデートを確認"
+        },
+        {
+            "name": "yt_update_enable",
+            "value": "GitHub の更新を確認"
+        },
+        {
+            "name": "yt_update_enable_desc",
+            "value": "オフにすると自動・手動の確認を行いません"
+        },
+        {
+            "name": "yt_update_on_startup",
+            "value": "起動時に確認"
+        },
+        {
+            "name": "yt_update_on_startup_desc",
+            "value": "通知なしで静かに実行します"
+        },
+        {
+            "name": "yt_update_last_check",
+            "value": "最後の確認"
+        },
+        {
+            "name": "yt_update_never_checked",
+            "value": "未確認"
+        },
+        {
+            "name": "yt_update_check_now",
+            "value": "今すぐ確認"
+        },
+        {
+            "name": "yt_update_rate_limited",
+            "value": "GitHub がリクエストを制限しています。しばらくしてから再試行してください"
+        },
+        {
+            "name": "yt_update_available",
+            "value": "新しいバージョンがあります"
+        },
+        {
+            "name": "yt_update_disabled_hint",
+            "value": "先に「GitHub の更新を確認」をオンにしてください"
+        },
+        {
+            "name": "yt_update_links",
+            "value": "リンク"
         }
     ]
 }
