@@ -331,14 +331,14 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   wired into clear-all-data so already-downloaded models are still cleaned.
   Details: `entry/AGENTS.md` §2 (player feature), `mediaservice/AGENTS.md`
   §3.
-- **Translation service**: Options → 翻译服务 selects the provider for
-  comment/description translation (and the disabled AI subtitle track path):
-  Google gtx, Google Cloud Translation (API key), MyMemory, Lingva,
-  LibreTranslate, DeepL, OpenAI-compatible LLM, and a fully custom
+- **Translation service**: Options → 语言与地区 → 翻译服务 selects the provider
+  for **comment/description translation**: Google gtx, Google Cloud
+  Translation, MyMemory, Lingva, LibreTranslate, DeepL, Microsoft Translator
+  (Azure), OpenAI-compatible LLM, and a fully custom
   URL/method/headers/body/response-path endpoint. Config lives in
   `LlmTranslateConfig` (`cfg_ai_translate_*`), routing in
   `TranslationService` (`entry/common/TranslationService.ets`); all requests
-  use the app proxy. Subtitle P0 `tlang` stays the default subtitle track.
+  use the app proxy. Subtitle translation is not part of this settings page.
 - **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, or build
   trees. `AGENTS.md` files are tracked project docs — keep them in sync
   with the code they describe, and never put machine-specific absolute

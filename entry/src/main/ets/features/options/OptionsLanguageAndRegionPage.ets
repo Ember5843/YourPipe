@@ -4,6 +4,7 @@ import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { OptionItem } from '../../common/components/OptionItem';
 import { UIConfig } from '../../common/AppState';
 import { LanguagePickerItem, buildExtendedLanguageItems } from '../../common/components/LanguagePickerDialog';
+import { getTranslationEngineDisplay, LlmTranslateConfig } from '../../common/LlmTranslateConfig';
 
 interface OptionsLanguageAndRegionPageParams {
   appLangItems: LanguagePickerItem[];
@@ -14,6 +15,7 @@ interface OptionsLanguageAndRegionPageParams {
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
   reloadHomeForSearchLocaleChange: () => void;
   applyLanguageSelection: (code: string) => void;
+  onTranslationServiceClick: () => void;
 }
 
 @Component
@@ -29,7 +31,8 @@ export struct OptionsLanguageAndRegionPage {
     clickEffectEnabled: null,
     updateUiConfig: () => {},
     reloadHomeForSearchLocaleChange: () => {},
-    applyLanguageSelection: () => {}
+    applyLanguageSelection: () => {},
+    onTranslationServiceClick: () => {}
   };
 
   private getItemDisplay(items: LanguagePickerItem[], code: string): string {
@@ -153,10 +156,22 @@ export struct OptionsLanguageAndRegionPage {
               }
             })
           }
+
+          ListItem() {
+            OptionItem({
+              title: $r('app.string.yt_option_translation_service'),
+              subtitle: getTranslationEngineDisplay(LlmTranslateConfig.get().engine),
+              showChevron: true,
+              clickEffectEnabled: this.params.clickEffectEnabled,
+              transparentBackground: true,
+              onClickAction: this.params.onTranslationServiceClick
+            })
+          }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
         .borderRadius(16)
         .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
       }
       .width('100%')
       .layoutWeight(1)

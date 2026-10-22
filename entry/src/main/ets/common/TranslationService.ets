@@ -56,6 +56,19 @@ interface GoogleRequest {
   format: string;
 }
 
+interface AzureInput {
+  Text: string;
+}
+
+interface AzureTranslation {
+  text?: string;
+  to?: string;
+}
+
+interface AzureResult {
+  translations?: AzureTranslation[];
+}
+
 interface MyMemoryData {
   translatedText?: string;
 }
@@ -67,10 +80,11 @@ interface MyMemoryResponse {
 }
 
 /**
- * 多接口翻译服务（评论 / 简介 / AI 字幕）。
+ * 多接口翻译服务（评论 / 简介）。
  *
  * 接口由 LlmTranslateConfig.engine 选择：
- * gtx / MyMemory / Lingva / LibreTranslate / DeepL / OpenAI 兼容 LLM / 自定义。
+ * gtx / Google Cloud / MyMemory / Lingva / LibreTranslate / DeepL / Azure /
+ * OpenAI 兼容 LLM / 自定义。
  * 所有请求都走 HttpDownloader 的代理注入；目标语言仍由内容翻译设置决定。
  * 缓存 key 包含接口与端点，切换接口不会误用旧译文。
  */
@@ -181,6 +195,8 @@ export class TranslationService {
         out = await TranslationService.translateLibreBatch(texts, target, cfg);
       } else if (cfg.engine === 'deepl') {
         out = await TranslationService.translateDeepLBatch(texts, target, cfg);
+      } else if (cfg.engine === 'azure') {
+        out = await TranslationService.translateAzureBatch(texts, target, cfg);
       } else {
         out = [];
         for (let i = 0; i < texts.length; i++) {
@@ -220,6 +236,7 @@ export class TranslationService {
       case 'lingva': return TranslationService.translateLingva(text, target, cfg);
       case 'libretranslate': return TranslationService.translateLibre(text, target, cfg);
       case 'deepl': return TranslationService.translateDeepL(text, target, cfg);
+      case 'azure': return TranslationService.translateAzure(text, target, cfg);
       case 'llm': return TranslationService.translateLlm(text, target, cfg);
       case 'custom': return TranslationService.translateCustom(text, target, cfg);
       case 'gtx':
@@ -461,6 +478,55 @@ export class TranslationService {
     return translations.map((item: DeepLTranslation): string => item.text || '');
   }
 
+  // ── Microsoft Translator（Azure） ──────────────────────────
+
+  private static async translateAzure(text: string, target: string, cfg: LlmTranslateConfig): Promise<string> {
+    const out = await TranslationService.translateAzureBatch([text], target, cfg);
+    return out[0];
+  }
+
+  private static async translateAzureBatch(
+    texts: string[],
+    target: string,
+    cfg: LlmTranslateConfig
+  ): Promise<string[]> {
+    const key = cfg.apiKey.trim();
+    if (key.length === 0) {
+      throw new Error('azure api key empty');
+    }
+    const base = TranslationService.endpointOf(cfg,
+      'https://api.cognitive.microsofttranslator.com').replace(/\/+$/, '');
+    const baseUrl = base.endsWith('/translate') ? base : `${base}/translate`;
+    const url = `${baseUrl}${baseUrl.indexOf('?') >= 0 ? '&' : '?'}api-version=3.0&to=`
+      + encodeURIComponent(TranslationService.toAzureCode(target));
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Ocp-Apim-Subscription-Key': key,
+      'User-Agent': 'YourPipe-Translation'
+    };
+    if (cfg.region.trim().length > 0) {
+      headers['Ocp-Apim-Subscription-Region'] = cfg.region.trim();
+    }
+    const body: AzureInput[] = texts.map((t: string): AzureInput => {
+      return { Text: t } as AzureInput;
+    });
+    const response = await TranslationService.request(url, http.RequestMethod.POST,
+      headers, JSON.stringify(body), 30000);
+    TranslationService.ensureOk(response, 'azure');
+    const json = TranslationService.asJsonArray(response.result);
+    if (json.length !== texts.length) {
+      throw new Error('azure response mismatch');
+    }
+    return json.map((item: Object): string => {
+      const result = item as AzureResult;
+      const translated = result.translations?.[0]?.text;
+      if (!translated) {
+        throw new Error('empty azure translation');
+      }
+      return translated;
+    });
+  }
+
   // ── LLM（OpenAI 兼容） ──────────────────────────────────────
 
   private static async translateLlm(text: string, target: string, cfg: LlmTranslateConfig): Promise<string> {
@@ -628,6 +694,10 @@ export class TranslationService {
     return JSON.parse(TranslationService.asText(body)) as Record<string, Object>;
   }
 
+  private static asJsonArray(body: string | Object | ArrayBuffer): Array<Object> {
+    return JSON.parse(TranslationService.asText(body)) as Array<Object>;
+  }
+
   private static chunkText(text: string, maxLen: number): string[] {
     const chunks: string[] = [];
     let rest = text;
@@ -702,6 +772,16 @@ export class TranslationService {
       return 'PT-BR';
     }
     return target.toUpperCase();
+  }
+
+  private static toAzureCode(target: string): string {
+    if (target === 'zh-CN') {
+      return 'zh-Hans';
+    }
+    if (target === 'zh-HK' || target === 'zh-TW') {
+      return 'zh-Hant';
+    }
+    return target.split('-')[0].toLowerCase();
   }
 
   private static keyOf(text: string): string {

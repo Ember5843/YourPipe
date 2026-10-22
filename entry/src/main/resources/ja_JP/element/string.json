@@ -3793,6 +3793,14 @@
         {
             "name": "yt_translation_engine_google",
             "value": "Google Cloud Translation（API キー）"
+        },
+        {
+            "name": "yt_translation_engine_azure",
+            "value": "Microsoft Translator（Azure）"
+        },
+        {
+            "name": "yt_translation_region",
+            "value": "リージョン"
         }
     ]
 }

@@ -8,6 +8,7 @@ export const TRANSLATION_ENGINES: string[] = [
   'lingva',
   'libretranslate',
   'deepl',
+  'azure',
   'llm',
   'custom'
 ];
@@ -19,6 +20,7 @@ export function getTranslationEngineDisplay(engine: string): Resource {
     case 'lingva': return $r('app.string.yt_translation_engine_lingva');
     case 'libretranslate': return $r('app.string.yt_translation_engine_libre');
     case 'deepl': return $r('app.string.yt_translation_engine_deepl');
+    case 'azure': return $r('app.string.yt_translation_engine_azure');
     case 'llm': return $r('app.string.yt_ai_translate_engine_llm');
     case 'custom': return $r('app.string.yt_translation_engine_custom');
     case 'gtx':
@@ -27,10 +29,11 @@ export function getTranslationEngineDisplay(engine: string): Resource {
 }
 
 /**
- * 翻译服务配置（评论 / 简介 / AI 字幕共用）。
+ * 翻译服务配置（评论 / 简介共用）。
  *
  * - gtx / mymemory / lingva：免 key 的公共端点；
- * - libretranslate / deepl：自填实例地址或 API key；
+ * - google / deepl / azure：官方接口，需 API Key（Azure 还需 Region）；
+ * - libretranslate：自填官方/自建实例地址；
  * - llm：OpenAI 兼容 /v1/chat/completions；
  * - custom：URL / 方法 / 请求头 / 请求体 / 响应路径全部由用户模板决定。
  *
@@ -38,12 +41,14 @@ export function getTranslationEngineDisplay(engine: string): Resource {
  */
 export class LlmTranslateConfig {
   engine: string = 'gtx';
-  /** 非 LLM 接口的地址（LibreTranslate / Lingva / DeepL；空 = 使用默认实例）。 */
+  /** 非 LLM 接口的地址（LibreTranslate / Lingva / DeepL / Azure；空 = 默认）。 */
   endpoint: string = '';
   /** LLM 的 OpenAI 兼容 Base URL。 */
   baseUrl: string = 'https://api.deepseek.com';
   model: string = 'deepseek-chat';
   apiKey: string = '';
+  /** Microsoft Translator 区域（例如 eastasia / global）；其他接口忽略。 */
+  region: string = '';
   bilingual: boolean = true;
   /** 自定义接口。 */
   customUrl: string = '';
@@ -69,6 +74,7 @@ export class LlmTranslateConfig {
       case 'lingva': return 'https://lingva.ml';
       case 'libretranslate': return 'https://libretranslate.com';
       case 'deepl': return 'https://api-free.deepl.com';
+      case 'azure': return 'https://api.cognitive.microsofttranslator.com';
       case 'llm': return 'https://api.deepseek.com';
       default: return '';
     }
@@ -82,6 +88,7 @@ export class LlmTranslateConfig {
     cfg.baseUrl = PreferencesStore.getString('cfg_ai_translate_base_url', 'https://api.deepseek.com');
     cfg.model = PreferencesStore.getString('cfg_ai_translate_model', 'deepseek-chat');
     cfg.apiKey = PreferencesStore.getString('cfg_ai_translate_api_key', '');
+    cfg.region = PreferencesStore.getString('cfg_ai_translate_region', '');
     cfg.bilingual = PreferencesStore.getString('cfg_ai_translate_bilingual', 'true') === 'true';
     cfg.customUrl = PreferencesStore.getString('cfg_ai_translate_custom_url', '');
     cfg.customMethod = PreferencesStore.getString('cfg_ai_translate_custom_method', 'POST') === 'GET'

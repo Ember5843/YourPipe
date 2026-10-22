@@ -17,12 +17,11 @@ export interface OptionsTranslationPageParams {
 }
 
 /**
- * 翻译服务设置：评论 / 简介 / AI 字幕共用的接口选择与配置。
+ * 翻译服务设置：评论与简介翻译的接口选择与配置。
  *
  * 免 key：Google gtx、MyMemory、Lingva；
- * 需配置：LibreTranslate（地址 / 可选 key）、DeepL（key）、OpenAI 兼容 LLM、自定义接口。
- * 字幕的 P0 自动翻译轨仍由 YouTube tlang 提供，这里的配置用于评论/简介与
- * AI 字幕整轨翻译。
+ * 需配置：Google Cloud / DeepL / Microsoft Translator（key，Azure 另需 region）、
+ * LibreTranslate（地址 / 可选 key）、OpenAI 兼容 LLM、自定义接口。
  */
 @Component
 export struct OptionsTranslationPage {
@@ -34,13 +33,15 @@ export struct OptionsTranslationPage {
   @State private baseUrl: string = 'https://api.deepseek.com';
   @State private model: string = 'deepseek-chat';
   @State private apiKey: string = '';
+  @State private region: string = '';
   @State private customUrl: string = '';
   @State private customMethod: string = 'POST';
   @State private customHeaders: string = '{"Content-Type": "application/json"}';
   @State private customBody: string = '{"text":"{text}","target_lang":"{target}"}';
   @State private customResponsePath: string = 'translatedText';
   @State private testing: boolean = false;
-  @State private testMessage: ResourceStr = '';
+  private testTimer: number = -1;
+  private testGeneration: number = 0;
 
   aboutToAppear(): void {
     const cfg = LlmTranslateConfig.get();
@@ -49,6 +50,7 @@ export struct OptionsTranslationPage {
     this.baseUrl = cfg.baseUrl;
     this.model = cfg.model;
     this.apiKey = cfg.apiKey;
+    this.region = cfg.region;
     this.customUrl = cfg.customUrl;
     this.customMethod = cfg.customMethod;
     this.customHeaders = cfg.customHeaders;
@@ -57,6 +59,11 @@ export struct OptionsTranslationPage {
   }
 
   aboutToDisappear(): void {
+    this.testGeneration++;
+    if (this.testTimer >= 0) {
+      clearTimeout(this.testTimer);
+      this.testTimer = -1;
+    }
     this.persist();
   }
 
@@ -67,6 +74,7 @@ export struct OptionsTranslationPage {
     next.baseUrl = this.baseUrl.trim();
     next.model = this.model.trim();
     next.apiKey = this.apiKey.trim();
+    next.region = this.region.trim();
     next.customUrl = this.customUrl.trim();
     next.customMethod = this.customMethod === 'GET' ? 'GET' : 'POST';
     next.customHeaders = this.customHeaders;
@@ -95,19 +103,68 @@ export struct OptionsTranslationPage {
     return LlmTranslateConfig.defaultEndpoint(this.engine);
   }
 
+  private toast(message: string): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message, duration: 2200 });
+    } catch (e) {
+      logger.warn(`show toast failed: ${(e as Error).message || e}`);
+    }
+  }
+
   private runTest(): void {
-    this.persist();
+    if (this.testing) {
+      return;
+    }
+    try {
+      this.persist();
+    } catch (e) {
+      logger.warn(`translation persist failed: ${(e as Error).message || e}`);
+      this.toast(getContext().resourceManager.getStringSync(
+        $r('app.string.yt_ai_translate_test_fail').id));
+      return;
+    }
     this.testing = true;
-    this.testMessage = '';
+    const generation = ++this.testGeneration;
+    this.toast(getContext().resourceManager.getStringSync(
+      $r('app.string.yt_ai_translate_testing').id));
+    if (this.testTimer >= 0) {
+      clearTimeout(this.testTimer);
+    }
+    // 网络请求本身有 10–30s 超时；这里再加一道总超时，按钮不会永久卡在“测试中”。
+    this.testTimer = setTimeout(() => {
+      if (generation !== this.testGeneration) {
+        return;
+      }
+      this.testGeneration++;
+      this.testing = false;
+      this.toast(getContext().resourceManager.getStringSync(
+        $r('app.string.yt_ai_translate_test_fail').id));
+      logger.warn(`translation test timeout engine=${this.engine}`);
+    }, 40000);
     TranslationService.testProvider()
       .then(() => {
-        this.testMessage = $r('app.string.yt_ai_translate_test_ok');
+        if (generation !== this.testGeneration) {
+          return;
+        }
+        this.toast(getContext().resourceManager.getStringSync(
+          $r('app.string.yt_ai_translate_test_ok').id));
       })
       .catch((e: Error) => {
+        if (generation !== this.testGeneration) {
+          return;
+        }
         logger.warn(`translation test failed engine=${this.engine}: ${e.message || e}`);
-        this.testMessage = $r('app.string.yt_ai_translate_test_fail');
+        this.toast(getContext().resourceManager.getStringSync(
+          $r('app.string.yt_ai_translate_test_fail').id));
       })
       .finally(() => {
+        if (generation !== this.testGeneration) {
+          return;
+        }
+        if (this.testTimer >= 0) {
+          clearTimeout(this.testTimer);
+          this.testTimer = -1;
+        }
         this.testing = false;
       });
   }
@@ -176,7 +233,6 @@ export struct OptionsTranslationPage {
               transparentBackground: true,
               onChange: (index: number) => {
                 this.engine = TRANSLATION_ENGINES[index];
-                this.testMessage = '';
                 this.persist();
               }
             })
@@ -187,7 +243,7 @@ export struct OptionsTranslationPage {
         .clip(true)
 
         if (this.engine === 'libretranslate' || this.engine === 'lingva' || this.engine === 'deepl'
-          || this.engine === 'google') {
+          || this.engine === 'google' || this.engine === 'azure') {
           ListItem() {
             PlaybackSectionTitle({ title: $r('app.string.yt_translation_endpoint') })
           }
@@ -198,10 +254,17 @@ export struct OptionsTranslationPage {
               this.FieldRow($r('app.string.yt_translation_endpoint'), this.endpoint,
                 this.endpointPlaceholder(), false, (value: string) => { this.endpoint = value; })
             }
-            if (this.engine === 'libretranslate' || this.engine === 'deepl' || this.engine === 'google') {
+            if (this.engine === 'libretranslate' || this.engine === 'deepl' || this.engine === 'google'
+              || this.engine === 'azure') {
               ListItem() {
                 this.FieldRow($r('app.string.yt_ai_translate_api_key'), this.apiKey, '', true,
                   (value: string) => { this.apiKey = value; })
+              }
+            }
+            if (this.engine === 'azure') {
+              ListItem() {
+                this.FieldRow($r('app.string.yt_translation_region'), this.region, 'eastasia',
+                  false, (value: string) => { this.region = value; })
               }
             }
           }
@@ -276,22 +339,6 @@ export struct OptionsTranslationPage {
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
           .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
-
-          ListItem() {
-            Text($r('app.string.yt_translation_custom_hint'))
-              .fontSize(12)
-              .fontColor($r('app.color.yourtube_text_hint'))
-              .width('100%')
-              .padding({ left: 4, right: 4 })
-          }
-        }
-
-        ListItem() {
-          Text($r('app.string.yt_translation_note'))
-            .fontSize(12)
-            .fontColor($r('app.color.yourtube_text_hint'))
-            .width('100%')
-            .padding({ left: 4, right: 4, top: 8 })
         }
 
         ListItem() {
@@ -306,16 +353,6 @@ export struct OptionsTranslationPage {
             .onClick(() => { this.runTest(); })
         }
         .padding({ top: 8 })
-
-        if (typeof this.testMessage === 'string' && this.testMessage.length > 0) {
-          ListItem() {
-            Text(this.testMessage)
-              .fontSize(13)
-              .fontColor($r('app.color.yourtube_text_quaternary'))
-              .width('100%')
-              .padding({ left: 4, right: 4 })
-          }
-        }
       }
       .width('100%')
       .height('100%')

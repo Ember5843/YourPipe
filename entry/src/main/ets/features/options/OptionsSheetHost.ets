@@ -139,7 +139,6 @@ export struct OptionsSheetHost {
               onPlaybackClick: () => { this.pushOptionsPath('playback'); },
               onGestureControlClick: () => { this.pushOptionsPath('gesture_control'); },
               onSubtitleClick: () => { this.pushOptionsPath('subtitle'); },
-              onTranslationServiceClick: () => { this.pushOptionsPath('translation_service'); },
               onPerformanceClick: () => { this.pushOptionsPath('performance'); },
               onNetworkClick: () => { this.pushOptionsPath('network'); },
               // [DISABLED] P3：onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
@@ -212,7 +211,8 @@ export struct OptionsSheetHost {
               clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
               updateUiConfig: this.params.updateUiConfig,
               reloadHomeForSearchLocaleChange: this.params.reloadHomeForSearchLocaleChange,
-              applyLanguageSelection: this.params.applyLanguageSelection
+              applyLanguageSelection: this.params.applyLanguageSelection,
+              onTranslationServiceClick: () => { this.pushOptionsPath('translation_service'); }
             }
           })
       }
