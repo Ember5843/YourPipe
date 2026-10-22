@@ -4009,6 +4009,86 @@
         {
             "name": "yt_exp_da_footer",
             "value": "タイトルは DeArrow コミュニティの投稿によるもので、動画と完全には一致しない場合があります。"
+        },
+        {
+            "name": "yt_exp_da_thumbs",
+            "value": "サムネイルを置き換える"
+        },
+        {
+            "name": "yt_exp_da_thumbs_desc",
+            "value": "動画のフレームを使用するため、読み込みが遅くなります"
+        },
+        {
+            "name": "yt_exp_ai_mode",
+            "value": "扱い"
+        },
+        {
+            "name": "yt_exp_ai_mode_mark",
+            "value": "マークのみ"
+        },
+        {
+            "name": "yt_exp_ai_mode_hide",
+            "value": "完全に非表示"
+        },
+        {
+            "name": "yt_exp_ai_warnlist",
+            "value": "中確度リストを含める"
+        },
+        {
+            "name": "yt_exp_ai_sync",
+            "value": "自動更新"
+        },
+        {
+            "name": "yt_exp_ai_sync_daily",
+            "value": "毎日"
+        },
+        {
+            "name": "yt_exp_ai_sync_weekly",
+            "value": "毎週"
+        },
+        {
+            "name": "yt_exp_ai_sync_manual",
+            "value": "手動のみ"
+        },
+        {
+            "name": "yt_exp_ai_sync_now",
+            "value": "今すぐ更新"
+        },
+        {
+            "name": "yt_exp_ai_status",
+            "value": "最終同期：%s · %d 件"
+        },
+        {
+            "name": "yt_exp_ai_never",
+            "value": "未同期"
+        },
+        {
+            "name": "yt_exp_ai_license",
+            "value": "データ提供：AiSList（CC BY-NC 4.0）"
+        },
+        {
+            "name": "yt_exp_ai_badge",
+            "value": "AI"
+        },
+        {
+            "name": "yt_exp_ai_notice",
+            "value": "このチャンネルは AI 生成コンテンツとしてマークされています"
+        },
+        {
+            "name": "yt_exp_ai_syncing",
+            "value": "同期中…"
+        },
+        {
+            "name": "yt_exp_ai_sync_failed",
+            "value": "同期に失敗しました"
+        },
+        {
+            "name": "yt_exp_ai_empty",
+            "value": "リストが空です。先に更新してください"
+        },
+        {
+            "name": "yt_exp_ai_status_label",
+            "value": "リストの状態"
         }
     ]
 }

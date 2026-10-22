@@ -108,6 +108,19 @@ export struct OptionsDeArrowPage {
               }
             })
             Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
+            PlaybackToggleRow({
+              title: $r('app.string.yt_exp_da_thumbs'),
+              subtitle: $r('app.string.yt_exp_da_thumbs_desc'),
+              isOn: this.cfg.deArrowThumbnails,
+              themeColor: this.themePrimary,
+              transparentBackground: true,
+              onChange: (value: boolean) => {
+                this.params.updateConfig((cfg: ExperimentalConfig) => {
+                  cfg.deArrowThumbnails = value;
+                });
+              }
+            })
+            Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
             PlaybackSelectRow({
               title: $r('app.string.yt_exp_da_limit'),
               options: this.limitOptions(),

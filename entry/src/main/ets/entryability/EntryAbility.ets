@@ -4,6 +4,7 @@ import { window } from '@kit.ArkUI';
 import { i18n } from '@kit.LocalizationKit';
 import { PreferencesStore } from '../common/PreferencesStore';
 import { AppState, UIConfig, YourtubeDarkMode } from '../common/AppState';
+import { AiListStore } from '../common/experimental/AiListStore';
 import { PlaybackConfig } from '../common/PlaybackConfig';
 import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
@@ -43,6 +44,7 @@ export default class EntryAbility extends UIAbility {
 
       PreferencesStore.init(this.context);
       AppState.init();
+      AiListStore.getInstance().init(this.context);
       // 把 UIAbilityContext 读取注入 mediaservice（惰性 getter），
       // 避免 AvSessionManager / 后台长时任务直接 AppStorage.get('context')。
       ContextProvider.setProvider(() => this.context);

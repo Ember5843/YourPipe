@@ -4,9 +4,17 @@ import { CommunityHttp, CommunityHttpResult } from './CommunityHttp';
 const logger = AppLog.getInstance('DeArrowClient');
 
 const BRANDING_URL: string = 'https://sponsor.ajay.app/api/branding';
+const THUMBNAIL_URL: string = 'https://dearrow-thumb.ajay.app/api/v1/getThumbnail';
 const CACHE_TTL_MS: number = 24 * 60 * 60 * 1000;
 const EMPTY_CACHE_TTL_MS: number = 60 * 60 * 1000;
 const CACHE_LIMIT: number = 500;
+
+export interface DeArrowBranding {
+  /** 可替换的众包标题；空串表示不替换。 */
+  title: string;
+  /** 可替换的缩略图时间点（秒）；< 0 表示不替换。 */
+  thumbnailTime: number;
+}
 
 interface DeArrowTitleApiItem {
   title?: string;
@@ -15,23 +23,33 @@ interface DeArrowTitleApiItem {
   locked?: boolean;
 }
 
-interface DeArrowBrandingApi {
-  titles?: DeArrowTitleApiItem[];
-  randomTime?: number;
-  videoDuration?: number;
+interface DeArrowThumbnailApiItem {
+  timestamp?: number;
+  original?: boolean;
+  votes?: number;
+  locked?: boolean;
 }
 
-interface TitleCacheEntry {
-  title: string;
+interface DeArrowBrandingApi {
+  titles?: DeArrowTitleApiItem[];
+  thumbnails?: DeArrowThumbnailApiItem[];
+}
+
+interface BrandingCacheEntry {
+  branding: DeArrowBranding;
   fetchedAt: number;
 }
 
-/** DeArrow 只读客户端：众包标题（缩略图留到后续阶段）。 */
+function emptyBranding(): DeArrowBranding {
+  return { title: '', thumbnailTime: -1 };
+}
+
+/** DeArrow 只读客户端：众包标题 + 缩略图时间点。 */
 export class DeArrowClient {
   private static instance: DeArrowClient | null = null;
 
-  private cache: Map<string, TitleCacheEntry> = new Map();
-  private inflight: Map<string, Promise<string>> = new Map();
+  private cache: Map<string, BrandingCacheEntry> = new Map();
+  private inflight: Map<string, Promise<DeArrowBranding>> = new Map();
 
   static getInstance(): DeArrowClient {
     if (!DeArrowClient.instance) {
@@ -40,11 +58,10 @@ export class DeArrowClient {
     return DeArrowClient.instance;
   }
 
-  /** 返回可替换的标题；无提交/全部原题/负票时返回空串。 */
-  async getTitle(videoId: string): Promise<string> {
+  async getBranding(videoId: string): Promise<DeArrowBranding> {
     const id = (videoId || '').trim();
     if (id.length === 0) {
-      return '';
+      return emptyBranding();
     }
     const cached = this.readCache(id);
     if (cached !== null) {
@@ -54,7 +71,7 @@ export class DeArrowClient {
     if (pending) {
       return pending;
     }
-    const task = this.fetchTitle(id);
+    const task = this.fetchBranding(id);
     this.inflight.set(id, task);
     try {
       return await task;
@@ -63,42 +80,55 @@ export class DeArrowClient {
     }
   }
 
+  /** 缩略图生成服务 URL；只在有众包提交时间点时调用。 */
+  static thumbnailUrl(videoId: string, timestamp: number): string {
+    return `${THUMBNAIL_URL}?videoID=${encodeURIComponent(videoId)}`
+      + `&time=${encodeURIComponent(timestamp.toFixed(3))}`;
+  }
+
   clearCache(): void {
     this.cache.clear();
   }
 
-  private async fetchTitle(videoId: string): Promise<string> {
+  private async fetchBranding(videoId: string): Promise<DeArrowBranding> {
     const url = `${BRANDING_URL}?videoID=${encodeURIComponent(videoId)}&fetchAll=true`;
     const startedAt = Date.now();
     let result: CommunityHttpResult;
     try {
       result = await CommunityHttp.getText(url, 8000);
     } catch (e) {
-      logger.warn(`title fetch failed video=${videoId} error=${(e as Error).message}`);
+      logger.warn(`branding fetch failed video=${videoId} error=${(e as Error).message}`);
       throw e as Error;
     }
 
-    let title = '';
+    let branding = emptyBranding();
     if (result.status === 200 && result.body.length > 0) {
-      title = DeArrowClient.pickTitle(result.body);
+      branding = DeArrowClient.parse(result.body);
     } else if (result.status !== 404 && result.status !== 204) {
-      logger.warn(`title unexpected status video=${videoId} status=${result.status}`);
+      logger.warn(`branding unexpected status video=${videoId} status=${result.status}`);
     }
 
-    this.writeCache(videoId, title);
-    logger.info(`title video=${videoId} replaced=${title.length > 0} `
-      + `status=${result.status} elapsed=${Date.now() - startedAt}ms`);
-    return title;
+    this.writeCache(videoId, branding);
+    logger.info(`branding video=${videoId} title=${branding.title.length > 0} `
+      + `thumb=${branding.thumbnailTime >= 0} status=${result.status} `
+      + `elapsed=${Date.now() - startedAt}ms`);
+    return branding;
   }
 
-  private static pickTitle(body: string): string {
-    let branding: DeArrowBrandingApi;
+  private static parse(body: string): DeArrowBranding {
+    let api: DeArrowBrandingApi;
     try {
-      branding = JSON.parse(body) as DeArrowBrandingApi;
+      api = JSON.parse(body) as DeArrowBrandingApi;
     } catch (e) {
-      return '';
+      return emptyBranding();
     }
-    const titles = branding.titles;
+    return {
+      title: DeArrowClient.pickTitle(api.titles),
+      thumbnailTime: DeArrowClient.pickThumbnailTime(api.thumbnails)
+    };
+  }
+
+  private static pickTitle(titles: DeArrowTitleApiItem[] | undefined): string {
     if (!Array.isArray(titles)) {
       return '';
     }
@@ -108,7 +138,6 @@ export class DeArrowClient {
       }
       const locked = item.locked === true;
       const votes = typeof item.votes === 'number' ? item.votes : 0;
-      // 负票且未锁定的标题不采用；锁定标题即使 0 票也采用。
       if (!locked && votes < 0) {
         continue;
       }
@@ -120,31 +149,53 @@ export class DeArrowClient {
     return '';
   }
 
+  private static pickThumbnailTime(thumbnails: DeArrowThumbnailApiItem[] | undefined): number {
+    if (!Array.isArray(thumbnails)) {
+      return -1;
+    }
+    for (const item of thumbnails) {
+      if (!item || item.original === true) {
+        continue;
+      }
+      const locked = item.locked === true;
+      const votes = typeof item.votes === 'number' ? item.votes : 0;
+      if (!locked && votes < 0) {
+        continue;
+      }
+      const timestamp = item.timestamp;
+      if (typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0) {
+        return timestamp;
+      }
+    }
+    return -1;
+  }
+
   /** DeArrow 用 '>' 标记「不要自动改变大小写」的词，展示前去掉。 */
   private static cleanTitle(raw: string): string {
     return raw.replace(/>/g, '').trim();
   }
 
-  private readCache(videoId: string): string | null {
+  private readCache(videoId: string): DeArrowBranding | null {
     const entry = this.cache.get(videoId);
     if (!entry) {
       return null;
     }
-    const ttl = entry.title.length > 0 ? CACHE_TTL_MS : EMPTY_CACHE_TTL_MS;
+    const hasData = entry.branding.title.length > 0 || entry.branding.thumbnailTime >= 0;
+    const ttl = hasData ? CACHE_TTL_MS : EMPTY_CACHE_TTL_MS;
     if (Date.now() - entry.fetchedAt > ttl) {
       this.cache.delete(videoId);
       return null;
     }
-    return entry.title;
+    return entry.branding;
   }
 
-  private writeCache(videoId: string, title: string): void {
+  private writeCache(videoId: string, branding: DeArrowBranding): void {
     if (this.cache.size >= CACHE_LIMIT) {
       const oldest = this.cache.keys().next();
       if (!oldest.done) {
         this.cache.delete(oldest.value);
       }
     }
-    this.cache.set(videoId, { title: title, fetchedAt: Date.now() });
+    this.cache.set(videoId, { branding: branding, fetchedAt: Date.now() });
   }
 }

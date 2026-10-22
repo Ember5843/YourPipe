@@ -4009,6 +4009,86 @@
         {
             "name": "yt_exp_da_footer",
             "value": "تأتي العناوين من مساهمات مجتمع DeArrow وقد لا تطابق الفيديو تمامًا."
+        },
+        {
+            "name": "yt_exp_da_thumbs",
+            "value": "استبدال الصور المصغرة"
+        },
+        {
+            "name": "yt_exp_da_thumbs_desc",
+            "value": "يستخدم لقطات من الفيديو؛ التحميل أبطأ"
+        },
+        {
+            "name": "yt_exp_ai_mode",
+            "value": "المعالجة"
+        },
+        {
+            "name": "yt_exp_ai_mode_mark",
+            "value": "تعليم فقط"
+        },
+        {
+            "name": "yt_exp_ai_mode_hide",
+            "value": "إخفاء بالكامل"
+        },
+        {
+            "name": "yt_exp_ai_warnlist",
+            "value": "تضمين قائمة الثقة المتوسطة"
+        },
+        {
+            "name": "yt_exp_ai_sync",
+            "value": "تحديث تلقائي"
+        },
+        {
+            "name": "yt_exp_ai_sync_daily",
+            "value": "يوميًا"
+        },
+        {
+            "name": "yt_exp_ai_sync_weekly",
+            "value": "أسبوعيًا"
+        },
+        {
+            "name": "yt_exp_ai_sync_manual",
+            "value": "يدوي فقط"
+        },
+        {
+            "name": "yt_exp_ai_sync_now",
+            "value": "تحديث الآن"
+        },
+        {
+            "name": "yt_exp_ai_status",
+            "value": "آخر مزامنة: %s · %d إدخالاً"
+        },
+        {
+            "name": "yt_exp_ai_never",
+            "value": "لم تتم المزامنة بعد"
+        },
+        {
+            "name": "yt_exp_ai_license",
+            "value": "المصدر: AiSList (CC BY-NC 4.0)"
+        },
+        {
+            "name": "yt_exp_ai_badge",
+            "value": "AI"
+        },
+        {
+            "name": "yt_exp_ai_notice",
+            "value": "هذه القناة موسومة بمحتوى مولّد بالذكاء الاصطناعي"
+        },
+        {
+            "name": "yt_exp_ai_syncing",
+            "value": "جارٍ المزامنة…"
+        },
+        {
+            "name": "yt_exp_ai_sync_failed",
+            "value": "فشلت المزامنة"
+        },
+        {
+            "name": "yt_exp_ai_empty",
+            "value": "القائمة فارغة، حدّثها أولاً"
+        },
+        {
+            "name": "yt_exp_ai_status_label",
+            "value": "حالة القائمة"
         }
     ]
 }

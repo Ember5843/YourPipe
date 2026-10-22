@@ -4009,6 +4009,86 @@
         {
             "name": "yt_exp_da_footer",
             "value": "제목은 DeArrow 커뮤니티 제출에서 가져오며 동영상과 정확히 일치하지 않을 수 있습니다."
+        },
+        {
+            "name": "yt_exp_da_thumbs",
+            "value": "썸네일 바꾸기"
+        },
+        {
+            "name": "yt_exp_da_thumbs_desc",
+            "value": "동영상 프레임을 사용하므로 로딩이 느립니다"
+        },
+        {
+            "name": "yt_exp_ai_mode",
+            "value": "처리 방식"
+        },
+        {
+            "name": "yt_exp_ai_mode_mark",
+            "value": "표시만"
+        },
+        {
+            "name": "yt_exp_ai_mode_hide",
+            "value": "완전히 숨기기"
+        },
+        {
+            "name": "yt_exp_ai_warnlist",
+            "value": "중간 신뢰도 목록 포함"
+        },
+        {
+            "name": "yt_exp_ai_sync",
+            "value": "자동 업데이트"
+        },
+        {
+            "name": "yt_exp_ai_sync_daily",
+            "value": "매일"
+        },
+        {
+            "name": "yt_exp_ai_sync_weekly",
+            "value": "매주"
+        },
+        {
+            "name": "yt_exp_ai_sync_manual",
+            "value": "수동만"
+        },
+        {
+            "name": "yt_exp_ai_sync_now",
+            "value": "지금 업데이트"
+        },
+        {
+            "name": "yt_exp_ai_status",
+            "value": "마지막 동기화: %s · %d개"
+        },
+        {
+            "name": "yt_exp_ai_never",
+            "value": "아직 동기화되지 않음"
+        },
+        {
+            "name": "yt_exp_ai_license",
+            "value": "데이터 출처: AiSList (CC BY-NC 4.0)"
+        },
+        {
+            "name": "yt_exp_ai_badge",
+            "value": "AI"
+        },
+        {
+            "name": "yt_exp_ai_notice",
+            "value": "이 채널은 AI 생성 콘텐츠로 표시되어 있습니다"
+        },
+        {
+            "name": "yt_exp_ai_syncing",
+            "value": "동기화 중…"
+        },
+        {
+            "name": "yt_exp_ai_sync_failed",
+            "value": "동기화 실패"
+        },
+        {
+            "name": "yt_exp_ai_empty",
+            "value": "목록이 비어 있습니다. 먼저 업데이트하세요"
+        },
+        {
+            "name": "yt_exp_ai_status_label",
+            "value": "목록 상태"
         }
     ]
 }

@@ -5,8 +5,9 @@ import { FeedDataSource, FeedItemKeyOf } from '../model/FeedDataSource';
 import { BasicPrefetcher, IPrefetcher } from '@kit.ArkUI';
 import { defaultFeedThumbUrl, FeedThumbUrlOf } from '../model/ThumbPrefetcher';
 import { SearchStreamItem, VideoItem } from 'youtube_core';
-import { ExperimentalConfig } from '../experimental/ExperimentalConfig';
-import { DeArrowClient } from '../experimental/DeArrowClient';
+import { ExperimentalConfig, EXP_AILIST_MODE_HIDE } from '../experimental/ExperimentalConfig';
+import { DeArrowClient, DeArrowBranding } from '../experimental/DeArrowClient';
+import { AiListStore } from '../experimental/AiListStore';
 
 /** 卡片 builder 的单参数（§3 对象字面量范式：by-reference 刷新） */
 export interface MediaFeedItemSlot {
@@ -69,6 +70,7 @@ export interface MediaVideoFeedParams {
 export struct MediaVideoFeed {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageProp('aiListVersion') @Watch('onAiListVersionChanged') aiListVersion: number = 0;
 
   // ── 身份稳定成员（创建时赋值一次）──
   dataSource: FeedDataSource = new FeedDataSource();
@@ -132,6 +134,7 @@ export struct MediaVideoFeed {
   private enrichApplied: number = 0;
   private enrichScheduled: boolean = false;
   private enrichDisposed: boolean = false;
+  private aiFlagsScheduled: boolean = false;
   private feedListener: DataChangeListener = {
     onDataReloaded: () => {
       this.armEntryAnim();
@@ -169,10 +172,12 @@ export struct MediaVideoFeed {
   aboutToAppear(): void {
     this.dataSource.registerDataChangeListener(this.feedListener);
     this.dataSource.thumbUrlOf = this.itemThumbUrl ?? defaultFeedThumbUrl;
+    this.dataSource.itemFilter = (item: Object): boolean => this.feedItemAllowed(item);
     this.prefetcher = new BasicPrefetcher(this.dataSource);
     // 挂载时数据源可能已有数据（如订阅 tab 缓存），补一次门控布防
     this.armEntryAnim();
     this.scheduleEnrich(0, 9);
+    this.scheduleAiFlags();
   }
 
   aboutToDisappear(): void {
@@ -242,6 +247,7 @@ export struct MediaVideoFeed {
       this.dataVersion += 1;
     }
     this.scheduleEnrich(0, 9);
+    this.scheduleAiFlags();
   }
 
   // ── DeArrow 标题回填 ──────────────────────────────────────────────────────
@@ -324,10 +330,10 @@ export struct MediaVideoFeed {
         this.enrichInflight = Math.max(0, this.enrichInflight - 1);
         this.pumpEnrich();
       };
-      DeArrowClient.getInstance().getTitle(id)
-        .then((title: string) => {
-          if (generation === this.enrichGeneration && title.length > 0) {
-            this.applyTitle(id, title);
+      DeArrowClient.getInstance().getBranding(id)
+        .then((branding: DeArrowBranding) => {
+          if (generation === this.enrichGeneration) {
+            this.applyBranding(id, branding);
           }
           done();
         })
@@ -337,15 +343,33 @@ export struct MediaVideoFeed {
     }
   }
 
-  private applyTitle(videoId: string, title: string): void {
+  private applyBranding(videoId: string, branding: DeArrowBranding): void {
+    const cfg = this.deArrowConfig();
+    if (!cfg) {
+      return;
+    }
     const list: Object[] = this.dataSource.getDataList();
     for (let i = 0; i < list.length; i++) {
       const video = this.videoItemOf(list[i]);
       if (!video || video.videoId !== videoId) {
         continue;
       }
-      if (video.title !== title) {
-        video.title = title;
+      let changed = false;
+      if (cfg.deArrowTitles && branding.title.length > 0 && video.title !== branding.title) {
+        video.title = branding.title;
+        changed = true;
+      }
+      if (cfg.deArrowThumbnails && branding.thumbnailTime >= 0) {
+        const url = DeArrowClient.thumbnailUrl(videoId, branding.thumbnailTime);
+        if (video.thumbnailUrl !== url) {
+          if (video.originalThumbnailUrl.length === 0) {
+            video.originalThumbnailUrl = video.thumbnailUrl;
+          }
+          video.thumbnailUrl = url;
+          changed = true;
+        }
+      }
+      if (changed) {
         this.dataSource.notifyDataChange(i);
       }
       this.enrichApplied += 1;
@@ -365,6 +389,61 @@ export struct MediaVideoFeed {
       return (item as SearchStreamItem).video;
     }
     return null;
+  }
+
+  // ── AiSList：标记角标 / 隐藏过滤 ──────────────────────────────────────────
+
+  /** 隐藏模式：在数据源层剔除高置信频道；warn 与未命中保留。 */
+  private feedItemAllowed(item: Object): boolean {
+    const cfg = AppStorage.get<ExperimentalConfig>('experimentalConfig');
+    if (!cfg || !cfg.aiListEnabled || cfg.aiListMode !== EXP_AILIST_MODE_HIDE) {
+      return true;
+    }
+    const video = this.videoItemOf(item);
+    if (!video) {
+      return true;
+    }
+    return !AiListStore.getInstance().isBlocked(video.channelId, video.channelHandle);
+  }
+
+  private onAiListVersionChanged(): void {
+    this.scheduleAiFlags();
+  }
+
+  private scheduleAiFlags(): void {    if (this.enrichDisposed || this.aiFlagsScheduled) {
+      return;
+    }
+    const cfg = AppStorage.get<ExperimentalConfig>('experimentalConfig');
+    if (!cfg || !cfg.aiListEnabled) {
+      return;
+    }
+    this.aiFlagsScheduled = true;
+    setTimeout(() => {
+      this.aiFlagsScheduled = false;
+      if (!this.enrichDisposed) {
+        this.applyAiListFlags();
+      }
+    }, 150);
+  }
+
+  private applyAiListFlags(): void {
+    const cfg = AppStorage.get<ExperimentalConfig>('experimentalConfig');
+    if (!cfg || !cfg.aiListEnabled) {
+      return;
+    }
+    const store = AiListStore.getInstance();
+    const list: Object[] = this.dataSource.getDataList();
+    for (let i = 0; i < list.length; i++) {
+      const video = this.videoItemOf(list[i]);
+      if (!video) {
+        continue;
+      }
+      const flag = store.flagFor(video.channelId, video.channelHandle);
+      if (video.aiListFlag !== flag) {
+        video.aiListFlag = flag;
+        this.dataSource.notifyDataChange(i);
+      }
+    }
   }
 
   /** dataVersion<0 永不成立，仅建立 @State 依赖，保证空↔非空切换时骨架分支重算 */

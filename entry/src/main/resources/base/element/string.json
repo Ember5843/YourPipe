@@ -4009,6 +4009,86 @@
         {
             "name": "yt_exp_da_footer",
             "value": "标题来自 DeArrow 社区提交，可能与视频内容不完全一致。"
+        },
+        {
+            "name": "yt_exp_da_thumbs",
+            "value": "替换缩略图"
+        },
+        {
+            "name": "yt_exp_da_thumbs_desc",
+            "value": "使用视频截帧，加载较慢"
+        },
+        {
+            "name": "yt_exp_ai_mode",
+            "value": "处理方式"
+        },
+        {
+            "name": "yt_exp_ai_mode_mark",
+            "value": "只标记"
+        },
+        {
+            "name": "yt_exp_ai_mode_hide",
+            "value": "直接隐藏"
+        },
+        {
+            "name": "yt_exp_ai_warnlist",
+            "value": "包含中置信名单"
+        },
+        {
+            "name": "yt_exp_ai_sync",
+            "value": "自动更新"
+        },
+        {
+            "name": "yt_exp_ai_sync_daily",
+            "value": "每天"
+        },
+        {
+            "name": "yt_exp_ai_sync_weekly",
+            "value": "每周"
+        },
+        {
+            "name": "yt_exp_ai_sync_manual",
+            "value": "仅手动"
+        },
+        {
+            "name": "yt_exp_ai_sync_now",
+            "value": "立即更新"
+        },
+        {
+            "name": "yt_exp_ai_status",
+            "value": "上次同步：%s · %d 条"
+        },
+        {
+            "name": "yt_exp_ai_never",
+            "value": "尚未同步"
+        },
+        {
+            "name": "yt_exp_ai_license",
+            "value": "数据来源：AiSList（CC BY-NC 4.0）"
+        },
+        {
+            "name": "yt_exp_ai_badge",
+            "value": "AI"
+        },
+        {
+            "name": "yt_exp_ai_notice",
+            "value": "该频道被标记为 AI 生成内容"
+        },
+        {
+            "name": "yt_exp_ai_syncing",
+            "value": "正在同步…"
+        },
+        {
+            "name": "yt_exp_ai_sync_failed",
+            "value": "同步失败"
+        },
+        {
+            "name": "yt_exp_ai_empty",
+            "value": "名单为空，请先更新"
+        },
+        {
+            "name": "yt_exp_ai_status_label",
+            "value": "名单状态"
         }
     ]
 }

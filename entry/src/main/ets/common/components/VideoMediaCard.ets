@@ -84,6 +84,22 @@ export struct VideoMediaCard {
     return this.actionType === 'remove' ? $r('app.color.yourtube_button_disabled') : this.themePrimary;
   }
 
+  /** AiSList 角标：block=红，warn=橙；未命中返回空串。 */
+  private aiBadgeText(): string {
+    if (this.video.aiListFlag.length === 0) {
+      return '';
+    }
+    try {
+      return getContext().resourceManager.getStringSync($r('app.string.yt_exp_ai_badge').id);
+    } catch (_e) {
+      return 'AI';
+    }
+  }
+
+  private aiBadgeColor(): string {
+    return this.video.aiListFlag === 'warn' ? '#F59E0B' : '#E53935';
+  }
+
   private hasActionButton(): boolean {
     return this.useFavoriteToggle || (typeof this.actionLabel === 'string' && this.actionLabel.length > 0);
   }
@@ -162,7 +178,10 @@ export struct VideoMediaCard {
       isLive: this.video.isLive,
       isPremium: this.video.isPremium,
       requiresMembership: this.video.requiresMembership,
-      typeLabel: this.getTypeLabelText()
+      typeLabel: this.getTypeLabelText(),
+      fallbackImageUrl: this.video.originalThumbnailUrl || '',
+      cornerLabel: this.aiBadgeText(),
+      cornerLabelColor: this.aiBadgeColor()
     })
   }
 
@@ -179,7 +198,10 @@ export struct VideoMediaCard {
       isLive: this.video.isLive,
       isPremium: this.video.isPremium,
       requiresMembership: this.video.requiresMembership,
-      typeLabel: this.getTypeLabelText()
+      typeLabel: this.getTypeLabelText(),
+      fallbackImageUrl: this.video.originalThumbnailUrl || '',
+      cornerLabel: this.aiBadgeText(),
+      cornerLabelColor: this.aiBadgeColor()
     })
       .margin({ right: MEDIA_LIST_THUMB_GAP })
   }

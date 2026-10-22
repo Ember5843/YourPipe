@@ -4009,6 +4009,86 @@
         {
             "name": "yt_exp_da_footer",
             "value": "標題來自 DeArrow 社群提交，可能與影片內容不完全一致。"
+        },
+        {
+            "name": "yt_exp_da_thumbs",
+            "value": "替換縮圖"
+        },
+        {
+            "name": "yt_exp_da_thumbs_desc",
+            "value": "使用影片截圖，載入較慢"
+        },
+        {
+            "name": "yt_exp_ai_mode",
+            "value": "處理方式"
+        },
+        {
+            "name": "yt_exp_ai_mode_mark",
+            "value": "只標記"
+        },
+        {
+            "name": "yt_exp_ai_mode_hide",
+            "value": "直接隱藏"
+        },
+        {
+            "name": "yt_exp_ai_warnlist",
+            "value": "包含中置信名單"
+        },
+        {
+            "name": "yt_exp_ai_sync",
+            "value": "自動更新"
+        },
+        {
+            "name": "yt_exp_ai_sync_daily",
+            "value": "每天"
+        },
+        {
+            "name": "yt_exp_ai_sync_weekly",
+            "value": "每週"
+        },
+        {
+            "name": "yt_exp_ai_sync_manual",
+            "value": "僅手動"
+        },
+        {
+            "name": "yt_exp_ai_sync_now",
+            "value": "立即更新"
+        },
+        {
+            "name": "yt_exp_ai_status",
+            "value": "上次同步：%s · %d 條"
+        },
+        {
+            "name": "yt_exp_ai_never",
+            "value": "尚未同步"
+        },
+        {
+            "name": "yt_exp_ai_license",
+            "value": "資料來源：AiSList（CC BY-NC 4.0）"
+        },
+        {
+            "name": "yt_exp_ai_badge",
+            "value": "AI"
+        },
+        {
+            "name": "yt_exp_ai_notice",
+            "value": "該頻道被標記為 AI 生成內容"
+        },
+        {
+            "name": "yt_exp_ai_syncing",
+            "value": "正在同步…"
+        },
+        {
+            "name": "yt_exp_ai_sync_failed",
+            "value": "同步失敗"
+        },
+        {
+            "name": "yt_exp_ai_empty",
+            "value": "名單為空，請先更新"
+        },
+        {
+            "name": "yt_exp_ai_status_label",
+            "value": "名單狀態"
         }
     ]
 }

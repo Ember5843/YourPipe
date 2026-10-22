@@ -38,7 +38,8 @@ import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSessi
 import { systemShare } from '@kit.ShareKit';
 import { AppLog } from '../../../common/AppLog';
 import { ExperimentalConfig } from '../../../common/experimental/ExperimentalConfig';
-import { DeArrowClient } from '../../../common/experimental/DeArrowClient';
+import { DeArrowClient, DeArrowBranding } from '../../../common/experimental/DeArrowClient';
+import { AiListStore } from '../../../common/experimental/AiListStore';
 import { sharePlainText } from '../../../common/utils/ShareUtil';
 import {
   SegmentKind as DescriptionSegmentKind,
@@ -69,6 +70,8 @@ export struct VideoDetails {
   /** DeArrow 众包标题；空串时展示原标题。 */
   @State deArrowTitle: string = '';
   private deArrowGeneration: number = 0;
+  /** AiSList 命中标记（'' / 'block' / 'warn'），用于播放页提示。 */
+  @State aiListFlag: string = '';
   @State channelInfo: SearchChannelItem = new SearchChannelItem(
           0,
           this.item.channelId || '',
@@ -142,17 +145,29 @@ export struct VideoDetails {
     if (videoId.length === 0) {
       return;
     }
-    DeArrowClient.getInstance().getTitle(videoId)
-      .then((title: string) => {
-        if (generation !== this.deArrowGeneration || title.length === 0) {
+    DeArrowClient.getInstance().getBranding(videoId)
+      .then((branding: DeArrowBranding) => {
+        if (generation !== this.deArrowGeneration || branding.title.length === 0) {
           return;
         }
-        this.deArrowTitle = title;
+        this.deArrowTitle = branding.title;
         logger.info(`dearrow title applied video=${videoId}`);
       })
       .catch((_e: Error) => {
         // 无提交/网络失败都保持原标题，不打扰播放。
       });
+  }
+
+  private refreshAiListFlag(): void {
+    const cfg = AppStorage.get<ExperimentalConfig>('experimentalConfig');
+    if (!cfg || !cfg.aiListEnabled) {
+      this.aiListFlag = '';
+      return;
+    }
+    this.aiListFlag = AiListStore.getInstance().flagFor(
+      this.item?.channelId || this.channelId || '',
+      this.item?.channelHandle || ''
+    );
   }
 
   private openDescriptionLink(target: string): void {
@@ -229,6 +244,7 @@ export struct VideoDetails {
     this.channelInfoService = new ChannelInfoService();
     this.resetForCurrentItem();
     this.refreshDeArrowTitle();
+    this.refreshAiListFlag();
     this.classifyStreamsForDownload();
     this.startSleepTimerUiUpdates();
 
@@ -328,6 +344,7 @@ export struct VideoDetails {
     this.isTitleExpanded = false;
     this.resetForCurrentItem();
     this.refreshDeArrowTitle();
+    this.refreshAiListFlag();
     this.classifyStreamsForDownload();
     // 自动连播切到下一集时清掉旧视频的统计曲线，避免新旧样本混在同一图表里。
     this.statsSpeedSamples = [];
@@ -678,6 +695,24 @@ export struct VideoDetails {
       Column() {
         // ── 标题 ──
         Column() {
+          if (this.aiListFlag.length > 0) {
+            Row({ space: 6 }) {
+              SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+                .fontSize(12)
+                .fontColor([this.aiListFlag === 'warn' ? '#F59E0B' : '#E53935'])
+              Text($r('app.string.yt_exp_ai_notice'))
+                .fontSize(11)
+                .fontColor(this.aiListFlag === 'warn' ? '#F59E0B' : '#E53935')
+                .layoutWeight(1)
+                .maxLines(2)
+            }
+            .width('100%')
+            .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+            .backgroundColor(this.aiListFlag === 'warn' ? '#1FF59E0B' : '#1FE53935')
+            .borderRadius(8)
+            .margin({ bottom: 8 })
+          }
+
           Text(this.displayTitle())
             .fontSize($r('app.float.font_size_18'))
             .fontColor($r('app.color.yourtube_text_primary'))

@@ -23,9 +23,15 @@ export struct MediaThumb {
   @Prop requiresMembership: boolean = false;
   /** Optional string tag (e.g. "播放列表"). Resource labels should be resolved by caller. */
   @Prop typeLabel: string = '';
+  /** 替换图（如 DeArrow）加载失败时的原始缩略图。 */
+  @Prop fallbackImageUrl: string = '';
+  /** 左上角角标（已本地化的短文本，例如 "AI"）；空串不显示。 */
+  @Prop cornerLabel: string = '';
+  @Prop cornerLabelColor: string = '#E53935';
   @State private displayUrl: string = '';
   @State private fallbackIndex: number = 0;
   private fallbackUrls: string[] = [];
+  private fallbackUsed: boolean = false;
 
   aboutToAppear(): void {
     this.resetImageChain(this.imageUrl);
@@ -45,6 +51,7 @@ export struct MediaThumb {
   private resetImageChain(url: string): void {
     this.fallbackUrls = MediaThumb.buildFallbackChain(url);
     this.fallbackIndex = 0;
+    this.fallbackUsed = false;
     this.displayUrl = this.fallbackUrls.length > 0 ? this.fallbackUrls[0] : '';
   }
 
@@ -86,9 +93,18 @@ export struct MediaThumb {
     if (this.fallbackIndex + 1 < this.fallbackUrls.length) {
       this.fallbackIndex = this.fallbackIndex + 1;
       this.displayUrl = this.fallbackUrls[this.fallbackIndex];
-    } else {
-      this.displayUrl = '';
+      return;
     }
+    // 替换图（DeArrow）或所有档位都失败：回退到原始缩略图一次。
+    if (!this.fallbackUsed && this.fallbackImageUrl.length > 0
+      && this.fallbackImageUrl !== this.displayUrl) {
+      this.fallbackUsed = true;
+      this.fallbackUrls = MediaThumb.buildFallbackChain(this.fallbackImageUrl);
+      this.fallbackIndex = 0;
+      this.displayUrl = this.fallbackUrls.length > 0 ? this.fallbackUrls[0] : '';
+      return;
+    }
+    this.displayUrl = '';
   }
 
   build() {
@@ -134,6 +150,17 @@ export struct MediaThumb {
           .height(this.fillParent ? '100%' : this.heightVp)
           .fill(this.bgColor())
           .radius(this.borderRadiusVp)
+      }
+
+      if (this.cornerLabel.length > 0) {
+        Text(this.cornerLabel)
+          .fontSize(8)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Color.White)
+          .backgroundColor(this.cornerLabelColor)
+          .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+          .borderRadius({ topLeft: 4, bottomRight: 6 })
+          .position({ x: 0, y: 0 })
       }
 
       if (this.showLive && this.isLive) {

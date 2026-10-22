@@ -72,6 +72,7 @@ import { ExperimentalConfig } from '../common/experimental/ExperimentalConfig';
 import { SponsorBlockSkipper } from '../common/experimental/SponsorBlockSkipper';
 import { SponsorBlockClient } from '../common/experimental/SponsorBlockClient';
 import { DeArrowClient } from '../common/experimental/DeArrowClient';
+import { AiListStore } from '../common/experimental/AiListStore';
 import { LlmTranslateConfig } from '../common/LlmTranslateConfig';
 import { SubtitleTranslationService } from '../features/player/translate/SubtitleTranslationService';
 import { AsrModelManager } from '../features/player/asr/AsrModelManager';
@@ -251,6 +252,7 @@ struct Index {
     } else {
       skipper.onPlaybackStopped();
     }
+    AiListStore.getInstance().syncIfNeeded();
   }
 
   /** 播放端点变更：应用 per-state 配置、重置身份/pot 缓存、清 prefetch（旧端点抓的流 URL 不可复用）。 */
@@ -290,6 +292,7 @@ struct Index {
     SponsorBlockSkipper.getInstance().onPlaybackStopped();
     SponsorBlockClient.getInstance().clearCache();
     DeArrowClient.getInstance().clearCache();
+    AiListStore.getInstance().clear();
 
     // 播放端点恢复默认（visionos/tv_downgraded）并使身份/pot 缓存失效
     AuthStateHelper.applyPlayerClientConfig(defaultPlaybackConfig.guestPlayerClient, defaultPlaybackConfig.authPlayerClient);
@@ -421,6 +424,7 @@ struct Index {
     SponsorBlockSkipper.getInstance().onPlaybackStopped();
     SponsorBlockClient.getInstance().clearCache();
     DeArrowClient.getInstance().clearCache();
+    AiListStore.getInstance().clear();
     const defaultProxy = NetworkProxyConfig.resetToDefault();
     AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
     ShortsFeedService.getInstance().invalidate('clear_all_data');

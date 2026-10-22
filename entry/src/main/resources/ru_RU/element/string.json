@@ -4009,6 +4009,86 @@
         {
             "name": "yt_exp_da_footer",
             "value": "Заголовки берутся из отправок сообщества DeArrow и могут не совпадать с видео."
+        },
+        {
+            "name": "yt_exp_da_thumbs",
+            "value": "Заменять обложки"
+        },
+        {
+            "name": "yt_exp_da_thumbs_desc",
+            "value": "Использует кадры видео; загружается медленнее"
+        },
+        {
+            "name": "yt_exp_ai_mode",
+            "value": "Обработка"
+        },
+        {
+            "name": "yt_exp_ai_mode_mark",
+            "value": "Только помечать"
+        },
+        {
+            "name": "yt_exp_ai_mode_hide",
+            "value": "Полностью скрывать"
+        },
+        {
+            "name": "yt_exp_ai_warnlist",
+            "value": "Включить список средней уверенности"
+        },
+        {
+            "name": "yt_exp_ai_sync",
+            "value": "Автообновление"
+        },
+        {
+            "name": "yt_exp_ai_sync_daily",
+            "value": "Ежедневно"
+        },
+        {
+            "name": "yt_exp_ai_sync_weekly",
+            "value": "Еженедельно"
+        },
+        {
+            "name": "yt_exp_ai_sync_manual",
+            "value": "Только вручную"
+        },
+        {
+            "name": "yt_exp_ai_sync_now",
+            "value": "Обновить сейчас"
+        },
+        {
+            "name": "yt_exp_ai_status",
+            "value": "Последняя синхронизация: %s · %d записей"
+        },
+        {
+            "name": "yt_exp_ai_never",
+            "value": "Ещё не синхронизировано"
+        },
+        {
+            "name": "yt_exp_ai_license",
+            "value": "Источник: AiSList (CC BY-NC 4.0)"
+        },
+        {
+            "name": "yt_exp_ai_badge",
+            "value": "ИИ"
+        },
+        {
+            "name": "yt_exp_ai_notice",
+            "value": "Этот канал помечен как ИИ-контент"
+        },
+        {
+            "name": "yt_exp_ai_syncing",
+            "value": "Синхронизация…"
+        },
+        {
+            "name": "yt_exp_ai_sync_failed",
+            "value": "Ошибка синхронизации"
+        },
+        {
+            "name": "yt_exp_ai_empty",
+            "value": "Список пуст, сначала обновите его"
+        },
+        {
+            "name": "yt_exp_ai_status_label",
+            "value": "Состояние списка"
         }
     ]
 }

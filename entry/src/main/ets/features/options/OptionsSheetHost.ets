@@ -21,7 +21,7 @@ import { OptionsDataAccountPage } from './OptionsDataAccountPage';
 import { OptionsExperimentalPage } from './OptionsExperimentalPage';
 import { OptionsSponsorBlockPage } from './OptionsSponsorBlockPage';
 import { OptionsDeArrowPage } from './OptionsDeArrowPage';
-import { ExperimentalComingSoonPage } from './ExperimentalComingSoonPage';
+import { OptionsAiListPage } from './OptionsAiListPage';
 import { OptionsNetworkPage } from './OptionsNetworkPage';
 // [DISABLED] P3：import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
 import { HelpGuidePage } from '../help/HelpGuidePage';
@@ -427,7 +427,11 @@ export struct OptionsSheetHost {
         title: $r('app.string.yt_exp_ai_title'),
         onBack: () => { this.popOptionsPath(); }
       }) {
-        ExperimentalComingSoonPage()
+        OptionsAiListPage({
+          params: {
+            updateConfig: this.params.updateExperimentalConfig
+          }
+        })
       }
     } else if (name === 'playback') {
       OptionsNavScaffold({

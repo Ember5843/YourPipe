@@ -15,10 +15,13 @@ import { IDataSourcePrefetching } from '@kit.ArkUI';
 import { FeedThumbUrlOf, ThumbPrefetcher } from './ThumbPrefetcher';
 
 export type FeedItemKeyOf = (item: Object, index: number) => string;
+export type FeedItemFilter = (item: Object) => boolean;
 
 export class FeedDataSource implements IDataSourcePrefetching {
   /** 缩略图预取 URL 提取器；MediaVideoFeed 挂载时注入（缺省 defaultFeedThumbUrl） */
   thumbUrlOf: FeedThumbUrlOf | null = null;
+  /** 展示层过滤（如 AiSList 隐藏模式）：在 key 计算前剔除条目，索引保持一致。 */
+  itemFilter: FeedItemFilter | null = null;
   private listeners: DataChangeListener[] = [];
   private dataArray: Object[] = [];
   private keys: string[] = [];
@@ -36,7 +39,9 @@ export class FeedDataSource implements IDataSourcePrefetching {
   }
 
   public setData(data: Object[], keyOf?: FeedItemKeyOf): void {
-    const nextData: Object[] = data.slice();
+    const filter: FeedItemFilter | null = this.itemFilter;
+    const source: Object[] = filter ? data.filter((item: Object) => filter(item)) : data;
+    const nextData: Object[] = source.slice();
     if (keyOf) {
       const nextKeys: string[] = nextData.map((item: Object, index: number) => keyOf(item, index));
       let prefix: number = 0;

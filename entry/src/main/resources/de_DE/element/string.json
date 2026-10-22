@@ -4009,6 +4009,86 @@
         {
             "name": "yt_exp_da_footer",
             "value": "Titel stammen aus DeArrow-Community-Einreichungen und können vom Videoinhalt abweichen."
+        },
+        {
+            "name": "yt_exp_da_thumbs",
+            "value": "Vorschaubilder ersetzen"
+        },
+        {
+            "name": "yt_exp_da_thumbs_desc",
+            "value": "Nutzt Videoframes; langsameres Laden"
+        },
+        {
+            "name": "yt_exp_ai_mode",
+            "value": "Umgang"
+        },
+        {
+            "name": "yt_exp_ai_mode_mark",
+            "value": "Nur markieren"
+        },
+        {
+            "name": "yt_exp_ai_mode_hide",
+            "value": "Vollständig ausblenden"
+        },
+        {
+            "name": "yt_exp_ai_warnlist",
+            "value": "Liste mit mittlerer Konfidenz einbeziehen"
+        },
+        {
+            "name": "yt_exp_ai_sync",
+            "value": "Automatisch aktualisieren"
+        },
+        {
+            "name": "yt_exp_ai_sync_daily",
+            "value": "Täglich"
+        },
+        {
+            "name": "yt_exp_ai_sync_weekly",
+            "value": "Wöchentlich"
+        },
+        {
+            "name": "yt_exp_ai_sync_manual",
+            "value": "Nur manuell"
+        },
+        {
+            "name": "yt_exp_ai_sync_now",
+            "value": "Jetzt aktualisieren"
+        },
+        {
+            "name": "yt_exp_ai_status",
+            "value": "Zuletzt synchronisiert: %s · %d Einträge"
+        },
+        {
+            "name": "yt_exp_ai_never",
+            "value": "Noch nicht synchronisiert"
+        },
+        {
+            "name": "yt_exp_ai_license",
+            "value": "Datenquelle: AiSList (CC BY-NC 4.0)"
+        },
+        {
+            "name": "yt_exp_ai_badge",
+            "value": "KI"
+        },
+        {
+            "name": "yt_exp_ai_notice",
+            "value": "Dieser Kanal ist als KI-generierter Inhalt markiert"
+        },
+        {
+            "name": "yt_exp_ai_syncing",
+            "value": "Synchronisierung…"
+        },
+        {
+            "name": "yt_exp_ai_sync_failed",
+            "value": "Synchronisierung fehlgeschlagen"
+        },
+        {
+            "name": "yt_exp_ai_empty",
+            "value": "Liste ist leer, bitte zuerst aktualisieren"
+        },
+        {
+            "name": "yt_exp_ai_status_label",
+            "value": "Listenstatus"
         }
     ]
 }

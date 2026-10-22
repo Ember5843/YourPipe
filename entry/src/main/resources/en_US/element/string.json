@@ -4009,6 +4009,86 @@
         {
             "name": "yt_exp_da_footer",
             "value": "Titles come from DeArrow community submissions and may not match the video exactly."
+        },
+        {
+            "name": "yt_exp_da_thumbs",
+            "value": "Replace thumbnails"
+        },
+        {
+            "name": "yt_exp_da_thumbs_desc",
+            "value": "Uses frames from the video; slower to load"
+        },
+        {
+            "name": "yt_exp_ai_mode",
+            "value": "Handling"
+        },
+        {
+            "name": "yt_exp_ai_mode_mark",
+            "value": "Mark only"
+        },
+        {
+            "name": "yt_exp_ai_mode_hide",
+            "value": "Hide completely"
+        },
+        {
+            "name": "yt_exp_ai_warnlist",
+            "value": "Include medium-confidence list"
+        },
+        {
+            "name": "yt_exp_ai_sync",
+            "value": "Auto update"
+        },
+        {
+            "name": "yt_exp_ai_sync_daily",
+            "value": "Daily"
+        },
+        {
+            "name": "yt_exp_ai_sync_weekly",
+            "value": "Weekly"
+        },
+        {
+            "name": "yt_exp_ai_sync_manual",
+            "value": "Manual only"
+        },
+        {
+            "name": "yt_exp_ai_sync_now",
+            "value": "Update now"
+        },
+        {
+            "name": "yt_exp_ai_status",
+            "value": "Last synced: %s · %d entries"
+        },
+        {
+            "name": "yt_exp_ai_never",
+            "value": "Not synced yet"
+        },
+        {
+            "name": "yt_exp_ai_license",
+            "value": "Data source: AiSList (CC BY-NC 4.0)"
+        },
+        {
+            "name": "yt_exp_ai_badge",
+            "value": "AI"
+        },
+        {
+            "name": "yt_exp_ai_notice",
+            "value": "This channel is marked as AI-generated content"
+        },
+        {
+            "name": "yt_exp_ai_syncing",
+            "value": "Syncing…"
+        },
+        {
+            "name": "yt_exp_ai_sync_failed",
+            "value": "Sync failed"
+        },
+        {
+            "name": "yt_exp_ai_empty",
+            "value": "List is empty, update it first"
+        },
+        {
+            "name": "yt_exp_ai_status_label",
+            "value": "List status"
         }
     ]
 }

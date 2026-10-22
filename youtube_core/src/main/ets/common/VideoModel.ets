@@ -6,6 +6,8 @@ export class VideoItem {
   author: string;
   viewCount: string;
   thumbnailUrl: string;
+  /** DeArrow 替换前的原始缩略图；用于替换图加载失败时回退。 */
+  originalThumbnailUrl: string = '';
   thumbnailColor: string;
   isLive: boolean;
   isPremium: boolean;
@@ -32,6 +34,9 @@ export class VideoItem {
    * 仅作数据标记（Shorts feed 过滤、UI 角标用），不改变播放路径。
    */
   isShort: boolean = false;
+
+  /** AiSList 命中标记：'' = 未命中，'block' = 高置信，'warn' = 中置信。仅 UI 展示用。 */
+  aiListFlag: string = '';
 
   constructor(
     id: number,
