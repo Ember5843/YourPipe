@@ -4137,6 +4137,14 @@
         {
             "name": "yt_update_links",
             "value": "링크"
+        },
+        {
+            "name": "yt_update_ok",
+            "value": "확인"
+        },
+        {
+            "name": "yt_update_later",
+            "value": "나중에"
         }
     ]
 }

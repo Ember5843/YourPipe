@@ -18,9 +18,12 @@ export const APPGALLERY_TEST_URL = 'https://appgallery.huawei.com/apptest/AOd7gm
 export const GITHUB_REPO_URL = 'https://github.com/Ember5843/YourPipe';
 
 export type UpdateCheckStatus = 'upToDate' | 'updateAvailable' | 'failed';
+export type UpdateCheckSource = 'startup' | 'manual';
 
 export interface UpdateCheckResult {
   status: UpdateCheckStatus;
+  /** 触发来源：启动静默检查 / 用户手动检查。 */
+  source: UpdateCheckSource;
   localVersionName: string;
   localVersionCode: number;
   remoteVersionName: string;
@@ -57,21 +60,22 @@ export class UpdateChecker {
   }
 
   /** 并发去重：启动静默检查与手动检查同时触发时只发一次请求。 */
-  static check(): Promise<UpdateCheckResult> {
+  static check(source: UpdateCheckSource = 'manual'): Promise<UpdateCheckResult> {
     if (UpdateChecker.inFlight) {
       return UpdateChecker.inFlight;
     }
-    const task = UpdateChecker.runCheck().finally(() => {
+    const task = UpdateChecker.runCheck(source).finally(() => {
       UpdateChecker.inFlight = null;
     });
     UpdateChecker.inFlight = task;
     return task;
   }
 
-  private static async runCheck(): Promise<UpdateCheckResult> {
+  private static async runCheck(source: UpdateCheckSource): Promise<UpdateCheckResult> {
     const local = UpdateChecker.readLocalVersion();
     const result: UpdateCheckResult = {
       status: 'failed',
+      source: source,
       localVersionName: local.versionName,
       localVersionCode: local.versionCode,
       remoteVersionName: '',

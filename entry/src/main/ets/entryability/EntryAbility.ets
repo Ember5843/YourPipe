@@ -165,10 +165,13 @@ export default class EntryAbility extends UIAbility {
     }
     setTimeout(() => {
       NetworkProxyConfig.awaitReady()
-        .then(() => UpdateChecker.check())
+        .then(() => UpdateChecker.check('startup'))
         .then((result: UpdateCheckResult) => {
           logger.info(`startup update check status=${result.status} `
             + `remote=${result.remoteVersionName} rateLimited=${result.rateLimited}`);
+          if (result.status === 'updateAvailable') {
+            AppStorage.setOrCreate('startupUpdatePromptAt', Date.now());
+          }
         })
         .catch((e: Error) => logger.warn(`startup update check failed: ${e.message}`));
     }, 4000);

@@ -4137,6 +4137,14 @@
         {
             "name": "yt_update_links",
             "value": "相關連結"
+        },
+        {
+            "name": "yt_update_ok",
+            "value": "確定"
+        },
+        {
+            "name": "yt_update_later",
+            "value": "稍後"
         }
     ]
 }

@@ -10,6 +10,7 @@ import {
   UpdateCheckResult,
   UpdateChecker
 } from '../../common/UpdateChecker';
+import { showUpdateAvailableDialog, showUpdateMessageDialog } from '../../common/UpdatePrompt';
 import { getAppVersion } from '../../common/AppVersion';
 import { openExternalUrl } from '../../common/utils/ExternalLinkUtil';
 import { AppLog } from '../../common/AppLog';
@@ -66,45 +67,31 @@ export struct OptionsUpdatePage {
 
   private async checkNow(): Promise<void> {
     if (this.checking) {
-      this.getUIContext().getPromptAction().showToast({
-        message: $r('app.string.yt_update_checking'),
-        duration: 1500
-      });
       return;
     }
     if (!this.uiConfig.checkGithubUpdates) {
-      this.getUIContext().getPromptAction().showToast({
-        message: $r('app.string.yt_update_disabled_hint'),
-        duration: 2500
-      });
+      showUpdateMessageDialog(this.getUIContext(),
+        $r('app.string.yt_update_page_title'),
+        $r('app.string.yt_update_disabled_hint'));
       return;
     }
     this.checking = true;
-    this.getUIContext().getPromptAction().showToast({
-      message: $r('app.string.yt_update_checking'),
-      duration: 1500
-    });
     logger.info('manual update check requested');
     try {
-      const result = await UpdateChecker.check();
+      const result = await UpdateChecker.check('manual');
       this.result = result;
-      if (result.status === 'upToDate') {
-        this.getUIContext().getPromptAction().showToast({
-          message: $r('app.string.yt_update_up_to_date'),
-          duration: 2000
-        });
-      } else if (result.status === 'updateAvailable') {
-        this.getUIContext().getPromptAction().showToast({
-          message: `${this.rm().getStringSync($r('app.string.yt_update_available').id)} v${result.remoteVersionName}`,
-          duration: 2500
-        });
+      if (result.status === 'updateAvailable') {
+        showUpdateAvailableDialog(this.getUIContext(), result);
+      } else if (result.status === 'upToDate') {
+        showUpdateMessageDialog(this.getUIContext(),
+          $r('app.string.yt_update_page_title'),
+          $r('app.string.yt_update_up_to_date'));
       } else {
-        this.getUIContext().getPromptAction().showToast({
-          message: result.rateLimited
+        showUpdateMessageDialog(this.getUIContext(),
+          $r('app.string.yt_update_page_title'),
+          result.rateLimited
             ? $r('app.string.yt_update_rate_limited')
-            : $r('app.string.yt_update_check_failed'),
-          duration: 3000
-        });
+            : $r('app.string.yt_update_check_failed'));
       }
     } finally {
       this.checking = false;

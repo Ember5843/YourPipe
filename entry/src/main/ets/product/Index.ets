@@ -73,6 +73,13 @@ import { SponsorBlockSkipper } from '../common/experimental/SponsorBlockSkipper'
 import { SponsorBlockClient } from '../common/experimental/SponsorBlockClient';
 import { DeArrowClient } from '../common/experimental/DeArrowClient';
 import { AiListStore } from '../common/experimental/AiListStore';
+import { UpdateChecker } from '../common/UpdateChecker';
+import {
+  markStartupUpdatePrompted,
+  resetStartupUpdatePrompted,
+  shouldPromptStartupUpdate,
+  showUpdateAvailableDialog
+} from '../common/UpdatePrompt';
 import { LlmTranslateConfig } from '../common/LlmTranslateConfig';
 import { SubtitleTranslationService } from '../features/player/translate/SubtitleTranslationService';
 import { AsrModelManager } from '../features/player/asr/AsrModelManager';
@@ -110,6 +117,7 @@ struct Index {
   @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
   @StorageLink('watchHistory') watchHistory: WatchHistoryItem[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageProp('startupUpdatePromptAt') @Watch('onStartupUpdatePrompt') startupUpdatePromptAt: number = 0;
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   @StorageLink('pendingPlaybackContinuation') @Watch('onPendingContinuationChanged') pendingPlaybackContinuation: string = '';
@@ -303,6 +311,8 @@ struct Index {
 
     // 4. 下次启动重新显示引导
     PreferencesStore.setString(PREF_HELP_GUIDE_SEEN, 'false');
+    // 更新提示去重也复位：恢复默认后同一版本可以再次提示
+    resetStartupUpdatePrompted();
     // 订阅信息流快速模式与安全提示弹窗也是独立 Preferences 键，一并复位
     PreferencesStore.setString('cfg_feed_fast_mode', 'false');
     PreferencesStore.setString(PREF_SECURE_SHIELD_DONT_SHOW, 'false');
@@ -477,8 +487,28 @@ struct Index {
 
   //@Provider backPressedDispatcher: BackPressedDispatcher = new BackPressedDispatcher()
 
+  private onStartupUpdatePrompt(): void {
+    this.tryPromptStartupUpdate();
+  }
+
+  /** 启动静默检查发现新版本时弹一次（同一版本只提示一次）。 */
+  private tryPromptStartupUpdate(): void {
+    if (!this.uiConfig.checkGithubUpdates || !this.uiConfig.checkUpdatesOnStartup) {
+      return;
+    }
+    const result = UpdateChecker.getLastResult();
+    if (!result || !shouldPromptStartupUpdate(result)) {
+      return;
+    }
+    markStartupUpdatePrompted(result);
+    logger.info(`startup update prompt version=${result.remoteVersionName} `
+      + `code=${result.remoteVersionCode}`);
+    showUpdateAvailableDialog(this.getUIContext(), result);
+  }
+
   aboutToAppear() {
     this.ensureStores();
+    setTimeout(() => this.tryPromptStartupUpdate(), 1000);
     // 重启对账：从持久化索引恢复已完成下载条目（文件缺失的条目自动丢弃）。
     DownloadManager.getInstance().restoreTasks();
     // 本地导入库独立索引：文件缺失的条目启动时丢弃。

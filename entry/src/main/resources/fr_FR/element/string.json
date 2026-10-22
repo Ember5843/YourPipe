@@ -4137,6 +4137,14 @@
         {
             "name": "yt_update_links",
             "value": "Liens"
+        },
+        {
+            "name": "yt_update_ok",
+            "value": "OK"
+        },
+        {
+            "name": "yt_update_later",
+            "value": "Plus tard"
         }
     ]
 }
