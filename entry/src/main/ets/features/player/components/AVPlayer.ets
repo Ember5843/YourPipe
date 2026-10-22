@@ -258,7 +258,9 @@ export struct VideoPlayer {
   }
 
   private undoSponsorSkip(): void {
-    if (SponsorBlockSkipper.getInstance().undo()) {
+    const undone = SponsorBlockSkipper.getInstance().undo();
+    Logger.info(TAG, `sponsor skip undo tapped result=${undone}`);
+    if (undone) {
       this.skipNotice = null;
       if (this.skipNoticeTimerId >= 0) {
         clearTimeout(this.skipNoticeTimerId);
@@ -2047,11 +2049,14 @@ export struct VideoPlayer {
             .fontWeight(FontWeight.Medium)
             .fontColor(this.themePrimary)
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-            .onClick(() => this.undoSponsorSkip())
         }
         .padding({ left: 14, right: 8, top: 6, bottom: 6 })
         .backgroundColor('#E6000000')
         .borderRadius(18)
+        // 整条提示都可点撤销；Default 命中会挡住下层手势层，避免撤销点击被
+        // 播放器的单击手势（收起控件）抢走。
+        .hitTestBehavior(HitTestMode.Default)
+        .onClick(() => this.undoSponsorSkip())
       }
       .width('100%')
       .height('100%')

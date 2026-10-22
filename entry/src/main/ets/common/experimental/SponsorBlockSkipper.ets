@@ -32,6 +32,8 @@ export class SponsorBlockSkipper {
   private videoId: string = '';
   private segments: SponsorSegment[] = [];
   private lastSegment: SponsorSegment | null = null;
+  /** 提示条「撤销」的目标：只在新视频/新跳过/撤销时更新，不被进度事件清空。 */
+  private undoSegment: SponsorSegment | null = null;
   /** 用户点「撤销」后暂时放行的片段；离开片段范围后自动解除。 */
   private suppressedSegment: SponsorSegment | null = null;
   private lastSkipAtMs: number = 0;
@@ -97,13 +99,15 @@ export class SponsorBlockSkipper {
 
   /** 用户在提示条上点「撤销」：回到片段起点，并放行该片段。 */
   undo(): boolean {
-    const segment = this.lastSegment;
+    const segment = this.undoSegment;
     const controller = this.controller;
     if (!segment || !controller) {
+      logger.warn(`undo ignored video=${this.videoId} segment=${segment ? 'set' : 'none'} controller=${controller ? 'set' : 'none'}`);
       return false;
     }
     this.suppressedSegment = segment;
     this.lastSegment = null;
+    this.undoSegment = null;
     if (this.noticeListener) {
       this.noticeListener(null);
     }
@@ -131,6 +135,7 @@ export class SponsorBlockSkipper {
     this.videoId = '';
     this.segments = [];
     this.lastSegment = null;
+    this.undoSegment = null;
     this.suppressedSegment = null;
     this.lastSkipAtMs = 0;
   }
@@ -152,8 +157,18 @@ export class SponsorBlockSkipper {
       return;
     }
 
+    const state = controller.getPlaybackState();
+    // seek 过程中 MPV 的 time-pos 可能短暂回落（甚至 0）。若此时先做
+    // 「拖回片段之前」判断，会把 lastSegment 清掉，提示条的撤销随即失效。
+    // 因此所有状态判断必须先于 rearm。
+    if (!state.isPlaying || state.isSeeking) {
+      return;
+    }
     const position = currentTime;
-    // 用户拖回片段之前 → 重新武装，允许再次跳过。
+    if (position <= 0 || Date.now() - this.lastSkipAtMs < SKIP_DEBOUNCE_MS) {
+      return;
+    }
+    // 用户真正拖回片段之前 → 重新武装，允许再次跳过。
     if (this.lastSegment && position < this.lastSegment.startSec - REWIND_REARM_SEC) {
       this.lastSegment = null;
     }
@@ -165,14 +180,6 @@ export class SponsorBlockSkipper {
       } else {
         return;
       }
-    }
-
-    const state = controller.getPlaybackState();
-    if (!state.isPlaying || state.isSeeking) {
-      return;
-    }
-    if (Date.now() - this.lastSkipAtMs < SKIP_DEBOUNCE_MS) {
-      return;
     }
 
     const segment = this.findSegment(position);
@@ -189,6 +196,7 @@ export class SponsorBlockSkipper {
     }
 
     this.lastSegment = segment;
+    this.undoSegment = segment;
     this.lastSkipAtMs = Date.now();
     controller.syncSeek(targetSec * 1000);
     logger.info(`skip video=${this.videoId} category=${segment.category} `
