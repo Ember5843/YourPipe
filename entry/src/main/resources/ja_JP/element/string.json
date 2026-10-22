@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "リージョン"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "実験的な機能"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "内蔵の実験的な拡張機能（既定ではオフ）"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "オン"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "オフ"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "これらの機能は第三者コミュニティのサービスに依存しており、予告なく変更・停止する場合があります。"
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "プラグインのキャッシュを削除"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "キャッシュを削除しました"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "この機能は開発中です"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "スポンサー、イントロ、アウトロなどの区間を自動でスキップ"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "SponsorBlock を有効にする"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "区間のカテゴリ"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "スポンサー"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "自己宣伝"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "インタラクション促し"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "イントロ"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "アウトロ"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "プレビュー/振り返り"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "音楽以外"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "フィラー"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "ハイライト"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "スキップ動作"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "スキップして通知（元に戻せます）"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "通知せずスキップ"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "ボタンのみ表示"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "元に戻せる時間"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d 秒"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "プライバシー検索"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "動画 ID ではなくハッシュのみ送信"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "スキップしました：%s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "元に戻す"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "この動画に利用できる区間はありません"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d カテゴリ"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "クラウドソースのタイトルとサムネイル"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "AI 生成コンテンツのチャンネルをマークまたは非表示"
         }
     ]
 }

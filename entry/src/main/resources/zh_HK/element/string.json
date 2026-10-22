@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "區域（Region）"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "實驗性功能"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "內建實驗性增強功能，預設關閉"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "已啟用"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "未啟用"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "這些功能依賴第三方社群服務，可能隨時變更或無法使用。"
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "清除此外掛快取"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "快取已清除"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "此功能正在開發中"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "自動跳過贊助、片頭、片尾等片段"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "啟用 SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "片段類別"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "贊助片段"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "自我推廣"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "互動提醒"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "片頭"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "片尾"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "預覽/回顧"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "非音樂片段"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "填充內容"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "精彩片段"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "跳過行為"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "跳過並提示（可撤銷）"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "靜默跳過"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "只顯示跳過按鈕"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "撤銷視窗"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d 秒"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "隱私查詢"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "只傳送影片雜湊，不傳送影片 ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "已跳過：%s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "撤銷"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "此影片沒有可用片段"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d 類片段"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "群眾標題與縮圖"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "標記或隱藏 AI 生成內容的頻道"
         }
     ]
 }

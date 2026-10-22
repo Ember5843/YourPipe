@@ -15,6 +15,7 @@ import { SubscriptionFeedStore, SubscriptionFeedItem } from './SubscriptionFeedS
 import { SearchHistoryStore, SearchHistoryItem } from './SearchHistoryStore';
 import { UIConfig } from './AppState';
 import { PlaybackConfig } from './PlaybackConfig';
+import { ExperimentalConfig } from './experimental/ExperimentalConfig';
 import { SubscriptionUser } from './SubscriptionModel';
 import { PlaylistItem, StoredLocalQueue } from './PlaylistModel';
 import { VideoItem } from 'youtube_core';
@@ -284,8 +285,10 @@ export class DataBackupManager {
     PreferencesStore.restoreConfigEntries(validEntries);
     const uiConfig = UIConfig.loadFromPreferences();
     const playbackConfig = PlaybackConfig.loadFromPreferences();
+    const experimentalConfig = ExperimentalConfig.loadFromPreferences();
     AppStorage.setOrCreate('uiConfig', uiConfig);
     AppStorage.setOrCreate('playbackConfig', playbackConfig);
+    AppStorage.setOrCreate('experimentalConfig', experimentalConfig);
     AppStorage.setOrCreate('autoPlayQueue', playbackConfig.autoPlayNext);
     // 恢复后重应用，复用 EntryAbility.onCreate / AppState.init 的同一套函数
     const networkProxyConfig = NetworkProxyConfig.load();

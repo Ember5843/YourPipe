@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "Región"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "Funciones experimentales"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "Mejoras experimentales integradas, desactivadas por defecto"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "Activado"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "Desactivado"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "Estas funciones dependen de servicios comunitarios de terceros y pueden cambiar o fallar en cualquier momento."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "Borrar caché del complemento"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "Caché borrada"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "Esta función está en desarrollo"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "Omite automáticamente segmentos de patrocinio, intro, outro y similares"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "Activar SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "Categorías de segmentos"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "Patrocinio"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "Autopromoción"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "Recordatorio de interacción"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "Intro"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "Outro"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "Avance/resumen"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "Fuera de música"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "Relleno"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "Momento destacado"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "Comportamiento al omitir"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "Omitir y avisar (se puede deshacer)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "Omitir en silencio"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "Mostrar solo el botón"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "Ventana de deshacer"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d s"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "Consulta privada"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "Enviar solo un hash del vídeo, no su ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "Omitido: %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "Deshacer"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "No hay segmentos disponibles para este vídeo"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d categorías"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "Títulos y miniaturas colaborativos"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "Marcar u ocultar canales con contenido generado por IA"
         }
     ]
 }

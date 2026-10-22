@@ -16,6 +16,7 @@ import { normalizeUrl } from '../features/home/utils/ThumbnailUtils';
 import { formatDurationHms } from './utils/FormatUtils';
 import { YOUTUBE_VIDEO_ID } from './Constants';
 import { ErrorInfo, ErrorInfoOptions } from './model/ErrorInfo';
+import { SponsorBlockSkipper } from './experimental/SponsorBlockSkipper';
 
 export interface CachedChannelProfile {
   name: string;
@@ -766,6 +767,8 @@ export class PlayerSession {
     this._currentVideo = video;
     this._activePlayVideoId = videoId;
     logger.info(`${TAG} play() called for ${videoId} local=${!!video.localMediaPath}`);
+    // SponsorBlock：与提取并行取片段，播放进度到达时自动跳过（本地/直播由 skipper 忽略）。
+    SponsorBlockSkipper.getInstance().onVideoStarted(this._controller, video);
 
     const generation = this._playGeneration;
     const promise = this.doPlay(video, videoId, generation);
@@ -797,6 +800,8 @@ export class PlayerSession {
    * 返回 null 表示本条提取/提交失败（调用方展示封面 + 重试，不弹播放页错误）。
    */
   async playShorts(video: VideoItem): Promise<VideoData | null> {
+    // 短视频换条不需要长视频的 SponsorBlock 跳过状态。
+    SponsorBlockSkipper.getInstance().onPlaybackStopped();
     if (this._controller.playerState === PlayerState.RELEASED) {
       this.recreateReleasedController(true);
       this._controller.setFileLoop(true);
@@ -1326,6 +1331,7 @@ export class PlayerSession {
       return;
     }
     logger.info(`${TAG} release() called`);
+    SponsorBlockSkipper.getInstance().onPlaybackStopped();
     // 若画中画激活，先停止 PiP（释放播放器前关闭悬浮窗）
     if (this._isPiPActive && this.onStopPiP) {
       this.onStopPiP().catch((e: Error) => {
@@ -1363,6 +1369,7 @@ export class PlayerSession {
       return;
     }
     logger.info(`${TAG} closeForNavigation() called`);
+    SponsorBlockSkipper.getInstance().onPlaybackStopped();
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
     this.resetSession(true, true);

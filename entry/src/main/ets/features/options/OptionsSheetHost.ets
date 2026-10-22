@@ -8,6 +8,7 @@ import { buildTitleMenu, buildSheetTitleBar } from '../../common/components/HdsT
 import { UIConfig, YourtubeDarkMode } from '../../common/AppState';
 import { COLOR_PRESETS } from '../../common/ThemeManager';
 import { PlaybackConfig, VideoQualityCap } from '../../common/PlaybackConfig';
+import { ExperimentalConfig } from '../../common/experimental/ExperimentalConfig';
 import { OptionsMainPage } from './OptionsMainPage';
 import { OptionsAppearancePage } from './OptionsAppearancePage';
 import { OptionsPlaybackPage } from './OptionsPlaybackPage';
@@ -17,6 +18,9 @@ import { OptionsTranslationPage } from './OptionsTranslationPage';
 import { OptionsPerformancePage } from './OptionsPerformancePage';
 import { OptionsLanguageAndRegionPage } from './OptionsLanguageAndRegionPage';
 import { OptionsDataAccountPage } from './OptionsDataAccountPage';
+import { OptionsExperimentalPage } from './OptionsExperimentalPage';
+import { OptionsSponsorBlockPage } from './OptionsSponsorBlockPage';
+import { ExperimentalComingSoonPage } from './ExperimentalComingSoonPage';
 import { OptionsNetworkPage } from './OptionsNetworkPage';
 // [DISABLED] P3：import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
 import { HelpGuidePage } from '../help/HelpGuidePage';
@@ -49,6 +53,7 @@ export interface OptionsSheetHostParams {
   onClose: () => void;
   updateUiConfig: (mutator: (cfg: UIConfig) => void) => void;
   updatePlaybackConfig: (mutator: (cfg: PlaybackConfig) => void) => void;
+  updateExperimentalConfig: (mutator: (cfg: ExperimentalConfig) => void) => void;
   applyLanguageSelection: (languageCode: string) => void;
   applyDarkModeSelection: (mode: YourtubeDarkMode) => void;
   reloadHomeForSearchLocaleChange: () => void;
@@ -77,6 +82,7 @@ export struct OptionsSheetHost {
     onClose: () => {},
     updateUiConfig: () => {},
     updatePlaybackConfig: () => {},
+    updateExperimentalConfig: () => {},
     applyLanguageSelection: () => {},
     applyDarkModeSelection: () => {},
     reloadHomeForSearchLocaleChange: () => {},
@@ -140,6 +146,7 @@ export struct OptionsSheetHost {
               onGestureControlClick: () => { this.pushOptionsPath('gesture_control'); },
               onSubtitleClick: () => { this.pushOptionsPath('subtitle'); },
               onPerformanceClick: () => { this.pushOptionsPath('performance'); },
+              onExperimentalClick: () => { this.pushOptionsPath('experimental'); },
               onNetworkClick: () => { this.pushOptionsPath('network'); },
               // [DISABLED] P3：onAiTranslateClick: () => { this.pushOptionsPath('ai_translate'); },
               onAppearanceClick: () => { this.pushOptionsPath('appearance'); },
@@ -379,6 +386,43 @@ export struct OptionsSheetHost {
         onBack: () => { this.popOptionsPath(); }
       }) {
         ChangelogPage()
+      }
+    } else if (name === 'experimental') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_exp_title'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+        OptionsExperimentalPage({
+          params: {
+            onNavigate: (subPage: string) => { this.pushOptionsPath(subPage); },
+            updateConfig: this.params.updateExperimentalConfig
+          }
+        })
+      }
+    } else if (name === 'experimental_sponsorblock') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_exp_sb_title'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+        OptionsSponsorBlockPage({
+          params: {
+            updateConfig: this.params.updateExperimentalConfig
+          }
+        })
+      }
+    } else if (name === 'experimental_dearrow') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_exp_da_title'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+        ExperimentalComingSoonPage()
+      }
+    } else if (name === 'experimental_ailist') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_exp_ai_title'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+        ExperimentalComingSoonPage()
       }
     } else if (name === 'playback') {
       OptionsNavScaffold({

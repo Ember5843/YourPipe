@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "Регион"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "Экспериментальные функции"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "Встроенные экспериментальные улучшения, по умолчанию выключены"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "Включено"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "Выключено"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "Эти функции зависят от сторонних общественных сервисов и могут измениться или перестать работать в любой момент."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "Очистить кэш плагина"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "Кэш очищен"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "Функция в разработке"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "Автоматически пропускать спонсорские, вступительные, финальные и подобные фрагменты"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "Включить SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "Категории фрагментов"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "Спонсор"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "Самореклама"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "Напоминание о взаимодействии"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "Вступление"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "Концовка"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "Превью/обзор"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "Вне музыки"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "Заполнение"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "Яркий момент"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "Поведение при пропуске"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "Пропускать с уведомлением (можно отменить)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "Пропускать молча"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "Показывать только кнопку"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "Окно отмены"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d с"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "Приватный запрос"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "Отправлять только хэш видео, без ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "Пропущено: %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "Отменить"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "Для этого видео нет фрагментов"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "Категорий: %d"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "Краудсорсинговые заголовки и обложки"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "Помечать или скрывать каналы с ИИ-контентом"
         }
     ]
 }

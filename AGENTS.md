@@ -339,6 +339,16 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `LlmTranslateConfig` (`cfg_ai_translate_*`), routing in
   `TranslationService` (`entry/common/TranslationService.ets`); all requests
   use the app proxy. Subtitle translation is not part of this settings page.
+- **Experimental features / 实验性功能**: Settings → 实验性功能
+  (`OptionsExperimentalPage`, config `ExperimentalConfig`, key
+  `cfg_experimental_json`) hosts built-in enhancement modules, all off by
+  default. SponsorBlock (implemented) fetches segments through
+  `CommunityHttp` → `SponsorBlockClient` (SHA-256 4-char hash prefix,
+  in-memory cache) and skips via `SponsorBlockSkipper`, which subscribes to
+  `AvPlayerController` progress from `PlayerSession` — never from the player
+  page UI, so background/PiP playback keeps skipping. DeArrow and AiSList
+  are placeholders (M0 skeleton) until their clients land. All requests use
+  `HttpDownloader` so the app proxy applies; no YouTube extractor changes.
 - **Secrets / artifacts**: do not commit keystores, `Crash_*.dmp`, or build
   trees. `AGENTS.md` files are tracked project docs — keep them in sync
   with the code they describe, and never put machine-specific absolute

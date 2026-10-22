@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "Região"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "Recursos experimentais"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "Melhorias experimentais integradas, desativadas por padrão"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "Ativado"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "Desativado"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "Estes recursos dependem de serviços comunitários de terceiros e podem mudar ou falhar a qualquer momento."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "Limpar cache do plugin"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "Cache limpo"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "Este recurso está em desenvolvimento"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "Pular automaticamente segmentos de patrocínio, intro, outro e similares"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "Ativar SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "Categorias de segmentos"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "Patrocínio"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "Autopromoção"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "Lembrete de interação"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "Intro"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "Outro"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "Prévia/recapitulação"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "Fora de música"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "Preenchimento"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "Destaque"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "Comportamento ao pular"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "Pular e avisar (desfazível)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "Pular em silêncio"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "Mostrar apenas o botão"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "Janela de desfazer"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d s"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "Consulta privada"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "Enviar apenas um hash do vídeo, não o ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "Pulado: %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "Desfazer"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "Nenhum segmento disponível para este vídeo"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d categorias"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "Títulos e miniaturas colaborativos"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "Marcar ou ocultar canais com conteúdo gerado por IA"
         }
     ]
 }

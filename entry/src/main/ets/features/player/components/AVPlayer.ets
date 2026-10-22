@@ -36,6 +36,8 @@ import {
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
+import { SponsorBlockSkipper, SponsorSkipNotice } from '../../../common/experimental/SponsorBlockSkipper';
+import { ExperimentalConfig } from '../../../common/experimental/ExperimentalConfig';
 import { PlayerPresentation } from '../../../common/PlayerPresentation';
 import { PiPManager } from '../pip/PiPManager';
 import { PlayerUiViewModel } from 'mediaservice';
@@ -214,6 +216,57 @@ export struct VideoPlayer {
     }
   };
 
+  /** SponsorBlock 提示层：仅 toast 模式会收到通知；页面不可见时跳过仍然生效。 */
+  private skipNoticeListener = (notice: SponsorSkipNotice | null): void => {
+    if (this.skipNoticeTimerId >= 0) {
+      clearTimeout(this.skipNoticeTimerId);
+      this.skipNoticeTimerId = -1;
+    }
+    this.skipNotice = notice;
+    if (!notice) {
+      return;
+    }
+    const config = AppStorage.get<ExperimentalConfig>('experimentalConfig');
+    const seconds = config ? Math.max(3, config.sponsorUnskipSeconds) : 5;
+    this.skipNoticeTimerId = setTimeout(() => {
+      this.skipNotice = null;
+      this.skipNoticeTimerId = -1;
+    }, seconds * 1000);
+  };
+
+  private skipCategoryLabel(category: string): string {
+    const rm = getContext().resourceManager;
+    let key: Resource = $r('app.string.yt_exp_sb_cat_sponsor');
+    if (category === 'selfpromo') {
+      key = $r('app.string.yt_exp_sb_cat_selfpromo');
+    } else if (category === 'interaction') {
+      key = $r('app.string.yt_exp_sb_cat_interaction');
+    } else if (category === 'intro') {
+      key = $r('app.string.yt_exp_sb_cat_intro');
+    } else if (category === 'outro') {
+      key = $r('app.string.yt_exp_sb_cat_outro');
+    } else if (category === 'preview') {
+      key = $r('app.string.yt_exp_sb_cat_preview');
+    } else if (category === 'music_offtopic') {
+      key = $r('app.string.yt_exp_sb_cat_music');
+    } else if (category === 'filler') {
+      key = $r('app.string.yt_exp_sb_cat_filler');
+    } else if (category === 'poi_highlight') {
+      key = $r('app.string.yt_exp_sb_cat_highlight');
+    }
+    return rm.getStringSync(key.id);
+  }
+
+  private undoSponsorSkip(): void {
+    if (SponsorBlockSkipper.getInstance().undo()) {
+      this.skipNotice = null;
+      if (this.skipNoticeTimerId >= 0) {
+        clearTimeout(this.skipNoticeTimerId);
+        this.skipNoticeTimerId = -1;
+      }
+    }
+  }
+
   private playbackStateListener = (state: PlaybackState) => {
     // PlaybackState is emitted continuously by the engine and closes the
     // timing gap where the state-machine transition happened before this page
@@ -310,6 +363,8 @@ export struct VideoPlayer {
   @State subtitleDragLiftRatio: number = 0;
   @State subtitleDragOffsetXRatio: number = 0;
   @State aiTranslateProgress: string = '';
+  @State skipNotice: SponsorSkipNotice | null = null;
+  private skipNoticeTimerId: number = -1;
   @State aiCaptionShown: boolean = false;
   /** 拖动中的高亮态（虚线取景框 + 气泡样式），需在 build 中响应 */
   @State subtitleDragging: boolean = false;
@@ -531,6 +586,7 @@ export struct VideoPlayer {
 
     // 注册进度监听（节流后的 currentTime/durationTime）
     this.controller.subscribeProgress(this.progressListener);
+    SponsorBlockSkipper.getInstance().setNoticeListener(this.skipNoticeListener);
     this.controller.subscribePlaybackState(this.playbackStateListener);
     // 错误与特殊状态监听
     this.controller.addErrorListener(this.errorListener);
@@ -1973,6 +2029,40 @@ export struct VideoPlayer {
     .zIndex(CommonConstants.Z_INDEX_BASE + 0.5)
   }
 
+  @Builder
+  SponsorSkipNoticeLayer() {
+    if (this.skipNotice) {
+      Column() {
+        Row({ space: 10 }) {
+          Text(getContext().resourceManager.getStringSync(
+            $r('app.string.yt_exp_sb_skipped').id,
+            this.skipCategoryLabel(this.skipNotice!.category)))
+            .fontSize(13)
+            .fontColor(Color.White)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+          Text($r('app.string.yt_exp_sb_undo'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.themePrimary)
+            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            .onClick(() => this.undoSponsorSkip())
+        }
+        .padding({ left: 14, right: 8, top: 6, bottom: 6 })
+        .backgroundColor('#E6000000')
+        .borderRadius(18)
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.End)
+      .alignItems(HorizontalAlign.Center)
+      .padding({ bottom: 110 })
+      .hitTestBehavior(HitTestMode.Transparent)
+      .zIndex(CommonConstants.Z_INDEX_BASE + 2.3)
+    }
+  }
+
   build() {
     Stack({ alignContent: Alignment.Center }) {
       // 1. 渲染层（XComponent SURFACE 直渲）
@@ -2058,6 +2148,9 @@ export struct VideoPlayer {
         .hitTestBehavior(HitTestMode.None)
         .zIndex(CommonConstants.Z_INDEX_BASE + 1)
       }
+
+      // SponsorBlock 跳过提示（toast 模式，可撤销）
+      this.SponsorSkipNoticeLayer()
 
       // 错误提示层（任一播放器出错都会显示）
       if (this.curSource.error || this.hasError) {
@@ -2837,6 +2930,12 @@ export struct VideoPlayer {
     this.controller.removeStateListener(this.keepScreenListener);
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
+    SponsorBlockSkipper.getInstance().setNoticeListener(null);
+    if (this.skipNoticeTimerId >= 0) {
+      clearTimeout(this.skipNoticeTimerId);
+      this.skipNoticeTimerId = -1;
+    }
+    this.skipNotice = null;
     this.controller.unsubscribePlaybackState(this.playbackStateListener);
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);

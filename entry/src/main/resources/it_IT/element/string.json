@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "Area"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "Funzioni sperimentali"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "Miglioramenti sperimentali integrati, disattivati per impostazione predefinita"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "Attivo"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "Disattivo"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "Queste funzioni dipendono da servizi comunitari di terze parti e possono cambiare o smettere di funzionare in qualsiasi momento."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "Svuota la cache del plugin"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "Cache svuotata"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "Questa funzione è in sviluppo"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "Salta automaticamente segmenti sponsor, intro, outro e simili"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "Attiva SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "Categorie di segmenti"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "Sponsor"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "Autopromozione"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "Promemoria interazione"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "Intro"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "Outro"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "Anteprima/riepilogo"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "Non musicale"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "Riempitivo"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "Momento saliente"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "Comportamento di salto"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "Salta e avvisa (annullabile)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "Salta in silenzio"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "Mostra solo il pulsante"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "Finestra di annullamento"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d s"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "Ricerca privata"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "Invia solo un hash del video, non l’ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "Saltato: %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "Annulla"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "Nessun segmento disponibile per questo video"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d categorie"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "Titoli e miniature crowdsourced"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "Contrassegna o nascondi i canali con contenuti generati dall’IA"
         }
     ]
 }

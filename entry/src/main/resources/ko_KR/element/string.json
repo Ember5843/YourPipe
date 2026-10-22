@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "지역"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "실험적 기능"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "내장 실험적 기능이며 기본적으로 꺼져 있습니다"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "켜짐"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "꺼짐"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "이 기능은 타사 커뮤니티 서비스에 의존하므로 언제든 변경되거나 중단될 수 있습니다."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "플러그인 캐시 지우기"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "캐시를 지웠습니다"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "이 기능은 개발 중입니다"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "스폰서, 인트로, 아웃트로 등의 구간을 자동으로 건너뜁니다"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "SponsorBlock 사용"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "구간 카테고리"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "스폰서"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "자기 홍보"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "상호작용 알림"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "인트로"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "아웃트로"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "미리보기/요약"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "음악 외"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "채우기"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "하이라이트"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "건너뛰기 동작"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "건너뛰고 알림(되돌릴 수 있음)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "조용히 건너뛰기"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "버튼만 표시"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "되돌리기 시간"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d초"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "비공개 조회"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "동영상 ID 대신 해시만 전송"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "건너뜀: %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "되돌리기"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "이 동영상에 사용할 수 있는 구간이 없습니다"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "카테고리 %d개"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "크라우드소싱 제목 및 썸네일"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "AI 생성 콘텐츠 채널 표시 또는 숨기기"
         }
     ]
 }

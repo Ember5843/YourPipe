@@ -68,6 +68,9 @@ import { ColorModeManager } from '../common/ColorModeManager';
 import { buildTitleMenu, buildYourTubeTitleBar } from '../common/components/HdsTitleBar';
 import { MaterialUtil } from '../common/utils/MaterialUtil';
 import { PlaybackConfig } from '../common/PlaybackConfig';
+import { ExperimentalConfig } from '../common/experimental/ExperimentalConfig';
+import { SponsorBlockSkipper } from '../common/experimental/SponsorBlockSkipper';
+import { SponsorBlockClient } from '../common/experimental/SponsorBlockClient';
 import { LlmTranslateConfig } from '../common/LlmTranslateConfig';
 import { SubtitleTranslationService } from '../features/player/translate/SubtitleTranslationService';
 import { AsrModelManager } from '../features/player/asr/AsrModelManager';
@@ -235,6 +238,20 @@ struct Index {
     this.savePlaybackConfig(this.playbackConfig);
   }
 
+  /** 实验性功能配置：就地改字段 → 落盘 → 让正在播放的 SponsorBlock 立即生效。 */
+  private updateExperimentalConfig(mutator: (cfg: ExperimentalConfig) => void): void {
+    const cfg = AppStorage.get<ExperimentalConfig>('experimentalConfig') ?? new ExperimentalConfig();
+    mutator(cfg);
+    cfg.saveToPreferences();
+    const session = PlayerSession.getInstance();
+    const skipper = SponsorBlockSkipper.getInstance();
+    if (session.currentVideo && session.controller.isActive()) {
+      skipper.reconnect(session.controller, session.currentVideo);
+    } else {
+      skipper.onPlaybackStopped();
+    }
+  }
+
   /** 播放端点变更：应用 per-state 配置、重置身份/pot 缓存、清 prefetch（旧端点抓的流 URL 不可复用）。 */
   private onPlayerClientChanged(guest: string, auth: string): void {
     AuthStateHelper.applyPlayerClientConfig(guest, auth);
@@ -264,6 +281,13 @@ struct Index {
     PlaybackConfig.saveToPreferences(defaultPlaybackConfig);
     AppStorage.setOrCreate('autoPlayQueue', defaultPlaybackConfig.autoPlayNext);
     DownloadManager.getInstance().refreshTaskPool();
+
+    // 2.1 实验性功能默认全部关闭，并停止正在生效的跳过/缓存
+    const defaultExperimentalConfig = new ExperimentalConfig();
+    defaultExperimentalConfig.saveToPreferences();
+    AppStorage.setOrCreate('experimentalConfig', defaultExperimentalConfig);
+    SponsorBlockSkipper.getInstance().onPlaybackStopped();
+    SponsorBlockClient.getInstance().clearCache();
 
     // 播放端点恢复默认（visionos/tv_downgraded）并使身份/pot 缓存失效
     AuthStateHelper.applyPlayerClientConfig(defaultPlaybackConfig.guestPlayerClient, defaultPlaybackConfig.authPlayerClient);
@@ -389,6 +413,11 @@ struct Index {
     const defaultPlaybackConfig = new PlaybackConfig();
     this.playbackConfig = defaultPlaybackConfig;
     AppStorage.setOrCreate('autoPlayQueue', defaultPlaybackConfig.autoPlayNext);
+    const defaultExperimentalConfig = new ExperimentalConfig();
+    defaultExperimentalConfig.saveToPreferences();
+    AppStorage.setOrCreate('experimentalConfig', defaultExperimentalConfig);
+    SponsorBlockSkipper.getInstance().onPlaybackStopped();
+    SponsorBlockClient.getInstance().clearCache();
     const defaultProxy = NetworkProxyConfig.resetToDefault();
     AppStorage.setOrCreate('networkProxyConfig', defaultProxy);
     ShortsFeedService.getInstance().invalidate('clear_all_data');
@@ -1597,6 +1626,9 @@ struct Index {
         },
         updatePlaybackConfig: (mutator: (cfg: PlaybackConfig) => void) => {
           this.updatePlaybackConfig(mutator);
+        },
+        updateExperimentalConfig: (mutator: (cfg: ExperimentalConfig) => void) => {
+          this.updateExperimentalConfig(mutator);
         },
         applyLanguageSelection: (languageCode: string) => {
           this.applyLanguageSelection(languageCode);

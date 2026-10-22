@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "Region"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "Experimental features"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "Built-in experimental enhancements, off by default"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "On"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "Off"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "These features rely on third-party community services and may change or break at any time."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "Clear plugin cache"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "Cache cleared"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "This feature is under development"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "Automatically skip sponsor, intro, outro and similar segments"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "Enable SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "Segment categories"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "Sponsor"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "Self-promotion"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "Interaction reminder"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "Intro"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "Outro"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "Preview/recap"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "Non-music"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "Filler"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "Highlight"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "Skip behavior"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "Skip and notify (undoable)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "Skip silently"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "Show skip button only"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "Undo window"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d s"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "Privacy lookup"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "Send only a video hash, not the video ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "Skipped: %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "Undo"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "No segments available for this video"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d categories"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "Crowdsourced titles and thumbnails"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "Mark or hide channels with AI-generated content"
         }
     ]
 }

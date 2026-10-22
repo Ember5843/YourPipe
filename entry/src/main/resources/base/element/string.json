@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "区域（Region）"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "实验性功能"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "内置实验性增强功能，默认关闭"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "已启用"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "未启用"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "这些功能依赖第三方社区服务，可能随时变更或不可用。"
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "清除本插件缓存"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "缓存已清除"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "该功能正在开发中"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "自动跳过赞助、片头、片尾等片段"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "启用 SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "片段类别"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "赞助片段"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "自我推广"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "互动提醒"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "片头"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "片尾"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "预览/回顾"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "非音乐片段"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "填充内容"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "精彩片段"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "跳过行为"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "跳过并提示（可撤销）"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "静默跳过"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "只显示跳过按钮"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "撤销窗口"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d 秒"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "隐私查询"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "只发送视频哈希，不发送视频 ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "已跳过：%s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "撤销"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "该视频没有可用片段"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d 类片段"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "众包标题与缩略图"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "标记或隐藏 AI 生成内容的频道"
         }
     ]
 }

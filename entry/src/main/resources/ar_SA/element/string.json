@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "المنطقة"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "ميزات تجريبية"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "تحسينات تجريبية مدمجة، معطّلة افتراضيًا"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "مفعّل"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "معطّل"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "تعتمد هذه الميزات على خدمات مجتمعية تابعة لجهات خارجية وقد تتغير أو تتوقف في أي وقت."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "مسح ذاكرة التخزين المؤقت للإضافة"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "تم مسح ذاكرة التخزين المؤقت"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "هذه الميزة قيد التطوير"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "تخطي مقاطع الرعاية والمقدمة والخاتمة وما شابه تلقائيًا"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "تفعيل SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "فئات المقاطع"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "رعاية"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "ترويج ذاتي"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "تنبيه تفاعل"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "مقدمة"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "خاتمة"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "معاينة/مراجعة"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "خارج الموسيقى"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "حشو"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "لحظة بارزة"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "سلوك التخطي"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "تخطي مع تنبيه (قابل للتراجع)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "تخطي بصمت"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "إظهار الزر فقط"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "نافذة التراجع"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d ث"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "استعلام خاص"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "إرسال تجزئة الفيديو فقط، دون المعرّف"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "تم التخطي: %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "تراجع"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "لا توجد مقاطع متاحة لهذا الفيديو"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d فئات"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "عناوين وصور مصغرة من المجتمع"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "تعليم أو إخفاء القنوات ذات المحتوى المولّد بالذكاء الاصطناعي"
         }
     ]
 }

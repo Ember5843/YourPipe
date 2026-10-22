@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "Region"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "Experimentelle Funktionen"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "Integrierte experimentelle Erweiterungen, standardmäßig deaktiviert"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "Aktiv"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "Inaktiv"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "Diese Funktionen nutzen Community-Dienste von Drittanbietern und können sich jederzeit ändern oder ausfallen."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "Plugin-Cache leeren"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "Cache geleert"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "Diese Funktion befindet sich in Entwicklung"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "Sponsor-, Intro-, Outro- und ähnliche Abschnitte automatisch überspringen"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "SponsorBlock aktivieren"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "Abschnittskategorien"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "Sponsor"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "Eigenwerbung"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "Interaktionshinweis"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "Intro"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "Outro"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "Vorschau/Rückblick"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "Keine Musik"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "Füllmaterial"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "Höhepunkt"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "Überspringverhalten"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "Überspringen und hinweisen (rückgängig machbar)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "Lautlos überspringen"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "Nur Schaltfläche anzeigen"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "Rückgängig-Fenster"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d s"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "Privatsphäre-Abfrage"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "Nur einen Video-Hash senden, keine Video-ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "Übersprungen: %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "Rückgängig"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "Keine Abschnitte für dieses Video verfügbar"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d Kategorien"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "Crowdsourcing-Titel und -Vorschaubilder"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "Kanäle mit KI-generierten Inhalten markieren oder ausblenden"
         }
     ]
 }

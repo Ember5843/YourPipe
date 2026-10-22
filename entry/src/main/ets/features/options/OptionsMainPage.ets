@@ -25,6 +25,7 @@ interface OptionsMainPageParams {
   onGestureControlClick: () => void;
   onSubtitleClick: () => void;
   onPerformanceClick: () => void;
+  onExperimentalClick: () => void;
   onNetworkClick: () => void;
   onAppearanceClick: () => void;
   // [DISABLED] P3：onAiTranslateClick: () => void;
@@ -52,6 +53,7 @@ export struct OptionsMainPage {
     onGestureControlClick: () => {},
     onSubtitleClick: () => {},
     onPerformanceClick: () => {},
+    onExperimentalClick: () => {},
     onNetworkClick: () => {},
     onAppearanceClick: () => {},
     // [DISABLED] P3：onAiTranslateClick: () => {},
@@ -313,6 +315,23 @@ export struct OptionsMainPage {
             iconColor: this.themePrimary,
             clickEffectEnabled: this.params.clickEffectEnabled,
             onClickAction: this.params.onPerformanceClick
+          })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_exp_title') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItem() {
+          OptionItem({
+            icon: $r('sys.symbol.clock'),
+            title: $r('app.string.yt_exp_title'),
+            subtitle: $r('app.string.yt_exp_subtitle'),
+            iconColor: this.themePrimary,
+            clickEffectEnabled: this.params.clickEffectEnabled,
+            onClickAction: this.params.onExperimentalClick
           })
         }
         .padding({ left: 0, right: 0 })

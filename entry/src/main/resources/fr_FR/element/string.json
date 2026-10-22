@@ -3845,6 +3845,154 @@
         {
             "name": "yt_translation_region",
             "value": "Région"
+        },
+        {
+            "name": "yt_exp_title",
+            "value": "Fonctionnalités expérimentales"
+        },
+        {
+            "name": "yt_exp_subtitle",
+            "value": "Améliorations expérimentales intégrées, désactivées par défaut"
+        },
+        {
+            "name": "yt_exp_enabled",
+            "value": "Activé"
+        },
+        {
+            "name": "yt_exp_disabled",
+            "value": "Désactivé"
+        },
+        {
+            "name": "yt_exp_footer",
+            "value": "Ces fonctionnalités dépendent de services communautaires tiers et peuvent changer ou cesser de fonctionner à tout moment."
+        },
+        {
+            "name": "yt_exp_clear_cache",
+            "value": "Vider le cache du plugin"
+        },
+        {
+            "name": "yt_exp_cache_cleared",
+            "value": "Cache vidé"
+        },
+        {
+            "name": "yt_exp_coming_soon",
+            "value": "Cette fonctionnalité est en cours de développement"
+        },
+        {
+            "name": "yt_exp_sb_title",
+            "value": "SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_desc",
+            "value": "Ignorer automatiquement les segments sponsor, intro, outro et similaires"
+        },
+        {
+            "name": "yt_exp_sb_master",
+            "value": "Activer SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_categories",
+            "value": "Catégories de segments"
+        },
+        {
+            "name": "yt_exp_sb_cat_sponsor",
+            "value": "Sponsor"
+        },
+        {
+            "name": "yt_exp_sb_cat_selfpromo",
+            "value": "Auto-promotion"
+        },
+        {
+            "name": "yt_exp_sb_cat_interaction",
+            "value": "Rappel d’interaction"
+        },
+        {
+            "name": "yt_exp_sb_cat_intro",
+            "value": "Intro"
+        },
+        {
+            "name": "yt_exp_sb_cat_outro",
+            "value": "Outro"
+        },
+        {
+            "name": "yt_exp_sb_cat_preview",
+            "value": "Aperçu/récapitulatif"
+        },
+        {
+            "name": "yt_exp_sb_cat_music",
+            "value": "Hors musique"
+        },
+        {
+            "name": "yt_exp_sb_cat_filler",
+            "value": "Remplissage"
+        },
+        {
+            "name": "yt_exp_sb_cat_highlight",
+            "value": "Temps fort"
+        },
+        {
+            "name": "yt_exp_sb_behavior",
+            "value": "Comportement d’ignorance"
+        },
+        {
+            "name": "yt_exp_sb_behavior_toast",
+            "value": "Ignorer et notifier (annulable)"
+        },
+        {
+            "name": "yt_exp_sb_behavior_silent",
+            "value": "Ignorer silencieusement"
+        },
+        {
+            "name": "yt_exp_sb_behavior_manual",
+            "value": "Afficher uniquement le bouton"
+        },
+        {
+            "name": "yt_exp_sb_unskip",
+            "value": "Fenêtre d’annulation"
+        },
+        {
+            "name": "yt_exp_sb_unskip_value",
+            "value": "%d s"
+        },
+        {
+            "name": "yt_exp_sb_privacy",
+            "value": "Requête privée"
+        },
+        {
+            "name": "yt_exp_sb_privacy_desc",
+            "value": "Envoyer uniquement un hachage de la vidéo, pas son ID"
+        },
+        {
+            "name": "yt_exp_sb_skipped",
+            "value": "Ignoré : %s"
+        },
+        {
+            "name": "yt_exp_sb_undo",
+            "value": "Annuler"
+        },
+        {
+            "name": "yt_exp_sb_no_segments",
+            "value": "Aucun segment disponible pour cette vidéo"
+        },
+        {
+            "name": "yt_exp_sb_categories_count",
+            "value": "%d catégories"
+        },
+        {
+            "name": "yt_exp_da_title",
+            "value": "DeArrow"
+        },
+        {
+            "name": "yt_exp_da_desc",
+            "value": "Titres et miniatures participatifs"
+        },
+        {
+            "name": "yt_exp_ai_title",
+            "value": "AiSList"
+        },
+        {
+            "name": "yt_exp_ai_desc",
+            "value": "Marquer ou masquer les chaînes à contenu généré par IA"
         }
     ]
 }
