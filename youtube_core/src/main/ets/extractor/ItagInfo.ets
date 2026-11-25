@@ -19,6 +19,8 @@ export class ItagInfo {
   private audioTrackNameVal: string | undefined;
   private audioLocaleVal: string | undefined;
   private audioTrackTypeVal: string | undefined;
+  private isDrcVal: boolean = false;
+  private isAutoDubbedVal: boolean = false;
 
   constructor(content: string, itagItem: ItagItem) {
     this.contentVal = content;
@@ -85,5 +87,21 @@ export class ItagInfo {
 
   getAudioTrackType(): string | undefined {
     return this.audioTrackTypeVal;
+  }
+
+  setIsDrc(isDrc: boolean): void {
+    this.isDrcVal = isDrc;
+  }
+
+  getIsDrc(): boolean {
+    return this.isDrcVal;
+  }
+
+  setIsAutoDubbed(isAutoDubbed: boolean): void {
+    this.isAutoDubbedVal = isAutoDubbed;
+  }
+
+  getIsAutoDubbed(): boolean {
+    return this.isAutoDubbedVal;
   }
 }

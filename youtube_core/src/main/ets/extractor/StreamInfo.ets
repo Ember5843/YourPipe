@@ -32,6 +32,8 @@ export interface StreamInfo {
   audioTrackId: string | undefined;
   audioTrackName: string | undefined;
   audioTrackType: string | undefined;
+  isDrc?: boolean;
+  isAutoDubbed?: boolean;
   audioChannels: number | undefined;
   audioSampleRate: number | undefined;
   videoFps: number | undefined;
@@ -72,6 +74,8 @@ export function equalStats(a: StreamInfo, b: StreamInfo): boolean {
   if (a.height !== b.height) return false;
   // 不同语言的音频流（audioTrackId 不同）不应被视为相同
   if (a.audioTrackId !== b.audioTrackId) return false;
+  // 区分 DRC 与非 DRC 音轨，避免非 DRC 轨被 DRC 吞掉
+  if (!!a.isDrc !== !!b.isDrc) return false;
   return true;
 }
 

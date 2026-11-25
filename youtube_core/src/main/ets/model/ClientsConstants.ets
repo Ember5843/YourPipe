@@ -137,7 +137,7 @@ export class ClientsConstants {
   /** PipePipe getAndroidUserAgent — country code is the request localization's. */
   static androidUserAgent(countryCode: string = 'US'): string {
     return "com.google.android.youtube/" + ClientsConstants.ANDROID_CLIENT_VERSION
-      + " (Linux; U; Android 15; " + countryCode + ") gzip";
+      + " (Linux; U; Android " + ClientsConstants.ANDROID_OS_VERSION + "; " + countryCode + ") gzip";
   }
 
   // =====================

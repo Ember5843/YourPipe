@@ -21,6 +21,7 @@ export interface YoutubeSabrFormatMeta {
   /** acont from xtags when present: original | dubbed | descriptive | … */
   audioTrackType?: string;
   isOriginalAudio?: boolean;
+  isAutoDubbed?: boolean;
   /** Optional progressive init URL (rare on pure SABR). */
   initializationUrl?: string;
   initRangeStart?: number;
@@ -108,21 +109,50 @@ export class YoutubeSabrInfo {
   }
 
   /**
-   * Multi-language audio reuses the same itag (e.g. 140) with different audioTrackId.
-   * Prefer exact itag+track match; fall back to first itag only when track is empty.
+   * Multi-language audio reuses the same itag (e.g. 140) with different audioTrackId,
+   * and DRC renditions share both itag and audioTrackId with normal tracks.
+   * Prefer exact itag+track+drc match (preferring non-DRC when drc is unspecified);
+   * fall back to first matching track/itag when no exact match exists.
    */
   findFormatByItagAndTrack(
     itag: number,
-    audioTrackId?: string
+    audioTrackId?: string,
+    drc?: boolean
   ): YoutubeSabrFormatMeta | undefined {
     const track = (audioTrackId || '').trim();
+    const matchesDrc = (format: YoutubeSabrFormatMeta): boolean => {
+      if (drc !== undefined) {
+        return (format.drc === true) === drc;
+      }
+      return format.drc !== true;
+    };
     if (track.length > 0) {
+      let trackFallback: YoutubeSabrFormatMeta | undefined = undefined;
       for (const format of this.formats) {
         if (format.itag === itag && (format.audioTrackId || '') === track) {
+          if (matchesDrc(format)) {
+            return format;
+          }
+          if (!trackFallback) {
+            trackFallback = format;
+          }
+        }
+      }
+      if (trackFallback) {
+        return trackFallback;
+      }
+    }
+    let itagFallback: YoutubeSabrFormatMeta | undefined = undefined;
+    for (const format of this.formats) {
+      if (format.itag === itag) {
+        if (matchesDrc(format)) {
           return format;
+        }
+        if (!itagFallback) {
+          itagFallback = format;
         }
       }
     }
-    return this.findFormatByItag(itag);
+    return itagFallback;
   }
 }

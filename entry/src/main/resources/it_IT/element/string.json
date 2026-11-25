@@ -4150,6 +4150,9 @@
         {"name": "yt_cookie_verify_success", "value": "Cookie verificato."},
         {"name": "yt_local_import_partial", "value": "%1$d file importati; %2$d non riusciti."},
         {"name": "yt_recovery_failed", "value": "Impossibile completare l’operazione. Riprova."},
-        {"name": "yt_proxy_applying", "value": "Applicazione del proxy…"}
+        {"name": "yt_proxy_applying", "value": "Applicazione del proxy…"},
+        {"name": "yt_exp_sb_skip_manual", "value": "Salta %s"},
+        {"name": "yt_exp_sb_jump_highlight", "value": "Vai al momento saliente"},
+        {"name": "yt_action_sleep_timer_off", "value": "Disattiva"}
     ]
 }

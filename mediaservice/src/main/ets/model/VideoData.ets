@@ -40,6 +40,8 @@ export interface StreamInfo {
   audioTrackId?: string;
   audioTrackName?: string;
   audioTrackType?: string;
+  isDrc?: boolean;
+  isAutoDubbed?: boolean;
   // DASH SegmentBase fields (from YouTube InnerTube API response)
   initRangeStart?: number;
   initRangeEnd?: number;

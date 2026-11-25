@@ -820,8 +820,21 @@ export struct VideoDetails {
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.yourtube_text_primary'))
+        Blank()
+        if (this.sleepTimerRemainingMinutes > 0) {
+          Button($r('app.string.yt_action_sleep_timer_off'))
+            .type(ButtonType.Capsule)
+            .height(32)
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.themePrimary)
+            .backgroundColor($r('app.color.yourtube_player_control_bg'))
+            .padding({ left: 12, right: 12 })
+            .onClick(() => { this.cancelActiveSleepTimer(); })
+        }
       }
       .width('100%')
+      .alignItems(VerticalAlign.Center)
       .padding({ top: 8, bottom: 4 })
 
       TimePicker({
@@ -1122,6 +1135,13 @@ export struct VideoDetails {
     this.syncSleepTimerUi();
     this.closeSheet();
     Logger.info(TAG, `Sleep timer sheet accepted minutes=${minutes}`);
+  }
+
+  private cancelActiveSleepTimer(): void {
+    PlayerSession.getInstance().cancelSleepTimer();
+    this.syncSleepTimerUi();
+    this.closeSheet();
+    Logger.info(TAG, 'Sleep timer turned off by user');
   }
 
   private shareVideo(): void {

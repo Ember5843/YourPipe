@@ -4150,6 +4150,9 @@
         {"name": "yt_cookie_verify_success", "value": "Cookie の確認に成功しました"},
         {"name": "yt_local_import_partial", "value": "%1$d 件をインポート、%2$d 件に失敗しました"},
         {"name": "yt_recovery_failed", "value": "操作を完了できませんでした。再試行してください。"},
-        {"name": "yt_proxy_applying", "value": "プロキシを適用中…"}
+        {"name": "yt_proxy_applying", "value": "プロキシを適用中…"},
+        {"name": "yt_exp_sb_skip_manual", "value": "%sをスキップ"},
+        {"name": "yt_exp_sb_jump_highlight", "value": "ハイライトへ移動"},
+        {"name": "yt_action_sleep_timer_off", "value": "タイマーをオフ"}
     ]
 }

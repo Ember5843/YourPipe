@@ -33,7 +33,16 @@ import { parseHlsMasterManifest } from './HlsManifestParser';
 import { YoutubeJavaScriptPlayerManager } from './cipher/YoutubeJavaScriptPlayerManager';
 import { PipePipeApiDecoder, PlayerMetadata } from './cipher/PipePipeApiDecoder';
 import {
+  ContentNotAvailableException,
   AgeRestrictedContentException,
+  PrivateContentException,
+  PaidContentException,
+  YoutubeMusicPremiumContentException,
+  GeographicRestrictionException,
+  LoginRequiredException,
+  AccountTerminatedException,
+  LiveStreamOfflineException,
+  AntiBotException,
   SignInConfirmNotBotException,
   ContentNotSupportedException,
   NoPlayableStreamsException,
@@ -606,6 +615,29 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
    *   (tv = tv_downgraded|tv_samsung — PipePipe isTvClient)
    *   + HLS for post-live / live+tv / web_safari
    */
+  /**
+   * True only for a base ContentNotAvailableException (not any unrecoverable
+   * subclass such as age-restricted, private, paid, geo-blocked, login, anti-bot,
+   * terminated account, or offline live). Used to allow visionos reel fallback.
+   */
+  private static isPureContentNotAvailableException(e: Error): boolean {
+    if (!(e instanceof ContentNotAvailableException)) {
+      return false;
+    }
+    if (e instanceof AgeRestrictedContentException
+      || e instanceof PrivateContentException
+      || e instanceof PaidContentException
+      || e instanceof YoutubeMusicPremiumContentException
+      || e instanceof GeographicRestrictionException
+      || e instanceof LoginRequiredException
+      || e instanceof AccountTerminatedException
+      || e instanceof LiveStreamOfflineException
+      || e instanceof AntiBotException) {
+      return false;
+    }
+    return e.name === 'ContentNotAvailableException';
+  }
+
   private async buildAndCacheStreams(videoId: string, innertubePlayers: InnertubePlayerResult,
     metaPlayerResponse: PlayerResponse): Promise<void> {
     this.cachedManifestNResult = null;
@@ -615,16 +647,31 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     this.cachedVideoOnlyStreams = [];
 
     const primaryPr = innertubePlayers.player;
+    const selectedClient = YoutubePlayerClientConfig.getYoutubePlayerClient();
+    let primaryPlayabilityError: Error | undefined = undefined;
     if (primaryPr?.playabilityStatus) {
-      PlayabilityChecker.check(primaryPr.playabilityStatus);
+      if (selectedClient === 'visionos') {
+        try {
+          PlayabilityChecker.check(primaryPr.playabilityStatus);
+        } catch (e) {
+          const err = e as Error;
+          if (YouTubeExtractor.isPureContentNotAvailableException(err)) {
+            primaryPlayabilityError = err;
+            logger.warn(`[STREAM] visionos playability soft-deferred for reel fallback: ${err.message}`);
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        PlayabilityChecker.check(primaryPr.playabilityStatus);
+      }
     }
 
     this.configuredStreamingData = primaryPr?.streamingData;
     this.configuredCpn = innertubePlayers.cpn ?? '';
     this.configuredSourceClient = innertubePlayers.sourceClient
-      ?? YoutubePlayerClientConfig.getYoutubePlayerClient();
+      ?? selectedClient;
 
-    const selectedClient = YoutubePlayerClientConfig.getYoutubePlayerClient();
     const isLive = this.resolveIsLive(metaPlayerResponse, primaryPr);
     const isPostLive = this.resolveIsPostLive(metaPlayerResponse, primaryPr);
     const hasSabrUrl = !!(this.configuredStreamingData?.serverAbrStreamingUrl
@@ -646,16 +693,18 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     }
 
     // Adaptive progressive URLs (PipePipe skips for TV client + LIVE)
-    if (!((selectedClient === 'tv_downgraded' || selectedClient === 'tv_samsung') && isLive)) {
+    if (!primaryPlayabilityError
+      && !((selectedClient === 'tv_downgraded' || selectedClient === 'tv_samsung') && isLive)) {
       await this.extractAdaptiveFormats(videoId, this.configuredStreamingData, this.configuredCpn || '',
         this.configuredSourceClient || selectedClient);
     }
 
     // HLS: PipePipe ensureStreamsAreCached conditions only
     // (post-live | live+tv client | web_safari). No empty-stream extra GET.
-    if (isPostLive
-      || (isLive && (selectedClient === 'tv_downgraded' || selectedClient === 'tv_samsung'))
-      || selectedClient === 'web_safari') {
+    if (!primaryPlayabilityError
+      && (isPostLive
+        || (isLive && (selectedClient === 'tv_downgraded' || selectedClient === 'tv_samsung'))
+        || selectedClient === 'web_safari')) {
       await this.tryExtractHlsStreams(videoId);
     }
 
@@ -666,7 +715,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       && this.cachedVideoOnlyStreams.length === 0
       && this.cachedVideoStreams.length === 0;
     if (selectedClient === 'visionos' && noStreamsYet
-      && !this.getHlsManifestUrlFromStreamingData()) {
+      && (primaryPlayabilityError !== undefined || !this.getHlsManifestUrlFromStreamingData())) {
       await this.extractAndroidReelMuxedFormats(videoId);
     }
 
@@ -675,12 +724,17 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     const hasAnyStream = this.cachedAudioStreams.length > 0
       || this.cachedVideoOnlyStreams.length > 0
       || this.cachedVideoStreams.length > 0;
-    if (!hasAnyStream && !this.getHlsManifestUrlFromStreamingData()) {
-      throw new NoPlayableStreamsException(
-        `No playable streams from client=${selectedClient} `
-        + `(adaptive=${this.configuredStreamingData?.adaptiveFormats?.length ?? 0}, `
-        + `serverAbr=${hasSabrUrl})`
-      );
+    if (!hasAnyStream) {
+      if (primaryPlayabilityError) {
+        throw primaryPlayabilityError;
+      }
+      if (!this.getHlsManifestUrlFromStreamingData()) {
+        throw new NoPlayableStreamsException(
+          `No playable streams from client=${selectedClient} `
+          + `(adaptive=${this.configuredStreamingData?.adaptiveFormats?.length ?? 0}, `
+          + `serverAbr=${hasSabrUrl})`
+        );
+      }
     }
   }
 
@@ -849,7 +903,9 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
           audioTrackId: fmt.audioTrackId,
           audioTrackName: fmt.audioTrackName,
           audioTrackType: fmt.audioTrackType
-            || (fmt.isOriginalAudio ? 'original' : undefined),
+            || (fmt.isAutoDubbed ? 'dubbed-auto' : (fmt.isOriginalAudio ? 'original' : undefined)),
+          isDrc: fmt.drc === true,
+          isAutoDubbed: fmt.isAutoDubbed === true,
           audioChannels: undefined,
           audioSampleRate: undefined,
           videoFps: undefined,
@@ -1010,6 +1066,9 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       if (!fmt.itag) {
         continue;
       }
+      if (fmt.drmFamilies && fmt.drmFamilies.length > 0) {
+        continue;
+      }
       const mime = fmt.mimeType || '';
       const isAudio = mime.startsWith('audio/');
       const isVideo = mime.startsWith('video/');
@@ -1026,14 +1085,21 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       const trackId = track?.id || '';
       const langPart = trackId.length > 0 ? trackId.split('.')[0] : '';
       const audioLocale = langPart.length > 0 ? langPart.split('-')[0] : undefined;
-      // Prefer xtags acont (NewPipe), then displayName / audioIsDefault.
+      // Prefer xtags acont (NewPipe), then isAutoDubbed / displayName; never let
+      // audioIsDefault flip a dubbed/auto-dubbed track into original.
       const acont = this.resolveAudioTrackType(fmt, fmt.url || '');
-      const isOriginal = acont === 'original'
-        || (!!displayName
-          && (displayName.toLowerCase().includes('original')
-            || displayName.toLowerCase().includes('default')
-            || displayName.includes('yokuqala')))
-        || track?.audioIsDefault === true;
+      const isAutoDubbed = track?.isAutoDubbed === true || acont === 'dubbed-auto';
+      let isOriginal = false;
+      if (isAutoDubbed) {
+        isOriginal = false;
+      } else if (acont !== undefined) {
+        isOriginal = acont === 'original';
+      } else if (displayName.length > 0) {
+        const lowerName = displayName.toLowerCase();
+        isOriginal = lowerName.includes('original')
+          || lowerName.includes('default')
+          || displayName.includes('yokuqala');
+      }
       let initStart: number | undefined = undefined;
       let initEnd: number | undefined = undefined;
       if (fmt.initRange?.start !== undefined) {
@@ -1074,6 +1140,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
         audioTrackName: displayName.length > 0 ? displayName : (trackId || undefined),
         audioTrackType: acont,
         isOriginalAudio: isOriginal,
+        isAutoDubbed: isAutoDubbed,
         initializationUrl: fmt.url,
         initRangeStart: initStart,
         initRangeEnd: initEnd,
@@ -1489,7 +1556,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
   /**
    * Resolve audio track type (acont) for DASH adaptive formats.
    * Priority matches NewPipeExtractor: format.xtags protobuf → URL xtags →
-   * audioTrack.displayName / audioIsDefault heuristics.
+   * audioTrack.isAutoDubbed / displayName heuristics.
    * Values: original | dubbed | dubbed-auto | descriptive | secondary.
    */
   private resolveAudioTrackType(formatData: Format, streamUrl: string): string | undefined {
@@ -1505,8 +1572,8 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     if (!track) {
       return undefined;
     }
-    if (track.audioIsDefault === true) {
-      return 'original';
+    if (track.isAutoDubbed === true) {
+      return 'dubbed-auto';
     }
     const displayName = (track.displayName || '').toLowerCase();
     if (displayName.indexOf('original') >= 0
@@ -2611,6 +2678,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     for (const formatData of formats) {
       try {
         if (!formatData.itag) continue;
+        if (formatData.drmFamilies && formatData.drmFamilies.length > 0) continue;
         const itagItem = ItagItem.getItag(formatData.itag);
         if (itagItem.itagType === itagTypeWanted) {
           const itagInfo = this.buildAndAddItagInfoToList(videoId, formatData, itagItem, itagItem.itagType, contentPlaybackNonce);
@@ -2693,6 +2761,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
 
     const isOtf = formatData.type === 'FORMAT_STREAM_TYPE_OTF';
     itagInfo.setIsUrl(!isOtf);
+    itagInfo.setIsDrc(formatData.isDrc === true);
 
     return itagInfo;
   }
@@ -2703,10 +2772,11 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     if (audioTrackType) {
       itagInfo.setAudioTrackType(audioTrackType);
     }
-    if (!formatData.audioTrack) {
+    const audioTrack = formatData.audioTrack;
+    itagInfo.setIsAutoDubbed(audioTrack?.isAutoDubbed === true || audioTrackType === 'dubbed-auto');
+    if (!audioTrack) {
       return;
     }
-    const audioTrack = formatData.audioTrack;
     if (audioTrack.id) {
       const audioTrackId = audioTrack.id;
       const displayName = (audioTrack.displayName || '').trim();
@@ -2879,6 +2949,8 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       audioTrackId: itagInfo.getAudioTrackId(),
       audioTrackName: itagInfo.getAudioTrackName(),
       audioTrackType: itagInfo.getAudioTrackType(),
+      isDrc: itagInfo.getIsDrc(),
+      isAutoDubbed: itagInfo.getIsAutoDubbed(),
       audioChannels: itagItem.getAudioChannels() > 0 ? itagItem.getAudioChannels() : undefined,
       audioSampleRate: itagItem.getSampleRate() > 0 ? itagItem.getSampleRate() : undefined,
       videoFps: undefined,

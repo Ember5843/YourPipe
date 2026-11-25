@@ -114,7 +114,7 @@ export class SponsorBlockClient {
 
     let segments: SponsorSegment[] = [];
     if (result.status === 200 && result.body.length > 0) {
-      segments = SponsorBlockClient.parse(videoId, result.body);
+      segments = SponsorBlockClient.parse(videoId, result.body, privacy);
     } else if (result.status !== 404 && result.status !== 204) {
       logger.warn(`unexpected status video=${videoId} status=${result.status}`);
     }
@@ -148,43 +148,63 @@ export class SponsorBlockClient {
     this.cache.set(videoId, { segments: segments, fetchedAt: Date.now() });
   }
 
-  private static parse(videoId: string, body: string): SponsorSegment[] {
-    let root: VideoSegmentsApiItem[];
-    try {
-      root = JSON.parse(body) as VideoSegmentsApiItem[];
-    } catch (e) {
-      logger.warn(`parse failed video=${videoId} error=${(e as Error).message}`);
-      return [];
-    }
-    if (!Array.isArray(root)) {
-      return [];
-    }
+  private static parse(videoId: string, body: string, privacy: boolean): SponsorSegment[] {
     const segments: SponsorSegment[] = [];
-    for (const video of root) {
-      if (!video || video.videoID !== videoId || !Array.isArray(video.segments)) {
-        continue;
+    if (privacy) {
+      let root: VideoSegmentsApiItem[];
+      try {
+        root = JSON.parse(body) as VideoSegmentsApiItem[];
+      } catch (e) {
+        logger.warn(`parse failed video=${videoId} error=${(e as Error).message}`);
+        return [];
       }
-      for (const item of video.segments) {
-        if (!item || !Array.isArray(item.segment) || item.segment.length < 2) {
+      if (!Array.isArray(root)) {
+        return [];
+      }
+      for (const video of root) {
+        if (!video || video.videoID !== videoId || !Array.isArray(video.segments)) {
           continue;
         }
-        const start = item.segment[0];
-        const end = item.segment[1];
-        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-          continue;
-        }
-        segments.push({
-          category: item.category || '',
-          actionType: item.actionType || 'skip',
-          startSec: start,
-          endSec: end,
-          votes: typeof item.votes === 'number' ? item.votes : 0,
-          locked: item.locked === 1
-        });
+        SponsorBlockClient.appendParsedItems(video.segments, segments);
       }
+    } else {
+      let items: SegmentApiItem[];
+      try {
+        items = JSON.parse(body) as SegmentApiItem[];
+      } catch (e) {
+        logger.warn(`parse failed video=${videoId} error=${(e as Error).message}`);
+        return [];
+      }
+      if (!Array.isArray(items)) {
+        return [];
+      }
+      SponsorBlockClient.appendParsedItems(items, segments);
     }
     segments.sort((a: SponsorSegment, b: SponsorSegment) => a.startSec - b.startSec);
     return segments;
+  }
+
+  private static appendParsedItems(items: SegmentApiItem[], out: SponsorSegment[]): void {
+    for (const item of items) {
+      if (!item || !Array.isArray(item.segment) || item.segment.length < 2) {
+        continue;
+      }
+      const actionType = item.actionType || 'skip';
+      const start = item.segment[0];
+      const end = item.segment[1];
+      const invalidRange = actionType === 'poi' ? end < start : end <= start;
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || invalidRange) {
+        continue;
+      }
+      out.push({
+        category: item.category || '',
+        actionType: actionType,
+        startSec: start,
+        endSec: end,
+        votes: typeof item.votes === 'number' ? item.votes : 0,
+        locked: item.locked === 1
+      });
+    }
   }
 
   private static async videoHashPrefix(videoId: string): Promise<string> {

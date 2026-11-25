@@ -4150,6 +4150,9 @@
         {"name": "yt_cookie_verify_success", "value": "Cookie 验证成功"},
         {"name": "yt_local_import_partial", "value": "已导入 %1$d 个文件，%2$d 个失败"},
         {"name": "yt_recovery_failed", "value": "操作未能全部完成，请重试"},
-        {"name": "yt_proxy_applying", "value": "正在应用代理…"}
+        {"name": "yt_proxy_applying", "value": "正在应用代理…"},
+        {"name": "yt_exp_sb_skip_manual", "value": "跳过 %s"},
+        {"name": "yt_exp_sb_jump_highlight", "value": "跳至精彩处"},
+        {"name": "yt_action_sleep_timer_off", "value": "关闭定时"}
     ]
 }

@@ -8,7 +8,7 @@ import { HttpDownloader } from '../network/HttpDownloader';
 import { splitSetCookieHeader } from '../network/CookieJar';
 import { isAccountCookieName } from './AuthCookieNames';
 import { buildWebRailHeaders } from './WebRailHeaders';
-import { ClientsConstants } from '../model/ClientsConstants';
+import { WebClientVersionResolver } from '../common/WebClientVersionResolver';
 import { isAuthRejectionResponse } from './AuthExpiredError';
 
 const logger = YTCoreLogger.getInstance('AuthSessionManager');
@@ -816,9 +816,10 @@ export class AuthSessionManager {
     const headers = buildWebRailHeaders(credential.cookies, authorization, true);
     headers['Content-Type'] = 'application/json';
     headers['X-Youtube-Client-Name'] = '1';
-    headers['X-Youtube-Client-Version'] = ClientsConstants.WEB_HARDCODED_CLIENT_VERSION;
+    const webClientVersion = WebClientVersionResolver.getCachedOrHardcoded();
+    headers['X-Youtube-Client-Version'] = webClientVersion;
     const client: Record<string, Object> = {
-      'clientName': 'WEB', 'clientVersion': ClientsConstants.WEB_HARDCODED_CLIENT_VERSION
+      'clientName': 'WEB', 'clientVersion': webClientVersion
     };
     const context: Record<string, Object> = { 'client': client };
     const body: Record<string, Object> = { 'context': context, 'browseId': 'FEhistory' };

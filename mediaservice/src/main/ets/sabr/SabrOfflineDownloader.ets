@@ -127,7 +127,7 @@ export class SabrOfflineDownloader {
   private static resolveAudioFormat(
     info: YoutubeSabrInfo, stream: StreamInfo, itag: number
   ): YoutubeSabrFormatMeta {
-    let found = info.findFormatByItagAndTrack(itag, stream.audioTrackId);
+    let found = info.findFormatByItagAndTrack(itag, stream.audioTrackId, stream.isDrc);
     if (found && stream.audioTrackId && found.audioTrackId !== stream.audioTrackId) {
       found = undefined;
     }
@@ -143,7 +143,9 @@ export class SabrOfflineDownloader {
       codecs: stream.codecs,
       audioTrackId: stream.audioTrackId,
       audioTrackName: stream.audioTrackName,
-      isOriginalAudio: (stream.audioTrackType || '').toLowerCase() === 'original',
+      isOriginalAudio: !stream.isAutoDubbed && (stream.audioTrackType || '').toLowerCase() === 'original',
+      isAutoDubbed: stream.isAutoDubbed === true,
+      drc: stream.isDrc === true,
       approxDurationMs: stream.approxDurationMs
     };
   }

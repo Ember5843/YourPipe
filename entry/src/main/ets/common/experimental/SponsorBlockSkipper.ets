@@ -3,6 +3,7 @@ import { VideoItem } from 'youtube_core';
 import { AppLog } from '../AppLog';
 import {
   ExperimentalConfig,
+  EXP_CATEGORY_HIGHLIGHT,
   EXP_SB_BEHAVIOR_MANUAL,
   EXP_SB_BEHAVIOR_SILENT,
   EXP_SB_BEHAVIOR_TOAST
@@ -17,8 +18,14 @@ const PROMPT_MIN_LEAD_SEC: number = 3;
 const PROMPT_MAX_LEAD_SEC: number = 10;
 /** 用户把进度拖到提示点之前这么远，视为放弃本次提示。 */
 const PROMPT_REARM_SEC: number = 3;
+/** poi_highlight 仅在时间点 > 1s 且播放尚在其前 > 2s 时提示一次。 */
+const POI_MIN_START_SEC: number = 1;
+const POI_LEAD_THRESHOLD_SEC: number = 2;
+
+export type SponsorSkipNoticeMode = 'undo' | 'manual' | 'poi';
 
 export interface SponsorSkipNotice {
+  mode: SponsorSkipNoticeMode;
   category: string;
   startSec: number;
   endSec: number;
@@ -44,6 +51,16 @@ export class SponsorBlockSkipper {
   private pendingSegment: SponsorSegment | null = null;
   /** 用户点「撤销」后放行的片段；离开片段范围后自动解除。 */
   private suppressedSegment: SponsorSegment | null = null;
+  /** manual 模式下当前命中的可跳过片段。 */
+  private manualSegment: SponsorSegment | null = null;
+  /** manual 模式下用户主动关闭提示的片段；离开该片段后解除。 */
+  private dismissedManualSegment: SponsorSegment | null = null;
+  /** 当前展示的精彩片段（poi_highlight）跳转提示。 */
+  private poiSegment: SponsorSegment | null = null;
+  /** 当前视频的精彩片段提示是否已处理（已跳转、已关闭或播放已到达其附近）。 */
+  private poiHandled: boolean = false;
+  /** 当前激活的提示，供页面重新挂载监听时同步。 */
+  private currentNotice: SponsorSkipNotice | null = null;
   private lastSkipAtMs: number = 0;
   private generation: number = 0;
   private noticeListener: ((notice: SponsorSkipNotice | null) => void) | null = null;
@@ -62,6 +79,9 @@ export class SponsorBlockSkipper {
   /** 播放页注册提示层；页面销毁时传 null。 */
   setNoticeListener(listener: ((notice: SponsorSkipNotice | null) => void) | null): void {
     this.noticeListener = listener;
+    if (listener && this.currentNotice) {
+      listener(this.currentNotice);
+    }
   }
 
   onVideoStarted(controller: AvPlayerController, video: VideoItem): void {
@@ -118,12 +138,75 @@ export class SponsorBlockSkipper {
     this.pendingSegment = null;
     this.suppressedSegment = segment;
     this.lastSegment = segment;
-    if (this.noticeListener) {
-      this.noticeListener(null);
-    }
+    this.emitNotice(null);
     logger.info(`undo pending skip video=${this.videoId} category=${segment.category} `
       + `start=${segment.startSec.toFixed(2)}`);
     return true;
+  }
+
+  /** manual 模式下用户点击「跳过」按钮：跳转到当前片段末尾。 */
+  skipManual(): boolean {
+    const segment = this.manualSegment;
+    const controller = this.controller;
+    if (!segment || !controller) {
+      logger.warn(`skipManual ignored video=${this.videoId} no active manual segment`);
+      return false;
+    }
+    const state = controller.getPlaybackState();
+    this.manualSegment = null;
+    this.dismissedManualSegment = segment;
+    this.commitSkip(segment, state.duration);
+    return true;
+  }
+
+  /** poi_highlight 模式下用户点击「跳至精彩处」：跳转到 poi.startSec 并标记已处理。 */
+  jumpToPoi(): boolean {
+    const segment = this.poiSegment;
+    const controller = this.controller;
+    if (!segment || !controller) {
+      logger.warn(`jumpToPoi ignored video=${this.videoId} no active poi segment`);
+      return false;
+    }
+    const state = controller.getPlaybackState();
+    const targetSec = state.duration > 0
+      ? Math.min(segment.startSec, Math.max(0, state.duration - 0.2))
+      : segment.startSec;
+    this.poiSegment = null;
+    this.poiHandled = true;
+    this.lastSkipAtMs = Date.now();
+    this.emitNotice(null);
+    controller.syncSeek(targetSec * 1000);
+    logger.info(`jump poi video=${this.videoId} from=${state.currentTime.toFixed(2)} `
+      + `to=${targetSec.toFixed(2)}`);
+    return true;
+  }
+
+  /** 关闭当前提示（manual 放行当前片段、poi 标记本视频已处理、undo 等同撤销）。 */
+  dismissNotice(): void {
+    if (this.pendingSegment) {
+      this.undo();
+      return;
+    }
+    if (this.manualSegment) {
+      const segment = this.manualSegment;
+      this.dismissedManualSegment = segment;
+      this.manualSegment = null;
+      this.emitNotice(null);
+      logger.info(`manual prompt dismissed video=${this.videoId} category=${segment.category} `
+        + `start=${segment.startSec.toFixed(2)}`);
+      return;
+    }
+    if (this.poiSegment) {
+      const segment = this.poiSegment;
+      this.poiSegment = null;
+      this.poiHandled = true;
+      this.emitNotice(null);
+      logger.info(`poi prompt dismissed video=${this.videoId} start=${segment.startSec.toFixed(2)}`);
+      return;
+    }
+    if (this.currentNotice) {
+      this.emitNotice(null);
+    }
   }
 
   /** 配置变更后按当前视频重新取片段（开关/类别/隐私模式改了要立即生效）。 */
@@ -146,9 +229,18 @@ export class SponsorBlockSkipper {
     this.lastSegment = null;
     this.pendingSegment = null;
     this.suppressedSegment = null;
+    this.manualSegment = null;
+    this.dismissedManualSegment = null;
+    this.poiSegment = null;
+    this.poiHandled = false;
     this.lastSkipAtMs = 0;
+    this.emitNotice(null);
+  }
+
+  private emitNotice(notice: SponsorSkipNotice | null): void {
+    this.currentNotice = notice;
     if (this.noticeListener) {
-      this.noticeListener(null);
+      this.noticeListener(notice);
     }
   }
 
@@ -160,10 +252,6 @@ export class SponsorBlockSkipper {
     const controller = this.controller;
     const config = SponsorBlockSkipper.config();
     if (!controller || !config || !config.sponsorBlockEnabled) {
-      return;
-    }
-    if (config.sponsorBehavior === EXP_SB_BEHAVIOR_MANUAL) {
-      this.cancelPending();
       return;
     }
     if (this.segments.length === 0 || durationTime <= 0) {
@@ -178,6 +266,17 @@ export class SponsorBlockSkipper {
     if (position <= 0) {
       return;
     }
+
+    if (config.sponsorBehavior === EXP_SB_BEHAVIOR_MANUAL) {
+      this.cancelPending();
+      this.tryManualSkip(position, durationTime, config);
+      return;
+    }
+    if (this.manualSegment) {
+      this.clearManualNotice();
+    }
+    this.dismissedManualSegment = null;
+
     const leadSec = SponsorBlockSkipper.leadSeconds(config);
 
     // 1. 已有待确认的提示：到片段起点就执行，用户拖远则取消。
@@ -220,28 +319,124 @@ export class SponsorBlockSkipper {
     // 4. 已经处在片段内（续播/拖动进入）：没有提前提示的余地，直接跳。
     const current = this.findSegment(position);
     if (current && current !== this.lastSegment) {
+      this.poiSegment = null;
       this.commitSkip(current, durationTime);
       return;
     }
 
     if (config.sponsorBehavior === EXP_SB_BEHAVIOR_SILENT) {
+      this.evaluatePoiHighlight(position, durationTime, config);
       return;
     }
 
     // 5. 片段开始前 leadSec 秒内：弹出可撤销提示，起点时才真正跳。
     const upcoming = this.findUpcomingSegment(position, leadSec);
     if (upcoming && upcoming !== this.lastSegment) {
+      this.poiSegment = null;
       this.pendingSegment = upcoming;
       this.lastSegment = upcoming;
       logger.info(`prompt video=${this.videoId} category=${upcoming.category} `
         + `start=${upcoming.startSec.toFixed(2)} position=${position.toFixed(2)} lead=${leadSec}s`);
-      if (this.noticeListener && config.sponsorBehavior === EXP_SB_BEHAVIOR_TOAST) {
-        this.noticeListener({
+      if (config.sponsorBehavior === EXP_SB_BEHAVIOR_TOAST) {
+        this.emitNotice({
+          mode: 'undo',
           category: upcoming.category,
           startSec: upcoming.startSec,
           endSec: upcoming.endSec
         });
       }
+      return;
+    }
+
+    // 6. 无待处理跳过片段时，评估精彩片段（poi_highlight）一次性跳转提示。
+    this.evaluatePoiHighlight(position, durationTime, config);
+  }
+
+  private tryManualSkip(position: number, durationTime: number, config: ExperimentalConfig): void {
+    if (this.dismissedManualSegment) {
+      const dismissed = this.dismissedManualSegment;
+      if (position < dismissed.startSec - SEGMENT_EDGE_MARGIN_SEC
+        || position > dismissed.endSec + SEGMENT_EDGE_MARGIN_SEC) {
+        this.dismissedManualSegment = null;
+      }
+    }
+    const current = this.findSegment(position);
+    if (current && current !== this.dismissedManualSegment) {
+      if (this.poiSegment) {
+        this.poiSegment = null;
+      }
+      if (this.manualSegment !== current) {
+        this.manualSegment = current;
+        logger.info(`manual prompt video=${this.videoId} category=${current.category} `
+          + `start=${current.startSec.toFixed(2)} end=${current.endSec.toFixed(2)} `
+          + `position=${position.toFixed(2)}`);
+        this.emitNotice({
+          mode: 'manual',
+          category: current.category,
+          startSec: current.startSec,
+          endSec: current.endSec
+        });
+      }
+      return;
+    }
+    if (this.manualSegment) {
+      this.clearManualNotice();
+    }
+    this.evaluatePoiHighlight(position, durationTime, config);
+  }
+
+  private clearManualNotice(): void {
+    if (!this.manualSegment) {
+      return;
+    }
+    logger.info(`manual prompt cleared video=${this.videoId} `
+      + `start=${this.manualSegment.startSec.toFixed(2)}`);
+    this.manualSegment = null;
+    if (this.currentNotice && this.currentNotice.mode === 'manual') {
+      this.emitNotice(null);
+    }
+  }
+
+  private evaluatePoiHighlight(position: number, durationTime: number, config: ExperimentalConfig): void {
+    if (!config.isSponsorCategoryEnabled(EXP_CATEGORY_HIGHLIGHT)) {
+      if (this.poiSegment) {
+        this.poiSegment = null;
+        if (this.currentNotice && this.currentNotice.mode === 'poi') {
+          this.emitNotice(null);
+        }
+      }
+      return;
+    }
+    const poi = this.findPoiHighlight();
+    if (!poi || poi.startSec >= durationTime - 0.5) {
+      return;
+    }
+    if (this.poiSegment) {
+      if (position >= poi.startSec - POI_LEAD_THRESHOLD_SEC) {
+        this.poiSegment = null;
+        this.poiHandled = true;
+        if (this.currentNotice && this.currentNotice.mode === 'poi') {
+          this.emitNotice(null);
+        }
+      }
+      return;
+    }
+    if (this.poiHandled) {
+      return;
+    }
+    if (position < poi.startSec - POI_LEAD_THRESHOLD_SEC) {
+      this.poiSegment = poi;
+      logger.info(`poi prompt video=${this.videoId} start=${poi.startSec.toFixed(2)} `
+        + `position=${position.toFixed(2)}`);
+      this.emitNotice({
+        mode: 'poi',
+        category: poi.category,
+        startSec: poi.startSec,
+        endSec: poi.endSec
+      });
+    } else {
+      // 视频从精彩处附近或之后续播：不再弹提示。
+      this.poiHandled = true;
     }
   }
 
@@ -257,14 +452,15 @@ export class SponsorBlockSkipper {
     const state = controller.getPlaybackState();
     if (targetSec <= state.currentTime) {
       this.cancelPending();
+      this.manualSegment = null;
+      this.emitNotice(null);
       return;
     }
     this.pendingSegment = null;
+    this.manualSegment = null;
     this.lastSegment = segment;
     this.lastSkipAtMs = Date.now();
-    if (this.noticeListener) {
-      this.noticeListener(null);
-    }
+    this.emitNotice(null);
     controller.syncSeek(targetSec * 1000);
     logger.info(`skip video=${this.videoId} category=${segment.category} `
       + `from=${state.currentTime.toFixed(2)} to=${targetSec.toFixed(2)}`);
@@ -277,9 +473,19 @@ export class SponsorBlockSkipper {
     logger.info(`prompt cancelled video=${this.videoId} `
       + `start=${this.pendingSegment.startSec.toFixed(2)}`);
     this.pendingSegment = null;
-    if (this.noticeListener) {
-      this.noticeListener(null);
+    if (this.currentNotice && this.currentNotice.mode === 'undo') {
+      this.emitNotice(null);
     }
+  }
+
+  private findPoiHighlight(): SponsorSegment | null {
+    for (const segment of this.segments) {
+      if (segment.actionType === 'poi' && segment.category === EXP_CATEGORY_HIGHLIGHT
+        && segment.startSec > POI_MIN_START_SEC) {
+        return segment;
+      }
+    }
+    return null;
   }
 
   private findSegment(position: number): SponsorSegment | null {

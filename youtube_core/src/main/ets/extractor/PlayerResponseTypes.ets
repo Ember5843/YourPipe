@@ -192,12 +192,15 @@ export interface Format {
   isDrc?: boolean;
   /** Target segment duration in seconds (populated on post-live DVR adaptive formats). */
   targetDurationSec?: number | string;
+  /** DRM family identifiers; non-empty means DRM-protected and unplayable directly. */
+  drmFamilies?: string[];
 }
 
 export interface AudioTrackInfo {
   id?: string;
   displayName?: string;
   audioIsDefault?: boolean;
+  isAutoDubbed?: boolean;
 }
 
 export interface Range {

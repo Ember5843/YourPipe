@@ -322,9 +322,9 @@ export class LocalMediaProxy {
       return '';
     }
     let videoFmt: YoutubeSabrFormatMeta | undefined = info.findFormatByItag(videoItag);
-    // Same itag can exist for multiple languages — must match audioTrackId.
+    // Same itag can exist for multiple languages and DRC/non-DRC renditions — match audioTrackId & drc.
     let audioFmt: YoutubeSabrFormatMeta | undefined =
-      info.findFormatByItagAndTrack(audioItag, audio.audioTrackId);
+      info.findFormatByItagAndTrack(audioItag, audio.audioTrackId, audio.isDrc);
     if (!videoFmt) {
       videoFmt = {
         itag: videoItag,
@@ -350,7 +350,9 @@ export class LocalMediaProxy {
         codecs: audio.codecs,
         audioTrackId: audio.audioTrackId,
         audioTrackName: audio.audioTrackName,
-        isOriginalAudio: (audio.audioTrackType || '').toLowerCase() === 'original',
+        isOriginalAudio: !audio.isAutoDubbed && (audio.audioTrackType || '').toLowerCase() === 'original',
+        isAutoDubbed: audio.isAutoDubbed === true,
+        drc: audio.isDrc === true,
         approxDurationMs: audio.approxDurationMs
       };
     } else if (audio.audioTrackId && audioFmt.audioTrackId !== audio.audioTrackId) {
@@ -369,15 +371,16 @@ export class LocalMediaProxy {
         codecs: audio.codecs || audioFmt.codecs,
         audioTrackId: audio.audioTrackId,
         audioTrackName: audio.audioTrackName || audioFmt.audioTrackName,
-        isOriginalAudio: (audio.audioTrackType || '').toLowerCase() === 'original'
-          || audioFmt.isOriginalAudio,
+        isOriginalAudio: !audio.isAutoDubbed
+          && ((audio.audioTrackType || '').toLowerCase() === 'original' || audioFmt.isOriginalAudio === true),
+        isAutoDubbed: audio.isAutoDubbed === true,
         initializationUrl: audioFmt.initializationUrl,
         initRangeStart: audioFmt.initRangeStart,
         initRangeEnd: audioFmt.initRangeEnd,
         contentLength: audio.contentLength ?? audioFmt.contentLength,
         approxDurationMs: audio.approxDurationMs ?? audioFmt.approxDurationMs,
         targetDurationSec: audioFmt.targetDurationSec,
-        drc: audioFmt.drc
+        drc: audio.isDrc !== undefined ? audio.isDrc : audioFmt.drc
       };
     }
     Logger.info(TAG, `createSabrDualSession: video=${videoItag} audio=${audioItag} `
@@ -539,6 +542,7 @@ export class LocalMediaProxy {
     switch (sourceClient) {
       case 'android':
       case 'ANDROID':
+      case 'android_reel':
         return ClientsConstants.ANDROID_USER_AGENT;
       case 'android_vr':
       case 'ANDROID_VR':

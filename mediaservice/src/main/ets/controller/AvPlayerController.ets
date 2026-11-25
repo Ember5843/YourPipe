@@ -5,7 +5,7 @@
 
 import { VideoData, StreamInfo } from '../model/VideoData';
 import { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from '../model/PlayerModel';
-import { PlaybackEngine, PlaybackState, PlaybackStats, EngineConfig } from '../engine/PlaybackEngine';
+import { PlaybackEngine, PlaybackState, PlaybackStats, EngineConfig, PlaybackErrorCategory } from '../engine/PlaybackEngine';
 import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
 import { registerDirectStream, registerHlsStream, unregisterStream } from '@yourpipe/libmpv-napi';
 import type { NativeDirectStreamSpec, NativeHlsStreamSpec } from '@yourpipe/libmpv-napi';
@@ -136,6 +136,11 @@ export class AvPlayerController {
   private isRecovering: boolean = false;
   private readonly MAX_ERROR_RETRIES = 2;
   private lastKnownGoodPosition: number = 0;
+  private playbackLoadSeq: number = 0;
+  private prematureEofHandledSeq: number = -1;
+  private prematureEofCount: number = 0;
+  private prematureEofLastPosSec: number = -1;
+  private prematureEofStableSinceMs: number = 0;
 
   // Playback stall watchdog (pure in-memory state)
   /** Tick interval for the stall watchdog timer. */
@@ -400,6 +405,7 @@ export class AvPlayerController {
     const cur = this.vm.playerModel.getCurrentStreams().audio;
     if (cur && cur.itag === audio.itag
       && (cur.audioTrackId || '') === (audio.audioTrackId || '')
+      && !!cur.isDrc === !!audio.isDrc
       && (cur.bitrate || 0) === (audio.bitrate || 0)) {
       return;
     }
@@ -673,7 +679,10 @@ export class AvPlayerController {
         this.vm.isBuffering = true;
         this.loadPlaybackSource(candidate.url, 0, generation, candidate);
         Logger.info(TAG, `[TTFF] load_submitted elapsed=${Date.now() - submitStartedAt}ms live=true`);
-        if (newSource.play || newSource.auto) {
+        const shouldAutoPlayLive = Boolean(newSource.play || newSource.auto);
+        this.transportIntentPlaying = shouldAutoPlayLive;
+        this.transportIntentRevision++;
+        if (shouldAutoPlayLive) {
           this.avSessionManager.activateForPlayback();
           this.playbackEngine.play();
         }
@@ -707,7 +716,10 @@ export class AvPlayerController {
       `proto=${playbackUrl.includes('ypstream://') ? 'ypstream' : 'legacy'}`);
     this.loadPlaybackSource(playbackUrl, startPos, generation);
     Logger.info(TAG, `[TTFF] load_submitted elapsed=${Date.now() - submitStartedAt}ms live=false`);
-    if (newSource.play || newSource.auto) {
+    const shouldAutoPlay = Boolean(newSource.play || newSource.auto);
+    this.transportIntentPlaying = shouldAutoPlay;
+    this.transportIntentRevision++;
+    if (shouldAutoPlay) {
       this.avSessionManager.activateForPlayback();
       this.playbackEngine.play();
     }
@@ -1113,6 +1125,8 @@ export class AvPlayerController {
     this.mediaSessionGeneration++;
     this.sourceSwitchGeneration++;
     this.latestPlaybackState = undefined;
+    this.transportIntentPlaying = false;
+    this.transportIntentRevision++;
     this.videoOutputDisabledAtMs = 0;
     Logger.info(TAG, `closeMediaSession generation=${this.mediaSessionGeneration} clearSurface=${clearSurface}`);
     this.playbackEngine.stop();
@@ -1990,6 +2004,9 @@ export class AvPlayerController {
     this.playbackEngine.setTargetVideoBitrate(videoBitrate);
     const loaded = this.playbackEngine.load(playbackUrl, startPosSec,
       candidate ? candidate.hlsAudioUrl : this.currentHlsAudioUrl);
+    if (loaded) {
+      this.playbackLoadSeq++;
+    }
     if (loaded && candidate) {
       this.commitPreparedSource(candidate);
       this.localTimelineAwaitingReady = sessionId.length > 0;
@@ -2110,9 +2127,14 @@ export class AvPlayerController {
     const pool = langMatched.length > 0 ? langMatched : candidates;
     const isOriginal = (s: StreamInfo): boolean => {
       const type = (s.audioTrackType || '').toUpperCase();
+      if (s.isAutoDubbed === true || type === 'DUBBED-AUTO') {
+        return false;
+      }
+      if (type.length > 0) {
+        return type === 'ORIGINAL';
+      }
       const name = (s.audioTrackName || '').toLowerCase();
-      return type === 'ORIGINAL'
-        || name.indexOf('original') >= 0
+      return name.indexOf('original') >= 0
         || name.indexOf('default') >= 0;
     };
     return pool.slice().sort((a: StreamInfo, b: StreamInfo): number => {
@@ -2141,21 +2163,28 @@ export class AvPlayerController {
     }
     const pref = (preferredLanguage || '').trim().toLowerCase();
     if (pref === '' || pref === 'original') {
-      const originalStreams = audioStreams.filter((s: StreamInfo) => {
-        const name = (s.audioTrackName || '').toLowerCase();
+      const originalStreams = audioStreams.filter((s: StreamInfo): boolean => {
         const type = (s.audioTrackType || '').toLowerCase();
+        if (s.isAutoDubbed === true || type === 'dubbed-auto') {
+          return false;
+        }
+        if (type.length > 0) {
+          return type === 'original';
+        }
+        const name = (s.audioTrackName || '').toLowerCase();
         return name.indexOf('original') >= 0
-          || name.indexOf('default') >= 0
-          || type === 'original';
+          || name.indexOf('default') >= 0;
       });
       if (originalStreams.length > 0) {
         return originalStreams;
       }
-      const noTrackInfo = audioStreams.filter((s: StreamInfo) =>
-        (s.audioTrackId || '') === '' && (s.audioLanguage || '') === '');
+      const noTrackInfo = audioStreams.filter((s: StreamInfo): boolean =>
+        (s.audioTrackId || '') === '' && (s.audioLanguage || '') === ''
+        && s.isAutoDubbed !== true
+        && (s.audioTrackType || '').toLowerCase() !== 'dubbed-auto');
       return noTrackInfo;
     }
-    const matched = audioStreams.filter((s: StreamInfo) => {
+    const matched = audioStreams.filter((s: StreamInfo): boolean => {
       const lang = (s.audioLanguage || '').toLowerCase();
       if (lang === pref) {
         return true;
@@ -2182,6 +2211,8 @@ export class AvPlayerController {
     else if (codecs.includes('mp4a') || mime.includes('audio/mp4')) score += 500000;
     else if (codecs.includes('opus') || mime.includes('audio/webm')) score += 300000;
     if (stream.itag === 599 || stream.itag === 600) score -= 200000;
+    // Deprioritize Dynamic Range Control (DRC) renditions so normal audio wins by default.
+    if (stream.isDrc === true) score -= 400000;
     return score + (stream.bitrate || 0);
   }
 
@@ -2256,12 +2287,107 @@ export class AvPlayerController {
     return mime.includes('audio/webm') || codecs.includes('opus') || codecs.includes('vorbis');
   }
 
+  private isCurrentSourceLocalFile(): boolean {
+    const stream = this.vm.playerModel.getCurrentStreams().video ?? this.curSource?.streams?.[0];
+    if (!stream) {
+      return false;
+    }
+    const delivery = (stream.deliveryMethod || '').toUpperCase();
+    const kind = (stream.kind || '').toLowerCase();
+    return delivery === 'LOCAL_FILE'
+      || kind === 'local_file'
+      || (stream.url || '').startsWith('file://');
+  }
+
+  private cloneStateWithError(
+    state: PlaybackState,
+    category: PlaybackErrorCategory,
+    errorMsg: string
+  ): PlaybackState {
+    return {
+      engineState: state.engineState,
+      isPlaying: state.isPlaying,
+      isReady: state.isReady,
+      isBuffered: state.isBuffered,
+      isBuffering: state.isBuffering,
+      isSeeking: state.isSeeking,
+      isEnded: state.isEnded,
+      isLive: state.isLive,
+      isSeekable: state.isSeekable,
+      currentTime: state.currentTime,
+      duration: state.duration,
+      playbackSpeed: state.playbackSpeed,
+      bufferingPercent: state.bufferingPercent,
+      seekableRanges: state.seekableRanges,
+      uri: state.uri,
+      mediaTitle: state.mediaTitle,
+      containerFormat: state.containerFormat,
+      videoWidth: state.videoWidth,
+      videoHeight: state.videoHeight,
+      videoStreamCount: state.videoStreamCount,
+      audioStreamCount: state.audioStreamCount,
+      subtitleStreamCount: state.subtitleStreamCount,
+      videoCodec: state.videoCodec,
+      videoBitRate: state.videoBitRate,
+      frameRate: state.frameRate,
+      audioCodec: state.audioCodec,
+      audioBitRate: state.audioBitRate,
+      audioChannels: state.audioChannels,
+      audioSampleRate: state.audioSampleRate,
+      fileSize: state.fileSize,
+      errorMsg: errorMsg,
+      errorCategory: category,
+      errorCode: state.errorCode
+    };
+  }
+
   private onPlaybackStateChange(state: PlaybackState): void {
     if (!this.isActive()) {
       this.stopStallWatchdog();
       return;
     }
     state = normalizePlaybackTimeline(state, this.vm.currentTime, this.vm.durationTime);
+    const isLocalFile = this.isCurrentSourceLocalFile();
+    const isLiveStream = state.isLive || this.curSource?.isLive === true;
+    const eofTolerance = state.duration > 0
+      ? Math.min(2, Math.max(0.5, state.duration * 0.05))
+      : 0;
+    const isPrematureEof = state.isEnded
+      && !isLocalFile
+      && (isLiveStream
+        || (state.duration > 0 && state.currentTime < state.duration - eofTolerance));
+    let triggerPrematureEofRecovery = false;
+    if (isPrematureEof) {
+      // Intercept premature EOF before updating vm.isEnded or relaying COMPLETED
+      // to stateMachine / AVSession / endedSubscribers.
+      state.isEnded = false;
+      if (!this.isRecovering && this.prematureEofHandledSeq !== this.playbackLoadSeq) {
+        this.prematureEofHandledSeq = this.playbackLoadSeq;
+        this.prematureEofLastPosSec = state.currentTime;
+        this.prematureEofStableSinceMs = 0;
+        this.errorRetryCount = Math.max(this.errorRetryCount, this.prematureEofCount);
+        this.prematureEofCount++;
+        state.isBuffering = true;
+        triggerPrematureEofRecovery = true;
+      } else {
+        state.isBuffering = this.vm.userVisibleErrorMsg.length === 0;
+      }
+    } else if (state.isPlaying && this.prematureEofCount > 0) {
+      // Only clear premature EOF counter once playback genuinely advances past
+      // the previous EOF position (or sustains live playback for 5s).
+      if (!isLiveStream && state.currentTime >= this.prematureEofLastPosSec + 2) {
+        this.prematureEofCount = 0;
+        this.prematureEofLastPosSec = -1;
+        this.prematureEofStableSinceMs = 0;
+      } else if (isLiveStream) {
+        if (this.prematureEofStableSinceMs === 0) {
+          this.prematureEofStableSinceMs = Date.now();
+        } else if (Date.now() - this.prematureEofStableSinceMs >= 5000) {
+          this.prematureEofCount = 0;
+          this.prematureEofStableSinceMs = 0;
+        }
+      }
+    }
     this.latestPlaybackState = state;
     // Watchdog lifecycle follows the media window: armed from the first engine
     // state of an active session, stopped when the session goes away.
@@ -2398,12 +2524,20 @@ export class AvPlayerController {
 
     // 错误监听（手动，需要特殊处理）
     const errorChanged = prevErrorMsg !== state.errorMsg;
-    if (errorChanged && state.errorMsg && !this.isRecovering) {
+    if (triggerPrematureEofRecovery) {
+      Logger.warn(TAG, `premature EOF intercepted: pos=${state.currentTime.toFixed(2)}s `
+        + `dur=${state.duration.toFixed(2)}s live=${isLiveStream} `
+        + `retryCount=${this.errorRetryCount}/${this.MAX_ERROR_RETRIES} `
+        + `loadSeq=${this.playbackLoadSeq} — routing to error recovery`);
+      this.resetStallBaseline();
+      const synthetic = this.cloneStateWithError(state, 'network', '[PLAYER] PREMATURE_EOF');
+      void this.handlePlaybackError(synthetic);
+    } else if (errorChanged && state.errorMsg && !this.isRecovering) {
       // MPV/FFmpeg may emit several Invalid states while probing or while an
       // automatic retry is in progress. Do not turn those diagnostics into UI.
       this.handlePlaybackError(state);
     }
-    if (!state.errorMsg && (state.isReady || state.isPlaying)) {
+    if (!state.errorMsg && !isPrematureEof && (state.isReady || state.isPlaying)) {
       this.publishUserVisibleError('');
     }
   }
@@ -2447,6 +2581,10 @@ export class AvPlayerController {
     this.seekableRangesListeners.forEach(listener => listener());
     // Keep videoOutputEnabled: session audio-only must survive source switch.
     this.lastKnownGoodPosition = 0;
+    this.prematureEofHandledSeq = -1;
+    this.prematureEofCount = 0;
+    this.prematureEofLastPosSec = -1;
+    this.prematureEofStableSinceMs = 0;
     this.waitingForBufferListeners.forEach(l => l(false));
     this.publishUserVisibleError('');
   }
@@ -2586,7 +2724,7 @@ export class AvPlayerController {
       try {
         await this.sleep(800);
         if (!this.isActive()) return;
-        this.retryPlayback(resumePos);
+        await this.retryPlayback(resumePos);
       } finally {
         this.isRecovering = false;
       }
@@ -2604,8 +2742,11 @@ export class AvPlayerController {
     }
 
     this.errorRetryCount = 0;
-    this.publishUserVisibleError(this.vm.errorMsg || '[PLAYER] PLAYBACK_FAILED');
-    this.onErrorNeedsUserAction?.(this.vm.errorMsg);
+    const errText = state.errorMsg || this.vm.errorMsg || '[PLAYER] PLAYBACK_FAILED';
+    this.vm.isBuffering = false;
+    this.vm.errorMsg = errText;
+    this.publishUserVisibleError(errText);
+    this.onErrorNeedsUserAction?.(errText);
   }
 
   private async retryPlayback(resumePos: number): Promise<void> {
@@ -2664,7 +2805,7 @@ export class AvPlayerController {
       return;
     }
     this.loadPlaybackSource(playbackUrl, effectiveResumePos, generation);
-    if (this.vm.isPlaying) {
+    if (this.vm.isPlaying || this.transportIntentPlaying) {
       this.playbackEngine.play();
     }
   }

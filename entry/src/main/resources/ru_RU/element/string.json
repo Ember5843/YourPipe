@@ -4150,6 +4150,9 @@
         {"name": "yt_cookie_verify_success", "value": "Cookie проверен."},
         {"name": "yt_local_import_partial", "value": "Импортировано файлов: %1$d; ошибок: %2$d."},
         {"name": "yt_recovery_failed", "value": "Не удалось завершить операцию. Повторите попытку."},
-        {"name": "yt_proxy_applying", "value": "Применение прокси…"}
+        {"name": "yt_proxy_applying", "value": "Применение прокси…"},
+        {"name": "yt_exp_sb_skip_manual", "value": "Пропустить: %s"},
+        {"name": "yt_exp_sb_jump_highlight", "value": "Перейти к важному моменту"},
+        {"name": "yt_action_sleep_timer_off", "value": "Выключить"}
     ]
 }

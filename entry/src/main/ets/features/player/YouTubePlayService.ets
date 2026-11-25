@@ -688,6 +688,8 @@ export class YouTubePlayService {
       audioTrackId: stream.audioTrackId,
       audioTrackName: stream.audioTrackName,
       audioTrackType: stream.audioTrackType,
+      isDrc: stream.isDrc,
+      isAutoDubbed: stream.isAutoDubbed,
       // DASH SegmentBase (用于生成 MPD)
       initRangeStart: stream.initRange?.start,
       initRangeEnd: stream.initRange?.end,

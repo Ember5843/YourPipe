@@ -216,7 +216,7 @@ export struct VideoPlayer {
     }
   };
 
-  /** SponsorBlock 提示层：仅 toast 模式会收到通知；页面不可见时跳过仍然生效。 */
+  /** SponsorBlock 提示层：toast（可撤销）、manual（手动跳过）、poi（跳转精彩片段）。 */
   private skipNoticeListener = (notice: SponsorSkipNotice | null): void => {
     if (this.skipNoticeTimerId >= 0) {
       clearTimeout(this.skipNoticeTimerId);
@@ -224,6 +224,18 @@ export struct VideoPlayer {
     }
     this.skipNotice = notice;
     if (!notice) {
+      return;
+    }
+    if (notice.mode === 'manual') {
+      // manual 按钮跟随片段生命周期，由 skipper 离开片段或用户点击/关闭时收起。
+      return;
+    }
+    if (notice.mode === 'poi') {
+      // 精彩片段提示限时展示 10 秒，超时后标记已处理并收起，不遮挡观影。
+      this.skipNoticeTimerId = setTimeout(() => {
+        this.skipNoticeTimerId = -1;
+        SponsorBlockSkipper.getInstance().dismissNotice();
+      }, 10000);
       return;
     }
     const config = AppStorage.get<ExperimentalConfig>('experimentalConfig');
@@ -259,15 +271,59 @@ export struct VideoPlayer {
     return rm.getStringSync(key.id);
   }
 
+  private clearLocalSkipNotice(): void {
+    this.skipNotice = null;
+    if (this.skipNoticeTimerId >= 0) {
+      clearTimeout(this.skipNoticeTimerId);
+      this.skipNoticeTimerId = -1;
+    }
+  }
+
   private undoSponsorSkip(): void {
     const undone = SponsorBlockSkipper.getInstance().undo();
     Logger.info(TAG, `sponsor skip undo tapped result=${undone}`);
     if (undone) {
-      this.skipNotice = null;
-      if (this.skipNoticeTimerId >= 0) {
-        clearTimeout(this.skipNoticeTimerId);
-        this.skipNoticeTimerId = -1;
-      }
+      this.clearLocalSkipNotice();
+    }
+  }
+
+  private skipManualSponsorSegment(): void {
+    const skipped = SponsorBlockSkipper.getInstance().skipManual();
+    Logger.info(TAG, `sponsor manual skip tapped result=${skipped}`);
+    if (skipped) {
+      this.clearLocalSkipNotice();
+    }
+  }
+
+  private jumpToPoiHighlight(): void {
+    const jumped = SponsorBlockSkipper.getInstance().jumpToPoi();
+    Logger.info(TAG, `sponsor poi jump tapped result=${jumped}`);
+    if (jumped) {
+      this.clearLocalSkipNotice();
+    }
+  }
+
+  private dismissSponsorNotice(): void {
+    SponsorBlockSkipper.getInstance().dismissNotice();
+    this.clearLocalSkipNotice();
+    Logger.info(TAG, 'sponsor notice dismissed by user');
+  }
+
+  private sponsorActionNoticeText(notice: SponsorSkipNotice): ResourceStr {
+    if (notice.mode === 'poi') {
+      return $r('app.string.yt_exp_sb_jump_highlight');
+    }
+    const rm = this.getUIContext().getHostContext()?.resourceManager;
+    if (!rm) {
+      return $r('app.string.yt_exp_sb_cat_sponsor');
+    }
+    try {
+      return rm.getStringSync(
+        $r('app.string.yt_exp_sb_skip_manual').id,
+        this.skipCategoryLabel(notice.category)
+      );
+    } catch (_e) {
+      return $r('app.string.yt_exp_sb_cat_sponsor');
     }
   }
 
@@ -2051,28 +2107,64 @@ export struct VideoPlayer {
   SponsorSkipNoticeLayer() {
     if (this.skipNotice) {
       Column() {
-        Row({ space: 10 }) {
-          Text(getContext().resourceManager.getStringSync(
-            $r('app.string.yt_exp_sb_skipped').id,
-            this.skipCategoryLabel(this.skipNotice!.category)))
-            .fontSize(13)
-            .fontColor(Color.White)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        if (this.skipNotice.mode === 'undo') {
+          Row({ space: 10 }) {
+            Text(getContext().resourceManager.getStringSync(
+              $r('app.string.yt_exp_sb_skipped').id,
+              this.skipCategoryLabel(this.skipNotice!.category)))
+              .fontSize(13)
+              .fontColor(Color.White)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-          Text($r('app.string.yt_exp_sb_undo'))
-            .fontSize(13)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.themePrimary)
-            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            Text($r('app.string.yt_exp_sb_undo'))
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.themePrimary)
+              .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          }
+          .padding({ left: 14, right: 8, top: 6, bottom: 6 })
+          .backgroundColor('#E6000000')
+          .borderRadius(18)
+          // 整条提示都可点撤销；Block 命中会挡住下层手势层，避免撤销点击被
+          // 播放器的单击手势（收起控件）抢走。
+          .hitTestBehavior(HitTestMode.Block)
+          .onClick(() => this.undoSponsorSkip())
+        } else {
+          Row({ space: 4 }) {
+            Text(this.sponsorActionNoticeText(this.skipNotice!))
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Color.White)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .padding({ left: 14, right: 8, top: 8, bottom: 8 })
+              .hitTestBehavior(HitTestMode.Block)
+              .onClick(() => {
+                if (this.skipNotice?.mode === 'poi') {
+                  this.jumpToPoiHighlight();
+                } else {
+                  this.skipManualSponsorSegment();
+                }
+              })
+
+            Stack({ alignContent: Alignment.Center }) {
+              SymbolGlyph($r('sys.symbol.xmark'))
+                .fontSize(13)
+                .fontColor(['#CCFFFFFF'])
+            }
+            .width(30)
+            .height(30)
+            .margin({ right: 4 })
+            .hitTestBehavior(HitTestMode.Block)
+            .onClick(() => this.dismissSponsorNotice())
+          }
+          .backgroundColor('#E6000000')
+          .borderRadius(18)
+          .alignItems(VerticalAlign.Center)
+          .hitTestBehavior(HitTestMode.Default)
+          .onClick(() => {})
         }
-        .padding({ left: 14, right: 8, top: 6, bottom: 6 })
-        .backgroundColor('#E6000000')
-        .borderRadius(18)
-        // 整条提示都可点撤销；Default 命中会挡住下层手势层，避免撤销点击被
-        // 播放器的单击手势（收起控件）抢走。
-        .hitTestBehavior(HitTestMode.Block)
-        .onClick(() => this.undoSponsorSkip())
       }
       .width('100%')
       .height('100%')

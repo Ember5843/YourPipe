@@ -4150,6 +4150,9 @@
         {"name": "yt_cookie_verify_success", "value": "تم التحقق من ملف تعريف الارتباط."},
         {"name": "yt_local_import_partial", "value": "تم استيراد %1$d ملف؛ فشل %2$d."},
         {"name": "yt_recovery_failed", "value": "تعذر إكمال العملية. يرجى المحاولة مجددًا."},
-        {"name": "yt_proxy_applying", "value": "جارٍ تطبيق الوكيل…"}
+        {"name": "yt_proxy_applying", "value": "جارٍ تطبيق الوكيل…"},
+        {"name": "yt_exp_sb_skip_manual", "value": "تخطي %s"},
+        {"name": "yt_exp_sb_jump_highlight", "value": "الانتقال إلى اللحظة المميزة"},
+        {"name": "yt_action_sleep_timer_off", "value": "إيقاف المؤقت"}
     ]
 }

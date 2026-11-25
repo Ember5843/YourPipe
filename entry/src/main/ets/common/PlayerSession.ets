@@ -123,6 +123,8 @@ export class PlayerSession {
   private _isLocalMode: boolean = false;
   /** release() 时调用，用于停止 PiP（避免循环 import，由 PiPManager 注入） */
   onStopPiP: (() => Promise<void>) | null = null;
+  /** 最近一次 release() 触发的异步 stopPiP 任务（供睡眠定时器退出前有界等待）。 */
+  private _pendingStopPiPPromise: Promise<void> | null = null;
   /** 小窗内队列换源时同步画面比例（避免循环 import，由 PiPManager 注入） */
   onUpdatePiPContentSize: ((width: number, height: number) => void) | null = null;
 
@@ -428,15 +430,56 @@ export class PlayerSession {
     this._sleepTimerId = setTimeout(() => {
       this._sleepTimerId = -1;
       this._sleepTimerEndsAt = 0;
-      logger.info(`${TAG} sleep timer fired minutes=${minutes}`);
-      this.release();
-      this._context.terminateSelf().then(() => {
-        logger.info(`${TAG} sleep timer terminated ability`);
-      }).catch((e: Error) => {
-        logger.error(`${TAG} sleep timer terminateSelf failed: ${e.message || e}`);
-      });
+      this.handleSleepTimerExpired(minutes);
     }, durationMs);
     logger.info(`${TAG} sleep timer scheduled minutes=${minutes} endsAt=${this._sleepTimerEndsAt}`);
+  }
+
+  private async handleSleepTimerExpired(minutes: number): Promise<void> {
+    logger.info(`${TAG} sleep timer fired minutes=${minutes}`);
+    // 显式退出必须传 force=true，否则画中画激活时 release() 会被 PiP 守卫直接跳过。
+    this.release(true);
+    // WatchHistoryStore.record() 走 3s 延迟刷盘且 EntryAbility.onDestroy() 不刷盘，
+    // 必须在 terminateSelf() 前主动落盘并等待 PreferencesStore 队列刷盘完成。
+    WatchHistoryStore.flushIfDirty();
+
+    const cleanupTasks: Promise<void>[] = [
+      PreferencesStore.flushPending().catch((e: Error) => {
+        logger.warn(`${TAG} sleep timer preferences flush failed: ${e.message || e}`);
+      })
+    ];
+    if (this._pendingStopPiPPromise) {
+      cleanupTasks.push(this._pendingStopPiPPromise);
+    }
+    // 给 closeMediaSession() 触发的异步 AVSession.destroy / ContinuousTask 停止留出短暂收尾窗口。
+    const drainDelay = new Promise<void>((resolve: () => void) => {
+      setTimeout(() => resolve(), 150);
+    });
+    cleanupTasks.push(drainDelay);
+
+    let timeoutId: number = -1;
+    const timeoutGuard = new Promise<void>((resolve: () => void) => {
+      timeoutId = setTimeout(() => {
+        logger.warn(`${TAG} sleep timer cleanup wait timed out after 500ms`);
+        resolve();
+      }, 500);
+    });
+    try {
+      await Promise.race<void>([
+        Promise.all<void>(cleanupTasks).then((): void => {}),
+        timeoutGuard
+      ]);
+    } finally {
+      if (timeoutId >= 0) {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    this._context.terminateSelf().then(() => {
+      logger.info(`${TAG} sleep timer terminated ability`);
+    }).catch((e: Error) => {
+      logger.error(`${TAG} sleep timer terminateSelf failed: ${e.message || e}`);
+    });
   }
 
   cancelSleepTimer(): void {
@@ -713,8 +756,9 @@ export class PlayerSession {
     }
     // 假结束识别:代理上游 4xx / EDL 分段全灭会让 mpv 提前报 End(进度远未到片尾)。
     // 对齐 PipePipe/SmartTube:媒体层瞬时失败原地重试当前条目,绝不自动跳下一首。
+    // 本地文件无上游断流，容器元数据时长大于实际流时长 >2s 属正常 EOF，必须排除。
     const state = this._controller.getPlaybackState();
-    if (state.duration > 0 && state.currentTime < state.duration - 2) {
+    if (state.duration > 0 && state.currentTime < state.duration - 2 && !this._isLocalMode) {
       logger.warn(`${TAG} premature end: pos=${state.currentTime.toFixed(2)}s dur=${state.duration.toFixed(2)}s `
         + `video=${this._currentVideo?.videoId || 'unknown'} — treating as failure, retrying in place`);
       this.retryCurrentWithFreshStreams(state.currentTime);
@@ -1462,9 +1506,15 @@ export class PlayerSession {
     logger.info(`${TAG} release() called`);
     SponsorBlockSkipper.getInstance().onPlaybackStopped();
     // 若画中画激活，先停止 PiP（释放播放器前关闭悬浮窗）
-    if (this._isPiPActive && this.onStopPiP) {
-      this.onStopPiP().catch((e: Error) => {
+    if ((this._isPiPActive || (force && this._pipHandoffPending)) && this.onStopPiP) {
+      const stopTask = this.onStopPiP().catch((e: Error) => {
         logger.warn(`${TAG} stopPiP on release failed: ${e.message}`);
+      });
+      this._pendingStopPiPPromise = stopTask;
+      stopTask.finally(() => {
+        if (this._pendingStopPiPPromise === stopTask) {
+          this._pendingStopPiPPromise = null;
+        }
       });
       this.setPiPActive(false);
     }
