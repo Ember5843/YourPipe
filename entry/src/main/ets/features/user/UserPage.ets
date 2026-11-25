@@ -1,4 +1,6 @@
 import { AppLog } from '../../common/AppLog';
+import { AppDataEpoch } from '../../common/AppDataEpoch';
+import { AuthSessionManager } from 'youtube_core';
 import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 import { ActionHub } from '../../common/ActionHub';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
@@ -132,7 +134,7 @@ export struct UserPage {
     const author = this.displayChannel.name || this.channel.name || video.author || '';
     const channelAvatarUrl = this.displayChannel.avatarUrl || this.channel.avatarUrl || '';
     const channelHandle = this.displayChannel.handle || this.channel.handle || '';
-    
+
     return new VideoItem(
       video.id,
       video.videoId,
@@ -234,8 +236,34 @@ export struct UserPage {
   }
 
   aboutToAppear() {
+    this.pageGeneration++;
     this.displayChannel = this.channel;
     this.loadAllContent();
+  }
+
+  private pageGeneration: number = 0;
+  private requestGenerations: Map<string, number> = new Map();
+
+  aboutToDisappear(): void {
+    this.pageGeneration++;
+    this.isLoading = false;
+    this.isLoadingMore = false;
+    this.isLoadingShorts = false;
+    this.isLoadingMoreShorts = false;
+    this.isLoadingLive = false;
+    this.isLoadingMoreLive = false;
+    this.isLoadingPlaylists = false;
+    this.isLoadingMorePlaylists = false;
+  }
+
+  private requestContext(scope: string, reset: boolean = false): string {
+    if (reset) this.requestGenerations.set(scope, (this.requestGenerations.get(scope) ?? 0) + 1);
+    return `${this.pageGeneration}|${this.requestGenerations.get(scope) ?? 0}|${this.getChannelId()}|`
+      + `${AppDataEpoch.capture()}|${AuthSessionManager.getInstance()?.getUserDataContextKey() ?? ''}`;
+  }
+
+  private requestCurrent(scope: string, context: string): boolean {
+    return this.requestContext(scope) === context && AppDataEpoch.isCurrent(AppDataEpoch.capture());
   }
 
   private async loadAllContent() {
@@ -249,9 +277,11 @@ export struct UserPage {
 
 
   private async loadChannelInfo(): Promise<void> {
+    const context = this.requestContext('profile', true);
     try {
       const channelId = this.channel.channelId || '';
       const profile = await this.channelInfoService.fetchChannelProfile(channelId);
+      if (!this.requestCurrent('profile', context)) return;
       if (profile.description && profile.description.length > 0) {
         this.fullDescription = profile.description;
       }
@@ -296,6 +326,8 @@ export struct UserPage {
   }
 
   private async loadVideos(): Promise<void> {
+    const context = this.requestContext('videos', true);
+    this.isLoadingMore = false;
     this.isLoading = true;
     this.errorMessage = '';
     try {
@@ -310,6 +342,7 @@ export struct UserPage {
       this.channelVisitorData = '';
       const service = FeedServiceProvider.getInstance().getChannelService();
       const result = await service.fetchChannelVideosInitial(channelId, 1);
+      if (!this.requestCurrent('videos', context)) return;
       if (result.items && result.items.length > 0) {
         this.videoList = this.fillChannelInfoList(result.items);
         this.channelNextPageToken = result.nextPageToken;
@@ -318,6 +351,7 @@ export struct UserPage {
         }
       } else {
         const fallback = await this.rssFallbackService.fetchChannelVideos(channelId, this.channel.name || channelId);
+        if (!this.requestCurrent('videos', context)) return;
         this.videoList = this.fillChannelInfoList(fallback);
         this.channelNextPageToken = null;
         this.channelVisitorData = '';
@@ -328,11 +362,12 @@ export struct UserPage {
           : (this.channel.avatarUrl || '');
       }
     } catch (err) {
+      if (!this.requestCurrent('videos', context)) return;
       logger.error('loadChannelVideos failed:', JSON.stringify(err));
       this.videoList = [];
       this.errorMessage = $r('app.string.yt_error_load_user_videos');
     } finally {
-      this.isLoading = false;
+      if (this.requestCurrent('videos', context)) this.isLoading = false;
     }
   }
 
@@ -344,11 +379,14 @@ export struct UserPage {
       return;
     }
     this.isLoadingMore = true;
+    const context = this.requestContext('videos');
+    this.errorMessage = '';
     try {
       const service = FeedServiceProvider.getInstance().getChannelService();
       const startId = this.videoList.length + 1;
       const token = this.channelNextPageToken ?? '';
       const result = await service.fetchChannelVideosNext(token, this.channelVisitorData, startId);
+      if (!this.requestCurrent('videos', context)) return;
       if (result.items && result.items.length > 0) {
         this.videoList = this.videoList.concat(this.fillChannelInfoList(result.items));
       }
@@ -361,9 +399,11 @@ export struct UserPage {
         this.channelVisitorData = result.visitorData;
       }
     } catch (err) {
+      if (!this.requestCurrent('videos', context)) return;
       logger.error('loadMoreVideos failed:', JSON.stringify(err));
+      this.errorMessage = $r('app.string.yt_error_load_user_videos');
     } finally {
-      this.isLoadingMore = false;
+      if (this.requestCurrent('videos', context)) this.isLoadingMore = false;
     }
   }
 
@@ -407,6 +447,9 @@ export struct UserPage {
     if (feed.getList().length > 0) {
       return;
     }
+    const scope = tag.toLowerCase().includes('short') ? 'shorts' : 'live';
+    const context = this.requestContext(scope, true);
+    feed.setLoadingMore(false);
     feed.setLoading(true);
     feed.setError('');
     try {
@@ -417,6 +460,7 @@ export struct UserPage {
         return;
       }
       const result = await fetchInitial(channelId, 1);
+      if (!this.requestCurrent(scope, context)) return;
       if (result.items && result.items.length > 0) {
         feed.setList(this.fillChannelInfoList(result.items));
         feed.setToken(result.nextPageToken);
@@ -427,10 +471,11 @@ export struct UserPage {
         feed.setList([]);
       }
     } catch (err) {
+      if (!this.requestCurrent(scope, context)) return;
       logger.error(`${tag} failed:`, JSON.stringify(err));
       feed.setError(errorRes);
     } finally {
-      feed.setLoading(false);
+      if (this.requestCurrent(scope, context)) feed.setLoading(false);
     }
   }
 
@@ -444,9 +489,13 @@ export struct UserPage {
       return;
     }
     feed.setLoadingMore(true);
+    feed.setError('');
+    const scope = tag.toLowerCase().includes('short') ? 'shorts' : 'live';
+    const context = this.requestContext(scope);
     try {
       const startId = feed.getList().length + 1;
       const result = await fetchNext(feed.getToken() ?? '', feed.getVisitor(), startId);
+      if (!this.requestCurrent(scope, context)) return;
       if (result.items && result.items.length > 0) {
         feed.setList(feed.getList().concat(this.fillChannelInfoList(result.items)));
         feed.setToken(result.nextPageToken);
@@ -457,9 +506,11 @@ export struct UserPage {
         feed.setToken(null);
       }
     } catch (err) {
+      if (!this.requestCurrent(scope, context)) return;
       logger.error(`${tag} failed:`, JSON.stringify(err));
+      feed.setError(scope === 'shorts' ? $r('app.string.yt_error_load_shorts') : $r('app.string.yt_error_load_live'));
     } finally {
-      feed.setLoadingMore(false);
+      if (this.requestCurrent(scope, context)) feed.setLoadingMore(false);
     }
   }
 
@@ -495,6 +546,8 @@ export struct UserPage {
   // Playlists Loading
   private async loadPlaylists(): Promise<void> {
     if (this.playlistList.length > 0) return;
+    const context = this.requestContext('playlists', true);
+    this.isLoadingMorePlaylists = false;
     this.isLoadingPlaylists = true;
     this.errorMessagePlaylists = '';
     try {
@@ -506,6 +559,7 @@ export struct UserPage {
       }
       const service = FeedServiceProvider.getInstance().getChannelService();
       const result = await service.fetchChannelPlaylistsInitial(channelId, 1);
+      if (!this.requestCurrent('playlists', context)) return;
       if (result.items && result.items.length > 0) {
         this.playlistList = result.items;
         this.playlistNextPageToken = result.nextPageToken;
@@ -514,20 +568,24 @@ export struct UserPage {
         this.playlistList = [];
       }
     } catch (err) {
+      if (!this.requestCurrent('playlists', context)) return;
       logger.error('loadPlaylists failed:', JSON.stringify(err));
       this.errorMessagePlaylists = $r('app.string.yt_error_load_playlists');
     } finally {
-      this.isLoadingPlaylists = false;
+      if (this.requestCurrent('playlists', context)) this.isLoadingPlaylists = false;
     }
   }
 
   private async loadMorePlaylists(): Promise<void> {
     if (this.isLoadingPlaylists || this.isLoadingMorePlaylists || !this.playlistNextPageToken) return;
     this.isLoadingMorePlaylists = true;
+    const context = this.requestContext('playlists');
+    this.errorMessagePlaylists = '';
     try {
       const service = FeedServiceProvider.getInstance().getChannelService();
       const startId = this.playlistList.length + 1;
       const result = await service.fetchChannelPlaylistsNext(this.playlistNextPageToken, this.playlistVisitorData, startId);
+      if (!this.requestCurrent('playlists', context)) return;
       if (result.items && result.items.length > 0) {
         this.playlistList = this.playlistList.concat(result.items);
         this.playlistNextPageToken = result.nextPageToken;
@@ -536,9 +594,11 @@ export struct UserPage {
         this.playlistNextPageToken = null;
       }
     } catch (err) {
+      if (!this.requestCurrent('playlists', context)) return;
       logger.error('loadMorePlaylists failed:', JSON.stringify(err));
+      this.errorMessagePlaylists = $r('app.string.yt_error_load_playlists');
     } finally {
-      this.isLoadingMorePlaylists = false;
+      if (this.requestCurrent('playlists', context)) this.isLoadingMorePlaylists = false;
     }
   }
 
@@ -564,7 +624,7 @@ export struct UserPage {
             .width(72)
             .height(72)
             .objectFit(ImageFit.Cover)
-            .borderRadius(36)
+            .borderRadius(36)
             .clip(true)
             .backgroundColor(this.displayChannel.thumbnailColor || $r('app.color.yourtube_icon_hint'))
         } else {

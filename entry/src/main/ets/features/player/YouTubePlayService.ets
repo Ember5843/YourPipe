@@ -155,10 +155,13 @@ export class YouTubePlayService {
    */
   private prefetchedResults: Map<string, PrefetchedPlayResult> = new Map();
   private prefetchInFlight: Map<string, Promise<YouTubePlayResult>> = new Map();
+  private prefetchGeneration: number = 0;
 
   /** Effective playback-auth partition of the prefetch caches. */
   private prefetchPartition(): string {
-    return AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true ? 'auth' : 'guest';
+    const session = AuthSessionManager.getInstance();
+    const mode = session?.isAuthEnabledForPlayback() === true ? 'auth' : 'guest';
+    return `${mode}|${session?.getCredentialRevision() ?? 0}|${YoutubePlayerClientConfig.getConfigurationKey()}`;
   }
 
   private prefetchCacheKey(videoId: string): string {
@@ -177,7 +180,12 @@ export class YouTubePlayService {
   private lastExtractionEndpoint: string = '';
 
   private async extractSerialized(videoId: string, attemptId: string): Promise<VideoInfo> {
+    const partition = this.prefetchPartition();
+    const generation = this.prefetchGeneration;
     const run: Promise<VideoInfo> = this.extractChain.then(() => {
+      if (partition !== this.prefetchPartition() || generation !== this.prefetchGeneration) {
+        throw new Error('Extraction context expired');
+      }
       if (!this.extractor) {
         throw new Error('extractor not initialized');
       }
@@ -222,6 +230,7 @@ export class YouTubePlayService {
     // Partition (guest | auth) is captured once at start: the result belongs to
     // the auth mode that produced it, even if the user toggles mid-extraction.
     const partition = this.prefetchPartition();
+    const generation = this.prefetchGeneration;
     const key = `${partition}|${videoId}`;
     const cached = this.prefetchedResults.get(key);
     if (cached && Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
@@ -234,7 +243,9 @@ export class YouTubePlayService {
     const task = this.play(videoId, `prefetch-${Date.now()}`, true);
     this.prefetchInFlight.set(key, task);
     task.then((result: YouTubePlayResult) => {
+      if (this.prefetchInFlight.get(key) !== task) return;
       this.prefetchInFlight.delete(key);
+      if (generation !== this.prefetchGeneration || partition !== this.prefetchPartition()) return;
       if (result.success) {
         const entry: PrefetchedPlayResult = { result: result, fetchedAtMs: Date.now() };
         this.prefetchedResults.set(key, entry);
@@ -243,7 +254,7 @@ export class YouTubePlayService {
         logger.warn(`${TAG} prefetch failed video=${videoId} part=${partition} code=${result.errorCode || '-'}`);
       }
     }).catch((e: Error) => {
-      this.prefetchInFlight.delete(key);
+      if (this.prefetchInFlight.get(key) === task) this.prefetchInFlight.delete(key);
       logger.warn(`${TAG} prefetch exception video=${videoId} part=${partition}: ${e.message || e}`);
     });
   }
@@ -260,6 +271,7 @@ export class YouTubePlayService {
    */
   async takePrefetched(videoId: string): Promise<YouTubePlayResult | undefined> {
     const key = this.prefetchCacheKey(videoId);
+    const generation = this.prefetchGeneration;
     const cached = this.prefetchedResults.get(key);
     if (cached) {
       if (Date.now() - cached.fetchedAtMs < YouTubePlayService.PREFETCH_TTL_MS) {
@@ -275,7 +287,8 @@ export class YouTubePlayService {
     if (inFlight) {
       logger.info(`${TAG} prefetch in-flight, awaiting video=${videoId}`);
       const result = await inFlight.catch(() => undefined);
-      this.prefetchInFlight.delete(key);
+      if (generation !== this.prefetchGeneration || key !== this.prefetchCacheKey(videoId)) return undefined;
+      if (this.prefetchInFlight.get(key) === inFlight) this.prefetchInFlight.delete(key);
       if (result && result.success) {
         logger.info(`${TAG} prefetch in-flight consumed video=${videoId}`);
         this.pendingDashPotPromise = this.dashPotInjections.get(key) ?? null;
@@ -293,6 +306,7 @@ export class YouTubePlayService {
    * 返回前等待该视频的 DASH PoToken 注入落地，保证交给下载器的直链已带 pot=。
    */
   async extractForDownload(videoId: string): Promise<YouTubePlayResult> {
+    const generation = this.prefetchGeneration;
     const trimmed = (videoId || '').trim();
     const key = this.prefetchCacheKey(trimmed);
     const cached = this.prefetchedResults.get(key);
@@ -311,6 +325,9 @@ export class YouTubePlayService {
         await injection;
       }
     }
+    if (generation !== this.prefetchGeneration || key !== this.prefetchCacheKey(trimmed)) {
+      throw new Error('Download extraction context expired');
+    }
     return result;
   }
 
@@ -322,6 +339,8 @@ export class YouTubePlayService {
    * inactive side is intentionally kept.
    */
   clearPrefetchCache(): void {
+    this.prefetchGeneration++;
+    this.pendingDashPotPromise = null;
     if (this.prefetchedResults.size > 0 || this.prefetchInFlight.size > 0) {
       logger.info(`${TAG} prefetch cache cleared (both partitions) results=${this.prefetchedResults.size} inFlight=${this.prefetchInFlight.size}`);
     }
@@ -412,11 +431,11 @@ export class YouTubePlayService {
    * 直播聊天首访（只读）：返回初始 continuation + 已到的消息。
    * 非直播 / 聊天关闭时 available=false。
    */
-  async fetchLiveChatInitial(videoId: string): Promise<LiveChatPage> {
+  async fetchLiveChatInitial(videoId: string, playerOffsetMs: number = -1): Promise<LiveChatPage> {
     if (!this.extractor) await this.initialize();
     this.syncExtractorLocale();
     try {
-      return await this.extractor!.fetchLiveChatInitial(videoId);
+      return await this.extractor!.fetchLiveChatInitial(videoId, playerOffsetMs);
     } catch (e) {
       logger.warn(`${TAG} fetchLiveChatInitial failed video=${videoId}: ${(e as Error).message || e}`);
       throw new Error(`live chat initial failed: ${(e as Error).message || e}`);
@@ -452,6 +471,8 @@ export class YouTubePlayService {
   }
 
   async play(videoIdOrUrl: string, attemptId: string = '', forPrefetch: boolean = false): Promise<YouTubePlayResult> {
+    const partition = this.prefetchPartition();
+    const generation = this.prefetchGeneration;
     logger.info(`${TAG} play() called for ${videoIdOrUrl} attempt=${attemptId || '-'}`);
     if (!this.extractor) {
       try {
@@ -483,6 +504,9 @@ export class YouTubePlayService {
       logger.info(`${TAG} 开始提取视频流及元数据 (包含 Player JS 和解密)...`);
       const extractStartMs = Date.now();
       const videoInfo = await this.extractWithEndpointFallback(videoId, attemptId);
+      if (generation !== this.prefetchGeneration || partition !== this.prefetchPartition()) {
+        throw new Error('Extraction context expired');
+      }
       const extractElapsed = Date.now() - extractStartMs;
       logger.info(`${TAG} 提取完成 elapsed=${extractElapsed}ms streams=${videoInfo.streams.length} subtitles=${videoInfo.subtitleTracks.length} isLive=${videoInfo.isLive}`);
       if (videoInfo.streams.length === 0) {
@@ -510,7 +534,7 @@ export class YouTubePlayService {
         // Track per partition+videoId so a prefetch never clobbers the startup
         // gate of the currently playing video; takePrefetched() promotes it on
         // a hit inside the same auth partition.
-        this.dashPotInjections.set(this.prefetchCacheKey(videoId), injection);
+        this.dashPotInjections.set(`${partition}|${videoId}`, injection);
         if (!forPrefetch) {
           this.pendingDashPotPromise = injection;
         }
@@ -697,6 +721,8 @@ export class YouTubePlayService {
 
   /** Inject pot= into DASH/progressive stream URLs (not SABR). */
   private async injectDashPoToken(videoInfo: VideoInfo): Promise<void> {
+    const partition = this.prefetchPartition();
+    const generation = this.prefetchGeneration;
     // PipePipe: tv_downgraded, tv_samsung and visionos are fully token-free —
     // /player carries no pot and media URLs never get pot= either.
     const clientKey = YoutubePlayerClientConfig.getYoutubePlayerClient();
@@ -716,6 +742,8 @@ export class YouTubePlayService {
     const startMs = Date.now();
     const potStr = await SabrWebViewPoTokenProvider.getInstance()
       .getDashPoToken(visitorData, videoInfo.videoId);
+    if (partition !== this.prefetchPartition() || generation !== this.prefetchGeneration ||
+      visitorData !== YoutubeJavaScriptPlayerManager.getSessionVisitorData()) return;
     if (!potStr) {
       logger.info(`${TAG} Dash PoToken not available video=${videoInfo.videoId}`);
       return;

@@ -13,13 +13,38 @@ import {
 const logger = AppLog.getInstance('SabrLocalDomPoToken');
 const API_KEY = 'AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw';
 const REQUEST_KEY = 'O43z0dpjhgX20SCx4KAo';
-const YOUTUBE_HOME = 'https://www.youtube.com';
-const ANONYMOUS_COOKIE = 'PREF=hl=en&gl=US';
-/** Matches PipePipe SharedWebViewRuntime.USER_AGENT (home fetch + WebView runtime). */
-export const SABR_POTOKEN_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-  + 'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.3';
+// The WebView UA is mobile; app=desktop keeps the WEB home and its WEB attestation (PipePipe f67df3e58).
+const YOUTUBE_HOME = 'https://www.youtube.com/?app=desktop&persist_app=1';
+const ANONYMOUS_COOKIE = 'PREF=hl=en&gl=US&app=desktop';
+/** Fallback only when WebView default UA cannot be queried cleanly. */
+export const FALLBACK_SABR_POTOKEN_USER_AGENT: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+  + 'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36';
+/** Backward-compatible alias for existing callers. */
+export const SABR_POTOKEN_USER_AGENT: string = FALLBACK_SABR_POTOKEN_USER_AGENT;
 /** PipePipe EXPIRY_MARGIN_MS: treat the minter as expired 60s before GenerateIT expiry. */
 const EXPIRY_MARGIN_SECONDS = 60;
+const MAX_TRACKED_TOKENS = 64;
+
+/**
+ * Resolve the actual WebView engine UA with the `; wv` token removed
+ * (PipePipe SharedWebViewRuntime.getUserAgent parity). BotGuard verifies that
+ * home/WAA request headers match the underlying JS runtime engine.
+ */
+export function resolveSabrWebViewUserAgent(controller: web_webview.WebviewController): string {
+  try {
+    const raw = controller.getUserAgent();
+    if (raw && raw.trim().length > 0) {
+      const cleaned = raw.replace(/;\s*wv\b/g, '').trim();
+      if (cleaned.length > 0) {
+        return cleaned;
+      }
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logger.warn(`resolveSabrWebViewUserAgent fallback: ${msg}`);
+  }
+  return FALLBACK_SABR_POTOKEN_USER_AGENT;
+}
 
 /**
  * Local-DOM PoToken generator (PipePipe 5.3.0 LocalDomPoTokenProvider parity).
@@ -37,6 +62,7 @@ const EXPIRY_MARGIN_SECONDS = 60;
 export class SabrLocalDomPoTokenGenerator {
   private controller: web_webview.WebviewController;
   private resourceManager: resourceManager.ResourceManager;
+  private readonly userAgent: string;
   private bootstrap?: YoutubePageAttestationBootstrap;
   private sessionPoToken?: Uint8Array;
   private expiresAtMs: number = 0;
@@ -45,10 +71,18 @@ export class SabrLocalDomPoTokenGenerator {
   /** Auth/identity epoch. invalidate() bumps it; an initialize() that resolves
    *  across the bump must not pin the old identity or install its bootstrap. */
   private epoch: number = 0;
+  private generationCounter: number = 0;
+  private currentGeneration: number = 0;
+  private mintedTokenGenerations: Map<string, number> = new Map<string, number>();
 
-  constructor(controller: web_webview.WebviewController, resourceManager: resourceManager.ResourceManager) {
+  constructor(
+    controller: web_webview.WebviewController,
+    resourceManager: resourceManager.ResourceManager,
+    userAgent: string = FALLBACK_SABR_POTOKEN_USER_AGENT
+  ) {
     this.controller = controller;
     this.resourceManager = resourceManager;
+    this.userAgent = userAgent || FALLBACK_SABR_POTOKEN_USER_AGENT;
   }
 
   async mint(_visitorData: string, identifier: string, forceRefresh: boolean): Promise<Uint8Array | undefined> {
@@ -61,23 +95,58 @@ export class SabrLocalDomPoTokenGenerator {
     }
     const bootstrap = this.bootstrap!;
     if (bootstrap.binding === 'session') {
+      if (this.sessionPoToken && this.currentGeneration > 0) {
+        this.trackMintedToken(this.sessionPoToken, this.currentGeneration);
+      }
       return this.sessionPoToken;
     }
-    return await this.mintIdentifier(identifier);
+    const token = await this.mintIdentifier(identifier);
+    if (token && token.length > 0 && this.currentGeneration > 0) {
+      this.trackMintedToken(token, this.currentGeneration);
+    }
+    return token;
+  }
+
+  generationOf(token: Uint8Array): number | undefined {
+    if (!token || token.length === 0) {
+      return undefined;
+    }
+    return this.mintedTokenGenerations.get(poTokenBytesToString(token));
+  }
+
+  private trackMintedToken(token: Uint8Array, generation: number): void {
+    const key = poTokenBytesToString(token);
+    if (this.mintedTokenGenerations.has(key)) {
+      this.mintedTokenGenerations.delete(key);
+    }
+    this.mintedTokenGenerations.set(key, generation);
+    while (this.mintedTokenGenerations.size > MAX_TRACKED_TOKENS) {
+      const oldest = this.mintedTokenGenerations.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      this.mintedTokenGenerations.delete(oldest.value);
+    }
   }
 
   /**
    * PipePipe LocalDomPoTokenProvider.invalidate(): drop the current bootstrap
    * and minter so the next mint re-fetches the home page and starts a fresh
-   * attestation session (identity rotation / credential change).
+   * attestation session. When expectedGeneration is supplied, leaves a newer
+   * healthy minter untouched (PipePipe tokenGeneration isolation).
    */
-  invalidate(): void {
+  invalidate(expectedGeneration?: number): void {
+    if (expectedGeneration !== undefined && this.currentGeneration !== expectedGeneration) {
+      logger.info(`invalidate skipped: expectedGen=${expectedGeneration} currentGen=${this.currentGeneration}`);
+      return;
+    }
     // Bump first: an initialize() already in flight will see the mismatch and
     // refuse to install its bootstrap / pin the old identity.
     this.epoch++;
     this.bootstrap = undefined;
     this.sessionPoToken = undefined;
     this.expiresAtMs = 0;
+    this.currentGeneration = 0;
   }
 
   /**
@@ -116,6 +185,7 @@ export class SabrLocalDomPoTokenGenerator {
     const pageHtml = await requestText(
       YOUTUBE_HOME,
       http.RequestMethod.GET,
+      this.userAgent,
       undefined,
       undefined,
       {
@@ -135,7 +205,7 @@ export class SabrLocalDomPoTokenGenerator {
     let interpreter = bootstrap.challenge.interpreterJavascript;
     if (!interpreter) {
       interpreter = await requestText(
-        bootstrap.challenge.interpreterUrl!, http.RequestMethod.GET, undefined, undefined);
+        bootstrap.challenge.interpreterUrl!, http.RequestMethod.GET, this.userAgent, undefined, undefined);
     }
 
     const runScript = `yourpipeRunBotGuard(${JSON.stringify(bootstrap.eventId)},`
@@ -148,6 +218,7 @@ export class SabrLocalDomPoTokenGenerator {
     const integrityBody = await requestText(
       'https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT',
       http.RequestMethod.POST,
+      this.userAgent,
       JSON.stringify([REQUEST_KEY, botguardResponse]),
       'application/json+protobuf');
     const integrity = JSON.parse(integrityBody) as Object[];
@@ -184,12 +255,16 @@ export class SabrLocalDomPoTokenGenerator {
     this.sessionPoToken = sessionPoToken;
     this.expiresAtMs = Date.now()
       + Math.max(EXPIRY_MARGIN_SECONDS, expirationSeconds - EXPIRY_MARGIN_SECONDS) * 1000;
+    this.currentGeneration = ++this.generationCounter;
+    if (sessionPoToken && sessionPoToken.length > 0) {
+      this.trackMintedToken(sessionPoToken, this.currentGeneration);
+    }
 
     // PipePipe parity: the mweb PoToken path runs on the bootstrap identity —
     // the home page visitorData drives /player, the UMP session and (for
     // anonymous session binding) the session token itself.
     SessionIdentityManager.pin(bootstrap.visitorData);
-    logger.info(`initialization complete expiresIn=${expirationSeconds}s binding=${bootstrap.binding}`);
+    logger.info(`initialization complete gen=${this.currentGeneration} expiresIn=${expirationSeconds}s binding=${bootstrap.binding}`);
   }
 
   private async mintIdentifier(identifier: string): Promise<Uint8Array | undefined> {
@@ -255,6 +330,7 @@ function buildChallengePayload(
 async function requestText(
   url: string,
   method: http.RequestMethod,
+  userAgent: string,
   body?: string,
   contentType?: string,
   extraHeaders?: Record<string, string>
@@ -262,7 +338,7 @@ async function requestText(
   const request = http.createHttp();
   try {
     const headers: Record<string, string> = {
-      'User-Agent': SABR_POTOKEN_USER_AGENT,
+      'User-Agent': userAgent || FALLBACK_SABR_POTOKEN_USER_AGENT,
       'Accept': contentType ? 'application/json' : '*/*'
     };
     if (contentType) {

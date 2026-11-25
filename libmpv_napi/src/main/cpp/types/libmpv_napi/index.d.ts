@@ -91,7 +91,7 @@ export interface NativeMpvPlayerModule {
   pause: (playerId: string) => void;
   stop: (playerId: string) => void;
   prepare: (playerId: string, startPosition?: number) => void;
-  seekWithFlags: (playerId: string, positionMs: number) => void;
+  seekWithFlags: (playerId: string, positionMs: number, keyframe?: boolean) => void;
   setPlaybackRate: (playerId: string, rate: number) => void;
   setVolume: (playerId: string, volume: number) => void;
   setProperty: (playerId: string, key: string, value: string) => void;
@@ -140,6 +140,17 @@ export interface NativeMpvPlayerModule {
    */
   getHwdecCodecsWhitelist: () => string;
   command: (playerId: string, args: string[]) => void;
+  registerDirectStream: (specJson: string) => string;
+  registerHlsStream: (specJson: string) => string;
+  unregisterStream: (urlOrId: string) => void;
+  updateStreamProxy: (proxyJson: string) => void;
+  abortAllStreams: () => void;
+  getStreamMetrics: () => {
+    networkSpeedBps: number;
+    totalBytesRead: number;
+    retryCount: number;
+    lastHttpStatus: number;
+  };
 }
 
 declare const nativeModule: NativeMpvPlayerModule;

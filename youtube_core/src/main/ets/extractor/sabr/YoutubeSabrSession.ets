@@ -3,9 +3,11 @@ import { http } from '@kit.NetworkKit';
 import { YouTubeHttpClient } from '../../network/YouTubeHttpClient';
 import { HttpAbortToken, HttpError } from '../../network/HttpDownloader';
 import { ClientsConstants } from '../../model/ClientsConstants';
-import { SabrDecodedResponse, SabrFormatInitMeta } from './SabrDecodedResponse';
+import { SabrDecodedResponse, SabrFormatInitMeta, SabrLiveMetadata } from './SabrDecodedResponse';
+import { SabrMediaHeader } from './SabrMediaHeader';
 import { SabrMediaSegment, SabrSegmentRequest } from './SabrMediaSegment';
 import { SabrProtocolException } from './SabrProtocolException';
+import { splitSelfInitializingSegment } from './SabrSelfInitializingSegment';
 import { isRecoverableIntegrityIssues, requireUmpContentType, SabrPartProcessor } from './SabrResponseDecoder';
 import { UmpStreamReader } from './UmpStreamReader';
 import { SabrInfoReloader } from './SabrInfoReloader';
@@ -47,6 +49,40 @@ class PumpWaiter {
   }
 }
 
+/** Streaming segment arrival waiter — woken immediately on PART_MEDIA_END (PipePipe streaming parity). */
+class SegmentWaiter {
+  readonly resolve: (segment: SabrMediaSegment) => void;
+  readonly reject: (reason?: Object) => void;
+
+  constructor(resolve: (segment: SabrMediaSegment) => void, reject: (reason?: Object) => void) {
+    this.resolve = resolve;
+    this.reject = reject;
+  }
+}
+
+class WaiterRegistration {
+  readonly promise: Promise<SabrMediaSegment>;
+  readonly cancel: () => void;
+
+  constructor(promise: Promise<SabrMediaSegment>, cancel: () => void) {
+    this.promise = promise;
+    this.cancel = cancel;
+  }
+}
+
+class PumpStepResult {
+  segment?: SabrMediaSegment;
+  decoded?: SabrDecodedResponse;
+  joinedInFlight: boolean = false;
+}
+
+class SabrSeekAbortedError extends Error {
+  constructor(message: string = 'SABR POST aborted for seek') {
+    super(message);
+    this.name = 'SabrSeekAbortedError';
+  }
+}
+
 export function setSabrNetworkTrafficSink(sink?: SabrNetworkTrafficSink): void {
   networkTrafficSink = sink;
 }
@@ -54,7 +90,11 @@ export function setSabrNetworkTrafficSink(sink?: SabrNetworkTrafficSink): void {
 const MAX_REQUESTS_PER_SEGMENT = 16;
 const MAX_BACKOFF_MS = 30000;
 const MAX_INCOMPLETE_MEDIA_RESPONSES = 3;
-const MAX_CACHE_BYTES = 32 * 1024 * 1024;
+/** Per-track cache budgets so high-bitrate 4K60 video (4×15MB = 64MB/POST) never self-evicts or evicts audio. */
+const AUDIO_CACHE_MAX_BYTES = 16 * 1024 * 1024;
+const VIDEO_CACHE_MIN_BYTES = 48 * 1024 * 1024;
+const VIDEO_CACHE_MID_BYTES = 80 * 1024 * 1024;
+const VIDEO_CACHE_MAX_BYTES = 128 * 1024 * 1024;
 const SEEK_KEEP_WINDOW_MS = 8000;
 const EVICT_BEHIND_MS = 10000;
 /** Total wall-clock budget for in-pump network-error retries of one POST. */
@@ -88,6 +128,17 @@ export class YoutubeSabrSession {
   private segmentCache: Map<string, SabrMediaSegment> = new Map();
   private cacheOrder: string[] = [];
   private cachedBytes: number = 0;
+  private audioCachedBytes: number = 0;
+  private videoCachedBytes: number = 0;
+  private readonly videoCacheMaxBytes: number;
+  /** Ref-counted keys actively awaited by fetchSegment — never evicted. */
+  private activeDemands: Map<string, number> = new Map();
+  /** Media segment keys already delivered to the player (reclaimable first). */
+  private servedKeys: Set<string> = new Set();
+  /** Highest sequence number already served per itag (protects initial probe before first serve). */
+  private lastServedSeqByItag: Map<number, number> = new Map();
+  /** Streaming arrival waiters keyed by SabrSegmentRequest.cacheKey(). */
+  private segmentWaiters: Map<string, SegmentWaiter[]> = new Map();
   private playHeadMs: number = 0;
   private lastPlayHeadLogMs: number = -1;
   private closed: boolean = false;
@@ -95,8 +146,16 @@ export class YoutubeSabrSession {
   /** Serialize pumps — concurrent A/V ensureReady must not dual-fire rn=1. */
   private pumpBusy: boolean = false;
   private pumpWaiters: PumpWaiter[] = [];
-  /** In-flight UMP POST abort handle — close() destroys it to unblock the pump. */
+  /** In-flight pump promise so concurrent readers can join & wake on segment arrival. */
+  private activePumpPromise?: Promise<SabrDecodedResponse>;
+  /** In-flight UMP POST abort handle — close() or seek-reposition destroys it to unblock the pump. */
   private activePostAbort?: HttpAbortToken;
+  /** True while activePostAbort was tripped intentionally for a seek jump (not a close/error). */
+  private activePumpSeekAbort: boolean = false;
+  /** Request playerTimeMs of the currently running UMP POST. */
+  private activePumpPlayerTimeMs: number = 0;
+  /** Monotonic counter bumped on seek/reposition so stale pre-seek POSTs don't overwrite playbackCookie. */
+  private seekEpoch: number = 0;
   /** Resolves the interruptible server-backoff sleep early on close(). */
   private backoffWaker?: () => void;
   private consecutiveNoMedia: number = 0;
@@ -133,12 +192,20 @@ export class YoutubeSabrSession {
     this.info = info;
     this.audioFormat = audioFormat;
     this.videoFormat = videoFormat;
+    const videoBitrate = videoFormat.bitrate ?? 0;
+    if (videoBitrate > 24_000_000) {
+      this.videoCacheMaxBytes = VIDEO_CACHE_MAX_BYTES;
+    } else if (videoBitrate > 12_000_000) {
+      this.videoCacheMaxBytes = VIDEO_CACHE_MID_BYTES;
+    } else {
+      this.videoCacheMaxBytes = VIDEO_CACHE_MIN_BYTES;
+    }
     this.httpClient = httpClient;
     this.poTokenProvider = poTokenProvider;
     this.useAuth = useAuth;
     this.infoReloader = infoReloader;
     this.epoch = new SabrServerEpoch(info.serverAbrStreamingUrl);
-    this.streamState = new YoutubeSabrStreamState(audioFormat, videoFormat, this.epoch);
+    this.streamState = new YoutubeSabrStreamState(audioFormat, videoFormat, this.epoch, info.isPostLive);
     this.hostCandidates = YoutubeSabrSession.buildHostCandidates(info.serverAbrStreamingUrl);
     this.hostCandidateIndex = 0;
   }
@@ -179,14 +246,24 @@ export class YoutubeSabrSession {
     this.segmentCache.clear();
     this.cacheOrder = [];
     this.cachedBytes = 0;
-    // Unblock everything the pump may be waiting on: queued pump waiters, the
-    // server-backoff sleep, and the in-flight UMP POST (destroying its request
-    // makes the downloader throw through the normal error path).
+    this.audioCachedBytes = 0;
+    this.videoCachedBytes = 0;
+    this.activeDemands.clear();
+    this.servedKeys.clear();
+    this.lastServedSeqByItag.clear();
+    // Unblock everything the pump may be waiting on: queued pump waiters,
+    // streaming segment arrival waiters, server-backoff sleep, and in-flight UMP POST.
     const closeError = new SabrProtocolException('SABR session closed', 'closed');
     for (const waiter of this.pumpWaiters) {
       waiter.reject(closeError);
     }
     this.pumpWaiters = [];
+    this.segmentWaiters.forEach((waiters: SegmentWaiter[]) => {
+      for (const waiter of waiters) {
+        waiter.reject(closeError);
+      }
+    });
+    this.segmentWaiters.clear();
     this.backoffWaker?.();
     this.activePostAbort?.abort();
   }
@@ -241,7 +318,7 @@ export class YoutubeSabrSession {
       return false;
     }
     const endSegment = this.streamState.getEndSegment(format);
-    return endSegment > 0 && request.sequenceNumber > endSegment;
+    return endSegment >= 0 && request.sequenceNumber > endSegment;
   }
 
   isComplete(requestItag?: number): boolean {
@@ -255,149 +332,296 @@ export class YoutubeSabrSession {
   }
 
   /**
-   * Ensure a segment is available (init or media sequence). Pumps the session until found or budget spent.
+   * Ensure a segment is available (init or media sequence).
+   * Joins an in-flight streaming UMP POST when possible and wakes immediately when the target
+   * segment finishes arriving (PipePipe streaming parity), instead of waiting for the full 64MB+
+   * UMP response body to finish downloading.
    */
   async fetchSegment(request: SabrSegmentRequest): Promise<SabrMediaSegment> {
     if (this.closed) {
       throw new SabrProtocolException('SABR session closed', 'closed');
     }
-    const cached = this.segmentCache.get(request.cacheKey());
+    const key = request.cacheKey();
+    const cached = this.segmentCache.get(key);
     if (cached) {
       return cached;
     }
     if (this.isBeyondEnd(request)) {
-      throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`, 'beyond_end');
+      throw new SabrProtocolException(`SABR segment beyond end: ${key}`, 'beyond_end');
     }
 
-    // A DASH reader requests the target segment directly on seek. Move SABR's reported
-    // contiguous edge near that target instead of downloading the skipped span first.
     const requestFormat = request.itag === this.audioFormat.itag ? this.audioFormat
       : (request.itag === this.videoFormat.itag ? this.videoFormat : undefined);
     const requestTargetMs = !request.initSegment && requestFormat
-      ? this.streamState.getSegmentStartMs(requestFormat, request.sequenceNumber) : 0;
-    const cachedTailSequence = request.initSegment ? 0 : this.getMaxCachedSequence(request.itag);
-    // DASH normally asks for the segment immediately after the cached tail as read-ahead.
-    // Audio segments are about 10s long, so a time-only +8s test misclassified every normal
-    // audio prefetch as a seek and reset both tracks. A real forward seek skips sequence numbers.
-    const sequentialReadAhead = cachedTailSequence > 0
-      && request.sequenceNumber <= cachedTailSequence + 1;
-    if (requestFormat
-      && !sequentialReadAhead
-      && requestTargetMs > this.streamState.getBufferedEndMs(requestFormat) + 8000) {
-      this.prepareForForwardJump(requestTargetMs);
-    }
+      ? Math.max(0, this.streamState.getSegmentStartMs(requestFormat, request.sequenceNumber)) : 0;
 
-    let policyOnly = 0;
-    let holeRecoveryApplied = false;
-    let policyRecoveryApplied = false;
-    for (let attempt = 0; attempt < MAX_REQUESTS_PER_SEGMENT; attempt++) {
-      if (this.closed) {
-        throw new SabrProtocolException('SABR session closed', 'closed');
+    this.pinDemand(key);
+    try {
+      if (!request.initSegment && requestFormat) {
+        this.positionStreamForRequest(request, requestFormat, requestTargetMs);
       }
-      const decoded = await this.pumpOnce();
-      const hit = this.segmentCache.get(request.cacheKey());
-      if (hit) {
-        return hit;
-      }
-      if (this.isBeyondEnd(request)) {
-        throw new SabrProtocolException(`SABR segment beyond end: ${request.cacheKey()}`, 'beyond_end');
-      }
-      // Track the attestation-pending streak before the policy sees the response.
-      if (decoded.isNoMediaResponse() && decoded.isAttestationPending()) {
-        this.consecutiveAttestationPending++;
-      } else {
-        this.consecutiveAttestationPending = 0;
-      }
-      // SABR can send later segments while leaving the exact requested sequence as a hole.
-      // Rewind the advertised range once so the server is told honestly to refill that hole.
-      const observedAheadHole = !request.initSegment && this.hasCachedMediaAfter(request);
-      const holeRecoveryAvailable = !request.initSegment && !!requestFormat && !holeRecoveryApplied
-        && (observedAheadHole
-          || requestTargetMs + 500 < this.streamState.getBufferedEndMs(requestFormat));
-      const policyRecoveryAvailable = !request.initSegment && !!requestFormat
-        && !policyRecoveryApplied;
-      const policyCtx: SabrPolicyContext = {
-        phase: 'fetch',
-        redirectCount: this.epoch.redirectCount,
-        poTokenRefreshes: this.epoch.poTokenRefreshes,
-        consecutiveNoMedia: this.consecutiveNoMedia,
-        policyOnly: policyOnly,
-        hasPoToken: !!this.streamState.getRawPoToken(),
-        hasPoTokenProvider: !!this.poTokenProvider,
-        requestKey: request.cacheKey(),
-        holeRecoveryAvailable: holeRecoveryAvailable,
-        policyRecoveryAvailable: policyRecoveryAvailable,
-        reloads: this.epoch.reloads,
-        attestationRotations: this.attestationRotations,
-        consecutiveAttestationPending: this.consecutiveAttestationPending,
-        hasInfoReloader: !!this.infoReloader,
-        canRotateIdentity: !!this.poTokenProvider
-          && !!this.poTokenProvider.invalidatePoTokenIdentity
-      };
-      const actions = this.policy.evaluate(decoded, policyCtx);
-      for (const action of actions) {
-        if (action.type === 'fail') {
-          throw new SabrProtocolException(action.message, action.kind);
+
+      let policyOnly = 0;
+      let holeRecoveryCount = 0;
+      let policyRecoveryApplied = false;
+      let seekAbortRetries = 0;
+      let inFlightJoins = 0;
+      for (let attempt = 0; attempt < MAX_REQUESTS_PER_SEGMENT; attempt++) {
+        if (this.closed) {
+          throw new SabrProtocolException('SABR session closed', 'closed');
         }
-        if (action.type === 'apply_po_token') {
-          const applied = await this.applyPoTokenForProtectedResponse();
-          if (applied) {
-            break;
-          }
-          continue; // No PO yet: the chain's next action decides the fallback.
+        const hitBefore = this.segmentCache.get(key);
+        if (hitBefore) {
+          return hitBefore;
         }
-        if (action.type === 'rotate_identity') {
-          const rotated = await this.executeRotateIdentity();
-          if (rotated) {
-            break;
+        const step = await this.runOrJoinPumpForKey(key);
+        if (step.segment) {
+          return step.segment;
+        }
+        const hitAfter = this.segmentCache.get(key);
+        if (hitAfter) {
+          return hitAfter;
+        }
+        if (this.isBeyondEnd(request)) {
+          throw new SabrProtocolException(`SABR segment beyond end: ${key}`, 'beyond_end');
+        }
+        const decoded = step.decoded;
+        if (!decoded) {
+          continue;
+        }
+        if (decoded.abortedForSeek) {
+          if (seekAbortRetries < 6) {
+            seekAbortRetries++;
+            attempt--;
           }
           continue;
         }
-        // 'reload_player' never reaches the fetch phase: the pump policy decides
-        // and executes it for every response (see pumpOnceLocked).
-        if (action.type === 'recover_hole') {
-          if (!requestFormat) {
+        if (step.joinedInFlight && inFlightJoins < 4) {
+          // The pump we joined was already running before this demand; re-check positioning
+          // and start our own targeted POST without burning policy attempts.
+          inFlightJoins++;
+          if (!request.initSegment && requestFormat) {
+            this.positionStreamForRequest(request, requestFormat, requestTargetMs);
+          }
+          attempt--;
+          continue;
+        }
+        // Track the attestation-pending streak before the policy sees the response.
+        if (decoded.isNoMediaResponse() && decoded.isAttestationPending()) {
+          this.consecutiveAttestationPending++;
+        } else {
+          this.consecutiveAttestationPending = 0;
+        }
+        // SABR can send later segments while leaving the exact requested sequence as a hole
+        // (e.g. slight boundary skew on fallback timeline). Allow up to 3 progressive
+        // single-track step-backs (seq, seq-1, seq-2) so we never loop 10x on the same POST.
+        const observedAheadHole = !request.initSegment && this.hasCachedMediaAfter(request);
+        const holeRecoveryAvailable = !request.initSegment && !!requestFormat && holeRecoveryCount < 3
+          && (observedAheadHole
+            || request.sequenceNumber <= this.streamState.getLastSequence(requestFormat)
+            || requestTargetMs + 500 < this.streamState.getBufferedEndMs(requestFormat));
+        const policyRecoveryAvailable = !request.initSegment && !!requestFormat
+          && !policyRecoveryApplied;
+        const policyCtx: SabrPolicyContext = {
+          phase: 'fetch',
+          redirectCount: this.epoch.redirectCount,
+          poTokenRefreshes: this.epoch.poTokenRefreshes,
+          consecutiveNoMedia: this.consecutiveNoMedia,
+          policyOnly: policyOnly,
+          hasPoToken: !!this.streamState.getRawPoToken(),
+          hasPoTokenProvider: !!this.poTokenProvider,
+          requestKey: key,
+          holeRecoveryAvailable: holeRecoveryAvailable,
+          policyRecoveryAvailable: policyRecoveryAvailable,
+          reloads: this.epoch.reloads,
+          attestationRotations: this.attestationRotations,
+          consecutiveAttestationPending: this.consecutiveAttestationPending,
+          hasInfoReloader: !!this.infoReloader,
+          canRotateIdentity: !!this.poTokenProvider
+            && !!this.poTokenProvider.invalidatePoTokenIdentity
+        };
+        const actions = this.policy.evaluate(decoded, policyCtx);
+        for (const action of actions) {
+          if (action.type === 'fail') {
+            throw new SabrProtocolException(action.message, action.kind);
+          }
+          if (action.type === 'apply_po_token') {
+            const applied = await this.applyPoTokenForProtectedResponse();
+            if (applied) {
+              break;
+            }
+            continue; // No PO yet: the chain's next action decides the fallback.
+          }
+          if (action.type === 'rotate_identity') {
+            const rotated = await this.executeRotateIdentity();
+            if (rotated) {
+              break;
+            }
+            continue;
+          }
+          // 'reload_player' never reaches the fetch phase: the pump policy decides
+          // and executes it for every response (see pumpOnceLocked).
+          if (action.type === 'recover_hole') {
+            if (!requestFormat) {
+              break;
+            }
+            const minSeq = this.streamState.getStartSegment(requestFormat);
+            const targetSeq = Math.max(minSeq, request.sequenceNumber - holeRecoveryCount);
+            holeRecoveryCount++;
+            // Always reposition ONLY the missing track (PipePipe SabrMediaBridge.track parity)
+            // so a missing audio segment never wipes video bufferedRanges and re-downloads 60MB+.
+            this.seekEpoch++;
+            this.consecutiveNoMedia = 0;
+            this.streamState.prepareForMissingSegment(requestFormat, targetSeq);
+            logger.info(`[SABR] recover hole #${holeRecoveryCount} itag=${request.itag} `
+              + `reqSeq=${request.sequenceNumber} targetSeq=${targetSeq} `
+              + `targetMs=${this.streamState.getSegmentStartMs(requestFormat, targetSeq)} `
+              + `observedAhead=${observedAheadHole}`);
             break;
           }
-          holeRecoveryApplied = true;
-          if (observedAheadHole) {
-            // Keep server backoff: a hole refill must honor the cooldown too.
+          if (action.type === 'recover_policy') {
+            if (!requestFormat) {
+              break;
+            }
+            policyRecoveryApplied = true;
+            policyOnly = 0;
+            // Keep server backoff: repositioning the demand must not bypass the cooldown.
+            this.seekEpoch++;
             this.consecutiveNoMedia = 0;
             this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
-          } else {
-            this.prepareForRewind(requestTargetMs);
-          }
-          logger.info(`[SABR] recover hole itag=${request.itag} seq=${request.sequenceNumber} `
-            + `targetMs=${requestTargetMs} observedAhead=${observedAheadHole}`);
-          break;
-        }
-        if (action.type === 'recover_policy') {
-          if (!requestFormat) {
+            logger.info(`[SABR] recover policy-only itag=${request.itag} `
+              + `seq=${request.sequenceNumber} targetMs=${requestTargetMs}`);
             break;
           }
-          // PipePipe's stream pump repositions an outstanding near-edge demand when the
-          // server keeps acknowledging policy but returns no media. Without that step we
-          // resend the same buffered range and playback cookie forever, then expose a
-          // broken proxy response to the player. Re-advertise only the demanded track;
-          // keep the companion timeline intact so normal A/V read-ahead can continue.
-          policyRecoveryApplied = true;
-          policyOnly = 0;
-          // Keep server backoff: repositioning the demand must not bypass the cooldown.
-          this.consecutiveNoMedia = 0;
-          this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
-          logger.info(`[SABR] recover policy-only itag=${request.itag} `
-            + `seq=${request.sequenceNumber} targetMs=${requestTargetMs}`);
+          if (action.type === 'count_policy_only') {
+            policyOnly++;
+            break;
+          }
+          // 'continue' / 'retry': nothing to execute; the fetch loop pumps again.
           break;
         }
-        if (action.type === 'count_policy_only') {
-          policyOnly++;
-          break;
+      }
+      throw new SabrProtocolException(`SABR segment not available: ${key}`, 'segment_unavailable');
+    } finally {
+      this.releaseDemand(key);
+    }
+  }
+
+  /**
+   * Align streamState with an explicit segment demand before pumping (PipePipe SabrMediaBridge parity).
+   * Handles forward jumps, two-track backward seeks, and single-track holes without letting a
+   * missing audio segment wipe video bufferedRanges (or vice versa).
+   */
+  private positionStreamForRequest(
+    request: SabrSegmentRequest,
+    requestFormat: YoutubeSabrFormatMeta,
+    requestTargetMs: number
+  ): void {
+    const cachedTailSequence = this.getMaxCachedSequence(request.itag);
+    // DASH normally asks for the segment immediately after the cached tail as read-ahead.
+    // Audio segments are ~10s long, so a time-only +8s test misclassified normal audio prefetch.
+    const sequentialReadAhead = cachedTailSequence > 0
+      && request.sequenceNumber <= cachedTailSequence + 1;
+    if (!sequentialReadAhead
+      && requestTargetMs > this.streamState.getBufferedEndMs(requestFormat) + 8000) {
+      this.prepareForForwardJump(requestTargetMs);
+      this.abortActivePumpForSeek('forward_jump');
+      return;
+    }
+    const lastSeq = this.streamState.getLastSequence(requestFormat);
+    if (lastSeq >= request.sequenceNumber) {
+      // Track already advertised at/past this sequence, yet it is absent from cache.
+      const companion = requestFormat === this.audioFormat ? this.videoFormat : this.audioFormat;
+      const companionHasNear = this.hasCachedMediaNear(companion.itag, requestTargetMs);
+      const companionEndMs = this.streamState.getBufferedEndMs(companion);
+      if (!companionHasNear && requestTargetMs + 8000 < companionEndMs) {
+        // Genuine two-track backward seek: rewind both tracks so one POST fetches both.
+        this.prepareForRewind(requestTargetMs);
+        this.abortActivePumpForSeek('backward_seek');
+      } else {
+        // Single-track hole / initial seq=1 probe: reposition ONLY this track.
+        this.seekEpoch++;
+        this.consecutiveNoMedia = 0;
+        this.streamState.prepareForMissingSegment(requestFormat, request.sequenceNumber);
+        if (this.pumpBusy && Math.abs(this.activePumpPlayerTimeMs - requestTargetMs) > 15000) {
+          this.abortActivePumpForSeek('reposition');
         }
-        // 'continue' / 'retry': nothing to execute; the fetch loop pumps again.
-        break;
+        logger.info(`[SABR] position track itag=${request.itag} seq=${request.sequenceNumber} `
+          + `targetMs=${requestTargetMs} lastSeq=${lastSeq}`);
       }
     }
-    throw new SabrProtocolException(`SABR segment not available: ${request.cacheKey()}`, 'segment_unavailable');
+  }
+
+  private startBackgroundPump(): Promise<SabrDecodedResponse> {
+    const p = this.pumpOnce();
+    // Early segment wakeup can resolve fetchSegment before this HTTP response finishes;
+    // attach a sink so a later background error/abort never becomes an unhandled rejection.
+    p.catch(() => {});
+    return p;
+  }
+
+  private async runOrJoinPumpForKey(key: string): Promise<PumpStepResult> {
+    const immediate = this.segmentCache.get(key);
+    if (immediate) {
+      const hit = new PumpStepResult();
+      hit.segment = immediate;
+      return hit;
+    }
+    const joinedInFlight = this.activePumpPromise !== undefined;
+    const pumpPromise: Promise<SabrDecodedResponse> = joinedInFlight
+      ? (this.activePumpPromise as Promise<SabrDecodedResponse>)
+      : this.startBackgroundPump();
+    const waiter = this.registerSegmentWaiter(key);
+    return await new Promise<PumpStepResult>((resolve, reject) => {
+      let settled = false;
+      waiter.promise.then((segment: SabrMediaSegment) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        const res = new PumpStepResult();
+        res.segment = segment;
+        res.joinedInFlight = joinedInFlight;
+        resolve(res);
+      }).catch((err: Object) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(err);
+      });
+      pumpPromise.then((decoded: SabrDecodedResponse) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        waiter.cancel();
+        const res = new PumpStepResult();
+        res.joinedInFlight = joinedInFlight;
+        const arrived = this.segmentCache.get(key);
+        if (arrived) {
+          res.segment = arrived;
+        } else {
+          res.decoded = decoded;
+        }
+        resolve(res);
+      }).catch((err: Object) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        waiter.cancel();
+        const arrived = this.segmentCache.get(key);
+        if (arrived) {
+          const res = new PumpStepResult();
+          res.segment = arrived;
+          res.joinedInFlight = joinedInFlight;
+          resolve(res);
+          return;
+        }
+        reject(err);
+      });
+    });
   }
 
   /**
@@ -414,9 +638,14 @@ export class YoutubeSabrSession {
       }
     }
     this.pumpBusy = true;
+    const work = this.pumpOnceLocked();
+    this.activePumpPromise = work;
     try {
-      return await this.pumpOnceLocked();
+      return await work;
     } finally {
+      if (this.activePumpPromise === work) {
+        this.activePumpPromise = undefined;
+      }
       this.pumpBusy = false;
       const next = this.pumpWaiters.shift();
       if (next) {
@@ -429,6 +658,7 @@ export class YoutubeSabrSession {
     if (this.closed) {
       throw new SabrProtocolException('SABR session closed', 'closed');
     }
+    this.activePumpSeekAbort = false;
     // 锁内起点：以下计入的“无进展/退避”时间不含等待本地串行锁的时间
     // （pumpOnceLocked 只在获得 pumpBusy 之后进入）。
     const lockedStartMs = Date.now();
@@ -457,9 +687,12 @@ export class YoutubeSabrSession {
     // ingested — recoverable issues retry the POST (budget
     // MAX_INCOMPLETE_MEDIA_RESPONSES), anything else is fatal.
     let decoded: SabrDecodedResponse | undefined = undefined;
+    let startSeekEpoch = this.seekEpoch;
     /** Sequence numbers of the segments delivered by the accepted response. */
     const deliveredSeq = new Map<number, number[]>();
     while (true) {
+      startSeekEpoch = this.seekEpoch;
+      this.activePumpPlayerTimeMs = this.streamState.getRequestPlayerTimeMs();
       const isFirst = this.epoch.requestNumber === 0
         && !this.streamState.isInitialized(this.audioFormat)
         && !this.streamState.isInitialized(this.videoFormat);
@@ -479,6 +712,7 @@ export class YoutubeSabrSession {
         + `urlLen=${url.length} `
         + `profile=${this.info.profile} ustreamer=${hasUstreamer} `
         + `a=${this.audioFormat.itag} v=${this.videoFormat.itag} `
+        + `tMs=${Math.floor(this.activePumpPlayerTimeMs)} `
         + `lmA=${this.audioFormat.lastModified || 0} lmV=${this.videoFormat.lastModified || 0}`);
 
       const abortToken = new HttpAbortToken();
@@ -488,8 +722,8 @@ export class YoutubeSabrSession {
       let receivedBytes = 0;
       // PipePipe SabrStreamingResponseReader: the UMP reply is decoded while it
       // downloads. A completed segment is handed to the segment cache right
-      // away, so the player can start on the first segment instead of waiting
-      // for the whole response — and a 4K reply is never held in memory.
+      // away and wakes any waiting reader, so playback starts on the first
+      // segment instead of waiting for a 64MB+ response to finish.
       const reader = new UmpStreamReader();
       deliveredSeq.clear();
       let firstSegmentLogged = false;
@@ -503,17 +737,13 @@ export class YoutubeSabrSession {
           }
           if (!segment.header.initSegment && !firstSegmentLogged) {
             firstSegmentLogged = true;
-            // Streaming TTFF marker: the first MEDIA segment reached the cache
-            // this many ms after the POST started — the response itself is still
-            // downloading. Compare with the "[SABR] response status=…" line to
-            // see how much earlier playback can start. The init segment is not
-            // counted: it is metadata, not playable media.
             logger.info(`[SABR] first segment delivered +${Date.now() - postStartedMs}ms `
               + `itag=${segment.header.itag} seq=${segment.header.sequenceNumber} `
               + `bytes=${segment.getLength()}`);
           }
         },
-        (meta: SabrFormatInitMeta) => { this.streamState.observeFormatInitMeta(meta); }
+        (meta: SabrFormatInitMeta) => { this.streamState.observeFormatInitMeta(meta); },
+        (liveMeta: SabrLiveMetadata) => { this.streamState.observeLiveMetadata(liveMeta); }
       );
       try {
         response = await this.postBinaryWithNetworkRetry(url, body, headers, abortToken,
@@ -526,10 +756,22 @@ export class YoutubeSabrSession {
               part = reader.nextPart();
             }
           });
+      } catch (e) {
+        if (e instanceof SabrSeekAbortedError) {
+          this.epoch.requestNumber++;
+          this.evictCacheIfNeeded();
+          logger.info(`[SABR] pump aborted for seek after ${receivedBytes}B `
+            + `delivered=${summarizeSequenceMap(deliveredSeq)}`);
+          const aborted = new SabrDecodedResponse();
+          aborted.abortedForSeek = true;
+          return aborted;
+        }
+        throw e instanceof Error ? e : new Error(String(e));
       } finally {
         if (this.activePostAbort === abortToken) {
           this.activePostAbort = undefined;
         }
+        this.activePumpSeekAbort = false;
       }
       const status = response.responseCode;
       const contentType = extractContentType(response.header);
@@ -614,7 +856,13 @@ export class YoutubeSabrSession {
       }
     }
 
+    const seekChangedDuringPost = this.seekEpoch !== startSeekEpoch;
     this.streamState.ingest(decoded);
+    if (seekChangedDuringPost) {
+      // A seek repositioned the stream while this pre-seek response was finishing;
+      // do not let the stale pre-seek playbackCookie contaminate the next seek POST.
+      this.streamState.clearPlaybackCookie();
+    }
     // PipePipe updateBackoff applies to EVERY response (media or not) and a
     // server backoff above the limit is fatal — media must not silently
     // discard a cooldown the server attached to it.
@@ -687,6 +935,8 @@ export class YoutubeSabrSession {
 
     logger.info(`[SABR] pump segments=${decoded.segmentCount} `
       + `cache=${this.segmentCache.size}/${this.cachedBytes} `
+      + `(v=${Math.round(this.videoCachedBytes / 1048576)}M/${Math.round(this.videoCacheMaxBytes / 1048576)}M `
+      + `a=${Math.round(this.audioCachedBytes / 1048576)}M) `
       + `seq=${summarizeSequenceMap(deliveredSeq)} `
       + `protection=${decoded.streamProtectionStatus} `
       + `policy=${decoded.nextRequestPolicy?.summarize() || 'none'} `
@@ -718,6 +968,9 @@ export class YoutubeSabrSession {
         throw new SabrProtocolException('SABR session closed', 'closed');
       }
       if (abortToken.aborted) {
+        if (this.activePumpSeekAbort) {
+          throw new SabrSeekAbortedError();
+        }
         throw new SabrProtocolException('SABR request aborted', 'closed');
       }
       attempt++;
@@ -732,6 +985,9 @@ export class YoutubeSabrSession {
       } catch (e) {
         if (this.closed) {
           throw new SabrProtocolException('SABR session closed', 'closed');
+        }
+        if (this.activePumpSeekAbort && abortToken.aborted) {
+          throw new SabrSeekAbortedError();
         }
         const hostUnreachable = e instanceof HttpError && e.isHostUnreachable;
         // 1) 传输层主机不可达（DNS/连接/无路由）：轮换之前先做几次快速重试 ——
@@ -878,12 +1134,14 @@ export class YoutubeSabrSession {
   // semantics): a local reposition must never bypass the server's cooldown, or the
   // next POST just hits the protection boundary again and burns the mint budget.
   prepareForRewind(targetMs: number): void {
+    this.seekEpoch++;
     this.consecutiveNoMedia = 0;
     this.streamState.prepareForSeek(targetMs);
     this.evictOutsideWindow(targetMs);
   }
 
   prepareForForwardJump(targetMs: number): void {
+    this.seekEpoch++;
     this.consecutiveNoMedia = 0;
     this.streamState.prepareForSeek(targetMs);
     this.evictOutsideWindow(targetMs);
@@ -891,47 +1149,307 @@ export class YoutubeSabrSession {
     logger.info(`[SABR] prepare seek targetMs=${Math.floor(targetMs)}`);
   }
 
-  private ingestAndCacheSegment(segment: SabrMediaSegment): void {
-    const key = segment.cacheKey();
-    if (this.segmentCache.has(key)) {
+  /**
+   * PipePipe SabrSegmentDataSource.close() -> bridge.discard() parity:
+   * once a media segment has been delivered to MPV, mark it served and immediately reclaim
+   * older served segments of the same track (keeping 1 prior segment as a short reconnect
+   * safety cushion). Keeps memory lean and guarantees unconsumed segments are never starved.
+   */
+  markSegmentServed(request: SabrSegmentRequest): void {
+    if (request.initSegment || request.sequenceNumber < 0) {
       return;
     }
-    this.segmentCache.set(key, segment);
-    this.cacheOrder.push(key);
-    this.cachedBytes += segment.getLength();
-    this.streamState.ingestSegment(segment);
-    if (segment.header.initSegment) {
-      this.streamState.markInitReceived(segment.header.itag);
+    const key = request.cacheKey();
+    if (this.segmentCache.has(key)) {
+      this.servedKeys.add(key);
+    }
+    const prev = this.lastServedSeqByItag.get(request.itag) ?? -1;
+    const latest = Math.max(prev, request.sequenceNumber);
+    this.lastServedSeqByItag.set(request.itag, latest);
+    const keepFromSeq = latest - 1;
+    const remaining: string[] = [];
+    for (const k of this.cacheOrder) {
+      const seg = this.segmentCache.get(k);
+      if (!seg) {
+        continue;
+      }
+      if (!seg.header.initSegment
+        && seg.header.itag === request.itag
+        && this.servedKeys.has(k)
+        && seg.header.sequenceNumber < keepFromSeq
+        && !this.isDemanded(k)) {
+        this.deleteCachedKey(k);
+        continue;
+      }
+      remaining.push(k);
+    }
+    this.cacheOrder = remaining;
+  }
+
+  private pinDemand(key: string): void {
+    this.activeDemands.set(key, (this.activeDemands.get(key) ?? 0) + 1);
+  }
+
+  private releaseDemand(key: string): void {
+    const count = (this.activeDemands.get(key) ?? 0) - 1;
+    if (count <= 0) {
+      this.activeDemands.delete(key);
+    } else {
+      this.activeDemands.set(key, count);
     }
   }
 
-  private evictCacheIfNeeded(): void {
-    const keepBehind = Math.max(0, this.playHeadMs - EVICT_BEHIND_MS);
-    while (this.cachedBytes > MAX_CACHE_BYTES && this.cacheOrder.length > 0) {
-      const key = this.cacheOrder[0];
-      const segment = this.segmentCache.get(key);
-      if (!segment) {
-        this.cacheOrder.shift();
-        continue;
+  private isDemanded(key: string): boolean {
+    return (this.activeDemands.get(key) ?? 0) > 0;
+  }
+
+  private registerSegmentWaiter(key: string): WaiterRegistration {
+    let waiterRef: SegmentWaiter | undefined = undefined;
+    const promise = new Promise<SabrMediaSegment>((resolve, reject) => {
+      waiterRef = new SegmentWaiter(resolve, reject);
+      const list = this.segmentWaiters.get(key);
+      if (list) {
+        list.push(waiterRef);
+      } else {
+        this.segmentWaiters.set(key, [waiterRef]);
       }
-      // Never evict init segments
-      if (segment.header.initSegment) {
-        this.cacheOrder.push(this.cacheOrder.shift() as string);
-        // prevent infinite loop if only init left
-        if (this.cacheOrder.every(k => this.segmentCache.get(k)?.header.initSegment)) {
-          break;
+    });
+    const cancel = (): void => {
+      if (!waiterRef) {
+        return;
+      }
+      const list = this.segmentWaiters.get(key);
+      if (!list) {
+        return;
+      }
+      const idx = list.indexOf(waiterRef);
+      if (idx >= 0) {
+        list.splice(idx, 1);
+      }
+      if (list.length === 0) {
+        this.segmentWaiters.delete(key);
+      }
+    };
+    return new WaiterRegistration(promise, cancel);
+  }
+
+  private notifySegmentWaiters(key: string, segment: SabrMediaSegment): void {
+    const list = this.segmentWaiters.get(key);
+    if (!list || list.length === 0) {
+      return;
+    }
+    this.segmentWaiters.delete(key);
+    for (const waiter of list) {
+      waiter.resolve(segment);
+    }
+  }
+
+  private abortActivePumpForSeek(reason: string): void {
+    if (this.closed || !this.pumpBusy || !this.activePostAbort || this.activePumpSeekAbort) {
+      return;
+    }
+    // Never interrupt server-mandated backoff (only abort an active old-window HTTP download).
+    this.activePumpSeekAbort = true;
+    logger.info(`[SABR] abort in-flight POST for seek (${reason}) rn=${this.epoch.requestNumber}`);
+    this.activePostAbort.abort();
+  }
+
+  private addCachedSegment(key: string, seg: SabrMediaSegment): void {
+    this.segmentCache.set(key, seg);
+    this.cacheOrder.push(key);
+    const len = seg.getLength();
+    this.cachedBytes += len;
+    if (seg.header.itag === this.audioFormat.itag) {
+      this.audioCachedBytes += len;
+    } else if (seg.header.itag === this.videoFormat.itag) {
+      this.videoCachedBytes += len;
+    }
+  }
+
+  private deleteCachedKey(key: string): void {
+    const seg = this.segmentCache.get(key);
+    if (!seg) {
+      return;
+    }
+    this.segmentCache.delete(key);
+    this.servedKeys.delete(key);
+    const len = seg.getLength();
+    this.cachedBytes = Math.max(0, this.cachedBytes - len);
+    if (seg.header.itag === this.audioFormat.itag) {
+      this.audioCachedBytes = Math.max(0, this.audioCachedBytes - len);
+    } else if (seg.header.itag === this.videoFormat.itag) {
+      this.videoCachedBytes = Math.max(0, this.videoCachedBytes - len);
+    }
+  }
+
+  private ingestAndCacheSegment(segment: SabrMediaSegment): void {
+    let mediaSegment: SabrMediaSegment = segment;
+    if (this.info.isPostLive && !segment.header.initSegment) {
+      const split = splitSelfInitializingSegment(segment.data);
+      if (split) {
+        const initReq = SabrSegmentRequest.init(segment.header.itag);
+        const initKey = initReq.cacheKey();
+        if (!this.segmentCache.has(initKey)) {
+          const initHeader = new SabrMediaHeader();
+          initHeader.videoId = segment.header.videoId;
+          initHeader.itag = segment.header.itag;
+          initHeader.lastModified = segment.header.lastModified;
+          initHeader.xtags = segment.header.xtags;
+          initHeader.initSegment = true;
+          initHeader.sequenceNumber = -1;
+          initHeader.contentLength = split.initBytes.length;
+          const synthInit = new SabrMediaSegment(initHeader, split.initBytes);
+          this.addCachedSegment(initKey, synthInit);
+          this.streamState.markInitReceived(segment.header.itag);
+          logger.info(`[SABR] post-live synthesized init itag=${segment.header.itag} `
+            + `initBytes=${split.initBytes.length} mediaBytes=${split.mediaBytes.length}`);
+          this.notifySegmentWaiters(initKey, synthInit);
         }
-        continue;
+        mediaSegment = new SabrMediaSegment(segment.header, split.mediaBytes);
       }
-      const endMs = (segment.header.startMs >= 0 ? segment.header.startMs : 0)
-        + Math.max(0, segment.header.durationMs);
-      if (endMs > keepBehind && this.cachedBytes <= MAX_CACHE_BYTES * 1.2) {
+    }
+    const key = mediaSegment.cacheKey();
+    if (this.segmentCache.has(key)) {
+      this.notifySegmentWaiters(key, this.segmentCache.get(key) as SabrMediaSegment);
+      return;
+    }
+    this.addCachedSegment(key, mediaSegment);
+    this.streamState.ingestSegment(mediaSegment);
+    if (mediaSegment.header.initSegment) {
+      this.streamState.markInitReceived(mediaSegment.header.itag);
+    }
+    // Wake any fetchSegment waiting on this exact init/media segment immediately while
+    // the rest of the UMP response continues downloading in the background.
+    this.notifySegmentWaiters(key, mediaSegment);
+  }
+
+  private evictCacheIfNeeded(): void {
+    this.evictTrackIfNeeded(this.videoFormat.itag, this.videoCacheMaxBytes);
+    this.evictTrackIfNeeded(this.audioFormat.itag, AUDIO_CACHE_MAX_BYTES);
+  }
+
+  /**
+   * Per-track safe eviction:
+   * - Never evicts init segments or actively demanded keys.
+   * - Audio and video budgets are isolated so 15MB 4K60 video segments never evict audio.
+   * - Priority: (1) already-served segments oldest-first, (2) segments behind playHeadMs
+   *   (never touching startSeq before first serve), (3) above hard cap 1.25x, evict
+   *   furthest-ahead (highest seq) unconsumed segments — NEVER the earliest needed segment.
+   */
+  private evictTrackIfNeeded(itag: number, maxBytes: number): void {
+    const getTrackBytes = (): number => {
+      return itag === this.audioFormat.itag ? this.audioCachedBytes : this.videoCachedBytes;
+    };
+    if (getTrackBytes() <= maxBytes) {
+      return;
+    }
+    const format = itag === this.audioFormat.itag ? this.audioFormat : this.videoFormat;
+    const startSeq = this.streamState.getStartSegment(format);
+    const hasServedAny = this.lastServedSeqByItag.has(itag);
+    const keepBehind = Math.max(0, this.playHeadMs - EVICT_BEHIND_MS);
+    const hardCap = Math.floor(maxBytes * 1.25);
+
+    // Tier 1: already-served segments (oldest first).
+    if (getTrackBytes() > maxBytes) {
+      const nextOrder: string[] = [];
+      for (const key of this.cacheOrder) {
+        const seg = this.segmentCache.get(key);
+        if (!seg) {
+          continue;
+        }
+        if (getTrackBytes() > maxBytes
+          && !seg.header.initSegment
+          && seg.header.itag === itag
+          && this.servedKeys.has(key)
+          && !this.isDemanded(key)) {
+          this.deleteCachedKey(key);
+          continue;
+        }
+        nextOrder.push(key);
+      }
+      this.cacheOrder = nextOrder;
+    }
+
+    // Tier 2: segments strictly behind playHeadMs - EVICT_BEHIND_MS (oldest first).
+    if (getTrackBytes() > maxBytes && hasServedAny) {
+      const nextOrder: string[] = [];
+      for (const key of this.cacheOrder) {
+        const seg = this.segmentCache.get(key);
+        if (!seg) {
+          continue;
+        }
+        const endMs = (seg.header.startMs >= 0 ? seg.header.startMs : 0)
+          + Math.max(0, seg.header.durationMs);
+        if (getTrackBytes() > maxBytes
+          && !seg.header.initSegment
+          && seg.header.itag === itag
+          && endMs <= keepBehind
+          && !this.isDemanded(key)) {
+          this.deleteCachedKey(key);
+          continue;
+        }
+        nextOrder.push(key);
+      }
+      this.cacheOrder = nextOrder;
+    }
+
+    // Tier 3: hard cap — trim furthest-ahead (highest seq) unconsumed segments first,
+    // leaving the earliest unconsumed segment intact so playback can never self-starve.
+    while (getTrackBytes() > hardCap) {
+      let lowestUnconsumedSeq = Number.MAX_SAFE_INTEGER;
+      let highestKey = '';
+      let highestSeq = -1;
+      for (const key of this.cacheOrder) {
+        const seg = this.segmentCache.get(key);
+        if (!seg || seg.header.initSegment || seg.header.itag !== itag) {
+          continue;
+        }
+        const seq = seg.header.sequenceNumber;
+        if (!this.servedKeys.has(key) && seq < lowestUnconsumedSeq) {
+          lowestUnconsumedSeq = seq;
+        }
+      }
+      for (const key of this.cacheOrder) {
+        const seg = this.segmentCache.get(key);
+        if (!seg || seg.header.initSegment || seg.header.itag !== itag || this.isDemanded(key)) {
+          continue;
+        }
+        const seq = seg.header.sequenceNumber;
+        if (!hasServedAny && seq === startSeq) {
+          continue;
+        }
+        if (seq === lowestUnconsumedSeq) {
+          continue;
+        }
+        if (seq > highestSeq) {
+          highestSeq = seq;
+          highestKey = key;
+        }
+      }
+      if (!highestKey) {
         break;
       }
-      this.cacheOrder.shift();
-      this.segmentCache.delete(key);
-      this.cachedBytes -= segment.getLength();
+      this.deleteCachedKey(highestKey);
+      const idx = this.cacheOrder.indexOf(highestKey);
+      if (idx >= 0) {
+        this.cacheOrder.splice(idx, 1);
+      }
     }
+  }
+
+  private hasCachedMediaNear(itag: number, targetMs: number): boolean {
+    let found = false;
+    this.segmentCache.forEach((segment: SabrMediaSegment) => {
+      if (segment.header.itag !== itag || segment.header.initSegment) {
+        return;
+      }
+      const start = segment.header.startMs >= 0 ? segment.header.startMs : 0;
+      const end = start + Math.max(1000, segment.header.durationMs);
+      if (targetMs >= start - 2000 && targetMs <= end + 2000) {
+        found = true;
+      }
+    });
+    return found;
   }
 
   private hasCachedMediaAfter(request: SabrSegmentRequest): boolean {
@@ -968,7 +1486,7 @@ export class YoutubeSabrSession {
       if (!segment) {
         continue;
       }
-      if (segment.header.initSegment) {
+      if (segment.header.initSegment || this.isDemanded(key)) {
         keep.push(key);
         continue;
       }
@@ -977,8 +1495,7 @@ export class YoutubeSabrSession {
       if (end >= lo && start <= hi) {
         keep.push(key);
       } else {
-        this.segmentCache.delete(key);
-        this.cachedBytes -= segment.getLength();
+        this.deleteCachedKey(key);
       }
     }
     this.cacheOrder = keep;
@@ -1022,6 +1539,15 @@ export class YoutubeSabrSession {
     return false;
   }
 
+  /**
+   * PipePipe SabrAttestationRetryHandler -> YoutubeSabrSession.resetProtocolState():
+   * drop cookie + sabrContexts while preserving streaming URL, rn and buffered media cache.
+   */
+  resetProtocolState(): void {
+    this.epoch.resetServerState();
+    this.consecutiveAttestationPending = 0;
+  }
+
   private async applyPoTokenForProtectedResponse(): Promise<boolean> {
     if (this.poTokenWarmup) {
       const warmed = await this.poTokenWarmup;
@@ -1034,6 +1560,11 @@ export class YoutubeSabrSession {
     }
     if (this.epoch.poTokenRefreshes < SABR_MAX_PO_TOKEN_REFRESHES) {
       this.epoch.poTokenRefreshes++;
+      const rejected = this.streamState.getRawPoToken();
+      if (rejected && rejected.length > 0 && this.poTokenProvider?.invalidateRejectedToken) {
+        this.poTokenProvider.invalidateRejectedToken(rejected, this.info.videoId);
+      }
+      this.resetProtocolState();
       return await this.maybeApplyPoToken(true);
     }
     return false;

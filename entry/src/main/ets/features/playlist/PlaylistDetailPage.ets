@@ -46,12 +46,14 @@ export struct PlaylistDetailPage {
   private readonly SHARE_BUTTON_ID: string = 'playlistShareButtonId';
   /** 视频列表的 LazyForEach 数据源（videoList 重赋值经 @Watch 同步） */
   private feedSource: FeedDataSource = new FeedDataSource();
+  private requestGeneration: number = 0;
 
   aboutToAppear() {
     this.loadPlaylistVideos();
   }
 
   aboutToDisappear() {
+    this.requestGeneration++;
   }
 
   /** 本地播放列表的 id 带 local_ 前缀，与联机播放列表区分。 */
@@ -93,6 +95,8 @@ export struct PlaylistDetailPage {
   }
 
   private async loadPlaylistVideos(): Promise<void> {
+    const generation = ++this.requestGeneration;
+    this.isLoadingMore = false;
     this.isLoading = true;
     this.errorMessage = '';
     try {
@@ -118,6 +122,7 @@ export struct PlaylistDetailPage {
       this.visitorData = '';
       const service = FeedServiceProvider.getInstance().getPlaylistService();
       const result = await service.fetchPlaylistInitial(playlistId, 1);
+      if (generation !== this.requestGeneration) return;
       if (result.items && result.items.length > 0) {
         this.videoList = result.items;
         this.nextPageToken = result.nextPageToken;
@@ -132,8 +137,10 @@ export struct PlaylistDetailPage {
         try {
           const fallback = await this.rssFallbackService.fetchPlaylistVideos(
             playlistId, this.playlist.name || playlistId);
+          if (generation !== this.requestGeneration) return;
           this.videoList = fallback;
         } catch (rssErr) {
+          if (generation !== this.requestGeneration) return;
           logger.error('RSS playlist fallback failed:', JSON.stringify(rssErr));
           this.videoList = [];
         }
@@ -152,11 +159,12 @@ export struct PlaylistDetailPage {
         }
       }
     } catch (err) {
+      if (generation !== this.requestGeneration) return;
       logger.error('loadPlaylistVideos failed:', JSON.stringify(err));
       this.videoList = [];
       this.errorMessage = getContext().resourceManager.getStringSync($r('app.string.yt_error_load_playlists').id);
     } finally {
-      this.isLoading = false;
+      if (generation === this.requestGeneration) this.isLoading = false;
     }
   }
 
@@ -168,11 +176,14 @@ export struct PlaylistDetailPage {
       return;
     }
     this.isLoadingMore = true;
+    const generation = this.requestGeneration;
+    this.errorMessage = '';
     try {
       const service = FeedServiceProvider.getInstance().getPlaylistService();
       const startId = this.videoList.length + 1;
       const token = this.nextPageToken ?? '';
       const result = await service.fetchPlaylistNext(token, this.visitorData, startId);
+      if (generation !== this.requestGeneration) return;
       if (result.items && result.items.length > 0) {
         this.videoList = this.videoList.concat(result.items);
       }
@@ -185,9 +196,11 @@ export struct PlaylistDetailPage {
         this.visitorData = result.visitorData;
       }
     } catch (err) {
+      if (generation !== this.requestGeneration) return;
       logger.error('loadMorePlaylistVideos failed:', JSON.stringify(err));
+      this.errorMessage = getContext().resourceManager.getStringSync($r('app.string.yt_error_load_playlists').id);
     } finally {
-      this.isLoadingMore = false;
+      if (generation === this.requestGeneration) this.isLoadingMore = false;
     }
   }
 

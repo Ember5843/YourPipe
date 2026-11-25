@@ -196,6 +196,26 @@ napi_value GetHwdecCodecsWhitelist(napi_env env, napi_callback_info /*info*/)
     return MakeString(env, "h264,hevc,vp8,vp9,av1");
 }
 
+napi_value RegisterDirectStream(napi_env env, napi_callback_info /*info*/)
+{
+    return MakeString(env, "");
+}
+
+napi_value RegisterHlsStream(napi_env env, napi_callback_info /*info*/)
+{
+    return MakeString(env, "");
+}
+
+napi_value GetStreamMetrics(napi_env env, napi_callback_info /*info*/)
+{
+    napi_value obj = MakeEmptyObject(env);
+    SetNamedDouble(env, obj, "networkSpeedBps", 0);
+    SetNamedDouble(env, obj, "totalBytesRead", 0);
+    SetNamedInt(env, obj, "retryCount", 0);
+    SetNamedInt(env, obj, "lastHttpStatus", 0);
+    return obj;
+}
+
 napi_value Init(napi_env env, napi_value exports)
 {
     OH_LOG_Print(LOG_APP, LOG_WARN, 0xFF00, "mpv",
@@ -233,6 +253,12 @@ napi_value Init(napi_env env, napi_value exports)
         {"muxAudioVideo", nullptr, MuxAudioVideo, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"probeVideoHwDecoders", nullptr, ProbeVideoHwDecoders, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getHwdecCodecsWhitelist", nullptr, GetHwdecCodecsWhitelist, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"registerDirectStream", nullptr, RegisterDirectStream, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"registerHlsStream", nullptr, RegisterHlsStream, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"unregisterStream", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"updateStreamProxy", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"abortAllStreams", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"getStreamMetrics", nullptr, GetStreamMetrics, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
 
     napi_define_properties(env, exports, sizeof(descriptors) / sizeof(descriptors[0]), descriptors);

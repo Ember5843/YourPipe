@@ -3845,7 +3845,8 @@
         {
             "name": "yt_translation_region",
             "value": "Região"
-        },
+        }
+,
         {
             "name": "yt_exp_title",
             "value": "Recursos experimentais"
@@ -4145,6 +4146,10 @@
         {
             "name": "yt_update_later",
             "value": "Mais tarde"
-        }
+        },
+        {"name": "yt_cookie_verify_success", "value": "Cookie verificado."},
+        {"name": "yt_local_import_partial", "value": "%1$d arquivo(s) importado(s); %2$d falha(s)."},
+        {"name": "yt_recovery_failed", "value": "Não foi possível concluir a operação. Tente novamente."},
+        {"name": "yt_proxy_applying", "value": "Aplicando proxy…"}
     ]
 }

@@ -2,16 +2,28 @@
  * Outbound proxy for app HTTP. Applied by HttpDownloader / RangeProxy.
  * Loopback must never use proxy (LocalMediaProxy).
  */
+import { url } from '@kit.ArkTS';
+
 export type AppProxyKind = 'none' | 'http' | 'socks5';
+export type AppProxyState = 'disabled' | 'applying' | 'ready' | 'blocked';
+
+export class ProxyUnavailableError extends Error {
+  constructor() {
+    super('App proxy is unavailable');
+    this.name = 'ProxyUnavailableError';
+  }
+}
 
 export interface AppHttpProxySnapshot {
+  state?: AppProxyState;
+  revision?: number;
   kind: AppProxyKind;
   host: string;
   port: number;
   username: string;
   password: string;
   exclusionList: string[];
-  /** Loopback HTTP CONNECT bridge port when kind==='socks5'. Absent/0 = direct. */
+  /** Required loopback route for SOCKS5 consumers without native SOCKS support. */
   socks5LocalPort?: number;
 }
 
@@ -50,6 +62,15 @@ export class HttpProxyOptions {
     return DEFAULT_EXCLUSIONS.slice();
   }
 
+  static assertAvailable(rawUrl: string, snapshot?: AppHttpProxySnapshot, needsBridge: boolean = false): void {
+    const s = snapshot ?? HttpProxyOptions.getSnapshot();
+    if (s.kind === 'none' || HttpProxyOptions.shouldBypass(rawUrl, s)) return;
+    if (!HttpProxyOptions.isActive(s) || s.state === 'applying' || s.state === 'blocked' ||
+      (needsBridge && s.kind === 'socks5' && !(s.socks5LocalPort && s.socks5LocalPort > 0))) {
+      throw new ProxyUnavailableError();
+    }
+  }
+
   /** True when host/port look usable for an enabled proxy. */
   static isActive(snapshot?: AppHttpProxySnapshot): boolean {
     const s = snapshot ?? HttpProxyOptions.getSnapshot();
@@ -60,11 +81,10 @@ export class HttpProxyOptions {
   }
 
   static shouldBypass(url: string, snapshot?: AppHttpProxySnapshot): boolean {
+    if (url.startsWith('file://') || url.startsWith('edl://') || url.startsWith('/')) return true;
     const s = snapshot ?? HttpProxyOptions.getSnapshot();
     const host = HttpProxyOptions.extractHost(url).toLowerCase();
-    if (!host) {
-      return true;
-    }
+    if (!host) return false;
     if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') {
       return true;
     }
@@ -81,10 +101,9 @@ export class HttpProxyOptions {
     return false;
   }
 
-  private static extractHost(url: string): string {
+  private static extractHost(rawUrl: string): string {
     try {
-      const m = /^https?:\/\/([^/:?#]+)/i.exec(url);
-      return m ? m[1] : '';
+      return url.URL.parseURL(rawUrl).hostname;
     } catch (_e) {
       return '';
     }

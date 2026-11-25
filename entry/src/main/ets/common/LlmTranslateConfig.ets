@@ -59,11 +59,32 @@ export class LlmTranslateConfig {
 
   private static instance: LlmTranslateConfig | null = null;
 
+  snapshot(): LlmTranslateConfig {
+    const copy = new LlmTranslateConfig();
+    copy.engine = this.engine;
+    copy.endpoint = this.endpoint;
+    copy.baseUrl = this.baseUrl;
+    copy.model = this.model;
+    copy.apiKey = this.apiKey;
+    copy.region = this.region;
+    copy.bilingual = this.bilingual;
+    copy.customUrl = this.customUrl;
+    copy.customMethod = this.customMethod;
+    copy.customHeaders = this.customHeaders;
+    copy.customBody = this.customBody;
+    copy.customResponsePath = this.customResponsePath;
+    return copy;
+  }
+
   static get(): LlmTranslateConfig {
     if (!LlmTranslateConfig.instance) {
       LlmTranslateConfig.instance = LlmTranslateConfig.load();
     }
     return LlmTranslateConfig.instance;
+  }
+
+  static reload(): void {
+    LlmTranslateConfig.instance = LlmTranslateConfig.load();
   }
 
   /** 各接口的默认地址；UI 占位与 TranslationService 共用。 */
@@ -119,6 +140,7 @@ export class LlmTranslateConfig {
     PreferencesStore.setString('cfg_ai_translate_base_url', this.baseUrl);
     PreferencesStore.setString('cfg_ai_translate_model', this.model);
     PreferencesStore.setString('cfg_ai_translate_api_key', this.apiKey);
+    PreferencesStore.setString('cfg_ai_translate_region', this.region);
     PreferencesStore.setString('cfg_ai_translate_bilingual', this.bilingual ? 'true' : 'false');
     PreferencesStore.setString('cfg_ai_translate_custom_url', this.customUrl);
     PreferencesStore.setString('cfg_ai_translate_custom_method', this.customMethod);

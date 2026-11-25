@@ -1,6 +1,7 @@
-import { VideoBuildResult } from '../model/FeedResult';
+import { HomeFeedChip, HomeFeedSection, VideoBuildResult } from '../model/FeedResult';
 import { buildHomeKioskVideoItems } from './HomeFeedUtils';
 import { getContinuationToken } from './ContinuationUtils';
+import { getTextFromRuns } from './TextUtils';
 
 /**
  * SmartTube-style TV browse JSON walkers.
@@ -440,4 +441,99 @@ function tokenFromContinuations(continuations: Array<Record<string, Object>> | u
     }
   }
   return null;
+}
+
+export function getTvBrowseChips(response: Record<string, Object>): Array<HomeFeedChip> {
+  const chips: Array<HomeFeedChip> = [];
+  const seen = new Set<string>();
+  const surface = getTvSurfaceContent(response);
+  if (surface) {
+    const sectionList = surface['sectionListRenderer'] as Record<string, Object>;
+    const contents = sectionList ? (sectionList['contents'] as Array<Record<string, Object>>) : undefined;
+    if (contents) {
+      contents.forEach((entry) => {
+        const shelf = entry['shelfRenderer'] as Record<string, Object>;
+        if (!shelf) return;
+        let title = getTextFromRuns(shelf['title']).trim();
+        if (!title) {
+          const headerRenderer = shelf['headerRenderer'] as Record<string, Object>;
+          const shelfHeader = headerRenderer ? (headerRenderer['shelfHeaderRenderer'] as Record<string, Object>) : undefined;
+          if (shelfHeader) {
+            title = getTextFromRuns(shelfHeader['title']).trim();
+            if (!title) {
+              const avatarLockup = shelfHeader['avatarLockup'] as Record<string, Object>;
+              const avatarRenderer = avatarLockup ? (avatarLockup['avatarLockupRenderer'] as Record<string, Object>) : undefined;
+              if (avatarRenderer) {
+                title = getTextFromRuns(avatarRenderer['title']).trim();
+              }
+            }
+          }
+        }
+        if (title && title.length <= 18 && title.toLowerCase() !== 'shorts' && !seen.has(title)) {
+          seen.add(title);
+          chips.push({
+            label: title,
+            continuationToken: '',
+            isSelected: false,
+            searchQuery: title
+          });
+        }
+      });
+    }
+  }
+  return chips;
+}
+
+export function getTvBrowseSections(response: Record<string, Object>, startId: number): Array<HomeFeedSection> {
+  const sections: Array<HomeFeedSection> = [];
+  const seen = new Set<string>();
+  let nextId = startId;
+  const surface = getTvSurfaceContent(response);
+  if (!surface) {
+    return sections;
+  }
+  const sectionList = surface['sectionListRenderer'] as Record<string, Object>;
+  const contents = sectionList ? (sectionList['contents'] as Array<Record<string, Object>>) : undefined;
+  if (!contents) {
+    return sections;
+  }
+  contents.forEach((entry) => {
+    const shelf = entry['shelfRenderer'] as Record<string, Object>;
+    if (!shelf) return;
+    let title = getTextFromRuns(shelf['title']).trim();
+    if (!title) {
+      const headerRenderer = shelf['headerRenderer'] as Record<string, Object>;
+      const shelfHeader = headerRenderer ? (headerRenderer['shelfHeaderRenderer'] as Record<string, Object>) : undefined;
+      if (shelfHeader) {
+        title = getTextFromRuns(shelfHeader['title']).trim();
+        if (!title) {
+          const avatarLockup = shelfHeader['avatarLockup'] as Record<string, Object>;
+          const avatarRenderer = avatarLockup ? (avatarLockup['avatarLockupRenderer'] as Record<string, Object>) : undefined;
+          if (avatarRenderer) {
+            title = getTextFromRuns(avatarRenderer['title']).trim();
+          }
+        }
+      }
+    }
+    if (!title || title.toLowerCase() === 'shorts' || seen.has(title)) {
+      return;
+    }
+    const rawLeaves: Array<Record<string, Object>> = [];
+    collectTvLeaves(shelf, rawLeaves);
+    if (rawLeaves.length === 0) {
+      return;
+    }
+    const built = buildHomeKioskVideoItems(rawLeaves, nextId, '');
+    const nonShort = built.items.filter((it) => !it.isShort);
+    if (nonShort.length === 0) {
+      return;
+    }
+    nextId += built.items.length;
+    seen.add(title);
+    sections.push({
+      title,
+      items: nonShort
+    });
+  });
+  return sections;
 }

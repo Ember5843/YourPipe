@@ -30,6 +30,11 @@ export class YoutubePlayerClientConfig {
 
   private constructor() {}
 
+  /** Stable settings identity; temporary fallback selections never partition caches. */
+  static getConfigurationKey(): string {
+    return `${YoutubePlayerClientConfig.guestClient}|${YoutubePlayerClientConfig.authClient}|${YoutubePlayerClientConfig.explicitOverride ? YoutubePlayerClientConfig.selected : 'auto'}`;
+  }
+
   // DORMANT: 全仓零调用（端点选择已改为 per-state 配置 setConfiguredClients，
   // 手动 pin 机制不再接线）；保留仅供调试时临时强制锁定某一端点。
   static setYoutubePlayerClient(client: string): void {

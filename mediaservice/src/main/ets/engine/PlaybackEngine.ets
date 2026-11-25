@@ -97,6 +97,8 @@ export interface PlaybackEngine {
   setSubtitle(url: string): void;
 
   setVideoOutputEnabled(enabled: boolean): void;
+  /** Hint target video bitrate (bps) so the engine scales demuxer forward/back buffer caps. */
+  setTargetVideoBitrate(bitrateBps: number): void;
 
   getState(): PlaybackState;
   getPlaybackStats(): PlaybackStats;

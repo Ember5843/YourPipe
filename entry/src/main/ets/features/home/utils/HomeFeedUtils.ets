@@ -1,5 +1,6 @@
 import { VideoItem } from 'youtube_core';
-import { VideoBuildResult } from '../model/FeedResult';
+import { HomeFeedChip, HomeFeedSection, VideoBuildResult } from '../model/FeedResult';
+import { getTextFromRuns } from './TextUtils';
 import { ThumbnailPlaceholder } from '../../../common/ThumbnailPlaceholder';
 import { getContinuationToken } from './ContinuationUtils';
 import {
@@ -415,4 +416,284 @@ export function buildHomeKioskVideoItems(
   });
 
   return { items, nextPageToken };
+}
+
+
+function extractTokenFromEndpoint(endpoint: Record<string, Object> | undefined): string {
+  if (!endpoint) return '';
+  const contCmd = endpoint['continuationCommand'] as Record<string, Object>;
+  if (contCmd && typeof contCmd['token'] === 'string' && (contCmd['token'] as string).length > 0) {
+    return contCmd['token'] as string;
+  }
+  const reloadData = endpoint['reloadContinuationData'] as Record<string, Object>;
+  if (reloadData && typeof reloadData['continuation'] === 'string' && (reloadData['continuation'] as string).length > 0) {
+    return reloadData['continuation'] as string;
+  }
+  const execCmd = endpoint['commandExecutorCommand'] as Record<string, Object>;
+  const cmds = execCmd ? (execCmd['commands'] as Array<Record<string, Object>>) : undefined;
+  if (cmds) {
+    for (let i = 0; i < cmds.length; i++) {
+      const inner = cmds[i]['continuationCommand'] as Record<string, Object>;
+      if (inner && typeof inner['token'] === 'string' && (inner['token'] as string).length > 0) {
+        return inner['token'] as string;
+      }
+    }
+  }
+  const innertubeCmd = endpoint['innertubeCommand'] as Record<string, Object>;
+  if (innertubeCmd) {
+    return extractTokenFromEndpoint(innertubeCmd);
+  }
+  return '';
+}
+
+function extractChipText(textNode: Object | undefined): string {
+  if (!textNode) return '';
+  if (typeof textNode === 'string') return textNode.trim();
+  const obj = textNode as Record<string, Object>;
+  if (typeof obj['content'] === 'string') {
+    return (obj['content'] as string).trim();
+  }
+  return getTextFromRuns(textNode).trim();
+}
+
+function collectChipEntries(entries: Array<Record<string, Object>> | undefined, out: Array<HomeFeedChip>, seen: Set<string>): void {
+  if (!entries || entries.length === 0) return;
+  entries.forEach((entry) => {
+    const chip = entry['chipCloudChipRenderer'] as Record<string, Object>;
+    if (chip) {
+      const label = extractChipText(chip['text']);
+      if (!label || seen.has(label)) return;
+      const isSelected = chip['isSelected'] === true;
+      const token = extractTokenFromEndpoint(chip['navigationEndpoint'] as Record<string, Object>);
+      seen.add(label);
+      out.push({
+        label,
+        continuationToken: token,
+        isSelected,
+        searchQuery: label
+      });
+      return;
+    }
+    const vm = entry['chipViewModel'] as Record<string, Object>;
+    if (vm) {
+      const label = extractChipText(vm['text']);
+      if (!label || seen.has(label)) return;
+      const isSelected = vm['selected'] === true || vm['isSelected'] === true;
+      const token = extractTokenFromEndpoint(vm['tapCommand'] as Record<string, Object>);
+      seen.add(label);
+      out.push({
+        label,
+        continuationToken: token,
+        isSelected,
+        searchQuery: label
+      });
+    }
+  });
+}
+
+function collectShelfTitleChips(node: Record<string, Object> | undefined, out: Array<HomeFeedChip>, seen: Set<string>): void {
+  if (!node) return;
+  const richShelf = node['richShelfRenderer'] as Record<string, Object>;
+  if (richShelf) {
+    const title = extractChipText(richShelf['title']);
+    if (title && title.length <= 18 && title.toLowerCase() !== 'shorts' && !seen.has(title)) {
+      seen.add(title);
+      out.push({ label: title, continuationToken: '', isSelected: false, searchQuery: title });
+    }
+  }
+  const shelf = node['shelfRenderer'] as Record<string, Object>;
+  if (shelf) {
+    let title = extractChipText(shelf['title']);
+    if (!title) {
+      const headerRenderer = shelf['headerRenderer'] as Record<string, Object>;
+      const shelfHeader = headerRenderer ? (headerRenderer['shelfHeaderRenderer'] as Record<string, Object>) : undefined;
+      if (shelfHeader) {
+        title = extractChipText(shelfHeader['title']);
+      }
+    }
+    if (title && title.length <= 18 && title.toLowerCase() !== 'shorts' && !seen.has(title)) {
+      seen.add(title);
+      out.push({ label: title, continuationToken: '', isSelected: false, searchQuery: title });
+    }
+  }
+  const richSection = node['richSectionRenderer'] as Record<string, Object>;
+  if (richSection && richSection['content']) {
+    collectShelfTitleChips(richSection['content'] as Record<string, Object>, out, seen);
+  }
+  const itemSection = node['itemSectionRenderer'] as Record<string, Object>;
+  if (itemSection) {
+    const contents = itemSection['contents'] as Array<Record<string, Object>>;
+    if (contents) {
+      contents.forEach((c) => collectShelfTitleChips(c, out, seen));
+    }
+  }
+}
+
+/**
+ * Extract home feed filter chips and shelf category titles from browse response.
+ */
+export function getHomeFeedChipsFromTabContent(
+  tabContent: Record<string, Object> | undefined,
+  response?: Record<string, Object>
+): Array<HomeFeedChip> {
+  const chips: Array<HomeFeedChip> = [];
+  const seen = new Set<string>();
+
+  if (tabContent) {
+    const richGrid = tabContent['richGridRenderer'] as Record<string, Object>;
+    const header = richGrid ? (richGrid['header'] as Record<string, Object>) : undefined;
+    const chipBar = header ? (header['feedFilterChipBarRenderer'] as Record<string, Object>) : undefined;
+    if (chipBar) {
+      collectChipEntries(chipBar['contents'] as Array<Record<string, Object>>, chips, seen);
+    }
+    const chipCloud = header ? (header['chipCloudRenderer'] as Record<string, Object>) : undefined;
+    if (chipCloud) {
+      collectChipEntries(chipCloud['chips'] as Array<Record<string, Object>>, chips, seen);
+    }
+
+    const sectionList = tabContent['sectionListRenderer'] as Record<string, Object>;
+    const subMenu = sectionList ? (sectionList['subMenu'] as Record<string, Object>) : undefined;
+    const subChipBar = subMenu ? (subMenu['feedFilterChipBarRenderer'] as Record<string, Object>) : undefined;
+    if (subChipBar) {
+      collectChipEntries(subChipBar['contents'] as Array<Record<string, Object>>, chips, seen);
+    }
+  }
+
+  if (response) {
+    const rootHeader = response['header'] as Record<string, Object>;
+    if (rootHeader) {
+      const rootChipBar = rootHeader['feedFilterChipBarRenderer'] as Record<string, Object>;
+      if (rootChipBar) {
+        collectChipEntries(rootChipBar['contents'] as Array<Record<string, Object>>, chips, seen);
+      }
+      const rootChipCloud = rootHeader['chipCloudRenderer'] as Record<string, Object>;
+      if (rootChipCloud) {
+        collectChipEntries(rootChipCloud['chips'] as Array<Record<string, Object>>, chips, seen);
+      }
+    }
+  }
+
+  if (tabContent) {
+    const richGrid = tabContent['richGridRenderer'] as Record<string, Object>;
+    const richContents = richGrid ? (richGrid['contents'] as Array<Record<string, Object>>) : undefined;
+    if (richContents) {
+      richContents.forEach((c) => collectShelfTitleChips(c, chips, seen));
+    }
+    const sectionList = tabContent['sectionListRenderer'] as Record<string, Object>;
+    const sectionContents = sectionList ? (sectionList['contents'] as Array<Record<string, Object>>) : undefined;
+    if (sectionContents) {
+      sectionContents.forEach((c) => collectShelfTitleChips(c, chips, seen));
+    }
+  }
+
+  return chips;
+}
+
+/**
+ * Extract titled video shelves from an array of item/section nodes as grouped sections (Header + Videos).
+ */
+export function getHomeFeedSectionsFromNodes(
+  nodes: Array<Record<string, Object>> | undefined,
+  startId: number,
+  liveLabel: string
+): Array<HomeFeedSection> {
+  if (!nodes || nodes.length === 0) return [];
+  const sections: Array<HomeFeedSection> = [];
+  const seenTitles = new Set<string>();
+  let nextId = startId;
+
+  const pushShelfSection = (title: string, rawNodes: Array<Record<string, Object>>): void => {
+    const cleanTitle = (title || '').trim();
+    if (!cleanTitle || cleanTitle.toLowerCase() === 'shorts' || seenTitles.has(cleanTitle)) {
+      return;
+    }
+    const leaves = expandHomeFeedNodes(rawNodes);
+    if (leaves.length === 0) {
+      return;
+    }
+    const built = buildHomeKioskVideoItems(leaves, nextId, liveLabel);
+    const nonShort = built.items.filter((it: VideoItem) => !it.isShort);
+    if (nonShort.length === 0) {
+      return;
+    }
+    nextId += built.items.length;
+    seenTitles.add(cleanTitle);
+    sections.push({
+      title: cleanTitle,
+      items: nonShort
+    });
+  };
+
+  const inspectNode = (node: Record<string, Object> | undefined): void => {
+    if (!node) return;
+    const richShelf = node['richShelfRenderer'] as Record<string, Object>;
+    if (richShelf) {
+      const title = extractChipText(richShelf['title']);
+      const contents = richShelf['contents'] as Array<Record<string, Object>>;
+      if (title && contents && contents.length > 0) {
+        pushShelfSection(title, contents);
+      }
+      return;
+    }
+    const shelf = node['shelfRenderer'] as Record<string, Object>;
+    if (shelf) {
+      let title = extractChipText(shelf['title']);
+      if (!title) {
+        const headerRenderer = shelf['headerRenderer'] as Record<string, Object>;
+        const shelfHeader = headerRenderer ? (headerRenderer['shelfHeaderRenderer'] as Record<string, Object>) : undefined;
+        if (shelfHeader) {
+          title = extractChipText(shelfHeader['title']);
+        }
+      }
+      if (title) {
+        pushShelfSection(title, [node]);
+      }
+      return;
+    }
+    const richSection = node['richSectionRenderer'] as Record<string, Object>;
+    if (richSection && richSection['content']) {
+      inspectNode(richSection['content'] as Record<string, Object>);
+      return;
+    }
+    const itemSection = node['itemSectionRenderer'] as Record<string, Object>;
+    if (itemSection) {
+      const contents = itemSection['contents'] as Array<Record<string, Object>>;
+      if (contents) {
+        contents.forEach((c) => inspectNode(c));
+      }
+    }
+  };
+
+  nodes.forEach((c) => inspectNode(c));
+  return sections;
+}
+
+/**
+ * Extract titled video shelves from browse tabContent as grouped sections (Header + Videos).
+ */
+export function getHomeFeedSectionsFromTabContent(
+  tabContent: Record<string, Object> | undefined,
+  startId: number,
+  liveLabel: string
+): Array<HomeFeedSection> {
+  if (!tabContent) return [];
+  const allNodes: Array<Record<string, Object>> = [];
+
+  const richGrid = tabContent['richGridRenderer'] as Record<string, Object>;
+  if (richGrid) {
+    const contents = richGrid['contents'] as Array<Record<string, Object>>;
+    if (contents) {
+      contents.forEach((c) => allNodes.push(c));
+    }
+  }
+
+  const sectionList = tabContent['sectionListRenderer'] as Record<string, Object>;
+  if (sectionList) {
+    const contents = sectionList['contents'] as Array<Record<string, Object>>;
+    if (contents) {
+      contents.forEach((c) => allNodes.push(c));
+    }
+  }
+
+  return getHomeFeedSectionsFromNodes(allNodes, startId, liveLabel);
 }

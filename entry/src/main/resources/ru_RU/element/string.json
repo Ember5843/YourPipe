@@ -3845,7 +3845,8 @@
         {
             "name": "yt_translation_region",
             "value": "Регион"
-        },
+        }
+,
         {
             "name": "yt_exp_title",
             "value": "Экспериментальные функции"
@@ -4145,6 +4146,10 @@
         {
             "name": "yt_update_later",
             "value": "Позже"
-        }
+        },
+        {"name": "yt_cookie_verify_success", "value": "Cookie проверен."},
+        {"name": "yt_local_import_partial", "value": "Импортировано файлов: %1$d; ошибок: %2$d."},
+        {"name": "yt_recovery_failed", "value": "Не удалось завершить операцию. Повторите попытку."},
+        {"name": "yt_proxy_applying", "value": "Применение прокси…"}
     ]
 }

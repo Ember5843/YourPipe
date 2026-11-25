@@ -8,19 +8,17 @@ import { VideoCard } from '../../common/components/VideoCard';
 import { VideoCardGrid } from '../../common/components/VideoCardGrid';
 import { ErrorPage } from '../../common/components/ErrorPage';
 import { PlaylistCard } from '../../features/playlist/components/PlaylistCard';
-import { LocaleBundle } from '../../common/LocaleBundle';
 
-import { SearchLocaleManager } from '../../common/SearchLocaleManager';
-import { FeedServiceProvider } from '../../common/FeedServiceProvider';
+import { SearchViewModel } from './SearchViewModel';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { getFeedContentWidthVp, getVideoGridColumnCount, getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
 import { MediaFeedItemSlot, MediaVideoFeed } from '../../common/components/MediaVideoFeed';
-import { FeedDataSource } from '../../common/model/FeedDataSource';
 import { UIConfig } from '../../common/AppState';
 import { SearchHistoryStore, SearchHistoryItem } from '../../common/SearchHistoryStore';
 import type { BusinessError } from '@kit.BasicServicesKit';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
-import { buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
+import { buildYourTubeTitleBar } from '../../common/components/HdsTitleBar';
+
 import { TITLE_BAR_HEIGHT } from '../../common/components/MediaCardTokens';
 
 const logger = AppLog.getInstance('SearchPage');
@@ -44,28 +42,15 @@ export struct SearchPage {
   @Prop initialQuery: string = '';
 
   @State query: string = '';
-  @State @Watch('syncFeedSource') results: SearchInfoItem[] = [];
-  @State suggestions: string[] = [];
-  @State isSearching: boolean = false;
-  @State isSuggesting: boolean = false;
-  @State isLoadingMore: boolean = false;
-  @State hasSearched: boolean = false;
-  @State nextPageToken: string | null = null;
-  @State errorMessage: ResourceStr = '';
-  @State isResultMode: boolean = false;
-  @State activeContentFilters: string[] = [];
+  @State private vm: SearchViewModel = new SearchViewModel();
   @State lastOptionBeforeDialog: string = '';
   @State searchInputFocusable: boolean = this.initialQuery.trim().length === 0;
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   private isProgrammaticUpdate: boolean = false;
 
-  private readonly SUGGESTION_DEBOUNCE_MS: number = 280;
-  private readonly MAX_SUGGESTIONS: number = 12;
   private readonly SEARCH_RESULT_SIDE_PADDING: number = 12;
-  private suggestionTimer: number = -1;
+  private pageActive: boolean = false;
   private readonly resultScroller: Scroller = new Scroller();
-  /** 搜索结果的 LazyForEach 数据源（results 重赋值经 @Watch 同步） */
-  private feedSource: FeedDataSource = new FeedDataSource();
   private readonly suggestionScroller: Scroller = new Scroller();
   private hasAppliedInitialQuery: boolean = false;
   private isInitialSearchInFlight: boolean = false;
@@ -95,6 +80,8 @@ export struct SearchPage {
 
 
   aboutToAppear() {
+    this.pageActive = true;
+    this.vm.activate();
     this.loadSearchHistory();
     const initialQuery = this.initialQuery.trim();
     if (!this.hasAppliedInitialQuery && initialQuery.length > 0) {
@@ -109,19 +96,17 @@ export struct SearchPage {
   }
 
   aboutToDisappear() {
+    this.pageActive = false;
+    this.vm.deactivate();
     this.dialogController = undefined;
-  }
-
-  private syncFeedSource(): void {
-    this.feedSource.setData(this.results, SearchPage.keyOfResult);
-  }
-
-  private static keyOfResult(item: Object): string {
-    return (item as SearchInfoItem).id.toString();
   }
 
   private getSearchContentWidth(): number {
     return getFeedContentWidthVp(this.getUIContext(), this.deviceWidth, this.SEARCH_RESULT_SIDE_PADDING);
+  }
+
+  private static keyOfResult(item: Object): string {
+    return (item as SearchInfoItem).id.toString();
   }
 
   private gridColumns(): number {
@@ -260,113 +245,31 @@ export struct SearchPage {
     try {
       await this.runSearch(true);
     } finally {
-      this.isInitialSearchInFlight = false;
-      this.searchInputFocusable = true;
+      if (this.pageActive) {
+        this.isInitialSearchInFlight = false;
+        this.searchInputFocusable = true;
+      }
     }
   }
 
 
 
   private async runSearch(reset: boolean): Promise<void> {
-    if (!this.query || this.query.trim().length === 0) {
-      this.results = [];
-      this.nextPageToken = null;
-      this.suggestions = [];
-      this.hasSearched = false;
-      this.isResultMode = false;
-      return;
-    }
-
-    if (reset) {
-      SearchHistoryStore.addSearchHistory(this.query.trim());
+    const keyword = this.query.trim();
+    if (reset && keyword) {
+      SearchHistoryStore.addSearchHistory(keyword);
       this.loadSearchHistory();
-    }
-
-    // Switch to Result Mode immediately
-    if (reset) {
-      this.isResultMode = true;
-      this.isSearching = true;
-      this.results = []; // Clear previous results immediately
-      this.isLoadingMore = false;
-      this.nextPageToken = null;
-      this.activeContentFilters = this.getSelectedContentFilters();
-      this.suggestions = [];
-      this.hasSearched = true;
-      
-      // Dismiss keyboard
       try {
         inputMethod.getController().hideTextInput();
-      } catch (err) {
-        logger.error('Failed to hide keyboard:', JSON.stringify(err));
+      } catch (e) {
+        logger.warn(`Failed to hide keyboard: ${(e as Error).message}`);
       }
-    } else {
-      if (this.isSearching || this.isLoadingMore || !this.nextPageToken) {
-        return;
-      }
-      this.isLoadingMore = true;
     }
-
-    const service = FeedServiceProvider.getInstance().getSearchService();
-    const startId = reset ? 1 : (this.results.length + 1);
-    try {
-      service.setFilters(this.activeContentFilters);
-      const pageResult = reset
-        ? await service.searchInitial(this.query.trim(), startId)
-        : await service.searchNext(this.nextPageToken ?? '', startId);
-      if (reset) {
-        this.results = pageResult.items;
-      } else {
-        this.results = [...this.results, ...pageResult.items];
-      }
-      this.nextPageToken = pageResult.nextPageToken;
-      this.errorMessage = '';
-    } catch (err) {
-      logger.error('search failed:', JSON.stringify(err));
-      let message = '';
-      if (err && typeof err === 'object') {
-        const anyErr = err as Record<string, Object>;
-        message = (anyErr['message'] as string) || '';
-      }
-      this.errorMessage = message.length > 0 ? message : $r('app.string.yt_error_search_failed');
-    } finally {
-      this.isSearching = false;
-      this.isLoadingMore = false;
-    }
+    await this.vm.search(keyword, this.getSelectedContentFilters(), reset);
   }
 
   private scheduleSuggestions(): void {
-    // If in Result Mode, do not schedule suggestions unless typing changes mode back (handled in onChange)
-    const keyword = this.query.trim();
-    if (keyword.length === 0) {
-      this.suggestions = [];
-      this.isSuggesting = false;
-      return;
-    }
-    this.isSuggesting = true;
-    this.suggestions = [];
-    if (this.suggestionTimer >= 0) {
-      clearTimeout(this.suggestionTimer);
-    }
-    this.suggestionTimer = setTimeout(() => {
-      this.fetchSuggestions(keyword);
-    }, this.SUGGESTION_DEBOUNCE_MS);
-  }
-
-  private async fetchSuggestions(keyword: string): Promise<void> {
-    this.isSuggesting = true;
-    try {
-      const suggestionService = FeedServiceProvider.getInstance().getSearchSuggestionService();
-      const suggestions = await suggestionService.fetchSuggestions(keyword);
-      if (this.query.trim() !== keyword) {
-        return;
-      }
-      this.suggestions = suggestions.slice(0, this.MAX_SUGGESTIONS);
-    } catch (err) {
-      logger.error('suggestions failed:', JSON.stringify(err));
-      this.suggestions = [];
-    } finally {
-      this.isSuggesting = false;
-    }
+    this.vm.scheduleSuggestions(this.query);
   }
 
   private loadSearchHistory(): void {
@@ -494,7 +397,7 @@ export struct SearchPage {
               .onClick(() => {
                 this.isProgrammaticUpdate = true;
                 this.query = item.query;
-                this.suggestions = [];
+                this.vm.suggestions = [];
                 this.runSearch(true);
               })
               .gesture(LongPressGesture()
@@ -502,9 +405,12 @@ export struct SearchPage {
                   this.showDeleteConfirmDialog(item.query);
                 }))
             }, (item: SearchHistoryItem) => item.query + item.timestamp.toString())
-          }
-          .width('100%')
-          .backgroundColor($r('app.color.yourtube_bg_surface'))
+          }
+
+          .width('100%')
+
+          .backgroundColor($r('app.color.yourtube_bg_surface'))
+
           .scrollBar(BarState.Off)
         } else {
           Column() {
@@ -520,7 +426,7 @@ export struct SearchPage {
           .padding({ top: 32 })
           .alignItems(HorizontalAlign.Center)
         }
-      } else if (this.isSuggesting && this.suggestions.length === 0) {
+      } else if (this.vm.isSuggesting && this.vm.suggestions.length === 0) {
         Row() {
           LoadingProgress()
             .color(this.themePrimary)
@@ -530,9 +436,9 @@ export struct SearchPage {
         .width('100%')
         .justifyContent(FlexAlign.Center)
         .margin({ top: 8 })
-      } else if (this.suggestions.length > 0) {
+      } else if (this.vm.suggestions.length > 0) {
         List({ space: 4, scroller: this.suggestionScroller }) {
-          ForEach(this.suggestions, (item: string) => {
+          ForEach(this.vm.suggestions, (item: string) => {
             ListItem() {
               Row() {
                 SymbolGlyph($r('sys.symbol.magnifyingglass'))
@@ -561,13 +467,16 @@ export struct SearchPage {
             .onClick(() => {
               this.isProgrammaticUpdate = true;
               this.query = item;
-              this.suggestions = [];
+              this.vm.suggestions = [];
               this.runSearch(true);
             })
           }, (item: string) => item)
-        }
-        .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_surface'))
+        }
+
+        .width('100%')
+
+        .backgroundColor($r('app.color.yourtube_bg_surface'))
+
         .scrollBar(BarState.Off)
       }
     }
@@ -659,7 +568,7 @@ export struct SearchPage {
   @LocalBuilder
   SearchError() {
     ErrorPage({
-      errorMessage: this.errorMessage,
+      errorMessage: this.vm.errorMessage,
       onRetry: () => {
         this.runSearch(true);
       }
@@ -688,7 +597,7 @@ export struct SearchPage {
    */
   @Builder ResultView() {
     MediaVideoFeed({
-      dataSource: this.feedSource,
+      dataSource: this.vm.feedSource,
       gridScroller: this.resultScroller,
       listScroller: this.resultScroller,
       itemKey: SearchPage.keyOfResult,
@@ -706,9 +615,9 @@ export struct SearchPage {
         layoutPreference: this.uiConfig.homeLayoutMode,
         gridColumns: this.gridColumns(),
         listColumns: this.getWideListColumns(),
-        isLoading: this.isSearching && this.results.length === 0,
-        isLoadingMore: this.isLoadingMore,
-        errorMessage: this.results.length === 0 ? this.errorMessage : '',
+        isLoading: this.vm.isSearching && this.vm.results.length === 0,
+        isLoadingMore: this.vm.isLoadingMore,
+        errorMessage: this.vm.errorMessage,
         emptyText: '',
         hasHeader: true,
         headerHorizontalBleed: 0,
@@ -752,7 +661,7 @@ export struct SearchPage {
           logger.debug('initial tag search ignored automatic focus');
           return;
         }
-        this.isResultMode = false;
+        this.vm.isResultMode = false;
         if (this.query.trim().length > 0) {
           this.scheduleSuggestions();
         }
@@ -763,7 +672,7 @@ export struct SearchPage {
           this.isProgrammaticUpdate = false;
           return;
         }
-        this.isResultMode = false;
+        this.vm.isResultMode = false;
         this.scheduleSuggestions();
       })
       .onSubmit(() => {
@@ -813,7 +722,7 @@ export struct SearchPage {
   build() {
     HdsNavDestination() {
       Column() {
-        if (this.isResultMode) {
+        if (this.vm.isResultMode) {
           this.ResultView()
         } else {
           this.SuggestionView()

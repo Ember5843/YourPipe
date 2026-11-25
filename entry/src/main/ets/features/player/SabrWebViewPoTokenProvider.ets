@@ -36,7 +36,9 @@ export type LocalDomMintFn = (
 ) => Promise<Uint8Array | undefined>;
 
 /** Drops the generator's bootstrap/minter so the next mint re-bootstraps. */
-export type LocalDomInvalidateFn = () => void;
+export type LocalDomInvalidateFn = (expectedGeneration?: number) => void;
+/** Looks up the generator generation that produced a cached/recent token. */
+export type LocalDomGenerationOfFn = (token: Uint8Array) => number | undefined;
 
 export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionPoTokenHook {
   private static instance: SabrWebViewPoTokenProvider = new SabrWebViewPoTokenProvider();
@@ -45,6 +47,7 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
   private playerTokenCache?: CachedPlayerPoToken;
   private mint?: LocalDomMintFn;
   private invalidateMinter?: LocalDomInvalidateFn;
+  private generationOfToken?: LocalDomGenerationOfFn;
   private mintPromise?: Promise<Uint8Array | undefined>;
   /** videoId the in-flight mint is content-bound to (sole cache key for its result). */
   private mintVideoId: string = '';
@@ -78,15 +81,42 @@ export class SabrWebViewPoTokenProvider implements SabrPoTokenProvider, SessionP
     return SabrWebViewPoTokenProvider.instance;
   }
 
-  setMinter(mint?: LocalDomMintFn, invalidate?: LocalDomInvalidateFn): void {
+  setMinter(
+    mint?: LocalDomMintFn,
+    invalidate?: LocalDomInvalidateFn,
+    generationOf?: LocalDomGenerationOfFn
+  ): void {
     this.mint = mint;
     this.invalidateMinter = invalidate;
+    this.generationOfToken = generationOf;
     if (mint && this.pendingWarm) {
       const visitorData = this.pendingWarmVisitorData;
       this.pendingWarm = false;
       this.pendingWarmVisitorData = '';
       this.warmRuntime(visitorData);
     }
+  }
+
+  /**
+   * PipePipe SabrAttestationRetryHandler parity: invalidate ONLY the minter
+   * generation that produced the rejected token, leaving a newer minter untouched.
+   */
+  invalidateRejectedToken(token: Uint8Array, videoId: string): boolean {
+    const gen = this.generationOfToken ? this.generationOfToken(token) : undefined;
+    this.cache.delete(videoId);
+    this.dashCache.delete(videoId);
+    this.playerTokenCache = undefined;
+    if (gen !== undefined) {
+      this.authEpoch++;
+      this.runtimeWarmed = false;
+      this.mintTimeoutStreak = 0;
+      this.mintBrokenUntilMs = 0;
+      this.invalidateMinter?.(gen);
+      logger.info(`invalidateRejectedToken video=${videoId} gen=${gen}: invalidated rejected minter`);
+      return true;
+    }
+    logger.info(`invalidateRejectedToken video=${videoId}: generation unknown, cleared token caches`);
+    return false;
   }
 
   /**

@@ -52,7 +52,7 @@ youtube_core/src/main/
         YoutubeSabrRequestBuilder.ets
         UmpReader.ets, UmpStreamReader.ets, SabrProto.ets, SabrResponseDecoder.ets
         SabrMediaSegment.ets, SabrMediaHeader.ets, SabrDecodedResponse.ets
-        SabrMp4SegmentIndex.ets, SabrBufferedRange.ets
+        SabrMp4SegmentIndex.ets, SabrWebmSegmentIndex.ets, SabrBufferedRange.ets
         SabrPoTokenProvider.ets        — interface (impl lives in entry)
         SabrInfoReloader.ets           — re-probe interface (impl lives in entry)
         SabrProtocolException.ets      — typed `kind` error (no string matching)
@@ -233,6 +233,21 @@ youtube_core/src/main/
   - `SabrDecodedResponse.segmentCount` is the authoritative "media arrived"
     signal — in the streaming path the segments are not retained in
     `decoded.segments`.
+  - **Early wakeup & in-flight join**: `YoutubeSabrSession` wakes blocked
+    `segmentWaiters` as soon as the demanded segment arrives mid-POST (without
+    waiting for the whole multi-segment reply to finish) and joins an already
+    running pump (`runOrJoinPumpForKey`) instead of issuing duplicate POSTs.
+  - **Timeline indexing (MP4 + WebM)**: `YoutubeSabrStreamState` parses MP4
+    `sidx` (`SabrMp4SegmentIndex`) and WebM EBML `Info`/`Cues`
+    (`SabrWebmSegmentIndex`, PipePipe parity) so both MP4 and VP9/Opus WebM
+    tracks expose exact per-segment byte ranges and timelines.
+  - **Cache budgets & seek abort**: per-track segment cache limits are isolated
+    (audio 16 MiB; video 48 / 80 / 128 MiB by bitrate), active demands are
+    pinned against eviction, served segments are released via
+    `markSegmentServed()`, and seeks abort stale in-flight POSTs via
+    `abortActivePumpForSeek` (`seekEpoch` guards against pre-seek cookie
+    contamination). `HttpDownloader.postBinaryStreamOnce` bounds connect (10s),
+    first-byte (10s), and idle-read (12s) stalls.
   The buffered path (`sabrDecodeBody` / `umpReadAll`) stays for the offline
   downloader and the unit tests.
 - **Request URL params**: `alr=yes` and `cpn` are append-if-missing (an
@@ -435,6 +450,14 @@ Priority when both present:
 Fine-grained toggles: useAuthForUserData, useAuthForPlayback, master authEnabled
 ```
 - `AuthSessionManager.init(context)` — bootstraps storage; called from entry.
+  Explicit credential replacement/sign-out/import advances `credentialRevision`;
+  user-data auth policy has a separate context key. Token refreshes and ordinary
+  cookie rotations preserve the explicit account revision. Pending refresh/device
+  requests must check their captured revision/generation before committing.
+  Candidate Cookie verification uses an isolated `HttpDownloader(false)` and never
+  writes the active account; the credential commit must finish durable storage
+  before publishing the replacement. Account Set-Cookie observation is scoped to
+  the request's starting credential revision, including binary POST retries.
 - `setAuthStateChangeListener` — single-slot static hook fired after any
   credential-state change is persisted (`signOut` / `saveToken` /
   `saveCookieCredential` / OAuth `invalid_grant` clear / server-cleared

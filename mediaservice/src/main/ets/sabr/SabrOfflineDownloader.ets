@@ -31,6 +31,8 @@ export interface SabrOfflineDownloadOptions {
   durationMs?: number;
   useAuth?: boolean;
   isCancelled?: () => boolean;
+  registerAbort?: (abort: () => void) => void;
+  unregisterAbort?: (abort: () => void) => void;
   onProgress?: (progress: SabrOfflineProgress) => void;
   writeVideo: (data: Uint8Array) => void | Promise<void>;
   writeAudio: (data: Uint8Array) => void | Promise<void>;
@@ -74,7 +76,10 @@ export class SabrOfflineDownloader {
       + `durationMs=${durationMs} useAuth=${useAuth}`);
 
     const lease: SabrLease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth, '|dl');
+    const abort = (): void => { lease.session.abortInFlightPost('download-cancelled'); };
+    options.registerAbort?.(abort);
     try {
+      if (options.isCancelled?.()) throw new Error('cancelled');
       const videoBuf = new SabrTrackBuffer(lease, false, durationMs);
       const audioBuf = new SabrTrackBuffer(lease, true, durationMs);
       // Warm once (serialized), same as playback createSabrDualSession.
@@ -93,6 +98,7 @@ export class SabrOfflineDownloader {
 
       Logger.info(TAG, `download complete dual-track video=${videoItag} audio=${audioItag}`);
     } finally {
+      options.unregisterAbort?.(abort);
       sabrSessionStore.release(lease.key);
     }
   }
@@ -157,8 +163,10 @@ export class SabrOfflineDownloader {
   ): Promise<void> {
     let videoBytes = 0;
     let audioBytes = 0;
-    let videoSeq = 0;
-    let audioSeq = 0;
+    let videoSeq = -1;
+    let audioSeq = -1;
+    let videoCount = 0;
+    let audioCount = 0;
     let videoDone = false;
     let audioDone = false;
     let consecutiveFetchFails = 0;
@@ -176,7 +184,7 @@ export class SabrOfflineDownloader {
     onProgress?.({
       track: 'video', phase: 'init', sequence: 0,
       endSegment: videoBuf.getEndSegment(), bytesWritten: videoBytes, percent: 1,
-      videoBytes, audioBytes, videoSeq, audioSeq
+      videoBytes, audioBytes, videoSeq: 0, audioSeq: 0
     });
 
     const aInit = await audioBuf.readSegment(true, -1, false);
@@ -188,12 +196,16 @@ export class SabrOfflineDownloader {
     onProgress?.({
       track: 'audio', phase: 'init', sequence: 0,
       endSegment: audioBuf.getEndSegment(), bytesWritten: audioBytes, percent: 1,
-      videoBytes, audioBytes, videoSeq, audioSeq
+      videoBytes, audioBytes, videoSeq: 0, audioSeq: 0
     });
 
+    const videoStartSeq = videoBuf.getStartSegment();
+    const audioStartSeq = audioBuf.getStartSegment();
+    videoSeq = videoStartSeq - 1;
+    audioSeq = audioStartSeq - 1;
     // Next media sequence to request for each track.
-    let nextVideoSeq = 1;
-    let nextAudioSeq = 1;
+    let nextVideoSeq = videoStartSeq;
+    let nextAudioSeq = audioStartSeq;
 
     while (!videoDone || !audioDone) {
       if (isCancelled?.()) {
@@ -202,10 +214,10 @@ export class SabrOfflineDownloader {
 
       const vEnd = videoBuf.getEndSegment();
       const aEnd = audioBuf.getEndSegment();
-      if (!videoDone && vEnd > 0 && nextVideoSeq > vEnd) {
+      if (!videoDone && vEnd >= videoStartSeq && nextVideoSeq > vEnd) {
         videoDone = true;
       }
-      if (!audioDone && aEnd > 0 && nextAudioSeq > aEnd) {
+      if (!audioDone && aEnd >= audioStartSeq && nextAudioSeq > aEnd) {
         audioDone = true;
       }
       if (videoDone && audioDone) {
@@ -213,8 +225,8 @@ export class SabrOfflineDownloader {
       }
 
       // Choose lagging track by end time of last written media (dual-track balance).
-      const vTime = videoSeq > 0 ? videoBuf.getSegmentEndMs(videoSeq) : 0;
-      const aTime = audioSeq > 0 ? audioBuf.getSegmentEndMs(audioSeq) : 0;
+      const vTime = videoCount > 0 ? videoBuf.getSegmentEndMs(videoSeq) : 0;
+      const aTime = audioCount > 0 ? audioBuf.getSegmentEndMs(audioSeq) : 0;
       let preferVideo = !videoDone;
       if (!videoDone && !audioDone) {
         preferVideo = vTime <= aTime;
@@ -231,6 +243,7 @@ export class SabrOfflineDownloader {
           (bytes: number, seq: number): void => {
             videoBytes += bytes;
             videoSeq = seq;
+            videoCount++;
             nextVideoSeq = seq + 1;
           },
           (): void => {
@@ -245,6 +258,7 @@ export class SabrOfflineDownloader {
           (bytes: number, seq: number): void => {
             audioBytes += bytes;
             audioSeq = seq;
+            audioCount++;
             nextAudioSeq = seq + 1;
           },
           (): void => {
@@ -260,6 +274,7 @@ export class SabrOfflineDownloader {
           (bytes: number, seq: number): void => {
             videoBytes += bytes;
             videoSeq = seq;
+            videoCount++;
             nextVideoSeq = seq + 1;
           },
           (): void => {
@@ -272,6 +287,7 @@ export class SabrOfflineDownloader {
           (bytes: number, seq: number): void => {
             audioBytes += bytes;
             audioSeq = seq;
+            audioCount++;
             nextAudioSeq = seq + 1;
           },
           (): void => {
@@ -284,14 +300,15 @@ export class SabrOfflineDownloader {
         consecutiveFetchFails = 0;
         // Keep session play-head at the slower track so eviction does not drop needed segs.
         const headMs = Math.min(
-          videoSeq > 0 ? videoBuf.getSegmentEndMs(videoSeq) : 0,
-          audioSeq > 0 ? audioBuf.getSegmentEndMs(audioSeq) : 0
+          videoCount > 0 ? videoBuf.getSegmentEndMs(videoSeq) : 0,
+          audioCount > 0 ? audioBuf.getSegmentEndMs(audioSeq) : 0
         );
         if (headMs > 0) {
           sabrSessionStore.setPlayHeadMs(lease.key, headMs);
         }
         const percent = SabrOfflineDownloader.overallPercent(
-          videoSeq, audioSeq, videoBuf.getEndSegment(), audioBuf.getEndSegment(),
+          videoSeq, audioSeq, videoStartSeq, audioStartSeq,
+          videoBuf.getEndSegment(), audioBuf.getEndSegment(),
           videoBytes, audioBytes);
         onProgress?.({
           track: 'both',
@@ -319,13 +336,13 @@ export class SabrOfflineDownloader {
 
     const finalVideoEnd = videoBuf.getEndSegment();
     const finalAudioEnd = audioBuf.getEndSegment();
-    if (videoSeq <= 0 || audioSeq <= 0) {
-      throw new Error(`SABR download incomplete: missing media videoSeq=${videoSeq} audioSeq=${audioSeq}`);
+    if (videoCount <= 0 || audioCount <= 0) {
+      throw new Error(`SABR download incomplete: missing media videoCount=${videoCount} audioCount=${audioCount}`);
     }
-    if (finalVideoEnd > 0 && videoSeq < finalVideoEnd) {
+    if (finalVideoEnd >= videoStartSeq && videoSeq < finalVideoEnd) {
       throw new Error(`SABR video incomplete: last=${videoSeq} expected=${finalVideoEnd}`);
     }
-    if (finalAudioEnd > 0 && audioSeq < finalAudioEnd) {
+    if (finalAudioEnd >= audioStartSeq && audioSeq < finalAudioEnd) {
       throw new Error(`SABR audio incomplete: last=${audioSeq} expected=${finalAudioEnd}`);
     }
 
@@ -342,8 +359,8 @@ export class SabrOfflineDownloader {
       audioSeq
     });
     Logger.info(TAG, `dump dual-track vItag=${videoBuf.getItag()} aItag=${audioBuf.getItag()} `
-      + `vSegs=${videoSeq} aSegs=${audioSeq} vBytes=${videoBytes} aBytes=${audioBytes} `
-      + `vEnd=${finalVideoEnd} aEnd=${finalAudioEnd}`);
+      + `vSegs=${videoCount} aSegs=${audioCount} vBytes=${videoBytes} aBytes=${audioBytes} `
+      + `vStart=${videoStartSeq} vEnd=${finalVideoEnd} aStart=${audioStartSeq} aEnd=${finalAudioEnd}`);
   }
 
   private static async tryWriteNext(
@@ -380,19 +397,25 @@ export class SabrOfflineDownloader {
   }
 
   private static overallPercent(
-    videoSeq: number, audioSeq: number, vEnd: number, aEnd: number,
+    videoSeq: number, audioSeq: number,
+    vStart: number, aStart: number,
+    vEnd: number, aEnd: number,
     videoBytes: number, audioBytes: number
   ): number {
-    if (vEnd > 0 && aEnd > 0) {
-      const vp = Math.min(1, videoSeq / vEnd);
-      const ap = Math.min(1, audioSeq / aEnd);
+    const vSpan = vEnd >= vStart ? (vEnd - vStart + 1) : 0;
+    const aSpan = aEnd >= aStart ? (aEnd - aStart + 1) : 0;
+    const vDoneCount = videoSeq >= vStart ? (videoSeq - vStart + 1) : 0;
+    const aDoneCount = audioSeq >= aStart ? (audioSeq - aStart + 1) : 0;
+    if (vSpan > 0 && aSpan > 0) {
+      const vp = Math.min(1, vDoneCount / vSpan);
+      const ap = Math.min(1, aDoneCount / aSpan);
       return Math.min(99, Math.round(((vp + ap) / 2) * 100));
     }
-    if (vEnd > 0) {
-      return Math.min(99, Math.round((videoSeq / vEnd) * 100));
+    if (vSpan > 0) {
+      return Math.min(99, Math.round((vDoneCount / vSpan) * 100));
     }
-    if (aEnd > 0) {
-      return Math.min(99, Math.round((audioSeq / aEnd) * 100));
+    if (aSpan > 0) {
+      return Math.min(99, Math.round((aDoneCount / aSpan) * 100));
     }
     const mb = (videoBytes + audioBytes) / (1024 * 1024);
     return Math.min(99, Math.max(2, Math.round(mb)));

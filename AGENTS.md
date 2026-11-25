@@ -84,23 +84,24 @@ entry  →  mediaservice  →  youtube_core
 `youtube_core` has no HAR package deps (native `yourpipe_cipher` only).
 `libmpv_napi` is self-contained (embeds FFmpeg + libmpv on arm64).
 
-## 3. CodeGraph (code intelligence)
+## 3. HomeGraph (code intelligence)
 
-This repo is indexed by **CodeGraph** (`.codegraph/` at repo root, git-ignored).
+This repo is indexed by **HomeGraph** (`.homegraph/` at repo root, git-ignored;
+ArkTS via `arkanalyzer` + C/C++ via tree-sitter).
 
-- **Always prefer the `codegraph_explore` MCP tool for code search and
+- **Always prefer the `homegraph_explore` MCP tool for code search and
   comprehension** — how does X work, architecture, where/what is X, surveying
   an area, or reading the symbols you are about to change. One call returns
   the verbatim, line-numbered source of the relevant symbols plus call paths
   and blast radius. Use it BEFORE Grep/Glob/Read loops; only fall back to the
   built-in tools for exact-string searches or files outside the index.
-- Shell equivalent (always works): `codegraph explore "<symbols or question>"`,
-  `codegraph node <name>`, `codegraph query <search>`.
+- Shell equivalent (always works): `homegraph explore "<symbols or question>"`,
+  `homegraph node <name>`, `homegraph query <search>`.
 - **Keep the index fresh**: after finishing a batch of code edits, run
-  `codegraph sync` (incremental) so subsequent queries see current code.
-  `codegraph index` rebuilds from scratch when sync reports drift or after
+  `homegraph sync` (incremental) so subsequent queries see current code.
+  `homegraph index` rebuilds from scratch when sync reports drift or after
   large refactors / branch switches.
-- Never commit `.codegraph/` (git-ignored); indexing is per-machine.
+- Never commit `.homegraph/` (git-ignored); indexing is per-machine.
 
 ## 4. deveco-mcp (static syntax analysis)
 
@@ -214,13 +215,16 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
 - **Player stack**: product backend is MPV only (`libmpv_napi` +
   `MpvPlaybackEngine`). Do not reintroduce a second decoder/player path.
 - **Playback media path**: guest VOD is direct-link-first (`visionos`
-  GAPIS by default, pot-free → adaptiveFormats direct URLs → local
-  range/DASH proxy); guest endpoints are `visionos|mweb` (mweb for SABR
-  debugging). Signed-in VOD defaults to the mweb **SABR** path, with
-  `tv_downgraded` direct links still selectable. `android_vr`, `web_safari`,
-  and `tv_samsung` are unreachable in product (no UI; internal keys kept
-  for dormant debug pinning only); `android_vr` requires a session pot.
-  SABR ownership:
+  GAPIS by default, pot-free → adaptiveFormats direct URLs → native C++20
+  `ypstream://` `DirectRangeStream` via `libmpv_napi` `mpv_stream_cb_add_ro`
+  over `librcp_c`, with `LocalMediaProxy` as x86_64 stub fallback); live HLS
+  variants/renditions also run through native `ypstream://` `HlsLiveStream`
+  (async playlist refresh + 2-worker concurrent prefetch). Guest endpoints are
+  `visionos|mweb` (mweb for SABR debugging). Signed-in VOD defaults to the
+  mweb **SABR** path, with `tv_downgraded` direct links still selectable.
+  `android_vr`, `web_safari`, and `tv_samsung` are unreachable in product (no
+  UI; internal keys kept for dormant debug pinning only); `android_vr` requires
+  a session pot. SABR ownership:
   extractor bootstraps SABR; `youtube_core` owns UMP session fetch;
   `mediaservice` owns lease/store/serve + MPV load URL; `entry` owns PoToken
   WebView mint.
@@ -281,11 +285,13 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
 - **Network handover**: entry `NetworkHandoverService` owns the single
   `connection` default-network event subscription (SDK kit set has no
   NetworkBoostKit `netHandover`); on a switch/loss (2s debounce) it calls
-  `LocalMediaProxy.abortAllUpstreamFetches` and
-  `sabrSessionStore.abortAllInFlightPosts` so stale in-flight connections
-  fail fast and the existing retry paths recover on the new network. SABR
-  sessions are never closed by this path — only the in-flight POST is
-  aborted.
+  `LocalMediaProxy.abortAllUpstreamFetches`,
+  `sabrSessionStore.abortAllInFlightPosts`, and
+  `AvPlayerController.notifyNetworkChanged` (`abortAllStreams()` in
+  `libmpv_napi`, rotating the native `librcp_c` session) so stale in-flight
+  connections fail fast and the existing retry paths recover on the new
+  network. SABR sessions are never closed by this path — only the in-flight
+  POST is aborted.
 - **Dependency direction**: never import `entry` from HARs; never import
   `mediaservice` from `youtube_core`.
 - **Shorts 短视频**：不是独立模式，而是**首页信息流的一个维度** —— 标题栏（搜索图标
@@ -305,8 +311,8 @@ JSON) are git-ignored; prefer `AGENTS.md` + code over local drafts.
   `filesDir/local_media/`（索引 `local_media_json`），播放走与下载物相同的
   `LOCAL_FILE` 通道；目录与索引独立，不共享 `DownloadTask` 状态，但
   **播放队列共用**（`DownloadPage.buildLocalQueue()`：完成下载在前、导入
-  文件在后，切 `localMedia` 队列）。两者都属于用户媒体：`clearAllAppData`
-  保留文件并在 Preferences 清空后重建索引。
+  文件在后，切 `localMedia` 队列）。「清除应用全部数据」会等待下载和导入
+  操作退出，再删除两者的文件与索引；恢复默认设置不删除这些媒体。
 - **直播聊天（只读）**：`youtube_core` `LiveChatExtractor` 从 `/next` 的
   `conversationBar` 取 continuation 并轮询 `live_chat/get_live_chat`；
   `entry` `LiveChatPanel` 只在播放页「聊天」Tab 可见时轮询（服务端

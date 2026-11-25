@@ -450,6 +450,20 @@ export struct VideoPlayer {
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
     this.playbackStarted = false;
 
+    // When a reused PlayerPage starts a fresh session after detachSurface(),
+    // re-bind its live XComponent surfaceId so native pendingLoad can fire immediately.
+    if (this.controller && !this.controller.surfaceID) {
+      try {
+        const surfaceId = this.x_componentController.getXComponentSurfaceId();
+        if (surfaceId) {
+          this.controller.setSurfaceID(surfaceId);
+          Logger.info(TAG, `SurfaceID re-bound on source change: ${surfaceId}`);
+        }
+      } catch (_e) {
+        // XComponent surface may not be mounted yet; onLoad will bind it.
+      }
+    }
+
     this.syncPlaybackStateFromController();
 
     this.calculateSurfaceSize();
@@ -1543,7 +1557,7 @@ export struct VideoPlayer {
           .backgroundColor(this.vm.playbackSpeed === speed
             ? this.getSelectedMenuBackground() : Color.Transparent)
           .onClick(() => {
-            this.controller.setPlaybackSpeed(speed);
+            PlayerSession.getInstance().setSessionPlaybackSpeed(speed);
           })
       })
     }

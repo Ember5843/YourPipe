@@ -15,13 +15,16 @@ export interface ClientVersionGet {
 
 /**
  * PipePipe YoutubeParsingHelper.getClientVersion():
- * process cache → sw.js → results HTML → WEB_HARDCODED_CLIENT_VERSION.
+ * process cache → sw.js_data → results HTML → WEB_HARDCODED_CLIENT_VERSION.
  * Shared by mweb stream player, WEB metadata /player, and /next.
  */
 export class WebClientVersionResolver {
   private static cachedVersion: string = '';
   private static resolvePromise: Promise<string> | undefined = undefined;
 
+  private static readonly SW_JS_DATA_VERSION_REGEXES: string[] = [
+    '"([0-9]\\.[0-9]{8}\\.[0-9]{2}\\.[0-9]{2})"'
+  ];
   private static readonly VERSION_REGEXES: string[] = [
     'INNERTUBE_CONTEXT_CLIENT_VERSION":"([0-9\\.]+?)"',
     'innertube_context_client_version":"([0-9\\.]+?)"',
@@ -84,11 +87,11 @@ export class WebClientVersionResolver {
       const fromSw = await WebClientVersionResolver.extractFromSwJs(client);
       if (fromSw) {
         WebClientVersionResolver.cachedVersion = fromSw;
-        logger.info(`[WEB_VER] from sw.js: ${fromSw}`);
+        logger.info(`[WEB_VER] from sw.js_data: ${fromSw}`);
         return fromSw;
       }
     } catch (e) {
-      logger.warn('[WEB_VER] sw.js extract failed:', e);
+      logger.warn('[WEB_VER] sw.js_data extract failed:', e);
     }
 
     try {
@@ -113,11 +116,18 @@ export class WebClientVersionResolver {
       'Origin': 'https://www.youtube.com',
       'Referer': 'https://www.youtube.com/'
     };
-    const response = await client.get('https://www.youtube.com/sw.js', headers);
+    // PipePipeExtractor d7a64d52a: sw.js is an empty stub without a consent cookie; sw.js_data carries the version (~1.5 KB).
+    const response = await client.get('https://www.youtube.com/sw.js_data', headers);
     if (response.responseCode !== 200 || !response.result) {
       return '';
     }
-    return WebClientVersionResolver.matchVersion(response.result as string);
+    const body = response.result as string;
+    const fromSwData = WebClientVersionResolver.matchRegexList(
+      body, WebClientVersionResolver.SW_JS_DATA_VERSION_REGEXES);
+    if (fromSwData) {
+      return fromSwData;
+    }
+    return WebClientVersionResolver.matchVersion(body);
   }
 
   private static async extractFromResultsHtml(client: ClientVersionGet): Promise<string> {
@@ -140,7 +150,11 @@ export class WebClientVersionResolver {
   }
 
   private static matchVersion(input: string): string {
-    for (const pattern of WebClientVersionResolver.VERSION_REGEXES) {
+    return WebClientVersionResolver.matchRegexList(input, WebClientVersionResolver.VERSION_REGEXES);
+  }
+
+  private static matchRegexList(input: string, patterns: string[]): string {
+    for (const pattern of patterns) {
       const match = new RegExp(pattern).exec(input);
       if (match && match[1] && match[1].length > 0) {
         return match[1];

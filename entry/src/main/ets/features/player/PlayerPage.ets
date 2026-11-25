@@ -42,6 +42,8 @@ const TAG: string = '[PlayerLog][VideoPlayerPage]';
 export struct VideoPlayerPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageProp('selectedVideo') @Watch('onVideoChange') video: VideoItem | null = null;
+  /** Bumped by every external open; reloads even when the same video is re-opened. */
+  @StorageProp('playerOpenSeq') @Watch('onOpenRequested') openSeq: number = 0;
   // statusBarHeight 由 WindowUtil 在 avoidAreaChange 时实时更新（TYPE_SYSTEM / TYPE_CUTOUT max）
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
   // Index Provide 的 safeAreaTop 作为兜底，避免 Storage 尚未写入时 inset 为 0
@@ -104,6 +106,8 @@ export struct VideoPlayerPage {
   private windowUtil: WindowUtil = WindowUtil.getInstance();
   /** 页面已销毁（aboutToDisappear 后置位）：销毁后到达的延迟重放一律丢弃。 */
   private pageDestroyed: boolean = false;
+  /** Independent playback session ID bound to this PlayerPage instance. */
+  private boundSessionId: number = 0;
   private handleExitFullscreen: () => void = () => {
     this.handleFullScreenExit();
   };
@@ -302,11 +306,8 @@ export struct VideoPlayerPage {
     if (this.isRetrying || !this.video) return;
     this.isRetrying = true;
     const session = PlayerSession.getInstance();
-    const audioOnly = session.isAudioOnlyMode;
-    session.forceReset();
-    session.setAudioOnlyMode(audioOnly);
     this.isLoading = true;
-    session.beginPrepare(this.video);
+    session.retryCurrentVideo(this.video);
     try {
       await this.onVideoChange();
     } finally {
@@ -360,7 +361,7 @@ export struct VideoPlayerPage {
       streams: source.streams ? source.streams.slice() : [],
       subtitleTracks: source.subtitleTracks ? source.subtitleTracks.slice() : [],
       chapters: source.chapters ? source.chapters.slice() : [],
-      isLive: source.isLive,
+      isLive: source.isLive, isLiveReplay: source.isLiveReplay,
       hlsUrl: source.hlsUrl,
       dashMpdUrl: source.dashMpdUrl,
       thumbnailUrl: source.thumbnailUrl,
@@ -410,6 +411,7 @@ export struct VideoPlayerPage {
   async aboutToAppear(): Promise<void> {
     this.pageDestroyed = false;
     const session = PlayerSession.getInstance();
+    this.boundSessionId = session.sessionId;
     this.controller = session.controller;
     this.vm = session.controller.vm;
     session.subscribePlaybackExtras(this.playbackExtrasListener);
@@ -511,17 +513,21 @@ export struct VideoPlayerPage {
       return;
     }
     if (session.consumeExplicitPageCloseHandled()) {
-      pip.destroy();
+      if (this.boundSessionId === 0 || this.boundSessionId === session.sessionId) {
+        pip.destroy();
+      }
       logger.info(`${TAG} explicit page close already handled`);
       return;
     }
-    // A new source may have been opened between this page's pop and its
-    // aboutToDisappear callback. openVideoDetail() force-resets the session and
-    // starts beginPrepare(B) before the old page's lifecycle runs, so an
-    // unconditional closeForNavigation() here would tear down B's generation
-    // (observed: doPlay() result discarded right after source_submit, first
-    // switch fails, re-entering works). Only the page that still owns the
-    // session may close it.
+    // Primary session-ownership check: if a newer independent session has already
+    // started before this old page finished disappearing, NEVER touch the new
+    // session or destroy the new session's PiP controller.
+    if (this.boundSessionId > 0 && this.boundSessionId !== session.sessionId) {
+      logger.info(`${TAG} stale page disappear: pageSession=${this.boundSessionId} `
+        + `currentSession=${session.sessionId}; keep new session`);
+      return;
+    }
+    // Secondary fallback when same session switched video mid-disappear.
     const pageVideoId = this.video?.videoId || '';
     const currentVideoId = session.currentVideo?.videoId || '';
     const preparingVideoId = session.preparingVideoId;
@@ -530,11 +536,17 @@ export struct VideoPlayerPage {
         || (preparingVideoId.length > 0 && preparingVideoId !== pageVideoId))) {
       logger.info(`${TAG} stale page disappear: page=${pageVideoId} `
         + `current=${currentVideoId || '-'} preparing=${preparingVideoId || '-'}; keep session`);
-      pip.destroy();
       return;
     }
     session.closeForNavigation();
     pip.destroy();
+  }
+
+  private onOpenRequested(): void {
+    this.onVideoChange().catch((e: Error) => {
+      logger.error(`${TAG} open-request onVideoChange failed: ${e.message || e}`);
+      this.isLoading = false;
+    });
   }
 
   // Guard against concurrent onVideoChange invocations (e.g. @Watch + explicit call)
@@ -549,14 +561,17 @@ export struct VideoPlayerPage {
       return;
     }
     const session = PlayerSession.getInstance();
+    const runSessionId = session.sessionId;
+    const targetVideoId = this.video.videoId;
+    this.boundSessionId = runSessionId;
     this.isVideoChanging = true;
     this.controller = session.controller;
     this.vm = session.controller.vm;
 
     // 同视频已就绪：直接同步，使用缓存数据
     const cachedSource = session.cachedVideoSource;
-    if (session.currentVideo?.videoId === this.video?.videoId
-      && cachedSource?.videoId === this.video.videoId
+    if (session.currentVideo?.videoId === targetVideoId
+      && cachedSource?.videoId === targetVideoId
       && (session.controller.vm.isReady || cachedSource.streams !== undefined)) {
       this.controller = session.controller;
       this.vm = session.controller.vm;
@@ -572,7 +587,7 @@ export struct VideoPlayerPage {
     // 切换视频：清空旧流数据以显示加载占位图，清空元数据避免残留
     let waitForFirstFrame = false;
     try {
-      const isSwitchingVideo = !!this.videoSource.videoId && this.videoSource.videoId !== this.video.videoId;
+      const isSwitchingVideo = !!this.videoSource.videoId && this.videoSource.videoId !== targetVideoId;
       if (isSwitchingVideo) {
         session.controller.syncPause();
       }
@@ -590,6 +605,13 @@ export struct VideoPlayerPage {
         existingPip.destroy();
       }
       const newVideoSource = await session.play(this.video);
+
+      // Superseded by a newer session/video or destroyed page: drop quietly without
+      // mutating UI or flashing a false "播放失败" error banner.
+      if (this.pageDestroyed || runSessionId !== session.sessionId || this.video?.videoId !== targetVideoId) {
+        logger.info(`${TAG} onVideoChange superseded: runSession=${runSessionId} curSession=${session.sessionId} target=${targetVideoId}`);
+        return;
+      }
 
       this.controller = session.controller;
       this.vm = session.controller.vm;
@@ -907,6 +929,7 @@ export struct VideoPlayerPage {
       // Extractor sets videoInfo.isLive from isLiveNow only (not isLiveContent).
       // List badge item.isLive must not hide download on 直播回放.
       isLiveNow: this.videoSource.isLive === true,
+      isLiveReplay: this.videoSource.isLiveReplay === true,
       viewCount: this.videoSource.viewCount || 0,
       likeCount: this.detailLikeCount,
       dislikeCount: this.detailDislikeCount,

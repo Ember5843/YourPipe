@@ -306,7 +306,8 @@ export class LocalMediaProxy {
     video: StreamInfo,
     audio: StreamInfo,
     durationMs?: number,
-    useAuth: boolean = false
+    useAuth: boolean = false,
+    onLeaseAcquired?: (leaseKey: string) => void
   ): Promise<string> {
     if (!await LocalMediaProxy.ensureServer()) return '';
     const info: YoutubeSabrInfo | undefined = video.sabrInfo || audio.sabrInfo;
@@ -375,6 +376,7 @@ export class LocalMediaProxy {
         initRangeEnd: audioFmt.initRangeEnd,
         contentLength: audio.contentLength ?? audioFmt.contentLength,
         approxDurationMs: audio.approxDurationMs ?? audioFmt.approxDurationMs,
+        targetDurationSec: audioFmt.targetDurationSec,
         drc: audioFmt.drc
       };
     }
@@ -384,16 +386,23 @@ export class LocalMediaProxy {
     let lease: SabrLease | undefined = undefined;
     try {
       lease = sabrSessionStore.acquire(info, audioFmt, videoFmt, useAuth);
+      onLeaseAcquired?.(lease.key);
       const dur = durationMs || video.approxDurationMs || audio.approxDurationMs || 0;
       const videoBuf = new SabrTrackBuffer(lease, false, dur);
       const audioBuf = new SabrTrackBuffer(lease, true, dur);
       // Warm once (serialized pump), then attach buffers — avoid dual parallel rn=1.
       await videoBuf.ensureReady();
       await audioBuf.ensureReady();
+      const postLiveDur = info.isPostLive ? lease.session.getStreamState().getPostLiveDurationMs() : 0;
+      const effectiveDur = postLiveDur > 0 ? postLiveDur : dur;
+      if (postLiveDur > 0) {
+        videoBuf.updateDurationMs(postLiveDur);
+        audioBuf.updateDurationMs(postLiveDur);
+      }
 
       const session = makeEmptySession('');
       session.type = 'sabr-dual';
-      session.durationMs = durationMs || video.approxDurationMs || audio.approxDurationMs || 0;
+      session.durationMs = effectiveDur;
       session.hasAudio = true;
       session.videos = [LocalMediaProxy.toStreamResource(video, false)];
       session.audios = [LocalMediaProxy.toStreamResource(audio, true)];
@@ -427,6 +436,12 @@ export class LocalMediaProxy {
     if (!sessionId) return;
     Logger.debug(TAG, `destroySession: ${sessionId}`);
     localProxyServer.destroySession(sessionId);
+  }
+
+  /** Abort an in-flight pre-commit SABR lease when the caller cancels before session registration. */
+  static abortSabrLease(leaseKey: string): void {
+    if (!leaseKey) return;
+    sabrSessionStore.abort(leaseKey);
   }
 
   static updatePlaybackPosition(sessionId: string, positionMs: number): void {

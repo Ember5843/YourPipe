@@ -22,6 +22,8 @@ export struct PlayerInfoPanel {
   @Prop streams: StreamInfo[] = [];
   /** True only for currently live broadcasts (not VOD of past lives). */
   @Prop @Watch('onTabSetChanged') isLiveNow: boolean = false;
+  /** Past live broadcast: show chat replay tab synced to playback position. */
+  @Prop @Watch('onTabSetChanged') isLiveReplay: boolean = false;
   @Prop viewCount: number = 0;
   @Prop likeCount: string = '0';
   @Prop dislikeCount: string = '';
@@ -35,11 +37,26 @@ export struct PlayerInfoPanel {
   @State currentTabIndex: number = 0;
   @StorageLink('isLocalMode') @Watch('onTabSetChanged') isLocalMode: boolean = false;
 
+  private lastTabSetKey: string = '';
+
+  /**
+   * Rebuild Tabs as a whole when the tab set or video changes (stale TabBar items otherwise).
+   */
+  private tabSetKey(): string {
+    const ids = this.visibleTabs().map((item: TabItem) => item.id).join('_');
+    return `${this.video?.videoId || ''}|${ids}`;
+  }
+
   /**
    * 换视频 / 进入本地模式 / 直播状态变化后 Tab 集合可能变短：
    * 当前索引越界会显示空白内容，统一收回「简介」。
    */
   private onTabSetChanged(): void {
+    const key = this.tabSetKey();
+    if (key !== this.lastTabSetKey) {
+      this.lastTabSetKey = key;
+      this.currentTabIndex = 0;
+    }
     const count = this.visibleTabs().length;
     if (this.currentTabIndex >= count) {
       this.currentTabIndex = 0;
@@ -54,8 +71,8 @@ export struct PlayerInfoPanel {
     if (this.isLocalMode) {
       return this.tabArray.filter((item: TabItem) => item.id !== 1);
     }
-    if (this.isLiveNow) {
-      const tabs = this.tabArray.slice();
+    if (this.isLiveNow || this.isLiveReplay) {
+      const tabs = this.tabArray.filter((item: TabItem) => item.id !== LIVE_CHAT_TAB.id);
       tabs.push(LIVE_CHAT_TAB);
       return tabs;
     }
@@ -69,6 +86,7 @@ export struct PlayerInfoPanel {
 
   build() {
     Column() {
+      ForEach([this.tabSetKey()], (_key: string) => {
       Tabs({ barPosition: BarPosition.Start }) {
         ForEach(this.visibleTabs(), (item: TabItem, index: number) => {
           TabContent() {
@@ -97,7 +115,7 @@ export struct PlayerInfoPanel {
               } else if (item.id === 3) {
                 LiveChatPanel({
                   videoId: this.video?.videoId || '',
-                  active: this.currentTabIndex === index
+                  active: this.currentTabIndex === index, replay: !this.isLiveNow && this.isLiveReplay, vm: $vm
                 })
               } else {
                 PlayQueueList()
@@ -108,7 +126,7 @@ export struct PlayerInfoPanel {
           // tabBar 的高亮按「位置索引」比较，TabContent 的内容按 tab id 分派 ——
           // 本地模式过滤掉评论 tab 后 id≠位置，必须用 index，否则选中态错位。
           }.tabBar(this.tabBuilder(index, item.name))
-        }, (item: TabItem, index: number) => JSON.stringify(item) + index)
+        }, (item: TabItem) => `tab_${item.id}`)
       }
       .borderRadius({ topLeft: 16, topRight: 16 })
       .barMode(BarMode.Fixed)
@@ -118,6 +136,7 @@ export struct PlayerInfoPanel {
         this.currentTabIndex = targetIndex;
       })
       .backgroundColor($r('app.color.yourtube_bg_page'))
+      }, (key: string) => key)
     }
     .width(Const.WIDTH_FULL_PERCENT)
     .height(Const.HEIGHT_FULL_PERCENT)

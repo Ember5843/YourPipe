@@ -90,7 +90,7 @@ export class VideoInfo {
   author?: string;
   channelId?: string;
   lengthSeconds?: number;
-  durationMs?: number;
+  durationMs?: number;  isLiveReplay?: boolean;
   isLive?: boolean;
   viewCount?: number;
   publishDate?: string;

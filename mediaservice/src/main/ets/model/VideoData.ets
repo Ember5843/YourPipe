@@ -83,6 +83,8 @@ export interface VideoData {
   subtitleTracks?: SubtitleTrack[];
   chapters?: ChapterInfo[];
   isLive?: boolean;
+  /** 直播回放（非正在直播）：播放页显示聊天回放 Tab。 */
+  isLiveReplay?: boolean;
   hlsUrl?: string;
   dashMpdUrl?: string;
   thumbnailUrl?: string;

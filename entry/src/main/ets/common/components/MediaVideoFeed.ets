@@ -85,6 +85,8 @@ export struct MediaVideoFeed {
   onReachEnd?: () => void = undefined;
   /** 仅单列 List 分支（PlaylistDetailPage 提前预加载） */
   onScrollIndex?: (first: number, last: number) => void = undefined;
+  /** 滚动帧回调（如首页随滚动隐藏/展示顶部分类栏） */
+  onWillScroll?: (yOffset: number, scrollState: ScrollState) => void = undefined;
   /** 缩略图预取 URL 提取器（缺省 defaultFeedThumbUrl，覆盖 MediaVideoFeed 全部现有 item 形态） */
   itemThumbUrl?: FeedThumbUrlOf = undefined;
   /** Tabs / 外层 Scroll 嵌套场景：scrollForward=PARENT_FIRST, scrollBackward=SELF_FIRST */
@@ -489,6 +491,7 @@ export struct MediaVideoFeed {
   }
 
   private handleReachEnd(): void {
+    if (resolveResourceStr(this.params.errorMessage).length > 0) return;
     if (this.onReachEnd) {
       this.onReachEnd();
     }
@@ -539,6 +542,15 @@ export struct MediaVideoFeed {
     .width('100%')
     .justifyContent(FlexAlign.Center)
     .padding({ top: 12, bottom: 12 })
+  }
+
+  @Builder
+  PageErrorFooter() {
+    Column({ space: 8 }) {
+      Text(resolveResourceStr(this.params.errorMessage))
+        .fontSize(13).fontColor($r('app.color.yourtube_text_secondary'))
+      Button($r('app.string.yt_action_retry')).onClick(() => this.onReachEnd?.())
+    }.width('100%').padding(12)
   }
 
   @Builder
@@ -656,7 +668,9 @@ export struct MediaVideoFeed {
           .transition(this.entryTransitionOf(item, index))
         }
       }, (item: Object, index: number) => this.itemKey(item, index))
-      if (this.params.isLoadingMore) {
+      if (this.feedItemCount() > 0 && resolveResourceStr(this.params.errorMessage).length > 0) {
+        GridItem() { this.PageErrorFooter() }.columnStart(0).columnEnd(this.gridColumnCount() - 1)
+      } else if (this.params.isLoadingMore) {
         GridItem() {
           this.LoadingMoreFooter()
         }
@@ -679,6 +693,11 @@ export struct MediaVideoFeed {
     .onScrollIndex((first: number, last: number) => {
       this.handleVisibleAreaChanged(first, last);
     })
+    .onWillScroll((yOffset: number, scrollState: ScrollState) => {
+      if (this.onWillScroll) {
+        this.onWillScroll(yOffset, scrollState);
+      }
+    })
     .onReachEnd(() => {
       this.handleReachEnd();
     })
@@ -699,7 +718,9 @@ export struct MediaVideoFeed {
         }
         .transition(this.entryTransitionOf(item, index))
       }, (item: Object, index: number) => this.itemKey(item, index))
-      if (this.params.isLoadingMore) {
+      if (this.feedItemCount() > 0 && resolveResourceStr(this.params.errorMessage).length > 0) {
+        ListItem() { this.PageErrorFooter() }
+      } else if (this.params.isLoadingMore) {
         ListItem() {
           this.LoadingMoreFooter()
         }
@@ -721,6 +742,11 @@ export struct MediaVideoFeed {
         this.onScrollIndex(first, last);
       }
     })
+    .onWillScroll((yOffset: number, scrollState: ScrollState) => {
+      if (this.onWillScroll) {
+        this.onWillScroll(yOffset, scrollState);
+      }
+    })
     .onReachEnd(() => {
       this.handleReachEnd();
     })
@@ -730,7 +756,7 @@ export struct MediaVideoFeed {
     Column() {
       if (this.params.isLoading) {
         this.StateArea('loading')
-      } else if (resolveResourceStr(this.params.errorMessage).length > 0) {
+      } else if (this.feedItemCount() === 0 && resolveResourceStr(this.params.errorMessage).length > 0) {
         this.StateArea('error')
       } else if (this.feedItemCount() === 0) {
         this.StateArea('empty')

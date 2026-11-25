@@ -112,13 +112,38 @@ export class LiveStreamOfflineException extends ContentNotAvailableException {
 }
 
 /**
- * 机器人检测异常
- * 对应 NewPipe: SignInConfirmNotBotException
+ * 反爬拦截异常基类（PipePipeExtractor AntiBotException）
  */
-export class SignInConfirmNotBotException extends ContentNotAvailableException {
-  constructor(message: string) {
+export class AntiBotException extends ContentNotAvailableException {
+  readonly url: string;
+  readonly challengeUrl: string;
+
+  constructor(message: string, url: string = '', challengeUrl: string = '') {
     super(message);
+    this.name = 'AntiBotException';
+    this.url = url;
+    this.challengeUrl = challengeUrl;
+  }
+}
+
+/**
+ * 机器人检测异常
+ * 对应 NewPipe / PipePipe: SignInConfirmNotBotException / AntiBotLoginRequiredException
+ */
+export class SignInConfirmNotBotException extends AntiBotException {
+  constructor(message: string, url: string = '') {
+    super(message, url, '');
     this.name = 'SignInConfirmNotBotException';
+  }
+}
+
+/**
+ * 验证码挑战异常（ReCaptcha / BotCheck challenge URL）
+ */
+export class ReCaptchaChallengeException extends AntiBotException {
+  constructor(message: string, challengeUrl: string, url: string = '') {
+    super(message, url, challengeUrl);
+    this.name = 'ReCaptchaChallengeException';
   }
 }
 

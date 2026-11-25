@@ -1,4 +1,5 @@
 import { AppLog } from './AppLog';
+import { AppDataEpoch } from './AppDataEpoch';
 import {
   StreamInfo,
   muxAudioVideo,
@@ -10,7 +11,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
 import { notificationManager } from '@kit.NotificationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { taskpool } from '@kit.ArkTS';
+import { taskpool, url } from '@kit.ArkTS';
 import { UIConfig } from './AppState';
 import { DownloadTaskRecord, DownloadTaskStore } from './DownloadTaskStore';
 import { formatBytes } from './utils/FormatUtils';
@@ -90,6 +91,19 @@ export class DownloadTask {
   @Track retryCount: number = 0;
 
   _cancelled: boolean = false;
+  _attemptId: number = 0;
+  _abortHandlers: Set<() => void> = new Set();
+  _restartPending: boolean = false;
+  _restartVideo?: StreamInfo;
+  _restartAudio?: StreamInfo | null;
+
+  abortAttempt(): void {
+    this._cancelled = true;
+    for (const abort of this._abortHandlers) {
+      try { abort(); } catch (e) { logger.warn(`Task ${this.id} abort failed: ${(e as Error).message}`); }
+    }
+    this._abortHandlers.clear();
+  }
   /** 本次尝试的开始时间（超时预算用）。 */
   _startedAtMs: number = 0;
   _videoFilePath: string = '';
@@ -421,6 +435,8 @@ export class DownloadManager {
   private static readonly WATCHDOG_INTERVAL_MS: number = 15000;
   private tasks: DownloadTask[] = [];
   private activeTaskIds: Set<string> = new Set();
+  private runningTasks: Map<string, Promise<void>> = new Map();
+  private clearingTasks: boolean = false;
   private context: common.UIAbilityContext | null = null;
   private notificationDispatcher: DownloadNotificationDispatcher;
   /** 卡死任务看门狗（下载整体超时）。 */
@@ -462,6 +478,9 @@ export class DownloadManager {
   }
 
   addTask(task: DownloadTask): void {
+    if (this.clearingTasks || !AppDataEpoch.isCurrent(AppDataEpoch.capture())) {
+      throw new Error('Data recovery is running');
+    }
     if (!task._context && this.context) {
       task._context = this.context;
     }
@@ -474,7 +493,8 @@ export class DownloadManager {
   cancelTask(taskId: string): void {
     const task = this.tasks.find((item: DownloadTask) => item.id === taskId);
     if (task && task.status !== DownloadStatus.COMPLETED) {
-      task._cancelled = true;
+      task._restartPending = false;
+      task.abortAttempt();
       task.status = DownloadStatus.CANCELLED;
       logger.info(`Task ${task.id} cancelled`);
       this.cancelDownloadNotification(task);
@@ -500,7 +520,8 @@ export class DownloadManager {
       logger.warn(`Task ${task.id} pause refused: status=${task.status}`);
       return false;
     }
-    task._cancelled = true;
+    task._restartPending = false;
+    task.abortAttempt();
     task.status = DownloadStatus.PAUSED;
     logger.info(`Task ${task.id} paused (progress=${task.progress}%)`);
     this.cancelDownloadNotification(task);
@@ -528,6 +549,15 @@ export class DownloadManager {
     if (task.status !== DownloadStatus.PAUSED) {
       logger.warn(`Task ${task.id} resume refused: status=${task.status}`);
       return false;
+    }
+    if (this.activeTaskIds.has(task.id)) {
+      task._restartPending = true;
+      task._restartVideo = videoStream ?? task.videoStream;
+      task._restartAudio = audioStream !== undefined ? audioStream : task.audioStream;
+      task.status = DownloadStatus.PENDING;
+      logger.info(`Task ${task.id} resume waits for attempt=${task._attemptId} to exit`);
+      this.notifyTasksChanged();
+      return true;
     }
     if (videoStream) {
       task.videoStream = videoStream;
@@ -577,6 +607,15 @@ export class DownloadManager {
       logger.warn(`Task ${task.id} retry refused: budget spent (${task.retryCount}/${DownloadManager.MAX_RETRIES})`);
       return false;
     }
+    if (this.activeTaskIds.has(task.id)) {
+      task._restartPending = true;
+      task._restartVideo = videoStream ?? task.videoStream;
+      task._restartAudio = audioStream !== undefined ? audioStream : task.audioStream;
+      task.retryCount++;
+      task.status = DownloadStatus.PENDING;
+      this.notifyTasksChanged();
+      return true;
+    }
     if (videoStream) {
       task.videoStream = videoStream;
     }
@@ -615,7 +654,7 @@ export class DownloadManager {
    * 用户看到的就是"暂停中 → 立刻变已取消"。这里保住 PAUSED。
    */
   private applyCancelledStatus(task: DownloadTask): void {
-    if (task.status === DownloadStatus.PAUSED) {
+    if (task.status === DownloadStatus.PAUSED || task.status === DownloadStatus.FAILED || task._restartPending) {
       return;
     }
     task.status = DownloadStatus.CANCELLED;
@@ -624,10 +663,14 @@ export class DownloadManager {
   deleteTask(taskId: string): void {
     const task = this.tasks.find((item: DownloadTask) => item.id === taskId);
     if (task) {
-      task._cancelled = true;
+      task._restartPending = false;
+      task.abortAttempt();
       logger.info(`Task ${task.id} deleted includeOutput=true`);
       this.cancelDownloadNotification(task);
-      this.cleanupTaskFiles(task, true);
+      const running = this.runningTasks.get(task.id);
+      if (running) running.then(() => this.cleanupTaskFiles(task, true))
+        .catch((e: Error) => logger.warn(`deleted task cleanup failed id=${task.id}: ${e.message}`));
+      else this.cleanupTaskFiles(task, true);
     }
     this.tasks = this.tasks.filter((item: DownloadTask) => item.id !== taskId);
     this.notifyTasksChanged();
@@ -638,17 +681,29 @@ export class DownloadManager {
    * 「清除应用全部数据」：取消所有在飞任务，并删除已完成条目的沙箱文件、
    * 分片目录与索引。用户明确要求 clear-all 同时清掉已下载内容。
    */
-  clearAllTasksAndFiles(): void {
+  async clearAllTasksAndFiles(): Promise<void> {
+    this.clearingTasks = true;
     const snapshot = this.tasks.slice();
     snapshot.forEach((task: DownloadTask) => {
-      task._cancelled = true;
+      task._restartPending = false;
+      task.abortAttempt();
       if (task.status !== DownloadStatus.COMPLETED) {
         task.status = DownloadStatus.CANCELLED;
       }
       this.cancelDownloadNotification(task);
-      this.cleanupTaskFiles(task, true);
     });
     this.tasks = [];
+    try {
+      await Promise.all(Array.from(this.runningTasks.values()));
+      snapshot.forEach((task: DownloadTask) => {
+        this.cleanupTaskFiles(task, true);
+        if ((task.taskDir && fs.accessSync(task.taskDir)) || (task.outputPath && fs.accessSync(task.outputPath))) {
+          throw new Error('Some download files could not be deleted');
+        }
+      });
+    } finally {
+      this.clearingTasks = false;
+    }
     logger.info(`Download tasks + files cleared: count=${snapshot.length} active=${this.activeTaskIds.size}`);
     this.notifyTasksChanged();
   }
@@ -676,7 +731,7 @@ export class DownloadManager {
       outputPath = `${destinationDir}/${fileName}`;
       counter++;
     }
-    fs.copyFileSync(task.outputPath, outputPath);
+    await fs.copyFile(task.outputPath, outputPath);
     // 导出不再删除条目：条目与导出文件保持对应，删除条目也只动沙箱副本。
     task.exportedPath = outputPath;
     logger.info(`Task ${task.id} exported to downloads: ${outputPath}`);
@@ -887,6 +942,7 @@ export class DownloadManager {
   }
 
   private processQueue(): void {
+    if (this.clearingTasks) return;
     const maxActiveTasks = this.getMaxConcurrentDownloads();
     while (this.activeTaskIds.size < maxActiveTasks) {
       const pending = this.tasks.find((task: DownloadTask) => task.status === DownloadStatus.PENDING && !this.activeTaskIds.has(task.id));
@@ -896,11 +952,12 @@ export class DownloadManager {
 
       this.activeTaskIds.add(pending.id);
       logger.info(`Task ${pending.id} picked by taskpool: active=${this.activeTaskIds.size}/${maxActiveTasks}`);
-      this.runTask(pending);
+      this.runningTasks.set(pending.id, this.runTask(pending));
     }
   }
 
   private async runTask(task: DownloadTask): Promise<void> {
+    const attemptId = ++task._attemptId;
     task._startedAtMs = Date.now();
     this.startWatchdog();
     try {
@@ -913,7 +970,21 @@ export class DownloadManager {
       }
       logger.error(`Task ${task.id} failed: ${this.getErrorMessage(error)}`);
     } finally {
+      task._abortHandlers.clear();
+      this.runningTasks.delete(task.id);
       this.activeTaskIds.delete(task.id);
+      if (task._restartPending && this.tasks.includes(task) && !this.clearingTasks) {
+        task.videoStream = task._restartVideo ?? task.videoStream;
+        task.audioStream = task._restartAudio !== undefined ? task._restartAudio : task.audioStream;
+        task._restartPending = false;
+        task._restartVideo = undefined;
+        task._restartAudio = undefined;
+        task.totalSize = (task.videoStream.contentLength || 0) + (task.audioStream?.contentLength || 0);
+        task._cancelled = false;
+        task.status = DownloadStatus.PENDING;
+        task.errorMessage = '';
+      }
+      logger.info(`Task ${task.id} attempt=${attemptId} exited`);
       // 终态落盘：完成/失败都要写索引，否则重启后只剩"下次 addTask 时恰好已完成"的那几条。
       this.notifyTasksChanged();
       this.processQueue();
@@ -975,7 +1046,7 @@ export class DownloadManager {
       if (elapsed <= budget) {
         continue;
       }
-      task._cancelled = true;
+      task.abortAttempt();
       task.status = DownloadStatus.FAILED;
       task.errorMessage = this.tr($r('app.string.yt_download_timeout_failed'));
       logger.error(`Task ${task.id} timed out after ${Math.round(elapsed / 1000)}s `
@@ -1061,10 +1132,14 @@ export class DownloadManager {
         durationMs: durationMs > 0 ? durationMs : undefined,
         useAuth: useAuth,
         isCancelled: (): boolean => task._cancelled,
+        registerAbort: (abort: () => void): void => { task._abortHandlers.add(abort); },
+        unregisterAbort: (abort: () => void): void => { task._abortHandlers.delete(abort); },
         writeVideo: (data: Uint8Array): void => {
+          if (task._cancelled) return;
           writeTo(videoFile, data);
         },
         writeAudio: (data: Uint8Array): void => {
+          if (task._cancelled) return;
           writeTo(audioFile, data);
         },
         onProgress: (p: SabrOfflineProgress): void => {
@@ -1117,6 +1192,7 @@ export class DownloadManager {
       this.publishDownloadNotification(task, true);
 
       task.outputPath = await this.mergeOrCopy(task);
+      if (task._cancelled) return;
       task.status = DownloadStatus.COMPLETED;
       task.progress = 100;
       task.videoProgress = 100;
@@ -1152,6 +1228,7 @@ export class DownloadManager {
   }
 
   private async downloadHlsStream(task: DownloadTask): Promise<void> {
+    let openedFile: fs.File | undefined;
     logger.info(`Task ${task.id} HLS download start: stream=${this.getStreamLogLabel(task.videoStream)}`);
     task.status = DownloadStatus.DOWNLOADING_VIDEO;
     this.publishDownloadNotification(task, true);
@@ -1164,8 +1241,9 @@ export class DownloadManager {
       }
 
       // Master playlist → media playlist; never concat m3u8 text as media.
-      const mediaPlaylistUrl = await this.resolveHlsMediaPlaylistUrl(manifestUrl);
-      const playlist = await this.fetchHlsMediaPlaylist(mediaPlaylistUrl);
+      const mediaPlaylistUrl = await this.resolveHlsMediaPlaylistUrl(manifestUrl, task);
+      const playlist = await this.fetchHlsMediaPlaylist(mediaPlaylistUrl, task);
+      if (task._cancelled) return;
       if (playlist.segments.length === 0) {
         throw new Error('No segments found in HLS media playlist');
       }
@@ -1178,6 +1256,7 @@ export class DownloadManager {
       const outputExt = playlist.isFmp4 ? 'm4s' : 'ts';
       const outputPath = `${task.taskDir}/${safeTitle}.${outputExt}`;
       const outputFile = fs.openSync(outputPath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+      openedFile = outputFile;
 
       let totalDownloaded = 0;
       const writeParts: string[] = [];
@@ -1190,17 +1269,15 @@ export class DownloadManager {
 
       for (let i = 0; i < writeParts.length; i++) {
         if (task._cancelled) {
-          fs.closeSync(outputFile);
           return;
         }
-        const segData = await this.downloadHlsSegment(writeParts[i]);
+        const segData = await this.downloadHlsSegment(writeParts[i], task);
+        if (task._cancelled) return;
         if (!segData || segData.byteLength === 0) {
-          fs.closeSync(outputFile);
           throw new Error(`Empty HLS part ${i + 1}/${writeParts.length}`);
         }
         // Guard against accidentally writing another playlist as a "segment".
         if (this.looksLikeHlsPlaylist(segData)) {
-          fs.closeSync(outputFile);
           throw new Error('HLS part is still a playlist text; media playlist resolution failed');
         }
         totalDownloaded += segData.byteLength;
@@ -1214,6 +1291,7 @@ export class DownloadManager {
       }
 
       fs.closeSync(outputFile);
+      openedFile = undefined;
 
       // fMP4 concat without container rebuild is not a proper MP4; fail clearly rather than ship garbage.
       if (playlist.isFmp4) {
@@ -1237,11 +1315,15 @@ export class DownloadManager {
       task.errorMessage = this.getErrorMessage(error);
       logger.error(`Task ${task.id} HLS failed: ${task.errorMessage}`);
       this.publishDownloadNotification(task, true);
+    } finally {
+      if (openedFile) {
+        try { fs.closeSync(openedFile); } catch (e) { logger.warn(`HLS file close failed task=${task.id}: ${(e as Error).message}`); }
+      }
     }
   }
 
-  private async resolveHlsMediaPlaylistUrl(manifestUrl: string): Promise<string> {
-    const text = await this.fetchHlsText(manifestUrl);
+  private async resolveHlsMediaPlaylistUrl(manifestUrl: string, task: DownloadTask): Promise<string> {
+    const text = await this.fetchHlsText(manifestUrl, task);
     if (!text) {
       throw new Error('Empty HLS manifest');
     }
@@ -1256,11 +1338,11 @@ export class DownloadManager {
     }
     variants.sort((a, b) => (b.height || 0) - (a.height || 0));
     logger.info(`HLS master: picked height=${variants[0].height || 0} url=${variants[0].url}`);
-    return variants[0].url;
+    return this.resolveHlsUrl(variants[0].url, manifestUrl);
   }
 
-  private async fetchHlsMediaPlaylist(mediaPlaylistUrl: string): Promise<HlsMediaPlaylist> {
-    const text = await this.fetchHlsText(mediaPlaylistUrl);
+  private async fetchHlsMediaPlaylist(mediaPlaylistUrl: string, task: DownloadTask): Promise<HlsMediaPlaylist> {
+    const text = await this.fetchHlsText(mediaPlaylistUrl, task);
     if (!text) {
       throw new Error('Empty HLS media playlist');
     }
@@ -1270,7 +1352,25 @@ export class DownloadManager {
     return this.parseHlsMediaPlaylist(text, mediaPlaylistUrl);
   }
 
-  private async fetchHlsText(url: string): Promise<string> {
+  private requestForTask(request: http.HttpRequest, url: string, options: http.HttpRequestOptions,
+    task: DownloadTask): Promise<http.HttpResponse> {
+    if (task._cancelled) return Promise.reject(new Error('cancelled'));
+    return new Promise<http.HttpResponse>((resolve, reject) => {
+      const abort = (): void => {
+        try { request.destroy(); } finally { reject(new Error('cancelled')); }
+      };
+      task._abortHandlers.add(abort);
+      try {
+        request.request(url, options).then(resolve, reject)
+          .finally(() => task._abortHandlers.delete(abort));
+      } catch (e) {
+        task._abortHandlers.delete(abort);
+        reject(e as Error);
+      }
+    });
+  }
+
+  private async fetchHlsText(url: string, task: DownloadTask): Promise<string> {
     const request = http.createHttp();
     try {
       const options: http.HttpRequestOptions = {
@@ -1284,7 +1384,8 @@ export class DownloadManager {
         readTimeout: 15000,
       };
       HttpDownloader.applyProxyToOptions(options, url);
-      const response = await request.request(url, options);
+      const response = await this.requestForTask(request, url, options, task);
+      if (response.responseCode !== 200) throw new Error(`HLS manifest HTTP ${response.responseCode}`);
       return typeof response.result === 'string' ? response.result : '';
     } finally {
       request.destroy();
@@ -1329,24 +1430,7 @@ export class DownloadManager {
   }
 
   private resolveHlsUrl(ref: string, baseUrl: string): string {
-    if (ref.startsWith('http://') || ref.startsWith('https://')) {
-      return ref;
-    }
-    try {
-      // Absolute path on same origin.
-      if (ref.startsWith('/')) {
-        const schemeEnd = baseUrl.indexOf('://');
-        if (schemeEnd > 0) {
-          const pathStart = baseUrl.indexOf('/', schemeEnd + 3);
-          const origin = pathStart > 0 ? baseUrl.substring(0, pathStart) : baseUrl;
-          return origin + ref;
-        }
-      }
-    } catch (_e) {
-    }
-    const slash = baseUrl.lastIndexOf('/');
-    const base = slash >= 0 ? baseUrl.substring(0, slash + 1) : '';
-    return base + ref;
+    return url.URL.parseURL(ref, baseUrl).toString();
   }
 
   private looksLikeHlsPlaylist(data: ArrayBuffer): boolean {
@@ -1362,7 +1446,7 @@ export class DownloadManager {
     }
   }
 
-  private async downloadHlsSegment(url: string): Promise<ArrayBuffer> {
+  private async downloadHlsSegment(url: string, task: DownloadTask): Promise<ArrayBuffer> {
     const request = http.createHttp();
     try {
       const options: http.HttpRequestOptions = {
@@ -1376,7 +1460,7 @@ export class DownloadManager {
         readTimeout: 60000,
       };
       HttpDownloader.applyProxyToOptions(options, url);
-      const response = await request.request(url, options);
+      const response = await this.requestForTask(request, url, options, task);
       if (response.responseCode !== 200 && response.responseCode !== 206) {
         throw new Error(`HLS segment HTTP ${response.responseCode}`);
       }
@@ -1444,6 +1528,7 @@ export class DownloadManager {
     this.publishDownloadNotification(task, true);
 
     task.outputPath = await this.mergeOrCopy(task);
+    if (task._cancelled) return;
     task.status = DownloadStatus.COMPLETED;
     task.progress = 100;
     task.videoProgress = 100;
@@ -1692,6 +1777,8 @@ export class DownloadManager {
     onProgress: (written: number) => void,
     redirectDepth: number = 0
   ): Promise<StreamChunkResult> {
+    if (task._cancelled) throw new Error('cancelled');
+    const attemptId = task._attemptId;
     if (redirectDepth > 5) {
       throw new Error('Too many redirects');
     }
@@ -1727,6 +1814,7 @@ export class DownloadManager {
       };
 
       const cleanup = (): void => {
+        task._abortHandlers.delete(abort);
         clearStallTimer();
         try {
           httpRequest.off('headersReceive');
@@ -1761,6 +1849,8 @@ export class DownloadManager {
         }
         reject(error);
       };
+      const abort = (): void => finishReject(new Error('cancelled'));
+      task._abortHandlers.add(abort);
 
       const followRedirect = (): void => {
         if (settled || !redirectLocation) {
@@ -1799,7 +1889,7 @@ export class DownloadManager {
       });
 
       httpRequest.on('dataReceive', (data: ArrayBuffer) => {
-        if (task._cancelled) {
+        if (settled || task._cancelled || attemptId !== task._attemptId) {
           finishResolve({ responseCode: responseCode, bytesWritten: bytesWritten });
           return;
         }
@@ -1828,6 +1918,7 @@ export class DownloadManager {
         readTimeout: 120000,
         usingCache: false
       };
+      try {
       HttpDownloader.applyProxyToOptions(streamOptions, url);
       armStallTimer();
       httpRequest.requestInStream(
@@ -1840,6 +1931,9 @@ export class DownloadManager {
       }).catch((error: Error) => {
         finishReject(error);
       });
+      } catch (e) {
+        finishReject(e as Error);
+      }
     });
   }
 
@@ -1963,10 +2057,12 @@ export class DownloadManager {
         throw new Error(`Mux output too small (${outSize} B vs video=${videoSize} audio=${audioSize})`);
       }
 
+      if (task._cancelled) return outPath;
       task.updateMergeProgress(100);
       this.publishDownloadNotification(task);
     } else {
-      fs.copyFileSync(task._videoFilePath, outputPath);
+      await fs.copyFile(task._videoFilePath, outputPath);
+      if (task._cancelled) return outputPath;
       task.updateMergeProgress(100);
       this.publishDownloadNotification(task);
     }

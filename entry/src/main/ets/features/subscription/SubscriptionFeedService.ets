@@ -1,4 +1,5 @@
 import { AppLog } from '../../common/AppLog';
+import { AppDataEpoch } from '../../common/AppDataEpoch';
 import { AuthSessionManager, fetchRssFeed } from 'youtube_core';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { VideoItem } from 'youtube_core';
@@ -33,6 +34,10 @@ export interface FeedRefreshResult {
 }
 
 export class SubscriptionFeedService {
+  private contextKey(): string {
+    const session = AuthSessionManager.getInstance();
+    return `${AppDataEpoch.capture()}|${session?.getUserDataContextKey() ?? ''}|${session?.hasAuthForUserData() === true}`;
+  }
   /** 频道刷新阈值：5 分钟（对齐 NewPipe feed_update_threshold 默认 300s） */
   private static readonly STALE_THRESHOLD_MS: number = 5 * 60 * 1000;
   private static readonly PARALLEL_FETCHES: number = 3;
@@ -46,9 +51,11 @@ export class SubscriptionFeedService {
    * 逐频道抓取（默认 InnerTube browse，cfg_feed_fast_mode 开启时用 RSS）。
    */
   async refreshFeed(subscriptions: SubscriptionUser[], force: boolean = false): Promise<FeedRefreshResult> {
+    const context = this.contextKey();
     const startedAt = Date.now();
     if (this.isSignedIn()) {
       const official = await this.tryOfficialFeed();
+      if (context !== this.contextKey()) return { source: 'none', addedCount: 0, failedChannels: [], skippedFresh: 0 };
       if (official !== null) {
         logger.info(`refreshFeed source=official added=${official} elapsed=${Date.now() - startedAt}ms`);
         return { source: 'official', addedCount: official, failedChannels: [], skippedFresh: 0 };
@@ -77,9 +84,11 @@ export class SubscriptionFeedService {
 
   /** 官方聚合 feed。返回新增数；不可用（未登录/异常/空）返回 null 触发降级。 */
   private async tryOfficialFeed(): Promise<number | null> {
+    const context = this.contextKey();
     try {
       const library = FeedServiceProvider.getInstance().getUserLibraryService();
       const page = await library.fetchSubscriptionsFeed(1);
+      if (context !== this.contextKey()) return 0;
       if (!page.items || page.items.length === 0) {
         return null;
       }
@@ -121,6 +130,7 @@ export class SubscriptionFeedService {
   }
 
   private async refreshPerChannel(subscriptions: SubscriptionUser[], force: boolean): Promise<FeedRefreshResult> {
+    const context = this.contextKey();
     if (!subscriptions || subscriptions.length === 0) {
       return { source: 'none', addedCount: 0, failedChannels: [], skippedFresh: 0 };
     }
@@ -144,15 +154,19 @@ export class SubscriptionFeedService {
     const failedChannels: string[] = [];
     let cursor = 0;
     const worker = async (): Promise<void> => {
-      while (cursor < stale.length) {
+      while (cursor < stale.length && context === this.contextKey()) {
         const sub = stale[cursor++];
         const channelId = sub.channelId.trim();
         try {
           const items = fastMode
             ? await this.fetchChannelItemsViaRss(sub)
             : await this.fetchChannelItemsViaBrowse(sub);
+          if (context !== this.contextKey()) return;
+          const current = AppStorage.get<SubscriptionUser[]>('subscriptions') ?? [];
+          if (!current.some((item: SubscriptionUser) => item.channelId === channelId)) continue;
           added += SubscriptionFeedStore.upsertChannelItems(channelId, items, Date.now());
         } catch (err) {
+          if (context !== this.contextKey()) return;
           SubscriptionFeedStore.markChannelFailed(channelId);
           failedChannels.push(channelId);
           logger.warn(`channel fetch failed id=${channelId} fast=${fastMode}: ${JSON.stringify(err)}`);

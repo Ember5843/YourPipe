@@ -217,6 +217,7 @@ function makeYoutubeHeaders(resource: StreamResource): rcp.RequestHeaders {
  */
 function resolveRcpProxy(config: rcp.Configuration, url: string): void {
   const snap = HttpProxyOptions.getSnapshot();
+  HttpProxyOptions.assertAvailable(url, snap, true);
   if (snap.kind === 'socks5' && HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
     const localPort = snap.socks5LocalPort;
     if (localPort && localPort > 0) {
@@ -271,6 +272,7 @@ function createYoutubePostSession(url: string): rcp.Session {
  */
 function rcpProxyFingerprint(rawUrl: string): string {
   const snap = HttpProxyOptions.getSnapshot();
+  HttpProxyOptions.assertAvailable(rawUrl, snap, true);
   if (!HttpProxyOptions.isActive(snap) || HttpProxyOptions.shouldBypass(rawUrl, snap)) {
     return 'direct';
   }

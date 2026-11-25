@@ -3845,7 +3845,8 @@
         {
             "name": "yt_translation_region",
             "value": "リージョン"
-        },
+        }
+,
         {
             "name": "yt_exp_title",
             "value": "実験的な機能"
@@ -4145,6 +4146,10 @@
         {
             "name": "yt_update_later",
             "value": "あとで"
-        }
+        },
+        {"name": "yt_cookie_verify_success", "value": "Cookie の確認に成功しました"},
+        {"name": "yt_local_import_partial", "value": "%1$d 件をインポート、%2$d 件に失敗しました"},
+        {"name": "yt_recovery_failed", "value": "操作を完了できませんでした。再試行してください。"},
+        {"name": "yt_proxy_applying", "value": "プロキシを適用中…"}
     ]
 }

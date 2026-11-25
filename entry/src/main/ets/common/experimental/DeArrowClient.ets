@@ -46,6 +46,7 @@ function emptyBranding(): DeArrowBranding {
 
 /** DeArrow 只读客户端：众包标题 + 缩略图时间点。 */
 export class DeArrowClient {
+  private generation: number = 0;
   private static instance: DeArrowClient | null = null;
 
   private cache: Map<string, BrandingCacheEntry> = new Map();
@@ -76,7 +77,7 @@ export class DeArrowClient {
     try {
       return await task;
     } finally {
-      this.inflight.delete(id);
+      if (this.inflight.get(id) === task) this.inflight.delete(id);
     }
   }
 
@@ -87,10 +88,13 @@ export class DeArrowClient {
   }
 
   clearCache(): void {
+    this.generation++;
     this.cache.clear();
+    this.inflight.clear();
   }
 
   private async fetchBranding(videoId: string): Promise<DeArrowBranding> {
+    const generation = this.generation;
     const url = `${BRANDING_URL}?videoID=${encodeURIComponent(videoId)}&fetchAll=true`;
     const startedAt = Date.now();
     let result: CommunityHttpResult;
@@ -108,7 +112,7 @@ export class DeArrowClient {
       logger.warn(`branding unexpected status video=${videoId} status=${result.status}`);
     }
 
-    this.writeCache(videoId, branding);
+    if (generation === this.generation) this.writeCache(videoId, branding);
     logger.info(`branding video=${videoId} title=${branding.title.length > 0} `
       + `thumb=${branding.thumbnailTime >= 0} status=${result.status} `
       + `elapsed=${Date.now() - startedAt}ms`);

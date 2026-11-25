@@ -10,7 +10,7 @@ import { ColorModeManager } from '../common/ColorModeManager';
 import { LanguageManager } from '../common/LanguageManager';
 import { BackgroundTaskManager, AvPlayerController, LocalMediaProxy, PlayerState } from 'mediaservice';
 import { EnhancedLogger, PlaybackPreferences, ContextProvider } from 'mediaservice';
-import { AuthSessionManager, YTCoreLogger, YoutubeJavaScriptPlayerManager,
+import { AuthSessionManager, ChallengeCookies, YTCoreLogger, YoutubeJavaScriptPlayerManager,
   YoutubePlayerClientConfig } from 'youtube_core';
 import { AuthStateHelper } from '../common/AuthStateHelper';
 import { AppLogStore } from '../common/AppLogStore';
@@ -99,6 +99,7 @@ export default class EntryAbility extends UIAbility {
       const logEnabled = PreferencesStore.getString('cfg_enableLogger', 'false') === 'true';
       AppLogStore.init(logEnabled, this.context.filesDir);
       AuthSessionManager.init(this.context);
+      ChallengeCookies.init(this.context);
       // 凭据内部失效路径（invalid_grant / 服务端清除 SID 等）也触发状态刷新。
       AuthSessionManager.setAuthStateChangeListener(() => AuthStateHelper.refresh());
       AuthStateHelper.refresh();

@@ -62,15 +62,34 @@ export class PlayQueueManager {
   private nextPageToken: string | null = null;
   private visitorData: string = '';
   private isLoadingMore: boolean = false;
+  private queueGeneration: number = 0;
+  /** Independent playback session ID owning this queue. */
+  private sessionId: number = 0;
 
   // Listeners
   private listeners: QueueChangeListener[] = [];
 
   /**
    * Callback fired when the current video changes (via moveTo/next/prev).
-   * PlayerPage registers this to reload the video source.
+   * Carries the owning sessionId so stale callbacks from a closed session are discarded.
    */
-  onSwitchVideo: ((video: VideoItem) => void) | null = null;
+  onSwitchVideo: ((video: VideoItem, sessionId: number) => void) | null = null;
+
+  get boundSessionId(): number {
+    return this.sessionId;
+  }
+
+  /** Reset queue state completely for a brand-new independent playback session. */
+  resetForSession(sessionId: number): void {
+    this.sessionId = sessionId;
+    this.clear();
+  }
+
+  /** Rebind an existing queue snapshot (e.g. continuation restore) to a new session ID. */
+  rebindSession(sessionId: number): void {
+    this.sessionId = sessionId;
+    this.queueGeneration++;
+  }
 
   static getInstance(): PlayQueueManager {
     if (!PlayQueueManager.instance) {
@@ -107,6 +126,8 @@ export class PlayQueueManager {
   }
 
   private resetAutoQueueState(): void {
+    this.queueGeneration++;
+    this.isLoadingMore = false;
     this.autoQueueCandidates = [];
     this.autoQueueUsedUrls = new Set();
     this.autoQueueLocked = false;
@@ -190,10 +211,12 @@ export class PlayQueueManager {
     this.nextPageToken = null;
     this.visitorData = '';
     this.resetAutoQueueState();
+    const generation = this.queueGeneration;
 
     try {
       const service = FeedServiceProvider.getInstance().getPlaylistService();
       const result = await service.fetchPlaylistInitial(playlistId, 1);
+      if (generation !== this.queueGeneration) return;
       let loadedItems: VideoItem[] = result.items ? result.items.slice() : [];
       let nextToken: string | null = result.nextPageToken;
       let visitor: string = result.visitorData || '';
@@ -210,6 +233,7 @@ export class PlayQueueManager {
       while (foundIndex < 0 && nextToken) {
         const prevToken = nextToken;
         const nextResult = await service.fetchPlaylistNext(prevToken, visitor, loadedItems.length + 1);
+        if (generation !== this.queueGeneration) return;
         if (nextResult.items && nextResult.items.length > 0) {
           const oldLen = loadedItems.length;
           loadedItems = loadedItems.concat(nextResult.items);
@@ -240,6 +264,7 @@ export class PlayQueueManager {
 
       logger.info(`loadFromRemotePlaylist done: elapsed=${Date.now() - startedAt}ms total=${loadedItems.length} shown=${this.queue.length} pending=${this.pendingQueueItems.length} idx=${this.currentIndex} found=${foundIndex >= 0} token=${!!this.nextPageToken}`);
     } catch (err) {
+      if (generation !== this.queueGeneration) return;
       logger.error('loadFromRemotePlaylist failed, restoring previous queue:', err);
       // Full rollback to previous state on any error
       this.queue = prevQueue;
@@ -332,9 +357,9 @@ export class PlayQueueManager {
     const video = this.queue[index];
     logger.info(`moveTo: idx=${index} videoId=${video.videoId}`);
     this.notifyCurrentIndexChanged(index);
-    // Notify PlayerPage to reload the video
+    // Notify PlayerSession to reload the video within the owning session
     if (this.onSwitchVideo) {
-      this.onSwitchVideo(video);
+      this.onSwitchVideo(video, this.sessionId);
     }
     return video;
   }
@@ -350,10 +375,11 @@ export class PlayQueueManager {
 
   /** Move to next video, loading another queue page first if needed. */
   async nextOrLoadMore(): Promise<VideoItem | null> {
+    const generation = this.queueGeneration;
     if (!this.hasNext() && this.hasMorePages) {
       await this.loadMore();
     }
-    return this.next();
+    return generation === this.queueGeneration ? this.next() : null;
   }
 
   /** Move to previous video. Returns null if at start. */
@@ -393,6 +419,7 @@ export class PlayQueueManager {
       return false;
     }
 
+    const generation = this.queueGeneration;
     this.isLoadingMore = true;
     this.notifyQueueChanged();
     try {
@@ -412,6 +439,7 @@ export class PlayQueueManager {
       const service = FeedServiceProvider.getInstance().getPlaylistService();
       const startId = this.queue.length + 1;
       const result = await service.fetchPlaylistNext(this.nextPageToken!, this.visitorData, startId);
+      if (generation !== this.queueGeneration) return false;
 
       if (result.items && result.items.length > 0) {
         const oldLen = this.queue.length;
@@ -436,8 +464,10 @@ export class PlayQueueManager {
       logger.error('loadMore failed:', err);
       return false;
     } finally {
-      this.isLoadingMore = false;
-      this.notifyQueueChanged();
+      if (generation === this.queueGeneration) {
+        this.isLoadingMore = false;
+        this.notifyQueueChanged();
+      }
     }
   }
 

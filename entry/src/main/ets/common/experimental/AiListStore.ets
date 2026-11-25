@@ -1,6 +1,7 @@
 import { fileIo } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 import { AppLog } from '../AppLog';
+import { AppDataEpoch } from '../AppDataEpoch';
 import { ExperimentalConfig } from './ExperimentalConfig';
 import { CommunityHttp } from './CommunityHttp';
 
@@ -34,6 +35,7 @@ export class AiListStatus {
  * 数据来自 https://github.com/Override92/AiSList（CC BY-NC 4.0）。
  */
 export class AiListStore {
+  private generation: number = 0;
   private static instance: AiListStore | null = null;
 
   private status: AiListStatus = new AiListStatus();
@@ -104,6 +106,9 @@ export class AiListStore {
   }
 
   clear(): void {
+    this.generation++;
+    this.syncPromise = null;
+    this.status.syncing = false;
     const dir = this.dir();
     if (dir.length > 0) {
       for (const name of [BLOCK_FILE, WARN_FILE, META_FILE]) {
@@ -131,13 +136,17 @@ export class AiListStore {
     if (this.syncPromise) {
       return this.syncPromise;
     }
-    this.syncPromise = this.runSync().finally(() => {
-      this.syncPromise = null;
+    const task = this.runSync().finally(() => {
+      if (this.syncPromise === task) this.syncPromise = null;
     });
-    return this.syncPromise;
+    this.syncPromise = task;
+    return task;
   }
 
   private async runSync(): Promise<void> {
+    const generation = this.generation;
+    const epoch = AppDataEpoch.capture();
+    const current = (): boolean => generation === this.generation && AppDataEpoch.isCurrent(epoch);
     const cfg = AiListStore.config();
     if (!cfg) {
       return;
@@ -148,6 +157,7 @@ export class AiListStore {
     logger.info(`sync start warnlist=${cfg.aiListWarnList}`);
     try {
       const blockText = await CommunityHttp.getText(BLOCK_URL, 30000);
+      if (!current()) return;
       if (blockText.status !== 200 || blockText.body.length === 0) {
         throw new Error(`blocklist HTTP ${blockText.status}`);
       }
@@ -159,6 +169,7 @@ export class AiListStore {
       let warnSet: Set<string> = new Set();
       if (cfg.aiListWarnList) {
         const warnText = await CommunityHttp.getText(WARN_URL, 30000);
+        if (!current()) return;
         if (warnText.status === 200 && warnText.body.length > 0) {
           AiListStore.parseInto(warnText.body, warnSet);
           this.writeText(WARN_FILE, warnText.body);
@@ -186,10 +197,11 @@ export class AiListStore {
       logger.info(`sync done blocks=${this.status.blockCount} warns=${this.status.warnCount} `
         + `elapsed=${Date.now() - startedAt}ms`);
     } catch (e) {
+      if (!current()) return;
       this.status.error = (e as Error).message || String(e);
       logger.warn(`sync failed: ${this.status.error}`);
     } finally {
-      this.status.syncing = false;
+      if (generation === this.generation) this.status.syncing = false;
     }
   }
 

@@ -7,6 +7,9 @@ import { SapisidHashUtil } from './SapisidHashUtil';
 import { HttpDownloader } from '../network/HttpDownloader';
 import { splitSetCookieHeader } from '../network/CookieJar';
 import { isAccountCookieName } from './AuthCookieNames';
+import { buildWebRailHeaders } from './WebRailHeaders';
+import { ClientsConstants } from '../model/ClientsConstants';
+import { isAuthRejectionResponse } from './AuthExpiredError';
 
 const logger = YTCoreLogger.getInstance('AuthSessionManager');
 
@@ -39,6 +42,24 @@ export class AuthSessionManager {
   private accessToken: string = '';
   private accessTokenExpiresAt: number = 0;
   private cookieCredential: CookieAuthCredential | null = null;
+  private credentialRevision: number = 0;
+  private userDataRevision: number = 0;
+
+  getUserDataContextKey(): string {
+    return `${this.credentialRevision}|${this.userDataRevision}`;
+  }
+
+  getCredentialRevision(): number {
+    return this.credentialRevision;
+  }
+
+  /** Explicit account replacement invalidates pending work; routine rotations do not. */
+  private beginCredentialChange(): void {
+    this.credentialRevision++;
+    this.authRejectionNoticePending = false;
+    this.refreshPromise = undefined;
+    this.cancelDeviceLoginInternal(false);
+  }
   /** Master switch. When false, keep credentials but do not attach auth to any request. */
   private authEnabled: boolean = true;
   /** Fine-grained: attach auth to user-data requests (feed / subscriptions / history / search). */
@@ -80,6 +101,7 @@ export class AuthSessionManager {
     }
     AuthSessionManager.instance.context = context;
     AuthSessionManager.instance.load();
+    HttpDownloader.setAccountRevisionProvider(() => AuthSessionManager.instance?.credentialRevision ?? 0);
     HttpDownloader.setSetCookieObserver((sc: string | string[], url: string) => {
       const mgr = AuthSessionManager.instance;
       if (!mgr) {
@@ -330,6 +352,7 @@ export class AuthSessionManager {
    */
   async startDeviceLogin(): Promise<AuthAccountStatus> {
     this.cancelDeviceLoginInternal(false);
+    const generation = this.devicePollGeneration;
     this.deviceFlowActive = true;
     this.deviceStage = AuthStage.REQUESTING_CODE;
     this.deviceLastError = '';
@@ -339,6 +362,7 @@ export class AuthSessionManager {
     logger.info('Device login: requesting code');
     try {
       const code = await this.probe.requestDeviceCode();
+      if (generation !== this.devicePollGeneration) return this.getStatus();
       if (!code.deviceCode || !code.userCode) {
         this.deviceStage = AuthStage.FAILED;
         this.deviceLastErrorCode = 'empty_device_code';
@@ -357,6 +381,7 @@ export class AuthSessionManager {
       logger.info(`Device login: waiting user_code=${code.userCode} intervalMs=${this.devicePollIntervalMs}`);
       return this.getStatus();
     } catch (e) {
+      if (generation !== this.devicePollGeneration) return this.getStatus();
       this.deviceStage = AuthStage.FAILED;
       this.deviceFlowActive = false;
       this.deviceLastErrorCode = 'network_error';
@@ -489,6 +514,7 @@ export class AuthSessionManager {
   }
 
   setAuthEnabled(enabled: boolean): AuthAccountStatus {
+    if (enabled !== this.authEnabled) this.userDataRevision++;
     this.authEnabled = enabled;
     this.persistAuthEnabled();
     logger.info(`Auth enabled set to ${enabled}`);
@@ -500,6 +526,7 @@ export class AuthSessionManager {
   }
 
   setUseAuthForUserData(enabled: boolean): AuthAccountStatus {
+    if (enabled !== this.useAuthForUserData) this.userDataRevision++;
     this.useAuthForUserData = enabled;
     this.persistUseAuthForUserData();
     logger.info(`Use auth for user data set to ${enabled}`);
@@ -644,11 +671,12 @@ export class AuthSessionManager {
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
-    this.refreshPromise = this.refreshAccessToken();
+    const task = this.refreshAccessToken();
+    this.refreshPromise = task;
     try {
-      return await this.refreshPromise;
+      return await task;
     } finally {
-      this.refreshPromise = undefined;
+      if (this.refreshPromise === task) this.refreshPromise = undefined;
     }
   }
 
@@ -657,8 +685,11 @@ export class AuthSessionManager {
       return this.getStatus();
     }
 
+    const revision = this.credentialRevision;
+    const refreshToken = this.refreshToken;
     try {
-      const token = await this.probe.refreshAccessToken(this.refreshToken);
+      const token = await this.probe.refreshAccessToken(refreshToken);
+      if (revision !== this.credentialRevision || refreshToken !== this.refreshToken) return this.getStatus();
       if (token.error.length > 0) {
         logger.warn(`Refresh failed with code: ${token.error}`);
         if (token.error === 'invalid_grant') {
@@ -681,6 +712,7 @@ export class AuthSessionManager {
       logger.info('Access token refreshed');
       return this.getStatus();
     } catch (e) {
+      if (revision !== this.credentialRevision) return this.getStatus();
       logger.error('Refresh failed');
       const status = this.getStatus();
       status.stage = AuthStage.FAILED;
@@ -690,6 +722,7 @@ export class AuthSessionManager {
   }
 
   saveToken(token: AuthTokenResponse): AuthAccountStatus {
+    this.beginCredentialChange();
     this.applyToken(token);
     this.persistRefreshToken();
     logger.info('POC token saved');
@@ -698,6 +731,7 @@ export class AuthSessionManager {
   }
 
   signOut(): AuthAccountStatus {
+    this.beginCredentialChange();
     this.refreshToken = '';
     this.accessToken = '';
     this.accessTokenExpiresAt = 0;
@@ -748,13 +782,57 @@ export class AuthSessionManager {
   }
 
   saveCookieCredential(credential: CookieAuthCredential): AuthAccountStatus {
+    // Commit both keys before publishing the replacement account. A failed write
+    // must leave the active OAuth/Cookie session and its private-mode setting intact.
+    const storage = preferences.getPreferencesSync(this.context, { name: AuthSessionManager.STORAGE_NAME });
+    const previousCookie = this.cookieCredential?.toJson() ?? '';
+    const previousEnabled = this.authEnabled;
+    try {
+      storage.putSync(AuthSessionManager.COOKIE_CREDENTIAL_KEY, credential.toJson());
+      storage.putSync(AuthSessionManager.AUTH_ENABLED_KEY, 'true');
+      storage.flushSync();
+    } catch (e) {
+      try {
+        storage.putSync(AuthSessionManager.COOKIE_CREDENTIAL_KEY, previousCookie);
+        storage.putSync(AuthSessionManager.AUTH_ENABLED_KEY, previousEnabled ? 'true' : 'false');
+        storage.flushSync();
+      } catch (rollbackError) {
+        logger.error('Cookie credential persistence rollback failed');
+      }
+      logger.error('Cookie credential commit failed');
+      throw new Error('Unable to save account credential');
+    }
+    this.beginCredentialChange();
     this.cookieCredential = credential;
     this.authEnabled = true;
-    this.persistCookieCredential();
-    this.persistAuthEnabled();
     logger.info('Cookie credential saved');
     AuthSessionManager.emitAuthStateChange();
     return this.getStatus();
+  }
+
+  /** Read-only candidate probe. Its response cannot rotate the active account's cookies. */
+  async verifyCookieCredential(credential: CookieAuthCredential): Promise<void> {
+    const authorization = await SapisidHashUtil.generate(credential.sapiSid);
+    const headers = buildWebRailHeaders(credential.cookies, authorization, true);
+    headers['Content-Type'] = 'application/json';
+    headers['X-Youtube-Client-Name'] = '1';
+    headers['X-Youtube-Client-Version'] = ClientsConstants.WEB_HARDCODED_CLIENT_VERSION;
+    const client: Record<string, Object> = {
+      'clientName': 'WEB', 'clientVersion': ClientsConstants.WEB_HARDCODED_CLIENT_VERSION
+    };
+    const context: Record<string, Object> = { 'client': client };
+    const body: Record<string, Object> = { 'context': context, 'browseId': 'FEhistory' };
+    const response = await new HttpDownloader(false).request('POST',
+      'https://www.youtube.com/youtubei/v1/browse?prettyPrint=false', headers,
+      JSON.stringify(body), undefined, false, 10000);
+    const root = JSON.parse(response.result as string) as Record<string, Object>;
+    const responseContext = root['responseContext'] as Record<string, Object> | undefined;
+    const webContext = responseContext?.['mainAppWebResponseContext'] as Record<string, Object> | undefined;
+    if (isAuthRejectionResponse(response.responseCode, root['error'] as Record<string, Object>) ||
+      webContext?.['loggedOut'] !== false || !root['contents']) {
+      throw new Error('Sign-in required');
+    }
+    logger.info('Candidate Cookie verification succeeded');
   }
 
   private applyToken(token: AuthTokenResponse): void {
@@ -854,6 +932,7 @@ export class AuthSessionManager {
   }
 
   importAuthState(state: AuthBackupState): void {
+    this.beginCredentialChange();
     this.refreshToken = state.refreshToken;
     this.accessToken = state.accessToken;
     this.accessTokenExpiresAt = state.accessTokenExpiresAt;
@@ -863,6 +942,7 @@ export class AuthSessionManager {
     this.persistRefreshToken();
     this.persistCookieCredential();
     logger.info('Auth state imported');
+    AuthSessionManager.emitAuthStateChange();
   }
 
   private toUserMessage(code: string): string {

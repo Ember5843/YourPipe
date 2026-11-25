@@ -39,7 +39,7 @@ comes from `OptionsNavScaffold`'s custom `backIcon`.
 | Feature | Contents |
 |---|---|
 | `home` | Home feed, channel/playlist/search services + parsers (incl. TV lockup view-model parsing), recommend swiper / list UI; `HomeTabContent` — 首页 tab 内容宿主（feed 加载状态机 + 推荐位 banner + 三个 @LocalBuilder 卡片），Index 经 `HomeTabController` 触发 reset。**首页信息流按 `VideoItem.isShort` 拆成 `longList` / `shortList` 两份**（同一份 feed，切换维度不重新请求）：标题栏（搜索图标左侧）的切换符号在两者间切（`UIConfig.homeFeedMode`，持久化 `cfg_homeFeedMode`）。短视频只来自账号相关内容：① 首页 feed 的 Shorts 货架（`harvestShortsFromFeed` 自动多翻 ≤5 页去收）；② **feed 翻到顶后**接「我的频道」的 `/shorts`（`topUpShortsFromChannels`：订阅频道 → 观看历史频道，去重 ≤12 个，独立分页，`interleaveByChannel` 轮转交织防"整屏同一作者"）。**不用泛搜索补货**。推荐位 banner 只在长视频维度显示 |
-| `search` | `SearchPage` (NavDestination) |
+| `search` | `SearchPage` (NavDestination); `SearchViewModel` owns observable result/pagination/suggestion state and request generations |
 | `player` | Player / detail pages, play queue, `YouTubePlayService`, environment, continuation, PiP, **SABR PoToken mint** (`SabrWebViewPoTokenProvider`, `SabrPoTokenWebRuntime`, `SabrLocalDomPoTokenGenerator`), stream-info sheet live stats (`StatsBarGraph` + 500ms `controller.getPlaybackStats()` polling, only while the sheet is open), **布局状态机**（PlayerPage 方法派生，输入 `@Env(WINDOW_SIZE/BREAK_POINT)` + 视频比例：竖向窗口 → 上视频+下信息；真横屏且容得下 → 左视频+右信息栏 `clamp(W/3, 320, 480)`；非竖向但容不下 → 挤压强制铺满，信息经播放器菜单"视频信息"以 CENTER sheet 打开；内容组件 `components/PlayerInfoPanel.ets` 三处复用；信息 sheet 必须 `showClose: false`（自带关闭按钮与面板 Tab 栏重叠，关闭走拖拽条/点空白）；强制全屏态（`isFullLandscapeScreen() && !isManualFullscreen`）必须 `VideoPlayer.showFullscreenButton=false`（仅用户手动全屏保留退出入口）；ArkUI V1 @Component 不支持 ES get 访问器——布局派生必须用普通方法）, **直播聊天/实时评论（只读）**：`PlayerInfoPanel` 在 `isLiveNow` 时追加第 4 个「聊天」Tab（`LiveChatPanel`），可见时才轮询、离开/切台/换视频即停；首访 `/next` 的 `conversationBar.liveChatRenderer` 取 continuation，之后按服务端 `timeoutMs`（1–15s 夹紧）轮询 `live_chat/get_live_chat`，失败 5s 重连；只解析文本 / Super Chat / 会员消息，不做发送或点赞（避免账号风控）。协议实现见 `youtube_core` `LiveChatExtractor`，网络走 `YouTubePlayService.fetchLiveChatInitial/fetchLiveChatPage`）, **AI subtitle**: live path = P0 tlang 服务端自动翻译轨（`withAutoTranslatedTrack` 追加虚拟轨；注意 YouTube 按出口 IP 做 429 风控，出不出字幕取决于网络）；**[DISABLED]** P1 系统 AICaptionComponent、P2 gtx/LLM 整轨翻译（`translate/`）、P3 端侧 ASR（`asr/` + `workers/AsrStreamingWorker.ets`：`AsrLiveCaptionService` 真流式识别，MPV PCM tap + sherpa OnlineRecognizer 流式 zipformer 中英双语 int8；菜单项、Options 入口/设置页、PlayerSession/AVPlayer 接线、build-profile worker 注册均已注释，`AsrModelManager.clearAll`/`clearCaches` 的清数据接线保留以清理已下载模型）——入口/设置项均已注释，代码保留，重新启用 = 取消对应 [DISABLED] 注释块 |
 | `playlist` | Playlist list + detail |
 | `subscription` | Subscription manage + feed service (bottom tab) |
@@ -90,7 +90,18 @@ comes from `OptionsNavScaffold`'s custom `backIcon`.
 
 ## 3. Common stores / singletons (`common/`)
 Persistent state and shared singletons:
+- Classes using optimized `@Observed` + `@Track` must mark every field read by
+  ArkUI, including stable object references such as `SearchViewModel.feedSource`.
+  Compiler success alone does not validate this runtime observation contract;
+  verify the actual result-view transition and scrolling on a device/emulator.
 - `PreferencesStore.init(context)` — key/value store; init in `EntryAbility.onCreate`.
+  Synchronous `setString` updates share a queued flush; recovery code must await
+  `flushPending()` or `setStrings()`. `restoreConfigEntries` and `clearAll` return
+  Promises and propagate storage failures. `SettingsRuntime.applyPersisted()` is
+  the common completion boundary for restored/default settings, including client
+  selection, translation configuration/cache, theme/language and native proxy callbacks.
+  `AppDataEpoch` fences asynchronous commits during recovery; work started before
+  or during a recovery must not commit afterwards.
 - **配置是响应式的，不要 clone**：`UIConfig` / `PlaybackConfig` 都是
   `@Observed` 类、字段全部 `@Track`，存放在 AppStorage 的 `uiConfig` /
   `playbackConfig`。改设置的标准写法是**就地改字段**再落盘：
@@ -164,9 +175,12 @@ Persistent state and shared singletons:
   `Proxy-Authorization: Basic` upstream and both point at the loopback
   bridge, whose local side is auth-free); only the
   `HttpProxyOptions` snapshot stays native credentialed, and a bridge start
-  failure removes the WebView override and clears the app proxy (fail
-  visible, never silent
-  direct). Unauthenticated HTTP needs no bridge and talks to the upstream
+  failure keeps external requests blocked through a refusing loopback listener;
+  it must not clear routing to allow direct traffic. Snapshots expose
+  `disabled|applying|ready|blocked` and a revision. ArkWeb callbacks have a bounded
+  wait, and `awaitReady()` rejects on failure. Request snapshots are immutable
+  copies; changing the editable config cannot mutate an in-flight apply/test.
+  Unauthenticated HTTP needs no bridge and talks to the upstream
   natively everywhere.
   **常驻状态**：`NetworkProxyStatus`（`@Observed`，挂在 AppStorage `networkProxyStatus`）记录 enabled / bridgePort / bridgeRunning / bridgeFuseBlown / lastApplyOk / lastTestOk；设置页「网络」顶部常驻状态条 实时显示，熔断或上次应用失败时出现「重新应用并重启」按钮（`restartProxy` → 重新 apply → 复位熔断）。
 - `NetworkHandoverService` — network-handover adaptation. Single
@@ -241,6 +255,11 @@ Persistent state and shared singletons:
   `DownloadPage.buildLocalQueue()` 把完成下载放前、导入文件追加在后，
   统一切成 `localMedia` 队列。
   「清除应用全部数据」会调用 `clearAll()` 删除导入文件与索引。
+  Import copies run asynchronously, publish each completed file against the
+  current data epoch, and clean uncommitted files. `clearAll()` is asynchronous
+  and waits for active copies before deleting files. The download scheduler also
+  waits for cancelled attempts to release their files before resume/delete/clear;
+  cancelling a task aborts its registered netstack/SABR requests.
   UI 是 `DownloadPage` 的连续列表后半段 + `LocalMediaRow`（与下载任务同页、
   无分组标题，导入入口在该列表最下方）。
 - `PlayerSession` — singleton player state for the active `AvPlayerController`.

@@ -84,6 +84,43 @@ export class SabrTrackBuffer {
     return this.isAudio ? this.lease.audioFormat.itag : this.lease.videoFormat.itag;
   }
 
+  isPostLive(): boolean {
+    return this.lease.session.getStreamState().isPostLiveStream();
+  }
+
+  getStartSegment(): number {
+    const format = this.isAudio ? this.lease.audioFormat : this.lease.videoFormat;
+    return this.lease.session.getStreamState().getStartSegment(format);
+  }
+
+  getPresentationTimeOffsetMs(): number {
+    return this.lease.session.getStreamState().getPresentationTimeOffsetMs();
+  }
+
+  getPostLiveDurationMs(): number {
+    return this.lease.session.getStreamState().getPostLiveDurationMs();
+  }
+
+  getLiveSegmentDurationMs(): number {
+    const format = this.isAudio ? this.lease.audioFormat : this.lease.videoFormat;
+    return this.lease.session.getStreamState().getLiveSegmentDurationMs(format);
+  }
+
+  hasSegmentIndex(): boolean {
+    const format = this.isAudio ? this.lease.audioFormat : this.lease.videoFormat;
+    return this.lease.session.getStreamState().hasSegmentIndex(format);
+  }
+
+  updateDurationMs(ms: number): void {
+    if (ms > 0) {
+      this.durationMs = ms;
+      const updated = this.computeEstimatedTotal();
+      if (updated > 0) {
+        this.estimatedTotalBytes = updated;
+      }
+    }
+  }
+
   getEndSegment(): number {
     const format = this.isAudio ? this.lease.audioFormat : this.lease.videoFormat;
     return this.lease.session.getStreamState().getEndSegment(format);
@@ -106,10 +143,27 @@ export class SabrTrackBuffer {
    */
   peekSegmentLength(initSegment: boolean, sequenceNumber: number = -1): number {
     if (initSegment) {
-      return this.init ? this.init.getLength() : -1;
+      if (this.init) {
+        return this.init.getLength();
+      }
+      const cachedInit = this.lease.session.getCachedSegment(SabrSegmentRequest.init(this.getItag()));
+      return cachedInit ? cachedInit.getLength() : -1;
     }
     const seg = this.mediaBySeq.get(sequenceNumber);
-    return seg ? seg.getLength() : -1;
+    if (seg) {
+      return seg.getLength();
+    }
+    const cached = this.lease.session.getCachedSegment(
+      SabrSegmentRequest.media(this.getItag(), sequenceNumber));
+    return cached ? cached.getLength() : -1;
+  }
+
+  /** Notify session cache that a media segment has been delivered to MPV (PipePipe discard parity). */
+  markServed(initSegment: boolean, sequenceNumber: number): void {
+    if (initSegment || sequenceNumber < 0) {
+      return;
+    }
+    this.lease.session.markSegmentServed(SabrSegmentRequest.media(this.getItag(), sequenceNumber));
   }
 
   /**

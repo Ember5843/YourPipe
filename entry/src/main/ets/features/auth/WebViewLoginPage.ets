@@ -2,6 +2,7 @@ import web_webview from '@ohos.web.webview';
 import { AuthSessionManager, CookieAuthCredential } from 'youtube_core';
 import { AppLog } from '../../common/AppLog';
 import { AuthStateHelper } from '../../common/AuthStateHelper';
+import { NetworkProxyConfig, NetworkProxyStatus } from '../../common/NetworkProxyConfig';
 
 const logger = AppLog.getInstance('WebViewLoginPage');
 
@@ -14,6 +15,9 @@ enum LoginState {
 
 @Component
 export struct WebViewLoginPage {
+  @StorageProp('networkProxyStatus') private proxyStatus: NetworkProxyStatus = new NetworkProxyStatus();
+  @State private networkReady: boolean = false;
+  private pageGeneration: number = 0;
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -29,12 +33,15 @@ export struct WebViewLoginPage {
   private hasExtractedPot: boolean = false;
 
   aboutToAppear(): void {
+    this.prepareNetwork();
     if (this.onRegisterBackHandler) {
       this.onRegisterBackHandler((): boolean => this.handleBack());
     }
   }
 
   aboutToDisappear(): void {
+    this.pageGeneration++;
+    this.networkReady = false;
     if (this.onRegisterBackHandler) {
       this.onRegisterBackHandler((): boolean => false);
     }
@@ -53,6 +60,23 @@ export struct WebViewLoginPage {
       logger.warn('WebView backward failed');
     }
     return false;
+  }
+
+  private async prepareNetwork(reapply: boolean = false): Promise<void> {
+    const generation = ++this.pageGeneration;
+    this.networkReady = false;
+    try {
+      if (reapply) await NetworkProxyConfig.applySystemAndProviders(NetworkProxyConfig.load());
+      await NetworkProxyConfig.awaitReady();
+      if (generation !== this.pageGeneration) return;
+      this.networkReady = true;
+      this.state = LoginState.LOADING;
+    } catch (e) {
+      if (generation !== this.pageGeneration) return;
+      logger.warn(`Login network unavailable: ${(e as Error).message}`);
+      this.state = LoginState.FAILED;
+      this.errorMessage = getContext().resourceManager.getStringSync($r('app.string.yt_proxy_test_failed').id);
+    }
   }
 
   // No controller.prefetchPage here: this controller only attaches as the page
@@ -83,6 +107,19 @@ export struct WebViewLoginPage {
     }
   }
 
+  private commitCredential(credential: CookieAuthCredential): boolean {
+    try {
+      if (!this.authSession) throw new Error('Auth session unavailable');
+      this.authSession.saveCookieCredential(credential);
+      return true;
+    } catch (e) {
+      logger.error('Web login credential commit failed');
+      this.state = LoginState.FAILED;
+      this.errorMessage = getContext().resourceManager.getStringSync($r('app.string.yt_recovery_failed').id);
+      return false;
+    }
+  }
+
   private handleVideoPlaybackIntercepted(url: string): void {
     if (this.hasExtractedPot) {
       return;
@@ -108,9 +145,7 @@ export struct WebViewLoginPage {
       return;
     }
 
-    if (this.authSession) {
-      this.authSession.saveCookieCredential(credential);
-    }
+    if (!this.commitCredential(credential)) return;
     AuthStateHelper.reconcilePlaybackClient();
     logger.info('Login complete');
     this.state = LoginState.SUCCESS;
@@ -189,9 +224,7 @@ export struct WebViewLoginPage {
       this.errorMessage = getContext().resourceManager.getStringSync($r('app.string.yt_login_sapisid_failed').id);
       return;
     }
-    if (this.authSession) {
-      this.authSession.saveCookieCredential(credential);
-    }
+    if (!this.commitCredential(credential)) return;
     AuthStateHelper.reconcilePlaybackClient();
     logger.info('Login complete (without pot)');
     this.state = LoginState.SUCCESS;
@@ -202,7 +235,15 @@ export struct WebViewLoginPage {
 
   build() {
     Column() {
-      if (this.state === LoginState.LOADING || this.state === LoginState.EXTRACTING_POT) {
+      if (this.proxyStatus.enabled && this.proxyStatus.state !== 'ready') {
+        Column({ space: 16 }) {
+          Text(this.proxyStatus.state === 'applying' ? $r('app.string.yt_proxy_applying') : $r('app.string.yt_proxy_test_failed'))
+          if (this.proxyStatus.state === 'blocked') {
+            Button($r('app.string.yt_action_retry')).onClick(() => this.prepareNetwork(true))
+          }
+        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
+      } else if ((this.state === LoginState.LOADING || this.state === LoginState.EXTRACTING_POT) &&
+        this.networkReady && (!this.proxyStatus.enabled || this.proxyStatus.state === 'ready')) {
         Stack({ alignContent: Alignment.Top }) {
           Web({ src: WebViewLoginPage.LOGIN_URL, controller: this.webController })
             .javaScriptAccess(true)
@@ -281,7 +322,7 @@ export struct WebViewLoginPage {
               this.state = LoginState.LOADING;
               this.hasDetectedLogin = false;
               this.hasExtractedPot = false;
-              this.webController.loadUrl(WebViewLoginPage.LOGIN_URL);
+              this.prepareNetwork(true);
             })
 
           Button($r('app.string.yt_action_cancel'))

@@ -3845,7 +3845,8 @@
         {
             "name": "yt_translation_region",
             "value": "지역"
-        },
+        }
+,
         {
             "name": "yt_exp_title",
             "value": "실험적 기능"
@@ -4145,6 +4146,10 @@
         {
             "name": "yt_update_later",
             "value": "나중에"
-        }
+        },
+        {"name": "yt_cookie_verify_success", "value": "쿠키 확인 완료"},
+        {"name": "yt_local_import_partial", "value": "%1$d개 파일 가져옴, %2$d개 실패"},
+        {"name": "yt_recovery_failed", "value": "작업을 완료하지 못했습니다. 다시 시도하세요."},
+        {"name": "yt_proxy_applying", "value": "프록시 적용 중…"}
     ]
 }

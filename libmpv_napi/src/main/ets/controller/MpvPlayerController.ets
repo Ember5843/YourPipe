@@ -35,8 +35,8 @@ export class MpvPlayerController {
     nativeModule.prepare(this.playerId, startPosition);
   }
 
-  seek(positionMs: number): void {
-    nativeModule.seekWithFlags(this.playerId, positionMs);
+  seek(positionMs: number, keyframe: boolean = false): void {
+    nativeModule.seekWithFlags(this.playerId, positionMs, keyframe);
   }
 
   setPlaybackRate(rate: number): void {

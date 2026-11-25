@@ -2,7 +2,7 @@ import { YTCoreLogger } from '../common/YTCoreLogger';
 import { connection, http } from '@kit.NetworkKit';
 import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { Localization } from '../model/Localization';
-import { AppHttpProxySnapshot, HttpProxyOptions } from './HttpProxyOptions';
+import { AppHttpProxySnapshot, HttpProxyOptions, ProxyUnavailableError } from './HttpProxyOptions';
 
 const logger = YTCoreLogger.getInstance('HttpDownloader');
 
@@ -344,6 +344,17 @@ export class Request {
 
 // 增强的下载器实现
 export class HttpDownloader {
+  private readonly observeAccountCookies: boolean;
+
+  constructor(observeAccountCookies: boolean = true) {
+    this.observeAccountCookies = observeAccountCookies;
+  }
+
+  private static accountRevisionProvider: () => number = () => 0;
+
+  static setAccountRevisionProvider(provider: () => number): void {
+    HttpDownloader.accountRevisionProvider = provider;
+  }
   // 最大重试次数
   private static readonly MAX_RETRIES = 3;
   // 重试延迟（毫秒）
@@ -375,7 +386,10 @@ export class HttpDownloader {
   }
 
   /** 拿到响应即通知（不看状态码）；观察者抛错只记日志，不影响请求链路。 */
-  private static notifySetCookie(response: http.HttpResponse, url: string): void {
+  private notifySetCookie(response: http.HttpResponse, url: string, revision: number): void {
+    if (!this.observeAccountCookies || revision !== HttpDownloader.accountRevisionProvider()) {
+      return;
+    }
     const obs = HttpDownloader.setCookieObserver;
     if (!obs || !response || !response.header) {
       return;
@@ -402,6 +416,7 @@ export class HttpDownloader {
   /** Inject app proxy into request options. Loopback / exclusion always bypass. */
   static applyProxyToOptions(options: http.HttpRequestOptions, url: string): void {
     const snap: AppHttpProxySnapshot = HttpProxyOptions.getSnapshot();
+    HttpProxyOptions.assertAvailable(url, snap, deviceInfo.sdkApiVersion < 26);
     if (!HttpProxyOptions.isActive(snap) || HttpProxyOptions.shouldBypass(url, snap)) {
       options.usingProxy = false;
       return;
@@ -458,7 +473,7 @@ export class HttpDownloader {
             exclusionList: []
           };
         } else {
-          options.usingProxy = false;
+          throw new ProxyUnavailableError();
         }
       }
       return;
@@ -501,6 +516,7 @@ export class HttpDownloader {
     enableRetry: boolean = true,
     timeoutMs: number = 30000
   ): Promise<http.HttpResponse> {
+    const accountRevision = HttpDownloader.accountRevisionProvider();
     let lastError: HttpError | null = null;
     let attempt = 0;
     const maxAttempts = enableRetry ? HttpDownloader.MAX_RETRIES : 1;
@@ -531,7 +547,7 @@ export class HttpDownloader {
           chain.addChain([
             new RedirectAuthStripInterceptor(),
             new FinalResponseHookInterceptor((resp: http.HttpResponse) => {
-              HttpDownloader.notifySetCookie(resp, url);
+              this.notifySetCookie(resp, url, accountRevision);
             })
           ]);
           interceptorsApplied = chain.apply(request);
@@ -573,7 +589,7 @@ export class HttpDownloader {
         });
 
         if (!interceptorsApplied) {
-          HttpDownloader.notifySetCookie(response, url);
+          this.notifySetCookie(response, url, accountRevision);
         }
 
         // 5. 检查响应码
@@ -626,6 +642,7 @@ export class HttpDownloader {
         return response;
 
       } catch (err) {
+        if (err instanceof ProxyUnavailableError) throw err;
         if (err instanceof HttpError) {
           throw err;
         }
@@ -781,6 +798,7 @@ export class HttpDownloader {
     onChunk: ((chunk: Uint8Array) => void) | undefined,
     accumulate: boolean
   ): Promise<http.HttpResponse> {
+    const accountRevision = HttpDownloader.accountRevisionProvider();
     let lastError: HttpError | null = null;
     let attempt = 0;
     // SABR web-like posts must not inject default application/json Content-Type.
@@ -792,7 +810,7 @@ export class HttpDownloader {
       try {
         logger.debug(`POST-BIN-STREAM ${url} (attempt ${attempt}/${HttpDownloader.MAX_RETRIES}) bytes=${data.length}`);
         const response = await this.postBinaryStreamOnce(
-          url, data, headers, localization, onData, abortToken, onChunk, accumulate);
+          url, data, headers, localization, onData, abortToken, onChunk, accumulate, accountRevision);
         if (response.responseCode && response.responseCode >= 400) {
           let errBody = '';
           try {
@@ -832,6 +850,7 @@ export class HttpDownloader {
         }
         return response;
       } catch (err) {
+        if (err instanceof ProxyUnavailableError) throw err;
         if (err instanceof HttpError) {
           lastError = err;
           if (err.responseCode === 403) {
@@ -876,25 +895,26 @@ export class HttpDownloader {
     onData?: (bytes: number) => void,
     abortToken?: HttpAbortToken,
     onChunk?: (chunk: Uint8Array) => void,
-    accumulate: boolean = true
+    accumulate: boolean = true,
+    accountRevision: number = HttpDownloader.accountRevisionProvider()
   ): Promise<http.HttpResponse> {
     const requestHeaders = this.processBinaryHeaders(headers, localization);
-    const httpRequest = http.createHttp();
     const bodyCopy = new ArrayBuffer(data.length);
     new Uint8Array(bodyCopy).set(data);
     const httpOptions: http.HttpRequestOptions = {
       method: http.RequestMethod.POST,
       header: requestHeaders,
       extraData: bodyCopy,
-      connectTimeout: 30000,
-      // Normal SABR UMP POSTs complete in well under a second; a POST hanging
-      // past a minute is a dead link, and failing it fast lets the session's
-      // network-retry path re-send instead of freezing playback for minutes.
+      connectTimeout: 10000,
+      // Normal SABR UMP POSTs deliver headers/init within ~0.5s and stream chunks
+      // continuously; idle watchdog below catches dead edges in 10-12s while this
+      // 60s readTimeout remains the outer cap for huge 4K responses.
       readTimeout: 60000,
       usingCache: false
     };
     HttpDownloader.applyConnectionPoolReuse(httpOptions);
     HttpDownloader.applyProxyToOptions(httpOptions, url);
+    const httpRequest = http.createHttp();
 
     return new Promise<http.HttpResponse>((resolve, reject) => {
       const chunks: ArrayBuffer[] = [];
@@ -908,13 +928,37 @@ export class HttpDownloader {
       // would leave this Promise (and the SABR pump lock) unsettled forever.
       // Budget = readTimeout + 5s grace.
       const watchdogMs = 60000 + 5000;
+      // First-byte / inter-chunk idle watchdog: fail a wedged googlevideo edge in
+      // 10-12s instead of freezing playback for a full 60s before retrying.
+      const firstByteTimeoutMs = 10000;
+      const idleReadTimeoutMs = 12000;
       let watchdogTimer: number = -1;
+      let idleTimer: number = -1;
 
       const clearWatchdog = (): void => {
         if (watchdogTimer >= 0) {
           clearTimeout(watchdogTimer);
           watchdogTimer = -1;
         }
+        if (idleTimer >= 0) {
+          clearTimeout(idleTimer);
+          idleTimer = -1;
+        }
+      };
+
+      const armIdleTimer = (ms: number, phase: string): void => {
+        if (idleTimer >= 0) {
+          clearTimeout(idleTimer);
+          idleTimer = -1;
+        }
+        if (settled) {
+          return;
+        }
+        idleTimer = setTimeout(() => {
+          idleTimer = -1;
+          logger.warn(`POST-BIN-STREAM ${phase} timeout (${ms}ms), aborting request`);
+          finishErr(new HttpError(`stream stalled: ${phase} timeout`, url, 'POST'));
+        }, ms);
       };
 
       const cleanup = (): void => {
@@ -962,7 +1006,7 @@ export class HttpDownloader {
         } as http.HttpResponse;
         // requestInStream 不支持拦截器链（SDK 明确仅 request() 支持），
         // 这里的 Set-Cookie 观察者通知保持手动触发。
-        HttpDownloader.notifySetCookie(resp, url);
+        this.notifySetCookie(resp, url, accountRevision);
         resolve(resp);
       };
 
@@ -977,12 +1021,14 @@ export class HttpDownloader {
 
       httpRequest.on('headersReceive', (hdrs: Object) => {
         responseHeader = hdrs;
+        armIdleTimer(idleReadTimeoutMs, 'idle');
       });
 
       httpRequest.on('dataReceive', (chunk: ArrayBuffer) => {
         if (settled) {
           return;
         }
+        armIdleTimer(idleReadTimeoutMs, 'idle');
         if (chunk && chunk.byteLength > 0) {
           // Copy — framework may reuse the buffer on next callback.
           const copy = new ArrayBuffer(chunk.byteLength);
@@ -1025,6 +1071,7 @@ export class HttpDownloader {
         logger.warn(`POST-BIN-STREAM stalled: no dataEnd within ${watchdogMs}ms, aborting request`);
         finishErr(new HttpError('stream stalled: no dataEnd', url, 'POST'));
       }, watchdogMs);
+      armIdleTimer(firstByteTimeoutMs, 'first-byte');
 
       httpRequest.requestInStream(url, httpOptions).then((code: number) => {
         responseCode = code || 0;

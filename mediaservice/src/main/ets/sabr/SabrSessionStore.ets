@@ -1,4 +1,5 @@
 import {
+  AuthSessionManager,
   SabrInfoReloader,
   SabrMediaSegment,
   SabrPoTokenProvider,
@@ -69,7 +70,7 @@ class SabrSessionStoreImpl {
     // credential rail carries that rail's cookies / PoToken / identity and must
     // never be reused by the other state (login ↔ logout, or an account switch).
     return `${videoId}|p${profile}|a${audioItag}|t${audioTrackId || '-'}|v${videoItag}`
-      + `|${useAuth ? 'auth' : 'guest'}`;
+      + `|${useAuth ? 'auth' : 'guest'}|c${AuthSessionManager.getInstance()?.getCredentialRevision() ?? 0}`;
   }
 
   /**

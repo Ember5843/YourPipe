@@ -3,6 +3,8 @@ import { webview } from '@kit.ArkWeb';
 import {
   AppHttpProxySnapshot,
   AppProxyKind,
+  AppProxyState,
+  ProxyUnavailableError,
   HttpProxyOptions,
   socks5Bridge
 } from 'youtube_core';
@@ -18,13 +20,14 @@ const KEY_PORT = 'cfg_proxy_port';
 const KEY_USER = 'cfg_proxy_username';
 const KEY_PASS = 'cfg_proxy_password';
 
-@Observed
 /**
  * 代理连接状态（设置页常驻显示）。用 @Observed 挂在 AppStorage 上，
  * 桥接熔断 / 换端口 / apply 结果都能实时反映到 UI。
  */
 @Observed
 export class NetworkProxyStatus {
+  state: AppProxyState = 'disabled';
+  revision: number = 0;
   /** 配置是否启用。 */
   enabled: boolean = false;
   /** 走本地桥接时的端口（0 = 未走桥接，或桥接没起来）。 */
@@ -44,6 +47,22 @@ export class NetworkProxyStatus {
 }
 
 export class NetworkProxyConfig {
+  private static requestedCfg?: NetworkProxyConfig;
+  private static revision: number = 0;
+  private static state: AppProxyState = 'disabled';
+
+  static getRevision(): number { return NetworkProxyConfig.revision; }
+
+  snapshot(): NetworkProxyConfig {
+    const copy = new NetworkProxyConfig();
+    copy.enabled = this.enabled;
+    copy.kind = this.kind;
+    copy.host = this.host;
+    copy.port = this.port;
+    copy.username = this.username;
+    copy.password = this.password;
+    return copy;
+  }
   enabled: boolean = false;
   kind: AppProxyKind = 'http';
   host: string = '';
@@ -87,9 +106,11 @@ export class NetworkProxyConfig {
 
   /** 当前代理状态快照（不改动 UI 镜像）。 */
   static getStatus(): NetworkProxyStatus {
-    const cfg = NetworkProxyConfig.lastAppliedCfg;
+    const cfg = NetworkProxyConfig.requestedCfg;
     const status = NetworkProxyConfig.statusInstance;
     status.enabled = cfg ? cfg.enabled : false;
+    status.state = NetworkProxyConfig.state;
+    status.revision = NetworkProxyConfig.revision;
     status.bridgePort = socks5Bridge.getPort();
     status.bridgeRunning = socks5Bridge.isRunning();
     status.bridgeFuseBlown = socks5Bridge.isFuseBlown();
@@ -177,26 +198,40 @@ export class NetworkProxyConfig {
    * implicit rules stay — localhost / local-IP hosts remain direct, so the
    * PoToken local DOM is unaffected.
    */
-  private static applyWebViewProxy(proxyUrl: string): void {
-    try {
+  private static applyWebViewProxy(proxyUrl: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('WebView proxy apply timed out')), 8000);
+      try {
       const config = new webview.ProxyConfig();
       config.insertProxyRule(proxyUrl, webview.ProxySchemeFilter.MATCH_ALL_SCHEMES);
       webview.ProxyController.applyProxyOverride(config, () => {
         logger.info('webview proxy override applied');
+        clearTimeout(timer);
+        resolve();
       });
     } catch (e) {
       logger.warn(`applyProxyOverride failed: ${e instanceof Error ? e.message : String(e)}`);
+      clearTimeout(timer);
+      reject(e as Error);
     }
+    });
   }
 
-  private static removeWebViewProxy(): void {
-    try {
+  private static removeWebViewProxy(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('WebView proxy removal timed out')), 8000);
+      try {
       webview.ProxyController.removeProxyOverride(() => {
         logger.info('webview proxy override removed');
+        clearTimeout(timer);
+        resolve();
       });
     } catch (e) {
       logger.warn(`removeProxyOverride failed: ${e instanceof Error ? e.message : String(e)}`);
+      clearTimeout(timer);
+      reject(e as Error);
     }
+    });
   }
 
   private static setAppProxy(proxy: connection.HttpProxy, logMessage: string): void {
@@ -205,6 +240,7 @@ export class NetworkProxyConfig {
       logger.info(logMessage);
     } catch (e) {
       logger.warn(`setAppHttpProxy failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw e as Error;
     }
   }
 
@@ -255,8 +291,15 @@ export class NetworkProxyConfig {
    * (home feed, proxy test) should await this so it never runs in the bridge's
    * async startup window (which would go direct).
    */
-  static awaitReady(): Promise<void> {
-    return NetworkProxyConfig.applyPromise;
+  static async awaitReady(): Promise<void> {
+    let tail: Promise<void>;
+    do {
+      tail = NetworkProxyConfig.applyPromise;
+      await tail;
+    } while (tail !== NetworkProxyConfig.applyPromise);
+    if (NetworkProxyConfig.requestedCfg?.enabled && NetworkProxyConfig.state !== 'ready') {
+      throw new ProxyUnavailableError();
+    }
   }
 
   /**
@@ -284,6 +327,18 @@ export class NetworkProxyConfig {
    */
   static applySystemAndProviders(cfg: NetworkProxyConfig): Promise<void> {
     NetworkProxyConfig.ensureBridgeListeners();
+    const snapshot = cfg.snapshot();
+    const revision = ++NetworkProxyConfig.revision;
+    NetworkProxyConfig.requestedCfg = snapshot;
+    NetworkProxyConfig.state = 'applying';
+    HttpProxyOptions.setProvider((): AppHttpProxySnapshot => {
+      const current = NetworkProxyConfig.requestedCfg!;
+      const result = current.toSnapshot();
+      result.state = NetworkProxyConfig.state;
+      result.revision = NetworkProxyConfig.revision;
+      return result;
+    });
+    NetworkProxyConfig.publishStatus().lastTestAtMs = 0;
     // Serialize applies (promise-chain mutex): each new apply chains onto the
     // previous tail, so two applies can never interleave (e.g. a socks5 apply
     // awaiting bridge start racing a user switch to http). The last requested
@@ -293,7 +348,7 @@ export class NetworkProxyConfig {
     const tail: Promise<void> = NetworkProxyConfig.applyPromise;
     const p: Promise<void> = tail
       .catch((e: Error) => logger.warn(`previous proxy apply failed: ${e.message}`))
-      .then(() => NetworkProxyConfig.applyInternal(cfg));
+      .then(() => NetworkProxyConfig.applyWithStatus(snapshot, revision));
     NetworkProxyConfig.applyPromise = p;
     return p;
   }
@@ -322,6 +377,7 @@ export class NetworkProxyConfig {
   }
 
   private static onBridgePortChanged(port: number): void {
+    if (NetworkProxyConfig.state === 'applying') return;
     const cfg = NetworkProxyConfig.lastAppliedCfg;
     if (!cfg || !cfg.isReady() || !NetworkProxyConfig.cfgUsesBridge(cfg) || !socks5Bridge.isRunning()) {
       logger.warn(`bridge port change to ${port} ignored (bridge no longer the active config)`);
@@ -331,16 +387,23 @@ export class NetworkProxyConfig {
     // HttpProxyOptions needs no update: the installed provider reads
     // socks5Bridge.getPort() lazily per snapshot, so downloaders/RangeProxy
     // follow the new port on their own.
-    NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
+    const revision = NetworkProxyConfig.revision;
+    NetworkProxyConfig.state = 'applying';
+    NetworkProxyConfig.publishStatus();
+    NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`).then(() => {
+      if (revision !== NetworkProxyConfig.revision) return;
+      NetworkProxyConfig.setAppProxy({ host: '127.0.0.1', port: port,
+        exclusionList: HttpProxyOptions.defaultExclusions() }, `app proxy re-applied on bridge port=${port}`);
+      NetworkProxyConfig.state = 'ready';
+      NetworkProxyConfig.publishStatus();
+      NetworkProxyConfig.fireRepointListener();
+    }).catch((e: Error) => {
+      if (revision === NetworkProxyConfig.revision) NetworkProxyConfig.onBridgeFuseBlown(e.message);
+    });
     // Both bridge-backed modes point the app-level proxy at the bridge, so it
     // must follow the new port. (For credentialed http this is what lets ArkUI
     // Image thumbnails work — the Image fetcher does not answer proxy 407
     // challenges, while the loopback side of the bridge is auth-free.)
-    NetworkProxyConfig.setAppProxy({
-      host: '127.0.0.1',
-      port: port,
-      exclusionList: HttpProxyOptions.defaultExclusions()
-    } as connection.HttpProxy, `app http proxy re-applied on bridge port=${port}`);
     if (cfg.kind === 'socks5') {
       // MPV's process env was written at load() pointing at the bridge and must
       // be re-applied explicitly. Credentialed-http MPV env embeds the real
@@ -350,11 +413,13 @@ export class NetworkProxyConfig {
   }
 
   private static onBridgeFuseBlown(reason: string): void {
+    NetworkProxyConfig.state = 'blocked';
     logger.error(`socks5 bridge fuse blown, proxy unavailable until settings are re-applied: ${reason}`);
     const status = NetworkProxyConfig.publishStatus();
     status.lastApplyOk = false;
     status.lastApplyError = reason;
     status.lastApplyAtMs = Date.now();
+    NetworkProxyConfig.fireRepointListener();
     NetworkProxyConfig.showToast($r('app.string.yt_proxy_bridge_unavailable'));
   }
 
@@ -371,9 +436,44 @@ export class NetworkProxyConfig {
     }
   }
 
+  private static async applyWithStatus(cfg: NetworkProxyConfig, revision: number): Promise<void> {
+    if (revision !== NetworkProxyConfig.revision) return;
+    try {
+      await NetworkProxyConfig.applyInternal(cfg);
+      if (revision !== NetworkProxyConfig.revision) return;
+      NetworkProxyConfig.lastAppliedCfg = cfg;
+      NetworkProxyConfig.state = cfg.enabled ? 'ready' : 'disabled';
+      const status = NetworkProxyConfig.publishStatus();
+      status.lastApplyOk = true;
+      status.lastApplyError = '';
+      status.lastApplyAtMs = Date.now();
+      NetworkProxyConfig.fireRepointListener();
+    } catch (e) {
+      if (revision !== NetworkProxyConfig.revision) return;
+      NetworkProxyConfig.state = 'blocked';
+      const status = NetworkProxyConfig.publishStatus();
+      status.lastApplyOk = false;
+      status.lastApplyError = 'Proxy configuration unavailable';
+      status.lastApplyAtMs = Date.now();
+      logger.error(`proxy apply failed revision=${revision}: ${(e as Error).message}`);
+      if (cfg.enabled) {
+        try {
+          const port = await socks5Bridge.blockRequests();
+          NetworkProxyConfig.setAppProxy({ host: '127.0.0.1', port: port,
+            exclusionList: HttpProxyOptions.defaultExclusions() }, 'app proxy blocking external requests');
+          await NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
+        } catch (blockError) {
+          logger.error(`proxy blocking listener failed revision=${revision}: ${(blockError as Error).message}`);
+        }
+      }
+      NetworkProxyConfig.fireRepointListener();
+      throw new ProxyUnavailableError();
+    }
+  }
+
   private static async applyInternal(cfg: NetworkProxyConfig): Promise<void> {
+    if (cfg.enabled && !cfg.isReady()) throw new ProxyUnavailableError();
     if (cfg.isReady() && cfg.kind === 'socks5') {
-      NetworkProxyConfig.removeWebViewProxy();
       const ok: boolean = await socks5Bridge.start(cfg.host.trim(), cfg.port, cfg.username || '', cfg.password || '')
         .catch((e: Error) => {
           logger.warn(`socks5 bridge start failed: ${e.message}`);
@@ -382,14 +482,14 @@ export class NetworkProxyConfig {
       const port = socks5Bridge.getPort();
       logger.info(`socks5 bridge start ok=${ok} localPort=${port}`);
       if (ok && port > 0) {
-        NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
+        await NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${port}`);
         NetworkProxyConfig.setAppProxy({
           host: '127.0.0.1',
           port: port,
           exclusionList: HttpProxyOptions.defaultExclusions()
         } as connection.HttpProxy, `app http proxy on socks5 bridge port=${port}`);
       } else {
-        NetworkProxyConfig.clearAppProxy();
+        throw new ProxyUnavailableError();
       }
     } else if (cfg.isReady() && cfg.kind === 'http') {
       if (cfg.username && cfg.username.length > 0) {
@@ -398,7 +498,6 @@ export class NetworkProxyConfig {
         // override 和 app 级代理都指向 loopback 桥（桥向上游注入 Basic 认证，
         // 127.0.0.1 侧免认证），netstack 请求快照（HttpProxyOptions）保持原生
         // 带凭据字段，不随桥走。
-        NetworkProxyConfig.removeWebViewProxy();
         const ok: boolean = await socks5Bridge.start(cfg.host.trim(), cfg.port, cfg.username, cfg.password || '', 'http')
           .catch((e: Error) => {
             logger.warn(`http proxy bridge start failed: ${e.message}`);
@@ -407,7 +506,7 @@ export class NetworkProxyConfig {
         const bridgePort = socks5Bridge.getPort();
         logger.info(`http proxy bridge start ok=${ok} localPort=${bridgePort}`);
         if (ok && bridgePort > 0) {
-          NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${bridgePort}`);
+          await NetworkProxyConfig.applyWebViewProxy(`http://127.0.0.1:${bridgePort}`);
           NetworkProxyConfig.setAppProxy({
             host: '127.0.0.1',
             port: bridgePort,
@@ -416,13 +515,11 @@ export class NetworkProxyConfig {
         } else {
           // 桥不可用时不留指向死端口的 override，也不装 direct 规则——WebView
           // 明确失败，绝不静默直连。app 级代理同样清掉（与 socks5 失败路径一致）。
-          NetworkProxyConfig.removeWebViewProxy();
-          NetworkProxyConfig.clearAppProxy();
-          logger.error('http proxy bridge unavailable; WebView override and app proxy removed (no silent direct fallback)');
+          throw new ProxyUnavailableError();
         }
       } else {
         socks5Bridge.stop();
-        NetworkProxyConfig.applyWebViewProxy(`http://${cfg.host.trim()}:${cfg.port}`);
+        await NetworkProxyConfig.applyWebViewProxy(`http://${cfg.host.trim()}:${cfg.port}`);
         const proxy: connection.HttpProxy = {
           host: cfg.host.trim(),
           port: cfg.port,
@@ -432,27 +529,21 @@ export class NetworkProxyConfig {
       }
     } else {
       socks5Bridge.stop();
-      NetworkProxyConfig.removeWebViewProxy();
+      await NetworkProxyConfig.removeWebViewProxy();
       NetworkProxyConfig.clearAppProxy();
     }
 
-    HttpProxyOptions.setProvider((): AppHttpProxySnapshot => cfg.toSnapshot());
-    NetworkProxyConfig.lastAppliedCfg = cfg;
     // MPV 的 http_proxy 进程 env 只在 load() 写入：配置落地后立刻为当前源重刷，
     // 否则播放中的直连抓取（直播 HLS）会继续用旧代理直到下一次 load。
     // 无加载源时 refreshNetworkProxy 自身 no-op。
-    NetworkProxyConfig.fireRepointListener();
-    const status = NetworkProxyConfig.publishStatus();
-    status.lastApplyOk = true;
-    status.lastApplyError = '';
-    status.lastApplyAtMs = Date.now();
   }
 
   /**
    * 记录一次连接测试结果（设置页「测试连接」按钮调用）。
    * 只更新状态镜像，不改代理配置。
    */
-  static recordTestResult(ok: boolean): void {
+  static recordTestResult(ok: boolean, revision: number = NetworkProxyConfig.revision): void {
+    if (revision !== NetworkProxyConfig.revision) return;
     const status = NetworkProxyConfig.publishStatus();
     status.lastTestOk = ok;
     status.lastTestAtMs = Date.now();

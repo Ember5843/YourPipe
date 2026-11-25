@@ -46,3 +46,74 @@ export function probeVideoHwDecoders(): VideoHwDecoderCaps {
 export function getHwdecCodecsWhitelist(): string {
   return nativeModule.getHwdecCodecsWhitelist();
 }
+
+export interface NativeDirectStreamSpec {
+  url: string;
+  userAgent?: string;
+  contentLength?: number;
+  initRangeStart?: number;
+  initRangeEnd?: number;
+  indexRangeStart?: number;
+  indexRangeEnd?: number;
+  bitrate?: number;
+  itag?: number;
+  headers?: Record<string, string>;
+}
+
+export interface NativeHlsStreamSpec {
+  url: string;
+  userAgent?: string;
+  bitrate?: number;
+  itag?: number;
+  isAudio?: boolean;
+  headers?: Record<string, string>;
+}
+
+export interface NativeStreamProxyConfig {
+  kind: string;
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  bridgePort?: number;
+  exclusions?: string[];
+  revision?: number;
+}
+
+export interface NativeStreamMetrics {
+  networkSpeedBps: number;
+  totalBytesRead: number;
+  retryCount: number;
+  lastHttpStatus: number;
+}
+
+/** Register a direct HTTP range stream with MPV's native ypstream:// stream_cb bridge. */
+export function registerDirectStream(spec: NativeDirectStreamSpec): string {
+  return nativeModule.registerDirectStream(JSON.stringify(spec));
+}
+
+/** Register a live HLS media playlist stream with MPV's native ypstream:// HlsLiveStream reader. */
+export function registerHlsStream(spec: NativeHlsStreamSpec): string {
+  return nativeModule.registerHlsStream(JSON.stringify(spec));
+}
+
+/** Unregister and cancel any active readers for a ypstream:// stream URL or ID. */
+export function unregisterStream(urlOrId: string): void {
+  if (!urlOrId) return;
+  nativeModule.unregisterStream(urlOrId);
+}
+
+/** Update proxy settings used by native ypstream:// librcp_c transfers. */
+export function updateStreamProxy(proxy: NativeStreamProxyConfig): void {
+  nativeModule.updateStreamProxy(JSON.stringify(proxy));
+}
+
+/** Cancel all in-flight ypstream:// HTTP requests on network handover (retries cleanly on new epoch). */
+export function abortAllStreams(): void {
+  nativeModule.abortAllStreams();
+}
+
+/** Aggregate live throughput and retry counters from the native ypstream:// layer. */
+export function getStreamMetrics(): NativeStreamMetrics {
+  return nativeModule.getStreamMetrics() as NativeStreamMetrics;
+}

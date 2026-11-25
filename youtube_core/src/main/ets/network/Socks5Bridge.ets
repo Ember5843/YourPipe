@@ -1042,6 +1042,18 @@ export type Socks5BridgeFailureListener = (reason: string) => void;
 export type Socks5BridgePortChangeListener = (port: number) => void;
 
 export class Socks5Bridge {
+  private rejecting: boolean = false;
+
+  /** Keep a real local listener while unavailable; accepted sockets never reach an upstream. */
+  async blockRequests(): Promise<number> {
+    this.rejecting = true;
+    if (this.running) return this.getPort();
+    const cfg: Socks5Config = {
+      host: '127.0.0.1', port: 0, username: '', password: '', upstreamKind: 'http'
+    };
+    if (!await this.listenOnce(cfg, this.generation)) throw new Error('Proxy blocking listener unavailable');
+    return this.getPort();
+  }
   private server: socket.TCPSocketServer | null = null;
   private config: Socks5Config | null = null;
   private localPort: number = 0;
@@ -1063,7 +1075,7 @@ export class Socks5Bridge {
       this.stop();
       return false;
     }
-    if (this.running && this.config
+    if (!this.rejecting && this.running && this.config
       && this.config.host === h
       && this.config.port === p
       && this.config.username === (username || '')
@@ -1072,6 +1084,7 @@ export class Socks5Bridge {
       return true;
     }
     this.stop();
+    this.rejecting = false;
     const cfg: Socks5Config = {
       host: h,
       port: p,
@@ -1119,6 +1132,10 @@ export class Socks5Bridge {
       this.running = true;
       logger.info(TAG + ` started localPort=${this.localPort} upstream=${cfg.upstreamKind}://${cfg.host}:${cfg.port} auth=${cfg.username.length > 0}`);
       server.on('connect', (conn: socket.TCPSocketConnection) => {
+        if (this.rejecting) {
+          conn.close().catch((e: Error) => logger.warn(TAG + ` blocked socket close failed: ${describeErr(e)}`));
+          return;
+        }
         handleConnection(conn, cfg).catch((e: Error) => logger.warn(TAG + ` conn error: ${describeErr(e)}`));
       });
       server.on('error', (e: Error) => {

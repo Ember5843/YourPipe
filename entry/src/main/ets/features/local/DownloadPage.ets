@@ -10,6 +10,7 @@ import { VideoItem } from 'youtube_core';
 import { ActionHub } from '../../common/ActionHub';
 import { AppLog } from '../../common/AppLog';
 import { LocalMediaItem, LocalMediaStore } from '../../common/LocalMediaStore';
+import { AppDataEpoch } from '../../common/AppDataEpoch';
 import { LocalMediaRow } from './LocalMediaRow';
 import { PlayQueueSourceHint } from '../player/PlayQueueManager';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
@@ -163,6 +164,7 @@ export struct DownloadPage {
   }
 
   private async importFiles(): Promise<void> {
+    const epoch = AppDataEpoch.capture();
     if (this.importing) {
       return;
     }
@@ -174,13 +176,16 @@ export struct DownloadPage {
       options.maxSelectNumber = 10;
       options.fileSuffixFilters = ['.mp4', '.m4v', '.mkv', '.webm', '.mov', '.ts', '.flv', '.avi'];
       const uris = await filePicker.select(options);
+      if (!AppDataEpoch.isCurrent(epoch)) return;
       if (!uris || uris.length === 0) {
         return;
       }
       const result = await LocalMediaStore.importFromUris(uris);
+      if (!AppDataEpoch.isCurrent(epoch)) return;
       if (result.added > 0) {
         const message = context.resourceManager.getStringSync(
-          $r('app.string.yt_local_import_success').id, result.added);
+          result.failed > 0 ? $r('app.string.yt_local_import_partial').id : $r('app.string.yt_local_import_success').id,
+          result.added, result.failed);
         this.getUIContext().getPromptAction().showToast({ message, duration: 2000 });
       } else {
         this.getUIContext().getPromptAction().showToast({

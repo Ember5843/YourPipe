@@ -39,6 +39,7 @@ interface VideoSegmentsApiItem {
 
 /** SponsorBlock 客户端：只读查询 + 内存缓存 + 单飞去重。 */
 export class SponsorBlockClient {
+  private generation: number = 0;
   private static instance: SponsorBlockClient | null = null;
 
   private cache: Map<string, SegmentCacheEntry> = new Map();
@@ -61,7 +62,7 @@ export class SponsorBlockClient {
     if (id.length === 0 || categories.length === 0) {
       return [];
     }
-    const cacheKey = `${id}|${categories.join(',')}`;
+    const cacheKey = `${server}|${privacy}|${id}|${categories.join(',')}`;
     const cached = this.readCache(cacheKey);
     if (cached !== null) {
       return cached;
@@ -70,21 +71,24 @@ export class SponsorBlockClient {
     if (pending) {
       return pending;
     }
-    const task = this.fetchSegments(id, categories, server, privacy);
+    const task = this.fetchSegments(id, categories, server, privacy, cacheKey);
     this.inflight.set(cacheKey, task);
     try {
       return await task;
     } finally {
-      this.inflight.delete(cacheKey);
+      if (this.inflight.get(cacheKey) === task) this.inflight.delete(cacheKey);
     }
   }
 
   clearCache(): void {
+    this.generation++;
     this.cache.clear();
+    this.inflight.clear();
   }
 
   private async fetchSegments(videoId: string, categories: string[],
-    server: string, privacy: boolean): Promise<SponsorSegment[]> {
+    server: string, privacy: boolean, cacheKey: string): Promise<SponsorSegment[]> {
+    const generation = this.generation;
     const base = (server || 'https://sponsor.ajay.app').replace(/\/+$/, '');
     const categoryParam = encodeURIComponent(JSON.stringify(categories));
     const actionParam = encodeURIComponent(JSON.stringify(['skip', 'poi']));
@@ -115,7 +119,7 @@ export class SponsorBlockClient {
       logger.warn(`unexpected status video=${videoId} status=${result.status}`);
     }
 
-    this.writeCache(`${videoId}|${categories.join(',')}`, segments);
+    if (generation === this.generation) this.writeCache(cacheKey, segments);
     logger.info(`segments video=${videoId} privacy=${privacy} count=${segments.length} `
       + `status=${result.status} elapsed=${Date.now() - startedAt}ms`);
     return segments;

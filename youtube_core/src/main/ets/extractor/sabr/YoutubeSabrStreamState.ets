@@ -3,13 +3,15 @@ import {
   SabrContextSendingPolicy,
   SabrContextUpdate,
   SabrDecodedResponse,
-  SabrFormatInitMeta
+  SabrFormatInitMeta,
+  SabrLiveMetadata
 } from './SabrDecodedResponse';
 import { SabrMediaHeader } from './SabrMediaHeader';
 import { SabrMediaSegment } from './SabrMediaSegment';
 import { SabrServerEpoch } from './SabrServerEpoch';
 import { YoutubeSabrFormatMeta } from './YoutubeSabrInfo';
 import { parseMp4SegmentIndex, SabrSegmentIndex } from './SabrMp4SegmentIndex';
+import { parseWebmSegmentIndex } from './SabrWebmSegmentIndex';
 
 export const SABR_TRACK_BOTH = 0;
 export const SABR_TRACK_AUDIO_ONLY = 1;
@@ -17,9 +19,10 @@ export const SABR_TRACK_VIDEO_ONLY = 2;
 
 class FormatProgress {
   format: YoutubeSabrFormatMeta;
+  private readonly isPostLive: boolean;
   initReceived: boolean = false;
   firstSequence: number = -1;
-  /** Highest sequence received without a hole from sequence 1. */
+  /** Highest sequence received without a hole from startSequence. */
   lastSequence: number = 0;
   startTimeMs: number = 0;
   bufferedEndMs: number = 0;
@@ -27,12 +30,62 @@ class FormatProgress {
   endSegmentNumber: number = -1;
   endTimeMs: number = -1;
   averageDurationMs: number = 5000;
+  private postLiveStartSequence: number = 0;
+  private postLiveEndSequence: number = -1;
+  private postLiveStartTimeMs: number = 0;
+  private postLiveSegmentDurationMs: number = 0;
   private aheadSegments: Map<number, number> = new Map();
   private metadata?: SabrFormatInitMeta;
   private segmentIndex?: SabrSegmentIndex;
 
-  constructor(format: YoutubeSabrFormatMeta) {
+  constructor(format: YoutubeSabrFormatMeta, isPostLive: boolean = false) {
     this.format = format;
+    this.isPostLive = isPostLive;
+    this.lastSequence = isPostLive ? -1 : 0;
+  }
+
+  private minSequence(): number {
+    return this.isPostLive ? Math.max(0, this.postLiveStartSequence) : 1;
+  }
+
+  syncPostLiveWindow(
+    liveHeadSeq: number,
+    liveHeadTimeMs: number,
+    liveSeekableStartTimeMs: number,
+    liveSeekableEndTimeMs: number
+  ): void {
+    if (!this.isPostLive) {
+      return;
+    }
+    const dur = this.computeLiveSegmentDurationMs(liveHeadSeq, liveHeadTimeMs);
+    if (dur > 0) {
+      this.postLiveSegmentDurationMs = dur;
+    }
+    const endSeg = this.endSegmentNumber > 0 ? this.endSegmentNumber : liveHeadSeq;
+    const endTime = this.endTimeMs > 0
+      ? this.endTimeMs
+      : (liveHeadTimeMs > 0 ? liveHeadTimeMs : liveSeekableEndTimeMs);
+    let startSeq = 0;
+    if (endSeg >= 0 && liveSeekableStartTimeMs > 0 && endTime > liveSeekableStartTimeMs && dur > 0) {
+      const count = Math.ceil((endTime - liveSeekableStartTimeMs) / dur);
+      startSeq = Math.max(0, endSeg - count + 1);
+    }
+    this.postLiveStartSequence = startSeq;
+    this.postLiveStartTimeMs = Math.max(0, liveSeekableStartTimeMs);
+    this.postLiveEndSequence = endSeg;
+  }
+
+  private computeLiveSegmentDurationMs(liveHeadSeq: number, liveHeadTimeMs: number): number {
+    if (this.metadata && this.metadata.durationUnits > 0 && this.metadata.durationTimescale > 0) {
+      return Math.max(1, Math.floor(this.metadata.durationUnits * 1000 / this.metadata.durationTimescale));
+    }
+    if (this.format.targetDurationSec && this.format.targetDurationSec > 0) {
+      return Math.max(1, Math.floor(this.format.targetDurationSec * 1000));
+    }
+    if (liveHeadSeq > 0 && liveHeadTimeMs > 0) {
+      return Math.max(1, Math.floor(liveHeadTimeMs / liveHeadSeq));
+    }
+    return -1;
   }
 
   observeHeader(header: SabrMediaHeader): boolean {
@@ -40,13 +93,16 @@ class FormatProgress {
       this.initReceived = true;
       return true;
     }
+    const minSeq = this.minSequence();
     if (header.sequenceNumber >= 0) {
       if (this.firstSequence < 0 || header.sequenceNumber < this.firstSequence) {
         this.firstSequence = header.sequenceNumber;
       }
-      if (header.sequenceNumber === this.lastSequence + 1) {
+      if (this.lastSequence < minSeq && header.sequenceNumber === minSeq) {
         this.lastSequence = header.sequenceNumber;
-      } else if (header.sequenceNumber > this.lastSequence + 1) {
+      } else if (header.sequenceNumber === this.lastSequence + 1) {
+        this.lastSequence = header.sequenceNumber;
+      } else if (header.sequenceNumber > Math.max(this.lastSequence + 1, minSeq)) {
         this.aheadSegments.set(header.sequenceNumber,
           header.startMs + Math.max(0, header.durationMs));
       }
@@ -78,7 +134,7 @@ class FormatProgress {
   observeSegment(segment: SabrMediaSegment): boolean {
     const changed = this.observeHeader(segment.header);
     if (segment.header.initSegment && !this.segmentIndex) {
-      const mime = this.metadata?.mimeType ?? this.format.mimeType ?? '';
+      const mime = (this.metadata?.mimeType ?? this.format.mimeType ?? '').toLowerCase();
       if (mime.indexOf('mp4') >= 0) {
         try {
           this.segmentIndex = parseMp4SegmentIndex(segment.data,
@@ -89,6 +145,23 @@ class FormatProgress {
           return true;
         } catch (_) {
           // Keep the duration/count fallback for formats whose init data has no SIDX.
+        }
+      } else if (mime.indexOf('webm') >= 0) {
+        try {
+          const totalDurationMs = (this.metadata && this.metadata.durationUnits > 0
+            && this.metadata.durationTimescale > 0)
+            ? Math.floor((this.metadata.durationUnits * 1000 + this.metadata.durationTimescale / 2)
+              / this.metadata.durationTimescale)
+            : (this.format.approxDurationMs ?? -1);
+          this.segmentIndex = parseWebmSegmentIndex(segment.data,
+            this.metadata?.indexRangeStart ?? -1, this.metadata?.indexRangeEnd ?? -1,
+            totalDurationMs);
+          if (this.endSegmentNumber <= 0) {
+            this.endSegmentNumber = this.segmentIndex.size();
+          }
+          return true;
+        } catch (_) {
+          // Keep the duration/count fallback for formats whose init data has no Cues.
         }
       }
     }
@@ -112,10 +185,11 @@ class FormatProgress {
   }
 
   addBufferedRange(ranges: SabrBufferedRange[]): void {
-    if (!this.initReceived || this.lastSequence <= 0) {
+    const minSeq = this.minSequence();
+    if (!this.initReceived || this.lastSequence < minSeq) {
       return;
     }
-    const startSeq = this.firstSequence >= 0 ? this.firstSequence : 0;
+    const startSeq = this.firstSequence >= 0 ? this.firstSequence : minSeq;
     const endSeq = this.lastSequence;
     const duration = Math.max(0, this.bufferedEndMs - this.startTimeMs);
     ranges.push(SabrBufferedRange.fromProgress(
@@ -135,9 +209,10 @@ class FormatProgress {
     if (targetMs < this.bufferedEndMs) {
       this.bufferedEndMs = Math.max(0, targetMs);
     }
+    const minSeq = this.minSequence();
     // Soft reset sequence tracking near seek target; next headers re-fill.
     this.firstSequence = -1;
-    this.lastSequence = Math.max(0, this.getSegmentNumberAtOrAfterTimeMs(targetMs) - 1);
+    this.lastSequence = Math.max(minSeq - 1, this.getSegmentNumberAtOrAfterTimeMs(targetMs) - 1);
     this.aheadSegments.clear();
   }
 
@@ -147,29 +222,75 @@ class FormatProgress {
    */
   jumpTo(targetMs: number): void {
     const t = Math.max(0, targetMs);
-    if (t > this.bufferedEndMs) {
-      this.bufferedEndMs = t;
-    } else {
-      this.bufferedEndMs = t;
-    }
-    this.startTimeMs = 0;
-    const endSeq = Math.max(0, this.getSegmentNumberAtOrAfterTimeMs(t) - 1);
-    this.firstSequence = endSeq > 0 ? 1 : -1;
+    this.bufferedEndMs = t;
+    this.startTimeMs = this.isPostLive ? this.postLiveStartTimeMs : 0;
+    const minSeq = this.minSequence();
+    const endSeq = Math.max(minSeq - 1, this.getSegmentNumberAtOrAfterTimeMs(t) - 1);
+    this.firstSequence = endSeq >= minSeq ? minSeq : -1;
     this.lastSequence = endSeq;
     this.aheadSegments.clear();
   }
 
+  /**
+   * PipePipe SabrMediaBridge.track(): position this track's advertised bufferedThrough
+   * immediately before an exact sequence number without relying on ms-to-sequence rounding.
+   */
+  jumpToSequence(sequenceNumber: number): void {
+    const minSeq = this.minSequence();
+    const endSeq = Math.max(minSeq - 1, sequenceNumber - 1);
+    this.startTimeMs = this.isPostLive ? this.postLiveStartTimeMs : 0;
+    this.firstSequence = endSeq >= minSeq ? minSeq : -1;
+    this.lastSequence = endSeq;
+    if (endSeq >= minSeq) {
+      const endMs = this.getSegmentEndMs(endSeq);
+      this.bufferedEndMs = endMs >= 0 ? endMs : Math.max(0, this.getSegmentStartMs(sequenceNumber));
+    } else {
+      this.bufferedEndMs = this.startTimeMs;
+    }
+    this.aheadSegments.clear();
+  }
+
+  getLastSequence(): number {
+    return this.lastSequence;
+  }
+
+  getStartSequence(): number {
+    return this.isPostLive ? Math.max(0, this.postLiveStartSequence) : 1;
+  }
+
   getEndSegmentNumber(): number {
-    return this.endSegmentNumber;
+    if (this.endSegmentNumber >= 0) {
+      return this.endSegmentNumber;
+    }
+    return this.isPostLive ? this.postLiveEndSequence : -1;
+  }
+
+  hasSegmentIndex(): boolean {
+    return !!this.segmentIndex;
+  }
+
+  getEffectiveSegmentDurationMs(): number {
+    return this.postLiveSegmentDurationMs > 0 ? this.postLiveSegmentDurationMs : this.averageDurationMs;
   }
 
   getSegmentStartMs(sequenceNumber: number): number {
+    if (this.segmentIndex) {
+      if (sequenceNumber <= 1) {
+        return 0;
+      }
+      const indexed = this.segmentIndex.getEntry(sequenceNumber);
+      return indexed ? indexed.startMs : -1;
+    }
+    if (this.isPostLive) {
+      const startSeq = Math.max(0, this.postLiveStartSequence);
+      if (sequenceNumber <= startSeq) {
+        return this.postLiveStartTimeMs;
+      }
+      const dur = this.getEffectiveSegmentDurationMs();
+      return this.postLiveStartTimeMs + (sequenceNumber - startSeq) * dur;
+    }
     if (sequenceNumber <= 1) {
       return 0;
-    }
-    const indexed = this.segmentIndex?.getEntry(sequenceNumber);
-    if (indexed) {
-      return indexed.startMs;
     }
     return Math.max(0, sequenceNumber - 1) * this.averageDurationMs;
   }
@@ -179,6 +300,12 @@ class FormatProgress {
     if (indexed) {
       return indexed.getEndMs();
     }
+    if (this.isPostLive) {
+      if (sequenceNumber < 0) {
+        return -1;
+      }
+      return this.getSegmentStartMs(sequenceNumber) + this.getEffectiveSegmentDurationMs();
+    }
     if (sequenceNumber <= 0) {
       return -1;
     }
@@ -186,10 +313,10 @@ class FormatProgress {
   }
 
   getSegmentNumberAtOrAfterTimeMs(timeMs: number): number {
-    if (timeMs <= 0) {
-      return 1;
-    }
     if (this.segmentIndex) {
+      if (timeMs <= 0) {
+        return 1;
+      }
       for (let sequence = 1; sequence <= this.segmentIndex.size(); sequence++) {
         const entry = this.segmentIndex.getEntry(sequence);
         if (entry && entry.getEndMs() > timeMs) {
@@ -197,6 +324,17 @@ class FormatProgress {
         }
       }
       return Math.max(1, this.segmentIndex.size() + 1);
+    }
+    if (this.isPostLive) {
+      const startSeq = Math.max(0, this.postLiveStartSequence);
+      if (timeMs <= this.postLiveStartTimeMs) {
+        return startSeq;
+      }
+      const dur = Math.max(1, this.getEffectiveSegmentDurationMs());
+      return startSeq + Math.floor((timeMs - this.postLiveStartTimeMs) / dur);
+    }
+    if (timeMs <= 0) {
+      return 1;
     }
     return Math.max(1, Math.floor(timeMs / Math.max(1, this.averageDurationMs)) + 1);
   }
@@ -215,8 +353,8 @@ class FormatProgress {
   }
 
   isComplete(): boolean {
-    return this.initReceived && this.endSegmentNumber >= 0
-      && this.lastSequence >= this.endSegmentNumber;
+    const endSeg = this.getEndSegmentNumber();
+    return this.initReceived && endSeg >= 0 && this.lastSequence >= endSeg;
   }
 }
 
@@ -230,6 +368,13 @@ export class YoutubeSabrStreamState {
   private audio: FormatProgress;
   private video: FormatProgress;
   private epoch: SabrServerEpoch;
+  private readonly isPostLive: boolean;
+  private live: boolean = false;
+  private postLiveDvr: boolean = false;
+  private liveHeadSequenceNumber: number = -1;
+  private liveHeadTimeMs: number = -1;
+  private liveSeekableStartTimeMs: number = -1;
+  private liveSeekableEndTimeMs: number = -1;
   private playerTimeMsOverride: number = -1;
   private enabledTrackTypesBitfield: number = SABR_TRACK_BOTH;
   private selectAudioFormat: boolean = true;
@@ -244,14 +389,51 @@ export class YoutubeSabrStreamState {
   private bandwidthEstimateBps: number = -1;
 
   constructor(audioFormat: YoutubeSabrFormatMeta, videoFormat: YoutubeSabrFormatMeta,
-    epoch: SabrServerEpoch) {
-    this.audio = new FormatProgress(audioFormat);
-    this.video = new FormatProgress(videoFormat);
+    epoch: SabrServerEpoch, isPostLive: boolean = false) {
+    this.isPostLive = isPostLive;
+    this.audio = new FormatProgress(audioFormat, isPostLive);
+    this.video = new FormatProgress(videoFormat, isPostLive);
     this.epoch = epoch;
   }
 
   getEpoch(): SabrServerEpoch {
     return this.epoch;
+  }
+
+  isPostLiveStream(): boolean {
+    return this.isPostLive;
+  }
+
+  observeLiveMetadata(meta: SabrLiveMetadata): void {
+    this.live = true;
+    this.postLiveDvr = this.postLiveDvr || meta.isPostLiveDvr;
+    if (meta.liveHeadSequenceNumber >= 0) {
+      this.liveHeadSequenceNumber = Math.max(this.liveHeadSequenceNumber, meta.liveHeadSequenceNumber);
+    }
+    if (meta.liveHeadTimeMs >= 0) {
+      this.liveHeadTimeMs = Math.max(this.liveHeadTimeMs, meta.liveHeadTimeMs);
+    }
+    const minSeekMs = scaleToMilliseconds(meta.minSeekableTimeTicks, meta.minSeekableTimescale);
+    if (minSeekMs >= 0) {
+      this.liveSeekableStartTimeMs = Math.max(this.liveSeekableStartTimeMs, minSeekMs);
+    }
+    const maxSeekMs = scaleToMilliseconds(meta.maxSeekableTimeTicks, meta.maxSeekableTimescale);
+    if (maxSeekMs >= 0) {
+      this.liveSeekableEndTimeMs = Math.max(this.liveSeekableEndTimeMs, maxSeekMs);
+    }
+    this.syncPostLiveWindows();
+  }
+
+  private syncPostLiveWindows(): void {
+    if (!this.isPostLive) {
+      return;
+    }
+    this.audio.syncPostLiveWindow(
+      this.liveHeadSequenceNumber, this.liveHeadTimeMs,
+      this.liveSeekableStartTimeMs, this.liveSeekableEndTimeMs);
+    this.video.syncPostLiveWindow(
+      this.liveHeadSequenceNumber, this.liveHeadTimeMs,
+      this.liveSeekableStartTimeMs, this.liveSeekableEndTimeMs);
   }
 
   ingest(response: SabrDecodedResponse): boolean {
@@ -261,12 +443,16 @@ export class YoutubeSabrStreamState {
         this.epoch.playbackCookie = response.nextRequestPolicy.playbackCookie;
       }
     }
+    for (const liveMeta of response.liveMetadata) {
+      this.observeLiveMetadata(liveMeta);
+    }
     for (const meta of response.formatInitializationMetadata) {
       const progress = this.findProgressForItag(meta.itag);
       if (progress) {
         progressed = progress.observeMetadata(meta) || progressed;
       }
     }
+    this.syncPostLiveWindows();
     for (const header of response.mediaHeaders) {
       const progress = this.findProgressForItag(header.itag);
       if (progress) {
@@ -301,6 +487,7 @@ export class YoutubeSabrStreamState {
     const progress = this.findProgressForItag(meta.itag);
     if (progress) {
       progress.observeMetadata(meta);
+      this.syncPostLiveWindows();
     }
   }
 
@@ -379,9 +566,42 @@ export class YoutubeSabrStreamState {
     return progress ? progress.getBufferedEndMs() : 0;
   }
 
+  getLastSequence(format: YoutubeSabrFormatMeta): number {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getLastSequence() : (this.isPostLive ? -1 : 0);
+  }
+
+  getStartSegment(format: YoutubeSabrFormatMeta): number {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getStartSequence() : (this.isPostLive ? 0 : 1);
+  }
+
   getEndSegment(format: YoutubeSabrFormatMeta): number {
     const progress = this.findProgressForItag(format.itag);
     return progress ? progress.getEndSegmentNumber() : -1;
+  }
+
+  hasSegmentIndex(format: YoutubeSabrFormatMeta): boolean {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.hasSegmentIndex() : false;
+  }
+
+  getLiveSegmentDurationMs(format: YoutubeSabrFormatMeta): number {
+    const progress = this.findProgressForItag(format.itag);
+    return progress ? progress.getEffectiveSegmentDurationMs() : 5000;
+  }
+
+  getPresentationTimeOffsetMs(): number {
+    return this.isPostLive ? Math.max(0, this.liveSeekableStartTimeMs) : 0;
+  }
+
+  getPostLiveDurationMs(): number {
+    if (!this.isPostLive || !this.live) {
+      return 0;
+    }
+    const windowStart = Math.max(0, this.liveSeekableStartTimeMs);
+    const windowEnd = Math.max(this.liveSeekableEndTimeMs, Math.max(this.liveHeadTimeMs, windowStart));
+    return windowEnd > windowStart ? Math.max(1, windowEnd - windowStart) : 0;
   }
 
   getSegmentStartMs(format: YoutubeSabrFormatMeta, sequenceNumber: number): number {
@@ -535,14 +755,15 @@ export class YoutubeSabrStreamState {
     }
   }
 
-  /** Re-advertise one track immediately before an observed cache hole. */
+  /** Re-advertise one track immediately before an observed cache hole or behind-edge demand. */
   prepareForMissingSegment(format: YoutubeSabrFormatMeta, sequenceNumber: number): void {
     const progress = this.findProgressForItag(format.itag);
-    if (!progress || sequenceNumber <= 0) {
+    const minSeq = progress ? progress.getStartSequence() : 1;
+    if (!progress || sequenceNumber < minSeq) {
       return;
     }
-    const targetMs = progress.getSegmentStartMs(sequenceNumber);
-    progress.jumpTo(targetMs);
+    const targetMs = Math.max(0, progress.getSegmentStartMs(sequenceNumber));
+    progress.jumpToSequence(sequenceNumber);
     this.setPlayerTimeMsOverride(targetMs);
     this.clearPlaybackCookie();
   }
@@ -564,4 +785,11 @@ export class YoutubeSabrStreamState {
     }
     return undefined;
   }
+}
+
+function scaleToMilliseconds(ticks: number, timescale: number): number {
+  if (ticks < 0 || timescale <= 0) {
+    return -1;
+  }
+  return Math.floor(ticks * 1000 / timescale);
 }

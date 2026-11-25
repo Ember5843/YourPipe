@@ -14,8 +14,31 @@ import { UIConfig } from '../../common/AppState';
 import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { WatchHistoryStore } from '../../common/WatchHistoryStore';
 import { COLOR_PRESETS } from '../../common/ThemeManager';
+import { HomeFeedChip, HomeFeedSection } from './model/FeedResult';
 
 const logger = AppLog.getInstance('HomeTabContent');
+
+/** 前置固定官方分类标签（排在最前，「全部」后紧跟「我的分类」）。 */
+const FRONT_OFFICIAL_CHIPS: Array<HomeFeedChip> = [
+  { label: '全部', continuationToken: '', isSelected: true },
+  { label: '我的分类', continuationToken: '', isSelected: false, isMyCategories: true },
+  { label: '音乐', continuationToken: '', isSelected: false, searchQuery: '音乐' },
+  { label: '游戏', continuationToken: '', isSelected: false, searchQuery: '游戏' },
+  { label: '直播', continuationToken: '', isSelected: false, searchQuery: '直播' }
+];
+
+/** 后置补充分类标签（排在推荐流动态分类之后）。 */
+const TAIL_OFFICIAL_CHIPS: Array<HomeFeedChip> = [
+  { label: '自然', continuationToken: '', isSelected: false, searchQuery: '自然 4K' },
+  { label: '旅游', continuationToken: '', isSelected: false, searchQuery: '旅游 Vlog' },
+  { label: '动画', continuationToken: '', isSelected: false, searchQuery: '动画' },
+  { label: '动作冒险游戏', continuationToken: '', isSelected: false, searchQuery: '动作冒险游戏' },
+  { label: '最近上传', continuationToken: '', isSelected: false, searchQuery: '最近上传' },
+  { label: '已观看', continuationToken: '', isSelected: false, searchQuery: '热门视频' },
+  { label: '发现新视频', continuationToken: '', isSelected: false, searchQuery: '推荐视频' }
+];
+
+const FALLBACK_CHIPS: Array<HomeFeedChip> = FRONT_OFFICIAL_CHIPS.concat(TAIL_OFFICIAL_CHIPS);
 
 /** 短视频列表少于该条数时，继续翻首页 feed 去收短视频（短视频就在这份混合 feed 里）。 */
 const HOME_SHORTS_TOPUP_THRESHOLD: number = 12;
@@ -97,12 +120,13 @@ export class HomeTabController {
 
 /**
  * 首页 tab 内容宿主：feed 加载状态机（kiosk/推荐双轨 + 分页 + 下拉刷新）、
- * 错误格式化、推荐位 banner、错误页 / 信息流 / 初始加载遮罩三档视图。
+ * 错误格式化、分类 Chip 栏、错误页 / 信息流 / 初始加载遮罩三档视图。
  * 原 Index.TabContentSection(0) 分支纯迁移；Index 经 HomeTabController 触发 reset。
  */
 @Component
 export struct HomeTabContent {
   controller: HomeTabController = new HomeTabController();
+  @Prop feedMode: string = 'long';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageLink('deviceWidth') deviceWidth: number = 0;
   @StorageProp('themePrimaryColor') themePrimary: string = COLOR_PRESETS[0].primary;
@@ -110,6 +134,20 @@ export struct HomeTabContent {
   @Consume('safeAreaBottom') safeAreaBottom: number = 0;
   @State longList: VideoItem[] = [];
   @State shortList: VideoItem[] = [];
+  @State chips: HomeFeedChip[] = FALLBACK_CHIPS;
+  @State selectedChipIndex: number = 0;
+  /** 分类 Chip 栏是否展开显示（下滑列表隐藏，上滑列表展开） */
+  @State isChipBarVisible: boolean = true;
+  /** 列表纵向滑动方向累计位移（用于防抖触发隐藏/展开） */
+  private chipScrollAccumY: number = 0;
+  @State myCategorySections: HomeFeedSection[] = [];
+  @State isMyCategoriesLoading: boolean = false;
+  private serverSections: HomeFeedSection[] = [];
+  /** 官方推荐流动态返回/提取的额外分类条目（仅展示在「我的分类」展开列表中，不含固定预设分类）。 */
+  private recommendedExtraChips: HomeFeedChip[] = [];
+  private myCategoriesSeenTitles: Set<string> = new Set<string>();
+  private myCategoriesIdCursor: number = 500000;
+  private myCategoriesFetched: boolean = false;
   /** 正在进行的 feed 拉取（"多翻几页收短视频"要串行等它）。 */
   private feedLoadInFlight: Promise<void> = Promise.resolve();
   /** 短视频补收（多翻 feed 页）的 in-flight 标记。 */
@@ -131,6 +169,9 @@ export struct HomeTabContent {
   @State kioskVisitorData: string = '';
   @State homeFeedSource: string = 'kiosk';
   @State homeMode: string = 'kiosk';
+  /** 当前是否处于分类 Chip 搜索兜底分页模式。 */
+  private activeChipSearchMode: boolean = false;
+  private chipScroller: Scroller = new Scroller();
   /** 首页信息流 LazyForEach 数据源：当前维度的列表变更后由 syncHomeFeedDataSource 同步 */
   private homeFeedDataSource: FeedDataSource = new FeedDataSource();
   private homeBannerMax: number = 6;
@@ -180,13 +221,325 @@ export struct HomeTabContent {
     this.homeFeedSource = 'kiosk';
     this.homeErrorMessage = '';
     this.homeModeNoticeMessage = '';
+    this.activeChipSearchMode = false;
+    this.selectedChipIndex = 0;
+    this.myCategoriesFetched = false;
     if (clearList) {
       this.longList = [];
       this.shortList = [];
+      this.serverSections = [];
+      this.recommendedExtraChips = [];
+      this.myCategoriesSeenTitles.clear();
+      this.myCategorySections = [];
       this.syncHomeFeedDataSource();
     }
     if (reload) {
       this.loadLiveVideos(true);
+    }
+  }
+
+  private isMyCategoriesSelected(): boolean {
+    return !this.isShortMode()
+      && this.selectedChipIndex >= 0
+      && this.selectedChipIndex < this.chips.length
+      && this.chips[this.selectedChipIndex].isMyCategories === true;
+  }
+
+  /** 点击顶部分类 Chip 切换内容。 */
+  private onSelectChip(index: number): void {
+    if (index < 0 || index >= this.chips.length) {
+      return;
+    }
+    if (this.selectedChipIndex === index && (this.longList.length > 0 || this.myCategorySections.length > 0)) {
+      this.scrollHomeFeedToTop();
+      return;
+    }
+    this.selectedChipIndex = index;
+    const chip = this.chips[index];
+    logger.info(`[HomeFeed] stage=chip_select index=${index} label=${chip.label} hasToken=${chip.continuationToken.length > 0} isMyCat=${chip.isMyCategories === true}`);
+    if (index === 0) {
+      this.activeChipSearchMode = false;
+      this.loadLiveVideos(true);
+      return;
+    }
+    if (chip.isMyCategories === true) {
+      this.activeChipSearchMode = false;
+      this.loadMyCategoriesSections(false).catch(() => undefined);
+      return;
+    }
+    const task = this.doLoadChipVideos(chip);
+    this.feedLoadInFlight = task;
+  }
+
+  /**
+   * 加载「我的分类」展开带 Header 的视频分组列表：
+   * 仅纳入官方推荐给我们的动态分类/货架条目（serverSections + recommendedExtraChips），
+   * 不把顶部固定预设页签（音乐 / 游戏 / 合辑 / 直播 / 自然 / 旅游等）全部搬进来。
+   */
+  private async loadMyCategoriesSections(forceRefresh: boolean): Promise<void> {
+    if (this.isMyCategoriesLoading) {
+      return;
+    }
+    if (this.myCategoriesFetched && !forceRefresh && this.myCategorySections.length > 0) {
+      return;
+    }
+    this.isMyCategoriesLoading = true;
+    this.homeErrorMessage = '';
+    const startedAt = Date.now();
+    try {
+      this.myCategoriesSeenTitles.clear();
+      for (let i = 0; i < FALLBACK_CHIPS.length; i++) {
+        this.myCategoriesSeenTitles.add(FALLBACK_CHIPS[i].label);
+      }
+
+      const resultSections: Array<HomeFeedSection> = [];
+
+      // 1. 推荐流原生货架分组（跳过与顶部固定预设同名项）
+      for (let i = 0; i < this.serverSections.length; i++) {
+        const sec = this.serverSections[i];
+        const title = (sec.title || '').trim();
+        if (title.length > 0 && sec.items.length > 0 && !this.myCategoriesSeenTitles.has(title)) {
+          this.myCategoriesSeenTitles.add(title);
+          resultSections.push({
+            title: title,
+            items: sec.items.slice(0, 8)
+          });
+        }
+      }
+      this.myCategorySections = resultSections.slice();
+
+      // 2. 拉取首屏官方推荐给我们的动态分类条目（首批 6 个分组）
+      await this.appendNextMyCategoriesBatch(6);
+
+      this.myCategoriesFetched = true;
+      logger.info(`[HomeFeed] stage=my_categories_done sections=${this.myCategorySections.length} elapsed=${Date.now() - startedAt}ms`);
+    } finally {
+      this.isMyCategoriesLoading = false;
+    }
+  }
+
+  /**
+   * 「我的分类」滑到底部时继续刷新加载更多官方推荐分类分组：
+   * 1. 若 recommendedExtraChips 中剩余未展示的推荐条目不足，先继续向后翻一页官方推荐流，
+   *    并入新返回的原生货架（sections）并从新推荐视频提取更多 #话题 与推荐频道；
+   * 2. 再并发拉取下一批推荐分类分组追加到底部。
+   */
+  private async loadMoreMyCategoriesSections(): Promise<void> {
+    if (this.isMyCategoriesLoading || !this.myCategoriesFetched) {
+      return;
+    }
+    this.isMyCategoriesLoading = true;
+    const startedAt = Date.now();
+    try {
+      let remaining = this.countUnseenExtraChips();
+      const homeService = FeedServiceProvider.getInstance().getHomeFeedService();
+      const useAuth = this.homeFeedSource.indexOf('recommended') === 0;
+
+      // 若待展示的官方推荐分类不足 4 个，向后翻一页官方推荐流补充
+      if (remaining < 4 && this.kioskNextPageToken && this.kioskNextPageToken.length > 0) {
+        try {
+          const startId = this.longList.length + this.shortList.length + 1;
+          const nextRes = await homeService.fetchHomeKioskNext(
+            this.kioskNextPageToken,
+            this.kioskVisitorData,
+            startId,
+            useAuth,
+            this.homeFeedSource
+          );
+          this.kioskNextPageToken = nextRes.nextPageToken;
+          if (nextRes.visitorData && nextRes.visitorData.length > 0) {
+            this.kioskVisitorData = nextRes.visitorData;
+          }
+          const split = this.splitByType(nextRes.items);
+          this.longList = this.longList.concat(split.long);
+          this.shortList = this.shortList.concat(split.short);
+          this.syncHomeFeedDataSource();
+
+          if (nextRes.sections && nextRes.sections.length > 0) {
+            const nextSections = this.myCategorySections.slice();
+            for (let i = 0; i < nextRes.sections.length; i++) {
+              const sec = nextRes.sections[i];
+              const title = (sec.title || '').trim();
+              if (title.length > 0 && sec.items.length > 0 && !this.myCategoriesSeenTitles.has(title)) {
+                this.myCategoriesSeenTitles.add(title);
+                nextSections.push({
+                  title: title,
+                  items: sec.items.slice(0, 8)
+                });
+              }
+            }
+            this.myCategorySections = nextSections;
+          }
+
+          this.appendExtraChipsFromItems(nextRes.items);
+          remaining = this.countUnseenExtraChips();
+        } catch (e) {
+          logger.warn(`[HomeFeed] stage=my_categories_next_feed_failed ${this.describeThrowable(e)}`);
+        }
+      }
+
+      // 若翻页后仍不足，从已加载的推荐流全量条目中继续挖掘未展示的推荐话题/频道
+      if (remaining < 4 && this.longList.length > 0) {
+        this.appendExtraChipsFromItems(this.longList);
+      }
+
+      await this.appendNextMyCategoriesBatch(4);
+      logger.info(`[HomeFeed] stage=my_categories_more_done sections=${this.myCategorySections.length} elapsed=${Date.now() - startedAt}ms`);
+    } finally {
+      this.isMyCategoriesLoading = false;
+    }
+  }
+
+  private countUnseenExtraChips(): number {
+    let count = 0;
+    for (let i = 0; i < this.recommendedExtraChips.length; i++) {
+      const lbl = (this.recommendedExtraChips[i].label || '').trim();
+      if (lbl.length > 0 && !this.myCategoriesSeenTitles.has(lbl)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private async appendNextMyCategoriesBatch(maxCount: number): Promise<void> {
+    const candidates: Array<HomeFeedChip> = [];
+    for (let i = 0; i < this.recommendedExtraChips.length && candidates.length < maxCount; i++) {
+      const c = this.recommendedExtraChips[i];
+      const lbl = (c.label || '').trim();
+      if (!lbl || this.myCategoriesSeenTitles.has(lbl)) {
+        continue;
+      }
+      this.myCategoriesSeenTitles.add(lbl);
+      candidates.push(c);
+    }
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const homeService = FeedServiceProvider.getInstance().getHomeFeedService();
+    const searchService = FeedServiceProvider.getInstance().getSearchService();
+    const useAuth = this.homeFeedSource.indexOf('recommended') === 0;
+    const batchSize = 4;
+    const currentSections = this.myCategorySections.slice();
+
+    for (let offset = 0; offset < candidates.length; offset += batchSize) {
+      const batch = candidates.slice(offset, offset + batchSize);
+      const batchResults: Array<HomeFeedSection | null> = await Promise.all(
+        batch.map(async (chip: HomeFeedChip): Promise<HomeFeedSection | null> => {
+          this.myCategoriesIdCursor += 100;
+          const baseId = this.myCategoriesIdCursor;
+          try {
+            if (chip.continuationToken && chip.continuationToken.length > 0) {
+              const res = await homeService.fetchHomeKioskNext(
+                chip.continuationToken,
+                this.kioskVisitorData,
+                baseId,
+                useAuth,
+                this.homeFeedSource
+              );
+              const split = this.splitByType(res.items);
+              const list = (split.long.length > 0 ? split.long : res.items).slice(0, 8);
+              if (list.length > 0) {
+                return {
+                  title: chip.label,
+                  items: list
+                };
+              }
+            }
+            const query = chip.searchQuery && chip.searchQuery.length > 0
+              ? chip.searchQuery
+              : chip.label;
+            const sRes = await searchService.fetchInitial(query, baseId);
+            const split = this.splitByType(sRes.items);
+            const list = (split.long.length > 0 ? split.long : sRes.items).slice(0, 8);
+            if (list.length > 0) {
+              return {
+                title: chip.label,
+                items: list
+              };
+            }
+            return null;
+          } catch (e) {
+            logger.warn(`[HomeFeed] stage=my_categories_item_failed label=${chip.label} ${this.describeThrowable(e)}`);
+            return null;
+          }
+        })
+      );
+      for (let k = 0; k < batchResults.length; k++) {
+        const sec = batchResults[k];
+        if (sec && sec.items.length > 0) {
+          currentSections.push(sec);
+        }
+      }
+      this.myCategorySections = currentSections.slice();
+    }
+  }
+
+  private async doLoadChipVideos(chip: HomeFeedChip): Promise<void> {
+    this.homeLoadGeneration += 1;
+    const generation = this.homeLoadGeneration;
+    this.isLoadingMore = false;
+    this.isInitialLoading = true;
+    this.homeErrorMessage = '';
+    const startedAt = Date.now();
+    try {
+      if (chip.continuationToken && chip.continuationToken.length > 0) {
+        this.activeChipSearchMode = false;
+        const homeService = FeedServiceProvider.getInstance().getHomeFeedService();
+        const useAuth = this.homeFeedSource.indexOf('recommended') === 0;
+        const result = await homeService.fetchHomeKioskNext(
+          chip.continuationToken,
+          this.kioskVisitorData,
+          1,
+          useAuth,
+          this.homeFeedSource
+        );
+        if (generation !== this.homeLoadGeneration) {
+          return;
+        }
+        const split = this.splitByType(result.items);
+        this.longList = split.long.length > 0 ? split.long : result.items;
+        if (split.short.length > 0) {
+          this.shortList = split.short;
+        }
+        this.kioskNextPageToken = result.nextPageToken;
+        if (result.visitorData && result.visitorData.length > 0) {
+          this.kioskVisitorData = result.visitorData;
+        }
+        this.syncHomeFeedDataSource();
+        this.scrollHomeFeedToTop();
+        logger.info(`[HomeFeed] stage=chip_done mode=continuation label=${chip.label} items=${result.items.length} elapsed=${Date.now() - startedAt}ms`);
+        return;
+      }
+
+      // 兜底：使用搜索接口按分类词拉取视频列表
+      this.activeChipSearchMode = true;
+      const searchService = FeedServiceProvider.getInstance().getSearchService();
+      const query = chip.searchQuery && chip.searchQuery.length > 0 ? chip.searchQuery : chip.label;
+      const searchRes = await searchService.fetchInitial(query, 1);
+      if (generation !== this.homeLoadGeneration) {
+        return;
+      }
+      const split = this.splitByType(searchRes.items);
+      this.longList = split.long.length > 0 ? split.long : searchRes.items;
+      this.kioskNextPageToken = searchRes.nextPageToken;
+      this.syncHomeFeedDataSource();
+      this.scrollHomeFeedToTop();
+      logger.info(`[HomeFeed] stage=chip_done mode=search label=${chip.label} items=${searchRes.items.length} elapsed=${Date.now() - startedAt}ms`);
+    } catch (err) {
+      if (generation !== this.homeLoadGeneration) {
+        return;
+      }
+      logger.error(`[HomeFeed] stage=chip_failed label=${chip.label} ${this.describeThrowable(err)}`);
+      this.homeErrorMessage = this.formatHomeRequestError(
+        err as Object,
+        getContext().resourceManager.getStringSync($r('app.string.yt_home_load_error').id)
+      );
+    } finally {
+      if (generation === this.homeLoadGeneration) {
+        this.isInitialLoading = false;
+        this.isLoadingMore = false;
+      }
     }
   }
 
@@ -203,6 +556,7 @@ export struct HomeTabContent {
       this.isLoadingMore = false;
       this.isInitialLoading = this.activeList().length === 0;
       this.homeErrorMessage = '';
+      this.activeChipSearchMode = false;
     } else {
       if (this.isLoadingMore) {
         return;
@@ -216,6 +570,23 @@ export struct HomeTabContent {
       + `source=${this.homeFeedSource} startId=${startId} long=${this.longList.length} `
       + `short=${this.shortList.length}`);
     try {
+      if (!reset && this.activeChipSearchMode) {
+        if (!this.kioskNextPageToken) {
+          return;
+        }
+        this.isLoadingMore = true;
+        const searchService = FeedServiceProvider.getInstance().getSearchService();
+        const searchRes = await searchService.fetchNext(this.kioskNextPageToken, startId);
+        if (generation !== this.homeLoadGeneration) {
+          return;
+        }
+        const split = this.splitByType(searchRes.items);
+        this.longList = this.longList.concat(split.long.length > 0 ? split.long : searchRes.items);
+        this.kioskNextPageToken = searchRes.nextPageToken;
+        this.syncHomeFeedDataSource();
+        return;
+      }
+
       if (this.homeMode === 'kiosk') {
         if (!reset) {
           if (!this.kioskNextPageToken) {
@@ -246,6 +617,11 @@ export struct HomeTabContent {
           this.shortList = split.short;
           this.homeFeedSource = kioskResult.source || 'kiosk';
           this.homeFeedEpoch += 1;
+          this.serverSections = kioskResult.sections ?? [];
+          this.myCategoriesFetched = false;
+          this.myCategorySections = [];
+          this.chips = this.buildMergedChips(kioskResult.chips ?? [], kioskResult.items);
+          this.selectedChipIndex = 0;
           this.scrollHomeFeedToTop();
         } else {
           const split = this.splitByType(kioskResult.items);
@@ -336,7 +712,18 @@ export struct HomeTabContent {
     try {
       this.kioskNextPageToken = null;
       this.kioskVisitorData = '';
-      await this.loadLiveVideos(true);
+      if (this.isMyCategoriesSelected()) {
+        const homeService = FeedServiceProvider.getInstance().getHomeFeedService();
+        const feedStyle = UIConfig.normalizeHomeFeedStyle(this.uiConfig.homeFeedStyle);
+        const kioskResult = await homeService.fetchHomeKioskInitial(1, feedStyle);
+        this.serverSections = kioskResult.sections ?? [];
+        this.chips = this.buildMergedChips(kioskResult.chips ?? [], kioskResult.items);
+        await this.loadMyCategoriesSections(true);
+      } else if (this.selectedChipIndex > 0 && this.selectedChipIndex < this.chips.length) {
+        await this.doLoadChipVideos(this.chips[this.selectedChipIndex]);
+      } else {
+        await this.loadLiveVideos(true);
+      }
       const nextHead = this.activeList().length > 0
         ? (this.activeList()[0].videoId || this.activeList()[0].id.toString())
         : '';
@@ -351,6 +738,8 @@ export struct HomeTabContent {
   }
 
   private scrollHomeFeedToTop(): void {
+    this.isChipBarVisible = true;
+    this.chipScrollAccumY = 0;
     try {
       if (this.uiConfig.homeLayoutMode === 'grid') {
         this.controller.gridScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
@@ -565,7 +954,7 @@ export struct HomeTabContent {
 
   /** 当前维度（'long' | 'short'）。 */
   private isShortMode(): boolean {
-    return this.uiConfig.homeFeedMode === 'short';
+    return this.feedMode === 'short';
   }
 
   /** 当前维度对应的列表。 */
@@ -619,7 +1008,7 @@ export struct HomeTabContent {
     }
   }
 
-  /** 首页列表数据（过滤 banner 后）→ LazyForEach 数据源；追加=增量，reset=全量刷新 */
+  /** 首页列表数据 → LazyForEach 数据源；追加=增量，reset=全量刷新 */
   private syncHomeFeedDataSource(): void {
     this.homeFeedDataSource.setData(this.getHomeListVideos(), (item: Object) => this.homeListItemKey(item as VideoItem));
   }
@@ -710,44 +1099,132 @@ export struct HomeTabContent {
     return code.length > 0 ? `[${code}] ${message}` : message;
   }
 
+  /**
+   * 组合顶部分类栏与「我的分类」动态推荐项：
+   * 1. 顶部栏（this.chips）保持固定预设分类（全部 / 我的分类 / 音乐 / 游戏 / 合辑 / 直播 / 自然 / 旅游 / ...），
+   *    若服务端返回同名 Chip 则复用其 continuationToken；
+   * 2. 官方推荐流返回的动态分类 Chip、货架类别及推荐视频中的热门 #话题 / 频道主题单独存入
+   *    this.recommendedExtraChips，供「我的分类」页签展开成带 Header 的分组视频列表展示。
+   */
+  private buildMergedChips(serverChips: Array<HomeFeedChip>, items: Array<VideoItem>): Array<HomeFeedChip> {
+    const serverByLabel = new Map<string, HomeFeedChip>();
+    for (let i = 0; i < serverChips.length; i++) {
+      const sc = serverChips[i];
+      const lbl = (sc.label || '').trim();
+      if (lbl.length > 0 && !serverByLabel.has(lbl)) {
+        serverByLabel.set(lbl, sc);
+      }
+    }
+
+    const merged: Array<HomeFeedChip> = [];
+    const seenPreset = new Set<string>();
+
+    // 1. 顶部栏：前置官方核心分类（含「全部」与「我的分类」）+ 尾部预设分类
+    const allPresets = FRONT_OFFICIAL_CHIPS.concat(TAIL_OFFICIAL_CHIPS);
+    for (let i = 0; i < allPresets.length; i++) {
+      const base = allPresets[i];
+      if (seenPreset.has(base.label)) {
+        continue;
+      }
+      const matched = serverByLabel.get(base.label);
+      seenPreset.add(base.label);
+      merged.push({
+        label: base.label,
+        continuationToken: (i === 0 || base.isMyCategories) ? '' : (matched?.continuationToken ?? base.continuationToken),
+        isSelected: i === 0,
+        searchQuery: base.searchQuery || base.label,
+        isMyCategories: base.isMyCategories
+      });
+    }
+
+    // 2. 提取官方推荐给我们的额外分类条目（仅放入「我的分类」recommendedExtraChips）
+    this.recommendedExtraChips = [];
+    const seenExtra = new Set<string>(seenPreset);
+    seenExtra.add('合辑');
+    seenExtra.add('Mixes');
+
+    for (let i = 0; i < serverChips.length; i++) {
+      const sc = serverChips[i];
+      const lbl = (sc.label || '').trim();
+      if (!lbl || seenExtra.has(lbl) || lbl.toLowerCase() === 'all') {
+        continue;
+      }
+      seenExtra.add(lbl);
+      this.recommendedExtraChips.push({
+        label: lbl,
+        continuationToken: sc.continuationToken || '',
+        isSelected: false,
+        searchQuery: sc.searchQuery || lbl
+      });
+    }
+
+    this.appendExtraChipsFromItems(items);
+    return merged;
+  }
+
+  /**
+   * 从推荐流视频条目中提取热门 #话题 标签与推荐频道/主题词，追加至 recommendedExtraChips。
+   */
+  private appendExtraChipsFromItems(items: Array<VideoItem>): void {
+    if (!items || items.length === 0) {
+      return;
+    }
+    const existing = new Set<string>();
+    for (let i = 0; i < FALLBACK_CHIPS.length; i++) {
+      existing.add(FALLBACK_CHIPS[i].label);
+    }
+    for (let i = 0; i < this.recommendedExtraChips.length; i++) {
+      existing.add(this.recommendedExtraChips[i].label);
+    }
+
+    const tagRegex = /#([\u4e00-\u9fa5A-Za-z0-9_]{2,12})/g;
+    for (let i = 0; i < items.length; i++) {
+      const title = items[i].title || '';
+      let match: RegExpExecArray | null = tagRegex.exec(title);
+      while (match !== null) {
+        const tag = match[1].trim();
+        if (tag.length >= 2 && tag.toLowerCase() !== 'shorts' && !existing.has(tag)) {
+          existing.add(tag);
+          this.recommendedExtraChips.push({
+            label: tag,
+            continuationToken: '',
+            isSelected: false,
+            searchQuery: tag
+          });
+        }
+        match = tagRegex.exec(title);
+      }
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const author = (items[i].author || '').trim();
+      if (author.length >= 2 && author.length <= 18 && !existing.has(author)) {
+        existing.add(author);
+        this.recommendedExtraChips.push({
+          label: author,
+          continuationToken: '',
+          isSelected: false,
+          searchQuery: author
+        });
+      }
+    }
+  }
+
   private gridColumns(): number {
     return getVideoGridColumnCount(getFeedContentWidthVp(this.getUIContext(), this.deviceWidth),
       UIConfig.gridDensityOffset(this.uiConfig.homeGridDensity));
   }
 
   private shouldShowHomeRecommendBanner(): boolean {
-    // Dual-rail sources: recommended | recommended-web | recommended-tv
-    return this.homeMode === 'kiosk'
-      && this.homeFeedSource.indexOf('recommended') === 0
-      && !this.isShortMode()
-      && this.longList.length > 0;
+    return false;
   }
 
   private getHomeBannerVideos(): VideoItem[] {
-    if (!this.shouldShowHomeRecommendBanner()) {
-      return [];
-    }
-    const limit = Math.min(this.homeBannerMax, this.longList.length);
-    return this.longList.slice(0, limit);
+    return [];
   }
 
   private getHomeListVideos(): VideoItem[] {
-    const list = this.activeList();
-    if (!this.shouldShowHomeRecommendBanner()) {
-      return list;
-    }
-    const bannerIds: string[] = [];
-    const banners = this.getHomeBannerVideos();
-    for (let i = 0; i < banners.length; i++) {
-      const id = (banners[i].videoId || banners[i].id.toString()).trim();
-      if (id.length > 0) {
-        bannerIds.push(id);
-      }
-    }
-    return list.filter((item: VideoItem) => {
-      const id = (item.videoId || item.id.toString()).trim();
-      return bannerIds.indexOf(id) < 0;
-    });
+    return this.activeList();
   }
 
   @LocalBuilder
@@ -774,16 +1251,95 @@ export struct HomeTabContent {
     .padding({ left: 12, right: 12 })
   }
 
-  /** 推荐位 banner：grid 模式经 headerHorizontalBleed 抵消容器左右 12vp 内边距保持全宽；底部间距补齐到原 12vp */
+  /** 推荐位 banner：已替换为顶部分类 Chip 栏 */
   @LocalBuilder
   HomeBannerHeader() {
     HomeRecommendSwiper({
       videos: this.getHomeBannerVideos(),
       feedEpoch: this.homeFeedEpoch
     })
-      .padding({ bottom: this.uiConfig.homeLayoutMode === 'grid' ? 4 : 8 })
-      // 插入-only 转场：禁止删除方向缩放（Grid 骨架切换/hasHeader 翻转时不再播"缩小消失"幽灵）
-      .transition(customAnimationUtil.isScaleTranEnter(`home_recommend_banner_${this.homeFeedEpoch}`, this.uiConfig))
+  }
+
+  /**
+   * 列表滚动联动顶部分类 Chip 栏：向下浏览时平滑收起，向上回滚时立即唤出。
+   */
+  private handleFeedWillScroll(yOffset: number): void {
+    if (Math.abs(yOffset) < 0.5) {
+      return;
+    }
+    const scroller = (!this.isMyCategoriesSelected() && this.uiConfig.homeLayoutMode === 'grid')
+      ? this.controller.gridScroller
+      : this.controller.listScroller;
+    let currentY = 999;
+    try {
+      const offset = scroller.currentOffset();
+      if (offset && typeof offset.yOffset === 'number') {
+        currentY = offset.yOffset;
+      }
+    } catch (_e) {
+      // ignore
+    }
+    // 处于列表顶部附近时始终展开分类栏
+    if (currentY <= 12) {
+      this.chipScrollAccumY = 0;
+      if (!this.isChipBarVisible) {
+        this.isChipBarVisible = true;
+      }
+      return;
+    }
+    if ((this.chipScrollAccumY > 0 && yOffset < 0) || (this.chipScrollAccumY < 0 && yOffset > 0)) {
+      this.chipScrollAccumY = 0;
+    }
+    this.chipScrollAccumY += yOffset;
+    if (this.chipScrollAccumY > 28 && this.isChipBarVisible) {
+      this.isChipBarVisible = false;
+      this.chipScrollAccumY = 0;
+    } else if (this.chipScrollAccumY < -14 && !this.isChipBarVisible) {
+      this.isChipBarVisible = true;
+      this.chipScrollAccumY = 0;
+    }
+  }
+
+  @Builder
+  ChipFilterBar() {
+    Column() {
+      Scroll(this.chipScroller) {
+        Row({ space: 10 }) {
+          ForEach(this.chips, (chip: HomeFeedChip, index: number) => {
+            Text(chip.label)
+              .fontSize(14)
+              .fontWeight(this.selectedChipIndex === index ? FontWeight.Medium : FontWeight.Normal)
+              .fontColor(this.selectedChipIndex === index
+                ? $r('app.color.yourtube_text_inverse')
+                : $r('app.color.yourtube_text_primary'))
+              .backgroundColor(this.selectedChipIndex === index
+                ? this.themePrimary
+                : Color.Transparent)
+              .borderRadius(8)
+              .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+              .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+              .onClick(() => {
+                this.onSelectChip(index);
+              })
+          }, (chip: HomeFeedChip, index: number) => `${index}_${chip.label}`)
+        }
+        .padding({ left: 16, right: 16, top: 6, bottom: 8 })
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .nestedScroll({
+        scrollForward: NestedScrollMode.SELF_ONLY,
+        scrollBackward: NestedScrollMode.SELF_ONLY
+      })
+      .width('100%')
+    }
+    .width('100%')
+    .height(this.isChipBarVisible ? 44 : 0)
+    .opacity(this.isChipBarVisible ? 1 : 0)
+    .clip(true)
+    .animation({ duration: 200, curve: Curve.FastOutSlowIn })
+    .backgroundColor($r('app.color.yourtube_bg_page'))
+    .zIndex(10)
   }
 
   @Builder LoadingBuilder() {
@@ -792,6 +1348,128 @@ export struct HomeTabContent {
       .width(40)
       .height(40)
       .margin({ bottom: 15 })
+  }
+
+  /**
+   * 「我的分类」展开式分组大列表：
+   * 每个分组由上方的页签/分类名称 Header 与下方的视频卡片（网格或条式）共同组成。
+   */
+  @Builder
+  MyCategoriesSectionedView() {
+    if (this.isMyCategoriesLoading && this.myCategorySections.length === 0) {
+      Column() {
+        this.LoadingBuilder()
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+    } else {
+      List({ scroller: this.controller.listScroller, space: 18 }) {
+        ForEach(this.myCategorySections, (section: HomeFeedSection, secIndex: number) => {
+          ListItem() {
+            Column({ space: 10 }) {
+              // 分组顶部 Header（页签名称 + 跳转当前分类）
+              Row() {
+                Row()
+                  .width(4)
+                  .height(18)
+                  .borderRadius(2)
+                  .backgroundColor(this.themePrimary)
+                  .margin({ right: 8 })
+
+                Text(section.title)
+                  .fontSize(17)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor($r('app.color.yourtube_text_primary'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .layoutWeight(1)
+
+                if (section.chipIndex !== undefined && section.chipIndex >= 2) {
+                  Row({ space: 4 }) {
+                    Text('更多')
+                      .fontSize(13)
+                      .fontColor($r('app.color.yourtube_text_secondary'))
+                    SymbolGlyph($r('sys.symbol.chevron_right'))
+                      .fontSize(13)
+                      .fontColor([$r('app.color.yourtube_text_secondary')])
+                  }
+                  .padding({ left: 8, right: 4, top: 4, bottom: 4 })
+                  .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+                  .onClick(() => {
+                    if (section.chipIndex !== undefined) {
+                      this.onSelectChip(section.chipIndex);
+                    }
+                  })
+                }
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+              .padding({ left: 4, right: 4, top: 4 })
+
+              // 分组下方视频条目（跟随首页网格/列表布局）
+              if (this.uiConfig.homeLayoutMode === 'grid') {
+                GridRow({
+                  columns: this.gridColumns(),
+                  gutter: { x: 8, y: 8 }
+                }) {
+                  ForEach(section.items, (video: VideoItem, vIndex: number) => {
+                    GridCol({ span: 1 }) {
+                      VideoCardGrid({
+                        video: video,
+                        actionLabel: $r('app.string.yt_action_favorite'),
+                        actionType: 'favorite',
+                        useFavoriteToggle: true
+                      })
+                    }
+                  }, (video: VideoItem, vIndex: number) => `${secIndex}_${vIndex}_${video.videoId || video.id}`)
+                }
+                .width('100%')
+              } else {
+                Column({ space: 4 }) {
+                  ForEach(section.items, (video: VideoItem, vIndex: number) => {
+                    VideoCard({
+                      video: video,
+                      actionLabel: $r('app.string.yt_action_favorite'),
+                      actionType: 'favorite',
+                      useFavoriteToggle: true
+                    })
+                  }, (video: VideoItem, vIndex: number) => `${secIndex}_${vIndex}_${video.videoId || video.id}`)
+                }
+                .width('100%')
+              }
+            }
+            .width('100%')
+          }
+        }, (section: HomeFeedSection, secIndex: number) => `sec_${secIndex}_${section.title}_${section.items.length}`)
+
+        if (this.isMyCategoriesLoading) {
+          ListItem() {
+            Row() {
+              LoadingProgress()
+                .color(this.themePrimary)
+                .width(28)
+                .height(28)
+            }
+            .width('100%')
+            .justifyContent(FlexAlign.Center)
+            .padding({ top: 12, bottom: 12 })
+          }
+        }
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 72 })
+      .clip(true)
+      .edgeEffect(EdgeEffect.Spring)
+      .onWillScroll((yOffset: number) => {
+        this.handleFeedWillScroll(yOffset);
+      })
+      .onReachEnd(() => {
+        this.loadMoreMyCategoriesSections().catch(() => undefined);
+      })
+    }
   }
 
   build() {
@@ -805,65 +1483,80 @@ export struct HomeTabContent {
           }
         })
       } else {
-        Refresh({ refreshing: $$this.isHomeRefreshing }) {
-          Column() {
-          if (this.homeModeNoticeMessage.length > 0) {
-            Text(this.homeModeNoticeMessage)
-              .fontSize(12)
-              .fontColor(this.themePrimary)
-              .margin({ top: 8, left: 16, right: 16 })
+        Column() {
+          if (!this.isShortMode() && this.chips.length > 0) {
+            this.ChipFilterBar()
           }
 
-          MediaVideoFeed({
-            dataSource: this.homeFeedDataSource,
-            gridScroller: this.controller.gridScroller,
-            listScroller: this.controller.listScroller,
-            itemKey: (item: Object) => this.homeListItemKey(item as VideoItem),
-            gridItemBuilder: this.HomeVideoGridCard,
-            itemBuilder: this.HomeVideoListCard,
-            headerBuilder: this.HomeBannerHeader,
-            onReachEnd: () => {
-              this.loadLiveVideos(false);
-              // 短视频维度：往后再翻几页混合 feed，把里面的短视频收进来。
-              if (this.isShortMode()) {
-                this.harvestShortsFromFeed().catch(() => undefined);
+          Refresh({ refreshing: $$this.isHomeRefreshing }) {
+            Column() {
+              if (this.homeModeNoticeMessage.length > 0) {
+                Text(this.homeModeNoticeMessage)
+                  .fontSize(12)
+                  .fontColor(this.themePrimary)
+                  .margin({ top: 4, bottom: 4, left: 16, right: 16 })
               }
-            },
-            params: {
-              layoutPreference: this.uiConfig.homeLayoutMode,
-              gridColumns: this.gridColumns(),
-              // 首页条式恒单列（无宽列分支）
-              listColumns: 1,
-              isLoading: false,
-              // 原网格分支无加载更多 footer，保持不显示
-              isLoadingMore: this.uiConfig.homeLayoutMode === 'grid' ? false : this.isLoadingMore,
-              errorMessage: '',
-              emptyText: '',
-              hasHeader: this.shouldShowHomeRecommendBanner(),
-              headerHorizontalBleed: 12,
-              gridContentPadding: { left: 12, right: 12, bottom: this.safeAreaBottom + 72 },
-              listContentEndOffset: this.safeAreaBottom + 72,
-              // 空列表也保持可滚动（下拉刷新可用）
-              stateScrollable: true,
-              // 上方有 homeModeNoticeMessage 兄弟节点
-              useLayoutWeight: true,
-              // 原首页两个分支均为 clip(false) 且未显式关滚动条
-              clipContent: false,
-              scrollBarOff: false
+
+              if (this.isMyCategoriesSelected()) {
+                this.MyCategoriesSectionedView()
+              } else {
+                MediaVideoFeed({
+                  dataSource: this.homeFeedDataSource,
+                  gridScroller: this.controller.gridScroller,
+                  listScroller: this.controller.listScroller,
+                  itemKey: (item: Object) => this.homeListItemKey(item as VideoItem),
+                  gridItemBuilder: this.HomeVideoGridCard,
+                  itemBuilder: this.HomeVideoListCard,
+                  headerBuilder: this.HomeBannerHeader,
+                  onWillScroll: (yOffset: number) => {
+                    this.handleFeedWillScroll(yOffset);
+                  },
+                  onReachEnd: () => {
+                    this.loadLiveVideos(false);
+                    // 短视频维度：往后再翻几页混合 feed，把里面的短视频收进来。
+                    if (this.isShortMode()) {
+                      this.harvestShortsFromFeed().catch(() => undefined);
+                    }
+                  },
+                  params: {
+                    layoutPreference: this.uiConfig.homeLayoutMode,
+                    gridColumns: this.gridColumns(),
+                    // 首页条式恒单列（无宽列分支）
+                    listColumns: 1,
+                    isLoading: false,
+                    // 原网格分支无加载更多 footer，保持不显示
+                    isLoadingMore: this.uiConfig.homeLayoutMode === 'grid' ? false : this.isLoadingMore,
+                    errorMessage: '',
+                    emptyText: '',
+                    hasHeader: false,
+                    headerHorizontalBleed: 12,
+                    gridContentPadding: { left: 12, right: 12, top: 4, bottom: this.safeAreaBottom + 72 },
+                    listContentEndOffset: this.safeAreaBottom + 72,
+                    // 空列表也保持可滚动（下拉刷新可用）
+                    stateScrollable: true,
+                    // 上方有 homeModeNoticeMessage 兄弟节点
+                    useLayoutWeight: true,
+                    // 严格裁剪顶部边界，防止下滑时视频卡片越界遮挡置顶的 ChipFilterBar
+                    clipContent: true,
+                    scrollBarOff: false
+                  }
+                })
+              }
             }
-          })
+            .width('100%')
+            .height('100%')
           }
           .width('100%')
-          .height('100%')
+          .layoutWeight(1)
+          .pullToRefresh(true)
+          .refreshOffset(64)
+          .onRefreshing(() => {
+            this.refreshHomeFeed();
+          })
         }
         .width('100%')
-        .layoutWeight(1)
+        .height('100%')
         .padding({ top: this.safeAreaTop + 56 })
-        .pullToRefresh(true)
-        .refreshOffset(64)
-        .onRefreshing(() => {
-          this.refreshHomeFeed();
-        })
       }
 
       if (this.isInitialLoading) {

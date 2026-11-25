@@ -28,6 +28,12 @@ export struct CommentReplyPage {
   @Consume('commentPageInfo') pageInfo: NavPathStack;
   @Consume('actionHub') actionHub: ActionHub;
   private scrollerForScroll: Scroller = new Scroller();
+  private requestGeneration: number = 0;
+
+  aboutToDisappear(): void {
+    this.requestGeneration++;
+    this.isLoading = false;
+  }
 
   /** 回复内时间戳点击 → 复用与简介/评论一致的精确 seek 通道。 */
   private seekToCommentTimestamp(seconds: number): void {
@@ -57,6 +63,7 @@ export struct CommentReplyPage {
     if (!continuation || this.isLoading) return;
     
     this.isLoading = true;
+    const generation = ++this.requestGeneration;
     if (reset) {
       this.replies = [];
     }
@@ -66,6 +73,7 @@ export struct CommentReplyPage {
       const context = getContext(this) as common.UIAbilityContext;
       const service = YouTubePlayService.getInstance(context);
       const response: CommentResponse = await service.fetchCommentReplies(continuation);
+      if (generation !== this.requestGeneration) return;
       
       if (reset) {
         this.replies = response.items;
@@ -77,10 +85,11 @@ export struct CommentReplyPage {
       this.errorMessage = '';
       logger.info(`loadReplies complete reset=${reset} loaded=${response.items.length} hasNext=${!!this.nextPageToken}`);
     } catch (e) {
+      if (generation !== this.requestGeneration) return;
       this.errorMessage = $r('app.string.yt_error_load_replies');
       logger.error(`loadReplies failed reset=${reset}`, e as Object);
     } finally {
-      this.isLoading = false;
+      if (generation === this.requestGeneration) this.isLoading = false;
     }
   }
 
@@ -112,7 +121,16 @@ export struct CommentReplyPage {
             .transition(customAnimationUtil.isScaleTran(index, this.uiConfig))
           }, (item: CommentItem) => item.id)
 
-          if (this.nextPageToken) {
+          if (this.errorMessage) {
+            ListItem() {
+              Column({ space: 8 }) {
+                Text(this.errorMessage).fontColor($r('app.color.yourtube_text_secondary'))
+                Button($r('app.string.yt_action_retry'))
+                  .onClick(() => this.loadReplies(this.replies.length === 0,
+                    this.nextPageToken || this.parentComment?.replyContinuation || null))
+              }.width('100%').padding(16)
+            }
+          } else if (this.isLoading) {
             ListItem() {
               Row() {
                 this.LoadingBuilder()
@@ -127,7 +145,7 @@ export struct CommentReplyPage {
         .layoutWeight(1)
         .width('100%')
         .onReachEnd(() => {
-          if (!this.isLoading && this.nextPageToken) {
+          if (!this.isLoading && !this.errorMessage && this.nextPageToken) {
             this.loadReplies(false, this.nextPageToken);
           }
         })

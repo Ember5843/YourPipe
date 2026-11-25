@@ -9,6 +9,7 @@ export { StreamInfo } from './src/main/ets/extractor/StreamInfo';
 export {
   AccountTerminatedException,
   AgeRestrictedContentException,
+  AntiBotException,
   ContentNotAvailableException,
   ContentNotSupportedException,
   ExtractionException,
@@ -18,6 +19,7 @@ export {
   NoPlayableStreamsException,
   PaidContentException,
   PrivateContentException,
+  ReCaptchaChallengeException,
   SignInConfirmNotBotException,
   StreamDeobfuscationException,
   YoutubeMusicPremiumContentException
@@ -32,6 +34,11 @@ export { YoutubeSabrInfo, YoutubeSabrFormatMeta } from './src/main/ets/extractor
 export { YoutubeSabrSession, setSabrNetworkTrafficSink } from './src/main/ets/extractor/sabr/YoutubeSabrSession';
 export { YoutubeSabrStreamState } from './src/main/ets/extractor/sabr/YoutubeSabrStreamState';
 export { SabrMediaSegment, SabrSegmentRequest } from './src/main/ets/extractor/sabr/SabrMediaSegment';
+export {
+  findSelfInitSegmentEnd,
+  SelfInitSegmentSplit,
+  splitSelfInitializingSegment
+} from './src/main/ets/extractor/sabr/SabrSelfInitializingSegment';
 export { SabrInfoReloader } from './src/main/ets/extractor/sabr/SabrInfoReloader';
 export { SabrPoTokenProvider } from './src/main/ets/extractor/sabr/SabrPoTokenProvider';
 export { SabrProtocolException } from './src/main/ets/extractor/sabr/SabrProtocolException';
@@ -70,8 +77,9 @@ export { YTCoreLogger } from './src/main/ets/common/YTCoreLogger';
 // ── network / auth ──
 export { YouTubeHttpClient } from './src/main/ets/network/YouTubeHttpClient';
 export { YOUTUBE_COOKIE_STORAGE_NAME } from './src/main/ets/network/CookieJar';
+export { ChallengeCookies, CHALLENGE_COOKIE_STORAGE_NAME } from './src/main/ets/network/ChallengeCookies';
 export { HttpDownloader } from './src/main/ets/network/HttpDownloader';
-export { HttpProxyOptions, AppHttpProxySnapshot, AppProxyKind } from './src/main/ets/network/HttpProxyOptions';
+export { HttpProxyOptions, AppHttpProxySnapshot, AppProxyKind, AppProxyState, ProxyUnavailableError } from './src/main/ets/network/HttpProxyOptions';
 export { socks5Bridge, Socks5BridgeFailureListener, Socks5BridgePortChangeListener } from './src/main/ets/network/Socks5Bridge';
 export { AuthAccountStatus, AuthStage } from './src/main/ets/auth/AuthModels';
 export { AuthSessionManager, AuthBackupState, AUTH_STORAGE_NAME } from './src/main/ets/auth/AuthSessionManager';

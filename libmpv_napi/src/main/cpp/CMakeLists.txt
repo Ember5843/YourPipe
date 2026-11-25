@@ -57,16 +57,27 @@ add_library(mpv_napi MODULE
     media_info_napi.cpp
     mux_napi.cpp
     hwdec_probe.cpp
+    stream/native_http_transport.cpp
+    stream/load_control.cpp
+    stream/direct_range_stream.cpp
+    stream/hls_live_stream.cpp
+    stream/mpv_stream_bridge.cpp
 )
 
 target_include_directories(mpv_napi PRIVATE "${MPV_SDK_ROOT}/include")
 target_include_directories(mpv_napi PRIVATE "${FFMPEG_SDK_ROOT}/include")
+
+# RemoteCommunicationKit (librcp_c.so) lives in the HMS native sysroot.
+if(DEFINED HMOS_SDK_NATIVE)
+    target_link_directories(mpv_napi PRIVATE "${HMOS_SDK_NATIVE}/sysroot/usr/lib/aarch64-linux-ohos")
+endif()
 
 target_link_libraries(mpv_napi
     ace_napi.z
     ace_ndk.z
     hilog_ndk.z
     ohfileuri
+    rcp_c
     # FFmpeg's aarch64 NEON asm addresses global data with ADRP+ADD (non-PIC).
     # In a shared lib those globals are preemptible by default, so the linker
     # rejects the relocations. -Bsymbolic binds references to symbols defined in

@@ -3845,7 +3845,8 @@
         {
             "name": "yt_translation_region",
             "value": "المنطقة"
-        },
+        }
+,
         {
             "name": "yt_exp_title",
             "value": "ميزات تجريبية"
@@ -4145,6 +4146,10 @@
         {
             "name": "yt_update_later",
             "value": "لاحقًا"
-        }
+        },
+        {"name": "yt_cookie_verify_success", "value": "تم التحقق من ملف تعريف الارتباط."},
+        {"name": "yt_local_import_partial", "value": "تم استيراد %1$d ملف؛ فشل %2$d."},
+        {"name": "yt_recovery_failed", "value": "تعذر إكمال العملية. يرجى المحاولة مجددًا."},
+        {"name": "yt_proxy_applying", "value": "جارٍ تطبيق الوكيل…"}
     ]
 }

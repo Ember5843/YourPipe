@@ -1,6 +1,7 @@
 import { connection } from '@kit.NetworkKit';
 import { LocalMediaProxy, sabrSessionStore } from 'mediaservice';
 import { AppLog } from './AppLog';
+import { PlayerSession } from './PlayerSession';
 
 const logger = AppLog.getInstance('NetworkHandover');
 
@@ -102,6 +103,7 @@ export class NetworkHandoverService {
     try {
       const abortedFetches = LocalMediaProxy.abortAllUpstreamFetches(reason);
       const abortedPosts = sabrSessionStore.abortAllInFlightPosts(reason);
+      PlayerSession.getInstance().controller.notifyNetworkChanged();
       logger.info(`network handover (${reason}): invalidated upstreamFetches=${abortedFetches} sabrPosts=${abortedPosts}`);
     } catch (e) {
       logger.error(`handover invalidation failed (${reason}): ${JSON.stringify(e)}`);

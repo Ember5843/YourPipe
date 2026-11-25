@@ -1,11 +1,11 @@
 import { MpvPlayerController, MediaStatus, PlaybackState as NativePlaybackState,
-  setHttpProxyEnv } from '@yourpipe/libmpv-napi';
-import type { MediaInfo } from '@yourpipe/libmpv-napi';
+  setHttpProxyEnv, updateStreamProxy, abortAllStreams, getStreamMetrics } from '@yourpipe/libmpv-napi';
+import type { MediaInfo, NativeStreamProxyConfig } from '@yourpipe/libmpv-napi';
 import { PlaybackEngine, PlaybackEngineState, PlaybackState, PlaybackErrorCategory, PlaybackStats,
   EngineConfig } from './PlaybackEngine';
 import Logger from '../utils/Logger';
 import { VideoHwCaps } from './VideoHwCaps';
-import { HttpProxyOptions } from 'youtube_core';
+import { AppHttpProxySnapshot, HttpProxyOptions } from 'youtube_core';
 
 const TAG: string = '[PlayerLog][MpvPlaybackEngine]';
 
@@ -72,6 +72,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   // 保存配置供 load() 方法使用
   private engineConfig: EngineConfig = {};
+  /** Target video bitrate hint (bps) for dynamic demuxer buffer sizing. */
+  private targetVideoBitrateBps: number = 0;
   /** 上次日志里的 hwdec-current，避免状态轮询刷屏 */
   private lastLoggedHwdec: string = '';
   /** Mirror of vid on/off for background audio-only only (never used on load/seek). */
@@ -147,7 +149,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
       ctrl.setProperty('demuxer-readahead-secs', `${demuxerReadaheadSecs}`);
       ctrl.setProperty('demuxer-max-bytes', `${demuxerMaxBytesMb * 1024 * 1024}`);
-      Logger.info(TAG, `Demuxer readahead=${demuxerReadaheadSecs}s max-bytes=${demuxerMaxBytesMb}MiB`);
+      ctrl.setProperty('demuxer-max-back-bytes', `${8 * 1024 * 1024}`);
+      Logger.info(TAG, `Demuxer readahead=${demuxerReadaheadSecs}s max-bytes=${demuxerMaxBytesMb}MiB max-back=8MiB`);
 
       ctrl.setProperty('hr-seek', 'yes');
       ctrl.setProperty('hr-seek-framedrop', 'yes');
@@ -203,11 +206,16 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   }
 
   detachSurface(): void {
-    // The native wrapper has no detach API. Stop the media first, then forget the
-    // old XComponent so a later page cannot accidentally bind a destroyed surface.
+    // Clear both ArkTS and native ctx.surfaceId so the next load() enters
+    // pendingLoad and waits for the new page's XComponent.onLoad instead of
+    // firing loadfile onto a destroyed previous/PiP surface.
     this.surfaceId = '';
     this.surfaceWidthPx = 0;
     this.surfaceHeightPx = 0;
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl !== null && !this.destroyed) {
+      ctrl.setVideoSurfaceId('');
+    }
   }
 
   resizeSurface(widthPx: number, heightPx: number): void {
@@ -232,9 +240,35 @@ export class MpvPlaybackEngine implements PlaybackEngine {
    * proxy URL); the native side also pins 127.0.0.1,localhost into no_proxy so
    * the LocalProxyServer path is never affected.
    */
-  private applyNetworkProxy(url: string): void {
+  private syncNativeStreamProxy(snap: AppHttpProxySnapshot): void {
+    const exclusions: string[] = [];
+    for (let i = 0; i < snap.exclusionList.length; i++) {
+      const item = snap.exclusionList[i];
+      if (item) {
+        exclusions.push(item);
+      }
+    }
+    const cfg: NativeStreamProxyConfig = {
+      kind: snap.kind || 'none',
+      host: snap.host || '',
+      port: snap.port || 0,
+      username: snap.username || '',
+      password: snap.password || '',
+      bridgePort: snap.socks5LocalPort ?? 0,
+      exclusions,
+      revision: snap.revision ?? 0,
+    };
+    updateStreamProxy(cfg);
+  }
+
+  private applyNetworkProxy(url: string): boolean {
     try {
       const snap = HttpProxyOptions.getSnapshot();
+      this.syncNativeStreamProxy(snap);
+      const isCustomStream = url.startsWith('ypstream://') || url.includes('ypstream://');
+      if (!isCustomStream) {
+        HttpProxyOptions.assertAvailable(url, snap, true);
+      }
       let proxyUrl = '';
       if (HttpProxyOptions.isActive(snap) && !HttpProxyOptions.shouldBypass(url, snap)) {
         if (snap.kind === 'http') {
@@ -254,9 +288,20 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         // 凭据绝不落日志：只记 kind / 上游 host:port / 是否带认证。
         Logger.info(TAG, `http_proxy env on kind=${snap.kind} target=${snap.host.trim()}:${snap.port} auth=${snap.username.length > 0}`);
       }
+      return true;
     } catch (e) {
       Logger.warn(TAG, `applyNetworkProxy failed: ${e instanceof Error ? e.message : String(e)}`);
+      return false;
     }
+  }
+
+  public notifyNetworkChanged(): void {
+    try {
+      this.syncNativeStreamProxy(HttpProxyOptions.getSnapshot());
+    } catch (_e) {
+      // Ignore proxy snapshot failure during handover; still abort stale sockets.
+    }
+    abortAllStreams();
   }
 
   /**
@@ -271,7 +316,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (this.destroyed || this.sourceUrl.length === 0) {
       return;
     }
-    this.applyNetworkProxy(this.sourceUrl);
+    if (!this.applyNetworkProxy(this.sourceUrl)) this.controller?.pause();
   }
 
   load(source: string, startPos: number, audioUrl: string = ''): boolean {
@@ -311,18 +356,52 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // HLS (live or DVR replay): reconnect_at_eof 会让 FFmpeg 在每个 segment EOF 时死循环重连
     // 同一 URL，而非让 HLS demuxer 正常切换到下一个 segment。HLS 流必须禁用。
     const isHls = this.looksHls(this.sourceUrl);
+    const isCustomStream = this.sourceUrl.startsWith('ypstream://') || this.sourceUrl.includes('ypstream://');
     const isLocalDash = this.sourceUrl.startsWith('http://127.0.0.1:')
       && this.sourceUrl.indexOf('/manifest.mpd') >= 0;
-    if (isLocalDash) {
+    // Dynamic demuxer buffer caps by selected video bitrate so high-bitrate
+    // 2K/4K60 streams retain 8-10s forward buffer without bloating back-buffer.
+    // Note: engineConfig.mpvDemuxerMaxBytes is configured in MiB (e.g. 20 = 20 MiB).
+    const rawCfg = this.engineConfig.mpvDemuxerMaxBytes ?? 32;
+    const cfgBytes = (Number.isFinite(rawCfg) && rawCfg > 0 && rawCfg < 4096)
+      ? Math.floor(rawCfg) * 1024 * 1024
+      : (Number.isFinite(rawCfg) && rawCfg >= 4096 ? Math.floor(rawCfg) : 32 * 1024 * 1024);
+    const baseMaxBytes = Math.max(32 * 1024 * 1024, cfgBytes);
+    let forwardMaxBytes = baseMaxBytes;
+    let backMaxBytes = 8 * 1024 * 1024;
+    if (this.targetVideoBitrateBps > 32_000_000) {
+      forwardMaxBytes = Math.max(baseMaxBytes, 96 * 1024 * 1024);
+      backMaxBytes = 12 * 1024 * 1024;
+    } else if (this.targetVideoBitrateBps > 12_000_000) {
+      forwardMaxBytes = Math.max(baseMaxBytes, 64 * 1024 * 1024);
+      backMaxBytes = 8 * 1024 * 1024;
+    }
+    ctrl.setProperty('demuxer-max-bytes', `${forwardMaxBytes}`);
+    ctrl.setProperty('demuxer-max-back-bytes', `${backMaxBytes}`);
+    Logger.info(TAG, `buffer budget: bitrate=${this.targetVideoBitrateBps}bps maxBytes=${Math.round(forwardMaxBytes / 1048576)}MiB backBytes=${Math.round(backMaxBytes / 1048576)}MiB`);
+
+    if (isCustomStream) {
+      // Native ypstream:// handles chunked retry, live HLS concurrent prefetch, & handover via librcp_c.
+      ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=0,reconnect_streamed=0');
+      ctrl.setProperty('stream-lavf-o', '');
+      const baseReadahead = this.engineConfig.mpvDemuxerReadaheadSecs ?? 8;
+      const baseCache = this.engineConfig.mpvCacheSecs ?? 10;
+      const readaheadSecs = this.isLive ? Math.max(12, baseReadahead) : baseReadahead;
+      const cacheSecs = this.isLive ? Math.max(14, baseCache) : baseCache;
+      ctrl.setProperty('demuxer-readahead-secs', `${readaheadSecs}`);
+      ctrl.setProperty('cache-secs', `${cacheSecs}`);
+    } else if (isLocalDash) {
       // A static MPD and each DASH fragment are finite resources. Their EOF is the normal
       // resource boundary; reconnect_at_eof loops on the MPD forever before opening init/media.
       ctrl.setProperty('demuxer-lavf-o',
         'reconnect_at_eof=0,reconnect_streamed=0,reconnect_delay_max=3');
+      ctrl.setProperty('stream-lavf-o', '');
       ctrl.setProperty('demuxer-readahead-secs', `${this.engineConfig.mpvDemuxerReadaheadSecs ?? 8}`);
       ctrl.setProperty('cache-secs', `${this.engineConfig.mpvCacheSecs ?? 10}`);
       Logger.info(TAG, 'Local DASH: EOF reconnect disabled');
     } else if (isHls) {
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_delay_max=3');
+      ctrl.setProperty('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=3');
       // HLS 需要更大的缓冲，使用用户配置的 2-3 倍
       const hlsReadaheadMultiplier = 3;
       const hlsCacheMultiplier = 2;
@@ -332,6 +411,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setProperty('cache-secs', `${baseCache * hlsCacheMultiplier}`);
     } else {
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
+      ctrl.setProperty('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5');
       ctrl.setProperty('demuxer-readahead-secs', `${this.engineConfig.mpvDemuxerReadaheadSecs ?? 8}`);
       ctrl.setProperty('cache-secs', `${this.engineConfig.mpvCacheSecs ?? 10}`);
     }
@@ -341,7 +421,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     // no_proxy pin, so this never affects the LocalProxyServer path. Called
     // before setMedia so every direct open (incl. later sub-add fetches, which
     // share the process env) sees the proxy.
-    this.applyNetworkProxy(this.sourceUrl);
+    if (!this.applyNetworkProxy(this.sourceUrl)) return false;
 
     // External audio track for split HLS (live/post-live): the audio rendition
     // playlist rides mpv audio-files, which mpv opens as part of the load, so
@@ -519,6 +599,10 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     }
   }
 
+  setTargetVideoBitrate(bitrateBps: number): void {
+    this.targetVideoBitrateBps = Number.isFinite(bitrateBps) && bitrateBps > 0 ? Math.floor(bitrateBps) : 0;
+  }
+
   getState(): PlaybackState {
     return this.buildState();
   }
@@ -534,8 +618,12 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (ctrl === null || this.destroyed) {
       return empty;
     }
+    const isCustomStream = this.sourceUrl.includes('ypstream://');
+    const mpvSpeed = this.parseStatsNumber(ctrl.getProperty('cache-speed'));
+    const nativeSpeed = isCustomStream ? getStreamMetrics().networkSpeedBps : 0;
     return {
-      cacheSpeedBps: this.parseStatsNumber(ctrl.getProperty('cache-speed')),
+      cacheSpeedBps: isCustomStream ? nativeSpeed : mpvSpeed,
+      networkSpeedBps: isCustomStream ? nativeSpeed : undefined,
       demuxerCacheDurationSec: this.parseStatsNumber(ctrl.getProperty('demuxer-cache-duration')),
       droppedFrames: this.parseStatsNumber(ctrl.getProperty('dropped-frame-count')),
       decoderDroppedFrames: this.parseStatsNumber(ctrl.getProperty('decoder-dropped-frame-count'))
@@ -543,10 +631,11 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   }
 
   isDirectNetworkSource(): boolean {
-    // Loopback proxy sessions (single/dual/SABR: http://127.0.0.1:..., legacy
-    // EDL: edl://) are fed by the local proxy; everything else (live HLS
-    // manifests) is fetched by FFmpeg directly from the network.
+    // Loopback proxy sessions (http://127.0.0.1:..., SABR) are metered by
+    // proxyTrafficMeter; native ypstream:// and direct remote HLS are metered
+    // by the engine's own stats.
     if (this.sourceUrl.length === 0) return false;
+    if (this.sourceUrl.includes('ypstream://')) return true;
     return !this.sourceUrl.startsWith('http://127.0.0.1:')
       && !this.sourceUrl.startsWith('edl://');
   }
@@ -588,8 +677,12 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private seekInternal(targetMs: number, keyframe: boolean): void {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed || this.isLive) return;
-    ctrl.seek(targetMs);
-    Logger.debug(TAG, `seek: target=${(targetMs / 1000).toFixed(2)}s keyframe=${keyframe}`);
+    // MPV's edl:// (!delay_open) timeline demuxer triggers premature audio/video
+    // filter EOF when sought with absolute+keyframes (flags=0, without SEEK_HR).
+    // Always use absolute+exact on EDL dual-track sources.
+    const effectiveKeyframe = keyframe && !this.sourceUrl.startsWith('edl://');
+    ctrl.seek(targetMs, effectiveKeyframe);
+    Logger.debug(TAG, `seek: target=${(targetMs / 1000).toFixed(2)}s keyframe=${effectiveKeyframe}`);
     this.emitCurrentState();
   }
 
@@ -951,24 +1044,31 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   private looksLive(url: string): boolean {
     const lower: string = url.toLowerCase();
+    // Native C++20 HlsLiveStream uses the yp_h_ stream prefix.
+    if (lower.startsWith('ypstream://yp_h_')) {
+      return true;
+    }
     if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
       return false;
     }
-    // 显式点播标记（VOD / DVR / CLEAN 都是可 seek 的录播）
+    // 显式非直播点播/clean 存档标记
     if (lower.includes('playlist_type/vod') || lower.includes('playlist_type=vod') ||
-        lower.includes('playlist_type/dvr') || lower.includes('playlist_type=dvr') ||
         lower.includes('playlist_type/clean') || lower.includes('playlist_type=clean')) {
       return false;
     }
-    // 显式直播标记
+    // 正在进行的直播即使带 DVR 回看窗口（playlist_type/dvr），仍带 yt_live_broadcast 或 live 标记
     if (lower.includes('playlist_type/live') || lower.includes('playlist_type=live') ||
-        lower.includes('yt_live_broadcast')) {
+        lower.includes('yt_live_broadcast') || lower.includes('/live/1')) {
       return true;
     }
     // 兜底：YouTube live manifest 路径形如 /api/manifest/hls_variant/.../live/1/...
     // 注意：用 '/live/' 而非裸 'live'，避免误命中 'keepalive' 等子串
     if (lower.includes('/manifest/') && lower.includes('/live/')) {
       return true;
+    }
+    // 仅有 DVR 标记（已结束直播回看等无实时直播标识）才视为可 seek 录播
+    if (lower.includes('playlist_type/dvr') || lower.includes('playlist_type=dvr')) {
+      return false;
     }
     return false;
   }
@@ -979,7 +1079,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       return false;
     }
     return lower.includes('.m3u8') || lower.includes('/hls_playlist/') ||
-      lower.includes('application/vnd.apple.mpegurl');
+      lower.includes('/hls_variant/') || lower.includes('application/vnd.apple.mpegurl');
   }
 
   private resetLocalState(clearSurface: boolean): void {

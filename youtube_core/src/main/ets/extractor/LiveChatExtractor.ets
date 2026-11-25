@@ -21,6 +21,8 @@ export interface LiveChatMessage {
   isMember: boolean;
   isOwner: boolean;
   isModerator: boolean;
+  /** 鍥炴斁娑堟伅鐩稿瑙嗛璧风偣鐨勫亸绉伙紙ms锛夛紱瀹炴椂鐩存挱涓?-1銆?*/
+  videoOffsetMs: number;
 }
 
 /** 一页直播聊天 + 下一次轮询的 continuation。 */
@@ -63,7 +65,7 @@ export class LiveChatExtractor {
   }
 
   /** 首访：没有直播聊天（点播 / 聊天关闭）时 available=false。 */
-  async fetchInitial(videoId: string): Promise<LiveChatPage> {
+  async fetchInitial(videoId: string, playerOffsetMs: number = -1): Promise<LiveChatPage> {
     try {
       const next = await this.backend.getInnerTubeNextResponse(videoId);
       const continuation = LiveChatExtractor.findInitialContinuation(next);
@@ -71,7 +73,7 @@ export class LiveChatExtractor {
         logger.info(`[LiveChat] no live chat continuation video=${videoId}`);
         return LiveChatExtractor.emptyPage(false, false);
       }
-      const page = await this.fetchPage(continuation, -1);
+      const page = await this.fetchPage(continuation, playerOffsetMs);
       page.available = true;
       return page;
     } catch (e) {
@@ -103,11 +105,12 @@ export class LiveChatExtractor {
     const actions = chat['actions'] as Array<Object>;
     if (actions && actions.length > 0) {
       for (let i = 0; i < actions.length; i++) {
-        const item = LiveChatExtractor.chatItemOf(actions[i] as Record<string, Object>);
+        const rawAction = actions[i] as Record<string, Object>;
+        const item = LiveChatExtractor.chatItemOf(rawAction);
         if (!item) {
           continue;
         }
-        const message = LiveChatExtractor.parseItem(item);
+        const message = LiveChatExtractor.parseItem(item, LiveChatExtractor.replayOffsetOf(rawAction));
         if (message) {
           messages.push(message);
         }
@@ -120,7 +123,7 @@ export class LiveChatExtractor {
     if (continuations && continuations.length > 0) {
       const first = continuations[0] as Record<string, Object>;
       const data = (first['timedContinuationData'] || first['invalidationContinuationData']
-        || first['reloadContinuationData']) as Record<string, Object>;
+        || first['reloadContinuationData'] || first['liveChatReplayContinuationData']) as Record<string, Object>;
       if (data) {
         nextContinuation = (data['continuation'] as string) || '';
         const rawTimeout = data['timeoutMs'];
@@ -163,7 +166,17 @@ export class LiveChatExtractor {
     return banner || null;
   }
 
-  private static parseItem(item: Record<string, Object>): LiveChatMessage | null {
+  private static replayOffsetOf(action: Record<string, Object>): number {
+    const replay = action['replayChatItemAction'] as Record<string, Object>;
+    if (!replay) {
+      return -1;
+    }
+    const raw = replay['videoOffsetTimeMsec'];
+    const parsed = typeof raw === 'number' ? raw as number : Number(raw as string);
+    return Number.isFinite(parsed) ? parsed : -1;
+  }
+
+  private static parseItem(item: Record<string, Object>, videoOffsetMs: number): LiveChatMessage | null {
     const textRenderer = item['liveChatTextMessageRenderer'] as Record<string, Object>;
     const paidRenderer = item['liveChatPaidMessageRenderer'] as Record<string, Object>;
     const memberRenderer = item['liveChatMembershipItemRenderer'] as Record<string, Object>;
@@ -212,7 +225,8 @@ export class LiveChatExtractor {
       amountText,
       isMember: isMember || !!memberRenderer,
       isOwner,
-      isModerator
+      isModerator,
+      videoOffsetMs
     };
   }
 

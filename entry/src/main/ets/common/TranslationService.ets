@@ -89,6 +89,11 @@ interface MyMemoryResponse {
  * 缓存 key 包含接口与端点，切换接口不会误用旧译文。
  */
 export class TranslationService {
+  private static revision: number = 0;
+
+  static contextKey(): string {
+    return `${TranslationService.revision}|${TranslationService.targetLanguage()}`;
+  }
   private static cache: Map<string, string> = new Map();
   private static readonly MAX_CACHE_ENTRIES: number = 500;
 
@@ -142,7 +147,9 @@ export class TranslationService {
   }
 
   static clearCache(): void {
+    TranslationService.revision++;
     TranslationService.cache.clear();
+    AppStorage.setOrCreate('translationContextRevision', TranslationService.revision);
   }
 
   static async translate(text: string): Promise<string> {
@@ -152,15 +159,16 @@ export class TranslationService {
       return hit;
     }
     const target = TranslationService.targetLanguage();
-    const cfg = LlmTranslateConfig.get();
+    const cfg = LlmTranslateConfig.get().snapshot();
     const startedAt = Date.now();
+    const context = TranslationService.contextKey();
     logger.info(`translate start engine=${cfg.engine} tl=${target} len=${text.length}`);
     try {
       const translated = await TranslationService.dispatch(text, target, cfg);
       if (!translated || translated.trim().length === 0) {
         throw new Error('empty translation result');
       }
-      TranslationService.putCache(key, translated);
+      if (context === TranslationService.contextKey()) TranslationService.putCache(key, translated);
       logger.info(`translate done engine=${cfg.engine} tl=${target} len=${text.length} `
         + `elapsed=${Date.now() - startedAt}ms`);
       return translated;
@@ -786,7 +794,7 @@ export class TranslationService {
 
   private static keyOf(text: string): string {
     const cfg = LlmTranslateConfig.get();
-    return `${cfg.engine}|${cfg.endpoint}|${cfg.baseUrl}|${cfg.model}|${cfg.customUrl}|`
+    return `${TranslationService.contextKey()}|${cfg.engine}|${cfg.endpoint}|${cfg.baseUrl}|${cfg.model}|${cfg.customUrl}|`
       + `${TranslationService.targetLanguage()}:${text}`;
   }
 

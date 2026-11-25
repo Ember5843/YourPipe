@@ -18,4 +18,10 @@ export interface SabrPoTokenProvider {
    * re-probed visitorData. Returns true when the invalidation took effect.
    */
   invalidatePoTokenIdentity?(info: YoutubeSabrInfo): Promise<boolean>;
+
+  /**
+   * Invalidate only the minter generation that produced the rejected [token]
+   * (PipePipe SabrAttestationRetryHandler tokenGeneration isolation).
+   */
+  invalidateRejectedToken?(token: Uint8Array, videoId: string): boolean;
 }

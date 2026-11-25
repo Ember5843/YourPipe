@@ -56,6 +56,9 @@ export class PiPManager {
   private pendingRestoreComponentController: XComponentController | null = null;
   private restoreWatchdogTimerId: number = -1;
   private restoreStopped: boolean = false;
+  /** Session ID that created the current PiPController; late events from older sessions are ignored. */
+  private ownerSessionId: number = 0;
+  private lastDestroyStopPromise: Promise<void> | null = null;
   private playbackStateListener = (state: PlaybackState): void => {
     this.hasPlaybackState = true;
     this.lastIsPlaying = state.isPlaying;
@@ -74,7 +77,9 @@ export class PiPManager {
   private pendingInitH: number = 0;
 
   private constructor() {
-    PlayerSession.getInstance().onStopPiP = () => this.stopPiP();
+    const session = PlayerSession.getInstance();
+    session.onStopPiP = () => this.stopPiP();
+    session.onUpdatePiPContentSize = (w: number, h: number) => this.updateContentSize(w, h);
   }
 
   static getInstance(): PiPManager {
@@ -162,6 +167,7 @@ export class PiPManager {
     }
 
     this.isCreatingController = true;
+    const creatingSessionId = PlayerSession.getInstance().sessionId;
     try {
       const safeW = videoWidth > 0 ? videoWidth : 16;
       const safeH = videoHeight > 0 ? videoHeight : 9;
@@ -173,13 +179,20 @@ export class PiPManager {
         contentWidth: safeW,
         contentHeight: safeH,
       };
-      this.pipController = await PiPWindow.create(config);
+      const created = await PiPWindow.create(config);
+      if (creatingSessionId !== PlayerSession.getInstance().sessionId) {
+        logger.info(`${TAG} init discarded: session changed (${creatingSessionId} -> ${PlayerSession.getInstance().sessionId})`);
+        created.stopPiP().catch(() => {});
+        return false;
+      }
+      this.pipController = created;
+      this.ownerSessionId = creatingSessionId;
       this.boundComponentController = this.componentController;
-      this.registerCallbacks();
+      this.registerCallbacks(creatingSessionId);
       this.pipController.setAutoStartEnabled(this.desiredAutoStart);
       this.isInitialized = true;
       this.applyPlaybackStateToPiP();
-      logger.info(`${TAG} init success, pipController created`);
+      logger.info(`${TAG} init success, pipController created session=${creatingSessionId}`);
       return true;
     } catch (e) {
       logger.error(`${TAG} init failed: ${e}`);
@@ -189,15 +202,15 @@ export class PiPManager {
     }
   }
 
-  private registerCallbacks(): void {
+  private registerCallbacks(boundSessionId: number): void {
     if (!this.pipController) {
       return;
     }
     this.pipController.on('stateChange', (state: PiPWindow.PiPState, reason: string) => {
-      this.onStateChange(state, reason);
+      this.onStateChange(state, reason, boundSessionId);
     });
     this.pipController.on('controlEvent', (param: PiPWindow.ControlEventParam) => {
-      this.onControlEvent(param);
+      this.onControlEvent(param, boundSessionId);
     });
   }
 
@@ -217,9 +230,13 @@ export class PiPManager {
     }
   }
 
-  private onStateChange(state: PiPWindow.PiPState, reason: string): void {
-    logger.info(`${TAG} onStateChange state=${state} reason=${reason}`);
+  private onStateChange(state: PiPWindow.PiPState, reason: string, boundSessionId: number): void {
+    logger.info(`${TAG} onStateChange state=${state} reason=${reason} session=${boundSessionId}`);
     const session = PlayerSession.getInstance();
+    if (boundSessionId > 0 && boundSessionId !== session.sessionId) {
+      logger.info(`${TAG} ignoring stale PiP stateChange state=${state} oldSession=${boundSessionId} currentSession=${session.sessionId}`);
+      return;
+    }
     switch (state) {
       case PiPWindow.PiPState.ABOUT_TO_START:
         // 即将进入 PiP：系统正在把主页 XComponent 的 surface 接管到悬浮窗，
@@ -376,9 +393,13 @@ export class PiPManager {
     }
   }
 
-  private onControlEvent(param: PiPWindow.ControlEventParam): void {
-    logger.info(`${TAG} onControlEvent controlType=${param.controlType} status=${param.status}`);
+  private onControlEvent(param: PiPWindow.ControlEventParam, boundSessionId: number): void {
+    logger.info(`${TAG} onControlEvent controlType=${param.controlType} status=${param.status} session=${boundSessionId}`);
     const session = PlayerSession.getInstance();
+    if (boundSessionId > 0 && boundSessionId !== session.sessionId) {
+      logger.info(`${TAG} ignoring stale PiP controlEvent oldSession=${boundSessionId} currentSession=${session.sessionId}`);
+      return;
+    }
     const controller = session.controller;
     switch (param.controlType) {
       case PiPWindow.PiPControlType.VIDEO_PLAY_PAUSE: {
@@ -551,6 +572,7 @@ export class PiPManager {
     // 先关闭系统 PiP 窗口再置空控制器：否则 PiP 激活时点新视频走 destroy，
     // app 侧控制器没了但系统悬浮窗还在，成为孤儿窗口导致状态错乱。
     const ctrl = this.pipController;
+    this.lastDestroyStopPromise = null;
     if (ctrl) {
       // Scope suppression to this controller instance: it covers a STOPPED that was
       // already queued before unregisterCallbacks() below takes effect, and it is
@@ -558,13 +580,19 @@ export class PiPManager {
       // controller generation (a stale flag previously swallowed a legitimate
       // restore STOPPED and permanently broke the PiP surface rebind).
       this.suppressStopFor = ctrl;
-      ctrl.stopPiP().catch((e: Error) => {
+      const stopTask: Promise<void> = ctrl.stopPiP().then(() => {
+        logger.info(`${TAG} stopPiP during destroy completed`);
+      }).catch((e: Error) => {
         logger.warn(`${TAG} stopPiP during destroy failed: ${e.message}`);
       }).finally(() => {
         if (this.suppressStopFor === ctrl) {
           this.suppressStopFor = null;
         }
+        if (this.lastDestroyStopPromise === stopTask) {
+          this.lastDestroyStopPromise = null;
+        }
       });
+      this.lastDestroyStopPromise = stopTask;
       // Safety net: if the stopPiP() promise never settles (system hang), the
       // suppression must still expire — a stuck flag would swallow the next
       // controller's legitimate STOPPED and recreate the dangling-player bug.
@@ -577,6 +605,7 @@ export class PiPManager {
     }
     this.unregisterCallbacks();
     this.pipController = null;
+    this.ownerSessionId = 0;
     this.boundComponentController = null;
     this.isInitialized = false;
     this.restoreStopped = false;
@@ -591,6 +620,36 @@ export class PiPManager {
     this.pendingInitCtx = null;
     this.pendingRestoreComponentController = null;
     this.clearRestoreWatchdog();
+  }
+
+  /**
+   * Orderly PiP teardown before starting a brand-new playback session:
+   * destroys controller bookkeeping immediately and waits briefly for system
+   * stopPiP() to settle so WMS finishes releasing the old PiP surface cleanly.
+   */
+  async destroyAndAwaitStop(timeoutMs: number = 250): Promise<void> {
+    const hadPiP = this.pipController !== null || PlayerSession.getInstance().isPiPActive;
+    this.destroy(true);
+    const stopTask = this.lastDestroyStopPromise;
+    if (!hadPiP || !stopTask) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      }, timeoutMs);
+      stopTask.finally(() => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
   }
 
   /**

@@ -8,6 +8,7 @@
 #include <filemanagement/file_uri/oh_file_uri.h>
 #include <hilog/log.h>
 #include <mpv/client.h>
+#include <mpv/stream_cb.h>
 #include <napi/native_api.h>
 #include <native_window/external_window.h>
 
@@ -15,6 +16,7 @@
 #include "hwdec_probe.h"
 #include "media_info_napi.h"
 #include "mux_napi.h"
+#include "stream/mpv_stream_bridge.h"
 
 // FFmpeg (n8.0) for direct libav* use — e.g. muxing an audio + video file into
 // one output. These are C headers, so they need C linkage from C++.
@@ -39,6 +41,8 @@ extern "C" {
 #include <string>
 #include <thread>
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 using namespace std;
@@ -83,6 +87,7 @@ struct MpvApi {
     int (*observe_property)(mpv_handle*, uint64_t, const char*, mpv_format) = nullptr;
     mpv_event* (*wait_event)(mpv_handle*, double) = nullptr;
     void (*wakeup)(mpv_handle*) = nullptr;
+    int (*stream_cb_add_ro)(mpv_handle*, const char*, void*, mpv_stream_cb_open_ro_fn) = nullptr;
 };
 
 MpvApi& Mpv()
@@ -139,6 +144,12 @@ bool LoadMpv()
     ok = LoadSymbol(api.library, api.observe_property, "mpv_observe_property") && ok;
     ok = LoadSymbol(api.library, api.wait_event, "mpv_wait_event") && ok;
     ok = LoadSymbol(api.library, api.wakeup, "mpv_wakeup") && ok;
+    // Optional stream_cb symbol for ypstream:// custom protocol support.
+    api.stream_cb_add_ro = reinterpret_cast<int (*)(mpv_handle*, const char*, void*, mpv_stream_cb_open_ro_fn)>(
+        dlsym(api.library, "mpv_stream_cb_add_ro"));
+    if (!api.stream_cb_add_ro) {
+        OH_LOG_Print(LOG_APP, LOG_WARN, 0xFF00, "mpv", "dlsym mpv_stream_cb_add_ro unavailable");
+    }
 
     api.available = ok;
     if (!ok) {
@@ -179,8 +190,15 @@ struct PlayerContext {
     int32_t surfaceWidth = 0;
     int32_t surfaceHeight = 0;
     napi_threadsafe_function tsfn = nullptr;
+    atomic_bool released {false};
     /** Native-side throttle for time-pos events (type 1); 0 = push immediately. */
     atomic_int64_t lastTimePosPushMs {0};
+    /** Properties set before mpv_initialize (e.g. while waiting for surface); applied on EnsureMpv(). */
+    mutex pendingPropsMutex;
+    vector<pair<string, string>> pendingProperties;
+    /** Observed string/stats property snapshot updated asynchronously by eventThread. */
+    mutex cachedPropsMutex;
+    unordered_map<string, string> cachedProps;
 };
 
 mutex gMutex;
@@ -299,6 +317,17 @@ void ResetObservedPlaybackState(PlayerContext& ctx)
         const scoped_lock lock(ctx.cacheRangesMutex);
         ctx.seekableRangesJson = "[]";
     }
+    {
+        const scoped_lock lock(ctx.cachedPropsMutex);
+        static const unordered_set<string> kPersistentProps = {"volume", "speed", "loop-file"};
+        for (auto it = ctx.cachedProps.begin(); it != ctx.cachedProps.end();) {
+            if (kPersistentProps.find(it->first) == kPersistentProps.end()) {
+                it = ctx.cachedProps.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
     // Do not reset ctx.paused here. "pause" is an observed MPV property and
     // START_FILE does not necessarily change it, so MPV may emit no follow-up
     // property event. Retaining the last observed value keeps MPV authoritative.
@@ -414,13 +443,44 @@ void UpdateStatusFromObservedProperties(PlayerContext& ctx)
     ctx.mediaStatus.store(status);
 }
 
-void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property)
+constexpr uint64_t kInfoPropReplyBase = 1000;
+
+bool IsCachedInfoProp(const string& name)
 {
-    if (!property || !property->name || !property->data) {
+    static const unordered_set<string> kInfoProps = {
+        "video-codec", "video-format", "width", "height", "container-fps", "video-bitrate",
+        "video-params/pixelformat", "video-params/colormatrix", "video-params/primaries",
+        "video-params/gamma", "video-params/rotate", "hwdec-current", "vid",
+        "audio-codec-name", "audio-codec", "audio-bitrate", "audio-params/channel-count",
+        "audio-params/samplerate", "audio-params/format", "audio-params/hr-channels", "aid",
+        "file-format", "media-title", "track-list/count", "file-size",
+        "cache-speed", "demuxer-cache-duration", "dropped-frame-count",
+        "decoder-dropped-frame-count", "volume"
+    };
+    return kInfoProps.find(name) != kInfoProps.end();
+}
+
+void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property, uint64_t replyId)
+{
+    if (!property || !property->name) {
         return;
     }
 
     const string name = property->name;
+    if (replyId >= kInfoPropReplyBase) {
+        const scoped_lock lock(ctx.cachedPropsMutex);
+        if (property->format == MPV_FORMAT_STRING && property->data) {
+            const char* raw = *static_cast<char**>(property->data);
+            ctx.cachedProps[name] = raw ? string(raw) : "";
+        } else if (property->format == MPV_FORMAT_NONE) {
+            ctx.cachedProps.erase(name);
+        }
+        return;
+    }
+
+    if (!property->data) {
+        return;
+    }
     if (property->format == MPV_FORMAT_DOUBLE) {
         const double value = *static_cast<double*>(property->data);
         if (!isfinite(value)) {
@@ -435,6 +495,10 @@ void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property)
             ctx.lastPositionMs.store(SecondsToMilliseconds(value));
         } else if (name == "demuxer-cache-duration") {
             ctx.lastBufferedMs.store(SecondsToMilliseconds(value));
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%.3f", value);
+            const scoped_lock lock(ctx.cachedPropsMutex);
+            ctx.cachedProps[name] = buf;
         }
     } else if (property->format == MPV_FORMAT_INT64) {
         const int64_t value = *static_cast<int64_t*>(property->data);
@@ -490,13 +554,29 @@ void ObservePlaybackProperties(PlayerContext& ctx)
     for (const auto& property : properties) {
         LogMpvError(property.name, Mpv().observe_property(ctx.mpv, replyId++, property.name, property.format));
     }
+
+    // Observe media info & live stats asynchronously so GetMediaInfo()/GetProperty()
+    // read from cachedProps without blocking the UI thread on mpv_get_property_string.
+    constexpr const char* kInfoStringProps[] = {
+        "video-codec", "video-format", "width", "height", "container-fps", "video-bitrate",
+        "video-params/pixelformat", "video-params/colormatrix", "video-params/primaries",
+        "video-params/gamma", "video-params/rotate", "hwdec-current", "vid",
+        "audio-codec-name", "audio-codec", "audio-bitrate", "audio-params/channel-count",
+        "audio-params/samplerate", "audio-params/format", "audio-params/hr-channels", "aid",
+        "file-format", "media-title", "track-list/count", "file-size",
+        "cache-speed", "dropped-frame-count", "decoder-dropped-frame-count", "volume"
+    };
+    uint64_t infoReplyId = kInfoPropReplyBase;
+    for (const char* propName : kInfoStringProps) {
+        LogMpvError(propName, Mpv().observe_property(ctx.mpv, infoReplyId++, propName, MPV_FORMAT_STRING));
+    }
 }
 
 struct TsfnEvent { int type; int64_t value; };
 
 void PushEvent(PlayerContext& ctx, int type, int64_t value)
 {
-    if (!ctx.tsfn) return;
+    if (ctx.released.load() || !ctx.tsfn) return;
     // time-pos fires per mpv property update (far above UI needs); throttle to
     // 100ms on the native side so a busy JS thread cannot grow the TSFN queue.
     if (type == 1) {
@@ -552,8 +632,12 @@ void StartEventLoop(PlayerContext& ctx)
                 PushEvent(ctx, 2, ctx.mediaStatus.load());
             } else if (event->event_id == MPV_EVENT_PROPERTY_CHANGE && event->data) {
                 auto* prop = static_cast<mpv_event_property*>(event->data);
+                if (event->reply_userdata >= kInfoPropReplyBase) {
+                    HandleObservedProperty(ctx, prop, event->reply_userdata);
+                    continue;
+                }
                 if (prop->format == MPV_FORMAT_NONE) { continue; }
-                HandleObservedProperty(ctx, prop);
+                HandleObservedProperty(ctx, prop, event->reply_userdata);
                 if (prop->name == string("time-pos")) {
                     PushEvent(ctx, 1, ctx.lastPositionMs.load());
                 } else if (prop->name == string("duration")) {
@@ -695,8 +779,7 @@ void ApplySurfaceSize(PlayerContext& ctx)
     char buf[32];
     snprintf(buf, sizeof(buf), "%dx%d", ctx.surfaceWidth, ctx.surfaceHeight);
     if (ctx.initialized) {
-        LogMpvError("ApplySurfaceSize set ohos-surface-size",
-                    Mpv().set_property_string(ctx.mpv, "ohos-surface-size", buf));
+        SetMpvStringProperty(ctx, "ohos-surface-size", buf, "ApplySurfaceSize set ohos-surface-size");
     } else {
         LogMpvError("ApplySurfaceSize set ohos-surface-size option",
                     Mpv().set_option_string(ctx.mpv, "ohos-surface-size", buf));
@@ -815,6 +898,10 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "osc", "no");
         SetOptionString(ctx.mpv, "input-default-bindings", "no");
         SetOptionString(ctx.mpv, "input-vo-keyboard", "no");
+        SetOptionString(ctx.mpv, "demuxer-max-back-bytes", "8388608");
+        SetOptionString(ctx.mpv, "network-timeout", "15");
+        // Allow our controlled internal edl:// + ypstream:// custom protocol playback.
+        SetOptionString(ctx.mpv, "load-unsafe-playlists", "yes");
         // target-colorspace-hint=yes drives the native-window HDR path.
         //
         // The OHOS Vulkan WSI (Maleoon 920C) only offers SDR swapchain
@@ -869,7 +956,21 @@ bool EnsureMpv(PlayerContext& ctx)
     }
 
     if (!ctx.initialized) {
+        vector<pair<string, string>> preInitProps;
+        {
+            const scoped_lock lock(ctx.pendingPropsMutex);
+            preInitProps.swap(ctx.pendingProperties);
+        }
+        vector<pair<string, string>> postInitProps;
+        for (const auto& kv : preInitProps) {
+            const int optRet = Mpv().set_option_string(ctx.mpv, kv.first.c_str(), kv.second.c_str());
+            if (optRet < 0) {
+                postInitProps.push_back(kv);
+            }
+        }
+
         ApplyWindowOption(ctx);
+        ApplySurfaceSize(ctx);
         const int error = Mpv().initialize(ctx.mpv);
         if (error < 0) {
             LogMpvError("mpv_initialize", error);
@@ -879,6 +980,14 @@ bool EnsureMpv(PlayerContext& ctx)
             return false;
         }
         ctx.initialized = true;
+        if (Mpv().stream_cb_add_ro) {
+            LogMpvError("mpv_stream_cb_add_ro(ypstream)",
+                        Mpv().stream_cb_add_ro(ctx.mpv, "ypstream", nullptr,
+                                               &yp_stream::MpvStreamBridge::OpenRoCallback));
+        }
+        for (const auto& kv : postInitProps) {
+            SetMpvStringProperty(ctx, kv.first.c_str(), kv.second, kv.first.c_str());
+        }
         LogMpvError("request log messages", Mpv().request_log_messages(ctx.mpv, "v"));
         ObservePlaybackProperties(ctx);
         StartEventLoop(ctx);
@@ -1006,8 +1115,30 @@ void LoadMedia(PlayerContext& ctx, const string& rawUrl, int64_t startPositionMs
 void SetStringProperty(PlayerContext& ctx, const char* key, const string& value)
 {
     const string property = key ? key : "";
+    if (property.empty()) {
+        return;
+    }
+    if (!ctx.initialized) {
+        const scoped_lock lock(ctx.pendingPropsMutex);
+        for (auto& kv : ctx.pendingProperties) {
+            if (kv.first == property) {
+                kv.second = value;
+                return;
+            }
+        }
+        ctx.pendingProperties.emplace_back(property, value);
+        return;
+    }
     PostCommand(ctx, [property, value](PlayerContext& workerCtx) {
         if (!EnsureMpv(workerCtx)) {
+            const scoped_lock lock(workerCtx.pendingPropsMutex);
+            for (auto& kv : workerCtx.pendingProperties) {
+                if (kv.first == property) {
+                    kv.second = value;
+                    return;
+                }
+            }
+            workerCtx.pendingProperties.emplace_back(property, value);
             return;
         }
         SetMpvStringProperty(workerCtx, property.c_str(), value, property.c_str());
@@ -1105,7 +1236,11 @@ napi_value SetVideoSurfaceSize(napi_env env, napi_callback_info info)
         if (width > 0 && height > 0) {
             ctx.surfaceWidth = width;
             ctx.surfaceHeight = height;
-            ApplySurfaceSize(ctx);
+            if (ctx.initialized) {
+                PostCommand(ctx, [](PlayerContext& workerCtx) {
+                    ApplySurfaceSize(workerCtx);
+                });
+            }
         }
     });
     return Undefined(env);
@@ -1121,11 +1256,15 @@ napi_value SetVideoSurfaceId(napi_env env, napi_callback_info info)
     OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv", "surface id id=%{public}s surface=%{public}s",
                  id.c_str(), surfaceId.c_str());
     lockFor(id, [&](PlayerContext& ctx) {
-        const string previousSurfaceId = ctx.surfaceId;
-        const bool surfaceChanged = !surfaceId.empty() && surfaceId != "0" && surfaceId != previousSurfaceId;
-        if (!surfaceId.empty() && surfaceId != "0") {
-            ctx.surfaceId = surfaceId;
+        if (surfaceId.empty() || surfaceId == "0") {
+            ctx.surfaceId.clear();
+            ctx.window = nullptr;
+            ctx.pendingLoad = false;
+            return;
         }
+        const string previousSurfaceId = ctx.surfaceId;
+        const bool surfaceChanged = surfaceId != previousSurfaceId;
+        ctx.surfaceId = surfaceId;
         if (!ctx.pendingLoad || ctx.mediaUrl.empty()) {
             // Runtime surface redirect (e.g. PiP restore: a brand-new XComponent
             // hands us a fresh surfaceId while mpv is already initialized and
@@ -1133,18 +1272,14 @@ napi_value SetVideoSurfaceId(napi_env env, napi_callback_info info)
             // pendingLoad is false once playback has started, so without this
             // branch mpv keeps rendering to the old (gone) surface -> black.
             //
-            // Re-push the new surfaceId into mpv's "wid" option. This fork tags
-            // "wid" with UPDATE_VO (mpv commit 8b0b186 "options: handle runtime
-            // wid change"), so changing it makes mpv tear down the whole VO
-            // (uninit_video_out) and rebuild it (reinit_video_chain) against the
-            // new surface, then auto queue_seek to the current position to
-            // present a frame — see player/command.c UPDATE_VO handler. That
-            // built-in seek is why we do NOT issue our own here. Cost: the
-            // decoder is also recreated, so expect a brief stall (acceptable,
-            // usually hidden by the PiP restore animation).
+            // Re-push the new surfaceId into mpv's "wid" option. Our custom OHOS
+            // mpv build routes runtime "wid" changes to VOCTRL_EXTERNAL_RESIZE
+            // (vo_ohos_begin_swap + ra_vk_ctx_recreate_surface) to swap the
+            // VkSurfaceKHR & swapchain in place without tearing down the VO,
+            // decoder, or audio chain, and without issuing a destructive seek.
             if (surfaceChanged && ctx.initialized && ctx.mpv) {
                 OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                             "surface redirect old=%{public}s new=%{public}s (UPDATE_VO)",
+                             "surface redirect old=%{public}s new=%{public}s (lightweight swap)",
                              previousSurfaceId.c_str(), surfaceId.c_str());
                 PostCommand(ctx, [](PlayerContext& workerCtx) {
                     ApplyWindowOption(workerCtx);
@@ -1181,13 +1316,16 @@ napi_value ReleasePlayer(napi_env env, napi_callback_info info)
         }
     }
     if (player) {
-        // Stop the event/command threads first so no PushEvent can race the
-        // tsfn release (a call after release would leak the event payload).
-        DestroyMpv(*player);
-        if (player->tsfn) {
-            napi_release_threadsafe_function(player->tsfn, napi_tsfn_release);
-            player->tsfn = nullptr;
-        }
+        player->released.store(true);
+        // Destroy asynchronously off the UI thread so terminate_destroy + thread joins
+        // can never stall ArkUI frame rendering.
+        std::thread([p = move(player)]() mutable {
+            DestroyMpv(*p);
+            if (p->tsfn) {
+                napi_release_threadsafe_function(p->tsfn, napi_tsfn_release);
+                p->tsfn = nullptr;
+            }
+        }).detach();
     }
     return Undefined(env);
 }
@@ -1264,18 +1402,26 @@ napi_value Prepare(napi_env env, napi_callback_info info)
 
 napi_value SeekWithFlags(napi_env env, napi_callback_info info)
 {
-    size_t argc = 2; napi_value args[2];
+    size_t argc = 3; napi_value args[3];
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     int64_t ms = 0;
     napi_get_value_int64(env, args[1], &ms);
+    bool keyframe = false;
+    if (argc > 2) {
+        napi_valuetype t = napi_undefined;
+        if (napi_typeof(env, args[2], &t) == napi_ok && t == napi_boolean) {
+            napi_get_value_bool(env, args[2], &keyframe);
+        }
+    }
+    const string seekMode = keyframe ? "absolute+keyframes" : "absolute+exact";
     lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
         const string seconds = to_string(static_cast<double>(ms) / 1000.0);
         SetTransientBuffering(ctx, true, "seek-flags-command-start");
-        PostCommand(ctx, [seconds](PlayerContext& workerCtx) {
+        PostCommand(ctx, [seconds, seekMode](PlayerContext& workerCtx) {
             if (!EnsureMpv(workerCtx)) {
                 return;
             }
-            RunMpvCommand(workerCtx, {"seek", seconds, "absolute+exact"}, "seek");
+            RunMpvCommand(workerCtx, {"seek", seconds, seekMode}, "seek");
         });
     });
     return Undefined(env);
@@ -1332,8 +1478,16 @@ napi_value GetProperty(napi_env env, napi_callback_info info)
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     const auto key = ToString(env, args[1]);
     const auto value = lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) -> string {
+        if (key.empty()) {
+            return {};
+        }
+        if (IsCachedInfoProp(key)) {
+            const scoped_lock lock(ctx.cachedPropsMutex);
+            auto it = ctx.cachedProps.find(key);
+            return (it != ctx.cachedProps.end()) ? it->second : string{};
+        }
         mpv_handle* handle = ctx.mpv;
-        if (!handle || !Mpv().get_property_string || key.empty()) {
+        if (!handle || !Mpv().get_property_string) {
             return {};
         }
         char* val = Mpv().get_property_string(handle, key.c_str());
@@ -1425,28 +1579,17 @@ napi_value GetMediaInfo(napi_env env, napi_callback_info info)
     size_t argc = 1; napi_value args[1];
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     int64_t duration = 0;
-    MpvPropReader reader;
+    unordered_map<string, string> snapshot;
     lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) {
         duration = ctx.lastDurationMs.load();
-        mpv_handle* handle = ctx.mpv;
-        // Capture the handle by value. NOTE: the reader is NOT used under the
-        // player lock — MediaInfoToNapi invokes it below, after lockFor has
-        // released gMutex. The handle can therefore race with ReleasePlayer's
-        // terminate_destroy; in practice the UI only queries info for a live
-        // player, and mpv_get_property_string on a dying handle is the
-        // accepted risk of reading properties off the command thread.
-        reader = [handle](const char* name) -> std::string {
-            if (!handle || !Mpv().get_property_string) return {};
-            char* val = Mpv().get_property_string(handle, name);
-            if (!val) return {};
-            std::string out(val);
-            Mpv().free(val);
-            return out;
-        };
+        const scoped_lock lock(ctx.cachedPropsMutex);
+        snapshot = ctx.cachedProps;
     });
-    if (!reader) {
-        reader = [](const char*) -> std::string { return {}; };
-    }
+    MpvPropReader reader = [snapshot = move(snapshot)](const char* name) -> std::string {
+        if (!name) return {};
+        auto it = snapshot.find(name);
+        return (it != snapshot.end()) ? it->second : std::string{};
+    };
     return MediaInfoToNapi(env, duration, reader);
 }
 
@@ -1534,6 +1677,75 @@ napi_value SetHttpProxyEnv(napi_env env, napi_callback_info info)
     return Undefined(env);
 }
 
+napi_value RegisterDirectStream(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value argv[1] = {nullptr};
+    napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+    std::string specJson = (argc >= 1 && argv[0]) ? ToString(env, argv[0]) : "";
+    const std::string streamUrl = yp_stream::MpvStreamBridge::Instance().RegisterDirectStreamJson(specJson);
+    napi_value result = nullptr;
+    napi_create_string_utf8(env, streamUrl.c_str(), streamUrl.size(), &result);
+    return result;
+}
+
+napi_value RegisterHlsStream(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value argv[1] = {nullptr};
+    napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+    std::string specJson = (argc >= 1 && argv[0]) ? ToString(env, argv[0]) : "";
+    const std::string streamUrl = yp_stream::MpvStreamBridge::Instance().RegisterHlsStreamJson(specJson);
+    napi_value result = nullptr;
+    napi_create_string_utf8(env, streamUrl.c_str(), streamUrl.size(), &result);
+    return result;
+}
+
+napi_value UnregisterStream(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value argv[1] = {nullptr};
+    napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+    if (argc >= 1 && argv[0]) {
+        yp_stream::MpvStreamBridge::Instance().UnregisterStream(ToString(env, argv[0]));
+    }
+    return Undefined(env);
+}
+
+napi_value UpdateStreamProxy(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value argv[1] = {nullptr};
+    napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+    if (argc >= 1 && argv[0]) {
+        yp_stream::MpvStreamBridge::Instance().UpdateProxyJson(ToString(env, argv[0]));
+    }
+    return Undefined(env);
+}
+
+napi_value AbortAllStreams(napi_env env, napi_callback_info /*info*/)
+{
+    yp_stream::MpvStreamBridge::Instance().AbortAllInFlight();
+    return Undefined(env);
+}
+
+napi_value GetStreamMetrics(napi_env env, napi_callback_info /*info*/)
+{
+    const yp_stream::StreamMetrics m = yp_stream::MpvStreamBridge::Instance().SnapshotMetrics();
+    napi_value obj = nullptr;
+    napi_create_object(env, &obj);
+    napi_value vSpeed = nullptr, vBytes = nullptr, vRetry = nullptr, vHttp = nullptr;
+    napi_create_int64(env, m.networkSpeedBps, &vSpeed);
+    napi_create_int64(env, m.totalBytesRead, &vBytes);
+    napi_create_int32(env, m.retryCount, &vRetry);
+    napi_create_int32(env, m.lastHttpStatus, &vHttp);
+    napi_set_named_property(env, obj, "networkSpeedBps", vSpeed);
+    napi_set_named_property(env, obj, "totalBytesRead", vBytes);
+    napi_set_named_property(env, obj, "retryCount", vRetry);
+    napi_set_named_property(env, obj, "lastHttpStatus", vHttp);
+    return obj;
+}
+
 napi_value Init(napi_env env, napi_value exports)
 {
     RegisterLogHandlerOnce();
@@ -1594,6 +1806,12 @@ napi_value Init(napi_env env, napi_value exports)
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, SetEventCallback, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"command", nullptr, MpvCommand, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"registerDirectStream", nullptr, RegisterDirectStream, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"registerHlsStream", nullptr, RegisterHlsStream, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"unregisterStream", nullptr, UnregisterStream, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"updateStreamProxy", nullptr, UpdateStreamProxy, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"abortAllStreams", nullptr, AbortAllStreams, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"getStreamMetrics", nullptr, GetStreamMetrics, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
 
     napi_define_properties(env, exports, std::size(descriptors), descriptors);

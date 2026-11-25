@@ -9,6 +9,12 @@ export {
   setHttpProxyEnv,
   probeVideoHwDecoders,
   getHwdecCodecsWhitelist,
+  registerDirectStream,
+  registerHlsStream,
+  unregisterStream,
+  updateStreamProxy,
+  abortAllStreams,
+  getStreamMetrics,
 } from './global';
 export {
 	MediaInfo,
@@ -17,5 +23,11 @@ export {
 	AudioStreamInfo,
 	VideoStreamInfo,
 } from './media-info';
-export type { VideoHwDecoderCaps } from './global';
+export type {
+  VideoHwDecoderCaps,
+  NativeDirectStreamSpec,
+  NativeHlsStreamSpec,
+  NativeStreamProxyConfig,
+  NativeStreamMetrics,
+} from './global';
 export { MpvPlayerController } from './controller/MpvPlayerController';

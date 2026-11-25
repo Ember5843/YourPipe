@@ -1,5 +1,9 @@
 import web_webview from '@ohos.web.webview';
-import { SabrLocalDomPoTokenGenerator, SABR_POTOKEN_USER_AGENT } from './SabrLocalDomPoTokenGenerator';
+import {
+  FALLBACK_SABR_POTOKEN_USER_AGENT,
+  resolveSabrWebViewUserAgent,
+  SabrLocalDomPoTokenGenerator
+} from './SabrLocalDomPoTokenGenerator';
 import { SabrWebViewPoTokenProvider } from './SabrWebViewPoTokenProvider';
 import { AppLog } from '../../common/AppLog';
 import { NetworkProxyConfig } from '../../common/NetworkProxyConfig';
@@ -11,6 +15,7 @@ export struct SabrPoTokenWebRuntime {
   private controller: web_webview.WebviewController = new web_webview.WebviewController();
   private provider: SabrWebViewPoTokenProvider = SabrWebViewPoTokenProvider.getInstance();
   private generator?: SabrLocalDomPoTokenGenerator;
+  private resolvedUserAgent: string = FALLBACK_SABR_POTOKEN_USER_AGENT;
   private runtimeReady: boolean = false;
 
   aboutToDisappear(): void {
@@ -48,13 +53,18 @@ export struct SabrPoTokenWebRuntime {
       .opacity(0.01)
       .hitTestBehavior(HitTestMode.None)
       .onControllerAttached(() => {
-        // BotGuard changes its signal output for opaque/about:blank origins. Match PipePipe's
-        // first-party blank runtime without loading the actual YouTube site. PipePipe also
-        // pins the WebView UA to the same desktop UA used for the home/GenerateIT fetches.
-        this.controller.setCustomUserAgent(SABR_POTOKEN_USER_AGENT);
-        this.controller.loadData(
-          '<!doctype html><html><head><title></title></head><body><div id="interaction"></div></body></html>',
-          'text/html', 'UTF-8', 'https://www.youtube.com/', 'about:blank');
+        // Align home/GenerateIT requests with the underlying WebView engine UA (minus "; wv")
+        // so BotGuard checks match the runtime engine (PipePipe f67df3e58).
+        this.resolvedUserAgent = resolveSabrWebViewUserAgent(this.controller);
+        try {
+          this.controller.setCustomUserAgent(this.resolvedUserAgent);
+          logger.info(`resolved WebView UA len=${this.resolvedUserAgent.length}`);
+          this.controller.loadData(
+            '<!doctype html><html><head><title></title></head><body><div id="interaction"></div></body></html>',
+            'text/html', 'UTF-8', 'https://www.youtube.com/', 'about:blank');
+        } catch (e) {
+          logger.warn(`WebRuntime setup failed: ${e}`);
+        }
         this.preconnectUpcomingWebOrigins();
       })
       .onPageEnd(() => {
@@ -63,15 +73,17 @@ export struct SabrPoTokenWebRuntime {
         }
         this.runtimeReady = true;
         this.generator = new SabrLocalDomPoTokenGenerator(
-          this.controller, getContext(this).resourceManager);
+          this.controller, getContext(this).resourceManager, this.resolvedUserAgent);
         this.provider.setMinter(async (
           visitorData: string,
           videoId: string,
           forceRefresh: boolean
         ): Promise<Uint8Array | undefined> => {
           return await this.generator?.mint(visitorData, videoId, forceRefresh);
-        }, () => {
-          this.generator?.invalidate();
+        }, (expectedGeneration?: number): void => {
+          this.generator?.invalidate(expectedGeneration);
+        }, (token: Uint8Array): number | undefined => {
+          return this.generator?.generationOf(token);
         });
       })
   }

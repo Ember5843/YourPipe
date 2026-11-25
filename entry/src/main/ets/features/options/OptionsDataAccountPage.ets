@@ -16,7 +16,6 @@ import {
 import { DataBackupManager, BackupError } from '../../common/DataBackupManager';
 import { BackupItemKey, AppBackupData, ALL_BACKUP_ITEM_KEYS } from '../../common/model/BackupModels';
 import { AuthStateHelper } from '../../common/AuthStateHelper';
-import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { PreferencesStore } from '../../common/PreferencesStore';
 import { WatchHistoryStore } from '../../common/WatchHistoryStore';
 import { AppLog } from '../../common/AppLog';
@@ -73,6 +72,12 @@ export struct OptionsDataAccountPage {
   private backupPickerController: CustomDialogController | null = null;
   private restorePickerController: CustomDialogController | null = null;
   private pendingRestoreBackup: AppBackupData | null = null;
+  private cookieImportGeneration: number = 0;
+
+  aboutToDisappear(): void {
+    this.cookieImportGeneration++;
+    this.isVerifyingCookie = false;
+  }
 
   private hasCredential(): boolean {
     return this.authStatus.hasCredential
@@ -224,15 +229,12 @@ export struct OptionsDataAccountPage {
     return pairs.join('; ');
   }
 
-  private async verifyCookieOnline(): Promise<CookieVerifyResult> {
+  private async verifyCookieOnline(credential: CookieAuthCredential): Promise<CookieVerifyResult> {
     try {
-      const library = FeedServiceProvider.getInstance().getUserLibraryService();
-      const page = await library.fetchWatchHistory(1);
+      await AuthSessionManager.getInstance()!.verifyCookieCredential(credential);
       const success: CookieVerifyResult = {
         ok: true,
-        detail: page.items.length > 0
-          ? getContext().resourceManager.getStringSync($r('app.string.yt_cookie_verify_history').id, page.items.length)
-          : this.tr($r('app.string.yt_cookie_verify_empty_history'))
+        detail: this.tr($r('app.string.yt_cookie_verify_success'))
       };
       return success;
     } catch (err) {
@@ -286,28 +288,37 @@ export struct OptionsDataAccountPage {
       return;
     }
 
-    session.saveCookieCredential(credential);
-    AuthStateHelper.refresh();
-    AuthStateHelper.reconcilePlaybackClient();
-
+    const revision = session.getCredentialRevision();
+    const generation = ++this.cookieImportGeneration;
     this.isVerifyingCookie = true;
     this.cookieImportMessage = this.tr($r('app.string.yt_cookie_local_validating'));
     try {
-      const result = await this.verifyCookieOnline();
+      const result = await this.verifyCookieOnline(credential);
+      if (generation !== this.cookieImportGeneration || revision !== session.getCredentialRevision()) {
+        logger.info('Cookie candidate discarded after account change');
+        return;
+      }
       if (result.ok) {
+        session.saveCookieCredential(credential);
+        AuthStateHelper.refresh();
+        AuthStateHelper.reconcilePlaybackClient();
         this.cookieInput = '';
         this.showCookieImport = false;
         this.cookieImportMessage = result.detail;
         this.cookieImportSuccess = true;
         this.params.onLoginSuccess();
       } else {
-        session.signOut();
-        AuthStateHelper.refresh();
         this.cookieImportMessage = result.detail;
         this.cookieImportSuccess = false;
       }
+    } catch (e) {
+      if (generation !== this.cookieImportGeneration) return;
+      logger.error('Cookie import commit failed');
+      this.cookieImportSuccess = false;
+      this.cookieImportMessage = getContext().resourceManager.getStringSync(
+        $r('app.string.yt_cookie_verify_failed').id, (e as Error).message);
     } finally {
-      this.isVerifyingCookie = false;
+      if (generation === this.cookieImportGeneration) this.isVerifyingCookie = false;
     }
   }
 
@@ -540,18 +551,21 @@ export struct OptionsDataAccountPage {
     });
   }
 
-  private handleRestore(selected: BackupItemKey[]): void {
-    if (!this.pendingRestoreBackup) {
+  private async handleRestore(selected: BackupItemKey[]): Promise<void> {
+    if (!this.pendingRestoreBackup || this.isBusy) {
       return;
     }
+    this.isBusy = true;
     try {
-      DataBackupManager.applyBackup(this.pendingRestoreBackup, selected);
+      await DataBackupManager.applyBackup(this.pendingRestoreBackup, selected);
       AuthStateHelper.refresh();
       this.showToast($r('app.string.yt_backup_restore_success'));
     } catch (e) {
+      logger.error(`Backup restore failed: ${(e as Error).message}`);
       const message = e instanceof BackupError ? $r(`app.string.${e.resourceKey}`) : $r('app.string.yt_backup_error_restore');
       this.showToast(message);
     } finally {
+      this.isBusy = false;
       this.pendingRestoreBackup = null;
     }
   }

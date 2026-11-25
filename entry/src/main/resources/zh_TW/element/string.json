@@ -3845,7 +3845,8 @@
         {
             "name": "yt_translation_region",
             "value": "區域（Region）"
-        },
+        }
+,
         {
             "name": "yt_exp_title",
             "value": "實驗性功能"
@@ -4145,6 +4146,10 @@
         {
             "name": "yt_update_later",
             "value": "稍後"
-        }
+        },
+        {"name": "yt_cookie_verify_success", "value": "Cookie 驗證成功"},
+        {"name": "yt_local_import_partial", "value": "已匯入 %1$d 個檔案，%2$d 個失敗"},
+        {"name": "yt_recovery_failed", "value": "操作未能全部完成，請重試"},
+        {"name": "yt_proxy_applying", "value": "正在套用代理…"}
     ]
 }

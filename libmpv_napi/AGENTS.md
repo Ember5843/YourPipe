@@ -37,6 +37,11 @@
   capability query for upper layers) and `getHwdecCodecsWhitelist` (the
   probe-derived hwdec-codecs whitelist string; native is the single source of
   truth, EnsureMpv applies the same value).
+- Native streaming (`ypstream://` via `mpv_stream_cb_add_ro` over `librcp_c`):
+  `registerDirectStream`, `registerHlsStream`, `unregisterStream`,
+  `updateStreamProxy`, `abortAllStreams`, `getStreamMetrics` (plus
+  `NativeDirectStreamSpec`, `NativeHlsStreamSpec`, `NativeStreamProxyConfig`,
+  `NativeStreamMetrics`). No-op/empty stubs on x86_64.
 
 ## 2. Layout
 ```
@@ -65,6 +70,19 @@ libmpv_napi/src/main/
                                          `ff_ohcodec_discard_buffer` so vendored libmpv
                                          resolves the symbol at load time; same source
                                          (and content) for both ABIs
+    stream/                            — pluggable C++20 `ypstream://` streaming layer
+      stream_types.h, stream_source.h  — `IStreamSource` interface + specs/metrics
+      native_http_transport.h / .cpp   — `librcp_c` HTTP/range transport (3 isolated
+                                         timeouts, session rotation on handover, unified
+                                         5s sliding-window inbound throughput meter)
+      load_control.h / .cpp            — dual-EWMA `BandwidthEstimator` + bitrate-tiered
+                                         adaptive chunk sizing (512 KiB..8 MiB)
+      direct_range_stream.h / .cpp     — direct VOD range reader (1-RTT prime, streaming
+                                         read, 1-slot prefetch, byte-exact resume, LRU)
+      hls_live_stream.h / .cpp         — live HLS media-playlist reader (async refresher,
+                                         2 concurrent prefetch workers, streaming read,
+                                         404/410 live-edge resync, non-seekable byte stream)
+      mpv_stream_bridge.h / .cpp       — `ypstream://` registry & `mpv_stream_cb_add_ro`
     ffmpeg-sdk/                        — vendored static libs (read-only; arm64)
     mpv-sdk/                           — vendored libmpv.so.2 (read-only; arm64)
     types/libmpv_napi/                 — NAPI `.so` types package (oh-package.json5)
@@ -82,7 +100,8 @@ libmpv_napi/src/main/
     that symbol at dlopen; copied next to `libmpv_napi.so` via a POST_BUILD
     copy.
 - Product links:
-  - `ace_napi.z`, `ace_ndk.z`, `hilog_ndk.z`, `ohfileuri`,
+  - `ace_napi.z`, `ace_ndk.z`, `hilog_ndk.z`, `ohfileuri`, `rcp_c`
+    (from `HMOS_SDK_NATIVE` sysroot, used by `stream/native_http_transport.cpp`),
     `native_window` (surface / XComponent correlation)
   - FFmpeg static libs from `ffmpeg-sdk/lib/${OHOS_ARCH}/` (libavformat,
     libavcodec, libavutil, libswresample, libdav1d, libxml2, libmbedtls*;
@@ -110,6 +129,15 @@ are built in WSL and then vendored here:
   - `libmpv_napi/src/main/cpp/ffmpeg-sdk/lib/${OHOS_ARCH}/libav*.a` (+ headers in `include/`)
 - Run the WSL build, then copy the new outputs into this repo. Hvigor picks
   them up at the next build. Today only **arm64-v8a** is vendored.
+- Key OHOS fork patches carried in the vendored `libmpv.so.2`:
+  - `audio/out/ao_ohaudio.c`: `AUDIOSTREAM_INTERRUPT_MODE_SHARE` so background
+    audio shares the app audio session without premature OS stop.
+  - `player/command.c` + `video/out/vulkan/context.c`: runtime `wid` changes
+    route to `VOCTRL_EXTERNAL_RESIZE` for lightweight Vulkan swapchain/surface
+    hot-swap (calling `pl_gpu_finish(vk->gpu)` before `pl_swapchain_destroy`)
+    without tearing down VO/decoder/audio on PiP restore.
+  - `player/audio.c` + `player/video.c` + `player/playloop.c`: re-anchor A/V
+    delay ledger on `vid=no → auto` restart and guard zero-frame EOF `playback_pts`.
 
 ## 5. Render surface: product path vs dormant standby
 - **Product path**: entry `AVPlayer.ets` lays out an **inline XComponent**

@@ -1,6 +1,7 @@
 import { BusinessError, cacheDownload, deviceInfo } from '@kit.BasicServicesKit';
 import { AppLog } from '../AppLog';
 import { MediaThumb } from '../components/MediaThumb';
+import { NetworkProxyConfig } from '../NetworkProxyConfig';
 
 const logger = AppLog.getInstance('ThumbPrefetcher');
 
@@ -88,6 +89,8 @@ export class ThumbPrefetcher {
     if (this.done.has(url) || this.inFlight.has(url)) {
       return;
     }
+    const proxy = NetworkProxyConfig.getStatus();
+    if (proxy.enabled && proxy.state !== 'ready') return;
     const handlers: PrefetchHandlers = {
       onSuccess: () => {
         this.finish(url, true, 0);

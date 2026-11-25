@@ -27,6 +27,8 @@ export class AvSessionManager {
   private currentMetadata: avSession.AVMetadata | undefined = undefined;
   private metadataGeneration: number = 0;
   private audioSessionManager: audio.AudioSessionManager | undefined = undefined;
+  private audioRoutingManager: audio.AudioRoutingManager | undefined = undefined;
+  private deviceChangeHandler: ((action: audio.DeviceChangeAction) => void) | undefined = undefined;
   private audioSessionActivated: boolean = false;
   private audioActivationGeneration: number = 0;
   private pendingPlaybackState: avSession.AVPlaybackState | null = null;
@@ -43,6 +45,7 @@ export class AvSessionManager {
   public onNextCommand: (() => void) | undefined = undefined;
   public onPreviousCommand: (() => void) | undefined = undefined;
   public onStopCommand: (() => void) | undefined = undefined;
+  public onOutputDeviceDisconnected: ((deviceName: string, deviceType: audio.DeviceType) => void) | undefined = undefined;
 
   /**
    * 音频会话当前是否处于激活态。
@@ -117,8 +120,9 @@ export class AvSessionManager {
       await this.session.activate();
       // 注：后台长时任务由 PlayerStateMachine 监听器统一管理（见 AvPlayerController），
       // 不再在此处启动，避免与状态机决策不同步。
-      // Wire up control-center button callbacks
+      // Wire up control-center button callbacks and audio output route changes
       this.registerSessionListeners();
+      this.registerAudioRoutingListener();
       Logger.info(TAG, 'AVSession initialized and activated');
     } catch (e) {
       const err = e as BusinessError;
@@ -141,6 +145,7 @@ export class AvSessionManager {
   private async destroyInternal(): Promise<void> {
     this.metadataGeneration++;
     this.deactivateForPause();
+    this.unregisterAudioRoutingListener();
     if (!this.session) {
       return;
     }
@@ -213,6 +218,7 @@ export class AvSessionManager {
 
     const pushMetadata = (pixelMap?: image.PixelMap) => {
       if (generation !== this.metadataGeneration || !this.session) {
+        pixelMap?.release().catch((e: BusinessError) => Logger.warn(TAG, `stale artwork release failed: ${e.message}`));
         return;
       }
       if (pixelMap) {
@@ -222,6 +228,7 @@ export class AvSessionManager {
         metadata.mediaImage = thumbnailUrl;
       }
       this.session?.setAVMetadata(metadata).then(() => {
+        if (generation !== this.metadataGeneration) return;
         this.currentMetadata = metadata;
         Logger.debug(TAG, `setAVMetadata: title=${title}, duration=${duration}s`);
       }).catch((e: BusinessError) => {
@@ -246,8 +253,9 @@ export class AvSessionManager {
    * correct aspect ratio instead of always cropping to 1:1.
    */
   private async downloadThumbnailPixelMap(url: string): Promise<image.PixelMap | undefined> {
+    const req = http.createHttp();
+    let source: image.ImageSource | undefined;
     try {
-      const req = http.createHttp();
       const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
@@ -256,20 +264,22 @@ export class AvSessionManager {
       };
       HttpDownloader.applyProxyToOptions(options, url);
       const resp = await req.request(url, options);
-      req.destroy();
       if (resp.responseCode !== 200 || !resp.result) {
         Logger.warn(TAG, `downloadThumbnailPixelMap: HTTP ${resp.responseCode}`);
         return undefined;
       }
       const buffer = resp.result as ArrayBuffer;
       const src = image.createImageSource(buffer);
+      source = src;
       // No desiredSize → decode at native resolution, preserving aspect ratio
       const pixelMap = await src.createPixelMap({ desiredPixelFormat: image.PixelMapFormat.RGBA_8888 });
-      src.release();
       return pixelMap;
     } catch (e) {
       Logger.warn(TAG, `downloadThumbnailPixelMap failed: ${(e as BusinessError).message}`);
       return undefined;
+    } finally {
+      req.destroy();
+      if (source) await source.release();
     }
   }
 
@@ -409,7 +419,49 @@ export class AvSessionManager {
       Logger.debug(TAG, 'Control center → stop');
       this.onStopCommand?.();
     });
-    // 注：当前系统版本 outputDeviceChange 事件名无效
+  }
+
+  private registerAudioRoutingListener(): void {
+    try {
+      if (!this.audioRoutingManager) {
+        this.audioRoutingManager = audio.getAudioManager().getRoutingManager();
+      }
+      if (this.deviceChangeHandler) {
+        this.audioRoutingManager.off('deviceChange', this.deviceChangeHandler);
+      }
+      this.deviceChangeHandler = (action: audio.DeviceChangeAction): void => {
+        if (action.type !== audio.DeviceChangeType.DISCONNECT || !action.deviceDescriptors) {
+          return;
+        }
+        for (const desc of action.deviceDescriptors) {
+          if (desc.deviceType === audio.DeviceType.WIRED_HEADSET
+            || desc.deviceType === audio.DeviceType.WIRED_HEADPHONES
+            || desc.deviceType === audio.DeviceType.BLUETOOTH_A2DP
+            || desc.deviceType === audio.DeviceType.BLUETOOTH_SCO
+            || desc.deviceType === audio.DeviceType.USB_HEADSET) {
+            const devName = desc.name || '';
+            Logger.info(TAG, `[AudioRoute] output disconnected type=${desc.deviceType} name=${devName || '-'}`);
+            this.onOutputDeviceDisconnected?.(devName, desc.deviceType);
+            break;
+          }
+        }
+      };
+      this.audioRoutingManager.on('deviceChange', audio.DeviceFlag.OUTPUT_DEVICES_FLAG, this.deviceChangeHandler);
+    } catch (e) {
+      Logger.warn(TAG, `[AudioRoute] registerAudioRoutingListener failed: ${(e as BusinessError).message || e}`);
+    }
+  }
+
+  private unregisterAudioRoutingListener(): void {
+    try {
+      if (this.audioRoutingManager && this.deviceChangeHandler) {
+        this.audioRoutingManager.off('deviceChange', this.deviceChangeHandler);
+      }
+    } catch (e) {
+      Logger.warn(TAG, `[AudioRoute] unregisterAudioRoutingListener failed: ${(e as BusinessError).message || e}`);
+    } finally {
+      this.deviceChangeHandler = undefined;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -449,7 +501,7 @@ export class AvSessionManager {
 
       this.audioSessionManager.on('audioSessionDeactivated',
         (event: audio.AudioSessionDeactivatedEvent) => {
-          Logger.info(TAG, `[AudioFocus] sessionDeactivated reason=${event.reason}`);
+          Logger.info(TAG, `[StateTrace] [AudioFocus] sessionDeactivated reason=${event.reason} gen=${activationGeneration}`);
           this.audioSessionActivated = false;
         });
 
@@ -459,18 +511,18 @@ export class AvSessionManager {
         });
 
       if (this.audioSessionActivated) {
-        Logger.info(TAG, '[AudioFocus] session already active (DEFAULT)');
+        Logger.info(TAG, `[StateTrace] [AudioFocus] session already active (DEFAULT) gen=${activationGeneration}`);
         return;
       }
 
       this.audioSessionManager.activateAudioSession(strategy).then(() => {
         if (activationGeneration !== this.audioActivationGeneration) {
-          Logger.info(TAG, '[AudioFocus] stale activation completed; deactivating');
+          Logger.info(TAG, `[StateTrace] [AudioFocus] stale activation completed gen=${activationGeneration} current=${this.audioActivationGeneration}`);
           this.audioSessionManager?.deactivateAudioSession().catch(() => {});
           return;
         }
         this.audioSessionActivated = true;
-        Logger.info(TAG, '[AudioFocus] sessionActivated strategy=DEFAULT scene=MEDIA');
+        Logger.info(TAG, `[StateTrace] [AudioFocus] sessionActivated strategy=DEFAULT scene=MEDIA gen=${activationGeneration}`);
       }).catch((e: BusinessError) => {
         Logger.error(TAG, `[AudioFocus] activate failed code=${e.code} message=${e.message}`);
       });
@@ -480,7 +532,7 @@ export class AvSessionManager {
   }
 
   public deactivateForPause(): void {
-    this.audioActivationGeneration++;
+    const gen = ++this.audioActivationGeneration;
     if (!this.audioSessionManager) {
       return;
     }
@@ -492,12 +544,12 @@ export class AvSessionManager {
     }
     if (this.audioSessionActivated) {
       this.audioSessionManager.deactivateAudioSession().then(() => {
-        Logger.info(TAG, '[AudioFocus] sessionDeactivated reason=user_or_controller');
+        Logger.info(TAG, `[StateTrace] [AudioFocus] sessionDeactivated reason=user_or_controller gen=${gen}`);
       }).catch((e: BusinessError) => {
         // 收到系统 STOP 时系统**已经**停用了音频会话，这时再调 deactivate
         // 会报 6800301（Deactivate audio session fail）——不是我们的错误，
         // 降级为 WARN：本地状态照样按「已停用」处理。
-        Logger.warn(TAG, `[AudioFocus] deactivate skipped code=${e.code} message=${e.message}`);
+        Logger.warn(TAG, `[StateTrace] [AudioFocus] deactivate skipped code=${e.code} gen=${gen} message=${e.message}`);
       });
       this.audioSessionActivated = false;
     }
@@ -523,7 +575,7 @@ export class AvSessionManager {
 
   private forwardFocusHint(hint: audio.AudioSessionStateChangeHint): void {
     const name = AvSessionManager.focusHintName(hint);
-    Logger.info(TAG, `[AudioFocus] hint=${name} raw=${hint}`);
+    Logger.info(TAG, `[StateTrace] [AudioFocus] hint=${name} raw=${hint} active=${this.audioSessionActivated}`);
     if (this.onAudioFocusHint) {
       this.onAudioFocusHint(hint);
     } else {

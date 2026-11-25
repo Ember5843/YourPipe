@@ -190,6 +190,8 @@ export interface Format {
    * The UMP request advertises it so the server serves the DRC track.
    */
   isDrc?: boolean;
+  /** Target segment duration in seconds (populated on post-live DVR adaptive formats). */
+  targetDurationSec?: number | string;
 }
 
 export interface AudioTrackInfo {

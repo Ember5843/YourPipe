@@ -4,6 +4,7 @@ import { VideoItem } from 'youtube_core';
 import { AppLog } from './AppLog';
 import { PreferencesStore } from './PreferencesStore';
 import { LocalMediaProgressStore } from './LocalMediaProgressStore';
+import { AppDataEpoch } from './AppDataEpoch';
 
 const logger = AppLog.getInstance('LocalMediaStore');
 
@@ -47,6 +48,9 @@ interface LocalMediaRecord {
  * - 属于用户媒体，和 `filesDir/downloads` 一样在「清除应用全部数据」时保留。
  */
 export class LocalMediaStore {
+  private static importRevision: number = 0;
+  private static importSequence: number = 0;
+  private static imports: Set<Promise<LocalMediaImportResult>> = new Set();
   private static readonly KEY: string = 'local_media_json';
   private static readonly DIR: string = 'local_media';
   private static readonly MAX_IMPORT_FILES: number = 10;
@@ -116,24 +120,45 @@ export class LocalMediaStore {
   }
 
   /** 「清除应用全部数据」：删除所有导入文件与索引。 */
-  static clearAll(): void {
+  static async clearAll(): Promise<void> {
+    LocalMediaStore.importRevision++;
+    await Promise.all(Array.from(LocalMediaStore.imports));
     const items = LocalMediaStore.items().slice();
+    const retained: LocalMediaItem[] = [];
     items.forEach((item: LocalMediaItem) => {
       try {
         if (fs.accessSync(item.path)) {
           fs.unlinkSync(item.path);
         }
       } catch (e) {
+        retained.push(item);
         logger.warn(`clearAll unlink failed id=${item.id}: ${(e as Error).message || e}`);
       }
       LocalMediaProgressStore.remove(`local:${item.id}`);
     });
-    LocalMediaStore.publish([]);
+    LocalMediaStore.publish(retained);
+    if (retained.length > 0) throw new Error('Some imported files could not be deleted');
+    // Include unindexed remnants from an interrupted copy or a previous failed cleanup.
+    const context = LocalMediaStore.context();
+    if (context) {
+      const dir = LocalMediaStore.dirPath(context);
+      if (fs.accessSync(dir)) {
+        for (const name of fs.listFileSync(dir)) fs.unlinkSync(`${dir}/${name}`);
+      }
+    }
     logger.info(`clearAll: removed=${items.length}`);
   }
 
   /** 系统文件选择器 → 复制进沙箱并落索引。 */
   static async importFromUris(uris: string[]): Promise<LocalMediaImportResult> {
+    const task = LocalMediaStore.doImportFromUris(uris);
+    LocalMediaStore.imports.add(task);
+    try { return await task; } finally { LocalMediaStore.imports.delete(task); }
+  }
+
+  private static async doImportFromUris(uris: string[]): Promise<LocalMediaImportResult> {
+    const epoch = AppDataEpoch.capture();
+    const revision = LocalMediaStore.importRevision;
     const context = LocalMediaStore.context();
     if (!context) {
       return { added: 0, failed: uris.length };
@@ -148,12 +173,13 @@ export class LocalMediaStore {
       return { added: 0, failed: uris.length };
     }
 
-    const all = LocalMediaStore.items().slice();
     let added = 0;
     let failed = 0;
     const limit = Math.min(uris.length, LocalMediaStore.MAX_IMPORT_FILES);
     for (let i = 0; i < limit; i++) {
+      if (!AppDataEpoch.isCurrent(epoch) || revision !== LocalMediaStore.importRevision) break;
       const uri = uris[i];
+      let pendingPath = '';
       try {
         // fileUri.FileUri(...).path 同时适用于 picker 返回的 file:// URI 与普通沙箱路径。
         const srcPath = uri.startsWith('file://') ? new fileUri.FileUri(uri).path : uri;
@@ -165,25 +191,33 @@ export class LocalMediaStore {
         }
         let size = 0;
         try {
-          size = fs.statSync(srcPath).size;
+          size = (await fs.stat(srcPath)).size;
         } catch (_e) {
           size = 0;
         }
-        const id = `imp_${Date.now()}_${i}`;
+        const id = `imp_${Date.now()}_${++LocalMediaStore.importSequence}`;
         const fileName = `${id}${ext}`;
         const dstPath = `${dir}/${fileName}`;
-        fs.copyFileSync(srcPath, dstPath);
+        pendingPath = dstPath;
+        await fs.copyFile(srcPath, dstPath);
+        if (!AppDataEpoch.isCurrent(epoch) || revision !== LocalMediaStore.importRevision) break;
         const title = LocalMediaStore.titleOf(srcPath);
+        const all = LocalMediaStore.items().slice();
         all.push(new LocalMediaItem(id, title, fileName, dstPath, size, Date.now()));
+        LocalMediaStore.publish(all);
+        pendingPath = '';
         added += 1;
         logger.info(`import ok id=${id} ext=${ext} size=${size}`);
       } catch (e) {
         failed += 1;
         logger.error(`import failed uri=${LocalMediaStore.redactUri(uri)}: ${(e as Error).message || e}`);
+      } finally {
+        if (pendingPath) {
+          try { await fs.unlink(pendingPath); } catch (e) {
+            logger.warn(`import temporary file cleanup failed: ${(e as Error).message || e}`);
+          }
+        }
       }
-    }
-    if (added > 0) {
-      LocalMediaStore.publish(all);
     }
     logger.info(`import done added=${added} failed=${failed} requested=${uris.length}`);
     return { added, failed };

@@ -66,8 +66,9 @@ keys/
 # Machine-local signing material (never commit)
 /signing-backup/
 
-# CodeGraph index (local tooling artifact, rebuilt via `codegraph sync`)
+# CodeGraph / HomeGraph index (local tooling artifacts, rebuilt via `homegraph sync`)
 .codegraph/
+.homegraph/
 
 # Local research/capture/scratch notes (never commit)
 /wb-req/

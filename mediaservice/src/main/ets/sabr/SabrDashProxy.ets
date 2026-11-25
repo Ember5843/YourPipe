@@ -21,12 +21,28 @@ function durationIso(durationMs: number): string {
 
 function segmentTimeline(buffer: SabrTrackBuffer, durationMs: number,
   fallbackDurationMs: number): string {
+  const startSeq = buffer.getStartSegment();
+  const ptoMs = buffer.getPresentationTimeOffsetMs();
+  const ptoAttr = ptoMs > 0 ? ` presentationTimeOffset="${ptoMs}"` : '';
   const end = buffer.getEndSegment();
-  if (end <= 0 || durationMs <= 0) {
-    Logger.warn(TAG, `fallback timeline itag=${buffer.getItag()} end=${end} durationMs=${durationMs} `
-      + `segmentDurationMs=${fallbackDurationMs}`);
-    return `<SegmentTemplate timescale="1000" startNumber="1" duration="${fallbackDurationMs}" `
+  if (end < startSeq || durationMs <= 0) {
+    Logger.warn(TAG, `fallback timeline itag=${buffer.getItag()} start=${startSeq} end=${end} `
+      + `durationMs=${durationMs} segmentDurationMs=${fallbackDurationMs}`);
+    return `<SegmentTemplate timescale="1000" startNumber="${startSeq}"${ptoAttr} duration="${fallbackDurationMs}" `
       + 'initialization="init" media="$Number$"/>';
+  }
+
+  // Post-live DVR has no SIDX index: emit a compressed uniform-duration timeline from
+  // LIVE_METADATA + FORMAT_INITIALIZATION_METADATA (PipePipe SabrDashMediaSource parity).
+  if (buffer.isPostLive() && !buffer.hasSegmentIndex()) {
+    const segDur = Math.max(1, buffer.getLiveSegmentDurationMs());
+    const startMs = Math.max(0, buffer.getSegmentStartMs(startSeq));
+    const count = end - startSeq + 1;
+    const repeatAttr = count > 1 ? ` r="${count - 1}"` : '';
+    Logger.info(TAG, `post-live timeline itag=${buffer.getItag()} start=${startSeq} end=${end} durMs=${segDur} ptoMs=${ptoMs}`);
+    return `<SegmentTemplate timescale="1000" startNumber="${startSeq}"${ptoAttr} `
+      + 'initialization="init" media="$Number$"><SegmentTimeline>'
+      + `<S t="${startMs}" d="${segDur}"${repeatAttr}/></SegmentTimeline></SegmentTemplate>`;
   }
 
   // Long videos routinely exceed 10,000 video segments. Falling back to a fixed duration here
@@ -43,11 +59,11 @@ function segmentTimeline(buffer: SabrTrackBuffer, durationMs: number,
     entries.push(`<S t="${runStartMs}" d="${runDurationMs}"`
       + (runRepeat > 0 ? ` r="${runRepeat}"` : '') + '/>');
   };
-  for (let sequence = 1; sequence <= end; sequence++) {
+  for (let sequence = startSeq; sequence <= end; sequence++) {
     const startMs = Math.max(0, buffer.getSegmentStartMs(sequence));
     const endMs = buffer.getSegmentEndMs(sequence);
     const segmentDurationMs = Math.max(1, endMs - startMs);
-    if (sequence > 1 && startMs === expectedNextStartMs
+    if (sequence > startSeq && startMs === expectedNextStartMs
       && segmentDurationMs === runDurationMs) {
       runRepeat++;
     } else {
@@ -59,8 +75,8 @@ function segmentTimeline(buffer: SabrTrackBuffer, durationMs: number,
     expectedNextStartMs = startMs + segmentDurationMs;
   }
   flushRun();
-  Logger.info(TAG, `exact timeline itag=${buffer.getItag()} segments=${end} runs=${entries.length}`);
-  return '<SegmentTemplate timescale="1000" startNumber="1" '
+  Logger.info(TAG, `exact timeline itag=${buffer.getItag()} segments=${end - startSeq + 1} runs=${entries.length}`);
+  return `<SegmentTemplate timescale="1000" startNumber="${startSeq}"${ptoAttr} `
     + 'initialization="init" media="$Number$"><SegmentTimeline>'
     + entries.join('') + '</SegmentTimeline></SegmentTemplate>';
 }
@@ -93,7 +109,10 @@ export function buildSabrDashManifest(session: DashSession): string {
   if (!session.sabrVideoBuffer || !session.sabrAudioBuffer) {
     return '';
   }
-  const durationMs = Math.max(1, session.durationMs);
+  const postLiveDur = session.sabrVideoBuffer.isPostLive()
+    ? (session.sabrVideoBuffer.getPostLiveDurationMs() || session.sabrAudioBuffer.getPostLiveDurationMs())
+    : 0;
+  const durationMs = Math.max(1, postLiveDur > 0 ? postLiveDur : session.durationMs);
   return '<?xml version="1.0" encoding="UTF-8"?>'
     + '<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" '
     + 'profiles="urn:mpeg:dash:profile:isoff-on-demand:2011" minBufferTime="PT1.5S" '
@@ -108,7 +127,8 @@ export async function serveSabrDashSegment(conn: socket.TCPSocketConnection,
   buffer: SabrTrackBuffer, segmentName: string, mimeType: string, headOnly: boolean): Promise<void> {
   const init = segmentName === 'init';
   const sequence = init ? -1 : parseInt(segmentName, 10);
-  if (!init && (!Number.isFinite(sequence) || sequence <= 0)) {
+  const minSeq = buffer.getStartSegment();
+  if (!init && (!Number.isFinite(sequence) || sequence < minSeq)) {
     await conn.send({ data: encodeUtf8('HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n') });
     return;
   }
@@ -173,5 +193,6 @@ export async function serveSabrDashSegment(conn: socket.TCPSocketConnection,
   await conn.send({ data: encodeUtf8(header) });
   if (!headOnly && data.length > 0) {
     await conn.send({ data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer });
+    buffer.markServed(init, sequence);
   }
 }

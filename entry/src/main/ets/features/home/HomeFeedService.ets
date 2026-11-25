@@ -8,8 +8,15 @@ import {
   fetchTvBrowsePage
 } from 'youtube_core';
 import { AppLog } from '../../common/AppLog';
-import { buildHomeKioskVideoItems, getHomeFeedItemsFromTabContent } from './utils/HomeFeedUtils';
-import { buildTvBrowseVideoItems, getTvVisitorData } from './utils/TvBrowseUtils';
+import { HomeFeedChip, HomeFeedSection } from './model/FeedResult';
+import {
+  buildHomeKioskVideoItems,
+  getHomeFeedChipsFromTabContent,
+  getHomeFeedItemsFromTabContent,
+  getHomeFeedSectionsFromNodes,
+  getHomeFeedSectionsFromTabContent
+} from './utils/HomeFeedUtils';
+import { buildTvBrowseVideoItems, getTvBrowseChips, getTvBrowseSections, getTvVisitorData } from './utils/TvBrowseUtils';
 
 const logger = AppLog.getInstance('HomeFeedService');
 
@@ -18,6 +25,8 @@ export interface KioskPageResult {
   nextPageToken: string | null;
   visitorData: string;
   source: string;
+  chips?: Array<HomeFeedChip>;
+  sections?: Array<HomeFeedSection>;
 }
 
 export class HomeFeedService {
@@ -60,7 +69,7 @@ export class HomeFeedService {
           throw new Error('Empty recommended feed');
         }
         logger.info(`[HomeFeed] stage=initial_done source=recommended-web items=${recommended.items.length} `
-          + `elapsed=${Date.now() - startedAt}ms hasNext=${!!recommended.nextPageToken}`);
+          + `chips=${recommended.chips?.length ?? 0} elapsed=${Date.now() - startedAt}ms hasNext=${!!recommended.nextPageToken}`);
         return recommended;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -228,7 +237,9 @@ export class HomeFeedService {
       items: built.items,
       nextPageToken: built.nextPageToken,
       visitorData: getTvVisitorData(resp),
-      source: 'recommended-tv'
+      source: 'recommended-tv',
+      chips: getTvBrowseChips(resp),
+      sections: getTvBrowseSections(resp, startId)
     };
   }
 
@@ -274,13 +285,17 @@ export class HomeFeedService {
       tabContent = contents;
     }
 
+    const chips = getHomeFeedChipsFromTabContent(tabContent, response);
+    const sections = getHomeFeedSectionsFromTabContent(tabContent, startId, 'LIVE');
     const rawItems: Array<Record<string, Object>> = getHomeFeedItemsFromTabContent(tabContent);
     const built = buildHomeKioskVideoItems(rawItems, startId, 'LIVE');
     return {
       items: built.items,
       nextPageToken: built.nextPageToken,
       visitorData,
-      source: 'kiosk'
+      source: 'kiosk',
+      chips,
+      sections
     };
   }
 
@@ -290,15 +305,23 @@ export class HomeFeedService {
     startId: number
   ): KioskPageResult {
     let items: Array<VideoItem> = [];
+    let sections: Array<HomeFeedSection> = [];
     let nextPageToken: string | null = null;
 
     const actions = response['onResponseReceivedActions'] as Array<Record<string, Object>>;
     if (actions && actions.length > 0) {
       actions.forEach((action) => {
         const append = action['appendContinuationItemsAction'] as Record<string, Object>;
-        const continuationItems = append ? (append['continuationItems'] as Array<Record<string, Object>>) : undefined;
+        const reload = action['reloadContinuationItemsCommand'] as Record<string, Object>;
+        const continuationItems = append
+          ? (append['continuationItems'] as Array<Record<string, Object>>)
+          : (reload ? (reload['continuationItems'] as Array<Record<string, Object>>) : undefined);
         if (!continuationItems || continuationItems.length === 0) {
           return;
+        }
+        const pageSections = getHomeFeedSectionsFromNodes(continuationItems, startId + items.length, 'LIVE');
+        if (pageSections.length > 0) {
+          sections = sections.concat(pageSections);
         }
         const expanded = this.expandContinuationItems(continuationItems);
         const built = buildHomeKioskVideoItems(expanded, startId + items.length, 'LIVE');
@@ -307,7 +330,7 @@ export class HomeFeedService {
       });
     }
 
-    return { items, nextPageToken, visitorData, source: 'kiosk' };
+    return { items, nextPageToken, visitorData, source: 'kiosk', sections };
   }
 
   private expandContinuationItems(items: Array<Record<string, Object>>): Array<Record<string, Object>> {

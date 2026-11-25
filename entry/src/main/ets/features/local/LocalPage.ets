@@ -20,8 +20,8 @@ import {
   MEDIA_META_SIZE,
   MEDIA_THUMB_RADIUS,
   MEDIA_TITLE_LINE_HEIGHT,
-  MEDIA_TITLE_SIZE,
-  TITLE_BAR_HEIGHT
+  MEDIA_TITLE_SIZE,
+  TITLE_BAR_HEIGHT
 } from '../../common/components/MediaCardTokens';
 import { FeedServiceProvider } from '../../common/FeedServiceProvider';
 import { getWideListColumnCount } from '../../common/utils/ListLayoutUtils';
@@ -454,7 +454,7 @@ export struct LocalPage {
         PanGesture(this.panOptionRight)
           .onActionEnd(() => {
             if (this.currentTabIndex === 0) {
-              this.onSwitchOuterTab(2);
+              this.onSwitchOuterTab(3);
             }
           })
       )

@@ -1,5 +1,6 @@
 import { VideoItem } from 'youtube_core';
 import { PlayQueueManager, QueueSourceType, QueueChangeListener } from '../PlayQueueManager';
+import { PlayerSession } from '../../../common/PlayerSession';
 import { MediaThumb } from '../../../common/components/MediaThumb';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { UIConfig } from '../../../common/AppState';
@@ -304,7 +305,7 @@ export struct PlayQueueList {
           .margin({ left: 6 })
           .onChange((isOn: boolean) => {
             this.autoPlayEnabled = isOn;
-            AppStorage.setOrCreate('autoPlayQueue', isOn);
+            PlayerSession.getInstance().setSessionAutoPlay(isOn);
           })
       }
       .alignItems(VerticalAlign.Center)

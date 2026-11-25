@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { PlayerUiViewModel } from 'mediaservice';
 import { LiveChatMessage, LiveChatPage } from 'youtube_core';
 import { AppLog } from '../../../common/AppLog';
 import { YouTubePlayService } from '../YouTubePlayService';
@@ -17,6 +18,12 @@ enum LiveChatStatus {
 const MAX_MESSAGES: number = 200;
 const RETRY_DELAY_MS: number = 5000;
 const MAX_AVATAR_URL_LENGTH: number = 2048;
+const REPLAY_TICK_MS: number = 1000;
+/** 回放：播放位置向后跳或向前跳超过该阈值视为 seek，重新定位聊天。 */
+const REPLAY_SEEK_BACK_MS: number = 2000;
+const REPLAY_SEEK_FORWARD_MS: number = 10000;
+/** 回放：缓冲区里的消息不足该时长（相对播放位置）就预取下一页。 */
+const REPLAY_PREFETCH_AHEAD_MS: number = 15000;
 
 /**
  * 播放页「聊天」Tab：YouTube 直播实时评论（只读）。
@@ -29,6 +36,9 @@ const MAX_AVATAR_URL_LENGTH: number = 2048;
 export struct LiveChatPanel {
   @Prop @Watch('onLifecycleChanged') videoId: string = '';
   @Prop @Watch('onLifecycleChanged') active: boolean = false;
+  /** 直播回放：按播放进度逐步显示聊天记录。 */
+  @Prop @Watch('onLifecycleChanged') replay: boolean = false;
+  @Link vm: PlayerUiViewModel;
   @StorageProp('isAppBackground') @Watch('onLifecycleChanged') isAppBackground: boolean = false;
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @State private status: string = LiveChatStatus.IDLE;
@@ -40,6 +50,12 @@ export struct LiveChatPanel {
   private generation: number = 0;
   private continuation: string = '';
   private seenIds: Set<string> = new Set<string>();
+  private pending: LiveChatMessage[] = [];
+  private lastReplayPosMs: number = -1;
+  private replayFetching: boolean = false;
+  private replayExhausted: boolean = false;
+  /** 用户是否正在手势滑动列表（避免首屏布局或编程滚动误判脱离底部）。 */
+  private userDragging: boolean = false;
 
   aboutToAppear(): void {
     this.syncLifecycle();
@@ -67,8 +83,13 @@ export struct LiveChatPanel {
     const generation = this.generation;
     this.messages = [];
     this.seenIds = new Set<string>();
+    this.pending = [];
+    this.lastReplayPosMs = -1;
+    this.replayFetching = false;
+    this.replayExhausted = false;
     this.continuation = '';
     this.autoScroll = true;
+    this.userDragging = false;
     this.status = LiveChatStatus.CONNECTING;
     logger.info(`start video=${this.videoId} generation=${generation}`);
     this.fetchInitial(generation);
@@ -101,7 +122,8 @@ export struct LiveChatPanel {
       return;
     }
     try {
-      const page: LiveChatPage = await service.fetchLiveChatInitial(this.videoId);
+      const page: LiveChatPage = await service.fetchLiveChatInitial(this.videoId,
+        this.replay ? this.currentPositionMs() : -1);
       if (generation !== this.generation) {
         return;
       }
@@ -112,6 +134,15 @@ export struct LiveChatPanel {
       }
       logger.info(`initial ok video=${this.videoId} ended=${page.ended} `
         + `messages=${page.messages.length} timeout=${page.timeoutMs}`);
+      if (this.replay) {
+        this.enqueueReplay(page);
+        const curPosMs = this.currentPositionMs();
+        this.lastReplayPosMs = curPosMs;
+        this.releaseDueReplay(curPosMs);
+        this.status = LiveChatStatus.CONNECTED;
+        this.scheduleReplayTick(generation);
+        return;
+      }
       this.applyPage(page);
       this.status = page.ended ? LiveChatStatus.ENDED : LiveChatStatus.CONNECTED;
       if (!page.ended) {
@@ -127,13 +158,121 @@ export struct LiveChatPanel {
     }
   }
 
-  private schedule(generation: number, delayMs: number): void {
+  private currentPositionMs(): number {
+    const sec = this.vm ? this.vm.currentTime : 0;
+    return sec > 0 ? Math.floor(sec * 1000) : 0;
+  }
+
+  /** Replay: queue one page of messages (sorted by video offset) and remember the next continuation. */
+  private enqueueReplay(page: LiveChatPage): void {
+    if (page.continuation.length > 0) {
+      this.continuation = page.continuation;
+    } else {
+      this.replayExhausted = true;
+    }
+    page.messages.forEach((message: LiveChatMessage) => {
+      if (!message.id || this.seenIds.has(message.id)) {
+        return;
+      }
+      this.seenIds.add(message.id);
+      this.pending.push(message);
+    });
+    this.pending.sort((a: LiveChatMessage, b: LiveChatMessage) => a.videoOffsetMs - b.videoOffsetMs);
+  }
+
+  private scheduleReplayTick(generation: number): void {
+    if (generation !== this.generation) return;
     if (this.timerId >= 0) {
       clearTimeout(this.timerId);
     }
     this.timerId = setTimeout(() => {
-      this.poll(generation);
-    }, Math.max(1000, delayMs));
+      this.timerId = -1;
+      this.replayTick(generation);
+    }, REPLAY_TICK_MS);
+  }
+
+  private replayTick(generation: number): void {
+    if (generation !== this.generation) return;
+    const cur = this.currentPositionMs();
+    if (this.lastReplayPosMs >= 0
+      && (cur < this.lastReplayPosMs - REPLAY_SEEK_BACK_MS || cur > this.lastReplayPosMs + REPLAY_SEEK_FORWARD_MS)) {
+      logger.info(`replay seek ${this.lastReplayPosMs}->${cur} video=${this.videoId}`);
+      this.start();
+      return;
+    }
+    this.lastReplayPosMs = cur;
+    this.releaseDueReplay(cur);
+    this.maybePrefetchReplay(generation, cur);
+    if (this.replayExhausted && this.pending.length === 0) {
+      this.status = LiveChatStatus.ENDED;
+    }
+    this.scheduleReplayTick(generation);
+  }
+
+  private releaseDueReplay(curMs: number): void {
+    let count = 0;
+    while (count < this.pending.length && this.pending[count].videoOffsetMs <= curMs) {
+      count++;
+    }
+    if (count === 0) {
+      return;
+    }
+    const due = this.pending.splice(0, count);
+    const next: LiveChatMessage[] = this.messages.concat(due);
+    this.messages = next.length > MAX_MESSAGES ? next.slice(next.length - MAX_MESSAGES) : next;
+    if (this.autoScroll) {
+      this.scrollToLatest();
+    }
+  }
+
+  private maybePrefetchReplay(generation: number, curMs: number): void {
+    if (this.replayFetching || this.replayExhausted || this.continuation.length === 0) {
+      return;
+    }
+    const tail = this.pending.length > 0 ? this.pending[this.pending.length - 1].videoOffsetMs : -1;
+    if (tail >= 0 && tail > curMs + REPLAY_PREFETCH_AHEAD_MS) {
+      return;
+    }
+    this.fetchReplayNext(generation, curMs);
+  }
+
+  private async fetchReplayNext(generation: number, curMs: number): Promise<void> {
+    const service = this.service();
+    if (!service) {
+      return;
+    }
+    this.replayFetching = true;
+    try {
+      const page: LiveChatPage = await service.fetchLiveChatPage(this.continuation, curMs);
+      if (generation !== this.generation) {
+        return;
+      }
+      this.enqueueReplay(page);
+    } catch (e) {
+      if (generation === this.generation) {
+        logger.warn(`replay poll failed video=${this.videoId}: ${(e as Error).message || e}`);
+      }
+    } finally {
+      if (generation === this.generation) {
+        this.replayFetching = false;
+      }
+    }
+  }
+
+  private schedule(generation: number, delayMs: number): void {
+    if (generation !== this.generation) return;
+    if (this.timerId >= 0) {
+      clearTimeout(this.timerId);
+    }
+    this.timerId = setTimeout(() => {
+      this.timerId = -1;
+      if (generation !== this.generation) return;
+      if (this.continuation.length === 0) {
+        this.fetchInitial(generation);
+      } else {
+        this.poll(generation);
+      }
+    }, Math.max(1000, Math.min(15000, delayMs)));
   }
 
   private async poll(generation: number): Promise<void> {
@@ -188,10 +327,26 @@ export struct LiveChatPanel {
       this.messages = next;
     }
     if (this.autoScroll) {
-      setTimeout(() => {
-        this.scroller.scrollEdge(Edge.Bottom);
-      }, 0);
+      this.scrollToLatest();
     }
+  }
+
+  /**
+   * 保持定位到最新消息底部。首屏从空态切换到 List 或插入多条消息时，
+   * List 懒加载布局需要多帧完成，组合 scrollToIndex(last) + scrollEdge(Bottom) 确保滚到底部。
+   */
+  private scrollToLatest(): void {
+    const generation = this.generation;
+    [0, 50, 150, 350].forEach((delay: number) => {
+      setTimeout(() => {
+        if (generation !== this.generation || !this.autoScroll || this.userDragging || this.messages.length === 0) {
+          return;
+        }
+        const lastIndex = this.messages.length - 1;
+        this.scroller.scrollToIndex(lastIndex, false, ScrollAlign.END);
+        this.scroller.scrollEdge(Edge.Bottom);
+      }, delay);
+    });
   }
 
   private statusText(): ResourceStr {
@@ -203,6 +358,17 @@ export struct LiveChatPanel {
       case LiveChatStatus.ERROR: return $r('app.string.yt_live_chat_error');
       default: return '';
     }
+  }
+
+  private formatMessageTime(message: LiveChatMessage): string {
+    if (message.videoOffsetMs >= 0) {
+      const total = Math.floor(message.videoOffsetMs / 1000);
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60).toString().padStart(2, '0');
+      const s = (total % 60).toString().padStart(2, '0');
+      return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+    }
+    return this.formatTime(message.timestampMs);
   }
 
   private formatTime(timestampMs: number): string {
@@ -271,7 +437,7 @@ export struct LiveChatPanel {
           if (message.isPaid && message.amountText.length > 0) {
             this.RoleTag(message.amountText, this.themePrimary)
           }
-          Text(this.formatTime(message.timestampMs))
+          Text(this.formatMessageTime(message))
             .fontSize(10)
             .fontColor($r('app.color.yourtube_text_hint'))
             .margin({ left: 6 })
@@ -362,8 +528,21 @@ export struct LiveChatPanel {
         .layoutWeight(1)
         .edgeEffect(EdgeEffect.Spring)
         .cachedCount(20)
-        .onScrollIndex((_start: number, end: number) => {
-          this.autoScroll = end >= this.messages.length - 2;
+        // 默认锁定在最新消息底部；用户手势滑动后解除锁定允许自由浏览，滑回最底部重新恢复跟随。
+        .onScrollStart(() => {
+          this.userDragging = true;
+        })
+        .onDidScroll((_offset: number, state: ScrollState) => {
+          if (state === ScrollState.Scroll) {
+            this.userDragging = true;
+            this.autoScroll = false;
+          }
+        })
+        .onScrollStop(() => {
+          if (this.userDragging) {
+            this.userDragging = false;
+            this.autoScroll = this.scroller.isAtEnd();
+          }
         })
       }
     }

@@ -473,7 +473,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     videoInfo.viewCount = this.parseIntSafe(vd.viewCount) || this.parseIntSafe(micro.viewCount);
     // PipePipe setStreamType parity: vd.isLive / isPostLiveDvr / isLiveNow —
     // vd.isLiveContent alone is also true for replays of past lives.
-    videoInfo.isLive = this.resolveIsLive(playerResponse);
+    videoInfo.isLive = this.resolveIsLive(playerResponse); videoInfo.isLiveReplay = !videoInfo.isLive && vd.isLiveContent === true;
     videoInfo.description = vd.shortDescription || this.extractTextFromRuns(micro.description) || '';
 
     const thumbs = vd.thumbnail?.thumbnails || micro.thumbnail?.thumbnails || [];
@@ -633,11 +633,12 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     logger.info(`[STREAM] ensureStreams client=${selectedClient} isLive=${isLive} postLive=${isPostLive} `
       + `hasSabrUrl=${hasSabrUrl} adaptive=${this.configuredStreamingData?.adaptiveFormats?.length ?? 0}`);
 
-    // SABR path (PipePipe): mweb|web + VOD + serverAbrStreamingUrl
+    // SABR path (PipePipe): mweb + VOD/PostLive + serverAbrStreamingUrl
     if ((selectedClient === 'mweb')
-      && !isLive && !isPostLive
+      && !isLive
       && hasSabrUrl) {
-      const sabrBuilt = await this.buildSabrStreams(videoId, primaryPr, this.configuredCpn || '', selectedClient);
+      const sabrBuilt = await this.buildSabrStreams(
+        videoId, primaryPr, this.configuredCpn || '', selectedClient, isPostLive);
       if (sabrBuilt) {
         return;
       }
@@ -803,9 +804,10 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     videoId: string,
     playerResponse: PlayerResponse | undefined,
     cpn: string,
-    sourceClient: string
+    sourceClient: string,
+    isPostLive: boolean = false
   ): Promise<boolean> {
-    const sabrInfo = await this.buildSabrInfo(videoId, playerResponse, cpn, sourceClient);
+    const sabrInfo = await this.buildSabrInfo(videoId, playerResponse, cpn, sourceClient, isPostLive);
     if (!sabrInfo) {
       return false;
     }
@@ -914,7 +916,8 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     videoId: string,
     playerResponse: PlayerResponse | undefined,
     cpn: string,
-    sourceClient: string
+    sourceClient: string,
+    isPostLive: boolean = false
   ): Promise<YoutubeSabrInfo | undefined> {
     if (!playerResponse?.streamingData) {
       return undefined;
@@ -946,6 +949,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       ? ClientsConstants.SAFARI_CLIENT_VERSION
       : WebClientVersionResolver.getCachedOrHardcoded();
     const sabrInfo = new YoutubeSabrInfo(profile, videoId, cpn, clientVersion, formats);
+    sabrInfo.isPostLive = isPostLive;
     sabrInfo.hl = this.hl;
     sabrInfo.gl = this.gl;
     sabrInfo.serverAbrStreamingUrl = serverAbr;
@@ -1050,6 +1054,9 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       const approxDurationMs = fmt.approxDurationMs
         ? this.parseIntSafe(fmt.approxDurationMs)
         : undefined;
+      const targetDurationSec = fmt.targetDurationSec !== undefined
+        ? this.parseIntSafe(String(fmt.targetDurationSec))
+        : undefined;
       const meta: YoutubeSabrFormatMeta = {
         itag: fmt.itag,
         mimeType: mime,
@@ -1072,6 +1079,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
         initRangeEnd: initEnd,
         contentLength: contentLength,
         approxDurationMs: approxDurationMs,
+        targetDurationSec: targetDurationSec,
         // PipePipe parseSabrFormats: formatData.getBoolean("isDrc", false).
         drc: fmt.isDrc === true
       };
@@ -1298,8 +1306,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     }
 
     const streamingData = streamPr?.streamingData;
-    const isPostLive = this.resolveIsPostLive(metaBase, streamPr);
-    const willUseSabr = usedClient === 'mweb' && !isLive && !isPostLive
+    const willUseSabr = usedClient === 'mweb' && !isLive
       && !!streamingData?.serverAbrStreamingUrl;
     const hasDirectDash = !willUseSabr && !!streamingData?.adaptiveFormats?.some(
       (format: Format) => !!(format.url || format.signatureCipher || format.cipher));
@@ -2505,8 +2512,8 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
   }
 
   /** 直播聊天首访：/next 的 conversationBar → live_chat continuation。 */
-  async fetchLiveChatInitial(videoId: string): Promise<LiveChatPage> {
-    return this.liveChatExtractor.fetchInitial(videoId);
+  async fetchLiveChatInitial(videoId: string, playerOffsetMs: number = -1): Promise<LiveChatPage> {
+    return this.liveChatExtractor.fetchInitial(videoId, playerOffsetMs);
   }
 
   /** 直播聊天轮询；playerOffsetMs < 0 表示实时直播。 */
@@ -2535,8 +2542,9 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       };
       body.currentPlayerState = state;
     }
+    const endpoint = playerOffsetMs >= 0 ? 'get_live_chat_replay' : 'get_live_chat';
     return this.client.postJson(
-      'https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?prettyPrint=false',
+      `https://www.youtube.com/youtubei/v1/live_chat/${endpoint}?prettyPrint=false`,
       body,
       this.webApiHeaders(),
       this.shouldAttachWebCookieAuth()

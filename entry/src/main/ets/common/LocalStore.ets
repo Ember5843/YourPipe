@@ -4,8 +4,16 @@ import { VideoItem } from 'youtube_core';
 import { PlaylistItem, StoredLocalQueue } from './PlaylistModel';
 import { PreferencesStore } from './PreferencesStore';
 import { SubscriptionFeedStore } from './SubscriptionFeedStore';
+import { VideoItemPersistence } from './VideoItemPersistence';
 
 const logger = AppLog.getInstance('LocalStore');
+
+interface LocalQueueRecord {
+  id: string;
+  name: string;
+  videos: Record<string, Object>[];
+  createdAt: number;
+}
 
 export class LocalStore {
   static loadSubscriptions(json: string): SubscriptionUser[] {
@@ -38,21 +46,9 @@ export class LocalStore {
       return [];
     }
     try {
-      const raw: VideoItem[] = JSON.parse(json);
-      return raw.map((item) => new VideoItem(
-        item.id || 0,
-        item.videoId || '',
-        item.title || '',
-        item.author || '',
-        item.viewCount || '',
-        item.thumbnailUrl || '',
-        typeof item.isLive === 'boolean' ? item.isLive : false,
-        item.thumbnailColor || '#CCCCCC',
-        item.channelId || '',
-        item.channelAvatarUrl || '',
-        item.channelHandle || '',
-        item.videoDescription || ''
-      ));
+      const raw = JSON.parse(json) as Record<string, Object>[];
+      return raw.filter((item) => !!item && typeof item === 'object')
+        .map((item) => VideoItemPersistence.restore(item));
     } catch (err) {
       logger.error('Failed to parse favorites:', JSON.stringify(err));
       return [];
@@ -60,7 +56,7 @@ export class LocalStore {
   }
 
   static saveFavorites(favorites: VideoItem[]): string {
-    return JSON.stringify(favorites);
+    return JSON.stringify(favorites.map((item) => VideoItemPersistence.record(item)));
   }
 
   static loadPlaylists(json: string): PlaylistItem[] {
@@ -94,23 +90,9 @@ export class LocalStore {
       return raw.map((item: Record<string, Object>): StoredLocalQueue => ({
         id: LocalStore.asString(item['id']),
         name: LocalStore.asString(item['name']),
-        videos: (item['videos'] as Array<Record<string, Object>> || []).map((v) =>
-          new VideoItem(
-            v['id'] as number || 0,
-            LocalStore.asString(v['videoId']),
-            LocalStore.asString(v['title']),
-            LocalStore.asString(v['author']),
-            LocalStore.asString(v['viewCount']),
-            LocalStore.asString(v['thumbnailUrl']),
-            typeof v['isLive'] === 'boolean' ? v['isLive'] as boolean : false,
-            LocalStore.asString(v['thumbnailColor']) || '#CCCCCC',
-            LocalStore.asString(v['channelId']),
-            LocalStore.asString(v['channelAvatarUrl']),
-            LocalStore.asString(v['channelHandle']),
-            LocalStore.asString(v['videoDescription']),
-            (v['videoDescriptionError'] as string) || null
-          )
-        ),
+        videos: (item['videos'] as Array<Record<string, Object>> || [])
+          .filter((video) => !!video && typeof video === 'object')
+          .map((video) => VideoItemPersistence.restore(video)),
         createdAt: item['createdAt'] as number || 0,
       }));
     } catch (err) {
@@ -120,7 +102,10 @@ export class LocalStore {
   }
 
   static saveLocalQueues(queues: StoredLocalQueue[]): string {
-    return JSON.stringify(queues);
+    return JSON.stringify(queues.map((queue: StoredLocalQueue): LocalQueueRecord => ({
+      id: queue.id, name: queue.name, createdAt: queue.createdAt,
+      videos: queue.videos.map((video: VideoItem) => VideoItemPersistence.record(video))
+    })));
   }
 
   /** Preferences → AppStorage('subscriptions')；@StorageLink 消费方随 AppStorage 写入自动刷新 */

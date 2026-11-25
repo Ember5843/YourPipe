@@ -10,6 +10,8 @@ export class CommentTranslateUiState {
   translated: string = '';
   /** translated 对应的目标语言；App 语言切换后旧译文失效 */
   language: string = '';
+  context: string = '';
+  requestGeneration: number = 0;
   translating: boolean = false;
   failed: boolean = false;
   showOriginal: boolean = false;
@@ -20,13 +22,27 @@ export class CommentTranslateStateStore {
   /** 上限：浏览大量评论时状态对象不再无限累积（插入序近似 LRU 淘汰） */
   private static readonly MAX_STATES: number = 500;
 
+  static refreshContext(state: CommentTranslateUiState): void {
+    const context = TranslationService.contextKey();
+    if (state.context === context) return;
+    state.requestGeneration++;
+    state.context = context;
+    state.language = TranslationService.targetLanguage();
+    state.translating = false;
+    state.failed = false;
+    state.showOriginal = false;
+    state.translated = TranslationService.getCached(state.commentText) ?? '';
+  }
+
   static get(commentId: string, commentText: string): CommentTranslateUiState {
     const lang = TranslationService.targetLanguage();
+    const context = TranslationService.contextKey();
     let state = CommentTranslateStateStore.states.get(commentId);
     if (!state || state.commentText !== commentText) {
       state = new CommentTranslateUiState();
       state.commentText = commentText;
       state.language = lang;
+      state.context = context;
       const cached = TranslationService.getCached(commentText);
       if (cached !== undefined) {
         state.translated = cached;
@@ -38,7 +54,10 @@ export class CommentTranslateStateStore {
           CommentTranslateStateStore.states.delete(oldest.value);
         }
       }
-    } else if (state.translated && state.language !== lang) {
+    } else if (state.context !== context) {
+      state.requestGeneration++;
+      state.context = context;
+      state.translating = false;
       // 目标语言已切换：旧译文失效，改用新语言缓存（没有则回到未翻译态）。
       state.translated = '';
       state.failed = false;
@@ -62,6 +81,9 @@ export class CommentTranslateStateStore {
 @Component
 export struct CommentTranslatedText {
   @ObjectLink state: CommentTranslateUiState;
+  @StorageProp('translationContextRevision') @Watch('onContextChanged') private translationContextRevision: number = 0;
+
+  private onContextChanged(): void { CommentTranslateStateStore.refreshContext(this.state); }
 
   build() {
     if (this.state.translated && !this.state.showOriginal) {
@@ -80,10 +102,14 @@ export struct CommentTranslatedText {
 @Component
 export struct CommentTranslateButton {
   @ObjectLink state: CommentTranslateUiState;
+  @StorageProp('translationContextRevision') @Watch('onContextChanged') private translationContextRevision: number = 0;
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop commentId: string;
 
+  private onContextChanged(): void { CommentTranslateStateStore.refreshContext(this.state); }
+
   private handleClick(): void {
+    CommentTranslateStateStore.refreshContext(this.state);
     if (this.state.translating) {
       return;
     }
@@ -93,19 +119,26 @@ export struct CommentTranslateButton {
     }
     this.state.translating = true;
     this.state.failed = false;
-    TranslationService.translate(this.state.commentText)
+    const state = this.state;
+    const context = TranslationService.contextKey();
+    const language = TranslationService.targetLanguage();
+    const generation = ++state.requestGeneration;
+    TranslationService.translate(state.commentText)
       .then((result: string) => {
-        this.state.translated = result;
-        this.state.showOriginal = false;
-        CommentTranslateStateStore.markTranslated(this.state);
+        if (generation !== state.requestGeneration || context !== TranslationService.contextKey()) return;
+        state.translated = result;
+        state.showOriginal = false;
+        state.language = language;
+        state.context = context;
         logger.info(`comment translated id=${this.commentId} len=${this.state.commentText.length}`);
       })
       .catch((e: Error) => {
-        this.state.failed = true;
+        if (generation !== state.requestGeneration || context !== TranslationService.contextKey()) return;
+        state.failed = true;
         logger.warn(`comment translate failed id=${this.commentId}: ${e.message || String(e)}`);
       })
       .finally(() => {
-        this.state.translating = false;
+        if (generation === state.requestGeneration) state.translating = false;
       });
   }
 

@@ -27,6 +27,7 @@ export interface YoutubeSabrFormatMeta {
   initRangeEnd?: number;
   contentLength?: number;
   approxDurationMs?: number;
+  targetDurationSec?: number;
   drc?: boolean;
 }
 
@@ -39,6 +40,8 @@ export class YoutubeSabrInfo {
   serverAbrStreamingUrl?: string;
   videoPlaybackUstreamerConfig?: string;
   formats: YoutubeSabrFormatMeta[];
+  /** True when the video is an ended live stream (DVR segments start at 0, self-init MP4). */
+  isPostLive: boolean = false;
   /** SABR clientInfo locale (PipePipe uses the app localization, not a fixed en-US). */
   hl: string = 'en-US';
   gl: string = 'US';

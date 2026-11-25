@@ -31,24 +31,37 @@ export struct OptionsNetworkPage {
 
   @State private testing: boolean = false;
   @State private testMessage: ResourceStr = '';
+  private testGeneration: number = 0;
+  private testRequest: http.HttpRequest | null = null;
+
+  aboutToDisappear(): void {
+    this.testGeneration++;
+    this.testRequest?.destroy();
+    this.testRequest = null;
+    this.testing = false;
+  }
 
   /** 重新应用配置（重启本地桥接、复位熔断）。 */
   private async restartProxy(): Promise<void> {
     if (this.testing) {
       return;
     }
+    this.persist();
+    const generation = this.testGeneration;
+    const revision = NetworkProxyConfig.getRevision();
     this.testing = true;
     try {
-      this.persist();
       await NetworkProxyConfig.awaitReady();
+      if (generation !== this.testGeneration || revision !== NetworkProxyConfig.getRevision()) return;
       const status = NetworkProxyConfig.publishStatus();
       status.lastApplyAtMs = Date.now();
       this.testMessage = $r('app.string.yt_proxy_restart_done');
     } catch (e) {
+      if (generation !== this.testGeneration || revision !== NetworkProxyConfig.getRevision()) return;
       logger.warn(`proxy restart failed: ${(e as Error).message}`);
       this.testMessage = $r('app.string.yt_proxy_test_failed');
     } finally {
-      this.testing = false;
+      if (generation === this.testGeneration) this.testing = false;
     }
   }
 
@@ -58,6 +71,7 @@ export struct OptionsNetworkPage {
     if (!this.networkProxyConfig.enabled) {
       return $r('app.string.yt_proxy_status_off');
     }
+    if (status.state === 'applying') return $r('app.string.yt_proxy_applying');
     if (status.bridgeFuseBlown) {
       return $r('app.string.yt_proxy_status_fuse');
     }
@@ -88,6 +102,10 @@ export struct OptionsNetworkPage {
   }
 
   private persist(): void {
+    this.testGeneration++;
+    this.testRequest?.destroy();
+    this.testRequest = null;
+    this.testing = false;
     NetworkProxyConfig.save(this.networkProxyConfig);
     NetworkProxyConfig.applySystemAndProviders(this.networkProxyConfig)
       .catch((e: Error) => logger.warn(`apply proxy on persist failed: ${e.message}`));
@@ -145,15 +163,19 @@ export struct OptionsNetworkPage {
       this.testMessage = $r('app.string.yt_proxy_incomplete');
       return;
     }
+    this.persist();
     this.testing = true;
     this.testMessage = $r('app.string.yt_proxy_testing');
-    this.persist();
+    const generation = this.testGeneration;
+    const revision = NetworkProxyConfig.getRevision();
     // 等代理配置完全落地（socks5 时等桥 listen 完成）再测，保证测的是新配置。
-    await NetworkProxyConfig.awaitReady();
     const testUrl = 'https://www.youtube.com/generate_204';
     const req = http.createHttp();
+    this.testRequest = req;
     const startedAt = Date.now();
     try {
+      await NetworkProxyConfig.awaitReady();
+      if (generation !== this.testGeneration || revision !== NetworkProxyConfig.getRevision()) return;
       const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         connectTimeout: 10000,
@@ -162,31 +184,36 @@ export struct OptionsNetworkPage {
       };
       HttpDownloader.applyProxyToOptions(options, testUrl);
       const response = await req.request(testUrl, options);
+      if (generation !== this.testGeneration || revision !== NetworkProxyConfig.getRevision()) return;
       const elapsed = Date.now() - startedAt;
       logger.info(`proxy test status=${response.responseCode} elapsed=${elapsed}ms`);
       if (response.responseCode >= 200 && response.responseCode < 400) {
         this.testMessage = $r('app.string.yt_proxy_test_ok');
-        NetworkProxyConfig.recordTestResult(true);
+        NetworkProxyConfig.recordTestResult(true, revision);
       } else if (response.responseCode === 407) {
         this.testMessage = $r('app.string.yt_proxy_test_auth_failed');
-        NetworkProxyConfig.recordTestResult(false);
+        NetworkProxyConfig.recordTestResult(false, revision);
       } else {
         this.testMessage = $r('app.string.yt_proxy_test_http_error');
-        NetworkProxyConfig.recordTestResult(false);
+        NetworkProxyConfig.recordTestResult(false, revision);
       }
     } catch (e) {
+      if (generation !== this.testGeneration || revision !== NetworkProxyConfig.getRevision()) return;
       const err = e as BusinessError;
       logger.warn(`proxy test failed: code=${err.code} msg=${err.message}`);
       const msg = err.message || '';
-      if (msg.includes('407') || await this.probeHttpProxyAuthFailure()) {
+      const authFailure = msg.includes('407') || await this.probeHttpProxyAuthFailure();
+      if (generation !== this.testGeneration || revision !== NetworkProxyConfig.getRevision()) return;
+      if (authFailure) {
         this.testMessage = $r('app.string.yt_proxy_test_auth_failed');
       } else {
         this.testMessage = $r('app.string.yt_proxy_test_failed');
       }
-      NetworkProxyConfig.recordTestResult(false);
+      NetworkProxyConfig.recordTestResult(false, revision);
     } finally {
       req.destroy();
-      this.testing = false;
+      if (this.testRequest === req) this.testRequest = null;
+      if (generation === this.testGeneration) this.testing = false;
     }
   }
 

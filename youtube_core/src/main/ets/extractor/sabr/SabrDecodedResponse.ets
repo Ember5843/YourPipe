@@ -58,6 +58,16 @@ export class SabrFormatInitMeta {
   durationTimescale: number = -1;
 }
 
+export class SabrLiveMetadata {
+  liveHeadSequenceNumber: number = -1;
+  liveHeadTimeMs: number = -1;
+  isPostLiveDvr: boolean = false;
+  minSeekableTimeTicks: number = -1;
+  minSeekableTimescale: number = -1;
+  maxSeekableTimeTicks: number = -1;
+  maxSeekableTimescale: number = -1;
+}
+
 export class SabrDecodedResponse {
   mediaHeaders: SabrMediaHeader[] = [];
   mediaEndHeaderIds: number[] = [];
@@ -65,6 +75,8 @@ export class SabrDecodedResponse {
   redirectUrl?: string;
   sabrError?: string;
   reloadRequested: boolean = false;
+  /** True when the in-flight UMP POST was intentionally aborted to serve a seek jump immediately. */
+  abortedForSeek: boolean = false;
   /**
    * RELOAD_PLAYER token
    * (`ReloadPlaybackContext.reload_playback_params.token`). Must be echoed in
@@ -79,6 +91,7 @@ export class SabrDecodedResponse {
   sabrContextUpdates: SabrContextUpdate[] = [];
   sabrContextSendingPolicy?: SabrContextSendingPolicy;
   formatInitializationMetadata: SabrFormatInitMeta[] = [];
+  liveMetadata: SabrLiveMetadata[] = [];
   backoffTimeMs: number = -1;
   unknownPartTypes: number[] = [];
   segments: SabrMediaSegment[] = [];

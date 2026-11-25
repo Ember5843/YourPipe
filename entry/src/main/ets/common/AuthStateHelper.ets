@@ -8,7 +8,7 @@ const logger = AppLog.getInstance('AuthStateHelper');
 export class AuthStateHelper {
   /**
    * Credential-rail fingerprint of the last observed auth state. Only
-   * presence-of-credential per rail is tracked — never credential material.
+   * Tracks rail, explicit account revision and playback auth policy; never credential material.
    */
   private static lastCredentialFingerprint: string = '';
 
@@ -95,15 +95,7 @@ export class AuthStateHelper {
     }
     const web = session.hasWebSapisidStored();
     const oauth = session.hasOauthCredentialStored();
-    if (web && oauth) {
-      return 'both';
-    }
-    if (web) {
-      return 'web';
-    }
-    if (oauth) {
-      return 'oauth';
-    }
-    return 'none';
+    const rail = web && oauth ? 'both' : (web ? 'web' : (oauth ? 'oauth' : 'none'));
+    return `${rail}|c${session.getCredentialRevision()}|playback=${session.isAuthEnabledForPlayback()}`;
   }
 }

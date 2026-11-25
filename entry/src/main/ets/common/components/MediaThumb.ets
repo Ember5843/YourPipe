@@ -3,8 +3,11 @@
  * Uses ImageFit.Contain so portrait frames are not cropped.
  * On load failure for YouTube /vi/ stills, steps down: maxres → hq720 → sd → hq → mq.
  */
+import { NetworkProxyStatus } from '../NetworkProxyConfig';
+
 @Component
 export struct MediaThumb {
+  @StorageProp('networkProxyStatus') private proxyStatus: NetworkProxyStatus = new NetworkProxyStatus();
   @Prop @Watch('onImageUrlPropChange') imageUrl: string = '';
   @Prop placeholderColor: string = '';
   @Prop thumbId: string = '';
@@ -109,7 +112,8 @@ export struct MediaThumb {
 
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
-      if (this.displayUrl && this.displayUrl.length > 0) {
+      if (this.displayUrl && this.displayUrl.length > 0 &&
+        (!this.proxyStatus.enabled || this.proxyStatus.state === 'ready')) {
         if (this.useCoverBackdrop) {
           Image(this.displayUrl)
             .width(this.fillParent ? '100%' : this.widthVp)

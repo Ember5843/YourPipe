@@ -2,20 +2,14 @@ import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import common from '@ohos.app.ability.common';
 import { AuthSessionManager, AuthBackupState } from 'youtube_core';
 import { AppLog } from './AppLog';
+import { AppDataEpoch } from './AppDataEpoch';
+import { SettingsRuntime } from './SettingsRuntime';
 import { getAppVersion } from './AppVersion';
 import { PreferencesStore } from './PreferencesStore';
-import { NetworkProxyConfig } from './NetworkProxyConfig';
-import { ThemeManager } from './ThemeManager';
-import { ColorModeManager } from './ColorModeManager';
-import { LanguageManager } from './LanguageManager';
-import { AuthStateHelper } from './AuthStateHelper';
 import { LocalStore } from './LocalStore';
 import { WatchHistoryStore, WatchHistoryItem } from './WatchHistoryStore';
 import { SubscriptionFeedStore, SubscriptionFeedItem } from './SubscriptionFeedStore';
 import { SearchHistoryStore, SearchHistoryItem } from './SearchHistoryStore';
-import { UIConfig } from './AppState';
-import { PlaybackConfig } from './PlaybackConfig';
-import { ExperimentalConfig } from './experimental/ExperimentalConfig';
 import { SubscriptionUser } from './SubscriptionModel';
 import { PlaylistItem, StoredLocalQueue } from './PlaylistModel';
 import { VideoItem } from 'youtube_core';
@@ -220,7 +214,9 @@ export class DataBackupManager {
     return available;
   }
 
-  static applyBackup(backup: AppBackupData, selected: BackupItemKey[]): void {
+  static async applyBackup(backup: AppBackupData, selected: BackupItemKey[]): Promise<void> {
+    const recovery = AppDataEpoch.beginRecovery();
+    try {
     const items = backup.items;
     const getItem = (key: BackupItemKey): Object | undefined => {
       switch (key) {
@@ -243,7 +239,7 @@ export class DataBackupManager {
       }
       switch (key) {
         case 'settings':
-          DataBackupManager.restoreSettings(value as Record<string, string>);
+          await DataBackupManager.restoreSettings(value as Record<string, string>);
           break;
         case 'subscriptions':
           DataBackupManager.restoreSubscriptions(value as SubscriptionUser[]);
@@ -271,10 +267,14 @@ export class DataBackupManager {
           break;
       }
     }
+    await PreferencesStore.flushPending();
     logger.info(`Backup applied for items: ${selected.join(', ')}`);
+    } finally {
+      AppDataEpoch.finishRecovery(recovery);
+    }
   }
 
-  private static restoreSettings(entries: Record<string, string>): void {
+  private static async restoreSettings(entries: Record<string, string>): Promise<void> {
     const validEntries: Record<string, string> = {};
     for (const key of Object.keys(entries)) {
       if (key.startsWith('cfg_')) {
@@ -282,26 +282,8 @@ export class DataBackupManager {
       }
     }
     // 只覆盖 cfg_ 设置键；观看历史/搜索历史/订阅/收藏等其余数据不得清空
-    PreferencesStore.restoreConfigEntries(validEntries);
-    const uiConfig = UIConfig.loadFromPreferences();
-    const playbackConfig = PlaybackConfig.loadFromPreferences();
-    const experimentalConfig = ExperimentalConfig.loadFromPreferences();
-    AppStorage.setOrCreate('uiConfig', uiConfig);
-    AppStorage.setOrCreate('playbackConfig', playbackConfig);
-    AppStorage.setOrCreate('experimentalConfig', experimentalConfig);
-    AppStorage.setOrCreate('autoPlayQueue', playbackConfig.autoPlayNext);
-    // 恢复后重应用，复用 EntryAbility.onCreate / AppState.init 的同一套函数
-    const networkProxyConfig = NetworkProxyConfig.load();
-    AppStorage.setOrCreate('networkProxyConfig', networkProxyConfig);
-    NetworkProxyConfig.applySystemAndProviders(networkProxyConfig)
-      .catch((e: Error) => logger.warn(`apply proxy after restore failed: ${e.message}`));
-    ThemeManager.initFromConfig(uiConfig.colorPreset);
-    LanguageManager.applyPersistedLanguage();
-    const context = AppStorage.get<common.UIAbilityContext>('context');
-    if (context) {
-      ColorModeManager.applyPersistedMode(context);
-    }
-    AuthStateHelper.refresh();
+    await PreferencesStore.restoreConfigEntries(validEntries);
+    await SettingsRuntime.applyPersisted();
   }
 
   private static restoreSubscriptions(items: SubscriptionUser[]): void {
@@ -313,7 +295,7 @@ export class DataBackupManager {
   }
 
   private static restoreFavorites(items: VideoItem[]): void {
-    const list = Array.isArray(items) ? items : [];
+    const list = LocalStore.loadFavorites(JSON.stringify(Array.isArray(items) ? items : []));
     AppStorage.setOrCreate('favorites', list);
     PreferencesStore.setString('favoritesJson', LocalStore.saveFavorites(list));
   }
@@ -325,7 +307,7 @@ export class DataBackupManager {
   }
 
   private static restoreLocalQueues(items: StoredLocalQueue[]): void {
-    const list = Array.isArray(items) ? items : [];
+    const list = LocalStore.loadLocalQueues(JSON.stringify(Array.isArray(items) ? items : []));
     AppStorage.setOrCreate('localQueues', list);
     PreferencesStore.setString('localQueuesJson', LocalStore.saveLocalQueues(list));
   }

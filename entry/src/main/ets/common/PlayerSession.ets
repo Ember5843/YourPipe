@@ -1,4 +1,5 @@
 import { AppLog } from './AppLog';
+import { AppDataEpoch } from './AppDataEpoch';
 import { AbilityConstant, common } from '@kit.AbilityKit';
 import { AvPlayerController, VideoData, PlayerState, StateChangeListener, LocalMediaProxy, SubtitleTrack } from 'mediaservice';
 import { VideoInfo, VideoItem } from 'youtube_core';
@@ -8,6 +9,7 @@ import { PlayQueueManager, QueueSourceType } from '../features/player/PlayQueueM
 import { WatchHistoryStore } from './WatchHistoryStore';
 import { LocalMediaProgressStore } from './LocalMediaProgressStore';
 import { PreferencesStore } from './PreferencesStore';
+import { PlaybackConfig } from './PlaybackConfig';
 import { NetworkProxyConfig } from './NetworkProxyConfig';
 import { TranslationService } from './TranslationService';
 // [DISABLED] P2 gtx 已随菜单项注释关闭；恢复时取消注释本行与 autoSelectPreferredSubtitle 内的调用
@@ -31,9 +33,24 @@ const TAG = '[PlayerSession]';
 
 interface PreparedPlayback {
   result: YouTubePlayResult;
+  sessionId: number;
   generation: number;
   attemptId: string;
   startedAt: number;
+}
+
+/** Independent per-session playback configuration snapshotted from Settings on open. */
+export interface SessionPlaybackConfig {
+  autoPlayNext: boolean;
+  vodPlaybackSpeed: number;
+  audioOnly: boolean;
+  subtitlePreferredLang: string;
+}
+
+export interface NewSessionOptions {
+  audioOnly: boolean;
+  preserveQueue: boolean;
+  clearSurface: boolean;
 }
 
 function getFallbackThumbnailUrl(videoId: string): string {
@@ -56,12 +73,17 @@ export class PlayerSession {
   private _activePlayVideoId: string = '';
   private _preparePromise: Promise<PreparedPlayback> | null = null;
   private _prepareVideoId: string = '';
+  private _prepareSessionId: number = -1;
   private _prepareGeneration: number = -1;
   private _prepareAttemptId: string = '';
   /** One-shot timer for the queue-next extraction prefetch (Layer 4). */
   private _queuePrefetchTimerId: number = -1;
   private _attemptSequence: number = 0;
-  /** Invalidates async extraction/source submission across a fresh external open. */
+  /** Monotonic independent session ID: incremented on every new external open and teardown. */
+  private _sessionId: number = 1;
+  /** Independent playback config snapshot owned by the active session. */
+  private _sessionConfig: SessionPlaybackConfig = this.createSessionConfigFromSettings(false);
+  /** Invalidates async extraction/source submission across a fresh external open or media switch. */
   private _playGeneration: number = 0;
   /** Source already accepted by the controller; MPV may still be opening/decoding it. */
   private _submittedVideoId: string = '';
@@ -101,6 +123,8 @@ export class PlayerSession {
   private _isLocalMode: boolean = false;
   /** release() 时调用，用于停止 PiP（避免循环 import，由 PiPManager 注入） */
   onStopPiP: (() => Promise<void>) | null = null;
+  /** 小窗内队列换源时同步画面比例（避免循环 import，由 PiPManager 注入） */
+  onUpdatePiPContentSize: ((width: number, height: number) => void) | null = null;
 
   private playbackExtrasListeners: Set<(source: VideoData) => void> = new Set();
 
@@ -165,6 +189,82 @@ export class PlayerSession {
 
   get controller(): AvPlayerController {
     return this._controller;
+  }
+
+  get sessionId(): number {
+    return this._sessionId;
+  }
+
+  get sessionConfig(): SessionPlaybackConfig {
+    return this._sessionConfig;
+  }
+
+  private createSessionConfigFromSettings(audioOnly: boolean): SessionPlaybackConfig {
+    const pb = AppStorage.get<PlaybackConfig>('playbackConfig');
+    const autoPlayNext = pb ? pb.autoPlayNext : (PreferencesStore.getString('cfg_pb_autoPlayNext', 'true') === 'true');
+    const subtitlePreferredLang = PreferencesStore.getString('cfg_subtitle_preferred_lang', '');
+    return {
+      autoPlayNext: autoPlayNext,
+      vodPlaybackSpeed: 1.0,
+      audioOnly: audioOnly,
+      subtitlePreferredLang: subtitlePreferredLang,
+    };
+  }
+
+  /**
+   * Start a brand-new independent playback session (new sessionId, fresh config snapshot
+   * from Settings, independent queue lifecycle) while reusing the warm native MPV engine.
+   */
+  startNewSession(options: NewSessionOptions): number {
+    this._explicitPageCloseHandled = false;
+    this.saveWatchHistory();
+    this.stopWatchSaveTimer();
+    this._sessionId += 1;
+    this.resetSession(false, options.clearSurface, false);
+    this._sessionConfig = this.createSessionConfigFromSettings(options.audioOnly);
+    AppStorage.setOrCreate('autoPlayQueue', this._sessionConfig.autoPlayNext);
+    const queue = PlayQueueManager.getInstance();
+    if (options.preserveQueue) {
+      queue.rebindSession(this._sessionId);
+    } else {
+      queue.resetForSession(this._sessionId);
+    }
+    this.setAudioOnlyMode(options.audioOnly);
+    this._controller.setPlaybackSpeed(1.0);
+    this._playbackTornDown = false;
+    logger.info(`${TAG} startNewSession id=${this._sessionId} audioOnly=${options.audioOnly} `
+      + `preserveQueue=${options.preserveQueue} clearSurface=${options.clearSurface} `
+      + `autoPlay=${this._sessionConfig.autoPlayNext}`);
+    return this._sessionId;
+  }
+
+  /** Update auto-play toggle for the active session only (does not mutate global Settings). */
+  setSessionAutoPlay(enabled: boolean): void {
+    this._sessionConfig.autoPlayNext = enabled;
+    AppStorage.setOrCreate('autoPlayQueue', enabled);
+  }
+
+  /** Update playback speed for the active session (remembered across VOD items in this queue). */
+  setSessionPlaybackSpeed(speed: number): void {
+    if (!Number.isFinite(speed) || speed <= 0) return;
+    if (!this._defaultSource.isLive) {
+      this._sessionConfig.vodPlaybackSpeed = speed;
+    }
+    this._controller.setPlaybackSpeed(speed);
+  }
+
+  /** Retry the current video in-place while preserving this session's ID, queue, and config. */
+  retryCurrentVideo(video: VideoItem): void {
+    this.saveWatchHistory();
+    this.stopWatchSaveTimer();
+    this.resetSession(true, false, this._isPiPActive);
+    this._playbackTornDown = false;
+    this._forceRefreshNextPrepare = true;
+    if (video.localMediaPath) {
+      this.beginLocalPrepare(video);
+    } else {
+      this.beginPrepare(video);
+    }
   }
 
   get currentVideo(): VideoItem | null {
@@ -468,9 +568,10 @@ export class PlayerSession {
     if (!videoId) return;
     this._playbackTornDown = false;
     this._prepareVideoId = videoId;
+    this._prepareSessionId = this._sessionId;
     this._prepareGeneration = this._playGeneration;
     this.setLocalMode(true);
-    logger.info(`${TAG} local prepare video=${videoId} generation=${this._playGeneration}`);
+    logger.info(`${TAG} local prepare video=${videoId} session=${this._sessionId} generation=${this._playGeneration}`);
   }
 
   beginPrepare(video: VideoItem): void {
@@ -478,20 +579,23 @@ export class PlayerSession {
     if (!videoId) return;
     // 显式的播放准备意图解除「已拆除」标记（外部打开/重试/换片都经此武装）。
     this._playbackTornDown = false;
+    const sessionId = this._sessionId;
     const generation = this._playGeneration;
     if (this._preparePromise
       && this._prepareVideoId === videoId
+      && this._prepareSessionId === sessionId
       && this._prepareGeneration === generation) {
       return;
     }
     const attemptId = `${videoId}-${Date.now()}-${++this._attemptSequence}`;
     const startedAt = Date.now();
     this._prepareVideoId = videoId;
+    this._prepareSessionId = sessionId;
     this._prepareGeneration = generation;
     this._prepareAttemptId = attemptId;
     this._controller.setStartupAttempt(attemptId, startedAt);
     logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=card_click`);
-    logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=prepare_start generation=${generation}`);
+    logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=prepare_start session=${sessionId} generation=${generation}`);
     const playService = YouTubePlayService.getInstance(this._context);
     const proxyTask = LocalMediaProxy.warmup().then((ok: boolean) => {
       logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=proxy_ready elapsed=${Date.now() - startedAt}ms ok=${ok}`);
@@ -514,6 +618,7 @@ export class PlayerSession {
       proxyTask
     ]).then((values) => ({
       result: values[0],
+      sessionId: sessionId,
       generation: generation,
       attemptId: attemptId,
       startedAt: startedAt
@@ -549,10 +654,11 @@ export class PlayerSession {
       clearTimeout(this._queuePrefetchTimerId);
       this._queuePrefetchTimerId = -1;
     }
+    const sessionId = this._sessionId;
     const generation = this._playGeneration;
     this._queuePrefetchTimerId = setTimeout(() => {
       this._queuePrefetchTimerId = -1;
-      if (!this.isPlayContextCurrent(generation, currentVideoId)) {
+      if (!this.isPlayContextCurrent(sessionId, generation, currentVideoId)) {
         return;
       }
       if (!this._controller.vm.isPlaying) {
@@ -614,7 +720,7 @@ export class PlayerSession {
       this.retryCurrentWithFreshStreams(state.currentTime);
       return;
     }
-    const autoPlay = AppStorage.get<boolean>('autoPlayQueue') ?? true;
+    const autoPlay = this._sessionConfig.autoPlayNext;
     if (!autoPlay) {
       return;
     }
@@ -662,11 +768,12 @@ export class PlayerSession {
     this._failureRetryInFlight = true;
     const attempt = this._failureRetryCount++;
     const delayMs = this.FAILURE_RETRY_BACKOFF_MS[Math.min(attempt, this.FAILURE_RETRY_BACKOFF_MS.length - 1)];
+    const sessionId = this._sessionId;
     const generation = this._playGeneration;
     logger.warn(`${TAG} fresh-stream retry #${attempt + 1}/${this.MAX_FAILURE_RETRIES} `
-      + `video=${videoId} resume=${resumePosSec.toFixed(2)}s delay=${delayMs}ms`);
+      + `session=${sessionId} video=${videoId} resume=${resumePosSec.toFixed(2)}s delay=${delayMs}ms`);
     setTimeout(async () => {
-      if (!this.isPlayContextCurrent(generation, videoId)) {
+      if (!this.isPlayContextCurrent(sessionId, generation, videoId)) {
         logger.info(`${TAG} fresh-stream retry discarded: session changed video=${videoId}`);
         this._failureRetryInFlight = false;
         return;
@@ -688,13 +795,17 @@ export class PlayerSession {
   }
 
   private bindQueueSwitchHandler(): void {
-    PlayQueueManager.getInstance().onSwitchVideo = (video: VideoItem) => {
-      this.switchToQueueVideo(video);
+    PlayQueueManager.getInstance().onSwitchVideo = (video: VideoItem, fromSessionId: number) => {
+      this.switchToQueueVideo(video, fromSessionId);
     };
   }
 
-  private async switchToQueueVideo(video: VideoItem): Promise<void> {
+  private async switchToQueueVideo(video: VideoItem, fromSessionId: number): Promise<void> {
     if (!video || !video.videoId) {
+      return;
+    }
+    if (fromSessionId > 0 && fromSessionId !== this._sessionId) {
+      logger.warn(`${TAG} queue switch discarded: stale session ${fromSessionId} != ${this._sessionId} video=${video.videoId}`);
       return;
     }
     // 排队期间播放已被拆除（典型：自动连播分页等待时用户退出播放页）：丢弃，
@@ -703,7 +814,7 @@ export class PlayerSession {
       logger.warn(`${TAG} queue switch discarded: playback already torn down video=${video.videoId}`);
       return;
     }
-    logger.info(`${TAG} queue switch -> ${video.videoId}`);
+    logger.info(`${TAG} queue switch session=${this._sessionId} -> ${video.videoId}`);
     AppStorage.setOrCreate('selectedVideo', video);
     await this.play(video);
   }
@@ -763,15 +874,17 @@ export class PlayerSession {
 
     // 本地源在提交前就把会话模式切到 local，播放页首帧不会先渲染在线详情 Tab
     // （评论 Tab 等），也避免依赖 doPlayLocal 的异步时序。
+    this._playbackTornDown = false;
     this.setLocalMode(!!video.localMediaPath);
     this._currentVideo = video;
     this._activePlayVideoId = videoId;
-    logger.info(`${TAG} play() called for ${videoId} local=${!!video.localMediaPath}`);
+    logger.info(`${TAG} play() called for ${videoId} session=${this._sessionId} local=${!!video.localMediaPath}`);
     // SponsorBlock：与提取并行取片段，播放进度到达时自动跳过（本地/直播由 skipper 忽略）。
     SponsorBlockSkipper.getInstance().onVideoStarted(this._controller, video);
 
+    const sessionId = this._sessionId;
     const generation = this._playGeneration;
-    const promise = this.doPlay(video, videoId, generation);
+    const promise = this.doPlay(video, videoId, sessionId, generation);
     this._activePlayPromise = promise;
     try {
       return await promise;
@@ -783,8 +896,10 @@ export class PlayerSession {
     }
   }
 
-  private isPlayContextCurrent(generation: number, videoId: string): boolean {
-    return generation === this._playGeneration && this._currentVideo?.videoId === videoId;
+  private isPlayContextCurrent(sessionId: number, generation: number, videoId: string): boolean {
+    return sessionId === this._sessionId
+      && generation === this._playGeneration
+      && this._currentVideo?.videoId === videoId;
   }
 
   /**
@@ -841,8 +956,9 @@ export class PlayerSession {
     this._activePlayVideoId = videoId;
     logger.info(`${TAG} playShorts start video=${videoId} generation=${this._playGeneration}`);
 
+    const sessionId = this._sessionId;
     const generation = this._playGeneration;
-    const promise = this.doPlay(video, videoId, generation);
+    const promise = this.doPlay(video, videoId, sessionId, generation);
     this._activePlayPromise = promise;
     try {
       return await promise;
@@ -893,7 +1009,7 @@ export class PlayerSession {
    * 合成一条 progressive 流（hasVideo+hasAudio），复用与点播一致的
    * updateVideoSource → selectInitialStreams → createPlaybackUrl(LOCAL_FILE) → load 链路。
    */
-  private async doPlayLocal(video: VideoItem, videoId: string, generation: number,
+  private async doPlayLocal(video: VideoItem, videoId: string, sessionId: number, generation: number,
     localPath: string): Promise<VideoData | null> {
     const startedAt = Date.now();
     // 本地播放不需要 beginPrepare（无提取），但它承担着「显式播放意图解除已拆除标记」
@@ -949,10 +1065,11 @@ export class PlayerSession {
     videoSource.auto = shouldPlay;
     logger.info(`${TAG} local source ready file=${PlayerSession.fileNameOf(localPath)} play=${shouldPlay}`);
     await this._controller.updateVideoSource(videoSource);
-    if (!this.isPlayContextCurrent(generation, videoId)) {
+    if (!this.isPlayContextCurrent(sessionId, generation, videoId)) {
       logger.info(`${TAG} local source discarded: session changed during submission`);
       return null;
     }
+    this._controller.setPlaybackSpeed(this._sessionConfig.vodPlaybackSpeed);
     this._submittedVideoId = videoId;
     this._cachedVideoSource = videoSource;
     this.notifyPlaybackSourceChanged(videoSource, 'local-source-ready');
@@ -967,9 +1084,9 @@ export class PlayerSession {
     return idx >= 0 ? path.substring(idx + 1) : path;
   }
 
-  private async doPlay(video: VideoItem, videoId: string, generation: number): Promise<VideoData | null> {
+  private async doPlay(video: VideoItem, videoId: string, sessionId: number, generation: number): Promise<VideoData | null> {
     if (video.localMediaPath) {
-      return this.doPlayLocal(video, videoId, generation, video.localMediaPath);
+      return this.doPlayLocal(video, videoId, sessionId, generation, video.localMediaPath);
     }
     try {
       const playService = YouTubePlayService.getInstance(this._context);
@@ -977,6 +1094,7 @@ export class PlayerSession {
       let prepared: PreparedPlayback;
       if (this._preparePromise
         && this._prepareVideoId === videoId
+        && this._prepareSessionId === sessionId
         && this._prepareGeneration === generation) {
         prepared = await this._preparePromise;
       } else {
@@ -987,8 +1105,9 @@ export class PlayerSession {
       const attemptId = prepared.attemptId;
       logger.info(`${TAG} [TIMING] video=${videoId} extract+MPV init elapsed=${Date.now() - startedAt}ms`);
 
-      if (prepared.generation !== this._playGeneration
-        || !this.isPlayContextCurrent(generation, videoId)) {
+      if (prepared.sessionId !== this._sessionId
+        || prepared.generation !== this._playGeneration
+        || !this.isPlayContextCurrent(sessionId, generation, videoId)) {
         logger.info(`${TAG} doPlay() result discarded: session changed during extraction`);
         return null;
       }
@@ -1052,7 +1171,7 @@ export class PlayerSession {
           streams: result.playerStreams ?? [],
           subtitleTracks: result.subtitleTracks ?? [],
           chapters: result.videoInfo.chapters || [],
-          isLive: result.videoInfo.isLive || false,
+          isLive: result.videoInfo.isLive || false, isLiveReplay: result.videoInfo.isLiveReplay || false,
           hlsUrl: result.videoInfo.hlsUrl,
           dashMpdUrl: result.videoInfo.dashMpdUrl,
           thumbnailUrl: video.thumbnailUrl || '',
@@ -1080,9 +1199,18 @@ export class PlayerSession {
         logger.info(`${TAG} stream ready, updating player source video=${videoId} streams=${videoSource.streams?.length || 0}`);
         logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=source_submit elapsed=${Date.now() - prepared.startedAt}ms`);
         await this._controller.updateVideoSource(videoSource);
-        if (!this.isPlayContextCurrent(generation, videoId)) {
+        if (!this.isPlayContextCurrent(sessionId, generation, videoId)) {
           logger.info(`${TAG} source completion discarded: session changed during submission`);
           return null;
+        }
+        // Apply session-scoped speed: live locks to 1.0x while preserving session VOD speed
+        // so switching back to a VOD item in the same queue restores it cleanly.
+        const targetSpeed = videoSource.isLive === true ? 1.0 : this._sessionConfig.vodPlaybackSpeed;
+        this._controller.setPlaybackSpeed(targetSpeed);
+        if (this._isPiPActive && this.onUpdatePiPContentSize) {
+          const vw = videoSource.width || 16;
+          const vh = videoSource.height || 9;
+          this.onUpdatePiPContentSize(vw, vh);
         }
         this._submittedVideoId = videoId;
         this._lastAutoAdvanceFromVideoId = '';
@@ -1092,10 +1220,10 @@ export class PlayerSession {
         // Live quality management: parse HLS variants in the background and
         // merge them into the quality list once ready. Playback never waits.
         if (videoSource.isLive && videoSource.hlsUrl) {
-          this.fetchLiveVariantsInBackground(playService, result.videoInfo);
+          this.fetchLiveVariantsInBackground(playService, result.videoInfo, sessionId);
         }
         logger.info(`${TAG} [STARTUP] attempt=${attemptId} stage=source_submitted elapsed=${Date.now() - prepared.startedAt}ms`);
-        this.fetchPlaybackExtrasInBackground(playService, result.videoInfo);
+        this.fetchPlaybackExtrasInBackground(playService, result.videoInfo, sessionId);
         this.startWatchSaveTimer();
         this.scheduleQueuePrefetch(videoId);
         return videoSource;
@@ -1162,11 +1290,11 @@ export class PlayerSession {
 
   /** Live quality: background-parse HLS master variants and merge them into
    * the controller quality list. Fire-and-forget; playback never waits. */
-  private fetchLiveVariantsInBackground(playService: YouTubePlayService, videoInfo: VideoInfo): void {
+  private fetchLiveVariantsInBackground(playService: YouTubePlayService, videoInfo: VideoInfo, sessionId: number): void {
     const videoId = videoInfo.videoId;
     const startedAt = Date.now();
     playService.fetchLiveHlsVariants(videoInfo).then((variants) => {
-      if (variants.length === 0 || this._currentVideo?.videoId !== videoId) {
+      if (variants.length === 0 || sessionId !== this._sessionId || this._currentVideo?.videoId !== videoId) {
         return;
       }
       logger.info(`${TAG} live HLS variants ready video=${videoId} count=${variants.length} elapsed=${Date.now() - startedAt}ms`);
@@ -1176,13 +1304,13 @@ export class PlayerSession {
     });
   }
 
-  private fetchPlaybackExtrasInBackground(playService: YouTubePlayService, videoInfo: VideoInfo): void {
+  private fetchPlaybackExtrasInBackground(playService: YouTubePlayService, videoInfo: VideoInfo, sessionId: number): void {
     const videoId = videoInfo.videoId;
     this._activeExtrasVideoId = videoId;
     const startedAt = Date.now();
     logger.info(`${TAG} playback extras start video=${videoId}`);
     playService.fetchPlaybackExtrasFor(videoInfo).then((extras) => {
-      if (!extras || this._currentVideo?.videoId !== videoId || this._activeExtrasVideoId !== videoId) {
+      if (!extras || sessionId !== this._sessionId || this._currentVideo?.videoId !== videoId || this._activeExtrasVideoId !== videoId) {
         return;
       }
       logger.info(`${TAG} playback extras done video=${videoId} elapsed=${Date.now() - startedAt}ms like=${extras.likeCount ?? -1} dislike=${extras.dislikeCount ?? -1} related=${extras.relatedItems?.length || 0} chapters=${extras.chapters?.length || 0}`);
@@ -1262,6 +1390,7 @@ export class PlayerSession {
   }
 
   private saveWatchHistory(): void {
+    if (!AppDataEpoch.isCurrent(AppDataEpoch.capture())) return;
     if (!this._watchVideoId) return;
     // release()/forceReset() 链路上，controller 可能已被 releaseVideo(0) 释放、
     // vm.currentTime 已被清零。强行落盘会把真实进度覆盖成 0。
@@ -1343,13 +1472,14 @@ export class PlayerSession {
     this.cancelSleepTimer();
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
+    this._sessionId += 1;
     this.resetSession(false, true);
+    this._sessionConfig = this.createSessionConfigFromSettings(false);
+    AppStorage.setOrCreate('autoPlayQueue', this._sessionConfig.autoPlayNext);
     this._explicitPageCloseHandled = true;
     AppStorage.setOrCreate('playerLoading', false);
-    const queue = PlayQueueManager.getInstance();
-    if (queue.sourceType === QueueSourceType.ADHOC) {
-      queue.clear();
-    }
+    // Closing a session destroys its independent queue completely (ADHOC, REMOTE, and LOCAL).
+    PlayQueueManager.getInstance().resetForSession(this._sessionId);
   }
 
   /**
@@ -1362,7 +1492,7 @@ export class PlayerSession {
     this.release(true);
   }
 
-  /** Normal navigation away from PlayerPage: close media but retain the queue. */
+  /** Normal navigation away from PlayerPage: tear down session and its independent queue. */
   closeForNavigation(): void {
     if (this.shouldRetainMediaOnPageDisappear()) {
       logger.warn(`${TAG} closeForNavigation() ignored during PiP handoff/restore`);
@@ -1370,9 +1500,15 @@ export class PlayerSession {
     }
     logger.info(`${TAG} closeForNavigation() called`);
     SponsorBlockSkipper.getInstance().onPlaybackStopped();
+    this.clearAudioOnlyMode();
+    this.cancelSleepTimer();
     this.saveWatchHistory();
     this.stopWatchSaveTimer();
-    this.resetSession(true, true);
+    this._sessionId += 1;
+    this.resetSession(false, true);
+    this._sessionConfig = this.createSessionConfigFromSettings(false);
+    AppStorage.setOrCreate('autoPlayQueue', this._sessionConfig.autoPlayNext);
+    PlayQueueManager.getInstance().resetForSession(this._sessionId);
     AppStorage.setOrCreate('playerLoading', false);
   }
 
@@ -1411,6 +1547,7 @@ export class PlayerSession {
     this._activePlayVideoId = '';
     this._preparePromise = null;
     this._prepareVideoId = '';
+    this._prepareSessionId = -1;
     this._prepareGeneration = -1;
     this._prepareAttemptId = '';
     if (this._queuePrefetchTimerId >= 0) {

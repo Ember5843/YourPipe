@@ -28,6 +28,12 @@ export struct CommentList {
   @Consume('commentPageInfo') pageInfo: NavPathStack;
   @Consume('actionHub') actionHub: ActionHub;
   private activeRequestKey: string = '';
+  private requestSequence: number = 0;
+
+  aboutToDisappear(): void {
+    this.activeRequestKey = '';
+    this.isLoading = false;
+  }
 
   /** 评论内时间戳点击 → 复用与简介一致的精确 seek 通道。 */
   private seekToCommentTimestamp(seconds: number): void {
@@ -55,7 +61,7 @@ export struct CommentList {
     this.loadComments(true);
   }
 
-  async loadComments(reset: boolean): Promise<void> {
+  async loadComments(reset: boolean, emptyRetries: number = 0): Promise<void> {
     if (this.isLoading) return;
     if (!this.videoId) return;
     
@@ -64,7 +70,7 @@ export struct CommentList {
 
     this.isLoading = true;
     const loadingVideoId = this.videoId;
-    const requestKey = `${loadingVideoId}_${Date.now()}`;
+    const requestKey = `${loadingVideoId}_${++this.requestSequence}`;
     this.activeRequestKey = requestKey;
     logger.info(`loadComments(reset=${reset}), current count: ${this.comments.length}, token: ${this.nextPageToken ? 'present' : 'none'}`);
 
@@ -90,12 +96,12 @@ export struct CommentList {
         const newItems = response.items.filter(newItem => !this.comments.some(existing => existing.id === newItem.id));
         if (newItems.length > 0) {
           this.comments = this.comments.concat(newItems);
-        } else if (response.nextPageToken && response.nextPageToken !== this.nextPageToken) {
+        } else if (emptyRetries < 1 && response.nextPageToken && response.nextPageToken !== this.nextPageToken) {
           // 如果拿到了新 token 但没拿到新项，尝试用新 token 继续加载一次
           this.nextPageToken = response.nextPageToken;
           this.isLoading = false; // 允许下一轮调用
           logger.warn('No new items but got new token, retrying...');
-          return this.loadComments(false);
+          return this.loadComments(false, emptyRetries + 1);
         }
       }
       this.nextPageToken = response.nextPageToken;

@@ -5,6 +5,7 @@ import {
   SabrContextUpdate,
   SabrDecodedResponse,
   SabrFormatInitMeta,
+  SabrLiveMetadata,
   SabrNextRequestPolicy,
   SabrRedirectInfo
 } from './SabrDecodedResponse';
@@ -17,6 +18,9 @@ import { UmpPart, umpReadAll } from './UmpReader';
 export const PART_MEDIA_HEADER = 20;
 export const PART_MEDIA = 21;
 export const PART_MEDIA_END = 22;
+export const PART_LIVE_METADATA = 31;
+export const PART_LIVE_METADATA_PROMISE = 33;
+export const PART_LIVE_METADATA_PROMISE_CANCELLATION = 34;
 export const PART_NEXT_REQUEST_POLICY = 35;
 export const PART_FORMAT_INITIALIZATION_METADATA = 42;
 export const PART_SABR_REDIRECT = 43;
@@ -91,16 +95,19 @@ export class SabrPartProcessor {
   private mediaBytesByHeaderId: Map<number, number> = new Map();
   private segmentSink?: (segment: SabrMediaSegment) => void;
   private formatMetaSink?: (meta: SabrFormatInitMeta) => void;
+  private liveMetaSink?: (meta: SabrLiveMetadata) => void;
   /** Segments retained only when no sink is attached. */
   private retainedSegments: SabrMediaSegment[] = [];
   private segmentCountValue: number = 0;
 
   constructor(
     segmentSink?: (segment: SabrMediaSegment) => void,
-    formatMetaSink?: (meta: SabrFormatInitMeta) => void
+    formatMetaSink?: (meta: SabrFormatInitMeta) => void,
+    liveMetaSink?: (meta: SabrLiveMetadata) => void
   ) {
     this.segmentSink = segmentSink;
     this.formatMetaSink = formatMetaSink;
+    this.liveMetaSink = liveMetaSink;
   }
 
   /** Process one UMP part. Never throws — a malformed part is logged and skipped. */
@@ -184,6 +191,15 @@ export class SabrPartProcessor {
           this.formatMetaSink?.(meta);
           break;
         }
+        case PART_LIVE_METADATA: {
+          const liveMeta = decodeLiveMetadata(part.data);
+          this.decoded.liveMetadata.push(liveMeta);
+          this.liveMetaSink?.(liveMeta);
+          break;
+        }
+        case PART_LIVE_METADATA_PROMISE:
+        case PART_LIVE_METADATA_PROMISE_CANCELLATION:
+          break;
         case PART_SABR_SEEK: {
           // Minimal handling: decode the reason for diagnostics. We do not execute the
           // server-demanded reposition (PipePipe doesn't either); the response is still
@@ -537,6 +553,41 @@ function summarizeOpaque(data: Uint8Array, label: string): string {
   } catch (_e) {
     return `${label}:opaque(${data.length})`;
   }
+}
+
+function decodeLiveMetadata(data: Uint8Array): SabrLiveMetadata {
+  const meta = new SabrLiveMetadata();
+  for (const field of sabrReadFields(data)) {
+    if (field.wireType !== WIRE_VARINT) {
+      continue;
+    }
+    switch (field.number) {
+      case 3:
+        meta.liveHeadSequenceNumber = field.varint;
+        break;
+      case 4:
+        meta.liveHeadTimeMs = field.varint;
+        break;
+      case 8:
+        meta.isPostLiveDvr = field.varint !== 0;
+        break;
+      case 12:
+        meta.minSeekableTimeTicks = field.varint;
+        break;
+      case 13:
+        meta.minSeekableTimescale = field.varint | 0;
+        break;
+      case 14:
+        meta.maxSeekableTimeTicks = field.varint;
+        break;
+      case 15:
+        meta.maxSeekableTimescale = field.varint | 0;
+        break;
+      default:
+        break;
+    }
+  }
+  return meta;
 }
 
 export function requireUmpContentType(contentType: string | undefined, status: number): void {

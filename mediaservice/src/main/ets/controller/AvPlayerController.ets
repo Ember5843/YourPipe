@@ -7,6 +7,8 @@ import { VideoData, StreamInfo } from '../model/VideoData';
 import { PlayerModel, StreamCategories, CurrentStreams, VideoEntry } from '../model/PlayerModel';
 import { PlaybackEngine, PlaybackState, PlaybackStats, EngineConfig } from '../engine/PlaybackEngine';
 import { MpvPlaybackEngine } from '../engine/MpvPlaybackEngine';
+import { registerDirectStream, registerHlsStream, unregisterStream } from '@yourpipe/libmpv-napi';
+import type { NativeDirectStreamSpec, NativeHlsStreamSpec } from '@yourpipe/libmpv-napi';
 import { VideoHwCaps } from '../engine/VideoHwCaps';
 import { LocalMediaProxy } from './LocalMediaProxy';
 import { AvSessionManager } from '../common/AvSessionManager';
@@ -16,6 +18,7 @@ import { ContextProvider } from '../common/ContextProvider';
 import { proxyTrafficMeter } from '../proxy/ProxyTrafficMeter';
 import { audio } from '@kit.AudioKit';
 import { PlayerStateRelay, ProgressSubscriber, PlaybackStateSubscriber } from '../state/PlayerStateRelay';
+import { normalizePlaybackTimeline } from '../state/PlaybackTimeline';
 import { PlayerStateMachine, StateChangeListener } from '../state/PlayerStateMachine';
 import { PlayerState } from '../state/PlayerState';
 import { PlayerUiViewModel } from '../state/PlayerUiViewModel';
@@ -31,9 +34,23 @@ interface HlsTrackPair {
   audioUrl: string;
   /** itag of the picked video variant — identity for menu highlight across master re-fetches. */
   itag?: number;
+  videoBitrate?: number;
+  audioBitrate?: number;
 }
 
 const TAG: string = '[PlayerLog][AvPlayerController]';
+
+class PreparedPlaybackSource {
+  url: string = '';
+  mediaGeneration: number = 0;
+  switchGeneration: number = 0;
+  sessionId: string = '';
+  audioSessionId: string = '';
+  streamUrls: string[] = [];
+  hlsAudioUrl: string = '';
+  liveItag?: number;
+  videoBitrate: number = 0;
+}
 
 @Observed
 export class AvPlayerController {
@@ -66,7 +83,12 @@ export class AvPlayerController {
   private subtitleCues: SubtitleCue[] = [];
   /** Guards async subtitle loads against stale completions (track switch / new source). */
   private subtitleLoadSeq: number = 0;
-  private playbackEngine: PlaybackEngine = new MpvPlaybackEngine();
+  private mpvEngine: MpvPlaybackEngine = new MpvPlaybackEngine();
+  private playbackEngine: PlaybackEngine = this.mpvEngine;
+  private surfaceWidthPx: number = 0;
+  private surfaceHeightPx: number = 0;
+  private currentStreamUrls: string[] = [];
+  private pendingDestroyStreamUrls: string[] = [];
   private avSessionManager: AvSessionManager = AvSessionManager.getInstance();
   private stateMachine: PlayerStateMachine = new PlayerStateMachine();
   private stateRelay: PlayerStateRelay = new PlayerStateRelay();
@@ -76,6 +98,10 @@ export class AvPlayerController {
   private mediaInitPromise: Promise<void> | null = null;
   /** Invalidates every async source/proxy operation from a closed media session. */
   private mediaSessionGeneration: number = 0;
+  private sourceSwitchGeneration: number = 0;
+  private latestPlaybackState?: PlaybackState;
+  private transportIntentRevision: number = 0;
+  private transportIntentPlaying: boolean = false;
 
   private errorListeners: Set<(errorMsg: string) => void> = new Set();
   private waitingForBufferListeners: Set<(isWaiting: boolean) => void> = new Set();
@@ -83,6 +109,8 @@ export class AvPlayerController {
 
   private currentLocalMediaSessionId: string = '';
   private pendingDestroySessionId: string = '';
+  /** In-flight SABR lease key before LocalProxyServer registers the session (aborted on cancel). */
+  private pendingSabrLeaseKey: string = '';
   /** EDL dual-track playback uses a second (audio) single-url session beside the main one. */
   private currentEdlAudioSessionId: string = '';
   private pendingDestroyEdlAudioSessionId: string = '';
@@ -115,9 +143,11 @@ export class AvPlayerController {
   /** A playback window is stalled when the position advances less than this over STALL_DETECT_MS. */
   private static readonly STALL_MIN_PROGRESS_SEC = 1;
   private static readonly STALL_DETECT_MS = 20000;
+  private static readonly STARTUP_STALL_DETECT_MS = 35000;
   private stallWatchdogTimer: number = -1;
   private stallBaselinePosSec: number = -1;
   private stallBaselineAtMs: number = 0;
+  private startupStallSinceMs: number = 0;
   /**
    * Quality/audio switch in flight: keep spinner on while proxy rebuilds + engine reloads.
    * loadStarted becomes true only after createPlaybackUrl finishes and load() is called,
@@ -169,7 +199,7 @@ export class AvPlayerController {
   }
 
   getPlaybackState(): PlaybackState {
-    return this.playbackEngine.getState();
+    return this.latestPlaybackState ?? this.playbackEngine.getState();
   }
 
   /** Live playback statistics (Stats-for-Nerds style); all zeros until the engine is initialized. */
@@ -183,14 +213,16 @@ export class AvPlayerController {
         networkSpeedBps: 0
       };
     }
-    // MPV's cache-speed is meaningless behind the loopback proxy (it reads
-    // locally); there the connection speed comes from proxy-metered inbound
-    // traffic. Direct network sources (live HLS) never pass the proxy, so
-    // cache-speed is the real fetch speed and is used instead.
+    // Unified 5s sliding-window inbound network speed (bytes/sec):
+    // - ypstream:// (Direct VOD + Live HLS): native C++ NativeHttpTransport 5s meter (stats.networkSpeedBps)
+    // - Local proxy (SABR / fallback RangeProxy): proxyTrafficMeter 5s meter
+    // - Direct FFmpeg fallback (DVR HLS / local): MPV cache-speed
     const stats = this.playbackEngine.getPlaybackStats();
-    stats.networkSpeedBps = this.playbackEngine.isDirectNetworkSource()
-      ? stats.cacheSpeedBps
-      : proxyTrafficMeter.getRateBps();
+    if (stats.networkSpeedBps === undefined) {
+      stats.networkSpeedBps = this.playbackEngine.isDirectNetworkSource()
+        ? stats.cacheSpeedBps
+        : proxyTrafficMeter.getRateBps();
+    }
     return stats;
   }
 
@@ -462,11 +494,11 @@ export class AvPlayerController {
     }
   }
 
-  /** Startup-only warmup: initialize MPV without AVSession or background-task registration. */
+  /** Startup-only warmup: initialize configured playback engine without AVSession or background-task registration. */
   public async prewarmPlaybackEngine(): Promise<void> {
     const ok = await this.ensurePlaybackEngineInitialized();
     if (!ok) {
-      throw new Error('MPV prewarm failed');
+      throw new Error('Playback engine prewarm failed');
     }
   }
 
@@ -510,6 +542,13 @@ export class AvPlayerController {
     this.avSessionManager.onAudioFocusHint = (hint) => {
       this.handleAudioFocusHint(hint);
     };
+    this.avSessionManager.onOutputDeviceDisconnected = (deviceName: string, deviceType) => {
+      if (this.isActive() && (this.vm.isPlaying
+        || this.stateMachine.isOneOf(PlayerState.PLAYING, PlayerState.BUFFERING))) {
+        Logger.info(TAG, `[StateTrace] [AudioRoute] auto-pause on output disconnect type=${deviceType} name=${deviceName || '-'}`);
+        this.syncPause();
+      }
+    };
   }
 
   private async ensurePlaybackEngineInitialized(): Promise<boolean> {
@@ -528,6 +567,9 @@ export class AvPlayerController {
         // 字幕文本唯一写入口是覆盖层（switchSubtitle/updateSubtitleOverlayText）；
         // 不再注册引擎 subtitleCallback，mpv 也不会再 sub-add 烧录。
         if (this.surfaceID.length > 0) {
+          if (this.surfaceWidthPx > 0 && this.surfaceHeightPx > 0) {
+            this.playbackEngine.resizeSurface(this.surfaceWidthPx, this.surfaceHeightPx);
+          }
           this.playbackEngine.attachSurface(this.surfaceID);
         }
       }
@@ -611,32 +653,40 @@ export class AvPlayerController {
     }
 
     // Live streams: resolve one video variant + its audio rendition from the HLS
-    // master and play them as variant playlist + mpv external audio (audio-files).
-    // The master itself cannot go to MPV: FFmpeg probes every variant playlist
-    // serially (multi-10s TTFF) and the audio rendition goes stale → audio=eof.
+    // master and play them through native C++20 HlsLiveStream (ypstream://) with
+    // concurrent segment prefetching & async playlist refresh.
     if (newSource.isLive && newSource.hlsUrl) {
-      const maxHeight = this.resolveMaxHeight(prefs.defaultQuality || 'best');
-      const hls = await this.resolveLiveHlsStreams(maxHeight);
-      if (!this.isMediaSessionCurrent(generation)) return;
-      Logger.info(TAG, `[TTFF] hls_variant_ready elapsed=${Date.now() - submitStartedAt}ms `
-        + `selected=${hls?.videoUrl ? 'yes' : 'master-fallback'} itag=${hls?.itag ?? '-'}`);
-      const liveUrl = hls?.videoUrl || newSource.hlsUrl;
-      this.currentHlsAudioUrl = hls?.audioUrl || '';
-      this.livePlayingVariantItag = hls?.itag;
-      Logger.info(TAG, `Live stream: variant=${this.describePlaybackUrl(liveUrl)} audio=${this.currentHlsAudioUrl ? 'external' : (hls ? 'muxed/none' : 'master-fallback')}`);
-      this.updateAvSessionMetadata(false);
-      this.vm.isBuffering = true;
-      this.loadPlaybackSource(liveUrl, 0, generation);
-      Logger.info(TAG, `[TTFF] load_submitted elapsed=${Date.now() - submitStartedAt}ms live=true`);
-      if (newSource.play || newSource.auto) {
-        this.avSessionManager.activateForPlayback();
-        this.playbackEngine.play();
+      const candidate = new PreparedPlaybackSource();
+      candidate.mediaGeneration = generation;
+      candidate.switchGeneration = ++this.sourceSwitchGeneration;
+      try {
+        const maxHeight = this.resolveMaxHeight(prefs.defaultQuality || 'best');
+        const hls = await this.resolveLiveHlsStreams(maxHeight);
+        if (!this.isPreparedSourceCurrent(candidate)) return;
+        Logger.info(TAG, `[TTFF] hls_variant_ready elapsed=${Date.now() - submitStartedAt}ms `
+          + `selected=${hls?.videoUrl ? 'yes' : 'master-fallback'} itag=${hls?.itag ?? '-'}`);
+        this.applyLiveHlsCandidate(hls, newSource.hlsUrl, undefined, 0, candidate);
+        Logger.info(TAG, `Live stream: variant=${this.describePlaybackUrl(candidate.url)} `
+          + `proto=${candidate.url.startsWith('ypstream://') ? 'ypstream-hls' : 'ffmpeg-hls'} `
+          + `audio=${candidate.hlsAudioUrl ? 'external' : (hls ? 'muxed/none' : 'master-fallback')}`);
+        this.updateAvSessionMetadata(false);
+        this.vm.isBuffering = true;
+        this.loadPlaybackSource(candidate.url, 0, generation, candidate);
+        Logger.info(TAG, `[TTFF] load_submitted elapsed=${Date.now() - submitStartedAt}ms live=true`);
+        if (newSource.play || newSource.auto) {
+          this.avSessionManager.activateForPlayback();
+          this.playbackEngine.play();
+        }
+      } finally {
+        this.destroyPreparedSource(candidate);
       }
       return;
     }
 
     const current = this.vm.playerModel.getCurrentStreams();
+    const sourceGeneration = this.sourceSwitchGeneration + 1;
     const playbackUrl = await this.createPlaybackUrl(current.video, current.audio, generation);
+    if (sourceGeneration !== this.sourceSwitchGeneration) return;
     if (!this.isMediaSessionCurrent(generation)) return;
     Logger.info(TAG, `[TTFF] url_ready elapsed=${Date.now() - submitStartedAt}ms `
       + `kind=${current.video?.kind || '-'} delivery=${current.video?.deliveryMethod || '-'} `
@@ -653,7 +703,8 @@ export class AvPlayerController {
     this.pendingStartFromSec = 0;
     Logger.info(TAG,
       `load mpv: ${current.video?.height}p codec=${current.video?.codecs} ` +
-      `hw=${VideoHwCaps.isCodecHardwareFriendly(current.video?.codecs)}`);
+      `hw=${VideoHwCaps.isCodecHardwareFriendly(current.video?.codecs)} ` +
+      `proto=${playbackUrl.includes('ypstream://') ? 'ypstream' : 'legacy'}`);
     this.loadPlaybackSource(playbackUrl, startPos, generation);
     Logger.info(TAG, `[TTFF] load_submitted elapsed=${Date.now() - submitStartedAt}ms live=false`);
     if (newSource.play || newSource.auto) {
@@ -665,12 +716,12 @@ export class AvPlayerController {
   public async switchQuality(videoStream: StreamInfo, audioStream?: StreamInfo): Promise<void> {
     if (!this.isActive() || !videoStream) return;
     const generation = this.mediaSessionGeneration;
+    const switchGeneration = ++this.sourceSwitchGeneration;
+    const intentRevision = this.transportIntentRevision;
     const wasPlaying = this.vm.isPlaying;
     const resumePos = this.vm.currentTime;
     const effectiveAudio = this.isSeparatedDash(videoStream, audioStream) ? this.ensureCompatibleAudio(videoStream, audioStream) : undefined;
 
-    this.vm.playerModel.updateVideoStream(videoStream);
-    this.vm.playerModel.updateAudioStream(effectiveAudio);
     // createPlaybackUrl 前保持转圈（SIDX/SABR 重建可能数秒）
     if (!this.qualitySwitchPending) {
       this.beginSourceSwitchUi();
@@ -685,28 +736,23 @@ export class AvPlayerController {
       || ((videoStream.kind || '').toLowerCase() === 'manifest_hls');
     const isLiveHlsSwitch = isHlsSwitch && this.curSource?.isLive === true;
 
-    let playbackUrl = '';
+    const candidate = new PreparedPlaybackSource();
+    candidate.mediaGeneration = generation;
+    candidate.switchGeneration = switchGeneration;
+    try {
     if (isLiveHlsSwitch) {
       // 直播切档：重解析 master（音频 rendition 只存在于 master），选中的
       // variant 按 itag 身份匹配（URL 每次响应重签，不能精确匹配），
-      // 新鲜签发的 variant playlist + 外挂音频 rendition 在直播边缘重启。
+      // 新鲜签发的 variant playlist + 外挂音频 rendition 通过原生 HlsLiveStream 在直播边缘重启。
       const maxHeight = this.resolveMaxHeight(PlaybackPreferences.snapshot().defaultQuality || 'best');
       const hls = await this.resolveLiveHlsStreams(maxHeight, videoStream);
-      if (!this.isMediaSessionCurrent(generation)) {
-        this.endSourceSwitchUi(false);
-        return;
-      }
-      this.currentHlsAudioUrl = hls?.audioUrl || '';
-      this.livePlayingVariantItag = hls?.itag ?? videoStream.itag;
-      playbackUrl = hls?.videoUrl || videoStream.url;
+      if (!this.isPreparedSourceCurrent(candidate)) return;
+      this.applyLiveHlsCandidate(hls, videoStream.url, videoStream.itag, videoStream.bitrate ?? 0, candidate);
     } else {
-      playbackUrl = await this.createPlaybackUrl(videoStream, effectiveAudio, generation);
+      candidate.url = await this.preparePlaybackUrl(videoStream, effectiveAudio, generation, candidate);
     }
-    if (!this.isMediaSessionCurrent(generation)) {
-      this.endSourceSwitchUi(false);
-      return;
-    }
-    if (!playbackUrl) {
+    if (!this.isPreparedSourceCurrent(candidate)) return;
+    if (!candidate.url) {
       this.endSourceSwitchUi(false);
       this.setError('[PLAYER] LOCAL_PROXY_FAILED');
       return;
@@ -715,17 +761,27 @@ export class AvPlayerController {
     Logger.info(TAG,
       `switchQuality: ${videoStream.height}p codec=${videoStream.codecs} itag=${videoStream.itag} ` +
       `hw=${VideoHwCaps.isCodecHardwareFriendly(videoStream.codecs)} pos=${resumePos.toFixed(2)}s`);
-    // Manual quality switch always allowed (including 4K VP9/AV1). Engine is mpv.
     this.qualitySwitchLoadStarted = true;
     this.vm.isSourceSwitching = true;
     this.vm.isBuffering = true;
-    const loaded = this.loadPlaybackSource(playbackUrl, isHlsSwitch ? 0 : resumePos, generation);
+    const loaded = this.loadPlaybackSource(candidate.url, isHlsSwitch ? 0 : resumePos, generation, candidate);
     if (!loaded) {
       this.endSourceSwitchUi(false);
       return;
     }
-    if (wasPlaying) {
+    this.vm.playerModel.updateVideoStream(videoStream);
+    this.vm.playerModel.updateAudioStream(effectiveAudio);
+    if (intentRevision === this.transportIntentRevision ? wasPlaying : this.transportIntentPlaying) {
       this.playbackEngine.play();
+    }
+    } catch (e) {
+      if (this.isPreparedSourceCurrent(candidate)) {
+        this.endSourceSwitchUi(false);
+        this.setError('[PLAYER] LOCAL_PROXY_FAILED');
+      }
+      Logger.warn(TAG, `source preparation failed switch=${switchGeneration}: ${(e as Error).message}`);
+    } finally {
+      this.destroyPreparedSource(candidate);
     }
   }
 
@@ -770,6 +826,8 @@ export class AvPlayerController {
   }
 
   public resizeSurface(widthPx: number, heightPx: number): void {
+    this.surfaceWidthPx = widthPx;
+    this.surfaceHeightPx = heightPx;
     // 不门控 isActive：引擎层会缓存几何，供 LOADING 阶段 bindSurface 时套用，
     // 否则 mpv video chain 初始化拿不到宽高（typeNode surface 早于引擎就绪）。
     this.playbackEngine.resizeSurface(widthPx, heightPx);
@@ -787,6 +845,8 @@ export class AvPlayerController {
 
   public syncPlay(): void {
     if (!this.isActive()) return;
+    this.transportIntentRevision++;
+    this.transportIntentPlaying = true;
     this.clearFocusInterruptFlags('user_play');
     if (this.vm.isEnded) {
       this.playbackEngine.seek(0, true);
@@ -800,6 +860,8 @@ export class AvPlayerController {
 
   public syncPause(): void {
     if (!this.isActive()) return;
+    this.transportIntentRevision++;
+    this.transportIntentPlaying = false;
     this.clearFocusInterruptFlags('user_pause');
     this.playbackEngine.pause();
     // Release focus so background audio can resume.
@@ -809,6 +871,10 @@ export class AvPlayerController {
 
   public syncStop(): void {
     if (!this.isActive()) return;
+    this.transportIntentRevision++;
+    this.transportIntentPlaying = false;
+    this.sourceSwitchGeneration++;
+    this.endSourceSwitchUi(false);
     this.clearFocusInterruptFlags('user_stop');
     this.playbackEngine.stop();
     this.avSessionManager.deactivateForPause();
@@ -827,9 +893,14 @@ export class AvPlayerController {
    */
   private handleAudioFocusHint(hint: audio.AudioSessionStateChangeHint): void {
     const name = AvSessionManager.focusHintName(hint);
+    Logger.info(TAG, `[StateTrace] [AudioFocus] handleHint=${name} state=${this.stateMachine.currentState} `
+      + `intentPlaying=${this.transportIntentPlaying} isPlaying=${this.vm.isPlaying} `
+      + `sessionActive=${this.avSessionManager.isSessionActive()}`);
     this.logDiagSnapshot(`focus-in:${name}`);
     switch (hint) {
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_PAUSE:
+        this.transportIntentRevision++;
+        this.transportIntentPlaying = false;
         this.systemPausedByFocus = true;
         this.systemStoppedByFocus = false;
         this.playbackEngine.pause();
@@ -837,6 +908,8 @@ export class AvPlayerController {
         this.logDiagSnapshot(`focus-pause:${name}`);
         break;
       case audio.AudioSessionStateChangeHint.AUDIO_SESSION_STATE_CHANGE_HINT_STOP:
+        this.transportIntentRevision++;
+        this.transportIntentPlaying = false;
         // 遵从系统接口：STOP = 永久失去音频焦点。必须停，并且**不能**自行重新
         // 激活会话去抢焦点——那会打断正在放音的其它应用。只有系统后续的
         // RESUME 提示、或用户主动按播放，才允许恢复。
@@ -858,6 +931,8 @@ export class AvPlayerController {
         }
         this.systemPausedByFocus = false;
         // Docs: after temporary PAUSE, re-activate session before resuming.
+        this.transportIntentRevision++;
+        this.transportIntentPlaying = true;
         this.avSessionManager.activateForPlayback();
         this.playbackEngine.play();
         Logger.info(TAG, `[AudioFocus] action=resume hint=${name}`);
@@ -917,6 +992,8 @@ export class AvPlayerController {
   }
 
   private videoOutputEnabled: boolean = true;
+  /** Timestamp when video output was turned off (vid=no); used to resync non-seekable live streams on resume. */
+  private videoOutputDisabledAtMs: number = 0;
 
   /**
    * 诊断快照：把「焦点标志 / 会话状态 / 引擎状态 / 播放位置 / 音量 / 视频输出
@@ -980,10 +1057,20 @@ export class AvPlayerController {
 
   public setVideoOutputEnabled(enabled: boolean): void {
     // Always remember desired flag (session audio-only survives load/LOADING).
-    const changed = this.videoOutputEnabled !== enabled;
+    const wasEnabled = this.videoOutputEnabled;
+    const changed = wasEnabled !== enabled;
     this.videoOutputEnabled = enabled;
-    if (!this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING, PlayerState.PAUSED,
-      PlayerState.BUFFERING, PlayerState.COMPLETED)) {
+    if (!enabled) {
+      if (wasEnabled || this.videoOutputDisabledAtMs === 0) {
+        this.videoOutputDisabledAtMs = Date.now();
+      }
+    }
+    const inActivePlayback = this.stateMachine.isOneOf(PlayerState.READY, PlayerState.PLAYING,
+      PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED);
+    if (!inActivePlayback) {
+      if (enabled) {
+        this.videoOutputDisabledAtMs = 0;
+      }
       if (changed) {
         Logger.info(TAG, `setVideoOutputEnabled=${enabled} (deferred until ready)`);
       }
@@ -993,6 +1080,18 @@ export class AvPlayerController {
     if (changed) {
       Logger.info(TAG, `setVideoOutputEnabled=${enabled}`);
       this.logDiagSnapshot(`video-output:${enabled ? 'on' : 'off'}`);
+    }
+    // Non-seekable live HLS streams cannot execute MPV's initiate_refresh_seek()
+    // when vid flips no -> auto after long background audio-only playback, leaving
+    // the video track stuck on stale pre-background frames (or 404/EOF on split A/V)
+    // while audio keeps playing. Resync cleanly to the live edge on foreground return.
+    if (enabled && !wasEnabled) {
+      const offMs = this.videoOutputDisabledAtMs > 0 ? (Date.now() - this.videoOutputDisabledAtMs) : 0;
+      this.videoOutputDisabledAtMs = 0;
+      if (this.curSource?.isLive === true && this.curSource.hlsUrl) {
+        Logger.info(TAG, `live video resume after ${(offMs / 1000).toFixed(1)}s vid=no — resyncing to live edge`);
+        void this.retryPlayback(0);
+      }
     }
   }
 
@@ -1012,8 +1111,15 @@ export class AvPlayerController {
    */
   public closeMediaSession(clearSurface: boolean = false): void {
     this.mediaSessionGeneration++;
+    this.sourceSwitchGeneration++;
+    this.latestPlaybackState = undefined;
+    this.videoOutputDisabledAtMs = 0;
     Logger.info(TAG, `closeMediaSession generation=${this.mediaSessionGeneration} clearSurface=${clearSurface}`);
     this.playbackEngine.stop();
+    if (this.pendingSabrLeaseKey) {
+      LocalMediaProxy.abortSabrLease(this.pendingSabrLeaseKey);
+      this.pendingSabrLeaseKey = '';
+    }
     this.destroyAllLocalSessions();
     this.detachBackgroundTaskListener();
     this.clearAvSessionCallbacks();
@@ -1045,10 +1151,11 @@ export class AvPlayerController {
     this.duckActive = false;
     this.savedVolume = 100;
     this.videoOutputEnabled = true;
-    this.playbackEngine.setVideoOutputEnabled(true);
+    this.mpvEngine.setVideoOutputEnabled(true);
+    this.mpvEngine.setPlaybackSpeed(1.0);
     if (clearSurface) {
       this.surfaceID = '';
-      this.playbackEngine.detachSurface();
+      this.mpvEngine.detachSurface();
     }
   }
 
@@ -1058,8 +1165,8 @@ export class AvPlayerController {
     if (!this.stateMachine.transition(PlayerState.RELEASED)) {
       this.stateMachine.forceTransition(PlayerState.RELEASED);
     }
-    Logger.debug(TAG, 'releaseVideo: destroy playback engine and LocalMediaProxy session');
-    this.playbackEngine.destroy();
+    Logger.debug(TAG, 'releaseVideo: destroy playback engines and LocalMediaProxy session');
+    this.mpvEngine.destroy();
     this.engineInitPromise = null;
     this.errorListeners.clear();
     this.waitingForBufferListeners.clear();
@@ -1371,7 +1478,13 @@ export class AvPlayerController {
     const audio = parsed.audioStreams.slice()
       .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
     Logger.info(TAG, `resolveLiveHlsStreams: ${selected.height || 0}p itag=${selected.itag ?? '-'} variants=${variants.length} audioRenditions=${parsed.audioStreams.length}`);
-    const pair: HlsTrackPair = { videoUrl: selected.url, audioUrl: audio?.url || '', itag: selected.itag };
+    const pair: HlsTrackPair = {
+      videoUrl: selected.url,
+      audioUrl: audio?.url || '',
+      itag: selected.itag,
+      videoBitrate: selected.bitrate,
+      audioBitrate: audio?.bitrate,
+    };
     return pair;
   }
 
@@ -1404,7 +1517,11 @@ export class AvPlayerController {
    * http_proxy 进程 env 重指到桥的新端口。loopback 源仍保持直连（bypass）。
    */
   refreshNetworkProxy(): void {
-    (this.playbackEngine as MpvPlaybackEngine).refreshNetworkProxy();
+    this.mpvEngine.refreshNetworkProxy();
+  }
+
+  public notifyNetworkChanged(): void {
+    this.mpvEngine.notifyNetworkChanged();
   }
 
   private async fetchText(url: string): Promise<string> {
@@ -1457,13 +1574,121 @@ export class AvPlayerController {
 
   private async createPlaybackUrl(video?: StreamInfo, audio?: StreamInfo,
     generation: number = this.mediaSessionGeneration): Promise<string> {
-    if (!video || !this.isMediaSessionCurrent(generation)) return '';
+    const candidate = new PreparedPlaybackSource();
+    candidate.mediaGeneration = generation;
+    candidate.switchGeneration = ++this.sourceSwitchGeneration;
+    try {
+      candidate.url = await this.preparePlaybackUrl(video, audio, generation, candidate);
+      if (!candidate.url || !this.isPreparedSourceCurrent(candidate)) return '';
+      this.commitPreparedSource(candidate);
+      return candidate.url;
+    } finally {
+      this.destroyPreparedSource(candidate);
+    }
+  }
 
-    // Defer old session destroy: mark stale, save for cleanup after new source is READY
+  private isPreparedSourceCurrent(candidate: PreparedPlaybackSource): boolean {
+    return this.isMediaSessionCurrent(candidate.mediaGeneration) &&
+      candidate.switchGeneration === this.sourceSwitchGeneration;
+  }
+
+  private destroyPreparedSource(candidate: PreparedPlaybackSource): void {
+    if (candidate.sessionId) LocalMediaProxy.destroySession(candidate.sessionId);
+    if (candidate.audioSessionId) LocalMediaProxy.destroySession(candidate.audioSessionId);
+    for (let i = 0; i < candidate.streamUrls.length; i++) {
+      unregisterStream(candidate.streamUrls[i]);
+    }
+    candidate.sessionId = '';
+    candidate.audioSessionId = '';
+    candidate.streamUrls = [];
+  }
+
+  private commitPreparedSource(candidate: PreparedPlaybackSource): void {
     this.deferCurrentSessionDestroy();
-    // HLS branches below re-arm this; every other playback path carries no
-    // external audio.
-    this.currentHlsAudioUrl = '';
+    this.currentLocalMediaSessionId = candidate.sessionId;
+    this.currentEdlAudioSessionId = candidate.audioSessionId;
+    this.currentStreamUrls = candidate.streamUrls;
+    this.currentHlsAudioUrl = candidate.hlsAudioUrl;
+    this.livePlayingVariantItag = candidate.liveItag;
+    candidate.sessionId = '';
+    candidate.audioSessionId = '';
+    candidate.streamUrls = [];
+  }
+
+  private registerNativeDirectTrack(stream: StreamInfo): string {
+    const spec: NativeDirectStreamSpec = {
+      url: stream.url,
+      contentLength: stream.contentLength,
+      initRangeStart: stream.initRangeStart,
+      initRangeEnd: stream.initRangeEnd,
+      indexRangeStart: stream.indexRangeStart,
+      indexRangeEnd: stream.indexRangeEnd,
+      bitrate: stream.bitrate,
+      itag: stream.itag,
+      headers: this.curSource?.headers,
+    };
+    return registerDirectStream(spec);
+  }
+
+  private registerNativeHlsTrack(url: string, bitrate?: number, itag?: number, isAudio: boolean = false): string {
+    if (!url) return '';
+    const spec: NativeHlsStreamSpec = {
+      url: url,
+      bitrate: bitrate,
+      itag: itag,
+      isAudio: isAudio,
+      headers: this.curSource?.headers,
+    };
+    return registerHlsStream(spec);
+  }
+
+  private applyLiveHlsCandidate(
+    hls: HlsTrackPair | null,
+    fallbackUrl: string,
+    fallbackItag: number | undefined,
+    fallbackBitrate: number,
+    candidate: PreparedPlaybackSource
+  ): void {
+    candidate.liveItag = hls?.itag ?? fallbackItag;
+    candidate.videoBitrate = hls?.videoBitrate ?? fallbackBitrate;
+    if (hls && hls.videoUrl) {
+      const nativeVideoUrl = this.registerNativeHlsTrack(hls.videoUrl, hls.videoBitrate, hls.itag, false);
+      if (nativeVideoUrl.startsWith('ypstream://')) {
+        candidate.streamUrls.push(nativeVideoUrl);
+        candidate.url = nativeVideoUrl;
+      } else {
+        candidate.url = hls.videoUrl;
+      }
+      if (hls.audioUrl) {
+        const nativeAudioUrl = this.registerNativeHlsTrack(hls.audioUrl, hls.audioBitrate, hls.itag, true);
+        if (nativeAudioUrl.startsWith('ypstream://')) {
+          candidate.streamUrls.push(nativeAudioUrl);
+          candidate.hlsAudioUrl = nativeAudioUrl;
+        } else {
+          candidate.hlsAudioUrl = hls.audioUrl;
+        }
+      } else {
+        candidate.hlsAudioUrl = '';
+      }
+      return;
+    }
+    // Master fallback (could not fetch/parse master): pass directly to FFmpeg HLS demuxer.
+    candidate.url = fallbackUrl;
+    candidate.hlsAudioUrl = '';
+  }
+
+  private isHlsAudioRendition(audio: StreamInfo | undefined): boolean {
+    if (!audio || !audio.url) return false;
+    const delivery = (audio.deliveryMethod || '').toUpperCase();
+    const kind = (audio.kind || '').toLowerCase();
+    return delivery === 'HLS' || kind === 'manifest_hls'
+      || audio.url.includes('.m3u8') || audio.url.includes('/manifest/hls_');
+  }
+
+  private async preparePlaybackUrl(video: StreamInfo | undefined, audio: StreamInfo | undefined,
+    generation: number, candidate: PreparedPlaybackSource): Promise<string> {
+    if (!video || !this.isMediaSessionCurrent(generation)) return '';
+    candidate.videoBitrate = video.bitrate ?? 0;
 
     const delivery = (video.deliveryMethod || '').toUpperCase();
     const kind = (video.kind || '').toLowerCase();
@@ -1477,7 +1702,7 @@ export class AvPlayerController {
     }
     if (delivery === 'SABR' || kind === 'sabr') {
       if (audio) {
-        return await this.buildSabrDualEdlUrl(video, audio, generation);
+        return await this.buildSabrDualEdlUrl(video, audio, generation, candidate);
       }
       Logger.error(TAG, 'createPlaybackUrl: SABR requires paired audio stream');
       return '';
@@ -1486,11 +1711,10 @@ export class AvPlayerController {
     if (!video.url) return '';
 
     if (delivery === 'HLS' || kind === 'manifest_hls') {
-      // Post-live DVR / non-live HLS: variant playlist direct; the paired audio
-      // rendition playlist (when the master is split A/V) rides as mpv external
-      // audio via currentHlsAudioUrl. Muxed variants carry audio already.
-      this.currentHlsAudioUrl = audio?.url || '';
-      Logger.info(TAG, `createPlaybackUrl: HLS variant url=${this.describePlaybackUrl(video.url)} extAudio=${this.currentHlsAudioUrl.length > 0}`);
+      // Post-live DVR / non-live HLS: variant playlist direct; attach paired audio
+      // ONLY when it is actually an HLS audio rendition (never a DASH videoplayback URL).
+      candidate.hlsAudioUrl = this.isHlsAudioRendition(audio) ? (audio?.url || '') : '';
+      Logger.info(TAG, `createPlaybackUrl: HLS variant url=${this.describePlaybackUrl(video.url)} extAudio=${candidate.hlsAudioUrl.length > 0}`);
       return video.url;
     }
 
@@ -1502,17 +1726,23 @@ export class AvPlayerController {
     switch (delivery) {
       case 'DASH':
         if (audio && this.isSeparatedDash(video, audio)) {
-          return await this.buildDualEdlUrl(video, audio, generation);
+          return await this.buildDualEdlUrl(video, audio, generation, candidate);
         }
-        return await this.buildSingleProxyUrl(video, generation);
+        return await this.buildSingleProxyUrl(video, generation, candidate);
 
       case 'PROGRESSIVE_HTTP':
       default:
-        return await this.buildSingleProxyUrl(video, generation);
+        return await this.buildSingleProxyUrl(video, generation, candidate);
     }
   }
 
-  private async buildSingleProxyUrl(video: StreamInfo, generation: number): Promise<string> {
+  private async buildSingleProxyUrl(video: StreamInfo, generation: number, candidate: PreparedPlaybackSource): Promise<string> {
+    const nativeStreamUrl = this.registerNativeDirectTrack(video);
+    if (nativeStreamUrl.startsWith('ypstream://')) {
+      candidate.streamUrls.push(nativeStreamUrl);
+      Logger.info(TAG, `buildSingleProxyUrl: ypstream itag=${video.itag} url=${nativeStreamUrl}`);
+      return nativeStreamUrl;
+    }
     const sessionId = await LocalMediaProxy.createSingleUrlSession(video.url, video);
     if (!this.isMediaSessionCurrent(generation)) {
       LocalMediaProxy.destroySession(sessionId);
@@ -1524,26 +1754,39 @@ export class AvPlayerController {
       LocalMediaProxy.destroySession(sessionId);
       return '';
     }
-    this.currentLocalMediaSessionId = sessionId;
+    candidate.sessionId = sessionId;
     Logger.debug(TAG, `buildSingleProxyUrl: itag=${video.itag} url=${playbackUrl}`);
     return playbackUrl;
   }
 
   private async buildSabrDualEdlUrl(video: StreamInfo, audio: StreamInfo,
-    generation: number): Promise<string> {
+    generation: number, candidate: PreparedPlaybackSource): Promise<string> {
     let resolvedDuration = this.resolveDurationMs(video, audio);
     if (resolvedDuration <= 0) {
       const vMeta = video.sabrInfo?.findFormatByItag(video.itag ?? -1)?.approxDurationMs ?? 0;
       const aMeta = audio.sabrInfo?.findFormatByItag(audio.itag ?? -1)?.approxDurationMs ?? 0;
       resolvedDuration = vMeta > 0 ? vMeta : aMeta;
     }
-    if (resolvedDuration <= 0) {
+    const isPostLive = video.sabrInfo?.isPostLive === true || audio.sabrInfo?.isPostLive === true;
+    if (resolvedDuration <= 0 && !isPostLive) {
       Logger.error(TAG, 'buildSabrDualEdlUrl: unknown duration, refusing EDL');
       return '';
     }
-    Logger.info(TAG, `buildSabrDualEdlUrl: video=[itag=${video.itag}] audio=[itag=${audio.itag}] durationMs=${resolvedDuration}`);
+    Logger.info(TAG, `buildSabrDualEdlUrl: video=[itag=${video.itag}] audio=[itag=${audio.itag}] durationMs=${resolvedDuration} postLive=${isPostLive}`);
+    let acquiredLeaseKey = '';
     try {
-      const sessionId = await LocalMediaProxy.createSabrDualSession(video, audio, resolvedDuration, false);
+      const sessionId = await LocalMediaProxy.createSabrDualSession(
+        video, audio, resolvedDuration, false, (leaseKey: string) => {
+          acquiredLeaseKey = leaseKey;
+          if (this.isMediaSessionCurrent(generation)) {
+            this.pendingSabrLeaseKey = leaseKey;
+          } else {
+            LocalMediaProxy.abortSabrLease(leaseKey);
+          }
+        });
+      if (this.pendingSabrLeaseKey === acquiredLeaseKey) {
+        this.pendingSabrLeaseKey = '';
+      }
       if (!this.isMediaSessionCurrent(generation)) {
         LocalMediaProxy.destroySession(sessionId);
         return '';
@@ -1554,11 +1797,14 @@ export class AvPlayerController {
         LocalMediaProxy.destroySession(sessionId);
         return '';
       }
-      this.currentLocalMediaSessionId = sessionId;
+      candidate.sessionId = sessionId;
       // SABR is exposed as a synthetic DASH manifest with exact init/media segment URLs.
       // MPV remains the DASH demuxer/player; the proxy owns segment demand, seeks and EOF.
       return playbackUrl;
     } catch (e) {
+      if (acquiredLeaseKey && this.pendingSabrLeaseKey === acquiredLeaseKey) {
+        this.pendingSabrLeaseKey = '';
+      }
       Logger.error(TAG, `buildSabrDualEdlUrl failed: ${e}`);
       return '';
     }
@@ -1572,38 +1818,47 @@ export class AvPlayerController {
    * buildDualDashUrl below is retained only as reference for a static-DASH rollback.
    */
   private async buildDualEdlUrl(video: StreamInfo, audio: StreamInfo,
-    generation: number = this.mediaSessionGeneration): Promise<string> {
+    generation: number, candidate: PreparedPlaybackSource): Promise<string> {
     const durationMs = this.resolveDurationMs(video, audio);
     if (durationMs <= 0) {
       Logger.error(TAG, 'buildDualEdlUrl: dual stream with unknown duration, refusing');
       return '';
     }
-    const videoSessionId = await LocalMediaProxy.createSingleUrlSession(video.url, video);
-    if (!videoSessionId) {
-      Logger.error(TAG, 'buildDualEdlUrl: video session unavailable');
-      return '';
+    let videoUrl = this.registerNativeDirectTrack(video);
+    let audioUrl = videoUrl.startsWith('ypstream://') ? this.registerNativeDirectTrack(audio) : '';
+    if (videoUrl.startsWith('ypstream://') && audioUrl.startsWith('ypstream://')) {
+      candidate.streamUrls.push(videoUrl, audioUrl);
+    } else {
+      if (videoUrl.startsWith('ypstream://')) unregisterStream(videoUrl);
+      if (audioUrl.startsWith('ypstream://')) unregisterStream(audioUrl);
+      const videoSessionId = await LocalMediaProxy.createSingleUrlSession(video.url, video);
+      if (!videoSessionId) {
+        Logger.error(TAG, 'buildDualEdlUrl: video session unavailable');
+        return '';
+      }
+      candidate.sessionId = videoSessionId;
+      const audioSessionId = await LocalMediaProxy.createSingleUrlSession(audio.url, audio);
+      if (!audioSessionId) {
+        Logger.error(TAG, 'buildDualEdlUrl: audio session unavailable');
+        LocalMediaProxy.destroySession(videoSessionId);
+        return '';
+      }
+      if (!this.isMediaSessionCurrent(generation)) {
+        LocalMediaProxy.destroySession(videoSessionId);
+        LocalMediaProxy.destroySession(audioSessionId);
+        return '';
+      }
+      videoUrl = LocalMediaProxy.getPlaybackUrl(videoSessionId);
+      audioUrl = LocalMediaProxy.getPlaybackUrl(audioSessionId);
+      if (!videoUrl.startsWith('http://127.0.0.1:') || !audioUrl.startsWith('http://127.0.0.1:')) {
+        Logger.error(TAG, `buildDualEdlUrl: invalid track urls video=${videoSessionId} audio=${audioSessionId}`);
+        LocalMediaProxy.destroySession(videoSessionId);
+        LocalMediaProxy.destroySession(audioSessionId);
+        return '';
+      }
+      candidate.sessionId = videoSessionId;
+      candidate.audioSessionId = audioSessionId;
     }
-    const audioSessionId = await LocalMediaProxy.createSingleUrlSession(audio.url, audio);
-    if (!audioSessionId) {
-      Logger.error(TAG, 'buildDualEdlUrl: audio session unavailable');
-      LocalMediaProxy.destroySession(videoSessionId);
-      return '';
-    }
-    if (!this.isMediaSessionCurrent(generation)) {
-      LocalMediaProxy.destroySession(videoSessionId);
-      LocalMediaProxy.destroySession(audioSessionId);
-      return '';
-    }
-    const videoUrl = LocalMediaProxy.getPlaybackUrl(videoSessionId);
-    const audioUrl = LocalMediaProxy.getPlaybackUrl(audioSessionId);
-    if (!videoUrl.startsWith('http://127.0.0.1:') || !audioUrl.startsWith('http://127.0.0.1:')) {
-      Logger.error(TAG, `buildDualEdlUrl: invalid track urls video=${videoSessionId} audio=${audioSessionId}`);
-      LocalMediaProxy.destroySession(videoSessionId);
-      LocalMediaProxy.destroySession(audioSessionId);
-      return '';
-    }
-    this.currentLocalMediaSessionId = videoSessionId;
-    this.currentEdlAudioSessionId = audioSessionId;
 
     const durationSec = (durationMs / 1000).toFixed(3);
     const parts: string[] = [];
@@ -1696,6 +1951,16 @@ export class AvPlayerController {
       LocalMediaProxy.markSessionStale(this.currentEdlAudioSessionId);
       this.currentEdlAudioSessionId = '';
     }
+    if (this.pendingDestroyStreamUrls.length > 0) {
+      for (let i = 0; i < this.pendingDestroyStreamUrls.length; i++) {
+        unregisterStream(this.pendingDestroyStreamUrls[i]);
+      }
+      this.pendingDestroyStreamUrls = [];
+    }
+    if (this.currentStreamUrls.length > 0) {
+      this.pendingDestroyStreamUrls = this.currentStreamUrls;
+      this.currentStreamUrls = [];
+    }
     this.localTimelineAwaitingReady = false;
     this.localTimelineExpectedStartMs = 0;
     this.localTimelineMismatchLogged = false;
@@ -1706,18 +1971,30 @@ export class AvPlayerController {
    * controller, so callbacks between setMedia() and Prepared can still describe the outgoing file.
    */
   private loadPlaybackSource(playbackUrl: string, startPosSec: number,
-    generation: number = this.mediaSessionGeneration): boolean {
+    generation: number = this.mediaSessionGeneration, candidate?: PreparedPlaybackSource): boolean {
     if (!this.isMediaSessionCurrent(generation)) return false;
+    if (candidate && !this.isPreparedSourceCurrent(candidate)) return false;
+    const sessionId = candidate ? candidate.sessionId : this.currentLocalMediaSessionId;
     const expectedStartMs = Math.max(0, Math.round(startPosSec * 1000));
-    this.localTimelineAwaitingReady = this.currentLocalMediaSessionId.length > 0;
+    this.localTimelineAwaitingReady = sessionId.length > 0;
     this.localTimelineExpectedStartMs = expectedStartMs;
     this.localTimelineMismatchLogged = false;
-    if (this.currentLocalMediaSessionId) {
-      LocalMediaProxy.updatePlaybackPosition(this.currentLocalMediaSessionId, expectedStartMs);
-      Logger.info(TAG, `local timeline armed session=${this.currentLocalMediaSessionId} ` +
+    if (sessionId) {
+      LocalMediaProxy.updatePlaybackPosition(sessionId, expectedStartMs);
+      Logger.info(TAG, `local timeline armed session=${sessionId} ` +
         `startMs=${expectedStartMs}`);
     }
-    const loaded = this.playbackEngine.load(playbackUrl, startPosSec, this.currentHlsAudioUrl);
+    const videoBitrate: number = (candidate && candidate.videoBitrate > 0)
+      ? candidate.videoBitrate
+      : (this.vm.playerModel.getCurrentStreams().video?.bitrate ?? 0);
+    this.playbackEngine.setTargetVideoBitrate(videoBitrate);
+    const loaded = this.playbackEngine.load(playbackUrl, startPosSec,
+      candidate ? candidate.hlsAudioUrl : this.currentHlsAudioUrl);
+    if (loaded && candidate) {
+      this.commitPreparedSource(candidate);
+      this.localTimelineAwaitingReady = sessionId.length > 0;
+      this.localTimelineExpectedStartMs = expectedStartMs;
+    }
     if (!loaded) {
       this.localTimelineAwaitingReady = false;
       Logger.warn(TAG, `local timeline disarmed: engine rejected load startMs=${expectedStartMs}`);
@@ -1756,6 +2033,10 @@ export class AvPlayerController {
       LocalMediaProxy.destroySession(this.currentEdlAudioSessionId);
     }
     this.currentEdlAudioSessionId = '';
+    for (let i = 0; i < this.currentStreamUrls.length; i++) {
+      unregisterStream(this.currentStreamUrls[i]);
+    }
+    this.currentStreamUrls = [];
     this.localTimelineAwaitingReady = false;
     this.localTimelineExpectedStartMs = 0;
     this.localTimelineMismatchLogged = false;
@@ -1771,6 +2052,10 @@ export class AvPlayerController {
       LocalMediaProxy.destroySession(this.pendingDestroyEdlAudioSessionId);
       this.pendingDestroyEdlAudioSessionId = '';
     }
+    for (let i = 0; i < this.pendingDestroyStreamUrls.length; i++) {
+      unregisterStream(this.pendingDestroyStreamUrls[i]);
+    }
+    this.pendingDestroyStreamUrls = [];
   }
 
   private isMediaSessionCurrent(generation: number): boolean {
@@ -1788,6 +2073,7 @@ export class AvPlayerController {
     this.avSessionManager.onPreviousCommand = undefined;
     this.avSessionManager.onStopCommand = undefined;
     this.avSessionManager.onAudioFocusHint = undefined;
+    this.avSessionManager.onOutputDeviceDisconnected = undefined;
   }
 
   private isRemoteManifestUrl(url: string): boolean {
@@ -1975,6 +2261,8 @@ export class AvPlayerController {
       this.stopStallWatchdog();
       return;
     }
+    state = normalizePlaybackTimeline(state, this.vm.currentTime, this.vm.durationTime);
+    this.latestPlaybackState = state;
     // Watchdog lifecycle follows the media window: armed from the first engine
     // state of an active session, stopped when the session goes away.
     this.ensureStallWatchdog();
@@ -2035,6 +2323,7 @@ export class AvPlayerController {
       this.vm.isBuffering = state.isBuffering;
       this.vm.isSourceSwitching = false;
     }
+    const prevReady = this.vm.isReady;
     this.vm.isReady = state.isReady;
     this.vm.isSeeking = state.isSeeking;
     this.vm.isEnded = state.isEnded;
@@ -2088,10 +2377,19 @@ export class AvPlayerController {
       LocalMediaProxy.destroySession(this.pendingDestroyEdlAudioSessionId);
       this.pendingDestroyEdlAudioSessionId = '';
     }
+    if (state.isReady && this.pendingDestroyStreamUrls.length > 0) {
+      for (let i = 0; i < this.pendingDestroyStreamUrls.length; i++) {
+        unregisterStream(this.pendingDestroyStreamUrls[i]);
+      }
+      this.pendingDestroyStreamUrls = [];
+    }
 
-    // 仅音频等：load 后引擎可能回到默认 vid=auto，就绪时重放期望值
+    // 仅音频等：load 后引擎可能回到默认 vid=auto，仅在刚进入就绪态时重放一次期望值
+    // （避免每 100ms 进度回调重复向 MPV 下发 vid=auto 刷屏）。
     if (state.isReady) {
-      this.applyVideoOutputPreference();
+      if (!prevReady) {
+        this.applyVideoOutputPreference();
+      }
       if (!this.avSessionArtworkPublished) {
         this.avSessionArtworkPublished = true;
         this.updateAvSessionMetadata(true);
@@ -2189,11 +2487,13 @@ export class AvPlayerController {
     }
     this.stallBaselinePosSec = -1;
     this.stallBaselineAtMs = 0;
+    this.startupStallSinceMs = 0;
   }
 
   private resetStallBaseline(): void {
     this.stallBaselinePosSec = this.lastKnownGoodPosition;
     this.stallBaselineAtMs = Date.now();
+    this.startupStallSinceMs = 0;
   }
 
   /**
@@ -2221,9 +2521,26 @@ export class AvPlayerController {
     }
     const pos = this.lastKnownGoodPosition;
     if (pos <= 0) {
-      // Still before first frame — startup buffering has its own UX, don't fire here.
+      // Catch startup/buffering deadlocks stuck at 0s beyond STARTUP_STALL_DETECT_MS.
+      if (this.startupStallSinceMs <= 0) {
+        this.startupStallSinceMs = Date.now();
+        return;
+      }
+      const startupElapsedMs = Date.now() - this.startupStallSinceMs;
+      if (startupElapsedMs < AvPlayerController.STARTUP_STALL_DETECT_MS) {
+        return;
+      }
+      Logger.warn(TAG, `stall watchdog: startup frozen at 0s for `
+        + `${Math.round(startupElapsedMs / 1000)}s videoId=${this.curSource?.videoId || 'unknown'} `
+        + `state=${this.stateMachine.currentState} — injecting recovery`);
+      this.startupStallSinceMs = 0;
+      const synthetic: PlaybackState = this.getPlaybackState();
+      synthetic.errorCategory = 'network';
+      synthetic.errorMsg = '[WATCHDOG] startup stalled';
+      this.handlePlaybackError(synthetic);
       return;
     }
+    this.startupStallSinceMs = 0;
     if (this.stallBaselinePosSec < 0) {
       this.resetStallBaseline();
       return;
@@ -2279,9 +2596,10 @@ export class AvPlayerController {
     // 同 URL 快速重试已耗尽:升级给 entry 做"重新提取新鲜流 URL + 原地重载"
     // (PipePipe reloadPlayQueueManager 语义),而不是直接报错/放弃。
     if (this.onRetryWithFreshStreams) {
-      Logger.info(TAG, `handlePlaybackError: escalate to fresh-stream retry resumePos=${resumePos.toFixed(2)}s`);
+      const freshResumePos = this.curSource?.isLive ? 0 : resumePos;
+      Logger.info(TAG, `handlePlaybackError: escalate to fresh-stream retry resumePos=${freshResumePos.toFixed(2)}s`);
       this.errorRetryCount = 0;
-      this.onRetryWithFreshStreams(resumePos);
+      this.onRetryWithFreshStreams(freshResumePos);
       return;
     }
 
@@ -2291,32 +2609,80 @@ export class AvPlayerController {
   }
 
   private async retryPlayback(resumePos: number): Promise<void> {
-    Logger.debug(TAG, `retryPlayback at ${resumePos.toFixed(2)}s`);
+    if (this.qualitySwitchPending && !this.qualitySwitchLoadStarted) return;
+    const isLive = this.curSource?.isLive === true;
+    const effectiveResumePos = isLive ? 0 : resumePos;
+    Logger.debug(TAG, `retryPlayback at ${effectiveResumePos.toFixed(2)}s live=${isLive}`);
     const generation = this.mediaSessionGeneration;
+
+    // Live HLS retry: re-resolve fresh variant & audio rendition from master and wrap
+    // in native HlsLiveStream at live edge (startPos=0). Never attach stale DASH audio.
+    if (isLive && this.curSource?.hlsUrl) {
+      const candidate = new PreparedPlaybackSource();
+      candidate.mediaGeneration = generation;
+      candidate.switchGeneration = ++this.sourceSwitchGeneration;
+      try {
+        const maxHeight = this.resolveMaxHeight(PlaybackPreferences.snapshot().defaultQuality || 'best');
+        const current = this.vm.playerModel.getCurrentStreams();
+        let picked: StreamInfo | undefined = current.video;
+        if (this.livePlayingVariantItag !== undefined && (!picked || picked.itag !== this.livePlayingVariantItag)) {
+          const streams = this.curSource.streams || [];
+          const matched = streams.find((s) => s.itag === this.livePlayingVariantItag);
+          if (matched) picked = matched;
+        }
+        let hls: HlsTrackPair | null = null;
+        try {
+          hls = await this.resolveLiveHlsStreams(maxHeight, picked);
+        } catch (e) {
+          Logger.warn(TAG, `retryPlayback: resolveLiveHlsStreams failed: ${(e as Error).message}`);
+        }
+        if (!this.isPreparedSourceCurrent(candidate)) return;
+        this.applyLiveHlsCandidate(hls, this.curSource.hlsUrl, this.livePlayingVariantItag, picked?.bitrate ?? 0, candidate);
+        if (!candidate.url) {
+          this.setError('[PLAYER] RETRY_FAILED');
+          return;
+        }
+        Logger.info(TAG, `retryPlayback live: proto=${candidate.url.startsWith('ypstream://') ? 'ypstream-hls' : 'ffmpeg-hls'} `
+          + `itag=${candidate.liveItag ?? '-'} extAudio=${candidate.hlsAudioUrl.length > 0}`);
+        this.loadPlaybackSource(candidate.url, 0, generation, candidate);
+        if (this.vm.isPlaying || this.transportIntentPlaying) {
+          this.playbackEngine.play();
+        }
+      } finally {
+        this.destroyPreparedSource(candidate);
+      }
+      return;
+    }
+
     const current = this.vm.playerModel.getCurrentStreams();
+    const sourceGeneration = this.sourceSwitchGeneration + 1;
     const playbackUrl = await this.createPlaybackUrl(current.video, current.audio, generation);
+    if (sourceGeneration !== this.sourceSwitchGeneration) return;
     if (!this.isMediaSessionCurrent(generation)) return;
     if (!playbackUrl) {
       this.setError('[PLAYER] RETRY_FAILED');
       return;
     }
-    this.loadPlaybackSource(playbackUrl, resumePos, generation);
+    this.loadPlaybackSource(playbackUrl, effectiveResumePos, generation);
     if (this.vm.isPlaying) {
       this.playbackEngine.play();
     }
   }
 
   private async switchToProgressiveFallback(resumePos: number): Promise<void> {
+    if (this.qualitySwitchPending && !this.qualitySwitchLoadStarted) return;
     const generation = this.mediaSessionGeneration;
     const categories = this.vm.playerModel.categorizedStreams;
     if (categories.progressive.length > 0) {
       const progressive = this.selectBestProgressive(categories.progressive);
-      this.vm.playerModel.updateVideoStream(progressive);
-      this.vm.playerModel.updateAudioStream(undefined);
       Logger.info(TAG, `Switched to progressive fallback: ${progressive.quality} [${progressive.itag}]`);
+      const sourceGeneration = this.sourceSwitchGeneration + 1;
       const playbackUrl = await this.createPlaybackUrl(progressive, undefined, generation);
+      if (sourceGeneration !== this.sourceSwitchGeneration) return;
       if (!this.isMediaSessionCurrent(generation)) return;
       if (playbackUrl) {
+        this.vm.playerModel.updateVideoStream(progressive);
+        this.vm.playerModel.updateAudioStream(undefined);
         this.loadPlaybackSource(playbackUrl, resumePos, generation);
         if (this.vm.isPlaying) {
           this.playbackEngine.play();
@@ -2388,9 +2754,11 @@ export class AvPlayerController {
       || to === PlayerState.READY || to === PlayerState.LOADING;
     if (isActive && !this.backgroundTaskActive) {
       this.backgroundTaskActive = true;
+      Logger.info(TAG, `[StateTrace] [BgTask] startContinuousTask state=${to}`);
       BackgroundTaskManager.startContinuousTask(ctx);
     } else if ((to === PlayerState.IDLE || to === PlayerState.RELEASED) && this.backgroundTaskActive) {
       this.backgroundTaskActive = false;
+      Logger.info(TAG, `[StateTrace] [BgTask] stopContinuousTask state=${to}`);
       BackgroundTaskManager.stopContinuousTask(ctx);
     }
   }

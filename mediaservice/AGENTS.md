@@ -26,14 +26,12 @@
 - `PlaybackEngine` (interface), `PlaybackEngineState`, `PlaybackState`,
   `PlaybackErrorCategory`, `EngineConfig`, `PlaybackStats` — engine contract
   types (`PlaybackStats` = on-demand snapshot for the entry stats UI:
-  MPV demuxer-cache-duration / dropped frames plus `networkSpeedBps`.
-  For proxy-fed sources `networkSpeedBps` comes from `proxyTrafficMeter` —
-  real network bytes metered in `RangeProxy` (upstream chunks) and at the
-  SABR UMP POST response (wired via `setSabrNetworkTrafficSink` in
-  `sabrSessionStore.setHttpClient`), since MPV `cache-speed` is loopback
-  throughput and pins at 0 once the demuxer cache cap is reached. For
-  direct network sources (live HLS bypasses the proxy — `isDirectNetworkSource()`)
-  `AvPlayerController` fills it from MPV `cache-speed` instead).
+  MPV demuxer-cache-duration / dropped frames plus unified 5s sliding-window
+  `networkSpeedBps`. Native `ypstream://` sources (direct VOD + live HLS)
+  report real inbound bytes/sec from `libmpv_napi`'s `NativeHttpTransport` 5s
+  meter (`getStreamMetrics().networkSpeedBps`); local proxy sources (SABR /
+  fallback RangeProxy) report from `proxyTrafficMeter` (same 5s window, wired
+  via `setSabrNetworkTrafficSink`); direct FFmpeg fallbacks use MPV `cache-speed`).
 - `VideoHwCaps` — device HW decoder capability snapshot + hwdec-codecs
   whitelist passthrough (value owned by native `getHwdecCodecsWhitelist`).
 - `PlayerState`, `isValidTransition`, `describeState`, `PlayerStateMachine`,
@@ -108,6 +106,16 @@ mediaservice/src/main/ets/
   not via `AppStorage`.
 - `VideoHwCaps` / NAPI probe inform auto quality / codec preference;
   manual quality switches remain available to the user.
+- `AvPlayerController` prepares quality/audio changes in independently owned
+  `PreparedPlaybackSource` candidates. Only the latest source generation may
+  submit; obsolete candidates release only their own proxy sessions. The old
+  active source is retired after the engine accepts the replacement. Explicit
+  user/system transport intent has its own revision and supersedes captured
+  pre-switch playing state. `PlaybackTimeline` normalizes same-media reload
+  positions before both the VM and `PlayerStateRelay` receive the snapshot.
+- SABR lease keys include the explicit credential revision as well as auth mode;
+  a replacement account must not acquire the previous account's session.
+  Offline downloads register an abort hook for their dedicated lease's in-flight POST.
 - Render surface is wired through entry's inline XComponent (`id:
   'PlayerXComponent'`, no `libraryname`) in `AVPlayer.ets`: on `onLoad` the
   surfaceId is routed via `AvPlayerController.setSurfaceID` →
@@ -173,12 +181,17 @@ stable local URL. Session types in `SessionStore`:
 | `youtube-dual` | Progressive/DASH dual (video+audio) with SIDX/`YoutubeDashIndex` (reference/rollback only, not on the production path) |
 | `sabr-dual` | SABR UMP dual tracks via `sabrSessionStore` (mweb opt-in path) |
 
-**Direct-link dual path (product VOD: visionos / tv_downgraded)**:
-`AvPlayerController.buildDualEdlUrl` creates two `single` open-range sessions
-(video + audio) and hands MPV a native `edl://` URL
-(`!new_stream` / `!delay_open`, the pre-SABR production pattern). MPV never
-touches a DASH demuxer for these clients; the SIDX `youtube-dual` static
-manifest path (`buildDualDashUrl`) is retained for reference only.
+**Direct-link VOD path (product guest `visionos` / signed-in `tv_downgraded`)**:
+`AvPlayerController.buildDualEdlUrl` and `buildSingleProxyUrl` register each
+track with `libmpv_napi`'s native `ypstream://` C++20 `DirectRangeStream`
+(`registerDirectStream`, zero loopback copy, `librcp_c` adaptive chunking +
+streaming read + handover session rotation) and hand MPV an `edl://` (dual)
+or direct `ypstream://` (single) URL; `LocalMediaProxy` `single` sessions stay
+as the automatic fallback when `registerDirectStream` returns empty (x86_64
+stub). `MpvPlaybackEngine.load` scales `demuxer-max-bytes` (`32 / 64 / 96 MiB`)
+and `demuxer-max-back-bytes` (`8 / 12 MiB`) from the selected video bitrate.
+The SIDX `youtube-dual` static manifest path (`buildDualDashUrl`) is retained
+for reference only.
 Upstream transports in `RangeProxy`: Android/iOS (empty-body POST) and
 VISIONOS (body-less GET) googlevideo requests stream over RCP so MPV's first
 byte never waits for a full buffered chunk; other clients — TVHTML5 included,
@@ -300,21 +313,22 @@ seeks re-baseline the window at the seek target (`resetStallBaselineTo`) — and
 a same-session reload keeps the last positive `currentTime`/`durationTime` in
 the UI view-model so the progress bar does not jump during the recovery.
 
-**Live HLS** (demuxed YouTube master, `?mpd_version=7`): one master GET in
-`AvPlayerController.resolveLiveHlsStreams` picks the variant ≤ the quality
-cap **and** the top-bitrate audio rendition (EXT-X-MEDIA / audio-only
-STREAM-INF, itag 233/234). The video variant URL goes to MPV directly — no
-proxy; the audio rendition is registered as an mpv external file before
-loadfile (`change-list audio-files append/clr` in `MpvPlaybackEngine.load`),
-so mpv opens audio together with the video and the first frame has sound.
-Never feed mpv a bare variant URL without the external audio — variants are
-video-only. Two mpv traps this avoids: list `-set` parsing splits on literal
-`,` and `:` inside these URLs (change-list `append` takes one raw item), and
-`audio-add` before the file is playing silently no-ops. Master-direct +
-`hls-bitrate` is also rejected: FFmpeg probes every variant serially and
-the audio renditions expire mid-probe. A quality
-switch re-runs the same helper and restarts at the live edge with the new
-variant + audio pair.
+**Live HLS** (demuxed or muxed YouTube master, `?mpd_version=7`): one master
+GET in `AvPlayerController.resolveLiveHlsStreams` picks the variant ≤ the
+quality cap **and** the top-bitrate audio rendition when split A/V
+(EXT-X-MEDIA / audio-only STREAM-INF, itag 233/234). Both variant and optional
+audio rendition are registered into `libmpv_napi`'s native `HlsLiveStream`
+(`registerHlsStream` → `ypstream://yp_h_*`, tracked in
+`PreparedPlaybackSource.streamUrls`), providing async playlist refresh and
+2-worker concurrent segment prefetching over `librcp_c`; only a master-fetch
+failure falls back to FFmpeg's direct `hls` demuxer. Split audio rides MPV's
+`change-list audio-files append/clr` (never `-set`, which splits on `,`/`:`,
+and never attaching unrelated DASH audio on retry). Live quality switches and
+retries always re-resolve the master and restart at `startPos = 0` (live edge).
+Because live streams are non-seekable (`!demux->seekable`), MPV's
+`initiate_refresh_seek` is a no-op when `vid` flips `no → auto` after long
+background audio-only playback; `AvPlayerController.setVideoOutputEnabled(true)`
+detects `false → true` on live streams and resyncs cleanly to the live edge.
 
 ## 5. Config injection
 - `PlaybackPreferences.setProvider(...)` is the **only** way

@@ -7,12 +7,15 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import type { BusinessError } from '@kit.BasicServicesKit';
 import { util } from '@kit.ArkTS';
 import { ActionHub, ActionHubEvent } from '../common/ActionHub';
-import { AuthSessionManager, SearchChannelItem, SearchPlaylistItem,
-  YoutubeJavaScriptPlayerManager, YOUTUBE_COOKIE_STORAGE_NAME, AUTH_STORAGE_NAME } from 'youtube_core';
+import { AuthSessionManager, ChallengeCookies, CHALLENGE_COOKIE_STORAGE_NAME, SearchChannelItem,
+  SearchPlaylistItem, YoutubeJavaScriptPlayerManager, YOUTUBE_COOKIE_STORAGE_NAME, AUTH_STORAGE_NAME } from 'youtube_core';
 import { VideoItem } from 'youtube_core';
 import { SubscriptionUser } from '../common/SubscriptionModel';
 import { LocalStore } from '../common/LocalStore';
 import { PreferencesStore } from '../common/PreferencesStore';
+import { TranslationService } from '../common/TranslationService';
+import { SettingsRuntime } from '../common/SettingsRuntime';
+import { AppDataEpoch } from '../common/AppDataEpoch';
 import { PlaylistItem, StoredLocalQueue } from '../common/PlaylistModel';
 import { WatchHistoryItem, WatchHistoryStore } from '../common/WatchHistoryStore';
 import { LocalMediaProgressStore } from '../common/LocalMediaProgressStore';
@@ -129,6 +132,9 @@ struct Index {
   @State systemLanguageCode: string = LanguageManager.LANGUAGE_EN_LATN;
   /** 首页 tab 的 feed 重置/滚动句柄宿主（实现由 HomeTabContent 挂载时注册） */
   private homeTabController: HomeTabController = new HomeTabController();
+  /** 短视频 tab 的 feed 重置/滚动句柄宿主 */
+  private shortsTabController: HomeTabController = new HomeTabController();
+  private shortsTabLoaded: boolean = false;
   /** Options sheet 栈清理动作（实现由 OptionsSheetHost 挂载时注册） */
   private optionsSheetActions: OptionsSheetActions = new OptionsSheetActions();
 
@@ -334,9 +340,26 @@ struct Index {
   }
 
   /** 恢复所有配置为默认值 */
-  private resetAllConfigs(): void {
+  private async runRecovery(clearData: boolean): Promise<void> {
+    let lease = -1;
+    try {
+      lease = AppDataEpoch.beginRecovery();
+      if (clearData) await this.clearAllAppData();
+      else await this.resetAllConfigs();
+    } catch (e) {
+      logger.error(`Data recovery failed clearData=${clearData}: ${(e as Error).message}`);
+      this.getUIContext().getPromptAction().showToast({ message: $r('app.string.yt_recovery_failed'), duration: 3000 });
+    } finally {
+      if (lease >= 0) AppDataEpoch.finishRecovery(lease);
+    }
+  }
+
+  private async resetAllConfigs(): Promise<void> {
     this.applyDefaultConfigs();
+    TranslationService.clearCache();
     ShortsFeedService.getInstance().invalidate('reset_configs');
+    await PreferencesStore.flushPending();
+    await SettingsRuntime.applyPersisted();
     this.getUIContext().getPromptAction().showToast({
       message: $r('app.string.yt_toast_reset_settings_done'),
       duration: 2000
@@ -345,7 +368,9 @@ struct Index {
   }
 
   /** 清除应用全部数据 */
-  private clearAllAppData(): void {
+  private async clearAllAppData(): Promise<void> {
+    PlayerSession.getInstance().stopPlayback();
+    PlayQueueManager.getInstance().clear();
     // 1. 停止本地媒体代理服务器
     LocalMediaProxy.stopAll();
 
@@ -356,24 +381,34 @@ struct Index {
     this.refreshHomeAfterAuthChange();
 
     // 3. 清除所有 Preferences 数据库
-    PreferencesStore.clearAll();
+    await PreferencesStore.clearAll();
     const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (hostContext) {
       try {
         const cookiePrefs = preferences.getPreferencesSync(hostContext, { name: YOUTUBE_COOKIE_STORAGE_NAME });
         cookiePrefs.clearSync();
-        cookiePrefs.flush();
+        await cookiePrefs.flush();
       } catch (e) {
         logger.warn('Failed to clear cookie preferences:', JSON.stringify(e));
+        throw new Error('Cookie storage could not be cleared');
       }
       // prefs 清除够不到 extractor 持有的内存 cookie jar，同步清内存网络状态
       YouTubePlayService.getInstance(hostContext).resetNetworkState();
+      ChallengeCookies.clear();
+      try {
+        const challengePrefs = preferences.getPreferencesSync(hostContext, { name: CHALLENGE_COOKIE_STORAGE_NAME });
+        challengePrefs.clearSync();
+        await challengePrefs.flush();
+      } catch (e) {
+        logger.warn('Failed to clear challenge cookie preferences:', JSON.stringify(e));
+      }
       try {
         const authPrefs = preferences.getPreferencesSync(hostContext, { name: AUTH_STORAGE_NAME });
         authPrefs.clearSync();
-        authPrefs.flush();
+        await authPrefs.flush();
       } catch (e) {
         logger.warn('Failed to clear auth preferences:', JSON.stringify(e));
+        throw new Error('Account storage could not be cleared');
       }
     }
 
@@ -449,12 +484,14 @@ struct Index {
     AppStorage.setOrCreate('favorites', []);
     this.playlists = [];
     AppStorage.setOrCreate('playlists', []);
+    this.localQueues = [];
+    AppStorage.setOrCreate('localQueues', []);
     WatchHistoryStore.clear();
     this.watchHistory = [];
     LocalMediaProgressStore.clearAll();
     // 用户明确要求「清除应用全部数据」同时删除已下载视频与本地导入文件。
-    DownloadManager.getInstance().clearAllTasksAndFiles();
-    LocalMediaStore.clearAll();
+    await DownloadManager.getInstance().clearAllTasksAndFiles();
+    await LocalMediaStore.clearAll();
     SearchHistoryStore.clearSearchHistory();
     AppLogStore.clear();
 
@@ -469,6 +506,9 @@ struct Index {
     });
 
     // 8. 提示用户
+    TranslationService.clearCache();
+    await PreferencesStore.flushPending();
+    await SettingsRuntime.applyPersisted();
     this.getUIContext().getPromptAction().showToast({
       message: $r('app.string.yt_toast_clear_all_data_done'),
       duration: 2000
@@ -514,11 +554,11 @@ struct Index {
     // 本地导入库独立索引：文件缺失的条目启动时丢弃。
     LocalMediaStore.restore();
     this.buildPickerItems();
-    // 默认首页：Options「启动时进入订阅」→ 首帧后切到订阅 tab（0=首页，1=订阅）。
+    // 默认首页：Options「启动时进入订阅」→ 首帧后切到订阅 tab（0=首页，1=短视频，2=订阅）。
     if (PreferencesStore.getString('cfg_default_home_tab', 'home') === 'subs') {
       logger.info('default home tab = subscriptions, switching after first layout');
       setTimeout(() => {
-        this.switchRootTab(1);
+        this.switchRootTab(2);
       }, 60);
     }
     // 首次启动帮助引导：只看 cfg_help_seen 持久化变量，与是否首次安装无关。
@@ -648,11 +688,23 @@ struct Index {
 
   private refreshHomeAfterAuthChange(): void {
     this.homeTabController.resetFeed(true, true);
+    if (this.shortsTabLoaded) {
+      this.shortsTabController.resetFeed(true, this.activeTabIndex === 1);
+      if (this.activeTabIndex !== 1) {
+        this.shortsTabLoaded = false;
+      }
+    }
   }
 
   /** 首页内容源（推荐/直播）变更：无论当前在哪个 tab 都立即重载，回来即可看到新源。 */
   private refreshHomeAfterFeedStyleChange(): void {
     this.homeTabController.resetFeed(true, true);
+    if (this.shortsTabLoaded) {
+      this.shortsTabController.resetFeed(true, this.activeTabIndex === 1);
+      if (this.activeTabIndex !== 1) {
+        this.shortsTabLoaded = false;
+      }
+    }
   }
 
   private onPendingContinuationChanged(): void {
@@ -701,10 +753,16 @@ struct Index {
     if (AuthSessionManager.getInstance()?.hasAuthForUserData() !== true) {
       return;
     }
+    const session = AuthSessionManager.getInstance()!;
+    const revision = session.getUserDataContextKey();
+    const epoch = AppDataEpoch.capture();
+    const current = (): boolean => AppDataEpoch.isCurrent(epoch) &&
+      session.getUserDataContextKey() === revision && session.hasAuthForUserData();
     try {
       const library = FeedServiceProvider.getInstance().getUserLibraryService();
       try {
         const historyPage = await library.fetchWatchHistory(1);
+        if (!current()) return;
         if (historyPage.items.length > 0) {
           WatchHistoryStore.mergeRemoteHistory(library.toWatchHistoryItems(historyPage.items));
           this.watchHistory = WatchHistoryStore.getAll();
@@ -712,8 +770,10 @@ struct Index {
       } catch (historyErr) {
         logger.error('syncUserLibrary history failed:', JSON.stringify(historyErr));
       }
+      if (!current()) return;
       try {
         const channels = await library.fetchSubscribedChannels();
+        if (!current()) return;
         if (channels.length > 0) {
           const map: Record<string, SubscriptionUser> = {};
           this.subscriptions.forEach((item) => {
@@ -956,6 +1016,12 @@ struct Index {
   private reloadHomeForSearchLocaleChange(): void {
     FeedServiceProvider.getInstance().invalidate();
     this.homeTabController.resetFeed(true, this.activeTabIndex === 0);
+    if (this.shortsTabLoaded) {
+      this.shortsTabController.resetFeed(true, this.activeTabIndex === 1);
+      if (this.activeTabIndex !== 1) {
+        this.shortsTabLoaded = false;
+      }
+    }
   }
 
   private openSearchPage(initialQuery: string = ''): void {
@@ -968,6 +1034,11 @@ struct Index {
     });
   }
 
+  private isPlayerPageAtTop(): boolean {
+    const names = this.navPathStack.getAllPathName();
+    return names.length > 0 && names[names.length - 1] === 'PlayerPage';
+  }
+
   private async openVideoDetail(
     video: VideoItem,
     sourceHint?: PlayQueueSourceHint,
@@ -975,25 +1046,27 @@ struct Index {
     audioOnly: boolean = false
   ): Promise<void> {
     const queueManager = PlayQueueManager.getInstance();
-    logger.info(`openVideoDetail: video=${video.videoId} source=${sourceHint ? sourceHint.type : 'adhoc'} queueType=${queueManager.sourceType} audioOnly=${audioOnly}`);
-
-    // 冷启动：从列表/作者页点视频进入播放页时，彻底重置上一次的播放状态，等价于"应用首次播放"，
-    // 杜绝关闭 PiP 等残留影响本次。队列内切换走 session.play()、PiP 恢复走 onPipRestore，
-    // 均不经此路径，故不受影响。preserveQueue=true 为跨设备续播恢复，保留其会话快照，不冷重置。
-    // Keep one media session across pages and source changes. Rebuilding the
-    // controller here breaks AVSession/background ownership. An active PiP is
-    // the exception: its controller is bound to the old page's XComponent.
     const session = PlayerSession.getInstance();
+    const hadPiP = session.isPiPActive || session.isPipHandoffPending || session.isPipRestoring
+      || PiPManager.getInstance().isReady;
+    const playerPageAtTop = this.isPlayerPageAtTop();
+    logger.info(`openVideoDetail: video=${video.videoId} source=${sourceHint ? sourceHint.type : 'adhoc'} `
+      + `queueType=${queueManager.sourceType} audioOnly=${audioOnly} hadPiP=${hadPiP} atTop=${playerPageAtTop}`);
+
     AppStorage.setOrCreate('playerLoading', true);
-    // Unconditional PiP teardown: destroy() is idempotent when no controller
-    // exists, and guarding on isPiPActive misses mid-restore / handoff states
-    // (isPiPActive is already false there) or a flag desynced by a media switch.
-    PiPManager.getInstance().destroy();
-    // Every navigation initiated outside the player is a fresh media session,
-    // including reopening the same video. Never reuse an old extracted URL,
-    // active extraction Promise, proxy session, MPV source, or cached VideoData.
-    // Queue-internal next/previous and PiP restore do not enter this method.
-    session.forceReset();
+    // Orderly PiP teardown: invalidate old PiP controller immediately and wait briefly
+    // for system stopPiP() to release the old PiP surface before opening the new session.
+    await PiPManager.getInstance().destroyAndAwaitStop(250);
+
+    // Every external open starts an independent playback session (new sessionId, fresh
+    // config snapshot from Settings, independent queue). Detach old native surface whenever
+    // PiP was active or PlayerPage is not already mounted at top so MPV waits for the new
+    // page's XComponent.onLoad instead of loading onto a dying surface.
+    session.startNewSession({
+      audioOnly: audioOnly,
+      preserveQueue: preserveQueue,
+      clearSurface: hadPiP || !playerPageAtTop,
+    });
 
     // If a source hint is provided, pre-load the queue from that source.
     // Fire-and-forget: do NOT await — the player page must open immediately.
@@ -1002,8 +1075,7 @@ struct Index {
       const queue = this.localQueues.find(q => q.id === sourceHint.playlistId);
       if (queue && queue.videos.length > 0) {
         queueManager.setLocalQueue(queue.videos, queue.name, queue.id, video.videoId);
-      } else if (queueManager.sourceType !== QueueSourceType.ADHOC
-        || queueManager.getCurrent()?.videoId !== video.videoId) {
+      } else {
         queueManager.setAdhocQueue([video], 0);
       }
     } else if (sourceHint && (sourceHint.type === 'downloads' || sourceHint.type === 'localFiles'
@@ -1028,50 +1100,36 @@ struct Index {
           sourceHint.nextPageToken ?? null,
           sourceHint.visitorData || ''
         );
-      } else if (queueManager.sourceType !== QueueSourceType.REMOTE || queueManager.sourceId !== sourceHint.playlistId) {
+      } else {
         logger.info(`openVideoDetail: start remote playlist load playlist=${sourceHint.playlistId} start=${video.videoId}`);
         queueManager.loadFromRemotePlaylist(sourceHint.playlistId, video.videoId, sourceHint.playlistName);
-      } else {
-        const index = queueManager.queue.findIndex((item) => item.videoId === video.videoId);
-        if (index >= 0 && index !== queueManager.currentIndex) {
-          queueManager.moveTo(index);
-        }
       }
+    } else if (!preserveQueue) {
+      queueManager.setAdhocQueue([video], 0);
     }
 
-    // External video opens create a fresh generated queue. Queue-internal switches use moveTo().
-    if (!sourceHint && !preserveQueue) {
-      const currentQueueVideo = queueManager.getCurrent();
-      if (queueManager.sourceType !== QueueSourceType.ADHOC || currentQueueVideo?.videoId !== video.videoId) {
-        queueManager.setAdhocQueue([video], 0);
-      }
-    }
-
-    // forceReset 会清仅音频；长按「仅音频播放」需在重置后再打开会话开关。
-    // External opens always carry an explicit presentation intent, so a normal
-    // open also clears audio-only mode left by a previous media item.
-    session.setAudioOnlyMode(audioOnly);
     PlayerPresentation.onAudioOnlyModeChanged(audioOnly);
 
-    this.selectedVideo = video;
-    this.showOptions = false;
-    AppStorage.setOrCreate('selectedVideo', video);
-
-    // Start extraction/engine/proxy work immediately after the click reset. The
-    // player page consumes this exact task and remains the only owner of source submission.
-    // 本地文件没有可提取的流：跳过预热，PlayerPage 的 session.play() 直接走 doPlayLocal；
-    // 仍要登记「正在打开」，否则上一个播放页的 aboutToDisappear 会把新本地会话拆掉。
+    // Arm prepare BEFORE mutating selectedVideo / playerOpenSeq so any mounted PlayerPage
+    // @Watch callback immediately joins this exact session & preparePromise without racing.
     if (video.localMediaPath) {
       session.beginLocalPrepare(video);
     } else {
       session.beginPrepare(video);
     }
 
+    this.selectedVideo = video;
+    this.showOptions = false;
+    AppStorage.setOrCreate('selectedVideo', video);
+
     const movedIndex = this.navPathStack.moveToTop('PlayerPage');
     if (movedIndex === -1) {
       this.navPathStack.pushPath({ name: 'PlayerPage' });
     } else {
-      logger.info('PlayerPage moved to top or already at top, only switching source');
+      // Reused PlayerPage: bump openSeq AFTER beginPrepare so it reloads for the new sessionId
+      // even when the same videoId is re-opened.
+      AppStorage.setOrCreate('playerOpenSeq', (AppStorage.get<number>('playerOpenSeq') ?? 0) + 1);
+      logger.info('PlayerPage moved to top or already at top, reloading for new session');
     }
   }
 
@@ -1342,10 +1400,12 @@ struct Index {
       case 0:
         return $r('app.string.yt_tab_home');
       case 1:
-        return $r('app.string.yt_tab_subscriptions');
+        return $r('app.string.yt_home_mode_short');
       case 2:
-        return $r('app.string.yt_tab_favorites');
+        return $r('app.string.yt_tab_subscriptions');
       case 3:
+        return $r('app.string.yt_tab_favorites');
+      case 4:
         return $r('app.string.yt_tab_local');
       default:
         return $r('app.string.yt_tab_home');
@@ -1355,6 +1415,10 @@ struct Index {
   private switchRootTab(index: number): void {
     this.tabsController.changeIndex(index);
     this.activeTabIndex = index;
+    if (index === 1 && !this.shortsTabLoaded) {
+      this.shortsTabLoaded = true;
+      this.shortsTabController.resetFeed(false, true);
+    }
   }
 
   private buildHdsTabsFloatingStyle(): HdsTabsFloatingStyle {
@@ -1389,6 +1453,9 @@ struct Index {
 
           TabContent() { this.TabContentSection(3) }
             .tabBar(this.buildTabStyle(3))
+
+          TabContent() { this.TabContentSection(4) }
+            .tabBar(this.buildTabStyle(4))
         }
         .barPosition(BarPosition.End)
         .vertical(false)
@@ -1406,6 +1473,10 @@ struct Index {
         .width('100%')
         .height('100%')
         .onChange((index: number) => {
+          if (index === 1 && !this.shortsTabLoaded) {
+            this.shortsTabLoaded = true;
+            this.shortsTabController.resetFeed(false, true);
+          }
           this.getUIContext()?.animateTo({
             duration: 350,
             curve: curves.springMotion(0.4, 0.8)
@@ -1460,15 +1531,13 @@ struct Index {
       materialEffect: this.immersiveMaterialEffect,
       avoidLayoutSafeArea: true,
       menus: [
-        ...(this.activeTabIndex === 0 ? [buildTitleMenu(this.homeModeMenuIcon(),
-          this.isShortHomeMode() ? $r('app.string.yt_home_mode_long') : $r('app.string.yt_home_mode_short'),
-          () => { this.toggleHomeFeedMode(); })] : []),
         buildTitleMenu($r('sys.symbol.magnifyingglass'), $r('app.string.yt_placeholder_search'), () => {
           this.openSearchPage();
         })
       ]
     }))
     .bindToScrollable([this.homeTabController.gridScroller, this.homeTabController.listScroller,
+      this.shortsTabController.gridScroller, this.shortsTabController.listScroller,
       SubscriptionScrollCoordinator.scroller, FavoritesScrollCoordinator.scroller,
       LocalScrollCoordinator.scroller])
     .bindSheet($$this.showOptions, this.OptionsSheet(), {
@@ -1630,14 +1699,19 @@ struct Index {
   @Builder TabContentSection(index: number) {
     if (index === 0) {
       HomeTabContent({
-        controller: this.homeTabController
+        controller: this.homeTabController,
+        feedMode: 'long'
       })
-    }
-    else if (index === 1) {
-      SubscriptionManagePage()
+    } else if (index === 1) {
+      HomeTabContent({
+        controller: this.shortsTabController,
+        feedMode: 'short'
+      })
     } else if (index === 2) {
-      FavoritesPage()
+      SubscriptionManagePage()
     } else if (index === 3) {
+      FavoritesPage()
+    } else if (index === 4) {
       LocalPage({
         onSwitchOuterTab: (targetIndex: number) => {
           this.switchRootTab(targetIndex);
@@ -1724,11 +1798,12 @@ struct Index {
    */
   private buildTabStyle(index: number): BottomTabBarStyle {
     const normalIcons: Resource[] = [
-      $r('sys.symbol.house'), $r('sys.symbol.person_2'), $r('sys.symbol.heart'), $r('sys.symbol.folder')
+      $r('sys.symbol.house'), $r('sys.symbol.play_circle'),
+      $r('sys.symbol.person_2'), $r('sys.symbol.heart'), $r('sys.symbol.folder')
     ];
     const selectedIcons: Resource[] = [
-      $r('sys.symbol.house_fill'), $r('sys.symbol.person_2_fill'),
-      $r('sys.symbol.heart_fill'), $r('sys.symbol.folder_fill')
+      $r('sys.symbol.house_fill'), $r('sys.symbol.play_circle_fill'),
+      $r('sys.symbol.person_2_fill'), $r('sys.symbol.heart_fill'), $r('sys.symbol.folder_fill')
     ];
     const normal = new SymbolGlyphModifier(normalIcons[index])
       .fontColor([$r('app.color.yourtube_text_primary')]);
@@ -1767,7 +1842,7 @@ struct Index {
         {
           value: $r('app.string.yt_action_confirm'),
           action: () => {
-            this.resetAllConfigs();
+            this.runRecovery(false);
           }
         }
       ],
@@ -1801,16 +1876,7 @@ struct Index {
           value: $r('app.string.yt_action_clear'),
           fontColor: this.themePrimary,
           action: () => {
-            this.clearAllAppData();
-            try {
-              uiContext.getPromptAction().showToast({
-                message: $r('app.string.yt_toast_clear_all_data_done'),
-                duration: 1500
-              });
-            } catch (err) {
-              const error: BusinessError = err as BusinessError;
-              logger.error(`Show toast error: ${error.message}`);
-            }
+            this.runRecovery(true);
           }
         }
       ],
