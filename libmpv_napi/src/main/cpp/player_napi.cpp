@@ -87,6 +87,7 @@ struct MpvApi {
     int (*set_property_string)(mpv_handle*, const char*, const char*) = nullptr;
     int (*request_log_messages)(mpv_handle*, const char*) = nullptr;
     int (*observe_property)(mpv_handle*, uint64_t, const char*, mpv_format) = nullptr;
+    int (*unobserve_property)(mpv_handle*, uint64_t) = nullptr;
     mpv_event* (*wait_event)(mpv_handle*, double) = nullptr;
     void (*wakeup)(mpv_handle*) = nullptr;
     int (*stream_cb_add_ro)(mpv_handle*, const char*, void*, mpv_stream_cb_open_ro_fn) = nullptr;
@@ -144,6 +145,11 @@ bool LoadMpv()
     ok = LoadSymbol(api.library, api.set_property_string, "mpv_set_property_string") && ok;
     ok = LoadSymbol(api.library, api.request_log_messages, "mpv_request_log_messages") && ok;
     ok = LoadSymbol(api.library, api.observe_property, "mpv_observe_property") && ok;
+    api.unobserve_property = reinterpret_cast<int (*)(mpv_handle*, uint64_t)>(
+        dlsym(api.library, "mpv_unobserve_property"));
+    if (!api.unobserve_property) {
+        OH_LOG_Print(LOG_APP, LOG_WARN, 0xFF00, "mpv", "dlsym mpv_unobserve_property unavailable");
+    }
     ok = LoadSymbol(api.library, api.wait_event, "mpv_wait_event") && ok;
     ok = LoadSymbol(api.library, api.wakeup, "mpv_wakeup") && ok;
     // Optional stream_cb symbol for ypstream:// custom protocol support.
@@ -193,6 +199,7 @@ struct PlayerContext {
     atomic_int64_t decoderFrameDropCount {0};
     atomic_int64_t estimatedFrameNumber {0};
     atomic_int64_t lastCacheFwBytes {0};
+    atomic_int64_t lastCacheSpeedBps {0};
     atomic<double> lastAvSyncSec {0.0};
     atomic_bool hasAvSync {false};
     atomic<double> lastEstimatedVfFps {0.0};
@@ -202,6 +209,14 @@ struct PlayerContext {
     atomic_bool released {false};
     /** Native-side throttle for time-pos events (type 1); 0 = push immediately. */
     atomic_int64_t lastTimePosPushMs {0};
+    /** Native-side dedup for status events (type 2); -1 = force next push. */
+    atomic_int32_t lastPushedStatus {-1};
+    atomic_int32_t lastPushedState {-1};
+    /** Native-side throttle for seekable-ranges events (type 4); 0 = push immediately. */
+    atomic_int64_t lastCacheRangesPushMs {0};
+    /** On-demand observation for high-frequency Stats-for-Nerds properties. */
+    atomic_bool statsObserveEnabled {false};
+    atomic_bool statsObservedInMpv {false};
     /** Properties set before mpv_initialize (e.g. while waiting for surface); applied on EnsureMpv(). */
     mutex pendingPropsMutex;
     vector<pair<string, string>> pendingProperties;
@@ -326,9 +341,14 @@ void ResetObservedPlaybackState(PlayerContext& ctx)
     ctx.decoderFrameDropCount.store(0);
     ctx.estimatedFrameNumber.store(0);
     ctx.lastCacheFwBytes.store(0);
+    ctx.lastCacheSpeedBps.store(0);
     ctx.lastAvSyncSec.store(0.0);
     ctx.hasAvSync.store(false);
     ctx.lastEstimatedVfFps.store(0.0);
+    ctx.lastTimePosPushMs.store(0);
+    ctx.lastPushedStatus.store(-1);
+    ctx.lastPushedState.store(-1);
+    ctx.lastCacheRangesPushMs.store(0);
     {
         const scoped_lock lock(ctx.cacheRangesMutex);
         ctx.seekableRangesJson = "[]";
@@ -464,6 +484,7 @@ constexpr uint64_t kDecoderFrameDropReplyId = 911;
 constexpr uint64_t kEstFrameNumReplyId = 912;
 constexpr uint64_t kAvSyncReplyId = 913;
 constexpr uint64_t kEstVfFpsReplyId = 914;
+constexpr uint64_t kCacheSpeedReplyId = 915;
 constexpr uint64_t kInfoPropReplyBase = 1000;
 
 bool IsCachedInfoProp(const string& name)
@@ -475,12 +496,51 @@ bool IsCachedInfoProp(const string& name)
         "audio-codec-name", "audio-codec", "audio-bitrate", "audio-params/channel-count",
         "audio-params/samplerate", "audio-params/format", "audio-params/hr-channels", "aid",
         "file-format", "media-title", "track-list/count", "file-size",
-        "cache-speed", "demuxer-cache-duration", "af", "volume"
+        "af", "volume"
     };
     return kInfoProps.find(name) != kInfoProps.end();
 }
 
-void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property, uint64_t replyId)
+void ApplyStatsObservation(PlayerContext& ctx, bool enable)
+{
+    if (!ctx.mpv) {
+        return;
+    }
+    const bool currentlyObserved = ctx.statsObservedInMpv.load();
+    if (enable == currentlyObserved) {
+        return;
+    }
+    if (enable) {
+        if (!Mpv().observe_property) {
+            return;
+        }
+        LogMpvError("estimated-frame-number",
+                    Mpv().observe_property(ctx.mpv, kEstFrameNumReplyId, "estimated-frame-number", MPV_FORMAT_INT64));
+        LogMpvError("avsync",
+                    Mpv().observe_property(ctx.mpv, kAvSyncReplyId, "avsync", MPV_FORMAT_DOUBLE));
+        LogMpvError("estimated-vf-fps",
+                    Mpv().observe_property(ctx.mpv, kEstVfFpsReplyId, "estimated-vf-fps", MPV_FORMAT_DOUBLE));
+        LogMpvError("cache-speed",
+                    Mpv().observe_property(ctx.mpv, kCacheSpeedReplyId, "cache-speed", MPV_FORMAT_INT64));
+        ctx.statsObservedInMpv.store(true);
+    } else {
+        if (!Mpv().unobserve_property) {
+            return;
+        }
+        Mpv().unobserve_property(ctx.mpv, kEstFrameNumReplyId);
+        Mpv().unobserve_property(ctx.mpv, kAvSyncReplyId);
+        Mpv().unobserve_property(ctx.mpv, kEstVfFpsReplyId);
+        Mpv().unobserve_property(ctx.mpv, kCacheSpeedReplyId);
+        ctx.statsObservedInMpv.store(false);
+        ctx.estimatedFrameNumber.store(0);
+        ctx.hasAvSync.store(false);
+        ctx.lastEstimatedVfFps.store(0.0);
+        ctx.lastCacheSpeedBps.store(0);
+    }
+}
+
+void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property, uint64_t replyId,
+                            bool* outShouldPushCacheRanges = nullptr)
 {
     if (!property || !property->name) {
         return;
@@ -515,10 +575,6 @@ void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property, ui
             ctx.lastPositionMs.store(SecondsToMilliseconds(value));
         } else if (name == "demuxer-cache-duration") {
             ctx.lastBufferedMs.store(SecondsToMilliseconds(value));
-            char buf[32];
-            snprintf(buf, sizeof(buf), "%.3f", value);
-            const scoped_lock lock(ctx.cachedPropsMutex);
-            ctx.cachedProps[name] = buf;
         }
     } else if (property->format == MPV_FORMAT_INT64) {
         const int64_t value = *static_cast<int64_t*>(property->data);
@@ -540,21 +596,44 @@ void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property, ui
         }
     } else if (property->format == MPV_FORMAT_NODE && name == "demuxer-cache-state") {
         const auto* cacheNode = static_cast<const mpv_node*>(property->data);
+        bool cacheIdle = false;
         if (cacheNode && cacheNode->format == MPV_FORMAT_NODE_MAP && cacheNode->u.list) {
             const mpv_node_list* map = cacheNode->u.list;
             for (int i = 0; i < map->num; ++i) {
-                if (map->keys && map->keys[i] && std::strcmp(map->keys[i], "fw-bytes") == 0) {
+                if (!map->keys || !map->keys[i]) {
+                    continue;
+                }
+                if (std::strcmp(map->keys[i], "fw-bytes") == 0) {
                     const mpv_node& val = map->values[i];
                     if (val.format == MPV_FORMAT_INT64) {
                         ctx.lastCacheFwBytes.store(val.u.int64 > 0 ? val.u.int64 : 0);
                     }
-                    break;
+                } else if (std::strcmp(map->keys[i], "cache-idle") == 0) {
+                    const mpv_node& val = map->values[i];
+                    if (val.format == MPV_FORMAT_FLAG) {
+                        cacheIdle = val.u.flag != 0;
+                    }
                 }
             }
         }
         const string rangesJson = SerializeSeekableRanges(cacheNode);
-        const scoped_lock lock(ctx.cacheRangesMutex);
-        ctx.seekableRangesJson = rangesJson;
+        bool rangesChanged = false;
+        {
+            const scoped_lock lock(ctx.cacheRangesMutex);
+            if (rangesJson != ctx.seekableRangesJson) {
+                ctx.seekableRangesJson = rangesJson;
+                rangesChanged = true;
+            }
+        }
+        if (rangesChanged && outShouldPushCacheRanges) {
+            const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+            const int64_t last = ctx.lastCacheRangesPushMs.load();
+            if (cacheIdle || last == 0 || now - last >= 300) {
+                ctx.lastCacheRangesPushMs.store(now);
+                *outShouldPushCacheRanges = true;
+            }
+        }
     }
 
     UpdateStatusFromObservedProperties(ctx);
@@ -588,16 +667,18 @@ void ObservePlaybackProperties(PlayerContext& ctx)
         LogMpvError(property.name, Mpv().observe_property(ctx.mpv, replyId++, property.name, property.format));
     }
 
+    // Frame drop counters only fire when drops actually occur (0 overhead during smooth playback)
+    // and are needed by diagnostic snapshots even when the Stats overlay is closed.
     LogMpvError("frame-drop-count",
                 Mpv().observe_property(ctx.mpv, kFrameDropReplyId, "frame-drop-count", MPV_FORMAT_INT64));
     LogMpvError("decoder-frame-drop-count",
                 Mpv().observe_property(ctx.mpv, kDecoderFrameDropReplyId, "decoder-frame-drop-count", MPV_FORMAT_INT64));
-    LogMpvError("estimated-frame-number",
-                Mpv().observe_property(ctx.mpv, kEstFrameNumReplyId, "estimated-frame-number", MPV_FORMAT_INT64));
-    LogMpvError("avsync",
-                Mpv().observe_property(ctx.mpv, kAvSyncReplyId, "avsync", MPV_FORMAT_DOUBLE));
-    LogMpvError("estimated-vf-fps",
-                Mpv().observe_property(ctx.mpv, kEstVfFpsReplyId, "estimated-vf-fps", MPV_FORMAT_DOUBLE));
+
+    // High-frequency stats properties (estimated-frame-number, avsync, estimated-vf-fps,
+    // cache-speed) are observed on demand only while a Stats UI is visible.
+    if (ctx.statsObserveEnabled.load()) {
+        ApplyStatsObservation(ctx, true);
+    }
 
     // Observe media info & live stats asynchronously so GetMediaInfo()/GetProperty()
     // read from cachedProps without blocking the UI thread on mpv_get_property_string.
@@ -608,7 +689,7 @@ void ObservePlaybackProperties(PlayerContext& ctx)
         "audio-codec-name", "audio-codec", "audio-bitrate", "audio-params/channel-count",
         "audio-params/samplerate", "audio-params/format", "audio-params/hr-channels", "aid",
         "file-format", "media-title", "track-list/count", "file-size",
-        "cache-speed", "af", "volume"
+        "af", "volume"
     };
     uint64_t infoReplyId = kInfoPropReplyBase;
     for (const char* propName : kInfoStringProps) {
@@ -639,6 +720,18 @@ void PushEvent(PlayerContext& ctx, int type, int64_t value)
     }
 }
 
+void PushStatusEvent(PlayerContext& ctx, bool force)
+{
+    const int32_t status = ctx.mediaStatus.load();
+    const int32_t state = ctx.state.load();
+    if (!force && status == ctx.lastPushedStatus.load() && state == ctx.lastPushedState.load()) {
+        return;
+    }
+    ctx.lastPushedStatus.store(status);
+    ctx.lastPushedState.store(state);
+    PushEvent(ctx, 2, status);
+}
+
 void StartEventLoop(PlayerContext& ctx)
 {
     if (!ctx.mpv || ctx.eventLoopRunning.load()) {
@@ -659,21 +752,22 @@ void StartEventLoop(PlayerContext& ctx)
             if (event->event_id == MPV_EVENT_START_FILE) {
                 ResetObservedPlaybackState(ctx);
                 SetMediaStatus(ctx, kStatusLoading, "start-file");
-                PushEvent(ctx, 2, ctx.mediaStatus.load());
+                PushStatusEvent(ctx, true);
             } else if (event->event_id == MPV_EVENT_FILE_LOADED) {
                 SetMediaStatus(ctx, kStatusLoaded | kStatusPrepared, "file-loaded");
-                PushEvent(ctx, 2, ctx.mediaStatus.load());
+                PushStatusEvent(ctx, true);
             } else if (event->event_id == MPV_EVENT_SEEK) {
                 int32_t status = ctx.mediaStatus.load();
                 status |= kStatusSeeking | kStatusBuffering | kStatusStalled;
                 status &= ~kStatusBuffered;
                 ctx.mediaStatus.store(status);
+                ctx.lastCacheRangesPushMs.store(0);
                 OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv-status", "seek status=0x%{public}x",
                              ctx.mediaStatus.load());
-                PushEvent(ctx, 2, ctx.mediaStatus.load());
+                PushStatusEvent(ctx, true);
             } else if (event->event_id == MPV_EVENT_PLAYBACK_RESTART) {
                 SetMediaStatus(ctx, kStatusLoaded | kStatusPrepared | kStatusBuffered, "playback-restart");
-                PushEvent(ctx, 2, ctx.mediaStatus.load());
+                PushStatusEvent(ctx, true);
             } else if (event->event_id == MPV_EVENT_PROPERTY_CHANGE && event->data) {
                 auto* prop = static_cast<mpv_event_property*>(event->data);
                 if (event->reply_userdata == kFrameDropReplyId) {
@@ -723,20 +817,32 @@ void StartEventLoop(PlayerContext& ctx)
                     }
                     continue;
                 }
+                if (event->reply_userdata == kCacheSpeedReplyId) {
+                    if (prop->format == MPV_FORMAT_INT64 && prop->data) {
+                        const int64_t val = *static_cast<int64_t*>(prop->data);
+                        ctx.lastCacheSpeedBps.store(val > 0 ? val : 0);
+                    } else if (prop->format == MPV_FORMAT_NONE) {
+                        ctx.lastCacheSpeedBps.store(0);
+                    }
+                    continue;
+                }
                 if (event->reply_userdata >= kInfoPropReplyBase) {
                     HandleObservedProperty(ctx, prop, event->reply_userdata);
                     continue;
                 }
                 if (prop->format == MPV_FORMAT_NONE) { continue; }
-                HandleObservedProperty(ctx, prop, event->reply_userdata);
-                if (prop->name == string("time-pos")) {
+                bool shouldPushCacheRanges = false;
+                HandleObservedProperty(ctx, prop, event->reply_userdata, &shouldPushCacheRanges);
+                if (prop->name && std::strcmp(prop->name, "time-pos") == 0) {
                     PushEvent(ctx, 1, ctx.lastPositionMs.load());
-                } else if (prop->name == string("duration")) {
+                } else if (prop->name && std::strcmp(prop->name, "duration") == 0) {
                     PushEvent(ctx, 3, ctx.lastDurationMs.load());
-                } else if (prop->name == string("demuxer-cache-state")) {
-                    PushEvent(ctx, 4, 0);
+                } else if (prop->name && std::strcmp(prop->name, "demuxer-cache-state") == 0) {
+                    if (shouldPushCacheRanges) {
+                        PushEvent(ctx, 4, 0);
+                    }
                 } else {
-                    PushEvent(ctx, 2, ctx.mediaStatus.load());
+                    PushStatusEvent(ctx, false);
                 }
             } else if (event->event_id == MPV_EVENT_END_FILE && event->data) {
                 auto* end = static_cast<mpv_event_end_file*>(event->data);
@@ -750,7 +856,7 @@ void StartEventLoop(PlayerContext& ctx)
                     SetMediaStatus(ctx, ctx.mediaUrl.empty() ? kStatusNoMedia : kStatusUnloaded, "end-file-stop");
                     ctx.state.store(kStateStopped);
                 }
-                PushEvent(ctx, 2, ctx.mediaStatus.load());
+                PushStatusEvent(ctx, true);
             }
             if (event->event_id == MPV_EVENT_LOG_MESSAGE && event->data) {
                 auto* message = static_cast<mpv_event_log_message*>(event->data);
@@ -986,6 +1092,10 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "keep-open", "yes");
         SetOptionString(ctx.mpv, "keep-open-pause", "yes");
         SetOptionString(ctx.mpv, "ytdl", "no");
+        SetOptionString(ctx.mpv, "load-scripts", "no");
+        SetOptionString(ctx.mpv, "sub-auto", "no");
+        SetOptionString(ctx.mpv, "audio-display", "no");
+        SetOptionString(ctx.mpv, "gpu-shader-cache", "yes");
         SetOptionString(ctx.mpv, "msg-level", "all=warn");
         SetOptionString(ctx.mpv, "osc", "no");
         SetOptionString(ctx.mpv, "input-default-bindings", "no");
@@ -1080,7 +1190,9 @@ bool EnsureMpv(PlayerContext& ctx)
         for (const auto& kv : postInitProps) {
             SetMpvStringProperty(ctx, kv.first.c_str(), kv.second, kv.first.c_str());
         }
-        LogMpvError("request log messages", Mpv().request_log_messages(ctx.mpv, "v"));
+        // Keep client log delivery at warn (matching msg-level=all=warn) so
+        // verbose core logs don't continuously wake eventThread and flood hilog.
+        LogMpvError("request log messages", Mpv().request_log_messages(ctx.mpv, "warn"));
         ObservePlaybackProperties(ctx);
         StartEventLoop(ctx);
         SetMediaStatus(ctx, ctx.mediaUrl.empty() ? kStatusNoMedia : kStatusLoading, "mpv-initialized");
@@ -1106,6 +1218,7 @@ void DestroyMpv(PlayerContext& ctx)
 
     ctx.mpv = nullptr;
     ctx.initialized = false;
+    ctx.statsObservedInMpv.store(false);
     ctx.window = nullptr;
     ctx.state.store(kStateStopped);
     SetMediaStatus(ctx, kStatusNoMedia, "destroy");
@@ -1588,6 +1701,15 @@ napi_value GetProperty(napi_env env, napi_callback_info info)
         if (key == "demuxer-cache-fw-bytes") {
             return std::to_string(ctx.lastCacheFwBytes.load());
         }
+        if (key == "demuxer-cache-duration") {
+            const int64_t bufferedMs = ctx.lastBufferedMs.load();
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%.3f", static_cast<double>(bufferedMs) / 1000.0);
+            return buf;
+        }
+        if (key == "cache-speed") {
+            return std::to_string(ctx.lastCacheSpeedBps.load());
+        }
         if (key == "avsync") {
             if (!ctx.hasAvSync.load()) {
                 return {};
@@ -1750,6 +1872,26 @@ napi_value SetEventCallback(napi_env env, napi_callback_info info)
                 napi_call_function(tEnv, global, jsCb, 2, argv, nullptr);
                 delete evt;
             }, &ctx.tsfn);
+    });
+    return Undefined(env);
+}
+
+napi_value SetStatsObservationEnabled(napi_env env, napi_callback_info info)
+{
+    size_t argc = 2;
+    napi_value args[2];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    bool enabled = false;
+    if (argc > 1) {
+        napi_get_value_bool(env, args[1], &enabled);
+    }
+    lockFor(ToString(env, args[0]), [enabled](PlayerContext& ctx) {
+        ctx.statsObserveEnabled.store(enabled);
+        if (ctx.initialized && ctx.mpv) {
+            PostCommand(ctx, [enabled](PlayerContext& workerCtx) {
+                ApplyStatsObservation(workerCtx, enabled);
+            });
+        }
     });
     return Undefined(env);
 }
@@ -1925,6 +2067,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"setHttpProxyEnv", nullptr, SetHttpProxyEnv, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getDuration", nullptr, GetDuration, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"setEventCallback", nullptr, SetEventCallback, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"setStatsObservationEnabled", nullptr, SetStatsObservationEnabled, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"command", nullptr, MpvCommand, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"registerDirectStream", nullptr, RegisterDirectStream, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"registerHlsStream", nullptr, RegisterHlsStream, nullptr, nullptr, nullptr, napi_default, nullptr},

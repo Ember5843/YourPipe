@@ -247,6 +247,30 @@ export class AvPlayerController {
     return this.latestPlaybackState ?? this.playbackEngine.getState();
   }
 
+  private statsObservationRefCount: number = 0;
+
+  /**
+   * Ref-counted lease for high-frequency MPV stats observation (frame count,
+   * avsync, measured FPS, cache-speed). Keeps MPV's event loop quiet when no
+   * stats UI is open.
+   */
+  public acquireStatsObservation(): void {
+    this.statsObservationRefCount++;
+    if (this.statsObservationRefCount === 1) {
+      this.playbackEngine.setStatsObservationEnabled(true);
+    }
+  }
+
+  public releaseStatsObservation(): void {
+    if (this.statsObservationRefCount <= 0) {
+      return;
+    }
+    this.statsObservationRefCount--;
+    if (this.statsObservationRefCount === 0) {
+      this.playbackEngine.setStatsObservationEnabled(false);
+    }
+  }
+
   /** Live playback statistics (Stats-for-Nerds style); all zeros until the engine is initialized. */
   getPlaybackStats(): PlaybackStats {
     if (!this.playbackEngine.isInitialized()) {

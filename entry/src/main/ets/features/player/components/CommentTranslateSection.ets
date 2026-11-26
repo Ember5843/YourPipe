@@ -135,7 +135,20 @@ export struct CommentTranslateButton {
       .catch((e: Error) => {
         if (generation !== state.requestGeneration || context !== TranslationService.contextKey()) return;
         state.failed = true;
-        logger.warn(`comment translate failed id=${this.commentId}: ${e.message || String(e)}`);
+        const detail = TranslationService.formatError(e);
+        logger.warn(`comment translate failed id=${this.commentId}: ${detail}`);
+        try {
+          const hostCtx = this.getUIContext().getHostContext();
+          const prefix = hostCtx?.resourceManager
+            ? hostCtx.resourceManager.getStringSync($r('app.string.yt_translate_failed').id)
+            : 'Translation failed';
+          this.getUIContext().getPromptAction().showToast({
+            message: `${prefix}: ${detail}`,
+            duration: 3000
+          });
+        } catch (_toastErr) {
+          // Ignore UI toast error if component is already detaching.
+        }
       })
       .finally(() => {
         if (generation === state.requestGeneration) state.translating = false;

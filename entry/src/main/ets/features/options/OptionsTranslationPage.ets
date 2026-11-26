@@ -153,9 +153,11 @@ export struct OptionsTranslationPage {
         if (generation !== this.testGeneration) {
           return;
         }
-        logger.warn(`translation test failed engine=${this.engine}: ${e.message || e}`);
-        this.toast(getContext().resourceManager.getStringSync(
-          $r('app.string.yt_ai_translate_test_fail').id));
+        const detail = TranslationService.formatError(e);
+        logger.warn(`translation test failed engine=${this.engine}: ${detail}`);
+        const baseMsg = getContext().resourceManager.getStringSync(
+          $r('app.string.yt_ai_translate_test_fail').id);
+        this.toast(`${baseMsg}: ${detail}`);
       })
       .finally(() => {
         if (generation !== this.testGeneration) {

@@ -118,6 +118,7 @@ export struct VideoDetails {
   private descSkeletonTimer: number = -1;
   private sleepTimerUiInterval: number = -1;
   private statsTimer: number = -1;
+  private statsObservationActive: boolean = false;
   @State statsSpeedSamples: number[] = [];
   @State statsBufferSamples: number[] = [];
   @State statsDropped: number = 0;
@@ -340,6 +341,8 @@ export struct VideoDetails {
   private startStreamStatsPolling(): void {
     this.stopStreamStatsPolling();
     this.resetStreamStatsState();
+    PlayerSession.getInstance().controller.acquireStatsObservation();
+    this.statsObservationActive = true;
     logger.debug(`stream stats polling started videoId=${this.item.videoId}`);
     this.pollStreamStats();
     this.statsTimer = setInterval(() => { this.pollStreamStats(); }, 500);
@@ -350,6 +353,10 @@ export struct VideoDetails {
       clearInterval(this.statsTimer);
       this.statsTimer = -1;
       logger.debug(`stream stats polling stopped videoId=${this.item.videoId}`);
+    }
+    if (this.statsObservationActive) {
+      this.statsObservationActive = false;
+      PlayerSession.getInstance().controller.releaseStatsObservation();
     }
   }
 

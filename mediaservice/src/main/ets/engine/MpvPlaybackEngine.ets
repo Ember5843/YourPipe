@@ -85,6 +85,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private lastLoggedHwdec: string = '';
   /** Mirror of vid on/off for background audio-only only (never used on load/seek). */
   private videoOutputOn: boolean = true;
+  /** Desired on-demand stats observation state (re-synced across engine init/rebuild). */
+  private statsObservationEnabled: boolean = false;
   /** Shorts 单条循环：loop-file=inf。跨 load 保持，进入/退出 Shorts 时切换。 */
   private fileLoopEnabled: boolean = false;
   /** MPV 原生音频滤镜意图（跨 load 保持，单入口 applyAudioFilters 组合 af）。 */
@@ -167,6 +169,13 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         Logger.info(TAG, `GPU API set to: ${gpuApi}`);
       }
 
+      const shaderCacheDir = (_config.mpvShaderCacheDir ?? '').trim();
+      if (shaderCacheDir.length > 0) {
+        ctrl.setProperty('gpu-shader-cache', 'yes');
+        ctrl.setProperty('gpu-shader-cache-dir', shaderCacheDir);
+        Logger.info(TAG, `GPU shader cache dir configured: ${shaderCacheDir}`);
+      }
+
       ctrl.setProperty('cache', 'yes');
       ctrl.setProperty('cache-secs', `${cacheSecs}`);
       ctrl.setProperty('cache-on-disk', 'no');
@@ -195,6 +204,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       }
       if (this.audioDelayMs !== 0) {
         this.applyAudioDelay(true);
+      }
+      if (this.statsObservationEnabled) {
+        ctrl.setStatsObservationEnabled(true);
       }
       if (this.surfaceId.length > 0) {
         this.bindSurface(ctrl, this.surfaceId);
@@ -719,6 +731,18 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   getState(): PlaybackState {
     return this.buildState();
+  }
+
+  setStatsObservationEnabled(enabled: boolean): void {
+    const next = Boolean(enabled);
+    if (this.statsObservationEnabled === next) {
+      return;
+    }
+    this.statsObservationEnabled = next;
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl !== null && !this.destroyed) {
+      ctrl.setStatsObservationEnabled(next);
+    }
   }
 
   getPlaybackStats(): PlaybackStats {

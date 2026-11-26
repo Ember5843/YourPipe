@@ -221,6 +221,7 @@ export struct VideoPlayer {
   @State showStatsOverlay: boolean = false;
   @State overlayStats: PlaybackStats | null = null;
   private statsOverlayTimerId: number = -1;
+  private statsObservationController: AvPlayerController | null = null;
   private lastSourceVideoId: string = '';
   @Prop @Watch('onIndexChange') curIndex: number = CommonConstants.CURINDEX_DEFAULT_NUM;
   @State surfaceWidth: number = CommonConstants.SURFACE_WIDTH;
@@ -2624,10 +2625,17 @@ export struct VideoPlayer {
             });
           }
         } else if (!res.cancelled) {
-          Logger.warn(TAG, `AI translate failed: ${res.error || '-'}`);
+          const detail = res.error ? TranslationService.formatError(res.error) : '';
+          Logger.warn(TAG, `AI translate failed: ${detail || '-'}`);
+          const hostCtx = this.getUIContext().getHostContext();
+          const baseMsg = hostCtx?.resourceManager
+            ? hostCtx.resourceManager.getStringSync($r('app.string.yt_ai_translate_failed').id)
+            : '';
           this.getUIContext().getPromptAction().showToast({
-            message: $r('app.string.yt_ai_translate_failed'),
-            duration: 2500
+            message: (baseMsg.length > 0 && detail.length > 0)
+              ? `${baseMsg}: ${detail}`
+              : $r('app.string.yt_ai_translate_failed'),
+            duration: 3000
           });
         }
       });
@@ -3793,6 +3801,10 @@ export struct VideoPlayer {
 
   private startStatsOverlayPolling(): void {
     this.stopStatsOverlayPolling();
+    if (this.controller) {
+      this.controller.acquireStatsObservation();
+      this.statsObservationController = this.controller;
+    }
     this.pollStatsOverlay();
     this.statsOverlayTimerId = setInterval(() => {
       this.pollStatsOverlay();
@@ -3803,6 +3815,10 @@ export struct VideoPlayer {
     if (this.statsOverlayTimerId >= 0) {
       clearInterval(this.statsOverlayTimerId);
       this.statsOverlayTimerId = -1;
+    }
+    if (this.statsObservationController) {
+      this.statsObservationController.releaseStatsObservation();
+      this.statsObservationController = null;
     }
   }
 

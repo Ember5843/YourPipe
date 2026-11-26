@@ -103,6 +103,7 @@ export interface NativeMpvPlayerModule {
   getMediaInfo: (playerId: string) => MediaInfo;
   getDuration: (playerId: string) => number;
   setEventCallback: (playerId: string, callback: (type: number, value: number) => void) => void;
+  setStatsObservationEnabled: (playerId: string, enabled: boolean) => void;
   isPlaying: (playerId: string) => boolean;
   setVideoSurfaceSize: (playerId: string, width: number, height: number) => void;
   setVideoSurfaceId: (playerId: string, surfaceId: string) => void;

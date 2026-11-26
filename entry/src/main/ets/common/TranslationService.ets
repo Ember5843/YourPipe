@@ -1,4 +1,5 @@
 import { http } from '@kit.NetworkKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { util } from '@kit.ArkTS';
 import { HttpDownloader } from 'youtube_core';
 import { AppLog } from './AppLog';
@@ -173,10 +174,9 @@ export class TranslationService {
         + `elapsed=${Date.now() - startedAt}ms`);
       return translated;
     } catch (e) {
-      const err = e as Error;
-      logger.warn(`translate failed engine=${cfg.engine} tl=${target} len=${text.length}: `
-        + `${err.message || String(e)}`);
-      throw new Error(err.message || 'translate failed');
+      const detail = TranslationService.formatError(e);
+      logger.warn(`translate failed engine=${cfg.engine} tl=${target} len=${text.length}: ${detail}`);
+      throw new Error(detail);
     }
   }
 
@@ -215,11 +215,43 @@ export class TranslationService {
         + `elapsed=${Date.now() - startedAt}ms`);
       return out;
     } catch (e) {
-      const err = e as Error;
-      logger.warn(`translateBatch failed engine=${cfg.engine} tl=${target} lines=${texts.length}: `
-        + `${err.message || String(e)}`);
-      throw new Error(err.message || 'translateBatch failed');
+      const detail = TranslationService.formatError(e);
+      logger.warn(`translateBatch failed engine=${cfg.engine} tl=${target} lines=${texts.length}: ${detail}`);
+      throw new Error(detail);
     }
+  }
+
+  /** 将 Error / BusinessError 提取为简短可读的错误原因（供日志与 Toast 展示）。 */
+  static formatError(err: Object | undefined | null): string {
+    if (!err) {
+      return 'unknown error';
+    }
+    if (typeof err === 'string') {
+      return TranslationService.clampErrorText(err);
+    }
+    const biz = err as BusinessError;
+    const rawMsg = typeof biz.message === 'string' ? biz.message.trim() : '';
+    const code = typeof biz.code === 'number' && Number.isFinite(biz.code) && biz.code !== 0
+      ? biz.code : 0;
+    let out = rawMsg;
+    if (code !== 0) {
+      out = out.length > 0 && out.indexOf(`${code}`) < 0
+        ? `${out} (${code})`
+        : (out.length > 0 ? out : `error ${code}`);
+    }
+    if (out.length === 0) {
+      const fallback = String(err);
+      out = fallback && fallback !== '[object Object]' ? fallback : 'unknown error';
+    }
+    return TranslationService.clampErrorText(out);
+  }
+
+  private static clampErrorText(text: string): string {
+    const clean = text.replace(/\s+/g, ' ').trim();
+    if (clean.length <= 120) {
+      return clean;
+    }
+    return clean.substring(0, 117) + '...';
   }
 
   /** 设置页“测试连接”：走一次真实翻译（不读缓存）。 */
@@ -255,11 +287,28 @@ export class TranslationService {
   // ── Google gtx ────────────────────────────────────────────────
 
   private static async translateGtx(text: string, target: string): Promise<string> {
+    // 长评论/长简介按行切分，避免单次请求超过 Google 免费接口约 5000 字符上限。
+    if (text.length > 4000) {
+      const chunks = TranslationService.chunkText(text, 4000);
+      const parts: string[] = [];
+      for (let i = 0; i < chunks.length; i++) {
+        parts.push(await TranslationService.translateGtxSingle(chunks[i], target));
+      }
+      return parts.join('\n').trim();
+    }
+    return TranslationService.translateGtxSingle(text, target);
+  }
+
+  private static async translateGtxSingle(text: string, target: string): Promise<string> {
+    // 使用 POST 表单提交 q，避免长文本拼入 GET URL 触发 400/414。
     const url = GTEX_URL
-      + '?client=gtx&sl=auto&dt=t&tl=' + encodeURIComponent(target)
-      + '&q=' + encodeURIComponent(text);
-    const response = await TranslationService.request(url, http.RequestMethod.GET,
-      { 'User-Agent': 'YourPipe-Translation' }, undefined, 15000);
+      + '?client=gtx&sl=auto&dt=t&tl=' + encodeURIComponent(target);
+    const body = 'q=' + encodeURIComponent(text);
+    const response = await TranslationService.request(url, http.RequestMethod.POST,
+      {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+        'User-Agent': 'YourPipe-Translation'
+      }, body, 15000);
     TranslationService.ensureOk(response, 'gtx');
     const translated = TranslationService.parseGtxResponse(response.result);
     if (!translated) {
@@ -271,10 +320,13 @@ export class TranslationService {
   private static async translateGtxBatch(texts: string[], target: string): Promise<string[]> {
     const block = texts.map((t: string, i: number) => `${i + 1}\t${t.replace(/\r?\n/g, ' ')}`).join('\n');
     const url = GTEX_URL
-      + '?client=gtx&sl=auto&dt=t&tl=' + encodeURIComponent(target)
-      + '&q=' + encodeURIComponent(block);
-    const response = await TranslationService.request(url, http.RequestMethod.GET,
-      { 'User-Agent': 'YourPipe-Translation' }, undefined, 20000);
+      + '?client=gtx&sl=auto&dt=t&tl=' + encodeURIComponent(target);
+    const body = 'q=' + encodeURIComponent(block);
+    const response = await TranslationService.request(url, http.RequestMethod.POST,
+      {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+        'User-Agent': 'YourPipe-Translation'
+      }, body, 20000);
     TranslationService.ensureOk(response, 'gtx');
     const segments = TranslationService.parseGtxSegments(response.result);
     return TranslationService.alignBatchSegments(segments, texts);
@@ -323,9 +375,9 @@ export class TranslationService {
   // ── MyMemory（免费） ─────────────────────────────────────────
 
   private static async translateMyMemory(text: string, target: string, cfg: LlmTranslateConfig): Promise<string> {
-    // MyMemory 单次请求限制约 500 字节；长简介按空白切块后逐段翻译。
-    if (text.length > 450) {
-      const chunks = TranslationService.chunkText(text, 450);
+    // MyMemory 单次请求限制 500 字节（UTF-8，非字符数）；中/日/韩/Emoji 按字节切块。
+    const chunks = TranslationService.chunkTextByUtf8Bytes(text, 450);
+    if (chunks.length > 1) {
       const parts: string[] = [];
       for (let i = 0; i < chunks.length; i++) {
         parts.push(await TranslationService.translateMyMemoryChunk(chunks[i], target, cfg));
@@ -348,9 +400,15 @@ export class TranslationService {
       { 'User-Agent': 'YourPipe-Translation' }, undefined, 20000);
     TranslationService.ensureOk(response, 'mymemory');
     const json = TranslationService.asJson(response.result) as MyMemoryResponse;
+    if (json.responseStatus !== undefined && json.responseStatus !== 200) {
+      throw new Error(`mymemory ${json.responseStatus}: ${json.responseDetails || 'request rejected'}`);
+    }
     const translated = json.responseData?.translatedText;
     if (!translated || translated.trim().length === 0) {
       throw new Error(json.responseDetails || 'empty mymemory translation');
+    }
+    if (translated.indexOf('MYMEMORY WARNING:') >= 0) {
+      throw new Error('mymemory daily quota exceeded');
     }
     return TranslationService.decodeHtml(translated);
   }
@@ -659,22 +717,53 @@ export class TranslationService {
     body: string | undefined,
     readTimeout: number
   ): Promise<http.HttpResponse> {
-    const request = http.createHttp();
-    const options: http.HttpRequestOptions = {
-      method,
-      header,
-      connectTimeout: 10000,
-      readTimeout
-    };
-    if (body !== undefined) {
-      options.extraData = body;
+    const maxAttempts = 2;
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const options: http.HttpRequestOptions = {
+        method,
+        header,
+        connectTimeout: 10000,
+        readTimeout
+      };
+      if (body !== undefined) {
+        options.extraData = body;
+      }
+      // Proxy configuration errors are deterministic; do not retry.
+      HttpDownloader.applyProxyToOptions(options, url);
+      const req = http.createHttp();
+      try {
+        const res = await req.request(url, options);
+        if (attempt + 1 < maxAttempts && TranslationService.isRetryableHttpStatus(res.responseCode)) {
+          logger.warn(`transient HTTP ${res.responseCode}, retrying once`);
+          await TranslationService.sleep(400);
+          continue;
+        }
+        return res;
+      } catch (e) {
+        const detail = TranslationService.formatError(e);
+        lastError = new Error(detail);
+        if (attempt + 1 < maxAttempts) {
+          logger.warn(`transient request error (${detail}), retrying once`);
+          await TranslationService.sleep(400);
+          continue;
+        }
+        throw lastError;
+      } finally {
+        req.destroy();
+      }
     }
-    HttpDownloader.applyProxyToOptions(options, url);
-    try {
-      return await request.request(url, options);
-    } finally {
-      request.destroy();
-    }
+    throw lastError ?? new Error('request failed');
+  }
+
+  private static isRetryableHttpStatus(code: number): boolean {
+    return code === 429 || (code >= 500 && code <= 504);
+  }
+
+  private static sleep(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      setTimeout(() => { resolve(); }, ms);
+    });
   }
 
   private static endpointOf(cfg: LlmTranslateConfig, fallback: string): string {
@@ -684,7 +773,16 @@ export class TranslationService {
 
   private static ensureOk(response: http.HttpResponse, provider: string): void {
     if (response.responseCode !== 200) {
-      throw new Error(`${provider} HTTP ${response.responseCode}`);
+      let extra = '';
+      try {
+        const raw = TranslationService.asText(response.result).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (raw.length > 0) {
+          extra = `: ${raw.length > 60 ? raw.substring(0, 60) + '...' : raw}`;
+        }
+      } catch (_e) {
+        // Ignore body decode error on failure path.
+      }
+      throw new Error(`${provider} HTTP ${response.responseCode}${extra}`);
     }
   }
 
@@ -711,8 +809,11 @@ export class TranslationService {
     let rest = text;
     while (rest.length > maxLen) {
       let cut = maxLen;
+      const nl = rest.lastIndexOf('\n', maxLen);
       const space = rest.lastIndexOf(' ', maxLen);
-      if (space > maxLen / 2) {
+      if (nl > maxLen / 2) {
+        cut = nl;
+      } else if (space > maxLen / 2) {
         cut = space;
       }
       chunks.push(rest.substring(0, cut).trim());
@@ -722,6 +823,46 @@ export class TranslationService {
       chunks.push(rest);
     }
     return chunks;
+  }
+
+  /** 按 UTF-8 字节上限切块（保护 MyMemory 500 字节上限，避免拆断代理对）。 */
+  private static chunkTextByUtf8Bytes(text: string, maxBytes: number): string[] {
+    const encoder = new util.TextEncoder();
+    if (encoder.encodeInto(text).byteLength <= maxBytes) {
+      return [text];
+    }
+    const chunks: string[] = [];
+    let cur = '';
+    let curBytes = 0;
+    let i = 0;
+    while (i < text.length) {
+      const code = text.charCodeAt(i);
+      const step = (code >= 0xD800 && code <= 0xDBFF && i + 1 < text.length) ? 2 : 1;
+      const ch = text.substring(i, i + step);
+      const chBytes = encoder.encodeInto(ch).byteLength;
+      if (cur.length > 0 && curBytes + chBytes > maxBytes) {
+        let cut = cur.length;
+        const lastSep = Math.max(cur.lastIndexOf('\n'), cur.lastIndexOf(' '));
+        if (lastSep > cur.length / 2) {
+          cut = lastSep;
+        }
+        const piece = cur.substring(0, cut).trim();
+        if (piece.length > 0) {
+          chunks.push(piece);
+        }
+        const tail = cur.substring(cut).trimStart();
+        cur = tail + ch;
+        curBytes = encoder.encodeInto(cur).byteLength;
+      } else {
+        cur += ch;
+        curBytes += chBytes;
+      }
+      i += step;
+    }
+    if (cur.trim().length > 0) {
+      chunks.push(cur.trim());
+    }
+    return chunks.length > 0 ? chunks : [text];
   }
 
   private static decodeHtml(text: string): string {

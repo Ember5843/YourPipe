@@ -117,6 +117,7 @@ export default class EntryAbility extends UIAbility {
           mpvDemuxerReadaheadSecs: parseInt(pb.demuxerReadaheadSecs, 10),
           mpvDemuxerMaxBytes: parseInt(pb.demuxerMaxBytes, 10),
           mpvGpuApi: pb.gpuApi,
+          mpvShaderCacheDir: `${this.context.cacheDir}/mpv-shader-cache`,
         } as EngineConfig;
       });
       // 日志初始化：尽早建立日志列表，根据持久化开关决定是否开始记录

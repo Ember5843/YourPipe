@@ -87,6 +87,10 @@ export class MpvPlayerController {
     nativeModule.setEventCallback(this.playerId, callback);
   }
 
+  setStatsObservationEnabled(enabled: boolean): void {
+    nativeModule.setStatsObservationEnabled(this.playerId, enabled);
+  }
+
   command(args: string[]): void {
     nativeModule.command(this.playerId, args);
   }

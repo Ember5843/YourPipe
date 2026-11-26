@@ -86,6 +86,8 @@ export interface EngineConfig {
   mpvDemuxerReadaheadSecs?: number;
   mpvDemuxerMaxBytes?: number;
   mpvGpuApi?: string;
+  /** Writable sandbox directory for persistent Vulkan/libplacebo SPIR-V shader cache. */
+  mpvShaderCacheDir?: string;
 }
 
 export interface PlaybackEngine {
@@ -125,6 +127,8 @@ export interface PlaybackEngine {
 
   getState(): PlaybackState;
   getPlaybackStats(): PlaybackStats;
+  /** Toggle on-demand observation of high-frequency stats properties (frame count, avsync, fps, cache-speed). */
+  setStatsObservationEnabled(enabled: boolean): void;
   /**
    * True when the loaded source is fetched directly from the network by the
    * engine (e.g. live HLS) instead of through the loopback proxy. Stats
