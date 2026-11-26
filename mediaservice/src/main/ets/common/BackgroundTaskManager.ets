@@ -12,6 +12,43 @@ import Logger from '../utils/Logger';
 const TAG = '[BackgroundTaskManager]';
 
 export class BackgroundTaskManager {
+  private static cancelCallback: ((info: backgroundTaskManager.ContinuousTaskCancelInfo) => void) | null = null;
+
+  /**
+   * 监听系统主动取消长时任务（如后台无有效音频输出被管控、用户划掉通知等），
+   * 以便播放器同步重置内部状态，下次起播时可重新申请。
+   */
+  public static registerCancelListener(onCancel: (reason: number) => void): void {
+    BackgroundTaskManager.unregisterCancelListener();
+    const cb = (info: backgroundTaskManager.ContinuousTaskCancelInfo): void => {
+      const reason: number = info?.reason ?? -1;
+      Logger.warn(TAG, `continuousTaskCancel received id=${info?.id ?? -1} reason=${reason}`);
+      onCancel(reason);
+    };
+    try {
+      backgroundTaskManager.on('continuousTaskCancel', cb);
+      BackgroundTaskManager.cancelCallback = cb;
+      Logger.info(TAG, 'registered continuousTaskCancel listener');
+    } catch (err) {
+      const e = err as BusinessError;
+      Logger.warn(TAG, `register continuousTaskCancel failed, code=${e?.code}, message=${e?.message}`);
+    }
+  }
+
+  public static unregisterCancelListener(): void {
+    const cb = BackgroundTaskManager.cancelCallback;
+    if (!cb) {
+      return;
+    }
+    BackgroundTaskManager.cancelCallback = null;
+    try {
+      backgroundTaskManager.off('continuousTaskCancel', cb);
+    } catch (err) {
+      const e = err as BusinessError;
+      Logger.warn(TAG, `unregister continuousTaskCancel failed, code=${e?.code}, message=${e?.message}`);
+    }
+  }
+
   /**
    * Register a continuous background task of type AUDIO_PLAYBACK.
    * Must be called before the app enters background while playback is active.

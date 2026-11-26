@@ -132,6 +132,8 @@ export class AvPlayerController {
   private stateRelay: PlayerStateRelay = new PlayerStateRelay();
   private backgroundTaskListener: StateChangeListener | null = null;
   private backgroundTaskActive: boolean = false;
+  private backgroundTaskStopTimer: number = -1;
+  private static readonly BG_TASK_PAUSE_GRACE_MS: number = 20000;
   private engineInitPromise: Promise<boolean> | null = null;
   private mediaInitPromise: Promise<void> | null = null;
   /** Invalidates every async source/proxy operation from a closed media session. */
@@ -3323,9 +3325,18 @@ export class AvPlayerController {
     const listener = new BackgroundTaskStateListener(this);
     this.backgroundTaskListener = listener;
     this.stateMachine.addListener(listener);
+    BackgroundTaskManager.registerCancelListener((reason: number) => {
+      this.clearBackgroundTaskStopTimer();
+      if (this.backgroundTaskActive) {
+        this.backgroundTaskActive = false;
+        Logger.warn(TAG, `[StateTrace] [BgTask] canceled by system reason=${reason}, flag reset`);
+      }
+    });
   }
 
   private detachBackgroundTaskListener(): void {
+    this.clearBackgroundTaskStopTimer();
+    BackgroundTaskManager.unregisterCancelListener();
     if (this.backgroundTaskListener) {
       this.stateMachine.removeListener(this.backgroundTaskListener);
       this.backgroundTaskListener = null;
@@ -3337,20 +3348,56 @@ export class AvPlayerController {
     }
   }
 
+  private clearBackgroundTaskStopTimer(): void {
+    if (this.backgroundTaskStopTimer >= 0) {
+      clearTimeout(this.backgroundTaskStopTimer);
+      this.backgroundTaskStopTimer = -1;
+    }
+  }
+
   // 由 BackgroundTaskStateListener 调用，集中管理后台任务的开关。
+  // 遵循鸿蒙规范：仅在活跃播放/起播缓冲期持有 AUDIO_PLAYBACK；暂停/完播后经短宽限期主动释放，
+  // 避免后台无音频输出时长期占着长时任务触发系统一致性校验惩罚。
   public _bgTaskOnStateChange(to: PlayerState): void {
     const ctx = ContextProvider.get();
     if (!ctx) return;
-    const isActive = to === PlayerState.PLAYING || to === PlayerState.PAUSED || to === PlayerState.BUFFERING
+    const isPlayingOrLoading = to === PlayerState.PLAYING || to === PlayerState.BUFFERING
       || to === PlayerState.READY || to === PlayerState.LOADING;
-    if (isActive && !this.backgroundTaskActive) {
-      this.backgroundTaskActive = true;
-      Logger.info(TAG, `[StateTrace] [BgTask] startContinuousTask state=${to}`);
-      BackgroundTaskManager.startContinuousTask(ctx);
-    } else if ((to === PlayerState.IDLE || to === PlayerState.RELEASED) && this.backgroundTaskActive) {
-      this.backgroundTaskActive = false;
-      Logger.info(TAG, `[StateTrace] [BgTask] stopContinuousTask state=${to}`);
-      BackgroundTaskManager.stopContinuousTask(ctx);
+    const isPausedOrDone = to === PlayerState.PAUSED || to === PlayerState.COMPLETED;
+    const isTerminal = to === PlayerState.IDLE || to === PlayerState.RELEASED || to === PlayerState.ERROR;
+
+    if (isPlayingOrLoading) {
+      this.clearBackgroundTaskStopTimer();
+      if (!this.backgroundTaskActive) {
+        this.backgroundTaskActive = true;
+        Logger.info(TAG, `[StateTrace] [BgTask] startContinuousTask state=${to}`);
+        BackgroundTaskManager.startContinuousTask(ctx);
+      }
+    } else if (isPausedOrDone) {
+      if (this.backgroundTaskActive && this.backgroundTaskStopTimer < 0) {
+        Logger.info(TAG, `[StateTrace] [BgTask] arm delayed stop (${AvPlayerController.BG_TASK_PAUSE_GRACE_MS}ms) state=${to}`);
+        this.backgroundTaskStopTimer = setTimeout(() => {
+          this.backgroundTaskStopTimer = -1;
+          const cur: PlayerState = this.stateMachine.currentState;
+          const stillIdleAudio = cur === PlayerState.PAUSED || cur === PlayerState.COMPLETED
+            || cur === PlayerState.IDLE || cur === PlayerState.RELEASED || cur === PlayerState.ERROR;
+          if (stillIdleAudio && this.backgroundTaskActive) {
+            const latestCtx = ContextProvider.get();
+            this.backgroundTaskActive = false;
+            Logger.info(TAG, `[StateTrace] [BgTask] delayed stopContinuousTask state=${cur}`);
+            if (latestCtx) {
+              BackgroundTaskManager.stopContinuousTask(latestCtx);
+            }
+          }
+        }, AvPlayerController.BG_TASK_PAUSE_GRACE_MS);
+      }
+    } else if (isTerminal) {
+      this.clearBackgroundTaskStopTimer();
+      if (this.backgroundTaskActive) {
+        this.backgroundTaskActive = false;
+        Logger.info(TAG, `[StateTrace] [BgTask] stopContinuousTask state=${to}`);
+        BackgroundTaskManager.stopContinuousTask(ctx);
+      }
     }
   }
 }

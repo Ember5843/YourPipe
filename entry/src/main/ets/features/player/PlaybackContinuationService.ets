@@ -74,7 +74,7 @@ export class PlaybackContinuationService {
   static readonly WANT_PAYLOAD_KEY: string = PAYLOAD_KEY;
   static readonly APP_STORAGE_PENDING_KEY: string = 'pendingPlaybackContinuation';
 
-  static buildPayload(): PlaybackContinuationPayload | null {
+  static buildPayload(forcePaused: boolean = false): PlaybackContinuationPayload | null {
     const session = PlayerSession.getInstance();
     const currentVideo = session.currentVideo || PlayQueueManager.getInstance().getCurrent();
     if (!currentVideo || !currentVideo.videoId || session.isReleased) {
@@ -106,15 +106,15 @@ export class PlaybackContinuationService {
       thumbnailUrl: video.thumbnailUrl,
       durationSec: sanitizeNumber(controller.vm.durationTime),
       progressSec: sanitizeNumber(controller.vm.currentTime),
-      wasPlaying: controller.vm.isPlaying,
+      wasPlaying: forcePaused ? false : controller.vm.isPlaying,
       queue: queue
     };
-    logger.info(`payload built videoId=${video.videoId} queueItems=${queue.items.length} progressSec=${payload.progressSec}`);
+    logger.info(`payload built videoId=${video.videoId} queueItems=${queue.items.length} progressSec=${payload.progressSec} wasPlaying=${payload.wasPlaying}`);
     return payload;
   }
 
-  static writeWantParam(wantParam: Record<string, Object>): boolean {
-    const payload = PlaybackContinuationService.buildPayload();
+  static writeWantParam(wantParam: Record<string, Object>, forcePaused: boolean = false): boolean {
+    const payload = PlaybackContinuationService.buildPayload(forcePaused);
     if (!payload) {
       logger.warn('want write skipped reason=no-payload');
       return false;

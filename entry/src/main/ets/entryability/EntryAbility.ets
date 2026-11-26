@@ -33,6 +33,11 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate('context', this.context);
     AppStorage.setOrCreate('playerLoading', false);
     try {
+      this.context.setRestoreEnabled(true);
+    } catch (err) {
+      logger.warn(`setRestoreEnabled(true) failed: ${JSON.stringify(err)}`);
+    }
+    try {
       this.context.setMissionContinueState(AbilityConstant.ContinueState.INACTIVE);
     } catch (err) {
       logger.warn(`setMissionContinueState(INACTIVE) on create failed: ${JSON.stringify(err)}`);
@@ -231,6 +236,19 @@ export default class EntryAbility extends UIAbility {
     this.handleContinuationWant(want, launchParam);
   }
 
+  onSaveState(reason: AbilityConstant.StateType, wantParam: Record<string, Object>): AbilityConstant.OnSaveResult {
+    try {
+      WatchHistoryStore.flushIfDirty();
+      // 系统因后台资源管控回收进程前保存播放现场；恢复时强制保持暂停态，避免次日点回突然出声。
+      const ok = PlaybackContinuationService.writeWantParam(wantParam, true);
+      logger.info(`onSaveState reason=${reason} saved=${ok}`);
+      return ok ? AbilityConstant.OnSaveResult.ALL_AGREE : AbilityConstant.OnSaveResult.ALL_REJECT;
+    } catch (err) {
+      logger.error(`onSaveState failed: ${JSON.stringify(err)}`);
+      return AbilityConstant.OnSaveResult.ALL_REJECT;
+    }
+  }
+
   onContinue(wantParam: Record<string, Object>): AbilityConstant.OnContinueResult {
     try {
       const ok = PlaybackContinuationService.writeWantParam(wantParam);
@@ -300,10 +318,9 @@ export default class EntryAbility extends UIAbility {
     WatchHistoryStore.flushIfDirty();
     // 后台长时任务由 PlayerStateMachine 统一管理；此处保留兜底注册以应对极端时序
     // （重复注册返回 9800005 会被静默忽略，详见 BackgroundTaskManager）。
-    // 仅播放活跃时才兜底注册（与 BackgroundTaskStateListener 同一活跃集合）：
-    // 从未播放就退后台时，注册注定失败，只会产生一条无意义的 ERROR 日志。
+    // 仅在正在播放/起播缓冲时才兜底注册；暂停态不应反向申请 AUDIO_PLAYBACK 长时任务。
     const playerState = PlayerSession.getInstance().playerState;
-    const isPlaybackActive = playerState === PlayerState.PLAYING || playerState === PlayerState.PAUSED
+    const isPlaybackActive = playerState === PlayerState.PLAYING
       || playerState === PlayerState.BUFFERING || playerState === PlayerState.READY
       || playerState === PlayerState.LOADING;
     if (isPlaybackActive) {
@@ -316,14 +333,17 @@ export default class EntryAbility extends UIAbility {
   }
 
   private handleContinuationWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    if (launchParam.launchReason !== AbilityConstant.LaunchReason.CONTINUATION) {
+    const isContinuation = launchParam.launchReason === AbilityConstant.LaunchReason.CONTINUATION;
+    const hasSavedPayload = !!(want?.parameters && typeof want.parameters[PlaybackContinuationService.WANT_PAYLOAD_KEY] === 'string');
+    if (!isContinuation && !hasSavedPayload) {
       return;
     }
     const payload = PlaybackContinuationService.extractFromWantParameters(want.parameters);
     if (!payload) {
-      logger.warn('Continuation launch ignored: payload missing or invalid');
+      logger.warn(`Restore/continuation launch ignored: payload missing or invalid (isContinuation=${isContinuation})`);
       return;
     }
+    logger.info(`Queued playback restore from ${isContinuation ? 'continuation' : 'saved_state'} videoId=${payload.videoId}`);
     AppStorage.setOrCreate(PlaybackContinuationService.APP_STORAGE_PENDING_KEY, JSON.stringify(payload));
   }
 }
