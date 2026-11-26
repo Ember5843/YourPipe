@@ -1,6 +1,6 @@
 import { ActionHub } from '../../../common/ActionHub';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
-import { customVibrator } from '../../../common/VibratorUtil';
+import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
 import { SearchChannelItem } from 'youtube_core';
 import { SubscriptionUser } from '../../../common/SubscriptionModel';
 import { UIConfig } from '../../../common/AppState';
@@ -22,7 +22,8 @@ interface ContextMenuItem {
   callback: Callback<void>;
 }
 
-const SYMBOL_FONT_SIZE: number = 16;
+const SYMBOL_FONT_SIZE: number = 20;
+const MENU_WIDTH_VP: number = 268;
 
 @Component
 export struct ChannelCard {
@@ -32,7 +33,7 @@ export struct ChannelCard {
   @Prop showDescription: boolean = true;
   @Prop forceActionLabel: ResourceStr = '';
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageProp('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @State isShowContextMenu: boolean = false;
 
@@ -73,8 +74,9 @@ export struct ChannelCard {
       items.push({
         symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.minus_circle'))
           .fontSize(SYMBOL_FONT_SIZE)
-          .fontColor([$r('sys.color.font_primary')]),
+          .fontColor([this.themePrimary]),
         content: $r('app.string.yt_action_unsubscribe'),
+        contentColor: this.themePrimary,
         callback: () => {
           const channelId = this.getChannelId();
           if (channelId) {
@@ -86,7 +88,7 @@ export struct ChannelCard {
       items.push({
         symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.plus_circle'))
           .fontSize(SYMBOL_FONT_SIZE)
-          .fontColor([$r('sys.color.font_primary')]),
+          .fontColor([$r('sys.color.icon_primary')]),
         content: $r('app.string.yt_action_subscribe'),
         callback: () => {
           this.actionHub.addSubscription(this.channel);
@@ -96,7 +98,7 @@ export struct ChannelCard {
     items.push({
       symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.share'))
         .fontSize(SYMBOL_FONT_SIZE)
-        .fontColor([$r('sys.color.font_primary')]),
+        .fontColor([$r('sys.color.icon_primary')]),
       content: $r('app.string.yt_action_share'),
       callback: () => {
         this.actionHub.shareChannel(this.channel);
@@ -109,70 +111,97 @@ export struct ChannelCard {
   contextMenuBuilder() {
     Scroll() {
       Column() {
-        // 信息区（与视频卡菜单同范式）：名称 / 订阅数·视频数 / 简介
+        // 信息区（与视频卡菜单同范式）：名称 / 大实心图标指标（订阅数、视频数） / 简介
         Column() {
           Text(this.channel.name || $r('app.string.yt_label_unknown'))
-            .fontSize(13)
+            .fontSize(15)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.yourtube_text_primary'))
+            .fontColor($r('sys.color.font_primary'))
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .lineHeight(20)
             .width('100%')
 
           if ((this.channel.subscriberText && this.channel.subscriberText.length > 0)
             || (this.channel.videoCountText && this.channel.videoCountText.length > 0)) {
-            Text([
-              this.channel.subscriberText || '',
-              this.channel.videoCountText || ''
-            ].filter((s: string) => s.length > 0).join(' · '))
-              .fontSize(12)
-              .fontColor($r('app.color.yourtube_text_quaternary'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .width('100%')
-              .margin({ top: 4 })
+            Row({ space: 12 }) {
+              if (this.channel.subscriberText && this.channel.subscriberText.length > 0) {
+                Column({ space: 4 }) {
+                  SymbolGlyph($r('sys.symbol.person_2_fill'))
+                    .fontSize(26)
+                    .fontColor([this.themePrimary])
+                  Text(this.channel.subscriberText)
+                    .fontSize(12)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor($r('sys.color.font_primary'))
+                    .fontFeature('"tnum" 1')
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Center)
+              }
+              if (this.channel.videoCountText && this.channel.videoCountText.length > 0) {
+                Column({ space: 4 }) {
+                  SymbolGlyph($r('sys.symbol.play_circle_fill'))
+                    .fontSize(26)
+                    .fontColor([$r('sys.color.icon_primary')])
+                  Text(this.channel.videoCountText)
+                    .fontSize(12)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor($r('sys.color.font_primary'))
+                    .fontFeature('"tnum" 1')
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Center)
+              }
+            }
+            .width('100%')
+            .margin({ top: 10 })
           }
 
           if (this.channel.description && this.channel.description.length > 0) {
             Text(this.channel.description)
               .fontSize(12)
-              .fontColor($r('app.color.yourtube_text_hint'))
+              .fontColor($r('sys.color.font_tertiary'))
               .maxLines(2)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .width('100%')
-              .margin({ top: 2 })
+              .margin({ top: 8 })
           }
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
-        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+        .padding({ left: 14, right: 14, top: 12, bottom: 12 })
 
         Divider()
           .strokeWidth(0.5)
           .color($r('sys.color.comp_divider'))
 
         Menu() {
-          ForEach(this.getContextMenus(), (item: ContextMenuItem) => {
+          ForEach(this.getContextMenus(), (item: ContextMenuItem, idx: number) => {
             MenuItem({
               symbolStartIcon: item.symbolStartIcon,
               content: item.content
             })
               .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+              .contentFont({ size: 15, weight: FontWeight.Medium })
               .contentFontColor(item.contentColor ?? $r('sys.color.font_primary'))
               .onClick(() => {
                 item.callback();
               });
-          });
+          }, (_item: ContextMenuItem, idx: number) => `ch_menu_${idx}`);
         }
         .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
         .width('100%')
         .height('auto')
       }
-      .backgroundColor($r('app.color.yourtube_bg_surface'))
+      .backgroundColor(Color.Transparent)
       .borderRadius(MEDIA_CARD_RADIUS)
       .clip(true)
-      // 与视频卡菜单统一 220vp（原 180vp）
-      .width(220)
+      .width(MENU_WIDTH_VP)
     }
     .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
     .edgeEffect(EdgeEffect.Spring);
@@ -255,15 +284,28 @@ export struct ChannelCard {
       .alignItems(HorizontalAlign.Start);
 
       Column() {
-        Button(this.getActionLabel())
-          .fontSize(12)
-          .fontColor($r('app.color.yourtube_text_inverse'))
-          .backgroundColor(this.isSubscribed() ? $r('app.color.yourtube_button_disabled') : this.themePrimary)
-          .height(28)
-          .padding({ left: 10, right: 10 })
-          .onClick(() => {
-            this.handleAction();
-          });
+        Button({ type: ButtonType.Capsule, stateEffect: true }) {
+          Row({ space: 4 }) {
+            SymbolGlyph(this.isSubscribed() ? $r('sys.symbol.checkmark') : $r('sys.symbol.plus'))
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor([this.isSubscribed() ? $r('sys.color.icon_secondary') : this.themePrimary])
+            Text(this.getActionLabel())
+              .fontSize(12)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.isSubscribed() ? $r('sys.color.font_secondary') : this.themePrimary)
+          }
+          .padding({ left: 10, right: 12 })
+          .alignItems(VerticalAlign.Center)
+        }
+        .backgroundColor(this.isSubscribed()
+          ? $r('sys.color.comp_background_tertiary')
+          : ThemeColorUtil.selectedBackground(this.themePrimary))
+        .height(30)
+        .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+        .onClick(() => {
+          this.handleAction();
+        });
       }
       .height(56)
       .justifyContent(FlexAlign.Center)
@@ -283,13 +325,11 @@ export struct ChannelCard {
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .bindContextMenu(this.isShowContextMenu, this.contextMenuBuilder, {
       preview: MenuPreviewMode.IMAGE,
-      previewAnimationOptions: { scale: [1.0, 1.1] },
+      previewAnimationOptions: { scale: [1.0, 1.06] },
       placement: Placement.BottomRight,
-      aboutToAppear: () => {
-        if (this.uiConfig.isVibrate) {
-          customVibrator.vibratorTriggerOfHapticClockTimer();
-        }
-      },
+      enableArrow: false,
+      backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK,
+      hapticFeedbackMode: this.uiConfig.isVibrate ? HapticFeedbackMode.ENABLED : HapticFeedbackMode.DISABLED,
       aboutToDisappear: () => {
         this.isShowContextMenu = false;
       }

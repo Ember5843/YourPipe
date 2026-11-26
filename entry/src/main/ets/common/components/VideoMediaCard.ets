@@ -1,9 +1,7 @@
 import { ActionHub } from '../../common/ActionHub';
 import { VideoItem } from 'youtube_core';
 import { customAnimationUtil } from '../../common/AnimationUtil';
-import { customVibrator } from '../../common/VibratorUtil';
 import { UIConfig } from '../AppState';
-import { curves } from '@kit.ArkUI';
 import { MediaThumb } from './MediaThumb';
 import { VideoItemContextMenu } from './VideoItemContextMenu';
 import { resolveResourceStr } from '../utils/ResourceStrUtil';
@@ -20,14 +18,14 @@ import {
   MEDIA_TITLE_SIZE
 } from './MediaCardTokens';
 
-const ACTION_BTN_HEIGHT: number = 28;
-const ACTION_BTN_RESERVE: number = 28;
+const MORE_BTN_SIZE: number = 28;
 
 /**
  * Shared video content shell.
- * layoutMode: 'list' = horizontal row (meta stacked: title / author / viewCount),
- * 'grid' = vertical card (title + meta 行：作者 · 统计，action button 在行右端)。
+ * layoutMode: 'list' = horizontal row (title + top-right more button / author / meta),
+ * 'grid' = vertical card (title + top-right more button / full-width author · meta).
  */
+@Reusable
 @Component
 export struct VideoMediaCard {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
@@ -43,45 +41,21 @@ export struct VideoMediaCard {
   @Prop showLiveTag: boolean = true;
   @Prop useFavoriteToggle: boolean = false;
   onOpenVideo?: (video: VideoItem) => void;
-  @StorageLink('favorites') favorites: VideoItem[] = [];
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageProp('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @State isShowContextMenu: boolean = false;
-  @State actionScale: number = 1;
+
+  aboutToReuse(_params: Record<string, Object>): void {
+    this.isShowContextMenu = false;
+  }
 
   private isGrid(): boolean {
     return this.layoutMode === 'grid';
   }
 
-  private getVideoId(): string {
-    return (this.video.videoId || '').trim();
-  }
-
   private getTypeLabelText(): string {
     // Resource 形式的标签（如搜索页传入的 $r）需解析成字符串，否则角标为空
     return resolveResourceStr(this.typeLabel);
-  }
-
-  private isFavorited(): boolean {
-    const videoId = this.getVideoId();
-    if (!videoId) {
-      return false;
-    }
-    return this.favorites.some((item: VideoItem) => item.videoId === videoId);
-  }
-
-  private getActionLabel(): ResourceStr {
-    if (this.useFavoriteToggle) {
-      return this.isFavorited() ? $r('app.string.yt_action_unfavorite') : $r('app.string.yt_action_favorite');
-    }
-    return this.actionLabel;
-  }
-
-  private getActionColor(): ResourceColor {
-    if (this.useFavoriteToggle) {
-      return this.isFavorited() ? $r('app.color.yourtube_button_disabled') : this.themePrimary;
-    }
-    return this.actionType === 'remove' ? $r('app.color.yourtube_button_disabled') : this.themePrimary;
   }
 
   /** AiSList 角标：block=红，warn=橙；未命中返回空串。 */
@@ -100,51 +74,6 @@ export struct VideoMediaCard {
     return this.video.aiListFlag === 'warn' ? '#F59E0B' : '#E53935';
   }
 
-  private hasActionButton(): boolean {
-    return this.useFavoriteToggle || (typeof this.actionLabel === 'string' && this.actionLabel.length > 0);
-  }
-
-  private playActionToggleAnim(): void {
-    if (!this.uiConfig.isAnimation) {
-      this.actionScale = 1;
-      return;
-    }
-    // Press-in then spring back so favorite / unfavorite feels responsive.
-    this.actionScale = 0.86;
-    const duration = Math.max(160, Math.min(this.uiConfig.animationSpeed || 220, 260));
-    this.getUIContext().animateTo({
-      duration: duration,
-      curve: curves.springMotion(0.32, 0.78)
-    }, () => {
-      this.actionScale = 1;
-    });
-  }
-
-  private handleAction(): void {
-    if (this.useFavoriteToggle) {
-      const videoId = this.getVideoId();
-      if (!videoId) {
-        return;
-      }
-      this.playActionToggleAnim();
-      if (this.isFavorited()) {
-        this.actionHub.removeFavorite(videoId);
-      } else {
-        this.actionHub.addFavorite(this.video);
-      }
-      return;
-    }
-    if (this.actionType === 'favorite' || this.actionType === 'remove') {
-      this.playActionToggleAnim();
-    }
-    if (this.actionType === 'favorite') {
-      this.actionHub.addFavorite(this.video);
-    } else if (this.actionType === 'remove') {
-      const targetId = this.video.videoId || this.video.id.toString();
-      this.actionHub.removeFavorite(targetId);
-    }
-  }
-
   private handleOpen(): void {
     if (!this.enableOpen) {
       return;
@@ -158,9 +87,35 @@ export struct VideoMediaCard {
 
   @Builder
   contextMenuBuilder() {
-    // 菜单内容统一由共享组件渲染（信息区 + 标准项 + 下载）；宿主管 anchor 与 preview 选项。
+    // 菜单内容统一由共享组件渲染（大图标指标区 + 快捷栏 + 标准项）；宿主管毛玻璃与触觉选项。
     VideoItemContextMenu({
-      video: this.video
+      video: this.video,
+      onClose: () => {
+        this.isShowContextMenu = false;
+      }
+    })
+  }
+
+  @Builder
+  MoreMenuButton() {
+    Button({ type: ButtonType.Circle, stateEffect: true }) {
+      SymbolGlyph($r('sys.symbol.plus'))
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor([$r('sys.color.icon_primary')])
+    }
+    .width(MORE_BTN_SIZE)
+    .height(MORE_BTN_SIZE)
+    .backgroundColor($r('sys.color.comp_background_tertiary'))
+    .shadow({
+      radius: 4,
+      color: '#18000000',
+      offsetX: 0,
+      offsetY: 1
+    })
+    .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+    .onClick(() => {
+      this.isShowContextMenu = true;
     })
   }
 
@@ -206,80 +161,53 @@ export struct VideoMediaCard {
       .margin({ right: MEDIA_LIST_THUMB_GAP })
   }
 
-  /** Title / author / viewCount stacked — shared by list and grid. */
+  /** Title (full width) / bottom row: [author + meta] + bottom-right circular '+' button. */
   @Builder
-  MetaTextStack() {
+  MetaBlockList() {
     Column() {
       Text(this.video.title)
         .fontSize(MEDIA_TITLE_SIZE)
-        .fontColor($r('app.color.yourtube_text_primary'))
+        .fontColor($r('sys.color.font_primary'))
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
         .fontWeight(FontWeight.Medium)
         .width('100%')
-        .margin({ bottom: 2 })
+        .margin({ bottom: 4 })
 
-      if (this.showAuthor && this.video.author && this.video.author.length > 0) {
-        Text(this.video.author)
-          .fontSize(MEDIA_META_SIZE)
-          .fontColor($r('app.color.yourtube_text_quaternary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
-          .margin({ bottom: 2 })
-      }
+      Blank()
 
-      if (this.showViewCount && this.listMetaText().length > 0) {
-        Text(this.listMetaText())
-          .fontSize(MEDIA_META_SIZE)
-          .fontColor($r('app.color.yourtube_text_hint'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
-      }
-    }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
-  }
+      Row({ space: 8 }) {
+        Column({ space: 2 }) {
+          if (this.showAuthor && this.video.author && this.video.author.length > 0) {
+            Text(this.video.author)
+              .fontSize(MEDIA_META_SIZE)
+              .fontColor($r('sys.color.font_secondary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+          }
 
-  @Builder
-  ActionButton() {
-    Button(this.getActionLabel())
-      .fontSize(12)
-      .fontColor($r('app.color.yourtube_text_inverse'))
-      .backgroundColor(this.getActionColor())
-      .height(ACTION_BTN_HEIGHT)
-      .padding({ left: 10, right: 10 })
-      .scale({ x: this.actionScale, y: this.actionScale })
-      .animation(this.uiConfig.isAnimation
-        ? { duration: 180, curve: curves.springMotion(0.32, 0.78) }
-        : { duration: 0 })
-      .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
-      .onClick(() => {
-        this.handleAction();
-      })
-  }
+          if (this.showViewCount && this.listMetaText().length > 0) {
+            Text(this.listMetaText())
+              .fontSize(MEDIA_META_SIZE)
+              .fontColor($r('sys.color.font_tertiary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+          }
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
 
-  @Builder
-  MetaBlockList() {
-    // Fixed height matches thumb so action stays bottom-end, independent of text lines.
-    Stack({ alignContent: Alignment.BottomEnd }) {
-      Column() {
-        this.MetaTextStack()
+        this.MoreMenuButton()
       }
       .width('100%')
-      .height('100%')
-      .alignItems(HorizontalAlign.Start)
-      .justifyContent(FlexAlign.Start)
-      .padding({ bottom: this.hasActionButton() ? ACTION_BTN_RESERVE : 0 })
-
-      if (this.hasActionButton()) {
-        this.ActionButton()
-      }
+      .alignItems(VerticalAlign.Bottom)
     }
     .layoutWeight(1)
     .height(MEDIA_LIST_THUMB_HEIGHT)
+    .alignItems(HorizontalAlign.Start)
   }
 
   /** grid meta 行的作者段（showAuthor 关闭或缺失时为空）。 */
@@ -323,51 +251,46 @@ export struct VideoMediaCard {
 
   @Builder
   MetaBlockGrid() {
-    // 上下分布卡片的底部信息栏：标题(≤2行) / meta 行[作者 · 统计 + 按钮]。
-    // 作者段与统计段（播放数→发布时间→时长，首个可用）有数据即渲染；
-    // 超宽由省略号截断，全量信息走长按菜单。
+    // 上下分布卡片的信息栏：通宽标题(≤2行) / 底部 meta 行[作者 · 统计 + 右下纯圆 '+' 按钮]。
     Column() {
       Text(this.video.title)
         .fontSize(MEDIA_TITLE_SIZE)
-        .fontColor($r('app.color.yourtube_text_primary'))
+        .fontColor($r('sys.color.font_primary'))
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
         .fontWeight(FontWeight.Medium)
         .width('100%')
-        .margin({ bottom: 2 })
+        .margin({ bottom: 6 })
 
-      if (this.bottomMetaRowHasContent() || this.hasActionButton()) {
-        Row({ space: 8 }) {
-          if (this.bottomMetaRowHasContent()) {
-            Text() {
-              if (this.gridMetaAuthor().length > 0) {
-                Span(this.gridMetaAuthor())
-                  .fontColor($r('app.color.yourtube_text_quaternary'))
-              }
-              if (this.gridMetaAuthor().length > 0 && this.gridMetaStat().length > 0) {
-                Span(' · ')
-                  .fontColor($r('app.color.yourtube_text_hint'))
-              }
-              if (this.gridMetaStat().length > 0) {
-                Span(this.gridMetaStat())
-                  .fontColor($r('app.color.yourtube_text_hint'))
-              }
+      Row({ space: 8 }) {
+        if (this.bottomMetaRowHasContent()) {
+          Text() {
+            if (this.gridMetaAuthor().length > 0) {
+              Span(this.gridMetaAuthor())
+                .fontColor($r('sys.color.font_secondary'))
             }
-            .fontSize(MEDIA_META_SIZE)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .layoutWeight(1)
-          } else {
-            Blank().layoutWeight(1)
+            if (this.gridMetaAuthor().length > 0 && this.gridMetaStat().length > 0) {
+              Span(' · ')
+                .fontColor($r('sys.color.font_tertiary'))
+            }
+            if (this.gridMetaStat().length > 0) {
+              Span(this.gridMetaStat())
+                .fontColor($r('sys.color.font_tertiary'))
+            }
           }
-          if (this.hasActionButton()) {
-            this.ActionButton()
-          }
+          .fontSize(MEDIA_META_SIZE)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+        } else {
+          Blank().layoutWeight(1)
         }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
+
+        this.MoreMenuButton()
       }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
@@ -394,13 +317,11 @@ export struct VideoMediaCard {
       .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
       .bindContextMenu(this.isShowContextMenu, this.contextMenuBuilder, {
         preview: MenuPreviewMode.IMAGE,
-        previewAnimationOptions: { scale: [1.0, 1.1] },
+        previewAnimationOptions: { scale: [1.0, 1.06] },
         placement: Placement.BottomRight,
-        aboutToAppear: () => {
-          if (this.uiConfig.isVibrate) {
-            customVibrator.vibratorTriggerOfHapticClockTimer();
-          }
-        },
+        enableArrow: false,
+        backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK,
+        hapticFeedbackMode: this.uiConfig.isVibrate ? HapticFeedbackMode.ENABLED : HapticFeedbackMode.DISABLED,
         aboutToDisappear: () => {
           this.isShowContextMenu = false;
         }
@@ -418,7 +339,7 @@ export struct VideoMediaCard {
         this.MetaBlockList()
       }
       .width('100%')
-      .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+      .padding({ left: 10, right: 6, top: 8, bottom: 8 })
       .alignItems(VerticalAlign.Top)
       .borderRadius(MEDIA_CARD_RADIUS)
       .backgroundColor($r('app.color.yourtube_bg_surface'))
@@ -431,13 +352,11 @@ export struct VideoMediaCard {
       .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
       .bindContextMenu(this.isShowContextMenu, this.contextMenuBuilder, {
         preview: MenuPreviewMode.IMAGE,
-        previewAnimationOptions: { scale: [1.0, 1.1] },
+        previewAnimationOptions: { scale: [1.0, 1.06] },
         placement: Placement.BottomRight,
-        aboutToAppear: () => {
-          if (this.uiConfig.isVibrate) {
-            customVibrator.vibratorTriggerOfHapticClockTimer();
-          }
-        },
+        enableArrow: false,
+        backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK,
+        hapticFeedbackMode: this.uiConfig.isVibrate ? HapticFeedbackMode.ENABLED : HapticFeedbackMode.DISABLED,
         aboutToDisappear: () => {
           this.isShowContextMenu = false;
         }

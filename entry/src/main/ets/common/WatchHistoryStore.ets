@@ -23,6 +23,9 @@ export interface WatchHistoryItem {
   channelId: string;           // 频道 ID（用于跳转频道页）
   channelAvatarUrl: string;    // 频道头像
   channelHandle: string;       // 频道 handle
+  viewCount?: string;          // 观看次数文本（可动态刷新）
+  publishedTimeText?: string;  // 发布时间文本（可动态刷新）
+  durationText?: string;       // 时长展示文本（durationSec=0 时兜底）
 }
 
 export class WatchHistoryStore {
@@ -106,28 +109,36 @@ export class WatchHistoryStore {
     progressSec: number,
     channelId: string = '',
     channelAvatarUrl: string = '',
-    channelHandle: string = ''
+    channelHandle: string = '',
+    viewCount: string = '',
+    publishedTimeText: string = '',
+    durationText: string = ''
   ): void {
     if (!WatchHistoryStore.isRecordEnabled()) {
       return;
     }
     if (!videoId || videoId.trim().length === 0) return;
 
+    const trimmedId = videoId.trim();
     const all = WatchHistoryStore.getAll();
+    const prev = all.find((h: WatchHistoryItem) => h.videoId === trimmedId);
     // 移除旧条目（如果已存在）
-    const filtered = all.filter((item: WatchHistoryItem) => item.videoId !== videoId);
+    const filtered = all.filter((item: WatchHistoryItem) => item.videoId !== trimmedId);
 
     const item: WatchHistoryItem = {
-      videoId: videoId.trim(),
-      title: title || videoId,
-      author: author || '',
-      thumbnailUrl: thumbnailUrl || '',
-      durationSec: durationSec >= 0 ? durationSec : 0,
+      videoId: trimmedId,
+      title: title || prev?.title || trimmedId,
+      author: author || prev?.author || '',
+      thumbnailUrl: thumbnailUrl || prev?.thumbnailUrl || '',
+      durationSec: durationSec > 0 ? durationSec : (prev?.durationSec || 0),
       progressSec: progressSec >= 0 ? progressSec : 0,
       lastWatchedAt: Date.now(),
-      channelId: channelId || '',
-      channelAvatarUrl: channelAvatarUrl || '',
-      channelHandle: channelHandle || ''
+      channelId: channelId || prev?.channelId || '',
+      channelAvatarUrl: channelAvatarUrl || prev?.channelAvatarUrl || '',
+      channelHandle: channelHandle || prev?.channelHandle || '',
+      viewCount: (viewCount && viewCount.length > 0) ? viewCount : (prev?.viewCount || ''),
+      publishedTimeText: (publishedTimeText && publishedTimeText.length > 0) ? publishedTimeText : (prev?.publishedTimeText || ''),
+      durationText: (durationText && durationText.length > 0) ? durationText : (prev?.durationText || '')
     };
     filtered.unshift(item);
 
@@ -198,7 +209,10 @@ export class WatchHistoryStore {
     durationSec: number = 0,
     channelId: string = '',
     channelAvatarUrl: string = '',
-    channelHandle: string = ''
+    channelHandle: string = '',
+    viewCount: string = '',
+    publishedTimeText: string = '',
+    durationText: string = ''
   ): void {
     const id = (videoId || '').trim();
     if (!id) {
@@ -210,17 +224,23 @@ export class WatchHistoryStore {
       if (item.videoId !== id) {
         return item;
       }
+      const nextViewCount = (viewCount && viewCount.length > 0) ? viewCount : (item.viewCount || '');
+      const nextPublished = (publishedTimeText && publishedTimeText.length > 0) ? publishedTimeText : (item.publishedTimeText || '');
+      const nextDurationText = (durationText && durationText.length > 0) ? durationText : (item.durationText || '');
       const merged: WatchHistoryItem = {
         videoId: id,
         title: (title && title.length > 0) ? title : item.title,
         author: (author && author.length > 0) ? author : item.author,
         thumbnailUrl: (thumbnailUrl && thumbnailUrl.length > 0) ? thumbnailUrl : item.thumbnailUrl,
-        durationSec: item.durationSec > 0 ? item.durationSec : (durationSec > 0 ? durationSec : 0),
+        durationSec: durationSec > 0 ? durationSec : (item.durationSec > 0 ? item.durationSec : 0),
         progressSec: item.progressSec,
         lastWatchedAt: item.lastWatchedAt,
         channelId: item.channelId || channelId || '',
         channelAvatarUrl: item.channelAvatarUrl || channelAvatarUrl || '',
-        channelHandle: item.channelHandle || channelHandle || ''
+        channelHandle: item.channelHandle || channelHandle || '',
+        viewCount: nextViewCount,
+        publishedTimeText: nextPublished,
+        durationText: nextDurationText
       };
       if (merged.title !== item.title
         || merged.author !== item.author
@@ -228,7 +248,10 @@ export class WatchHistoryStore {
         || merged.durationSec !== item.durationSec
         || merged.channelId !== item.channelId
         || merged.channelAvatarUrl !== item.channelAvatarUrl
-        || merged.channelHandle !== item.channelHandle) {
+        || merged.channelHandle !== item.channelHandle
+        || merged.viewCount !== (item.viewCount || '')
+        || merged.publishedTimeText !== (item.publishedTimeText || '')
+        || merged.durationText !== (item.durationText || '')) {
         changed = true;
       }
       return merged;
@@ -286,7 +309,10 @@ export class WatchHistoryStore {
             lastWatchedAt: prev.lastWatchedAt > 0 ? prev.lastWatchedAt : (item.lastWatchedAt || now),
             channelId: prev.channelId || item.channelId || '',
             channelAvatarUrl: prev.channelAvatarUrl || item.channelAvatarUrl || '',
-            channelHandle: prev.channelHandle || item.channelHandle || ''
+            channelHandle: prev.channelHandle || item.channelHandle || '',
+            viewCount: (item.viewCount && item.viewCount.length > 0) ? item.viewCount : (prev.viewCount || ''),
+            publishedTimeText: (item.publishedTimeText && item.publishedTimeText.length > 0) ? item.publishedTimeText : (prev.publishedTimeText || ''),
+            durationText: (item.durationText && item.durationText.length > 0) ? item.durationText : (prev.durationText || '')
           },
           isAnchor: true
         });
@@ -302,7 +328,10 @@ export class WatchHistoryStore {
             lastWatchedAt: 0,
             channelId: item.channelId || '',
             channelAvatarUrl: item.channelAvatarUrl || '',
-            channelHandle: item.channelHandle || ''
+            channelHandle: item.channelHandle || '',
+            viewCount: item.viewCount || '',
+            publishedTimeText: item.publishedTimeText || '',
+            durationText: item.durationText || ''
           },
           isAnchor: false
         });

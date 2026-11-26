@@ -371,7 +371,10 @@ export class UserLibraryService {
           lastWatchedAt: 0,
           channelId: v.channelId || '',
           channelAvatarUrl: v.channelAvatarUrl || '',
-          channelHandle: v.channelHandle || ''
+          channelHandle: v.channelHandle || '',
+          viewCount: v.viewCount || v.viewCountExact || '',
+          publishedTimeText: v.publishedTimeText || '',
+          durationText: v.durationText || ''
         };
         return item;
       });

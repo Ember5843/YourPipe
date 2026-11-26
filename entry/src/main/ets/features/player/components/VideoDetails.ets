@@ -634,48 +634,44 @@ export struct VideoDetails {
 
   @Builder
   StatsMetaRow() {
-    // Title-adjacent stats: views / date / like / dislike. Items size to their
-    // content; SpaceBetween pins the first/last item to the strip edges with
-    // equal gaps in between. The per-item width cap keeps gaps alive when a
-    // label runs long.
-    Row() {
+    // 无底框大实心图标 + 紧凑加粗数字，强化视觉重心、避免小方块堆砌感。
+    Row({ space: 8 }) {
       if (this.viewCount > 0) {
-        this.StatItem($r('sys.symbol.play_round_rectangle'), this.formatViewCount(this.viewCount))
+        this.StatItem($r('sys.symbol.play_circle_fill'), this.formatViewCount(this.viewCount), true)
       }
       if (this.publishDate && this.publishDate.length > 0) {
-        this.StatItem($r('sys.symbol.calendar'), this.formatRelativeDate(this.publishDate))
+        this.StatItem($r('sys.symbol.calendar_fill'), this.formatRelativeDate(this.publishDate), false)
       }
       if (this.hasLikeCount()) {
-        this.StatItem($r('sys.symbol.hand_thumbsup'), this.formatStatCount(this.likeCount))
+        this.StatItem($r('sys.symbol.hand_thumbsup_fill'), this.formatStatCount(this.likeCount), false)
       }
       if (this.hasDislikeCount()) {
-        this.StatItem($r('sys.symbol.hand_thumbsdown'), this.formatStatCount(this.dislikeCount))
+        this.StatItem($r('sys.symbol.hand_thumbsdown_fill'), this.formatStatCount(this.dislikeCount), false)
       }
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
-    .justifyContent(FlexAlign.SpaceBetween)
-    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
-    .borderRadius(12)
-    .backgroundColor($r('app.color.yourtube_player_info_bg'))
-    .margin({ top: 8, bottom: 12 })
+    .padding({ top: 10, bottom: 10 })
+    .margin({ top: 6, bottom: 10 })
   }
 
   @Builder
-  StatItem(icon: Resource, label: ResourceStr) {
-    Row({ space: 4 }) {
+  StatItem(icon: Resource, label: ResourceStr, accent: boolean) {
+    Column({ space: 5 }) {
       SymbolGlyph(icon)
-        .fontSize(13)
-        .fontColor([$r('app.color.yourtube_text_secondary')])
+        .fontSize(26)
+        .fontColor([accent ? this.themePrimary : $r('sys.color.icon_primary')])
       Text(label)
-        .fontSize(12)
-        .fontColor($r('app.color.yourtube_text_secondary'))
+        .fontSize(13)
+        .fontColor($r('sys.color.font_primary'))
         .fontWeight(FontWeight.Medium)
+        .fontFeature('"tnum" 1')
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textAlign(TextAlign.Center)
     }
-    .alignItems(VerticalAlign.Center)
-    .constraintSize({ maxWidth: '30%' })
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Center)
   }
 
   @Builder

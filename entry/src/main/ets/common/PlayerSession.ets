@@ -1254,7 +1254,11 @@ export class PlayerSession {
           // Keep the thumbnail selected by the feed stable throughout startup.
           // Replacing it while the loading cover is visible restarts MediaThumb's
           // fallback chain and produces a black flash between image requests.
-          // Back-fill local history for cloud-synced rows missing author / channel meta.
+          // Back-fill local history with latest metadata (duration, viewCount, publishDate).
+          const vcNum: number = result.videoInfo.viewCount ?? 0;
+          const resolvedViewCount: string = video.viewCount
+            || (vcNum > 0 ? String(vcNum) : '');
+          const resolvedPublished: string = video.publishedTimeText || result.videoInfo.uploadDate || '';
           WatchHistoryStore.enrichMetadata(
             videoId,
             video.title || '',
@@ -1263,7 +1267,10 @@ export class PlayerSession {
             result.videoInfo.lengthSeconds || 0,
             video.channelId || '',
             video.channelAvatarUrl || '',
-            video.channelHandle || ''
+            video.channelHandle || '',
+            resolvedViewCount,
+            resolvedPublished,
+            video.durationText || ''
           );
         }
         const videoSource: VideoData = {
@@ -1856,7 +1863,10 @@ export class PlayerSession {
         progressSec,
         this._currentVideo?.channelId || '',
         this._currentVideo?.channelAvatarUrl || '',
-        this._currentVideo?.channelHandle || ''
+        this._currentVideo?.channelHandle || '',
+        this._currentVideo?.viewCount || '',
+        this._currentVideo?.publishedTimeText || '',
+        this._currentVideo?.durationText || ''
       );
       logger.info(`${TAG} Saved history: ${this._watchVideoId} at ${progressSec.toFixed(1)}s`);
     } catch (e) {

@@ -1,8 +1,15 @@
 import { WatchHistoryStore, WatchHistoryItem } from '../../common/WatchHistoryStore';
 import { DownloadManager, DownloadTask } from '../../common/DownloadManager';
 import { ActionHub } from '../../common/ActionHub';
-import { AuthAccountStatus, AuthSessionManager, SearchPlaylistItem, VideoItem } from 'youtube_core';
-import { customVibrator } from '../../common/VibratorUtil';
+import {
+  AuthAccountStatus,
+  AuthSessionManager,
+  ClientsConstants,
+  HttpDownloader,
+  SearchPlaylistItem,
+  VideoItem,
+  WebClientVersionResolver
+} from 'youtube_core';
 import { UIConfig } from '../../common/AppState';
 import { customAnimationUtil } from '../../common/AnimationUtil';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
@@ -44,23 +51,220 @@ function formatRelativeTime(ts: number): ResourceStr {
   return $r('app.string.yt_date_days_ago', d);
 }
 
-const SYMBOL_FONT_SIZE: number = 16;
+const SYMBOL_FONT_SIZE: number = 20;
+const HISTORY_MORE_BTN_SIZE: number = 28;
+const HISTORY_META_REFRESH_TTL_MS: number = 60_000;
+const historyMetaRefreshAt: Map<string, number> = new Map<string, number>();
+
+interface NextTextRun {
+  text?: string;
+}
+
+interface NextTextField {
+  simpleText?: string;
+  runs?: NextTextRun[];
+}
+
+interface NextViewCountRenderer {
+  shortViewCount?: NextTextField;
+  viewCount?: NextTextField;
+}
+
+interface NextViewCountWrap {
+  videoViewCountRenderer?: NextViewCountRenderer;
+}
+
+interface NextPrimaryInfoRenderer {
+  title?: NextTextField;
+  viewCount?: NextViewCountWrap;
+  relativeDateText?: NextTextField;
+  dateText?: NextTextField;
+}
+
+interface NextBrowseEndpoint {
+  browseId?: string;
+}
+
+interface NextNavEndpoint {
+  browseEndpoint?: NextBrowseEndpoint;
+}
+
+interface NextOwnerRenderer {
+  title?: NextTextField;
+  navigationEndpoint?: NextNavEndpoint;
+}
+
+interface NextSecondaryOwner {
+  videoOwnerRenderer?: NextOwnerRenderer;
+}
+
+interface NextSecondaryInfoRenderer {
+  owner?: NextSecondaryOwner;
+}
+
+interface NextContentEntry {
+  videoPrimaryInfoRenderer?: NextPrimaryInfoRenderer;
+  videoSecondaryInfoRenderer?: NextSecondaryInfoRenderer;
+}
+
+interface NextInnerResults {
+  contents?: NextContentEntry[];
+}
+
+interface NextResultsWrap {
+  results?: NextInnerResults;
+}
+
+interface NextTwoColumnResults {
+  results?: NextResultsWrap;
+}
+
+interface NextContentsWrap {
+  twoColumnWatchNextResults?: NextTwoColumnResults;
+}
+
+interface NextResponseRoot {
+  contents?: NextContentsWrap;
+}
+
+interface NextRequestClient {
+  clientName: string;
+  clientVersion: string;
+  hl: string;
+  gl: string;
+}
+
+interface NextRequestContext {
+  client: NextRequestClient;
+}
+
+interface NextRequestPayload {
+  videoId: string;
+  context: NextRequestContext;
+}
+
+function readNextText(field?: NextTextField): string {
+  if (!field) {
+    return '';
+  }
+  if (field.simpleText && field.simpleText.length > 0) {
+    return field.simpleText.trim();
+  }
+  if (field.runs && field.runs.length > 0) {
+    return field.runs.map((r: NextTextRun): string => r.text || '').join('').trim();
+  }
+  return '';
+}
+
+/**
+ * 长按/打开历史条目菜单时后台轻量刷新最新观看次数、发布时间与标题并立即回写历史记录。
+ * 独立走无锁 /next 请求（不占用播放器提取互斥锁），带 60s 防抖并继承全局代理。
+ */
+async function refreshHistoryItemMetadata(videoId: string): Promise<void> {
+  const id = (videoId || '').trim();
+  if (!id || WatchHistoryStore.playlistIdOf(id).length > 0) {
+    return;
+  }
+  const now = Date.now();
+  const last = historyMetaRefreshAt.get(id) ?? 0;
+  if (now - last < HISTORY_META_REFRESH_TTL_MS) {
+    return;
+  }
+  historyMetaRefreshAt.set(id, now);
+  try {
+    const ui = AppStorage.get<UIConfig>('uiConfig');
+    const hl = (ui && ui.searchLanguage && ui.searchLanguage !== 'default') ? ui.searchLanguage : 'zh-CN';
+    const gl = (ui && ui.searchCountry && ui.searchCountry !== 'default') ? ui.searchCountry : 'US';
+    const clientVersion = WebClientVersionResolver.getCachedOrHardcoded();
+    const reqClient: NextRequestClient = {
+      clientName: ClientsConstants.WEB_CLIENT_NAME,
+      clientVersion: clientVersion,
+      hl: hl,
+      gl: gl
+    };
+    const reqContext: NextRequestContext = {
+      client: reqClient
+    };
+    const reqPayload: NextRequestPayload = {
+      videoId: id,
+      context: reqContext
+    };
+    const body: string = JSON.stringify(reqPayload);
+    const downloader = new HttpDownloader();
+    const resp = await downloader.post(
+      'https://www.youtube.com/youtubei/v1/next?prettyPrint=false',
+      body,
+      {
+        'Content-Type': ['application/json'],
+        'User-Agent': [ClientsConstants.WEB_USER_AGENT],
+        'X-YouTube-Client-Name': [ClientsConstants.WEB_CLIENT_ID],
+        'X-YouTube-Client-Version': [clientVersion]
+      }
+    );
+    if (resp.responseCode !== 200 || typeof resp.result !== 'string') {
+      return;
+    }
+    const root = JSON.parse(resp.result as string) as NextResponseRoot;
+    const entries = root?.contents?.twoColumnWatchNextResults?.results?.results?.contents;
+    if (!Array.isArray(entries)) {
+      return;
+    }
+    let title = '';
+    let viewCount = '';
+    let published = '';
+    let author = '';
+    let channelId = '';
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry.videoPrimaryInfoRenderer) {
+        const p = entry.videoPrimaryInfoRenderer;
+        title = readNextText(p.title);
+        const vc = p.viewCount?.videoViewCountRenderer;
+        viewCount = readNextText(vc?.shortViewCount) || readNextText(vc?.viewCount);
+        published = readNextText(p.relativeDateText) || readNextText(p.dateText);
+      }
+      if (entry.videoSecondaryInfoRenderer?.owner?.videoOwnerRenderer) {
+        const o = entry.videoSecondaryInfoRenderer.owner.videoOwnerRenderer;
+        author = readNextText(o.title);
+        channelId = o.navigationEndpoint?.browseEndpoint?.browseId || '';
+      }
+    }
+    if (title || viewCount || published || author || channelId) {
+      WatchHistoryStore.enrichMetadata(
+        id,
+        title,
+        author,
+        '',
+        0,
+        channelId,
+        '',
+        '',
+        viewCount,
+        published,
+        ''
+      );
+      logger.debug(`Refreshed history meta videoId=${id} views=${viewCount} pub=${published}`);
+    }
+  } catch (e) {
+    logger.warn(`refreshHistoryItemMetadata failed videoId=${id}: ${(e as Error).message || e}`);
+  }
+}
 
 @Component
 struct HistoryCard {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop item: WatchHistoryItem;
-  @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageProp('uiConfig') uiConfig: UIConfig = new UIConfig();
   @State isShowContextMenu: boolean = false;
   onOpen: (item: WatchHistoryItem) => void = (_item: WatchHistoryItem) => {};
 
   private toVideoItem(): VideoItem {
-    return new VideoItem(
+    const v = new VideoItem(
       0,
       this.item.videoId,
       this.item.title,
       this.item.author,
-      '',
+      this.item.viewCount || '',
       this.item.thumbnailUrl,
       false,
       '#1A1A1A',
@@ -68,6 +272,18 @@ struct HistoryCard {
       this.item.channelAvatarUrl || '',
       this.item.channelHandle || ''
     );
+    v.publishedTimeText = this.item.publishedTimeText || '';
+    v.durationText = this.item.durationSec > 0
+      ? formatDurationHms(this.item.durationSec)
+      : (this.item.durationText || '');
+    return v;
+  }
+
+  private openContextMenu(): void {
+    this.isShowContextMenu = true;
+    if (!this.isPlaylistEntry()) {
+      refreshHistoryItemMetadata(this.item.videoId);
+    }
   }
 
   private deleteItem(): void {
@@ -96,7 +312,7 @@ struct HistoryCard {
     const del: VideoMenuExtraItem = {
       symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
         .fontSize(SYMBOL_FONT_SIZE)
-        .fontColor([$r('sys.color.font_primary')]),
+        .fontColor([this.themePrimary]),
       content: $r('app.string.yt_action_delete_record'),
       contentColor: this.themePrimary,
       callback: () => {
@@ -173,39 +389,67 @@ struct HistoryCard {
       .height(MEDIA_LIST_THUMB_HEIGHT)
       .margin({ right: MEDIA_LIST_THUMB_GAP });
 
-      // ── 文字信息：标题 / 作者 / 时间 分行 ──
+      // ── 文字信息：通宽标题 + 底部 [作者 / 观看时间 + 右下纯圆三点按钮] ──
       Column() {
         Text(this.item.title)
           .fontSize(MEDIA_TITLE_SIZE)
-          .fontColor($r('app.color.yourtube_text_primary'))
+          .fontColor($r('sys.color.font_primary'))
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .lineHeight(MEDIA_TITLE_LINE_HEIGHT)
           .fontWeight(FontWeight.Medium)
           .width('100%')
-          .margin({ bottom: 2 });
+          .margin({ bottom: 4 });
 
-        if (this.item.author && this.item.author.length > 0) {
-          Text(this.item.author)
-            .fontSize(MEDIA_META_SIZE)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width('100%')
-            .margin({ bottom: 2 });
+        Blank()
+
+        Row({ space: 8 }) {
+          Column({ space: 2 }) {
+            if (this.item.author && this.item.author.length > 0) {
+              Text(this.item.author)
+                .fontSize(MEDIA_META_SIZE)
+                .fontColor($r('sys.color.font_secondary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .width('100%');
+            }
+
+            Text(formatRelativeTime(this.item.lastWatchedAt))
+              .fontSize(MEDIA_META_SIZE)
+              .fontColor($r('sys.color.font_tertiary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%');
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            SymbolGlyph($r('sys.symbol.plus'))
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .fontColor([$r('sys.color.icon_primary')])
+          }
+          .width(HISTORY_MORE_BTN_SIZE)
+          .height(HISTORY_MORE_BTN_SIZE)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .shadow({
+            radius: 4,
+            color: '#18000000',
+            offsetX: 0,
+            offsetY: 1
+          })
+          .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+          .onClick(() => {
+            this.openContextMenu();
+          })
         }
-
-        Text(formatRelativeTime(this.item.lastWatchedAt))
-          .fontSize(MEDIA_META_SIZE)
-          .fontColor($r('app.color.yourtube_text_hint'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%');
+        .width('100%')
+        .alignItems(VerticalAlign.Bottom)
       }
       .layoutWeight(1)
-      .constraintSize({ minHeight: MEDIA_LIST_THUMB_HEIGHT })
-      .alignItems(HorizontalAlign.Start)
-      .justifyContent(FlexAlign.Start);
+      .height(MEDIA_LIST_THUMB_HEIGHT)
+      .alignItems(HorizontalAlign.Start);
     }
     .width('100%')
     .padding({ left: 10, right: 10, top: 8, bottom: 8 })
@@ -220,13 +464,11 @@ struct HistoryCard {
     })
     .bindContextMenu(this.isShowContextMenu, this.historyMenuBuilder, {
       preview: MenuPreviewMode.IMAGE,
-      previewAnimationOptions: { scale: [1.0, 1.1] },
+      previewAnimationOptions: { scale: [1.0, 1.06] },
       placement: Placement.BottomRight,
-      aboutToAppear: () => {
-        if (this.uiConfig.isVibrate) {
-          customVibrator.vibratorTriggerOfHapticClockTimer();
-        }
-      },
+      enableArrow: false,
+      backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK,
+      hapticFeedbackMode: this.uiConfig.isVibrate ? HapticFeedbackMode.ENABLED : HapticFeedbackMode.DISABLED,
       aboutToDisappear: () => {
         this.isShowContextMenu = false;
       }
@@ -237,7 +479,7 @@ struct HistoryCard {
     .gesture(
       LongPressGesture()
         .onAction(() => {
-          this.isShowContextMenu = true;
+          this.openContextMenu();
         })
     );
   }
