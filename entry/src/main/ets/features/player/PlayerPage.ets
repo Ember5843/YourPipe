@@ -758,9 +758,9 @@ export struct VideoPlayerPage {
     this.publishFullscreenState();
   }
 
-  /** HDS 非线性动效：弹簧曲线驱动全屏进出布局收放（时长由弹簧物理参数决定，无需 duration） */
+  /** 临界阻尼弹簧（damping=1.0，无过冲回弹）：避免全屏收放时 XComponent 过冲抽动。 */
   private animateFullscreenLayout(change: () => void): void {
-    this.getUIContext().animateTo({ curve: curves.springMotion() }, change);
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.32, 1.0) }, change);
   }
 
   private enterImmersiveFullscreen(): void {
@@ -1045,19 +1045,19 @@ export struct VideoPlayerPage {
           .backgroundColor(Color.Black)
 
         Flex({
-          direction: this.isWideLayout() && !this.isFullLandscapeScreen()
+          direction: this.isSideAdmission()
             ? FlexDirection.Row : FlexDirection.Column
         }) {
           Stack() {
             this.VideoPlayerContent()
           }
-          // 宽布局：视频吃剩余宽度（右栏固定宽）；其余状态铺满
-          .width(this.isFullLandscapeScreen() ? Const.WIDTH_FULL_PERCENT :
-            this.isWideLayout() ? 0 : Const.WIDTH_FULL_PERCENT)
-          .layoutWeight(this.isWideLayout() && !this.isFullLandscapeScreen() ? 1 : 0)
-          .height(this.isFullLandscapeScreen() ? Const.HEIGHT_FULL_PERCENT :
-            this.isWideLayout() ? Const.HEIGHT_FULL_PERCENT :
-            this.getVideoHeightVp())
+          // 横屏侧栏窗口（含全屏态）：始终保持 Row + width(0) + layoutWeight(1)，
+          // 切全屏/退全屏只收放右侧 InfoPanel，不在 Row/Column 与 width 0/100% 间离散突变导致画面抽动。
+          .width(this.isSideAdmission() ? 0 : Const.WIDTH_FULL_PERCENT)
+          .layoutWeight(this.isSideAdmission() ? 1 : 0)
+          .height(this.isFullLandscapeScreen() || this.isSideAdmission()
+            ? Const.HEIGHT_FULL_PERCENT
+            : this.getVideoHeightVp())
           .clip(true)
 
           // 沉浸/分屏铺满时不占布局，避免详情 Tab 挤占小窗口高度

@@ -68,7 +68,7 @@ import { PlayerPresentation } from '../../../common/PlayerPresentation';
 import { PiPManager } from '../pip/PiPManager';
 import { PlayerUiViewModel } from 'mediaservice';
 import { MediaThumb } from '../../../common/components/MediaThumb';
-import { VideoItem } from 'youtube_core';
+import { ItagItem, VideoItem } from 'youtube_core';
 import {
   PlaybackConfig,
   SubtitleEdgeStyle,
@@ -2873,26 +2873,72 @@ export struct VideoPlayer {
     return (this.selectedVideo?.author || '').trim();
   }
 
+  private formatResolutionBadge(resolutionString: string): string {
+    const raw = (resolutionString || '').trim();
+    if (raw.length === 0) {
+      return '';
+    }
+    const match = /^(\d+)p/i.exec(raw);
+    if (!match) {
+      return raw.toUpperCase();
+    }
+    const p = parseInt(match[1], 10);
+    if (p >= 4320) {
+      return '8K';
+    }
+    if (p >= 2160) {
+      return '4K';
+    }
+    if (p >= 1440) {
+      return '2K';
+    }
+    return `${p}P`;
+  }
+
   private getTopBarSpecBadge(): string {
     if (this.curSource.isLive) {
       return 'LIVE';
     }
-    const h = this.vm.videoHeight;
     let res = '';
-    if (h >= 2160) {
-      res = '4K';
-    } else if (h >= 1440) {
-      res = '2K';
-    } else if (h >= 1080) {
-      res = '1080P';
-    } else if (h >= 720) {
-      res = '720P';
-    } else if (h >= 480) {
-      res = '480P';
-    } else if (h > 0) {
-      res = `${h}P`;
+    let fpsNum = 0;
+
+    // 权威来源（对齐 PipePipe / NewPipeExtractor）：始终优先按视频流 itag 查 ItagItem 表，
+    // 避免 21:9 宽银幕电影按 videoHeight 被降级误判、或 9:16 竖屏按 videoHeight 被升级误判。
+    const itag = this.vm.currentVideoItag;
+    if (itag > 0 && ItagItem.isSupported(itag)) {
+      const itagItem = ItagItem.getItag(itag);
+      res = this.formatResolutionBadge(itagItem.getResolutionString() || '');
+      if (itagItem.getFps() >= 48) {
+        fpsNum = itagItem.getFps();
+      }
     }
-    const fps = this.vm.frameRate >= 48 ? `${Math.round(this.vm.frameRate)}fps` : '';
+
+    // 仅本地无 itag 文件或未知 itag 时按短边兜底（防止竖屏 1080×1920 误判为 2K）。
+    if (res.length === 0) {
+      const shortSide = (this.vm.videoWidth > 0 && this.vm.videoHeight > 0)
+        ? Math.min(this.vm.videoWidth, this.vm.videoHeight)
+        : this.vm.videoHeight;
+      if (shortSide >= 4320) {
+        res = '8K';
+      } else if (shortSide >= 2160) {
+        res = '4K';
+      } else if (shortSide >= 1440) {
+        res = '2K';
+      } else if (shortSide >= 1080) {
+        res = '1080P';
+      } else if (shortSide >= 720) {
+        res = '720P';
+      } else if (shortSide >= 480) {
+        res = '480P';
+      } else if (shortSide > 0) {
+        res = `${shortSide}P`;
+      }
+    }
+
+    if (fpsNum <= 0 && this.vm.frameRate >= 48) {
+      fpsNum = Math.round(this.vm.frameRate);
+    }
+    const fps = fpsNum >= 48 ? `${fpsNum}fps` : '';
     if (res && fps) {
       return `${res} ${fps}`;
     }
