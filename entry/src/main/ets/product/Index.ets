@@ -114,11 +114,6 @@ struct Index {
   @State navPathStack: NavPathStack = new NavPathStack();
   private tabsController: HdsTabsController = new HdsTabsController();
   @State selectedVideo: VideoItem | null = null;
-  @StorageLink('favorites') favorites: VideoItem[] = [];
-  @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
-  @StorageLink('playlists') playlists: PlaylistItem[] = [];
-  @StorageLink('localQueues') localQueues: StoredLocalQueue[] = [];
-  @StorageLink('watchHistory') watchHistory: WatchHistoryItem[] = [];
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
   @StorageProp('startupUpdatePromptAt') @Watch('onStartupUpdatePrompt') startupUpdatePromptAt: number = 0;
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
@@ -477,17 +472,12 @@ struct Index {
     AuthStateHelper.applyPlayerClientConfig(defaultPlaybackConfig.guestPlayerClient, defaultPlaybackConfig.authPlayerClient);
 
     // 6. 清空各业务数据
-    this.subscriptions = [];
-    AppStorage.setOrCreate('subscriptions', []);
+    AppStorage.setOrCreate<SubscriptionUser[]>('subscriptions', []);
     SubscriptionFeedStore.clear();
-    this.favorites = [];
-    AppStorage.setOrCreate('favorites', []);
-    this.playlists = [];
-    AppStorage.setOrCreate('playlists', []);
-    this.localQueues = [];
-    AppStorage.setOrCreate('localQueues', []);
+    AppStorage.setOrCreate<VideoItem[]>('favorites', []);
+    AppStorage.setOrCreate<PlaylistItem[]>('playlists', []);
+    AppStorage.setOrCreate<StoredLocalQueue[]>('localQueues', []);
     WatchHistoryStore.clear();
-    this.watchHistory = [];
     LocalMediaProgressStore.clearAll();
     // 用户明确要求「清除应用全部数据」同时删除已下载视频与本地导入文件。
     await DownloadManager.getInstance().clearAllTasksAndFiles();
@@ -734,7 +724,39 @@ struct Index {
     LocalStore.loadFavoritesToAppStorage();
     LocalStore.loadPlaylistsToAppStorage();
     LocalStore.loadLocalQueuesToAppStorage();
-    this.watchHistory = WatchHistoryStore.loadToAppStorage();
+    WatchHistoryStore.loadToAppStorage();
+  }
+
+  private getSubscriptions(): SubscriptionUser[] {
+    return AppStorage.get<SubscriptionUser[]>('subscriptions') ?? [];
+  }
+
+  private setSubscriptions(items: SubscriptionUser[]): void {
+    AppStorage.setOrCreate<SubscriptionUser[]>('subscriptions', items);
+  }
+
+  private getFavorites(): VideoItem[] {
+    return AppStorage.get<VideoItem[]>('favorites') ?? [];
+  }
+
+  private setFavorites(items: VideoItem[]): void {
+    AppStorage.setOrCreate<VideoItem[]>('favorites', items);
+  }
+
+  private getPlaylists(): PlaylistItem[] {
+    return AppStorage.get<PlaylistItem[]>('playlists') ?? [];
+  }
+
+  private setPlaylists(items: PlaylistItem[]): void {
+    AppStorage.setOrCreate<PlaylistItem[]>('playlists', items);
+  }
+
+  private getLocalQueues(): StoredLocalQueue[] {
+    return AppStorage.get<StoredLocalQueue[]>('localQueues') ?? [];
+  }
+
+  private setLocalQueues(items: StoredLocalQueue[]): void {
+    AppStorage.setOrCreate<StoredLocalQueue[]>('localQueues', items);
   }
 
   /**
@@ -765,7 +787,6 @@ struct Index {
         if (!current()) return;
         if (historyPage.items.length > 0) {
           WatchHistoryStore.mergeRemoteHistory(library.toWatchHistoryItems(historyPage.items));
-          this.watchHistory = WatchHistoryStore.getAll();
         }
       } catch (historyErr) {
         logger.error('syncUserLibrary history failed:', JSON.stringify(historyErr));
@@ -776,7 +797,7 @@ struct Index {
         if (!current()) return;
         if (channels.length > 0) {
           const map: Record<string, SubscriptionUser> = {};
-          this.subscriptions.forEach((item) => {
+          this.getSubscriptions().forEach((item: SubscriptionUser) => {
             map[item.channelId] = item;
           });
           channels.forEach((item) => {
@@ -803,7 +824,7 @@ struct Index {
           Object.keys(map).forEach((key) => {
             merged.push(map[key]);
           });
-          this.subscriptions = merged;
+          this.setSubscriptions(merged);
           LocalStore.persistSubscriptions();
         }
       } catch (channelErr) {
@@ -818,13 +839,13 @@ struct Index {
   private saveCurrentQueueAsLocal(name: string): void {
     const qm = PlayQueueManager.getInstance();
     const entry = qm.saveAsLocal(name);
-    this.localQueues = [...this.localQueues, entry];
+    this.setLocalQueues([...this.getLocalQueues(), entry]);
     LocalStore.persistLocalQueues();
   }
 
   /** Delete a locally saved queue by id */
   private deleteLocalQueue(id: string): void {
-    this.localQueues = this.localQueues.filter(q => q.id !== id);
+    this.setLocalQueues(this.getLocalQueues().filter((q: StoredLocalQueue) => q.id !== id));
     LocalStore.persistLocalQueues();
   }
 
@@ -841,13 +862,13 @@ struct Index {
       videos: [video],
       createdAt: Date.now(),
     };
-    this.localQueues = [...this.localQueues, entry];
+    this.setLocalQueues([...this.getLocalQueues(), entry]);
     LocalStore.persistLocalQueues();
   }
 
   /** Add a video to an existing local playlist (deduplicated by videoId). */
   private addVideoToLocalQueue(queueId: string, video: VideoItem): void {
-    this.localQueues = this.localQueues.map((q) => {
+    this.setLocalQueues(this.getLocalQueues().map((q: StoredLocalQueue) => {
       if (q.id !== queueId) {
         return q;
       }
@@ -861,13 +882,13 @@ struct Index {
         createdAt: q.createdAt,
       };
       return updated;
-    });
+    }));
     LocalStore.persistLocalQueues();
   }
 
   /** Remove a video from a local playlist by videoId. */
   private removeVideoFromLocalQueue(queueId: string, videoId: string): void {
-    this.localQueues = this.localQueues.map((q) => {
+    this.setLocalQueues(this.getLocalQueues().map((q: StoredLocalQueue) => {
       if (q.id !== queueId) {
         return q;
       }
@@ -878,7 +899,7 @@ struct Index {
         createdAt: q.createdAt,
       };
       return updated;
-    });
+    }));
     LocalStore.persistLocalQueues();
   }
 
@@ -942,7 +963,7 @@ struct Index {
       this.removeVideoFromLocalQueue(queueId, videoId);
     };
     this.actionHub.loadLocalQueue = (queueId: string, startVideoId?: string) => {
-      const queue = this.localQueues.find(q => q.id === queueId);
+      const queue = this.getLocalQueues().find((q: StoredLocalQueue) => q.id === queueId);
       if (queue && queue.videos.length > 0) {
         const startVid = startVideoId
           ? queue.videos.find(v => v.videoId === startVideoId)
@@ -980,7 +1001,7 @@ struct Index {
     if (!trimmed) {
       return false;
     }
-    return this.subscriptions.some((item) => item.channelId === trimmed);
+    return this.getSubscriptions().some((item: SubscriptionUser) => item.channelId === trimmed);
   }
 
   private addSubscription(channel: SearchChannelItem): void {
@@ -992,7 +1013,7 @@ struct Index {
       return;
     }
     const displayName = channel.name && channel.name.length > 0 ? channel.name : channelId;
-    this.subscriptions = [...this.subscriptions, new SubscriptionUser(
+    this.setSubscriptions([...this.getSubscriptions(), new SubscriptionUser(
       channelId,
       displayName,
       channel.avatarUrl || '',
@@ -1000,7 +1021,7 @@ struct Index {
       channel.videoCountText || '',
       channel.description || '',
       channel.thumbnailColor || ''
-    )];
+    )]);
     LocalStore.persistSubscriptions();
   }
 
@@ -1009,7 +1030,7 @@ struct Index {
     if (!trimmed) {
       return;
     }
-    this.subscriptions = this.subscriptions.filter((item) => item.channelId !== trimmed);
+    this.setSubscriptions(this.getSubscriptions().filter((item: SubscriptionUser) => item.channelId !== trimmed));
     LocalStore.persistSubscriptions();
   }
 
@@ -1072,7 +1093,7 @@ struct Index {
     // Fire-and-forget: do NOT await — the player page must open immediately.
     // PlayQueueList will update reactively when the queue loads in the background.
     if (sourceHint && sourceHint.type === 'local') {
-      const queue = this.localQueues.find(q => q.id === sourceHint.playlistId);
+      const queue = this.getLocalQueues().find((q: StoredLocalQueue) => q.id === sourceHint.playlistId);
       if (queue && queue.videos.length > 0) {
         queueManager.setLocalQueue(queue.videos, queue.name, queue.id, video.videoId);
       } else {
@@ -1230,16 +1251,17 @@ struct Index {
   }
 
   private addFavorite(video: VideoItem): void {
-    const exists = this.favorites.some((item) => item.videoId === video.videoId);
+    const current = this.getFavorites();
+    const exists = current.some((item: VideoItem) => item.videoId === video.videoId);
     if (exists) {
       return;
     }
-    this.favorites = [...this.favorites, video];
+    this.setFavorites([...current, video]);
     LocalStore.persistFavorites();
   }
 
   private removeFavorite(videoId: string): void {
-    this.favorites = this.favorites.filter((item) => item.videoId !== videoId);
+    this.setFavorites(this.getFavorites().filter((item: VideoItem) => item.videoId !== videoId));
     LocalStore.persistFavorites();
   }
 
@@ -1248,7 +1270,8 @@ struct Index {
     if (!playlistId) {
       return;
     }
-    const exists = this.playlists.some((item) => item.playlistId === playlistId);
+    const current = this.getPlaylists();
+    const exists = current.some((item: PlaylistItem) => item.playlistId === playlistId);
     if (exists) {
       return;
     }
@@ -1257,7 +1280,7 @@ struct Index {
       playlist.name || playlistId,
       playlist.coverUrl || ''
     );
-    this.playlists = [...this.playlists, next];
+    this.setPlaylists([...current, next]);
     LocalStore.persistPlaylists();
   }
 
@@ -1266,7 +1289,7 @@ struct Index {
     if (!trimmed) {
       return;
     }
-    this.playlists = this.playlists.filter((item) => item.playlistId !== trimmed);
+    this.setPlaylists(this.getPlaylists().filter((item: PlaylistItem) => item.playlistId !== trimmed));
     LocalStore.persistPlaylists();
   }
 
@@ -1422,19 +1445,17 @@ struct Index {
   }
 
   private buildHdsTabsFloatingStyle(): HdsTabsFloatingStyle {
-    const effect = this.immersiveMaterialEffect ?? {
-      materialType: hdsMaterial.MaterialType.IMMERSIVE,
-      materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
-    };
     // 悬浮页签栏与屏幕底边的间距：有手势条时贴在其上方；无手势条（记为 0）时给 24vp
     // 下限——原 8vp 会让整条栏"沉"在屏幕底边（观感重心向下）。
     const bottomMargin = this.naviIndicatorHeight > 0
       ? Math.max(this.naviIndicatorHeight, 16)
       : 24;
     const base: HdsTabsFloatingStyle = {
-      barBottomMargin: bottomMargin,
-      systemMaterialEffect: effect
+      barBottomMargin: bottomMargin
     };
+    if (this.immersiveMaterialEffect !== undefined) {
+      base.systemMaterialEffect = this.immersiveMaterialEffect;
+    }
     return base;
   }
 
@@ -1477,12 +1498,16 @@ struct Index {
             this.shortsTabLoaded = true;
             this.shortsTabController.resetFeed(false, true);
           }
-          this.getUIContext()?.animateTo({
-            duration: 350,
-            curve: curves.springMotion(0.4, 0.8)
-          }, () => {
+          if (this.uiConfig.isAnimation) {
+            this.getUIContext()?.animateTo({
+              duration: 350,
+              curve: curves.springMotion(0.4, 0.8)
+            }, () => {
+              this.activeTabIndex = index;
+            });
+          } else {
             this.activeTabIndex = index;
-          });
+          }
         })
 
         // 主页 Shorts 悬浮球：**已停用**（全屏 Shorts 模式下线，入口改为
@@ -1543,7 +1568,7 @@ struct Index {
     .bindSheet($$this.showOptions, this.OptionsSheet(), {
       detents: [SheetSize.LARGE],
       dragBar: true,
-      backgroundColor: $r('sys.color.ohos_id_color_dialog_bg'),
+      backgroundColor: $r('sys.color.background_secondary'),
       preferType: SheetType.CENTER,
       showClose: false,
       scrollSizeMode: ScrollSizeMode.CONTINUOUS,

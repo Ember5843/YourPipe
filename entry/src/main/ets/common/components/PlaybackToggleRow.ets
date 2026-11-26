@@ -48,11 +48,11 @@ export struct PlaybackToggleRow {
         Text(this.title)
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.yourtube_text_primary'))
+          .fontColor($r('sys.color.font_primary'))
         if (!(typeof this.subtitle === 'string' && this.subtitle.length === 0)) {
           Text(this.subtitle)
             .fontSize(12)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
+            .fontColor($r('sys.color.font_secondary'))
             .margin({ top: 3 })
         }
       }
@@ -74,6 +74,6 @@ export struct PlaybackToggleRow {
     .constraintSize({ minHeight: 56 })
     .padding({ left: 16, right: 16, top: 12, bottom: 12 })
     .borderRadius(this.transparentBackground ? 0 : 16)
-    .backgroundColor(this.transparentBackground ? Color.Transparent : $r('app.color.yourtube_bg_surface_muted'))
+    .backgroundColor(this.transparentBackground ? Color.Transparent : $r('sys.color.comp_background_list_card'))
   }
 }

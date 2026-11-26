@@ -132,7 +132,7 @@ export struct OptionsLanguageAndRegionPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(16)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -168,7 +168,7 @@ export struct OptionsLanguageAndRegionPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(16)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })

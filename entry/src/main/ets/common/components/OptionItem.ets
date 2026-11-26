@@ -40,12 +40,12 @@ export struct OptionItem {
         Text(this.title)
           .fontWeight(FontWeight.Medium)
           .fontSize(16)
-          .fontColor($r('app.color.yourtube_text_primary'))
+          .fontColor($r('sys.color.font_primary'))
 
         if (this.subtitle) {
           Text(this.subtitle)
             .fontWeight(FontWeight.Normal)
-            .fontColor($r('app.color.yourtube_text_quaternary'))
+            .fontColor($r('sys.color.font_secondary'))
             .maxLines(this.subtitleMaxLines)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .margin({ top: 4 })
@@ -58,13 +58,13 @@ export struct OptionItem {
       if (this.showChevron) {
         SymbolGlyph($r('sys.symbol.chevron_right'))
           .fontSize(20)
-          .fontColor([$r('app.color.yourtube_icon_hint')])
+          .fontColor([$r('sys.color.icon_fourth')])
       }
     }
     .RowStyle()
     .alignItems(VerticalAlign.Center)
     .borderRadius(this.transparentBackground ? 0 : 16)
-    .backgroundColor(this.transparentBackground ? Color.Transparent : $r('app.color.yourtube_bg_surface_muted'))
+    .backgroundColor(this.transparentBackground ? Color.Transparent : $r('sys.color.comp_background_list_card'))
     .clickEffect(this.clickEffectEnabled)
     .onClick(() => {
       if (this.onClickAction) {

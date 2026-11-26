@@ -645,7 +645,7 @@ export struct OptionsDataAccountPage {
                     .fontSize(12)
                     .padding(10)
                     .borderRadius(12)
-                    .backgroundColor($r('app.color.yourtube_bg_page'))
+                    .backgroundColor($r('sys.color.comp_background_tertiary'))
                     .enabled(!this.isVerifyingCookie)
                     .onChange((v: string) => {
                       this.cookieInput = v;
@@ -691,7 +691,7 @@ export struct OptionsDataAccountPage {
               }
             }
           }
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
           .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -739,7 +739,7 @@ export struct OptionsDataAccountPage {
               }
             }
           }
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
           .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -802,7 +802,7 @@ export struct OptionsDataAccountPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -841,7 +841,7 @@ export struct OptionsDataAccountPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -878,7 +878,7 @@ export struct OptionsDataAccountPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -913,7 +913,7 @@ export struct OptionsDataAccountPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -948,7 +948,7 @@ export struct OptionsDataAccountPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })

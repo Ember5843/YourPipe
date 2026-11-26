@@ -179,7 +179,7 @@ export struct OptionsSheetHost {
           })
         ]
       }))
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .backgroundColor($r('sys.color.background_secondary'))
       .clip(true)
       .width('100%')
       .height('100%')
@@ -546,7 +546,7 @@ struct OptionsNavScaffold {
         this.onBack();
       }
     }))
-    .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+    .backgroundColor($r('sys.color.background_secondary'))
     .onBackPressed(() => {
       this.onBack();
       return true;

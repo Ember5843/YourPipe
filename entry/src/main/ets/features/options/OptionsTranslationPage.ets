@@ -183,7 +183,7 @@ export struct OptionsTranslationPage {
         .fontSize(14)
         .fontColor($r('app.color.yourtube_text_primary'))
         .padding({ left: 12, right: 12 })
-        .backgroundColor($r('app.color.yourtube_bg_page'))
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
         .borderRadius(10)
         .type(isPassword ? InputType.Password : InputType.Normal)
         .onChange((value: string) => { onChange(value); })
@@ -207,7 +207,7 @@ export struct OptionsTranslationPage {
         .fontSize(13)
         .fontColor($r('app.color.yourtube_text_primary'))
         .padding(10)
-        .backgroundColor($r('app.color.yourtube_bg_page'))
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
         .borderRadius(10)
         .onChange((value: string) => { onChange(value); })
     }
@@ -238,7 +238,7 @@ export struct OptionsTranslationPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
@@ -268,7 +268,7 @@ export struct OptionsTranslationPage {
               }
             }
           }
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
           .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -292,7 +292,7 @@ export struct OptionsTranslationPage {
                 (value: string) => { this.apiKey = value; })
             }
           }
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
           .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -335,7 +335,7 @@ export struct OptionsTranslationPage {
                 'translatedText', false, (value: string) => { this.customResponsePath = value; })
             }
           }
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
           .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })

@@ -603,7 +603,7 @@ export struct ChangelogPage {
             .width('100%')
             .padding({ left: 16, right: 16, top: 14, bottom: 14 })
             .borderRadius(SECTION_CARD_RADIUS)
-            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            .backgroundColor($r('sys.color.comp_background_list_card'))
             .border(index === 0 ? { width: 1, color: this.themePrimary, radius: 16 } : { width: 0 })
           }, (item: ChangelogEntry) => item.version)
         }
@@ -715,7 +715,7 @@ export struct AboutPage {
               })
             }
             .width('100%')
-            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            .backgroundColor($r('sys.color.comp_background_list_card'))
             .borderRadius(SECTION_CARD_RADIUS)
             .clip(true)
           }
@@ -756,7 +756,7 @@ export struct AboutPage {
               })
             }
             .width('100%')
-            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            .backgroundColor($r('sys.color.comp_background_list_card'))
             .borderRadius(SECTION_CARD_RADIUS)
             .clip(true)
           }

@@ -92,7 +92,7 @@ struct SessionCard {
             }
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
             .borderRadius(8)
-            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
           }
         }
         .width('100%')
@@ -140,7 +140,7 @@ struct SessionCard {
     .width('100%')
     .borderRadius(12)
     .padding({ left: 16, right: 8, top: 14, bottom: 14 })
-    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+    .backgroundColor($r('sys.color.comp_background_list_card'))
   }
 }
 
@@ -299,7 +299,7 @@ export struct LogPage {
         .borderRadius(SECTION_CARD_RADIUS)
         .constraintSize({ minHeight: 56 })
         .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
         .onClick(() => {
           this.toggleLogger();
@@ -310,7 +310,7 @@ export struct LogPage {
             .width('100%')
             .height(42)
             .fontSize(14)
-            .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+            .backgroundColor($r('sys.color.comp_background_list_card'))
             .borderRadius(12)
             .onChange((value: string) => {
               this.updateLogFilter(value);
@@ -342,7 +342,7 @@ export struct LogPage {
           .borderRadius(SECTION_CARD_RADIUS)
           .constraintSize({ minHeight: 52 })
           .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .margin({ top: 12 })
           .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
           .onClick(() => {

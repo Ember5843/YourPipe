@@ -43,7 +43,7 @@ export struct OptionsHeatmapPage {
           })
         }
         .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
       }
@@ -84,7 +84,7 @@ export struct OptionsHeatmapPage {
             })
           }
           .width('100%')
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
         }

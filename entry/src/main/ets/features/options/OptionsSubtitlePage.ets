@@ -358,7 +358,7 @@ export struct OptionsSubtitlePage {
                 }
                 .width(40)
                 .height(34)
-                .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                .backgroundColor($r('sys.color.comp_background_tertiary'))
                 .borderRadius(17)
                 .enabled(this.playbackConfig.subtitleOffsetMs > SUBTITLE_OFFSET_MIN_MS)
                 .opacity(this.playbackConfig.subtitleOffsetMs > SUBTITLE_OFFSET_MIN_MS ? 1 : 0.4)
@@ -373,7 +373,7 @@ export struct OptionsSubtitlePage {
                 }
                 .width(40)
                 .height(34)
-                .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                .backgroundColor($r('sys.color.comp_background_tertiary'))
                 .borderRadius(17)
                 .enabled(this.playbackConfig.subtitleOffsetMs < SUBTITLE_OFFSET_MAX_MS)
                 .opacity(this.playbackConfig.subtitleOffsetMs < SUBTITLE_OFFSET_MAX_MS ? 1 : 0.4)
@@ -389,7 +389,7 @@ export struct OptionsSubtitlePage {
                     .padding({ left: 14, right: 14 })
                     .fontSize(13)
                     .fontColor(this.params.themeColor)
-                    .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                    .backgroundColor($r('sys.color.comp_background_tertiary'))
                     .borderRadius(17)
                     .onClick(() => {
                       this.applySubtitleOffset(0);
@@ -455,7 +455,7 @@ export struct OptionsSubtitlePage {
           //   }
           // }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })

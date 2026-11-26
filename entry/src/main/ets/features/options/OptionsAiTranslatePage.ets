@@ -275,7 +275,7 @@ export struct OptionsAiTranslatePage {
                     .height(40)
                     .fontSize(14)
                     .backgroundColor(this.modelStatus === 'downloading'
-                      ? $r('app.color.yourtube_bg_surface_muted') : this.themePrimary)
+                      ? $r('sys.color.comp_background_tertiary') : this.themePrimary)
                     .fontColor(this.modelStatus === 'downloading'
                       ? $r('app.color.yourtube_text_primary') : Color.White)
                     .borderRadius(12)
@@ -293,7 +293,7 @@ export struct OptionsAiTranslatePage {
                   Button($r('app.string.yt_asr_model_delete'))
                     .height(40)
                     .fontSize(14)
-                    .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+                    .backgroundColor($r('sys.color.comp_background_tertiary'))
                     .fontColor($r('app.color.yourtube_text_primary'))
                     .borderRadius(12)
                     .onClick(() => {
@@ -307,7 +307,7 @@ export struct OptionsAiTranslatePage {
             .alignItems(HorizontalAlign.Start)
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 

@@ -130,8 +130,6 @@ export struct VideoDetails {
   @State descSkeletonOpacity: number = 0.3;
   @State sleepTimerRemainingMinutes: number = 0;
   @State showSavePlaylistSheet: boolean = false;
-  @State showStreamInfoSheet: boolean = false;
-  @State showSleepTimerSheet: boolean = false;
   /** 0=none, 1=save, 2=streaminfo, 3=sleep. Drives single bindSheet content. */
   @State activeSheet: number = 0;
   /** Single bindSheet visibility. Replaces the 3 separate bindSheet bindings. */
@@ -279,6 +277,11 @@ export struct VideoDetails {
 
     if (this.getEffectiveDesc().length === 0) {
       this.descSkeletonTimer = setInterval(() => {
+        if (this.getEffectiveDesc().length > 0) {
+          clearInterval(this.descSkeletonTimer);
+          this.descSkeletonTimer = -1;
+          return;
+        }
         this.descSkeletonOpacity = this.descSkeletonOpacity === 0.3 ? 0.7 : 0.3;
       }, 800);
     }
@@ -288,24 +291,36 @@ export struct VideoDetails {
     this.deArrowGeneration += 1;
     if (this.descSkeletonTimer >= 0) {
       clearInterval(this.descSkeletonTimer);
+      this.descSkeletonTimer = -1;
     }
-    if (this.sleepTimerUiInterval >= 0) {
-      clearInterval(this.sleepTimerUiInterval);
-      this.sleepTimerUiInterval = -1;
-    }
+    this.stopSleepTimerUiUpdates();
     this.stopStreamStatsPolling();
   }
 
   private startSleepTimerUiUpdates(): void {
+    this.syncSleepTimerUi();
+    if (this.sleepTimerRemainingMinutes <= 0) {
+      this.stopSleepTimerUiUpdates();
+      return;
+    }
+    if (this.sleepTimerUiInterval < 0) {
+      this.sleepTimerUiInterval = setInterval(() => this.syncSleepTimerUi(), 1000);
+    }
+  }
+
+  private stopSleepTimerUiUpdates(): void {
     if (this.sleepTimerUiInterval >= 0) {
       clearInterval(this.sleepTimerUiInterval);
+      this.sleepTimerUiInterval = -1;
     }
-    this.syncSleepTimerUi();
-    this.sleepTimerUiInterval = setInterval(() => this.syncSleepTimerUi(), 1000);
   }
 
   private syncSleepTimerUi(): void {
-    this.sleepTimerRemainingMinutes = PlayerSession.getInstance().sleepTimerRemainingMinutes;
+    const remaining = PlayerSession.getInstance().sleepTimerRemainingMinutes;
+    this.sleepTimerRemainingMinutes = remaining;
+    if (remaining <= 0) {
+      this.stopSleepTimerUiUpdates();
+    }
   }
 
   private resetStreamStatsState(): void {
@@ -940,8 +955,6 @@ export struct VideoDetails {
       onWillDisappear: () => {
         this.activeSheet = 0;
         this.showSavePlaylistSheet = false;
-        this.showStreamInfoSheet = false;
-        this.showSleepTimerSheet = false;
         this.stopStreamStatsPolling();
       }
     })
@@ -1328,7 +1341,7 @@ export struct VideoDetails {
     const d = this.sleepPickerDate;
     const minutes = d.getHours() * 60 + d.getMinutes();
     PlayerSession.getInstance().setSleepTimer(minutes);
-    this.syncSleepTimerUi();
+    this.startSleepTimerUiUpdates();
     this.closeSheet();
     Logger.info(TAG, `Sleep timer sheet accepted minutes=${minutes}`);
   }

@@ -41,7 +41,7 @@ export struct LanguagePickerPage {
       .height(38)
       .borderRadius(20)
       .fontSize(14)
-      .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+      .backgroundColor($r('sys.color.comp_background_list_card'))
       .margin({ left: 16, right: 16, bottom: 8 })
   }
 
@@ -87,8 +87,8 @@ export struct LanguagePickerPage {
 
                 Text(item.code)
                   .fontSize(11)
-                  .fontColor($r('app.color.yourtube_text_quaternary'))
-                  .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+                  .fontColor($r('sys.color.font_secondary'))
+                  .backgroundColor($r('sys.color.comp_background_tertiary'))
                   .borderRadius(4)
                   .padding({ left: 5, right: 5, top: 2, bottom: 2 })
                   .flexShrink(0)
@@ -114,7 +114,7 @@ export struct LanguagePickerPage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+      .backgroundColor($r('sys.color.background_secondary'))
     }
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .titleBar(buildYourTubeTitleBar({

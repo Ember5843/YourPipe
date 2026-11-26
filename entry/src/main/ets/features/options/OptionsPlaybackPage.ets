@@ -115,7 +115,7 @@ export struct OptionsPlaybackPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -176,7 +176,7 @@ export struct OptionsPlaybackPage {
                 }
                 .width(40)
                 .height(34)
-                .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                .backgroundColor($r('sys.color.comp_background_tertiary'))
                 .borderRadius(17)
                 .enabled(this.playbackConfig.audioDelayMs > AUDIO_DELAY_MIN_MS)
                 .opacity(this.playbackConfig.audioDelayMs > AUDIO_DELAY_MIN_MS ? 1 : 0.4)
@@ -191,7 +191,7 @@ export struct OptionsPlaybackPage {
                 }
                 .width(40)
                 .height(34)
-                .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                .backgroundColor($r('sys.color.comp_background_tertiary'))
                 .borderRadius(17)
                 .enabled(this.playbackConfig.audioDelayMs < AUDIO_DELAY_MAX_MS)
                 .opacity(this.playbackConfig.audioDelayMs < AUDIO_DELAY_MAX_MS ? 1 : 0.4)
@@ -207,7 +207,7 @@ export struct OptionsPlaybackPage {
                     .padding({ left: 14, right: 14 })
                     .fontSize(13)
                     .fontColor(this.params.themeColor)
-                    .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                    .backgroundColor($r('sys.color.comp_background_tertiary'))
                     .borderRadius(17)
                     .onClick(() => {
                       this.applyAudioDelay(0);
@@ -221,7 +221,7 @@ export struct OptionsPlaybackPage {
             .padding({ left: 16, right: 16, top: 12, bottom: 12 })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -262,7 +262,7 @@ export struct OptionsPlaybackPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
@@ -287,7 +287,7 @@ export struct OptionsPlaybackPage {
               })
             }
           }
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
         }
@@ -327,7 +327,7 @@ export struct OptionsPlaybackPage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 

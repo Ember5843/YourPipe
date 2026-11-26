@@ -122,19 +122,17 @@ export function buildYourTubeTitleBar(options: YourTubeTitleBarOptions): HdsNavi
       dividerStyle: materialDivider
     }
   };
-  const systemMaterialEffect: SystemMaterialParams = options.materialEffect ?? {
-    materialType: hdsMaterial.MaterialType.ADAPTIVE,
-    materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
-  };
   const style: TitleBarStyleOptions = {
     scrollEffectOpts: {
       enableScrollEffect: true,
       scrollEffectType: ScrollEffectType.GRADIENT_BLUR
     },
-    systemMaterialEffect,
     originalStyle,
     scrollEffectStyle
   };
+  if (options.materialEffect !== undefined) {
+    style.systemMaterialEffect = options.materialEffect;
+  }
 
   return {
     avoidLayoutSafeArea: options.avoidLayoutSafeArea ?? false,

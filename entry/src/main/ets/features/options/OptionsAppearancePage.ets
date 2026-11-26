@@ -107,7 +107,7 @@ export struct OptionsAppearancePage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
@@ -143,7 +143,7 @@ export struct OptionsAppearancePage {
             .padding({ left: 16, right: 16, top: 12, bottom: 12 })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
@@ -167,7 +167,7 @@ export struct OptionsAppearancePage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
 
@@ -188,7 +188,7 @@ export struct OptionsAppearancePage {
               })
             }
           }
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
         }
@@ -212,7 +212,7 @@ export struct OptionsAppearancePage {
             })
           }
         }
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
         // 原「Shorts」分组（悬浮球开关 + 首页显示短视频）随全屏 Shorts 模式

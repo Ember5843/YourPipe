@@ -160,7 +160,7 @@ export struct OptionsUpdatePage {
           }
         }
         .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
       }
@@ -223,7 +223,7 @@ export struct OptionsUpdatePage {
         }
         .width('100%')
         .padding(16)
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
       }
@@ -266,7 +266,7 @@ export struct OptionsUpdatePage {
                 .fontSize(12)
                 .height(34)
                 .layoutWeight(1)
-                .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+                .backgroundColor($r('sys.color.comp_background_tertiary'))
                 .fontColor($r('app.color.yourtube_text_primary'))
                 .border({ width: 1, color: $r('app.color.yourtube_divider') })
                 .onClick(() => this.openLink(APPGALLERY_TEST_URL, 'appgallery'))
@@ -276,7 +276,7 @@ export struct OptionsUpdatePage {
           .width('100%')
           .padding(16)
           .alignItems(HorizontalAlign.Start)
-          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .backgroundColor($r('sys.color.comp_background_list_card'))
           .borderRadius(SECTION_CARD_RADIUS)
           .clip(true)
         }
@@ -297,7 +297,7 @@ export struct OptionsUpdatePage {
             $r('app.string.yt_update_open_appgallery'), APPGALLERY_TEST_URL, 'appgallery')
         }
         .width('100%')
-        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .backgroundColor($r('sys.color.comp_background_list_card'))
         .borderRadius(SECTION_CARD_RADIUS)
         .clip(true)
       }
