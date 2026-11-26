@@ -323,3 +323,35 @@ export function findActiveSubtitleText(cues: SubtitleCue[], positionMs: number):
   }
   return out.join('\n');
 }
+
+function formatSrtTimestamp(ms: number): string {
+  const safe = Math.max(0, Math.round(ms));
+  const hours = Math.floor(safe / 3600000);
+  const minutes = Math.floor((safe % 3600000) / 60000);
+  const seconds = Math.floor((safe % 60000) / 1000);
+  const millis = safe % 1000;
+  const hStr = hours < 10 ? `0${hours}` : `${hours}`;
+  const mStr = minutes < 10 ? `0${minutes}` : `${minutes}`;
+  const sStr = seconds < 10 ? `0${seconds}` : `${seconds}`;
+  const msStr = millis < 10 ? `00${millis}` : (millis < 100 ? `0${millis}` : `${millis}`);
+  return `${hStr}:${mStr}:${sStr},${msStr}`;
+}
+
+/** Serialize parsed cues into standard SubRip (.srt) text. */
+export function formatCuesToSrt(cues: SubtitleCue[]): string {
+  if (cues.length === 0) {
+    return '';
+  }
+  const blocks: string[] = [];
+  let seq = 1;
+  for (let i = 0; i < cues.length; i++) {
+    const cue = cues[i];
+    const text = (cue.text || '').trim();
+    if (!text || cue.endMs <= cue.startMs) {
+      continue;
+    }
+    blocks.push(`${seq}\n${formatSrtTimestamp(cue.startMs)} --> ${formatSrtTimestamp(cue.endMs)}\n${text}`);
+    seq++;
+  }
+  return blocks.length > 0 ? `${blocks.join('\n\n')}\n` : '';
+}

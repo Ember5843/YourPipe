@@ -30,11 +30,11 @@ export {
   parseStoryboardSpec,
   getStoryboardFrame
 } from 'youtube_core';
-export { parseVttSubtitles, parseJson3Subtitles, SubtitleCue } from './src/main/ets/subtitle/VttSubtitleParser';
+export { parseVttSubtitles, parseJson3Subtitles, formatCuesToSrt, SubtitleCue } from './src/main/ets/subtitle/VttSubtitleParser';
 export { BackgroundTaskManager } from './src/main/ets/common/BackgroundTaskManager';
 export { PlayerState, isValidTransition, describeState } from './src/main/ets/state/PlayerState';
 export { PlayerStateMachine, StateChangeListener } from './src/main/ets/state/PlayerStateMachine';
 export { PlayerUiViewModel } from './src/main/ets/state/PlayerUiViewModel';
 export { PlaybackPreferences, PlaybackPreferencesSnapshot, PlaybackPreferencesProvider } from './src/main/ets/common/PlaybackPreferences';
 export { ContextProvider, UIAbilityContextProvider } from './src/main/ets/common/ContextProvider';
-export { muxAudioVideo } from '@yourpipe/libmpv-napi';
+export { muxAudioVideo, muxMedia } from '@yourpipe/libmpv-napi';

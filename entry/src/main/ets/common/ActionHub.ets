@@ -8,10 +8,13 @@ export enum ActionHubEvent {
   EXIT_FULLSCREEN = 'exitFullScreen',
   EXIT_COMMENT_REPLIES = 'exitCommentReplies',
   IS_REPLIES_OPEN_CHANGE = 'isRepliesOpenChange',
+  OPTIONS_SHEET_CLOSED = 'optionsSheetClosed',
 }
 
 export class ActionHub {
   openSearch: (initialQuery?: string) => void = () => {};
+  /** 从任意页面（如播放器错误层/等待提示）拉起设置抽屉并直达目标子页（如 data_account / playback / network）。 */
+  openOptionsTarget: (route: string, highlightKey?: string) => void = () => {};
   /** 主页 Shorts 悬浮球入口：push 全屏 Shorts 页。 */
   openShorts: () => void = () => {};
   openVideo: (video: VideoItem, sourceHint?: PlayQueueSourceHint, audioOnly?: boolean) => void = () => {};

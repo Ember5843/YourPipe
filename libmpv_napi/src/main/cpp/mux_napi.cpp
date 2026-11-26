@@ -12,6 +12,7 @@
 #include <hilog/log.h>
 
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,29 @@ std::string GetString(napi_env env, napi_value v)
     return s;
 }
 
+std::vector<std::string> GetStringArray(napi_env env, napi_value v)
+{
+    std::vector<std::string> out;
+    bool isArray = false;
+    if (!v || napi_is_array(env, v, &isArray) != napi_ok || !isArray) {
+        return out;
+    }
+    uint32_t len = 0;
+    if (napi_get_array_length(env, v, &len) != napi_ok) {
+        return out;
+    }
+    out.reserve(len);
+    for (uint32_t i = 0; i < len; ++i) {
+        napi_value elem = nullptr;
+        if (napi_get_element(env, v, i, &elem) == napi_ok && elem != nullptr) {
+            out.push_back(GetString(env, elem));
+        } else {
+            out.emplace_back();
+        }
+    }
+    return out;
+}
+
 // DocumentPicker hands back "file://docs/..." URIs, but libavformat wants a
 // real filesystem path. Resolve file:// URIs; pass anything else through.
 std::string ResolveUri(const std::string& url)
@@ -78,13 +102,23 @@ struct Input {
     ~Input() { if (fmt) avformat_close_input(&fmt); }
 };
 
-// Open `path` and locate the first stream of `type`. Throws MuxError on failure.
-void OpenInput(Input& in, const std::string& path, AVMediaType type)
+const char* MediaTypeLabel(AVMediaType type)
 {
-    // SABR dumps are fMP4 (init + moof/mdat). Give lavf room to probe fragments.
+    if (type == AVMEDIA_TYPE_VIDEO) return "video";
+    if (type == AVMEDIA_TYPE_AUDIO) return "audio";
+    if (type == AVMEDIA_TYPE_SUBTITLE) return "subtitle";
+    return "other";
+}
+
+// Open `path` and locate the first stream of `type`. Returns false when missing if allowMissing is true.
+bool OpenInputStream(Input& in, const std::string& path, AVMediaType type, bool allowMissing)
+{
     AVDictionary* opts = nullptr;
-    av_dict_set(&opts, "probesize", "10000000", 0);
-    av_dict_set(&opts, "analyzeduration", "10000000", 0);
+    if (type == AVMEDIA_TYPE_VIDEO || type == AVMEDIA_TYPE_AUDIO) {
+        // SABR dumps are fMP4 (init + moof/mdat). Give lavf room to probe fragments.
+        av_dict_set(&opts, "probesize", "10000000", 0);
+        av_dict_set(&opts, "analyzeduration", "10000000", 0);
+    }
     int ret = avformat_open_input(&in.fmt, path.c_str(), nullptr, &opts);
     av_dict_free(&opts);
     if (ret < 0) {
@@ -96,29 +130,82 @@ void OpenInput(Input& in, const std::string& path, AVMediaType type)
     }
     in.streamIndex = av_find_best_stream(in.fmt, type, -1, -1, nullptr, 0);
     if (in.streamIndex < 0) {
-        const char* what = (type == AVMEDIA_TYPE_VIDEO) ? "video" : "audio";
-        throw MuxError{std::string("no ") + what + " stream in " + path};
+        if (allowMissing) {
+            return false;
+        }
+        throw MuxError{std::string("no ") + MediaTypeLabel(type) + " stream in " + path};
     }
     AVStream* st = in.fmt->streams[in.streamIndex];
     MUX_LOG("open %{public}s type=%{public}s codec=%{public}d tb=%{public}d/%{public}d "
             "frames=%{public}lld duration=%{public}lld",
             path.c_str(),
-            type == AVMEDIA_TYPE_VIDEO ? "video" : "audio",
+            MediaTypeLabel(type),
             st->codecpar ? st->codecpar->codec_id : 0,
             st->time_base.num, st->time_base.den,
             static_cast<long long>(st->nb_frames),
             static_cast<long long>(st->duration));
+    return true;
 }
 
-// Remux: copy video stream from videoPath + audio stream from audioPath into
-// outPath. Container is chosen from outPath's extension. Throws MuxError.
-// A/V packets are interleaved by DTS so progressive players do not black-screen.
-void DoMux(const std::string& videoPath, const std::string& audioPath,
-           const std::string& outPath)
+// Remux: copy video stream + optional audio stream (or inline audio when audioPath is empty)
+// + zero or more subtitle tracks into outPath. Container is chosen from outPath's extension.
+// All packets are interleaved by DTS/PTS without re-encoding.
+void DoMuxMedia(
+    const std::string& videoPath,
+    const std::string& audioPath,
+    const std::vector<std::string>& subtitlePaths,
+    const std::vector<std::string>& subtitleLangs,
+    const std::vector<std::string>& subtitleTitles,
+    const std::string& outPath)
 {
-    Input video, audio;
-    OpenInput(video, videoPath, AVMEDIA_TYPE_VIDEO);
-    OpenInput(audio, audioPath, AVMEDIA_TYPE_AUDIO);
+    Input video;
+    Input externalAudio;
+    Input inlineAudio;
+    std::vector<std::unique_ptr<Input>> subInputs;
+
+    OpenInputStream(video, videoPath, AVMEDIA_TYPE_VIDEO, false);
+
+    struct StreamMap {
+        Input* in;
+        AVMediaType mediaType;
+        int outIndex;
+        AVPacket* peek;  // next packet waiting for interleave, or null when EOF
+        bool eof;
+    };
+    struct PendingSource {
+        Input* in;
+        AVMediaType mediaType;
+        std::string lang;
+        std::string title;
+        bool isDefaultSub;
+    };
+    std::vector<PendingSource> sources;
+    sources.push_back({&video, AVMEDIA_TYPE_VIDEO, {}, {}, false});
+
+    bool expectAudio = false;
+    if (!audioPath.empty()) {
+        OpenInputStream(externalAudio, audioPath, AVMEDIA_TYPE_AUDIO, false);
+        sources.push_back({&externalAudio, AVMEDIA_TYPE_AUDIO, {}, {}, false});
+        expectAudio = true;
+    } else if (OpenInputStream(inlineAudio, videoPath, AVMEDIA_TYPE_AUDIO, true)) {
+        sources.push_back({&inlineAudio, AVMEDIA_TYPE_AUDIO, {}, {}, false});
+        expectAudio = true;
+    }
+
+    size_t subCountAdded = 0;
+    for (size_t i = 0; i < subtitlePaths.size(); ++i) {
+        const std::string& subPath = subtitlePaths[i];
+        if (subPath.empty()) {
+            continue;
+        }
+        auto sub = std::make_unique<Input>();
+        OpenInputStream(*sub, subPath, AVMEDIA_TYPE_SUBTITLE, false);
+        std::string lang = i < subtitleLangs.size() ? subtitleLangs[i] : "";
+        std::string title = i < subtitleTitles.size() ? subtitleTitles[i] : "";
+        sources.push_back({sub.get(), AVMEDIA_TYPE_SUBTITLE, lang, title, subCountAdded == 0});
+        subInputs.push_back(std::move(sub));
+        subCountAdded++;
+    }
 
     AVFormatContext* out = nullptr;
     int ret = avformat_alloc_output_context2(&out, nullptr, nullptr, outPath.c_str());
@@ -126,16 +213,9 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
         throw MuxError{"cannot infer output format from " + outPath + ": " + AvErr(ret)};
     }
 
-    // Map: out stream 0 <- video input, out stream 1 <- audio input.
-    struct StreamMap {
-        Input* in;
-        int outIndex;
-        AVPacket* peek;  // next packet waiting for interleave, or null when EOF
-        bool eof;
-    };
     std::vector<StreamMap> maps;
-    for (Input* in : {&video, &audio}) {
-        AVStream* src = in->fmt->streams[in->streamIndex];
+    for (const PendingSource& srcDesc : sources) {
+        AVStream* src = srcDesc.in->fmt->streams[srcDesc.in->streamIndex];
         AVStream* dst = avformat_new_stream(out, nullptr);
         if (!dst) {
             avformat_free_context(out);
@@ -148,11 +228,23 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
         }
         dst->codecpar->codec_tag = 0;  // let the muxer pick a valid tag
         dst->time_base = src->time_base;
-        if (src->avg_frame_rate.num > 0 && src->avg_frame_rate.den > 0) {
+        if (srcDesc.mediaType == AVMEDIA_TYPE_VIDEO &&
+            src->avg_frame_rate.num > 0 && src->avg_frame_rate.den > 0) {
             dst->avg_frame_rate = src->avg_frame_rate;
             dst->r_frame_rate = src->r_frame_rate.num > 0 ? src->r_frame_rate : src->avg_frame_rate;
         }
-        maps.push_back({in, dst->index, nullptr, false});
+        if (srcDesc.mediaType == AVMEDIA_TYPE_SUBTITLE) {
+            if (!srcDesc.lang.empty()) {
+                av_dict_set(&dst->metadata, "language", srcDesc.lang.c_str(), 0);
+            }
+            if (!srcDesc.title.empty()) {
+                av_dict_set(&dst->metadata, "title", srcDesc.title.c_str(), 0);
+            }
+            if (srcDesc.isDefaultSub) {
+                dst->disposition |= AV_DISPOSITION_DEFAULT;
+            }
+        }
+        maps.push_back({srcDesc.in, srcDesc.mediaType, dst->index, nullptr, false});
     }
 
     // Open the output file (unless the muxer is buffer-only).
@@ -205,6 +297,13 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
         }
     };
 
+    auto anyAlive = [&maps]() -> bool {
+        for (const StreamMap& m : maps) {
+            if (!m.eof) return true;
+        }
+        return false;
+    };
+
     // Prime one packet from each input.
     for (StreamMap& m : maps) {
         readNext(m);
@@ -213,7 +312,8 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
     std::string failure;
     int64_t videoPkts = 0;
     int64_t audioPkts = 0;
-    while (!maps[0].eof || !maps[1].eof) {
+    int64_t subPkts = 0;
+    while (anyAlive()) {
         // Pick the stream whose next packet has the smaller DTS (in seconds).
         int pick = -1;
         double bestTs = 0;
@@ -241,6 +341,11 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
         AVPacket* pkt = m.peek;
         m.peek = nullptr;
 
+        if (pkt->dts == AV_NOPTS_VALUE && pkt->pts != AV_NOPTS_VALUE) {
+            pkt->dts = pkt->pts;
+        } else if (pkt->pts == AV_NOPTS_VALUE && pkt->dts != AV_NOPTS_VALUE) {
+            pkt->pts = pkt->dts;
+        }
         av_packet_rescale_ts(pkt, src->time_base, dst->time_base);
         pkt->stream_index = m.outIndex;
         pkt->pos = -1;
@@ -253,49 +358,14 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
             failure = "write frame failed: " + AvErr(wret);
             break;
         }
-        if (pick == 0) {
+        if (m.mediaType == AVMEDIA_TYPE_VIDEO) {
             videoPkts++;
-        } else {
+        } else if (m.mediaType == AVMEDIA_TYPE_AUDIO) {
             audioPkts++;
+        } else if (m.mediaType == AVMEDIA_TYPE_SUBTITLE) {
+            subPkts++;
         }
         readNext(m);
-    }
-
-    // Drain leftovers if interleave loop exited early on one side only.
-    if (failure.empty()) {
-        for (size_t i = 0; i < maps.size(); ++i) {
-            StreamMap& m = maps[i];
-            while (!m.eof) {
-                if (!m.peek && !readNext(m)) {
-                    break;
-                }
-                if (!m.peek) {
-                    break;
-                }
-                AVStream* src = m.in->fmt->streams[m.in->streamIndex];
-                AVStream* dst = out->streams[m.outIndex];
-                AVPacket* pkt = m.peek;
-                m.peek = nullptr;
-                av_packet_rescale_ts(pkt, src->time_base, dst->time_base);
-                pkt->stream_index = m.outIndex;
-                pkt->pos = -1;
-                int wret = av_interleaved_write_frame(out, pkt);
-                av_packet_free(&pkt);
-                if (wret < 0) {
-                    failure = "write frame failed: " + AvErr(wret);
-                    break;
-                }
-                if (i == 0) {
-                    videoPkts++;
-                } else {
-                    audioPkts++;
-                }
-                readNext(m);
-            }
-            if (!failure.empty()) {
-                break;
-            }
-        }
     }
 
     for (StreamMap& m : maps) {
@@ -308,7 +378,7 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
     if (failure.empty() && videoPkts == 0) {
         failure = "no video packets remuxed (black screen risk)";
     }
-    if (failure.empty() && audioPkts == 0) {
+    if (failure.empty() && expectAudio && audioPkts == 0) {
         failure = "no audio packets remuxed";
     }
 
@@ -318,9 +388,12 @@ void DoMux(const std::string& videoPath, const std::string& audioPath,
     }
     if (!(out->oformat->flags & AVFMT_NOFILE)) avio_closep(&out->pb);
     avformat_free_context(out);
-    MUX_LOG("mux done: %{public}s + %{public}s -> %{public}s vPkts=%{public}lld aPkts=%{public}lld (%{public}s)",
-            videoPath.c_str(), audioPath.c_str(), outPath.c_str(),
+    MUX_LOG("mux done: %{public}s + %{public}s + subs=%{public}zu -> %{public}s "
+            "vPkts=%{public}lld aPkts=%{public}lld sPkts=%{public}lld (%{public}s)",
+            videoPath.c_str(), audioPath.empty() ? "(inline/none)" : audioPath.c_str(),
+            subCountAdded, outPath.c_str(),
             static_cast<long long>(videoPkts), static_cast<long long>(audioPkts),
+            static_cast<long long>(subPkts),
             failure.empty() ? "ok" : failure.c_str());
     if (!failure.empty()) throw MuxError{failure};
 }
@@ -345,7 +418,42 @@ napi_value MuxAudioVideo(napi_env env, napi_callback_info info)
         return nullptr;
     }
     try {
-        DoMux(videoPath, audioPath, outPath);
+        DoMuxMedia(videoPath, audioPath, {}, {}, {}, outPath);
+    } catch (const MuxError& e) {
+        napi_throw_error(env, nullptr, e.message.c_str());
+        return nullptr;
+    }
+    return nullptr;
+}
+
+// napi entry: muxMedia(videoPath, audioPath, subtitlePaths, subtitleLangs, subtitleTitles, outPath): void
+napi_value MuxMedia(napi_env env, napi_callback_info info)
+{
+    size_t argc = 6;
+    napi_value args[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    if (argc < 6) {
+        napi_throw_error(env, nullptr,
+            "muxMedia: expected (videoPath, audioPath, subtitlePaths, subtitleLangs, subtitleTitles, outPath)");
+        return nullptr;
+    }
+    std::string videoPath = ResolveUri(GetString(env, args[0]));
+    std::string audioPath = ResolveUri(GetString(env, args[1]));
+    std::vector<std::string> subPathsRaw = GetStringArray(env, args[2]);
+    std::vector<std::string> subPaths;
+    subPaths.reserve(subPathsRaw.size());
+    for (const std::string& p : subPathsRaw) {
+        subPaths.push_back(ResolveUri(p));
+    }
+    std::vector<std::string> subLangs = GetStringArray(env, args[3]);
+    std::vector<std::string> subTitles = GetStringArray(env, args[4]);
+    std::string outPath = ResolveUri(GetString(env, args[5]));
+    if (videoPath.empty() || outPath.empty()) {
+        napi_throw_error(env, nullptr, "muxMedia: videoPath and outPath must be non-empty");
+        return nullptr;
+    }
+    try {
+        DoMuxMedia(videoPath, audioPath, subPaths, subLangs, subTitles, outPath);
     } catch (const MuxError& e) {
         napi_throw_error(env, nullptr, e.message.c_str());
         return nullptr;
@@ -359,6 +467,7 @@ void RegisterMuxModule(napi_env env, napi_value exports)
 {
     napi_property_descriptor desc[] = {
         {"muxAudioVideo", nullptr, MuxAudioVideo, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"muxMedia", nullptr, MuxMedia, nullptr, nullptr, nullptr, napi_default, nullptr},
     };
     napi_define_properties(env, exports, std::size(desc), desc);
 }

@@ -125,19 +125,25 @@ async function applyAuthHeaders(headers: Record<string, string[]>): Promise<void
   }
 }
 
-/** TV rail headers: Bearer only (SmartTube-style). No Cookie/SAPISIDHASH. */
+/** TV rail headers: Bearer (+ optional Brand Account X-Goog-Pageid) only. No Cookie/SAPISIDHASH. */
 async function applyTvAuthHeaders(headers: Record<string, string[]>): Promise<void> {
   const authSession = AuthSessionManager.getInstance();
   if (!authSession || !authSession.hasTvAuthForUserData()) {
     logger.warn('[browse-auth-tv] skip: no OAuth token');
     return;
   }
-  headers['X-Origin'] = ['https://www.youtube.com'];
-  headers['DNT'] = ['1'];
   const authorization = await authSession.getTvAuthorizationHeader();
   if (authorization && authorization.length > 0) {
     headers['Authorization'] = [authorization];
-    logger.info('[browse-auth-tv] authRail=tv Bearer attached');
+    const pageId = authSession.getTvPageIdHeader();
+    if (pageId) {
+      headers['X-Goog-Pageid'] = [pageId];
+    }
+    const tvVisitor = authSession.getTvVisitorData();
+    if (tvVisitor && headers['X-Goog-Visitor-Id'] === undefined) {
+      headers['X-Goog-Visitor-Id'] = [tvVisitor];
+    }
+    logger.info(`[browse-auth-tv] authRail=tv Bearer attached hasPageId=${!!pageId}`);
   } else {
     logger.warn('[browse-auth-tv] Bearer missing after refresh');
   }

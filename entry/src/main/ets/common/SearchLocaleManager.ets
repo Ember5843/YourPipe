@@ -9,7 +9,7 @@ export class SearchLocaleManager {
   static readonly DEFAULT_SEARCH_LANGUAGE: string = 'default';
   static readonly DEFAULT_SEARCH_COUNTRY: string = 'default';
   private static readonly FALLBACK_LANGUAGE: string = 'en';
-  private static readonly FALLBACK_COUNTRY: string = 'GB';
+  private static readonly FALLBACK_COUNTRY: string = 'US';
 
   static getSearchLocaleBundle(uiConfig?: UIConfig): LocaleBundle {
     const language = SearchLocaleManager.resolveSearchLanguage();

@@ -107,6 +107,7 @@ export class ConfiguredPlayerClient {
     }
 
     const id = ConfiguredPlayerClient.identity(key);
+    const isTvClient = key === 'tv_downgraded' || key === 'tv_samsung';
     const cpn = generateContentPlaybackNonce();
     const client: Record<string, Object> = {
       'utcOffsetMinutes': 0,
@@ -117,6 +118,16 @@ export class ConfiguredPlayerClient {
       'clientName': id.clientName,
       'clientVersion': id.clientVersion
     };
+    if (isTvClient) {
+      // SmartTube v32.83 QueryBuilder / AppClient.TV_DOWNGRADED parity
+      client['clientScreen'] = ClientsConstants.WATCH_CLIENT_SCREEN;
+      client['acceptLanguage'] = ctx.hl;
+      client['acceptRegion'] = ctx.gl;
+      if (key === 'tv_downgraded') {
+        client['browserName'] = ClientsConstants.TVHTML5_DOWNGRADED_BROWSER_NAME;
+        client['browserVersion'] = ClientsConstants.TVHTML5_DOWNGRADED_BROWSER_VERSION;
+      }
+    }
     if (id.needsVrDeviceFields) {
       client['deviceMake'] = ClientsConstants.ANDROID_VR_DEVICE_MAKE;
       client['deviceModel'] = ClientsConstants.ANDROID_VR_DEVICE_MODEL;
@@ -134,12 +145,24 @@ export class ConfiguredPlayerClient {
       client['visitorData'] = ctx.visitorData;
     }
 
-    const playbackContext: Record<string, Object> = {
-      'contentPlaybackContext': {
-        'html5Preference': 'HTML5_PREF_WANTS',
-        'signatureTimestamp': ctx.signatureTimestamp
-      } as Record<string, Object>
+    const contentPlaybackContext: Record<string, Object> = {
+      'html5Preference': 'HTML5_PREF_WANTS',
+      'signatureTimestamp': ctx.signatureTimestamp
     };
+    if (isTvClient) {
+      contentPlaybackContext['lactMilliseconds'] = 60000;
+      contentPlaybackContext['isInlinePlaybackNoAd'] = true;
+    }
+    const playbackContext: Record<string, Object> = {
+      'contentPlaybackContext': contentPlaybackContext
+    };
+    if (isTvClient) {
+      // SmartTube QueryBuilder: setting supportXhr=false ensures TV returns direct adaptiveFormats URLs.
+      playbackContext['devicePlaybackCapabilities'] = {
+        'supportsVp9Encoding': true,
+        'supportXhr': false
+      } as Record<string, Object>;
+    }
     // RELOAD_PLAYER echo (PipePipe appendReloadPlaybackContext): the token of a
     // server-requested player reload goes back into the re-probe request so the
     // server can mint a fresh streaming URL / ustreamer config for this session.
@@ -153,8 +176,15 @@ export class ConfiguredPlayerClient {
       logger.info(`[${key}] reload playback token attached len=${ctx.reloadPlaybackToken.length}`);
     }
 
+    const contextObj: Record<string, Object> = { 'client': client };
+    if (isTvClient) {
+      contextObj['user'] = {
+        'enableSafetyMode': false,
+        'lockedSafetyMode': false
+      } as Record<string, Object>;
+    }
     const payload: Record<string, Object> = {
-      'context': { 'client': client } as Record<string, Object>,
+      'context': contextObj,
       'playbackContext': playbackContext,
       'cpn': cpn,
       'videoId': ctx.videoId,
@@ -201,6 +231,9 @@ export class ConfiguredPlayerClient {
       'X-YouTube-Client-Name': id.clientId,
       'X-YouTube-Client-Version': id.clientVersion
     };
+    if (isTvClient && ctx.visitorData && ctx.visitorData.length > 0) {
+      headers['X-Goog-Visitor-Id'] = ctx.visitorData;
+    }
 
     // PipePipe addLoggedInHeaders: Cookie+SAPISIDHASH attaches to any client
     // (TVHTML5 included) when a cookie credential exists. OAuth Bearer stays a

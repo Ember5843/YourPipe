@@ -123,6 +123,18 @@ export interface NativeMpvPlayerModule {
    */
   muxAudioVideo: (videoPath: string, audioPath: string, outPath: string) => void;
   /**
+   * Remux video + optional audio (empty for muxed inputs like Progressive MP4)
+   * + zero or more subtitle files (.srt/.vtt) into a single container (e.g. .mkv).
+   */
+  muxMedia: (
+    videoPath: string,
+    audioPath: string,
+    subtitlePaths: string[],
+    subtitleLangs: string[],
+    subtitleTitles: string[],
+    outPath: string
+  ) => void;
+  /**
    * Probe OHOS hardware video decoder capability (cached after first call).
    * category HARDWARE for video/avc, hevc, vp9, av01, vp8.
    */

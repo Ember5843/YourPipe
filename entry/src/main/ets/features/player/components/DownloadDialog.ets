@@ -1,4 +1,4 @@
-import { StreamInfo, SelectOption, StreamCategories, PlayerModel } from 'mediaservice';
+import { StreamInfo, SelectOption, StreamCategories, PlayerModel, SubtitleTrack } from 'mediaservice';
 import { UIConfig } from '../../../common/AppState';
 import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
 import { formatBytes } from '../../../common/utils/FormatUtils';
@@ -11,6 +11,12 @@ export interface DownloadSelection {
   hls?: StreamInfo;
   /** True when selected video/audio are SABR (UMP session download). */
   sabr?: boolean;
+  /** Selected subtitle track (for standalone .srt or MKV soft-muxing). */
+  subtitle?: SubtitleTrack;
+  /** True to embed subtitle into a single .mkv file; false keeps .srt sidecar. */
+  embedSubtitle?: boolean;
+  /** True when downloading only a standalone .srt subtitle file. */
+  subtitleOnly?: boolean;
 }
 
 /**
@@ -19,6 +25,18 @@ export interface DownloadSelection {
  */
 export function buildDownloadTaskFromSelection(videoId: string, title: string, author: string,
   thumbnailUrl: string, selection: DownloadSelection): DownloadTask | null {
+  if (selection.subtitleOnly && selection.subtitle) {
+    const subOnlyStream: StreamInfo = {
+      url: selection.subtitle.url,
+      kind: 'subtitle',
+      deliveryMethod: 'LOCAL_FILE',
+      hasVideo: false,
+      hasAudio: false,
+      quality: selection.subtitle.languageCode || 'srt'
+    };
+    return new DownloadTask(`dl_${Date.now()}_${videoId}`, videoId, title, author, thumbnailUrl,
+      subOnlyStream, null, selection.subtitle, false, true);
+  }
   let videoStream: StreamInfo;
   let audioStream: StreamInfo | null = null;
   if (selection.progressive) {
@@ -35,14 +53,15 @@ export function buildDownloadTaskFromSelection(videoId: string, title: string, a
     return null;
   }
   return new DownloadTask(`dl_${Date.now()}_${videoId}`, videoId, title, author, thumbnailUrl,
-    videoStream, audioStream);
+    videoStream, audioStream, selection.subtitle || null, selection.embedSubtitle !== false, false);
 }
 
 enum DownloadMode {
   PROGRESSIVE = 'PROGRESSIVE',
   DASH_TRACKS = 'DASH_TRACKS',
   SABR_TRACKS = 'SABR_TRACKS',
-  HLS = 'HLS'
+  HLS = 'HLS',
+  SUBTITLE_ONLY = 'SUBTITLE_ONLY'
 }
 
 @CustomDialog
@@ -52,6 +71,7 @@ export struct DownloadDialog {
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
 
   streamCategories?: StreamCategories;
+  subtitleTracks: SubtitleTrack[] = [];
   videoId: string = '';
   videoTitle: string = '';
   videoAuthor: string = '';
@@ -63,17 +83,21 @@ export struct DownloadDialog {
   @State selectedDashAudio: string = '';
   @State selectedHls: string = '';
   @State selectedAudioTrack: ResourceStr = '';
+  @State selectedSubtitleLabel: string = '';
+  @State embedSubtitle: boolean = true;
   @State estimatedSize: string = '';
 
   @State audioTrackOptions: SelectOption[] = [];
   @State filteredAudioStreams: StreamInfo[] = [];
 
   private videoStreams: StreamInfo[] = [];
+  private subtitleLabelMap: Map<string, SubtitleTrack> = new Map<string, SubtitleTrack>();
 
   onConfirm: (selection: DownloadSelection) => void = () => {};
   onCancel: () => void = () => {};
 
   aboutToAppear() {
+    this.buildSubtitleLabelMap();
     const allVideo = this.streamCategories?.video || [];
     this.videoStreams = this.isSabrModePreferred(allVideo)
       ? allVideo.filter((s: StreamInfo) => PlayerModel.isSabrStream(s))
@@ -101,6 +125,8 @@ export struct DownloadDialog {
     } else if (this.streamCategories?.hlsManifest && this.streamCategories.hlsManifest.length > 0) {
       this.selectedMode = DownloadMode.HLS;
       this.selectedHls = this.getStreamLabel(this.streamCategories.hlsManifest[0]);
+    } else if (this.subtitleTracks.length > 0) {
+      this.selectedMode = DownloadMode.SUBTITLE_ONLY;
     }
 
     if (this.streamCategories?.audio && this.streamCategories.audio.length > 0) {
@@ -114,6 +140,10 @@ export struct DownloadDialog {
         this.selectedDashAudio = this.getStreamLabel(this.filteredAudioStreams[0]);
       }
     }
+
+    this.selectedSubtitleLabel = this.selectedMode === DownloadMode.SUBTITLE_ONLY && this.subtitleTracks.length > 0
+      ? this.getFirstSubtitleLabel()
+      : this.getNoSubtitleLabel();
 
     this.updateEstimatedSize();
   }
@@ -184,6 +214,13 @@ export struct DownloadDialog {
                 if (this.streamCategories?.hlsManifest?.length) {
                   if (index === pos) {
                     this.applyMode(DownloadMode.HLS);
+                    return;
+                  }
+                  pos++;
+                }
+                if (this.subtitleTracks.length > 0) {
+                  if (index === pos) {
+                    this.applyMode(DownloadMode.SUBTITLE_ONLY);
                   }
                 }
               })
@@ -191,6 +228,32 @@ export struct DownloadDialog {
           .width('100%')
 
           Divider().margin({ top: 20, bottom: 10 }).color($r('sys.color.comp_divider'))
+
+          if (this.selectedMode === DownloadMode.SUBTITLE_ONLY && this.subtitleTracks.length > 0) {
+            Column() {
+              this.SectionHeader($r('app.string.yt_download_subtitle_track'))
+              Select(this.getSubtitleTrackOnlyOptions())
+                .value(this.selectedSubtitleLabel)
+                .font({ size: 15 })
+                .selectedOptionFontColor(this.themePrimary)
+                .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
+                .optionBgColor(Color.Transparent)
+                .width('100%')
+                .height(40)
+                .backgroundColor($r('app.color.yourtube_bg_page'))
+                .borderRadius(8)
+                .onSelect((_index: number, value: string) => {
+                  this.selectedSubtitleLabel = value;
+                  this.updateEstimatedSize();
+                })
+              Text($r('app.string.yt_download_subtitle_only_hint'))
+                .fontSize(11)
+                .fontColor($r('app.color.yourtube_text_hint'))
+                .width('100%')
+                .margin({ top: 4 })
+            }
+            .width('100%')
+          }
 
           if (this.selectedMode === DownloadMode.PROGRESSIVE && this.streamCategories?.progressive?.length) {
             Column() {
@@ -327,6 +390,54 @@ export struct DownloadDialog {
               .margin({ top: 4 })
           }
 
+          if (this.subtitleTracks.length > 0 && (this.selectedMode === DownloadMode.PROGRESSIVE
+            || this.selectedMode === DownloadMode.DASH_TRACKS || this.selectedMode === DownloadMode.SABR_TRACKS)) {
+            Column() {
+              Divider().margin({ top: 16, bottom: 8 }).color($r('sys.color.comp_divider'))
+              this.SectionHeader($r('app.string.yt_download_step3_subtitles'))
+              Select(this.getSubtitleOptionsWithNone())
+                .value(this.selectedSubtitleLabel)
+                .font({ size: 15 })
+                .selectedOptionFontColor(this.themePrimary)
+                .selectedOptionBgColor(ThemeColorUtil.selectedBackground(this.themePrimary))
+                .optionBgColor(Color.Transparent)
+                .width('100%')
+                .height(40)
+                .backgroundColor($r('app.color.yourtube_bg_page'))
+                .borderRadius(8)
+                .onSelect((_index: number, value: string) => {
+                  this.selectedSubtitleLabel = value;
+                  this.updateEstimatedSize();
+                })
+
+              if (this.getSelectedSubtitleTrack() !== undefined) {
+                Row() {
+                  Text($r('app.string.yt_download_subtitle_embed'))
+                    .fontSize(13)
+                    .fontColor($r('app.color.yourtube_text_primary'))
+                    .layoutWeight(1)
+                  Toggle({ type: ToggleType.Switch, isOn: this.embedSubtitle })
+                    .selectedColor(this.themePrimary)
+                    .onChange((isOn: boolean) => {
+                      this.embedSubtitle = isOn;
+                    })
+                }
+                .width('100%')
+                .margin({ top: 10 })
+                .alignItems(VerticalAlign.Center)
+
+                Text(this.embedSubtitle
+                  ? $r('app.string.yt_download_subtitle_embed_hint')
+                  : $r('app.string.yt_download_subtitle_sidecar_hint'))
+                  .fontSize(11)
+                  .fontColor($r('app.color.yourtube_text_hint'))
+                  .width('100%')
+                  .margin({ top: 4 })
+              }
+            }
+            .width('100%')
+          }
+
           if (this.estimatedSize) {
             Row({ space: 8 }) {
               SymbolGlyph($r('sys.symbol.doc'))
@@ -459,6 +570,10 @@ export struct DownloadDialog {
       this.selectedProgressive = this.getStreamLabel(this.streamCategories.progressive[0]);
     } else if (mode === DownloadMode.HLS && this.streamCategories?.hlsManifest?.length) {
       this.selectedHls = this.getStreamLabel(this.streamCategories.hlsManifest[0]);
+    } else if (mode === DownloadMode.SUBTITLE_ONLY && this.subtitleTracks.length > 0) {
+      if (!this.getSelectedSubtitleTrack()) {
+        this.selectedSubtitleLabel = this.getFirstSubtitleLabel();
+      }
     } else if (mode === DownloadMode.SABR_TRACKS) {
       this.videoStreams = allVideo.filter((s: StreamInfo) => PlayerModel.isSabrStream(s));
       if (this.videoStreams.length > 0) {
@@ -508,6 +623,9 @@ export struct DownloadDialog {
     if (this.streamCategories?.hlsManifest?.length) {
       options.push({ value: $r('app.string.yt_download_mode_hls') } as SelectOption);
     }
+    if (this.subtitleTracks.length > 0) {
+      options.push({ value: $r('app.string.yt_download_mode_subtitle_only') } as SelectOption);
+    }
     return options;
   }
 
@@ -521,7 +639,67 @@ export struct DownloadDialog {
     if (mode === DownloadMode.SABR_TRACKS) {
       return $r('app.string.yt_download_mode_sabr');
     }
+    if (mode === DownloadMode.SUBTITLE_ONLY) {
+      return $r('app.string.yt_download_mode_subtitle_only');
+    }
     return $r('app.string.yt_download_mode_dash');
+  }
+
+  private buildSubtitleLabelMap(): void {
+    this.subtitleLabelMap.clear();
+    for (let i = 0; i < this.subtitleTracks.length; i++) {
+      const track = this.subtitleTracks[i];
+      let label = this.getSubtitleBaseLabel(track);
+      if (this.subtitleLabelMap.has(label)) {
+        label = `${label} (${i + 1})`;
+      }
+      this.subtitleLabelMap.set(label, track);
+    }
+  }
+
+  private getSubtitleBaseLabel(track: SubtitleTrack): string {
+    const display = (track.name || track.languageCode || 'Unknown').trim();
+    const tags: string[] = [];
+    if (track.languageCode && !display.toLowerCase().includes(track.languageCode.toLowerCase())) {
+      tags.push(track.languageCode);
+    }
+    if (track.isAutoTranslated) {
+      const tr = this.resourceToString($r('app.string.yt_download_subtitle_translated'));
+      if (tr) tags.push(tr);
+    } else if (track.isAutoGenerated) {
+      const auto = this.resourceToString($r('app.string.yt_download_subtitle_auto'));
+      if (auto) tags.push(auto);
+    }
+    return tags.length > 0 ? `${display} [${tags.join(' · ')}]` : display;
+  }
+
+  private getNoSubtitleLabel(): string {
+    return this.resourceToString($r('app.string.yt_download_subtitle_none')) || 'No subtitles';
+  }
+
+  private getFirstSubtitleLabel(): string {
+    const iter = this.subtitleLabelMap.keys().next();
+    return iter.done ? this.getNoSubtitleLabel() : iter.value;
+  }
+
+  private getSubtitleOptionsWithNone(): SelectOption[] {
+    const opts: SelectOption[] = [{ value: this.getNoSubtitleLabel() } as SelectOption];
+    this.subtitleLabelMap.forEach((_track: SubtitleTrack, label: string) => {
+      opts.push({ value: label } as SelectOption);
+    });
+    return opts;
+  }
+
+  private getSubtitleTrackOnlyOptions(): SelectOption[] {
+    const opts: SelectOption[] = [];
+    this.subtitleLabelMap.forEach((_track: SubtitleTrack, label: string) => {
+      opts.push({ value: label } as SelectOption);
+    });
+    return opts;
+  }
+
+  private getSelectedSubtitleTrack(): SubtitleTrack | undefined {
+    return this.subtitleLabelMap.get(this.selectedSubtitleLabel);
   }
 
   private getVideoOptions(): SelectOption[] {
@@ -608,6 +786,10 @@ export struct DownloadDialog {
       this.estimatedSize = '';
       return;
     }
+    if (selection.subtitleOnly) {
+      this.estimatedSize = '< 1 MB (.srt)';
+      return;
+    }
     let totalBytes = 0;
     if (selection.progressive) {
       totalBytes = selection.progressive.contentLength || 0;
@@ -624,6 +806,22 @@ export struct DownloadDialog {
 
   private getCurrentSelection(): DownloadSelection | null {
     const selection: DownloadSelection = {};
+    const subTrack = this.getSelectedSubtitleTrack();
+    if (this.selectedMode === DownloadMode.SUBTITLE_ONLY) {
+      if (!subTrack) {
+        return null;
+      }
+      selection.subtitle = subTrack;
+      selection.subtitleOnly = true;
+      selection.embedSubtitle = false;
+      return selection;
+    }
+
+    if (subTrack) {
+      selection.subtitle = subTrack;
+      selection.embedSubtitle = this.embedSubtitle;
+    }
+
     if (this.selectedMode === DownloadMode.PROGRESSIVE) {
       selection.progressive = this.getStreamByLabel(this.streamCategories?.progressive || [], this.selectedProgressive);
       return selection.progressive ? selection : null;

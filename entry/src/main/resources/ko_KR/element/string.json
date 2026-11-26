@@ -1042,7 +1042,7 @@
         },
         {
             "name": "yt_error_age_restricted_hint",
-            "value": "브라우저에서 YouTube 계정으로 로그인해야 시청할 수 있습니다"
+            "value": "'데이터 및 계정'에서 성인 계정으로 로그인하고 계정 재생을 켜세요"
         },
         {
             "name": "yt_error_geo_restricted",
@@ -1082,7 +1082,7 @@
         },
         {
             "name": "yt_error_login_required_hint",
-            "value": "브라우저에서 YouTube 계정으로 로그인하세요"
+            "value": "'데이터 및 계정'에서 로그인하고 '재생에 로그인 사용'을 켜세요"
         },
         {
             "name": "yt_error_account_terminated",
@@ -1782,7 +1782,7 @@
         },
         {
             "name": "yt_auth_notice_message",
-            "value": "YouTube 로그인을 환영합니다. 제한적인 계정 콘텐츠 접근을 제공하며, 일부 네트워크 환경에서 익명 모드를 사용할 수 없는 문제를 효과적으로 완화합니다. 약간의 추가 네트워크 오버헤드가 발생할 수 있으니 참고하세요 :)"
+            "value": "1. 이 앱은 서드파티 YouTube 클라이언트입니다. 로그인하면 YouTube 데이터를 가져올 수 있지만, 수정·삭제나 댓글 작성 등 계정 조작 기능은 제공하지 않습니다.\n\n2. 로그인 상태 재생을 사용하면 연령 제한 콘텐츠 시청 및 IP 차단 우회가 가능하지만, 추가 대기 시간이 발생합니다.\n\n3. YouTube 데이터 접근 범위를 자유롭게 켜고 끌 수 있으며, 사용 경험에 따라 로그인 상태 재생 여부를 결정하시기 바랍니다."
         },
         {
             "name": "yt_auth_continue_sign_in",
@@ -4519,6 +4519,178 @@
         {
             "name": "yt_exp_hm_footer",
             "value": "YouTube 기본 다시 보기 데이터를 사용하며, 히트맵 데이터가 있는 동영상에서만 동작합니다."
+        },
+        {
+            "name": "yt_error_bot_check",
+            "value": "현재 네트워크 요청이 YouTube 봇 확인에 의해 차단되었습니다"
+        },
+        {
+            "name": "yt_error_bot_check_hint",
+            "value": "계정 재생을 켜거나 네트워크/엔드포인트를 변경한 뒤 다시 시도하세요"
+        },
+        {
+            "name": "yt_error_hint_incognito_off",
+            "value": "계정이 시크릿 모드로 일시 중지되어 있습니다. 계정 재생을 켜면 계속 볼 수 있습니다"
+        },
+        {
+            "name": "yt_error_hint_playback_auth_off",
+            "value": "현재 계정이 데이터 전용으로 설정되어 익명 재생이 차단되었습니다"
+        },
+        {
+            "name": "yt_error_hint_auth_already_on",
+            "value": "계정 재생이 이미 켜져 있습니다. 로그인 만료 여부나 네트워크를 확인하세요"
+        },
+        {
+            "name": "yt_error_action_sign_in",
+            "value": "로그인"
+        },
+        {
+            "name": "yt_error_action_enable_auth_retry",
+            "value": "계정 재생 켜고 재시도"
+        },
+        {
+            "name": "yt_error_action_account_settings",
+            "value": "계정 설정"
+        },
+        {
+            "name": "yt_error_action_endpoint_settings",
+            "value": "재생 엔드포인트"
+        },
+        {
+            "name": "yt_error_action_network_settings",
+            "value": "네트워크 및 프록시"
+        },
+        {
+            "name": "yt_sabr_backoff_countdown",
+            "value": "YouTube 요청으로 재생 계속 전 %d초 대기 중입니다"
+        },
+        {
+            "name": "yt_sabr_backoff_non_premium_hint",
+            "value": "비프리미엄 계정 재생 시 광고 대기 시간이 발생합니다"
+        },
+        {
+            "name": "yt_sabr_backoff_switch_fast",
+            "value": "재생 인증 관리 ›"
+        },
+        {
+            "name": "yt_auth_status_card_title",
+            "value": "현재 적용 모드"
+        },
+        {
+            "name": "yt_auth_status_data_label",
+            "value": "사용자 데이터"
+        },
+        {
+            "name": "yt_auth_status_playback_label",
+            "value": "동영상 재생"
+        },
+        {
+            "name": "yt_auth_status_data_account",
+            "value": "계정 사용 중 (추천 / 구독 / 재생목록)"
+        },
+        {
+            "name": "yt_auth_status_data_local",
+            "value": "로컬 익명 (계정 데이터 미사용)"
+        },
+        {
+            "name": "yt_auth_status_data_incognito",
+            "value": "시크릿 일시 중지 (자격 증명 유지됨)"
+        },
+        {
+            "name": "yt_auth_status_play_guest",
+            "value": "익명 직결 (%s · 빠른 시작, 광고 대기 없음)"
+        },
+        {
+            "name": "yt_auth_status_play_account",
+            "value": "계정 인증 (%s · 차단 우회, 비프리미엄 약 5초 대기)"
+        },
+        {
+            "name": "yt_help_auth_master",
+            "value": "시크릿 모드 전환\n끔: 로그인 정보를 유지한 채 계정 일시 중지\n켬: 아래 데이터 및 재생 설정 복원"
+        },
+        {
+            "name": "yt_help_auth_user_data",
+            "value": "추천 및 구독 동기화\n켬: 재생 지연 없이 맞춤 피드·구독 불러오기\n제한: 댓글 작성 및 업로드는 미지원"
+        },
+        {
+            "name": "yt_help_auth_playback",
+            "value": "빠른 시작 vs 차단 우회\n끔: 즉시 재생 (간혹 봇 확인 발생 가능)\n켬: 제한 영상 재생 (비프리미엄 약 5초 대기)"
+        },
+        {
+            "name": "yt_help_guest_endpoint",
+            "value": "익명 재생 채널\nvisionos: 빠른 직결 재생 (권장)\nmweb: 재생 실패 시 대체용"
+        },
+        {
+            "name": "yt_help_auth_endpoint",
+            "value": "계정 재생 채널\nmweb: 호환성 최우선 (권장)\ntv_downgraded: QR 로그인용 직결 예비 채널"
+        },
+        {
+            "name": "yt_popup_got_it",
+            "value": "확인"
+        },
+        {
+            "name": "yt_auth_boundary_message",
+            "value": "1. 이 앱은 서드파티 YouTube 클라이언트입니다. 로그인하면 YouTube 데이터를 가져올 수 있지만, 수정·삭제나 댓글 작성 등 계정 조작 기능은 제공하지 않습니다.\n\n2. 로그인 상태 재생을 사용하면 연령 제한 콘텐츠 시청 및 IP 차단 우회가 가능하지만, 추가 대기 시간이 발생합니다.\n\n3. YouTube 데이터 접근 범위를 자유롭게 켜고 끌 수 있으며, 사용 경험에 따라 로그인 상태 재생 여부를 결정하시기 바랍니다."
+        },
+        {
+            "name": "yt_download_mode_subtitle_only",
+            "value": "자막만 다운로드 (.srt)"
+        },
+        {
+            "name": "yt_download_step3_subtitles",
+            "value": "단계 3: 자막 옵션 (선택 사항)"
+        },
+        {
+            "name": "yt_download_subtitle_none",
+            "value": "자막 다운로드 안 함"
+        },
+        {
+            "name": "yt_download_subtitle_track",
+            "value": "자막 트랙"
+        },
+        {
+            "name": "yt_download_subtitle_embed",
+            "value": "동영상 파일에 포함 (.mkv)"
+        },
+        {
+            "name": "yt_download_subtitle_embed_hint",
+            "value": "재인코딩 없이 단일 .mkv 동영상 파일에 자막을 무손실 병합합니다. 하드코딩(번인)은 지원되지 않으며 .srt 파일만 받으려면 위에서 '자막만 다운로드'를 선택하세요."
+        },
+        {
+            "name": "yt_download_subtitle_sidecar_hint",
+            "value": "동영상과 함께 별도의 .srt 자막 파일을 저장합니다."
+        },
+        {
+            "name": "yt_download_subtitle_only_hint",
+            "value": "오디오/비디오 없이 표준 .srt 자막 파일만 저장합니다."
+        },
+        {
+            "name": "yt_download_subtitle_auto",
+            "value": "자동 생성"
+        },
+        {
+            "name": "yt_download_subtitle_translated",
+            "value": "번역됨"
+        },
+        {
+            "name": "yt_download_export_action",
+            "value": "내보내기"
+        },
+        {
+            "name": "yt_changelog_0_7_2_1",
+            "value": "TV 로그인 및 18+ 연령 제한 수정: SmartTube 방식에 맞춰 YouTube TV 클라이언트 정보 및 visitorData 실시간 추출, 브랜드 계정 pageId 지원, 기본 국가 US 폴백 및 TV OAuth 재생 라우팅 적용"
+        },
+        {
+            "name": "yt_changelog_0_7_2_2",
+            "value": "다운로드 및 자막 기능 강화: YouTube 분할 다운로드 2번째 청크가 HTTP 200 응답으로 실패하던 오류 수정, .srt 단독 다운로드 및 무손실 .mkv 자막 내장 지원"
+        },
+        {
+            "name": "yt_changelog_0_7_2_3",
+            "value": "계정 경계 및 재생 안내 개선: 로그인 안내 문구 개편, 도움말 말풍선 가독성 개선, 인증 오류 시 설정 바로가기 및 비회원 SABR 5초 대기 카운트다운 추가"
+        },
+        {
+            "name": "yt_changelog_0_7_2_4",
+            "value": "번역 및 플레이어 최적화: 번역 실패 시 구체적 원인 표시 및 MPV 이벤트/셰이더 오버헤드 추가 절감"
         }
     ]
 }

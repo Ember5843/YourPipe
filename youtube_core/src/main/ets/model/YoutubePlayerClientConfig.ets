@@ -81,11 +81,16 @@ export class YoutubePlayerClientConfig {
 
   /**
    * Select the configured client for the current auth state (guest default
-   * visionos, signed-in default mweb). No-op when a client was
-   * explicitly pinned via setYoutubePlayerClient.
+   * visionos, signed-in default mweb). OAuth-only (cookie-less) sessions cannot
+   * use mweb (YouTube rejects TV OAuth Bearer on MWEB), so route directly to
+   * tv_downgraded unless explicitly pinned.
    */
-  static applyAuthDefault(hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
+  static applyAuthDefault(hasYouTubeLogin: boolean, oauthOnly?: boolean): void {
     if (YoutubePlayerClientConfig.explicitOverride) {
+      return;
+    }
+    if (hasYouTubeLogin && oauthOnly) {
+      YoutubePlayerClientConfig.selected = 'tv_downgraded';
       return;
     }
     YoutubePlayerClientConfig.selected = hasYouTubeLogin
@@ -94,8 +99,12 @@ export class YoutubePlayerClientConfig {
   }
 
   /** Reset to the configured client for the given auth state (clears any explicit pin). */
-  static resetToAuthDefault(hasYouTubeLogin: boolean, _oauthOnly?: boolean): void {
+  static resetToAuthDefault(hasYouTubeLogin: boolean, oauthOnly?: boolean): void {
     YoutubePlayerClientConfig.explicitOverride = false;
+    if (hasYouTubeLogin && oauthOnly) {
+      YoutubePlayerClientConfig.selected = 'tv_downgraded';
+      return;
+    }
     YoutubePlayerClientConfig.selected = hasYouTubeLogin
       ? YoutubePlayerClientConfig.authClient
       : YoutubePlayerClientConfig.guestClient;

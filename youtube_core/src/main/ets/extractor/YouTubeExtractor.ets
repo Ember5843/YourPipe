@@ -1278,7 +1278,7 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     // attaches to whichever client is selected (PipePipe addLoggedInHeaders).
     const webCookieAuth = this.shouldAttachWebCookieAuth();
     const hasOauth = this.isOauthOnlyPlaybackAuth();
-    YoutubePlayerClientConfig.applyAuthDefault(webCookieAuth || hasOauth, false);
+    YoutubePlayerClientConfig.applyAuthDefault(webCookieAuth || hasOauth, hasOauth);
     const selectedClient = YoutubePlayerClientConfig.getYoutubePlayerClient();
     logger.info(`[STREAM] selectedClient=${selectedClient} webCookieAuth=${webCookieAuth} `
       + `oauthOnly=${hasOauth}`);
@@ -1371,10 +1371,12 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       + `${WebClientVersionResolver.getCachedOrHardcodedSource()} version=${initialMwebVersion}`);
     const streamStartedAt = Date.now();
     // Dual auth rails: Cookie+SAPISIDHASH on any client (PipePipe); OAuth-only
-    // sessions get Bearer on tv_downgraded directly (SmartTube) — the retry
-    // below only covers the case where a non-TV client was manually selected.
-    // webCookieAuth/hasOauth already honor the useAuthForPlayback setting.
-    const tvBearerAuth = selectedClient === 'tv_downgraded' && hasOauth;
+    // sessions get Bearer on tv_downgraded directly (SmartTube). If TV Bearer
+    // wasn't used on the primary request (e.g. dual-rail Web cookies failed or
+    // a non-TV client hit an auth/age gate), retry tv_downgraded with Bearer.
+    // webCookieAuth/hasOauth/hasTvPlaybackAuth honor useAuthForPlayback.
+    const hasTvPlaybackAuth = AuthSessionManager.getInstance()?.hasTvAuthForPlayback() === true;
+    const tvBearerAuth = selectedClient === 'tv_downgraded' && (hasOauth || (hasTvPlaybackAuth && !webCookieAuth));
     let innertubePlayers = await this.fetchSelectedStreamPlayer(
       videoId, sts, selectedClient, webCookieAuth, tvBearerAuth);
     if (selectedClient === 'mweb' && !innertubePlayers.player?.streamingData) {
@@ -1385,13 +1387,13 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
           videoId, sts, selectedClient, webCookieAuth, tvBearerAuth);
       }
     }
-    // Restricted / LOGIN_REQUIRED: OAuth may retry TVHTML5 + Bearer (SmartTube)
-    // when the selected client is not already tv_downgraded (e.g. manual mweb).
-    // Cookie path keeps the selected client+Cookie; do not inject Bearer onto it.
+    // Restricted / LOGIN_REQUIRED / AGE_VERIFICATION_REQUIRED: retry TVHTML5 + Bearer
+    // whenever TV OAuth is enabled for playback and Bearer wasn't already attempted.
     const playStatus = innertubePlayers.player?.playabilityStatus?.status?.toUpperCase() || '';
-    if (selectedClient !== 'tv_downgraded' && hasOauth && (playStatus === 'LOGIN_REQUIRED' || playStatus === 'UNPLAYABLE'
+    if (hasTvPlaybackAuth && !tvBearerAuth && (playStatus === 'LOGIN_REQUIRED' || playStatus === 'UNPLAYABLE'
+      || playStatus === 'AGE_VERIFICATION_REQUIRED' || playStatus === 'AGE_CHECK_REQUIRED'
       || !innertubePlayers.player?.streamingData)) {
-      logger.warn(`[STREAM] oauth restricted status=${playStatus || 'empty'} → tv_downgraded+Bearer`);
+      logger.warn(`[STREAM] tv oauth fallback status=${playStatus || 'empty'} (client=${selectedClient}) → tv_downgraded+Bearer`);
       const tvPlayers = await this.fetchSelectedStreamPlayer(
         videoId, sts, 'tv_downgraded', false, true);
       if (tvPlayers.player?.streamingData) {
@@ -2053,10 +2055,9 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       hl: this.hl,
       gl: this.gl,
       // Stage 2: web-like clients carry the pinned session identity; TV stays
-      // token-free (PipePipe 7673caed; tv_samsung likewise). No pin yet →
-      // undefined (first request).
+      // token-free unless using TV OAuth Bearer (SmartTube carries TV visitorData).
       visitorData: (selectedClient === 'tv_downgraded' || selectedClient === 'tv_samsung')
-        ? undefined
+        ? (useTvAuth ? (AuthSessionManager.getInstance()?.getTvVisitorData() || undefined) : undefined)
         : YoutubeJavaScriptPlayerManager.getSessionVisitorData() || undefined,
       signatureTimestamp: sts,
       reloadPlaybackToken: reloadPlaybackToken

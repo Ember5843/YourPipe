@@ -3,6 +3,12 @@ import { AppDataEpoch } from './AppDataEpoch';
 import {
   StreamInfo,
   muxAudioVideo,
+  muxMedia,
+  parseVttSubtitles,
+  parseJson3Subtitles,
+  formatCuesToSrt,
+  SubtitleCue,
+  SubtitleTrack,
   SabrOfflineDownloader,
   SabrOfflineProgress
 } from 'mediaservice';
@@ -36,8 +42,33 @@ function muxTask(videoPath: string, audioPath: string, outPath: string): void {
   muxAudioVideo(videoPath, audioPath, outPath);
 }
 
+@Concurrent
+function muxMediaTask(
+  videoPath: string,
+  audioPath: string,
+  subtitlePaths: string[],
+  subtitleLangs: string[],
+  subtitleTitles: string[],
+  outPath: string
+): void {
+  muxMedia(videoPath, audioPath, subtitlePaths, subtitleLangs, subtitleTitles, outPath);
+}
+
 async function runMuxTask(videoPath: string, audioPath: string, outPath: string): Promise<void> {
   const task = new taskpool.Task(muxTask, videoPath, audioPath, outPath);
+  await taskpool.execute(task);
+}
+
+async function runMuxMediaTask(
+  videoPath: string,
+  audioPath: string,
+  subtitlePaths: string[],
+  subtitleLangs: string[],
+  subtitleTitles: string[],
+  outPath: string
+): Promise<void> {
+  const task = new taskpool.Task(
+    muxMediaTask, videoPath, audioPath, subtitlePaths, subtitleLangs, subtitleTitles, outPath);
   await taskpool.execute(task);
 }
 
@@ -73,6 +104,9 @@ export class DownloadTask {
   @Track thumbnailUrl: string;
   videoStream: StreamInfo;
   audioStream: StreamInfo | null;
+  subtitleTrack: SubtitleTrack | null = null;
+  embedSubtitleInVideo: boolean = true;
+  subtitleOnly: boolean = false;
   @Track status: DownloadStatus = DownloadStatus.PENDING;
   @Track progress: number = 0;
   @Track videoProgress: number = 0;
@@ -109,6 +143,7 @@ export class DownloadTask {
   _startedAtMs: number = 0;
   _videoFilePath: string = '';
   _audioFilePath: string = '';
+  _subtitleFilePath: string = '';
   /**
    * 断点续传：分片文件对应的流 itag（首次尝试时记录）。
    * 重试若换了 itag，半截文件的字节就属于旧流，不能接 → 记录保持首次的值，
@@ -130,7 +165,10 @@ export class DownloadTask {
     author: string,
     thumbnailUrl: string,
     videoStream: StreamInfo,
-    audioStream: StreamInfo | null
+    audioStream: StreamInfo | null,
+    subtitleTrack: SubtitleTrack | null = null,
+    embedSubtitleInVideo: boolean = true,
+    subtitleOnly: boolean = false
   ) {
     this.id = id;
     this.videoId = videoId;
@@ -139,7 +177,10 @@ export class DownloadTask {
     this.thumbnailUrl = thumbnailUrl;
     this.videoStream = videoStream;
     this.audioStream = audioStream;
-    this.totalSize = (videoStream.contentLength || 0) + (audioStream?.contentLength || 0);
+    this.subtitleTrack = subtitleTrack;
+    this.embedSubtitleInVideo = embedSubtitleInVideo;
+    this.subtitleOnly = subtitleOnly;
+    this.totalSize = subtitleOnly ? 0 : ((videoStream.contentLength || 0) + (audioStream?.contentLength || 0));
   }
 
   updateProgress(bytesDownloaded: number, total: number, type: 'video' | 'audio'): void {
@@ -916,8 +957,8 @@ export class DownloadManager {
         return;
       }
       const output = fileNames.find((file: string) =>
-        !file.startsWith('video.') && !file.startsWith('audio.')
-          && /\.(mp4|mkv|webm|m4a|mp3|ts|m4s|mov|flv)$/i.test(file));
+        !file.startsWith('video.') && !file.startsWith('audio.') && file !== 'sub.srt'
+          && /\.(mp4|mkv|webm|m4a|mp3|ts|m4s|mov|flv|srt)$/i.test(file));
       if (!output) {
         return;
       }
@@ -1197,6 +1238,13 @@ export class DownloadManager {
       videoFileOpen = false;
       fs.closeSync(audioFile);
       audioFileOpen = false;
+
+      if (task.subtitleTrack) {
+        await this.downloadTaskSubtitleFile(task);
+        if (task._cancelled) {
+          return;
+        }
+      }
 
       task.status = DownloadStatus.MERGING;
       task.updateMergeProgress(5);
@@ -1492,6 +1540,11 @@ export class DownloadManager {
       return;
     }
 
+    if (task.subtitleOnly) {
+      await this.downloadSubtitleOnlyTask(task);
+      return;
+    }
+
     if (this.isHlsStream(task.videoStream)) {
       await this.downloadHlsStream(task);
       return;
@@ -1507,6 +1560,7 @@ export class DownloadManager {
     const audioExt = task.audioStream ? this.getFileExtension(task.audioStream) : '';
     task._videoFilePath = `${task.taskDir}/video.${videoExt}`;
     task._audioFilePath = task.audioStream ? `${task.taskDir}/audio.${audioExt}` : '';
+    task._subtitleFilePath = '';
     // 断点续传的"内容身份"：只记首次尝试的 itag。重试若换流（换了 itag），
     // 磁盘上的半截文件属于旧流，不能接 —— 保持首次的值，续传时据此拒绝。
     if (task._resumeVideoItag < 0) {
@@ -1515,7 +1569,7 @@ export class DownloadManager {
     if (task.audioStream && task._resumeAudioItag < 0) {
       task._resumeAudioItag = task.audioStream.itag ?? -1;
     }
-    logger.info(`Task ${task.id} start: dir=${task.taskDir} totalSize=${task.totalSize || 'unknown'} video=${this.getStreamLogLabel(task.videoStream)} audio=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'}`);
+    logger.info(`Task ${task.id} start: dir=${task.taskDir} totalSize=${task.totalSize || 'unknown'} video=${this.getStreamLogLabel(task.videoStream)} audio=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'} sub=${task.subtitleTrack ? (task.subtitleTrack.languageCode || 'yes') : 'none'}`);
     this.showToast(this.tr($r('app.string.yt_download_started_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
 
     task.status = DownloadStatus.DOWNLOADING_VIDEO;
@@ -1529,6 +1583,13 @@ export class DownloadManager {
       task.status = DownloadStatus.DOWNLOADING_AUDIO;
       this.publishDownloadNotification(task, true);
       await this.downloadStream(task, task.audioStream, task._audioFilePath, 'audio');
+      if (task._cancelled) {
+        return;
+      }
+    }
+
+    if (task.subtitleTrack) {
+      await this.downloadTaskSubtitleFile(task);
       if (task._cancelled) {
         return;
       }
@@ -1761,12 +1822,16 @@ export class DownloadManager {
           if (task._cancelled) {
             return;
           }
-          if (result.responseCode === 200 && start > 0) {
-            // 续传时服务端无视了 Range（回 200 + 整体）：半截文件接不上，交给上层重来。
-            throw new Error(`${DOWNLOAD_RANGE_IGNORED_MARKER}: ${type} range=${rangeSpec}`);
-          }
           if (result.responseCode !== 206 && result.responseCode !== 200) {
             throw new Error(`Chunk request returned HTTP ${result.responseCode}`);
+          }
+          const isYoutubeRangeQuery = this.isYoutubePlaybackUrl(stream.url);
+          if (result.responseCode === 200 && start > 0 && result.bytesWritten !== expectedSize) {
+            // YouTube `?range=` 正常就是回 HTTP 200 + 恰好 expectedSize 字节；
+            // 仅当回 200 且字节数与请求分片对不上（非 YouTube 无视 Range，或服务端返回超长整文件）才判定为忽略 Range。
+            if (!isYoutubeRangeQuery || result.bytesWritten > expectedSize) {
+              throw new Error(`${DOWNLOAD_RANGE_IGNORED_MARKER}: ${type} range=${rangeSpec} bytes=${result.bytesWritten}`);
+            }
           }
           if (result.bytesWritten !== expectedSize) {
             throw new Error(`Chunk size mismatch expected=${expectedSize} actual=${result.bytesWritten}`);
@@ -2114,21 +2179,36 @@ export class DownloadManager {
       throw new Error('Video track missing before merge');
     }
 
-    if (task.audioStream && task._audioFilePath) {
-      const audioSize = this.getLocalFileSize(task._audioFilePath);
-      if (audioSize <= 0) {
-        throw new Error('Audio track missing before merge');
+    const subSize = task._subtitleFilePath ? this.getLocalFileSize(task._subtitleFilePath) : 0;
+    const embedSub = Boolean(task.subtitleTrack && task.embedSubtitleInVideo && subSize > 0);
+    const hasAudio = Boolean(task.audioStream && task._audioFilePath);
+
+    if (hasAudio || embedSub) {
+      let audioSize = 0;
+      if (hasAudio) {
+        audioSize = this.getLocalFileSize(task._audioFilePath);
+        if (audioSize <= 0) {
+          throw new Error('Audio track missing before merge');
+        }
       }
-      logger.info(`Task ${task.id} mux merge output=${outputExt} videoExt=${this.getFileExtension(task.videoStream)} audioExt=${this.getFileExtension(task.audioStream)} videoBytes=${videoSize} audioBytes=${audioSize}`);
+      logger.info(`Task ${task.id} mux merge output=${outputExt} videoExt=${this.getFileExtension(task.videoStream)} `
+        + `audioExt=${task.audioStream ? this.getFileExtension(task.audioStream) : 'inline/none'} `
+        + `embedSub=${embedSub} videoBytes=${videoSize} audioBytes=${audioSize} subBytes=${subSize}`);
 
       const videoPath = task._videoFilePath;
-      const audioPath = task._audioFilePath;
+      const audioPath = hasAudio ? task._audioFilePath : '';
       const outPath = outputPath;
 
       try {
         // Remove stale incomplete output from a previous failed mux attempt.
         this.safeUnlink(outPath);
-        await runMuxTask(videoPath, audioPath, outPath);
+        if (embedSub && task.subtitleTrack) {
+          const langCode = this.toMkvLangCode(task.subtitleTrack.languageCode);
+          const subTitle = (task.subtitleTrack.name || task.subtitleTrack.languageCode || 'Subtitles').trim();
+          await runMuxMediaTask(videoPath, audioPath, [task._subtitleFilePath], [langCode], [subTitle], outPath);
+        } else {
+          await runMuxTask(videoPath, audioPath, outPath);
+        }
       } catch (e) {
         this.safeUnlink(outPath);
         const msg = (e as Error).message || String(e);
@@ -2157,8 +2237,157 @@ export class DownloadManager {
       this.publishDownloadNotification(task);
     }
 
+    if (task.subtitleTrack && !task.embedSubtitleInVideo && subSize > 0) {
+      const langSuffix = this.sanitizeFilename(task.subtitleTrack.languageCode || 'sub');
+      const sidecarPath = `${task.taskDir}/${safeTitle}.${langSuffix}.srt`;
+      try {
+        await fs.copyFile(task._subtitleFilePath, sidecarPath);
+        logger.info(`Subtitle sidecar saved: ${sidecarPath}`);
+      } catch (e) {
+        logger.warn(`Subtitle sidecar copy failed: ${(e as Error).message || e}`);
+      }
+    }
+
     logger.info(`File saved to app downloads: ${outputPath} bytes=${this.getLocalFileSize(outputPath)}`);
     return outputPath;
+  }
+
+  private async downloadSubtitleOnlyTask(task: DownloadTask): Promise<void> {
+    if (!task.subtitleTrack) {
+      throw new Error('Missing subtitle track');
+    }
+    task.taskDir = this.ensureTaskDir(task);
+    const safeTitle = this.sanitizeFilename(task.title || task.videoId);
+    const langCode = this.sanitizeFilename(task.subtitleTrack.languageCode || 'sub');
+    const outputPath = `${task.taskDir}/${safeTitle}.${langCode}.srt`;
+    logger.info(`Task ${task.id} subtitle-only download start: lang=${langCode} out=${outputPath}`);
+    this.showToast(this.tr($r('app.string.yt_download_started_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
+
+    task.status = DownloadStatus.DOWNLOADING_VIDEO;
+    task.progress = 20;
+    this.publishDownloadNotification(task, true);
+
+    const srt = await this.fetchSubtitleAsSrt(task.subtitleTrack, task);
+    if (task._cancelled) {
+      return;
+    }
+    this.writeUtf8TextFile(outputPath, srt);
+    const writtenSize = this.getLocalFileSize(outputPath);
+    if (writtenSize <= 0) {
+      throw new Error('Subtitle file is empty after write');
+    }
+
+    task.outputPath = outputPath;
+    task.totalSize = writtenSize;
+    task.downloadedSize = writtenSize;
+    task.status = DownloadStatus.COMPLETED;
+    task.progress = 100;
+    task.videoProgress = 100;
+    logger.info(`Task ${task.id} subtitle-only completed: output=${outputPath} bytes=${writtenSize}`);
+    this.publishDownloadNotification(task, true);
+    this.showToast(this.tr($r('app.string.yt_download_completed_format'), this.truncateNotificationText(task.title || task.videoId, 36)));
+  }
+
+  private async downloadTaskSubtitleFile(task: DownloadTask): Promise<void> {
+    if (!task.subtitleTrack) {
+      return;
+    }
+    const subPath = `${task.taskDir}/sub.srt`;
+    const srt = await this.fetchSubtitleAsSrt(task.subtitleTrack, task);
+    if (task._cancelled) {
+      return;
+    }
+    this.writeUtf8TextFile(subPath, srt);
+    task._subtitleFilePath = subPath;
+    logger.info(`Task ${task.id} subtitle prepared: path=${subPath} bytes=${this.getLocalFileSize(subPath)}`);
+  }
+
+  private async fetchSubtitleAsSrt(track: SubtitleTrack, task: DownloadTask): Promise<string> {
+    if (!track.url) {
+      throw new Error('Missing subtitle track URL');
+    }
+    const json3Url = this.buildSubtitleFormatUrl(track.url, 'json3');
+    let cues: SubtitleCue[] = [];
+    try {
+      const json3Body = await this.fetchSubtitleText(json3Url, task);
+      if (json3Body.trim().length > 0) {
+        cues = parseJson3Subtitles(json3Body);
+      }
+    } catch (e) {
+      logger.debug(`Subtitle json3 fetch failed, trying vtt: ${(e as Error).message || e}`);
+    }
+    if (cues.length === 0) {
+      const vttUrl = this.buildSubtitleFormatUrl(track.url, 'vtt');
+      const vttBody = await this.fetchSubtitleText(vttUrl, task);
+      if (vttBody.trim().length > 0) {
+        cues = parseVttSubtitles(vttBody);
+      }
+    }
+    if (cues.length === 0) {
+      throw new Error('Subtitle track contains no cues');
+    }
+    const srt = formatCuesToSrt(cues);
+    if (!srt) {
+      throw new Error('Failed to serialize subtitle cues to SRT');
+    }
+    return srt;
+  }
+
+  private buildSubtitleFormatUrl(baseUrl: string, fmt: 'json3' | 'vtt'): string {
+    const cleaned = baseUrl.replace(/([?&])fmt=[^&]*/gi, '$1').replace(/[?&]$/, '');
+    const sep = cleaned.includes('?') ? '&' : '?';
+    return `${cleaned}${sep}fmt=${fmt}`;
+  }
+
+  private async fetchSubtitleText(targetUrl: string, task: DownloadTask): Promise<string> {
+    const request = http.createHttp();
+    try {
+      const options: http.HttpRequestOptions = {
+        method: http.RequestMethod.GET,
+        expectDataType: http.HttpDataType.STRING,
+        header: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36',
+          'Referer': 'https://www.youtube.com/',
+        },
+        connectTimeout: 15000,
+        readTimeout: 20000,
+      };
+      HttpDownloader.applyProxyToOptions(options, targetUrl);
+      const response = await this.requestForTask(request, targetUrl, options, task);
+      if (response.responseCode !== 200) {
+        throw new Error(`Subtitle HTTP ${response.responseCode}`);
+      }
+      return typeof response.result === 'string' ? response.result : '';
+    } finally {
+      request.destroy();
+    }
+  }
+
+  private writeUtf8TextFile(path: string, content: string): void {
+    const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+    try {
+      fs.writeSync(file.fd, content);
+    } finally {
+      fs.closeSync(file);
+    }
+  }
+
+  private toMkvLangCode(code: string): string {
+    const base = (code || '').trim().toLowerCase().split(/[-_]/)[0];
+    switch (base) {
+      case 'zh': return 'zho';
+      case 'en': return 'eng';
+      case 'ja': return 'jpn';
+      case 'ko': return 'kor';
+      case 'fr': return 'fra';
+      case 'de': return 'deu';
+      case 'es': return 'spa';
+      case 'ru': return 'rus';
+      case 'pt': return 'por';
+      case 'it': return 'ita';
+      case 'ar': return 'ara';
+      default: return base.length === 3 ? base : 'und';
+    }
   }
 
   private getStreamLogLabel(stream: StreamInfo): string {
@@ -2197,7 +2426,7 @@ export class DownloadManager {
   }
 
   private cleanupTaskFiles(task: DownloadTask, includeOutput: boolean): void {
-    [task._videoFilePath, task._audioFilePath].forEach((path: string) => this.safeUnlink(path));
+    [task._videoFilePath, task._audioFilePath, task._subtitleFilePath].forEach((path: string) => this.safeUnlink(path));
     this.safeRemoveDir(`${task.taskDir}/video_parts`);
     this.safeRemoveDir(`${task.taskDir}/audio_parts`);
     if (includeOutput) {
@@ -2258,6 +2487,12 @@ export class DownloadManager {
   }
 
   private getOutputExtension(task: DownloadTask): string {
+    if (task.subtitleOnly) {
+      return 'srt';
+    }
+    if (task.subtitleTrack && task.embedSubtitleInVideo) {
+      return 'mkv';
+    }
     const videoExt = this.getFileExtension(task.videoStream);
     const audioExt = task.audioStream ? this.getFileExtension(task.audioStream) : '';
     if (!task.audioStream || videoExt === audioExt) {

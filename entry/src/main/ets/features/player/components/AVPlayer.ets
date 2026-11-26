@@ -89,6 +89,7 @@ import {
   SubtitleTranslationService,
   SubtitleTranslateProgress
 } from '../translate/SubtitleTranslationService';
+import { SabrBackoffNotice } from './SabrBackoffNotice';
 // [DISABLED] P3 端侧 ASR 实时识别：产品只保留 P0 tlang 官方自动翻译轨（代码保留）
 // import { AsrLiveCaptionService, AsrLiveProgress } from '../asr/AsrLiveCaptionService';
 
@@ -701,6 +702,7 @@ export struct VideoPlayer {
   onFullScreenClick: (isLandscape?: boolean) => void = () => {};
   /** 当播放器内部发生不可恢复错误时，通知父组件重新获取流信息 */
   onRetry: () => void = () => {};
+  onOpenOptionsTarget?: (route: string, highlightKey?: string) => void;
   onSurfaceReady?: (xc: XComponentController) => void;
   /** 全屏/分屏/挤压铺满态：打开信息面板 sheet（PlayerPage 注入） */
   onShowInfoPanel?: () => void;
@@ -3229,15 +3231,25 @@ export struct VideoPlayer {
           })
             .brightness(0.4)
 
-          LoadingProgress()
-            .width(48)
-            .height(48)
-            .color(Color.White)
+          Column() {
+            LoadingProgress()
+              .width(48)
+              .height(48)
+              .color(Color.White)
+
+            SabrBackoffNotice({
+              videoId: this.curSource.videoId || this.selectedVideo?.videoId || '',
+              onOpenPlaybackAuthSettings: this.onOpenOptionsTarget ? () => {
+                this.onOpenOptionsTarget!('data_account', 'playback_auth');
+              } : undefined
+            })
+          }
+          .justifyContent(FlexAlign.Center)
+          .alignItems(HorizontalAlign.Center)
         }
         .width('100%')
         .height('100%')
         .backgroundColor(Color.Black)
-        .hitTestBehavior(HitTestMode.None)
         .zIndex(CommonConstants.Z_INDEX_BASE + 1)
       }
 
@@ -3253,11 +3265,18 @@ export struct VideoPlayer {
             .width(48)
             .height(48)
             .color(Color.White)
+
+          SabrBackoffNotice({
+            videoId: this.curSource.videoId || this.selectedVideo?.videoId || '',
+            onOpenPlaybackAuthSettings: this.onOpenOptionsTarget ? () => {
+              this.onOpenOptionsTarget!('data_account', 'playback_auth');
+            } : undefined
+          })
         }
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .hitTestBehavior(HitTestMode.None)
+        .hitTestBehavior(HitTestMode.Transparent)
         .zIndex(CommonConstants.Z_INDEX_BASE + 1)
       }
 
@@ -3305,26 +3324,53 @@ export struct VideoPlayer {
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .padding({ left: 32, right: 32 })
 
-          Button($r('app.string.yt_action_retry'))
-            .height(36)
-            .padding({ left: 20, right: 20 })
-            .backgroundColor(this.themePrimary)
-            .borderRadius(18)
-            .margin({ top: 8 })
-            .onClick(() => {
-              this.registerControlActivity();
-              this.hasError = false;
-              this.isWaitingForDualBuffer = false;
-              if (this.onRetry) {
-                // 通知父组件重新获取流（YouTube URL 有过期时间，必须重新请求）
-                this.onRetry();
-              } else {
-                // Fallback: 直接复用旧流重试（仅适用于 URL 不过期的场景）
-                this.curSource.error = undefined;
-                this.vm.errorMsg = '';
-                this.controller.updateVideoSource(this.curSource);
-              }
-            })
+          Row({ space: 12 }) {
+            Button($r('app.string.yt_action_retry'))
+              .height(36)
+              .padding({ left: 20, right: 20 })
+              .backgroundColor(this.themePrimary)
+              .borderRadius(18)
+              .onClick(() => {
+                this.registerControlActivity();
+                this.hasError = false;
+                this.isWaitingForDualBuffer = false;
+                if (this.onRetry) {
+                  // 通知父组件重新获取流（YouTube URL 有过期时间，必须重新请求）
+                  this.onRetry();
+                } else {
+                  // Fallback: 直接复用旧流重试（仅适用于 URL 不过期的场景）
+                  this.curSource.error = undefined;
+                  this.vm.errorMsg = '';
+                  this.controller.updateVideoSource(this.curSource);
+                }
+              })
+
+            if (this.onOpenOptionsTarget) {
+              Button($r('app.string.yt_error_action_endpoint_settings'))
+                .height(36)
+                .padding({ left: 16, right: 16 })
+                .backgroundColor('#4DFFFFFF')
+                .fontColor(Color.White)
+                .borderRadius(18)
+                .onClick(() => {
+                  this.registerControlActivity();
+                  this.onOpenOptionsTarget!('playback', 'endpoint_section');
+                })
+
+              Button($r('app.string.yt_error_action_account_settings'))
+                .height(36)
+                .padding({ left: 16, right: 16 })
+                .backgroundColor('#4DFFFFFF')
+                .fontColor(Color.White)
+                .borderRadius(18)
+                .onClick(() => {
+                  this.registerControlActivity();
+                  this.onOpenOptionsTarget!('data_account', 'playback_auth');
+                })
+            }
+          }
+          .margin({ top: 8 })
+          .justifyContent(FlexAlign.Center)
         }
         .width('100%')
         .height('100%')

@@ -27,10 +27,12 @@ export class AuthStateHelper {
    * 不要在调用点散落 resetToAuthDefault 及其参数推导。
    */
   static reconcilePlaybackClient(): void {
-    const usePlaybackAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
-    YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth);
+    const session = AuthSessionManager.getInstance();
+    const usePlaybackAuth = session?.isAuthEnabledForPlayback() === true;
+    const oauthOnly = session?.hasTvAuthForPlayback() === true && session?.hasWebAuthForPlayback() !== true;
+    YoutubePlayerClientConfig.resetToAuthDefault(usePlaybackAuth, oauthOnly);
     logger.info(`playback client reconciled state=${usePlaybackAuth ? 'auth' : 'guest'} `
-      + `client=${YoutubePlayerClientConfig.getYoutubePlayerClient()}`);
+      + `oauthOnly=${oauthOnly} client=${YoutubePlayerClientConfig.getYoutubePlayerClient()}`);
   }
 
   /**

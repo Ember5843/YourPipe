@@ -154,6 +154,10 @@ export class PlayabilityChecker {
       }
     }
 
+    if (status.toUpperCase() === 'AGE_VERIFICATION_REQUIRED' || status.toUpperCase() === 'AGE_CHECK_REQUIRED') {
+      throw new AgeRestrictedContentException(reason || status);
+    }
+
     if (status.toUpperCase() === 'LIVE_STREAM_OFFLINE') {
       throw new LiveStreamOfflineException('Live offline');
     }

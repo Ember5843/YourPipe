@@ -18,6 +18,10 @@ export interface AuthBackupState {
   accessToken: string;
   accessTokenExpiresAt: number;
   cookieCredentialJson: string;
+  tvPageId?: string;
+  tvVisitorData?: string;
+  oauthClientId?: string;
+  oauthClientSecret?: string;
 }
 
 /** 鉴权持久化 preferences 存储名（"清除所有数据"需要按此名擦除，entry 侧经 Index 导出引用）。 */
@@ -34,6 +38,11 @@ export class AuthSessionManager {
   private static readonly AUTH_ENABLED_KEY: string = 'auth_enabled';
   private static readonly USE_AUTH_FOR_USER_DATA_KEY: string = 'use_auth_for_user_data';
   private static readonly USE_AUTH_FOR_PLAYBACK_KEY: string = 'use_auth_for_playback';
+  private static readonly DEVICE_ID_KEY: string = 'tv_device_id';
+  private static readonly TV_PAGE_ID_KEY: string = 'tv_page_id';
+  private static readonly TV_VISITOR_DATA_KEY: string = 'tv_visitor_data';
+  private static readonly OAUTH_CLIENT_ID_KEY: string = 'oauth_client_id';
+  private static readonly OAUTH_CLIENT_SECRET_KEY: string = 'oauth_client_secret';
   private static readonly REFRESH_MARGIN_MS: number = 60000;
 
   private context: Context;
@@ -42,6 +51,12 @@ export class AuthSessionManager {
   private accessToken: string = '';
   private accessTokenExpiresAt: number = 0;
   private cookieCredential: CookieAuthCredential | null = null;
+  private deviceId: string = '';
+  private tvPageId: string = '';
+  private tvVisitorData: string = '';
+  private oauthClientId: string = '';
+  private oauthClientSecret: string = '';
+  private tvAccountChecked: boolean = false;
   private credentialRevision: number = 0;
   private userDataRevision: number = 0;
 
@@ -438,9 +453,33 @@ export class AuthSessionManager {
         return;
       }
       if (token.accessToken.length > 0 || token.refreshToken.length > 0) {
+        // Persist matched client credentials + Brand Account pageIdToken (X-Goog-Pageid).
+        const creds = this.probe.getResolvedClientCredentials();
+        this.oauthClientId = creds.clientId;
+        this.oauthClientSecret = creds.clientSecret;
+        const scrapedVisitor = this.probe.getCachedTvVisitorData();
+        if (scrapedVisitor.length > 0) {
+          this.tvVisitorData = scrapedVisitor;
+        }
+        this.tvPageId = '';
+        this.tvAccountChecked = false;
+        if (token.accessToken.length > 0) {
+          const accountInfo = await this.probe.fetchSelectedAccountPageId(token.accessToken, this.tvVisitorData);
+          if (generation !== this.devicePollGeneration || !this.deviceFlowActive) {
+            return;
+          }
+          if (accountInfo.checked) {
+            this.tvAccountChecked = true;
+            this.tvPageId = accountInfo.pageId;
+            if (accountInfo.visitorData.length > 0) {
+              this.tvVisitorData = accountInfo.visitorData;
+            }
+          }
+        }
         // Dual-rail: keep Cookie if present; OAuth coexists (web + tv rails).
         this.authEnabled = true;
         this.persistAuthEnabled();
+        this.persistTvMetadata();
         this.saveToken(token);
         this.deviceFlowActive = false;
         this.deviceStage = AuthStage.SIGNED_IN;
@@ -448,7 +487,7 @@ export class AuthSessionManager {
         this.deviceUserCode = '';
         this.deviceLastError = '';
         this.deviceLastErrorCode = '';
-        logger.info(`Device login succeeded authMode=${this.getStatus().authMode}`);
+        logger.info(`Device login succeeded authMode=${this.getStatus().authMode} hasPageId=${this.tvPageId.length > 0}`);
         return;
       }
       const err = token.error || '';
@@ -589,7 +628,7 @@ export class AuthSessionManager {
     if (!this.authEnabled || !this.useAuthForPlayback) {
       return false;
     }
-    return this.hasWebCredentialStored();
+    return this.hasWebSapisidStored();
   }
 
   hasTvAuthForPlayback(): boolean {
@@ -666,6 +705,18 @@ export class AuthSessionManager {
     return this.accessToken ? `Bearer ${this.accessToken}` : undefined;
   }
 
+  /** SmartTube X-Goog-Pageid header for TV OAuth Brand Accounts (restricted videos). */
+  getTvPageIdHeader(): string | undefined {
+    if (!this.authEnabled || this.tvPageId.length === 0) {
+      return undefined;
+    }
+    return this.tvPageId;
+  }
+
+  getTvVisitorData(): string {
+    return this.tvVisitorData || this.probe.getCachedTvVisitorData();
+  }
+
   /** Merge concurrent refreshes into one in-flight call (WebClientVersionResolver pattern). */
   private async refreshAccessTokenShared(): Promise<AuthAccountStatus> {
     if (this.refreshPromise) {
@@ -688,7 +739,7 @@ export class AuthSessionManager {
     const revision = this.credentialRevision;
     const refreshToken = this.refreshToken;
     try {
-      const token = await this.probe.refreshAccessToken(refreshToken);
+      const token = await this.probe.refreshAccessToken(refreshToken, this.oauthClientId, this.oauthClientSecret);
       if (revision !== this.credentialRevision || refreshToken !== this.refreshToken) return this.getStatus();
       if (token.error.length > 0) {
         logger.warn(`Refresh failed with code: ${token.error}`);
@@ -698,7 +749,10 @@ export class AuthSessionManager {
           this.refreshToken = '';
           this.accessToken = '';
           this.accessTokenExpiresAt = 0;
+          this.tvPageId = '';
+          this.tvAccountChecked = false;
           this.persistRefreshToken();
+          this.persistTvMetadata();
           this.noteAuthRejection('tv', 'invalid_grant');
           AuthSessionManager.emitAuthStateChange();
         }
@@ -709,7 +763,18 @@ export class AuthSessionManager {
         return status;
       }
       this.applyToken(token);
-      logger.info('Access token refreshed');
+      if (!this.tvAccountChecked && this.tvPageId.length === 0 && this.accessToken.length > 0) {
+        const accountInfo = await this.probe.fetchSelectedAccountPageId(this.accessToken, this.tvVisitorData);
+        if (accountInfo.checked) {
+          this.tvAccountChecked = true;
+          this.tvPageId = accountInfo.pageId;
+          if (accountInfo.visitorData.length > 0) {
+            this.tvVisitorData = accountInfo.visitorData;
+          }
+          this.persistTvMetadata();
+        }
+      }
+      logger.info(`Access token refreshed hasPageId=${this.tvPageId.length > 0}`);
       return this.getStatus();
     } catch (e) {
       if (revision !== this.credentialRevision) return this.getStatus();
@@ -736,11 +801,18 @@ export class AuthSessionManager {
     this.accessToken = '';
     this.accessTokenExpiresAt = 0;
     this.cookieCredential = null;
+    this.tvPageId = '';
+    this.tvVisitorData = '';
+    this.oauthClientId = '';
+    this.oauthClientSecret = '';
+    this.tvAccountChecked = false;
+    this.probe.setPersistedClientCredentials('', '');
     this.authEnabled = true;
     this.useAuthForUserData = true;
     this.useAuthForPlayback = true;
     this.persistRefreshToken();
     this.persistCookieCredential();
+    this.persistTvMetadata();
     this.persistAuthEnabled();
     this.persistUseAuthForUserData();
     this.persistUseAuthForPlayback();
@@ -850,9 +922,22 @@ export class AuthSessionManager {
   private load(): void {
     try {
       const storage = preferences.getPreferencesSync(this.context, { name: AuthSessionManager.STORAGE_NAME });
+      this.deviceId = (storage.getSync(AuthSessionManager.DEVICE_ID_KEY, '') as string).trim();
+      if (this.deviceId.length === 0) {
+        this.deviceId = SmartTubeAuthProbe.newDeviceId();
+        storage.putSync(AuthSessionManager.DEVICE_ID_KEY, this.deviceId);
+        storage.flush();
+      }
+      this.probe.setDeviceId(this.deviceId);
+      this.tvPageId = (storage.getSync(AuthSessionManager.TV_PAGE_ID_KEY, '') as string).trim();
+      this.tvVisitorData = (storage.getSync(AuthSessionManager.TV_VISITOR_DATA_KEY, '') as string).trim();
+      this.oauthClientId = (storage.getSync(AuthSessionManager.OAUTH_CLIENT_ID_KEY, '') as string).trim();
+      this.oauthClientSecret = (storage.getSync(AuthSessionManager.OAUTH_CLIENT_SECRET_KEY, '') as string).trim();
+      this.probe.setPersistedClientCredentials(this.oauthClientId, this.oauthClientSecret);
+
       this.refreshToken = storage.getSync(AuthSessionManager.REFRESH_TOKEN_KEY, '') as string;
       if (this.refreshToken.length > 0) {
-        logger.info('POC refresh token loaded');
+        logger.info(`POC refresh token loaded hasPageId=${this.tvPageId.length > 0}`);
       }
       const credentialJson = storage.getSync(AuthSessionManager.COOKIE_CREDENTIAL_KEY, '') as string;
       if (credentialJson.length > 0) {
@@ -869,6 +954,19 @@ export class AuthSessionManager {
       this.useAuthForPlayback = playbackRaw !== 'false';
     } catch (e) {
       logger.error('Failed to load auth state');
+    }
+  }
+
+  private persistTvMetadata(): void {
+    try {
+      const storage = preferences.getPreferencesSync(this.context, { name: AuthSessionManager.STORAGE_NAME });
+      storage.putSync(AuthSessionManager.TV_PAGE_ID_KEY, this.tvPageId);
+      storage.putSync(AuthSessionManager.TV_VISITOR_DATA_KEY, this.tvVisitorData);
+      storage.putSync(AuthSessionManager.OAUTH_CLIENT_ID_KEY, this.oauthClientId);
+      storage.putSync(AuthSessionManager.OAUTH_CLIENT_SECRET_KEY, this.oauthClientSecret);
+      storage.flush();
+    } catch (e) {
+      logger.error('Failed to persist TV metadata');
     }
   }
 
@@ -928,7 +1026,11 @@ export class AuthSessionManager {
       refreshToken: this.refreshToken,
       accessToken: this.accessToken,
       accessTokenExpiresAt: this.accessTokenExpiresAt,
-      cookieCredentialJson: this.cookieCredential ? this.cookieCredential.toJson() : ''
+      cookieCredentialJson: this.cookieCredential ? this.cookieCredential.toJson() : '',
+      tvPageId: this.tvPageId,
+      tvVisitorData: this.tvVisitorData,
+      oauthClientId: this.oauthClientId,
+      oauthClientSecret: this.oauthClientSecret
     };
   }
 
@@ -940,8 +1042,15 @@ export class AuthSessionManager {
     this.cookieCredential = state.cookieCredentialJson.length > 0
       ? CookieAuthCredential.fromJson(state.cookieCredentialJson)
       : null;
+    this.tvPageId = (state.tvPageId || '').trim();
+    this.tvVisitorData = (state.tvVisitorData || '').trim();
+    this.oauthClientId = (state.oauthClientId || '').trim();
+    this.oauthClientSecret = (state.oauthClientSecret || '').trim();
+    this.tvAccountChecked = this.tvPageId.length > 0;
+    this.probe.setPersistedClientCredentials(this.oauthClientId, this.oauthClientSecret);
     this.persistRefreshToken();
     this.persistCookieCredential();
+    this.persistTvMetadata();
     logger.info('Auth state imported');
     AuthSessionManager.emitAuthStateChange();
   }

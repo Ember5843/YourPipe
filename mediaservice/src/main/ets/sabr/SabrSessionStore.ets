@@ -157,6 +157,28 @@ class SabrSessionStoreImpl {
   }
 
   /**
+   * Max remaining UMP server backoff (ms) across active playback leases
+   * (excludes '|dl' offline downloads). Drives the PipePipe-style player
+   * countdown ("YouTube forces us to wait N seconds...").
+   */
+  getPlaybackBackoffRemainingMs(videoId?: string): number {
+    let maxMs = 0;
+    this.leases.forEach((lease: SabrLease, key: string) => {
+      if (key.endsWith('|dl')) {
+        return;
+      }
+      if (videoId && videoId.length > 0 && lease.info.videoId !== videoId) {
+        return;
+      }
+      const rem = lease.session.getBackoffRemainingMs();
+      if (rem > maxMs) {
+        maxMs = rem;
+      }
+    });
+    return maxMs;
+  }
+
+  /**
    * Network-handover lever (wired by entry NetworkHandoverService): abort the
    * in-flight UMP POST of every active session so a stale connection errors
    * out immediately. Unlike abort(key), sessions stay open — each session's

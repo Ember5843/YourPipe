@@ -101,7 +101,8 @@ export struct DownloadPage {
     let startIndex = -1;
 
     this.tasks.forEach((task: DownloadTask) => {
-      if (task.status !== DownloadStatus.COMPLETED || !task.outputPath) {
+      if (task.status !== DownloadStatus.COMPLETED || !task.outputPath
+        || task.outputPath.toLowerCase().endsWith('.srt')) {
         return;
       }
       let playable = true;
@@ -579,17 +580,31 @@ struct DownloadTaskRow {
           this.resumePausedTask();
         })
     } else if (this.task.status === DownloadStatus.COMPLETED) {
-      // 主操作 = 应用内播放；导出降为长按菜单里的次操作。
-      Button($r('app.string.yt_local_play'))
-        .fontSize(12)
-        .fontColor($r('app.color.yourtube_text_inverse'))
-        .backgroundColor(this.themePrimary)
-        .height(ACTION_BTN_HEIGHT)
-        .padding({ left: 10, right: 10 })
-        .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
-        .onClick(() => {
-          this.playTask();
-        })
+      if (this.isSubtitleOnlyTask()) {
+        Button($r('app.string.yt_download_export_action'))
+          .fontSize(12)
+          .fontColor($r('app.color.yourtube_text_inverse'))
+          .backgroundColor(this.themePrimary)
+          .height(ACTION_BTN_HEIGHT)
+          .padding({ left: 10, right: 10 })
+          .enabled(!this.exporting)
+          .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+          .onClick(() => {
+            this.exportTaskToDownloads();
+          })
+      } else {
+        // 主操作 = 应用内播放；导出降为长按菜单里的次操作。
+        Button($r('app.string.yt_local_play'))
+          .fontSize(12)
+          .fontColor($r('app.color.yourtube_text_inverse'))
+          .backgroundColor(this.themePrimary)
+          .height(ACTION_BTN_HEIGHT)
+          .padding({ left: 10, right: 10 })
+          .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+          .onClick(() => {
+            this.playTask();
+          })
+      }
     } else if (this.task.status === DownloadStatus.FAILED) {
       // 失败任务：主操作 = 重试（重新提取新鲜流后再入队），删除降为长按菜单。
       Button(this.retrying ? $r('app.string.yt_download_retrying') : $r('app.string.yt_action_retry'))
@@ -750,8 +765,16 @@ struct DownloadTaskRow {
    * 主操作：在应用内直接播放已下载的文件（沙箱路径交给 MPV，不经过代理）。
    * 整份下载库一起入队、点击项为起点 —— 打开「自动连播」后会顺着列表放下去。
    */
+  private isSubtitleOnlyTask(): boolean {
+    return this.task.subtitleOnly === true || (this.task.outputPath || '').toLowerCase().endsWith('.srt');
+  }
+
   private playTask(): void {
     if (this.task.status !== DownloadStatus.COMPLETED || !this.task.outputPath) {
+      return;
+    }
+    if (this.isSubtitleOnlyTask()) {
+      this.exportTaskToDownloads();
       return;
     }
     let exists = true;

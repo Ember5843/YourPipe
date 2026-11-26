@@ -13,6 +13,21 @@ export function muxAudioVideo(videoPath: string, audioPath: string, outPath: str
 }
 
 /**
+ * Remux video + optional audio + optional subtitle tracks (.srt/.vtt) into a single
+ * container (e.g. .mkv) without re-encoding.
+ */
+export function muxMedia(
+  videoPath: string,
+  audioPath: string,
+  subtitlePaths: string[],
+  subtitleLangs: string[],
+  subtitleTitles: string[],
+  outPath: string
+): void {
+  nativeModule.muxMedia(videoPath, audioPath, subtitlePaths, subtitleLangs, subtitleTitles, outPath);
+}
+
+/**
  * Set the process-level HTTP proxy env (http_proxy / no_proxy) for MPV-direct
  * fetches (HLS master/segment playlists, sub-add subtitle downloads) via the
  * vendored FFmpeg. Non-empty url may embed user:pass for an authenticated

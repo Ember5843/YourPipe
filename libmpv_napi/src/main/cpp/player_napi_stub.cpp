@@ -177,6 +177,12 @@ napi_value MuxAudioVideo(napi_env env, napi_callback_info /*info*/)
     return Undefined(env);
 }
 
+napi_value MuxMedia(napi_env env, napi_callback_info /*info*/)
+{
+    napi_throw_error(env, nullptr, "muxMedia is unavailable on x86_64 stub (emulator UI only)");
+    return Undefined(env);
+}
+
 napi_value ProbeVideoHwDecoders(napi_env env, napi_callback_info /*info*/)
 {
     napi_value obj = MakeEmptyObject(env);
@@ -252,6 +258,7 @@ napi_value Init(napi_env env, napi_value exports)
         {"setStatsObservationEnabled", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"command", nullptr, NoopPlayer, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"muxAudioVideo", nullptr, MuxAudioVideo, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"muxMedia", nullptr, MuxMedia, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"probeVideoHwDecoders", nullptr, ProbeVideoHwDecoders, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"getHwdecCodecsWhitelist", nullptr, GetHwdecCodecsWhitelist, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"registerDirectStream", nullptr, RegisterDirectStream, nullptr, nullptr, nullptr, napi_default, nullptr},

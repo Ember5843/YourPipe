@@ -1,11 +1,18 @@
+import { HelpBubbleContent } from './HelpBubbleContent';
+
 @Component
 export struct PlaybackToggleRow {
   @Prop title: ResourceStr;
   @Prop subtitle: ResourceStr = '';
+  @Prop helpText: ResourceStr = '';
+  @Prop @Watch('onForcePopupChange') forceShowPopup: boolean = false;
   @Prop @Watch('onIsOnPropChange') isOn: boolean;
   @Prop themeColor: ResourceColor = '#E53935';
   @Prop transparentBackground: boolean = false;
   onChange?: (val: boolean) => void;
+  onPopupClosed?: () => void;
+
+  @State private showHelpPopup: boolean = false;
 
   /**
    * 开关状态由本组件**本地自持**（`$$` 双向绑定），父级只负责下发意图。
@@ -26,6 +33,41 @@ export struct PlaybackToggleRow {
 
   aboutToAppear() {
     this.localOn = this.isOn;
+    if (this.forceShowPopup && this.hasHelpText()) {
+      setTimeout(() => {
+        this.showHelpPopup = true;
+      }, 280);
+    }
+  }
+
+  onForcePopupChange(): void {
+    if (this.forceShowPopup && this.hasHelpText() && !this.showHelpPopup) {
+      setTimeout(() => {
+        this.showHelpPopup = true;
+      }, 220);
+    }
+  }
+
+  private hasHelpText(): boolean {
+    return !(typeof this.helpText === 'string' && this.helpText.length === 0);
+  }
+
+  private closeHelpPopup(): void {
+    this.showHelpPopup = false;
+    if (this.onPopupClosed) {
+      this.onPopupClosed();
+    }
+  }
+
+  @Builder
+  private HelpPopupBuilder() {
+    HelpBubbleContent({
+      helpText: this.helpText,
+      accentColor: this.themeColor,
+      onDismiss: () => {
+        this.closeHelpPopup();
+      }
+    })
   }
 
   onIsOnPropChange(): void {
@@ -45,10 +87,38 @@ export struct PlaybackToggleRow {
   build() {
     Row({ space: 12 }) {
       Column() {
-        Text(this.title)
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('sys.color.font_primary'))
+        Row({ space: 6 }) {
+          Text(this.title)
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('sys.color.font_primary'))
+            .constraintSize({ maxWidth: '88%' })
+
+          if (this.hasHelpText()) {
+            SymbolGlyph($r('sys.symbol.questionmark_circle'))
+              .fontSize(17)
+              .fontColor([$r('sys.color.font_secondary')])
+              .padding(4)
+              .hitTestBehavior(HitTestMode.Block)
+              .onClick(() => {
+                this.showHelpPopup = !this.showHelpPopup;
+              })
+              .bindPopup(this.showHelpPopup, {
+                width: 288,
+                builder: () => { this.HelpPopupBuilder(); },
+                placement: Placement.Top,
+                enableArrow: true,
+                autoCancel: true,
+                onStateChange: (e) => {
+                  if (!e.isVisible && this.showHelpPopup) {
+                    this.closeHelpPopup();
+                  }
+                }
+              })
+          }
+        }
+        .alignItems(VerticalAlign.Center)
+
         if (!(typeof this.subtitle === 'string' && this.subtitle.length === 0)) {
           Text(this.subtitle)
             .fontSize(12)

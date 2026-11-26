@@ -24,7 +24,7 @@ import { CommonConstants as Const, ChapterInfo, PlaybackState, PlayerState, Vide
 import { WindowUtil } from '../../common/utils/WindowUtil';
 import { VideoPlayer } from './components/AVPlayer';
 // 播放器错误统一由 VideoPlayer / AVPlayer 内部处理，不再使用 ErrorPage 短路
-import { HttpDownloader, VideoItem } from 'youtube_core';
+import { HttpDownloader, VideoItem, AuthAccountStatus } from 'youtube_core';
 import { ActionHub, ActionHubEvent } from '../../common/ActionHub';
 import { AvPlayerController, PlayerUiViewModel } from 'mediaservice';
 import { PlayerSession } from '../../common/PlayerSession';
@@ -33,6 +33,12 @@ import { PiPManager } from './pip/PiPManager';
 import { PlaybackConfig } from '../../common/PlaybackConfig';
 import { MediaThumb } from '../../common/components/MediaThumb';
 import { ErrorInfo } from '../../common/model/ErrorInfo';
+import { SabrBackoffNotice } from './components/SabrBackoffNotice';
+import {
+  buildErrorRecoveryPlan,
+  executeErrorRecoveryAction,
+  snapshotPlaybackAuthAndEndpoint
+} from './PlayerErrorRecovery';
 
 const logger = AppLog.getInstance('PlayerPage');
 
@@ -102,7 +108,21 @@ export struct VideoPlayerPage {
   @StorageLink('isAudioOnlyMode') @Watch('onAudioOnlyModeChange') isAudioOnlyMode: boolean = false;
   /** 播放设置（含 pipOnReturn） */
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
+  @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
   @StorageProp('isAppBackground') @Watch('onAppBackgroundChange') isAppBackground: boolean = false;
+  private preOptionsAuthEndpointSnap: string = '';
+  private handleOptionsSheetClosed: () => void = () => {
+    const prev = this.preOptionsAuthEndpointSnap;
+    this.preOptionsAuthEndpointSnap = '';
+    if (!prev || this.pageDestroyed) {
+      return;
+    }
+    const next = snapshotPlaybackAuthAndEndpoint();
+    if (prev !== next && (this.errorInfo !== null || this.videoDescriptionError !== null || this.controller.vm.userVisibleErrorMsg.length > 0)) {
+      logger.info(`${TAG} auth/endpoint changed in OptionsSheet (${prev} -> ${next}); auto-retrying current video`);
+      this.retryLoadVideo();
+    }
+  };
   private windowUtil: WindowUtil = WindowUtil.getInstance();
   /** 页面已销毁（aboutToDisappear 后置位）：销毁后到达的延迟重放一律丢弃。 */
   private pageDestroyed: boolean = false;
@@ -457,6 +477,7 @@ export struct VideoPlayerPage {
     }
 
     this.actionHub.on(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
+    this.actionHub.on(ActionHubEvent.OPTIONS_SHEET_CLOSED, this.handleOptionsSheetClosed);
 
     harmonyShare.on('knockShare', this.knockShareCallback);
   }
@@ -501,6 +522,7 @@ export struct VideoPlayerPage {
     this.windowUtil.disableLandscapeMultiWindow();
     this.windowUtil.setMainWindowOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
     this.actionHub.off(ActionHubEvent.EXIT_FULLSCREEN, this.handleExitFullscreen);
+    this.actionHub.off(ActionHubEvent.OPTIONS_SHEET_CLOSED, this.handleOptionsSheetClosed);
 
     // 退出播放页：关闭 PiP 自动启动（避免非播放页 home 键误启），注销生命周期回调
     const pip = PiPManager.getInstance();
@@ -836,12 +858,12 @@ export struct VideoPlayerPage {
             .maxLines(3)
             .padding({ left: 24, right: 24 })
 
-          if (this.errorInfo.actionHint) {
-            Text(this.errorInfo.actionHint)
-              .fontColor('#99FFFFFF')
+          if (buildErrorRecoveryPlan(this.errorInfo.errorCode, this.authStatus).dynamicHint || this.errorInfo.actionHint) {
+            Text(buildErrorRecoveryPlan(this.errorInfo.errorCode, this.authStatus).dynamicHint ?? this.errorInfo.actionHint!)
+              .fontColor('#B3FFFFFF')
               .fontSize(12)
               .textAlign(TextAlign.Center)
-              .maxLines(2)
+              .maxLines(3)
               .padding({ left: 24, right: 24 })
           }
 
@@ -854,7 +876,35 @@ export struct VideoPlayerPage {
               .padding({ left: 24, right: 24 })
           }
 
-          Row({ space: 12 }) {
+          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center }) {
+            if (buildErrorRecoveryPlan(this.errorInfo.errorCode, this.authStatus).actionKind !== 'none') {
+              Button() {
+                Row({ space: 6 }) {
+                  if (buildErrorRecoveryPlan(this.errorInfo!.errorCode, this.authStatus).actionIcon) {
+                    SymbolGlyph(buildErrorRecoveryPlan(this.errorInfo!.errorCode, this.authStatus).actionIcon!)
+                      .fontSize(16)
+                      .fontColor([Color.White])
+                  }
+                  Text(buildErrorRecoveryPlan(this.errorInfo!.errorCode, this.authStatus).actionLabel!)
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Color.White)
+                }
+              }
+              .height(36)
+              .padding({ left: 18, right: 18 })
+              .backgroundColor(this.themePrimary)
+              .borderRadius(18)
+              .margin({ left: 6, right: 6, top: 4, bottom: 4 })
+              .onClick(() => {
+                const plan = buildErrorRecoveryPlan(this.errorInfo!.errorCode, this.authStatus);
+                this.preOptionsAuthEndpointSnap = snapshotPlaybackAuthAndEndpoint();
+                executeErrorRecoveryAction(plan.actionKind, this.actionHub, () => {
+                  this.retryLoadVideo();
+                });
+              })
+            }
+
             if (this.errorInfo.isRetryable) {
               Button() {
                 Row({ space: 6 }) {
@@ -867,9 +917,11 @@ export struct VideoPlayerPage {
                 }
               }
               .height(36)
-              .padding({ left: 20, right: 20 })
-              .backgroundColor(this.themePrimary)
+              .padding({ left: 18, right: 18 })
+              .backgroundColor(buildErrorRecoveryPlan(this.errorInfo.errorCode, this.authStatus).actionKind !== 'none'
+                ? '#4DFFFFFF' : this.themePrimary)
               .borderRadius(18)
+              .margin({ left: 6, right: 6, top: 4, bottom: 4 })
               .onClick(() => { this.retryLoadVideo(); })
             }
 
@@ -885,13 +937,14 @@ export struct VideoPlayerPage {
                 }
               }
               .height(36)
-              .padding({ left: 20, right: 20 })
-              .backgroundColor('#666666')
+              .padding({ left: 18, right: 18 })
+              .backgroundColor('#4DFFFFFF')
               .borderRadius(18)
+              .margin({ left: 6, right: 6, top: 4, bottom: 4 })
               .onClick(() => { this.openInBrowser(this.errorInfo!.openInBrowserUrl!); })
             }
           }
-          .justifyContent(FlexAlign.Center)
+          .padding({ left: 16, right: 16 })
         }
       } else if (this.videoDescriptionError) {
         Column({ space: 12 }) {
@@ -904,18 +957,43 @@ export struct VideoPlayerPage {
             .textAlign(TextAlign.Center)
             .maxLines(3)
             .padding({ left: 24, right: 24 })
-          Button($r('app.string.yt_action_retry'))
-            .height(36)
-            .padding({ left: 16, right: 16 })
-            .backgroundColor(this.themePrimary)
-            .borderRadius(18)
-            .onClick(() => { this.retryLoadVideo(); })
+          Row({ space: 12 }) {
+            Button($r('app.string.yt_action_retry'))
+              .height(36)
+              .padding({ left: 18, right: 18 })
+              .backgroundColor(this.themePrimary)
+              .borderRadius(18)
+              .onClick(() => { this.retryLoadVideo(); })
+
+            Button($r('app.string.yt_error_action_account_settings'))
+              .height(36)
+              .padding({ left: 16, right: 16 })
+              .backgroundColor('#4DFFFFFF')
+              .fontColor(Color.White)
+              .borderRadius(18)
+              .onClick(() => {
+                this.preOptionsAuthEndpointSnap = snapshotPlaybackAuthAndEndpoint();
+                this.actionHub.openOptionsTarget('data_account', 'playback_auth');
+              })
+          }
         }
       } else if (this.isLoading) {
-        LoadingProgress()
-          .width(40)
-          .height(40)
-          .color(Color.White)
+        Column() {
+          LoadingProgress()
+            .width(40)
+            .height(40)
+            .color(Color.White)
+
+          SabrBackoffNotice({
+            videoId: this.video?.videoId || this.videoSource.videoId || '',
+            onOpenPlaybackAuthSettings: () => {
+              this.preOptionsAuthEndpointSnap = snapshotPlaybackAuthAndEndpoint();
+              this.actionHub.openOptionsTarget('data_account', 'playback_auth');
+            }
+          })
+        }
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
       }
     }
     .width('100%')
@@ -986,6 +1064,10 @@ export struct VideoPlayerPage {
         },
         onRetry: () => {
           this.retryLoadVideo();
+        },
+        onOpenOptionsTarget: (route: string, highlightKey?: string) => {
+          this.preOptionsAuthEndpointSnap = snapshotPlaybackAuthAndEndpoint();
+          this.actionHub.openOptionsTarget(route, highlightKey);
         },
         onSurfaceReady: (xc: XComponentController) => {
           // 把播放页 XComponentController 注入 PiPManager 作为 PiP 的 componentController

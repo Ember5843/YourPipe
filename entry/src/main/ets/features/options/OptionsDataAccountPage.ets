@@ -11,7 +11,8 @@ import {
   AuthAccountStatus,
   AuthSessionManager,
   AuthStage,
-  CookieAuthCredential
+  CookieAuthCredential,
+  YoutubePlayerClientConfig
 } from 'youtube_core';
 import { DataBackupManager, BackupError } from '../../common/DataBackupManager';
 import { BackupItemKey, AppBackupData, ALL_BACKUP_ITEM_KEYS } from '../../common/model/BackupModels';
@@ -47,7 +48,9 @@ interface OptionsDataAccountPageParams {
 export struct OptionsDataAccountPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
-  @StorageLink('authStatus') authStatus: AuthAccountStatus = new AuthAccountStatus();
+  @StorageLink('authStatus') @Watch('onAuthStatusChanged') authStatus: AuthAccountStatus = new AuthAccountStatus();
+  @StorageLink('optionsHighlightKey') optionsHighlightKey: string = '';
+  @State private forceShowPlaybackAuthBubble: boolean = false;
 
   @Prop params: OptionsDataAccountPageParams = {
     onLoginClick: () => {},
@@ -74,9 +77,60 @@ export struct OptionsDataAccountPage {
   private pendingRestoreBackup: AppBackupData | null = null;
   private cookieImportGeneration: number = 0;
 
+  aboutToAppear(): void {
+    this.syncPlaybackAuthCoachBubble();
+  }
+
   aboutToDisappear(): void {
     this.cookieImportGeneration++;
     this.isVerifyingCookie = false;
+    this.forceShowPlaybackAuthBubble = false;
+  }
+
+  onAuthStatusChanged(): void {
+    this.syncPlaybackAuthCoachBubble();
+  }
+
+  private syncPlaybackAuthCoachBubble(): void {
+    if (!this.isAuthActive()) {
+      this.forceShowPlaybackAuthBubble = false;
+      return;
+    }
+    if (this.optionsHighlightKey === 'playback_auth') {
+      this.forceShowPlaybackAuthBubble = true;
+      return;
+    }
+    if (PreferencesStore.getString('cfg_coach_playback_auth_shown', 'false') !== 'true') {
+      this.forceShowPlaybackAuthBubble = true;
+    }
+  }
+
+  private markPlaybackAuthCoachSeen(): void {
+    this.forceShowPlaybackAuthBubble = false;
+    if (this.optionsHighlightKey === 'playback_auth') {
+      this.optionsHighlightKey = '';
+    }
+    PreferencesStore.setString('cfg_coach_playback_auth_shown', 'true');
+  }
+
+  private getActiveUserDataSummary(): ResourceStr {
+    if (!this.hasCredential()) {
+      return $r('app.string.yt_auth_status_data_local');
+    }
+    if (!this.isAuthActive()) {
+      return $r('app.string.yt_auth_status_data_incognito');
+    }
+    return this.isUseAuthForUserDataActive()
+      ? $r('app.string.yt_auth_status_data_account')
+      : $r('app.string.yt_auth_status_data_local');
+  }
+
+  private getActivePlaybackSummary(): ResourceStr {
+    const endpoint = YoutubePlayerClientConfig.getYoutubePlayerClient();
+    const playbackAuth = this.isAuthActive() && this.isUseAuthForPlaybackActive();
+    return playbackAuth
+      ? $r('app.string.yt_auth_status_play_account', endpoint)
+      : $r('app.string.yt_auth_status_play_guest', endpoint);
   }
 
   private hasCredential(): boolean {
@@ -117,11 +171,11 @@ export struct OptionsDataAccountPage {
     return $r('app.string.yt_auth_subtitle_incognito');
   }
 
-  private startLogin(): void {
+  private startLogin(onConfirmAction?: () => void): void {
     const uiContext = this.getUIContext();
     uiContext.showAlertDialog({
       title: $r('app.string.yt_auth_notice_title'),
-      message: $r('app.string.yt_auth_notice_message'),
+      message: $r('app.string.yt_auth_boundary_message'),
       autoCancel: true,
       alignment: DialogAlignment.Center,
       offset: { dx: 0, dy: -20 },
@@ -135,7 +189,11 @@ export struct OptionsDataAccountPage {
           value: $r('app.string.yt_auth_continue_sign_in'),
           fontColor: this.themePrimary,
           action: () => {
-            this.params.onLoginClick();
+            if (onConfirmAction) {
+              onConfirmAction();
+            } else {
+              this.params.onLoginClick();
+            }
           }
         }
       ],
@@ -574,6 +632,54 @@ export struct OptionsDataAccountPage {
     Column() {
       List({ space: 6 }) {
         ListItem() {
+          Column({ space: 8 }) {
+            Row({ space: 6 }) {
+              SymbolGlyph($r('sys.symbol.info_circle_fill'))
+                .fontSize(15)
+                .fontColor([this.themePrimary])
+              Text($r('app.string.yt_auth_status_card_title'))
+                .fontSize(13)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('sys.color.font_primary'))
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+
+            Row({ space: 8 }) {
+              Text($r('app.string.yt_auth_status_data_label'))
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('sys.color.font_secondary'))
+              Text(this.getActiveUserDataSummary())
+                .fontSize(12)
+                .fontColor($r('sys.color.font_primary'))
+                .layoutWeight(1)
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Top)
+
+            Row({ space: 8 }) {
+              Text($r('app.string.yt_auth_status_playback_label'))
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('sys.color.font_secondary'))
+              Text(this.getActivePlaybackSummary())
+                .fontSize(12)
+                .fontColor(this.isAuthActive() && this.isUseAuthForPlaybackActive()
+                  ? this.themePrimary : $r('sys.color.font_primary'))
+                .layoutWeight(1)
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Top)
+          }
+          .width('100%')
+          .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+          .backgroundColor($r('sys.color.comp_background_list_card'))
+          .borderRadius(SECTION_CARD_RADIUS)
+        }
+        .padding({ left: 0, right: 0, bottom: 2 })
+
+        ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_section_account') })
         }
         .padding({ left: 0, right: 0 })
@@ -606,7 +712,9 @@ export struct OptionsDataAccountPage {
                 transparentBackground: true,
                 clickEffectEnabled: customAnimationUtil.isClickEffect(this.uiConfig),
                 onClickAction: () => {
-                  this.params.onDeviceQrLoginClick();
+                  this.startLogin(() => {
+                    this.params.onDeviceQrLoginClick();
+                  });
                 }
               })
             }
@@ -702,6 +810,7 @@ export struct OptionsDataAccountPage {
               PlaybackToggleRow({
                 title: this.getAccountTitle(),
                 subtitle: this.getAccountSubtitle(),
+                helpText: $r('app.string.yt_help_auth_master'),
                 isOn: this.isAuthActive(),
                 themeColor: this.themePrimary,
                 transparentBackground: true,
@@ -716,6 +825,7 @@ export struct OptionsDataAccountPage {
                 PlaybackToggleRow({
                   title: $r('app.string.yt_option_auth_use_for_user_data'),
                   subtitle: $r('app.string.yt_option_auth_use_for_user_data_subtitle'),
+                  helpText: $r('app.string.yt_help_auth_user_data'),
                   isOn: this.isUseAuthForUserDataActive(),
                   themeColor: this.themePrimary,
                   transparentBackground: true,
@@ -729,11 +839,16 @@ export struct OptionsDataAccountPage {
                 PlaybackToggleRow({
                   title: $r('app.string.yt_option_auth_use_for_playback'),
                   subtitle: $r('app.string.yt_option_auth_use_for_playback_subtitle'),
+                  helpText: $r('app.string.yt_help_auth_playback'),
+                  forceShowPopup: this.forceShowPlaybackAuthBubble,
                   isOn: this.isUseAuthForPlaybackActive(),
                   themeColor: this.themePrimary,
                   transparentBackground: true,
                   onChange: (val: boolean) => {
                     this.onUseAuthForPlaybackToggle(val);
+                  },
+                  onPopupClosed: () => {
+                    this.markPlaybackAuthCoachSeen();
                   }
                 })
               }

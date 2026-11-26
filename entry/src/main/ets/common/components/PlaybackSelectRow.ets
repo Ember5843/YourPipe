@@ -1,19 +1,59 @@
 import { SelectOption } from 'mediaservice';
 import { ThemeColorUtil } from '../ThemeColorUtil';
+import { HelpBubbleContent } from './HelpBubbleContent';
 
 @Component
 export struct PlaybackSelectRow {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @Prop title: ResourceStr;
+  @Prop helpText: ResourceStr = '';
+  @Prop @Watch('onForcePopupChange') forceShowPopup: boolean = false;
   @Prop options: Array<SelectOption>;
   @Prop @Watch('onSelectedIndexChange') selectedIndex: number;
   @State selectedValue: string = '';
+  @State private showHelpPopup: boolean = false;
   @Prop fontColor: ResourceColor = '#E53935';
   @Prop transparentBackground: boolean = false;
   onChange?: (index: number) => void;
+  onPopupClosed?: () => void;
 
   aboutToAppear() {
     this.syncValue();
+    if (this.forceShowPopup && this.hasHelpText()) {
+      setTimeout(() => {
+        this.showHelpPopup = true;
+      }, 280);
+    }
+  }
+
+  onForcePopupChange(): void {
+    if (this.forceShowPopup && this.hasHelpText() && !this.showHelpPopup) {
+      setTimeout(() => {
+        this.showHelpPopup = true;
+      }, 220);
+    }
+  }
+
+  private hasHelpText(): boolean {
+    return !(typeof this.helpText === 'string' && this.helpText.length === 0);
+  }
+
+  private closeHelpPopup(): void {
+    this.showHelpPopup = false;
+    if (this.onPopupClosed) {
+      this.onPopupClosed();
+    }
+  }
+
+  @Builder
+  private HelpPopupBuilder() {
+    HelpBubbleContent({
+      helpText: this.helpText,
+      accentColor: this.themePrimary,
+      onDismiss: () => {
+        this.closeHelpPopup();
+      }
+    })
   }
 
   onSelectedIndexChange() {
@@ -39,11 +79,38 @@ export struct PlaybackSelectRow {
 
   build() {
     Row() {
-      Text(this.title)
-        .fontSize(15)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('sys.color.font_primary'))
-        .layoutWeight(1)
+      Row({ space: 6 }) {
+        Text(this.title)
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('sys.color.font_primary'))
+          .constraintSize({ maxWidth: '85%' })
+
+        if (this.hasHelpText()) {
+          SymbolGlyph($r('sys.symbol.questionmark_circle'))
+            .fontSize(17)
+            .fontColor([$r('sys.color.font_secondary')])
+            .padding(4)
+            .hitTestBehavior(HitTestMode.Block)
+            .onClick(() => {
+              this.showHelpPopup = !this.showHelpPopup;
+            })
+            .bindPopup(this.showHelpPopup, {
+              width: 288,
+              builder: () => { this.HelpPopupBuilder(); },
+              placement: Placement.Top,
+              enableArrow: true,
+              autoCancel: true,
+              onStateChange: (e) => {
+                if (!e.isVisible && this.showHelpPopup) {
+                  this.closeHelpPopup();
+                }
+              }
+            })
+        }
+      }
+      .alignItems(VerticalAlign.Center)
+      .layoutWeight(1)
 
       Select(this.options)
         .selected(this.selectedIndex >= 0 ? this.selectedIndex : 0)

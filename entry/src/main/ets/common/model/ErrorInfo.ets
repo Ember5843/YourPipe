@@ -68,6 +68,9 @@ export class ErrorInfo {
     if (this.errorCode.includes('PRIVATE')) {
       return $r('sys.symbol.eye_slash');
     }
+    if (this.errorCode.includes('BOT_CHECK')) {
+      return $r('sys.symbol.key_shield_fill');
+    }
     if (this.errorCode.includes('LOGIN')) {
       return $r('sys.symbol.person');
     }

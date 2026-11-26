@@ -1042,7 +1042,7 @@
         },
         {
             "name": "yt_error_age_restricted_hint",
-            "value": "ブラウザで YouTube アカウントにログインすると視聴できます"
+            "value": "「データとアカウント」で成人アカウントにログインし、アカウント再生を有効にしてください"
         },
         {
             "name": "yt_error_geo_restricted",
@@ -1082,7 +1082,7 @@
         },
         {
             "name": "yt_error_login_required_hint",
-            "value": "ブラウザで YouTube アカウントにログインしてください"
+            "value": "「データとアカウント」でログインし、「再生にログイン状態を使用」を有効にしてください"
         },
         {
             "name": "yt_error_account_terminated",
@@ -1782,7 +1782,7 @@
         },
         {
             "name": "yt_auth_notice_message",
-            "value": "YouTube へのログインへようこそ。アカウントのコンテンツへの限定的なアクセスを提供し、一部のネットワーク環境で匿名モードが利用できない問題を効果的に緩和できます。追加のネットワーク通信が発生しますのでご了承ください :)"
+            "value": "1. 本アプリはサードパーティ製の YouTube クライアントです。ログインすると YouTube データを取得できますが、編集・削除やコメント投稿などの操作機能はありません。\n\n2. ログイン状態での再生を利用すると、年齢制限コンテンツの視聴や IP 制限の回避が可能になりますが、再生開始に余分な時間がかかります。\n\n3. YouTube データへのアクセス範囲は自由に切り替えられます。体験に応じてログイン再生を有効にするかお選びください。"
         },
         {
             "name": "yt_auth_continue_sign_in",
@@ -4519,6 +4519,178 @@
         {
             "name": "yt_exp_hm_footer",
             "value": "YouTube 標準のリプレイデータを使用します。データがある動画でのみ有効です。"
+        },
+        {
+            "name": "yt_error_bot_check",
+            "value": "ネットワークからのリクエストが YouTube のボット確認の対象になりました"
+        },
+        {
+            "name": "yt_error_bot_check_hint",
+            "value": "ログインしてアカウント再生を有効にするか、回線／エンドポイントを切り替えて再試行してください"
+        },
+        {
+            "name": "yt_error_hint_incognito_off",
+            "value": "アカウントはシークレットモードで一時停止中です。アカウント再生を有効にすると続行できます"
+        },
+        {
+            "name": "yt_error_hint_playback_auth_off",
+            "value": "現在はデータのみにアカウントを使用中のため、匿名再生がブロックされました"
+        },
+        {
+            "name": "yt_error_hint_auth_already_on",
+            "value": "アカウント再生は有効です。ログインの有効期限や回線を確認してください"
+        },
+        {
+            "name": "yt_error_action_sign_in",
+            "value": "ログイン"
+        },
+        {
+            "name": "yt_error_action_enable_auth_retry",
+            "value": "アカウント再生を有効化して再試行"
+        },
+        {
+            "name": "yt_error_action_account_settings",
+            "value": "アカウント設定"
+        },
+        {
+            "name": "yt_error_action_endpoint_settings",
+            "value": "再生エンドポイント"
+        },
+        {
+            "name": "yt_error_action_network_settings",
+            "value": "ネットワークとプロキシ"
+        },
+        {
+            "name": "yt_sabr_backoff_countdown",
+            "value": "再生を続行するまで YouTube により %d 秒待機させられています"
+        },
+        {
+            "name": "yt_sabr_backoff_non_premium_hint",
+            "value": "非 Premium のアカウント再生では広告待機が発生します"
+        },
+        {
+            "name": "yt_sabr_backoff_switch_fast",
+            "value": "再生認証設定 ›"
+        },
+        {
+            "name": "yt_auth_status_card_title",
+            "value": "現在の有効モード"
+        },
+        {
+            "name": "yt_auth_status_data_label",
+            "value": "ユーザーデータ"
+        },
+        {
+            "name": "yt_auth_status_playback_label",
+            "value": "動画再生"
+        },
+        {
+            "name": "yt_auth_status_data_account",
+            "value": "アカウント有効（おすすめ／登録チャンネル／リスト）"
+        },
+        {
+            "name": "yt_auth_status_data_local",
+            "value": "ローカル匿名（アカウントデータ不使用）"
+        },
+        {
+            "name": "yt_auth_status_data_incognito",
+            "value": "シークレット一時停止（認証情報を保持）"
+        },
+        {
+            "name": "yt_auth_status_play_guest",
+            "value": "匿名ダイレクト（%s・高速、広告待機なし）"
+        },
+        {
+            "name": "yt_auth_status_play_account",
+            "value": "アカウント認証（%s・制限回避、非 Premium は約 5 秒待機）"
+        },
+        {
+            "name": "yt_help_auth_master",
+            "value": "シークレット切替\nオフ：認証情報を保持したまま一時停止\nオン：下のデータ・再生設定を復元"
+        },
+        {
+            "name": "yt_help_auth_user_data",
+            "value": "おすすめ・登録チャンネル同期\nオン：再生速度に影響せずデータを取得\n制限：コメント投稿やアップロードは非対応"
+        },
+        {
+            "name": "yt_help_auth_playback",
+            "value": "高速起動 vs 制限回避\nオフ：即時再生（ボット確認が出る場合あり）\nオン：制限動画を再生（非Premiumは約5秒待機）"
+        },
+        {
+            "name": "yt_help_guest_endpoint",
+            "value": "匿名再生チャンネル\nvisionos：高速ダイレクト再生（推奨）\nmweb：再生失敗時の切り替え用"
+        },
+        {
+            "name": "yt_help_auth_endpoint",
+            "value": "ログイン再生チャンネル\nmweb：互換性重視（推奨）\ntv_downgraded：QRログイン向け予備"
+        },
+        {
+            "name": "yt_popup_got_it",
+            "value": "了解"
+        },
+        {
+            "name": "yt_auth_boundary_message",
+            "value": "1. 本アプリはサードパーティ製の YouTube クライアントです。ログインすると YouTube データを取得できますが、編集・削除やコメント投稿などの操作機能はありません。\n\n2. ログイン状態での再生を利用すると、年齢制限コンテンツの視聴や IP 制限の回避が可能になりますが、再生開始に余分な時間がかかります。\n\n3. YouTube データへのアクセス範囲は自由に切り替えられます。体験に応じてログイン再生を有効にするかお選びください。"
+        },
+        {
+            "name": "yt_download_mode_subtitle_only",
+            "value": "字幕のみ (.srt)"
+        },
+        {
+            "name": "yt_download_step3_subtitles",
+            "value": "ステップ 3: 字幕オプション（任意）"
+        },
+        {
+            "name": "yt_download_subtitle_none",
+            "value": "字幕をダウンロードしない"
+        },
+        {
+            "name": "yt_download_subtitle_track",
+            "value": "字幕トラック"
+        },
+        {
+            "name": "yt_download_subtitle_embed",
+            "value": "動画ファイルに埋め込む (.mkv)"
+        },
+        {
+            "name": "yt_download_subtitle_embed_hint",
+            "value": "再エンコードなしで単一の .mkv 動画ファイルに字幕を格納します。焼き込み（ハードサブ）には非対応のため、.srt 単体保存は上のモードで「字幕のみ」を選択してください。"
+        },
+        {
+            "name": "yt_download_subtitle_sidecar_hint",
+            "value": "動画と一緒に .srt 字幕ファイルを保存します。"
+        },
+        {
+            "name": "yt_download_subtitle_only_hint",
+            "value": "映像・音声を取得せず、標準 .srt 字幕ファイルのみを保存します。"
+        },
+        {
+            "name": "yt_download_subtitle_auto",
+            "value": "自動生成"
+        },
+        {
+            "name": "yt_download_subtitle_translated",
+            "value": "翻訳"
+        },
+        {
+            "name": "yt_download_export_action",
+            "value": "書き出し"
+        },
+        {
+            "name": "yt_changelog_0_7_2_1",
+            "value": "TV ログインと年齢制限 (18+) の修正：SmartTube 認証方式に合わせ、YouTube TV クライアント認証情報と visitorData の動的取得、ブランドアカウント pageId、US 既定地域フォールバック、TV OAuth 再生ルーティングを実装"
+        },
+        {
+            "name": "yt_changelog_0_7_2_2",
+            "value": "ダウンロードと字幕機能の強化：YouTube 分割ダウンロードのチャンク 2 が HTTP 200 応答で失敗する不具合を修正し、.srt 単体保存および無劣化 .mkv 字幕埋め込みに対応"
+        },
+        {
+            "name": "yt_changelog_0_7_2_3",
+            "value": "アカウント境界と再生ガイダンス改善：ログイン案内文を更新し、ヘルプ吹き出しの視認性を改善、認証エラー時の設定直行リンクおよび非プレミアム SABR 5 秒待機カウントダウンを追加"
+        },
+        {
+            "name": "yt_changelog_0_7_2_4",
+            "value": "翻訳とプレーヤーの最適化：翻訳失敗時の詳細エラー表示を追加し、MPV イベントとシェーダー処理負荷をさらに軽減"
         }
     ]
 }

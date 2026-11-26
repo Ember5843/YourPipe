@@ -538,7 +538,8 @@ export struct VideoDetails {
     if (!this.streamCategories ||
       (this.streamCategories.video.length === 0 &&
         this.streamCategories.progressive.length === 0 &&
-        this.streamCategories.hlsManifest.length === 0)) {
+        this.streamCategories.hlsManifest.length === 0 &&
+        (this.vm.subtitleTracks?.length ?? 0) === 0)) {
       this.getUIContext().getPromptAction().showToast({ message: $r('app.string.yt_error_no_downloadable_stream') });
       return;
     }
@@ -547,10 +548,12 @@ export struct VideoDetails {
     this.downloadManager.setContext(ctx);
 
     const categories = this.streamCategories;
+    const subtitles = this.vm.subtitleTracks ? this.vm.subtitleTracks.slice() : [];
 
     this.downloadDialogController = new CustomDialogController({
       builder: DownloadDialog({
         streamCategories: categories,
+        subtitleTracks: subtitles,
         videoId: this.item.videoId,
         videoTitle: this.item.title,
         videoAuthor: this.item.author,

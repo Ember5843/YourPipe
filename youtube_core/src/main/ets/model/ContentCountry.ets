@@ -2,8 +2,8 @@ import { Localization } from './Localization'; // 假设 Localization 也在同�
 
 export class ContentCountry {
   // 对应 Java: public static final ContentCountry DEFAULT
-  // 使用 Lazy loading 或者直接引用 Localization 的静态属性
-  public static readonly DEFAULT: ContentCountry = new ContentCountry("GB");
+  // 对齐 SmartTube 默认地区 US，避免 gl=GB 触发欧英强制身份证年龄验证导致 TV OAuth 无法播放 18+ 内容
+  public static readonly DEFAULT: ContentCountry = new ContentCountry("US");
 
   // 对应 Java: private final String countryCode
   private readonly countryCode: string;

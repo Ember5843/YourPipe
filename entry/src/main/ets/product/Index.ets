@@ -910,6 +910,15 @@ struct Index {
     this.actionHub.openSearch = (initialQuery?: string) => {
       this.openSearchPage(initialQuery);
     };
+    this.actionHub.openOptionsTarget = (route: string, highlightKey?: string) => {
+      AppStorage.setOrCreate('optionsHighlightKey', highlightKey ?? '');
+      if (this.showOptions) {
+        this.optionsSheetActions.openRoute(route);
+      } else {
+        this.optionsSheetActions.pendingRoute = route;
+        this.showOptions = true;
+      }
+    };
     this.actionHub.openShorts = () => {
       this.openShortsPage();
     };
@@ -1367,8 +1376,9 @@ struct Index {
           return;
         }
         const categories = PlayerModel.classifyForDownload(result.playerStreams ?? []);
+        const subtitles = result.subtitleTracks ?? [];
         if (categories.video.length === 0 && categories.progressive.length === 0
-          && categories.hlsManifest.length === 0) {
+          && categories.hlsManifest.length === 0 && subtitles.length === 0) {
           this.getUIContext().getPromptAction().showToast({ message: $r('app.string.yt_error_no_downloadable_stream') });
           return;
         }
@@ -1376,6 +1386,7 @@ struct Index {
         this.cardDownloadDialogController = new CustomDialogController({
           builder: DownloadDialog({
             streamCategories: categories,
+            subtitleTracks: subtitles,
             videoId: videoId,
             videoTitle: video.title,
             videoAuthor: video.author,
@@ -1588,6 +1599,8 @@ struct Index {
       radiusRenderStrategy: RenderStrategy.OFFSCREEN,
       onDisappear: () => {
         this.optionsSheetActions.clearPath();
+        AppStorage.setOrCreate('optionsHighlightKey', '');
+        this.actionHub.emit(ActionHubEvent.OPTIONS_SHEET_CLOSED);
       }
     })
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])

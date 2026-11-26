@@ -271,8 +271,8 @@ export class YouTubeHttpClient implements ClientVersionGet {
   }
 
   /**
-   * TV rail only: Bearer access token. Never injects Cookie/SAPISIDHASH.
-   * SmartTube-style for TVHTML5 player/browse only.
+   * TV rail only: Bearer access token (+ optional Brand Account X-Goog-Pageid).
+   * Never injects Cookie/SAPISIDHASH — SmartTube-style for TVHTML5 player/browse only.
    */
   private async injectTvAuthHeaders(
     headers: Record<string, string | string[]>
@@ -284,9 +284,16 @@ export class YouTubeHttpClient implements ClientVersionGet {
     const authorization = await activeAuthSession.getTvAuthorizationHeader();
     if (authorization && authorization.length > 0) {
       headers['Authorization'] = authorization;
-      headers['X-Origin'] = 'https://www.youtube.com';
-      headers['DNT'] = '1';
-      logger.info('[NET] authRail=tv Bearer inject');
+      const pageId = activeAuthSession.getTvPageIdHeader();
+      if (pageId) {
+        headers['X-Goog-Pageid'] = pageId;
+      }
+      const tvVisitor = activeAuthSession.getTvVisitorData();
+      if (tvVisitor && headers['X-Goog-Visitor-Id'] === undefined) {
+        headers['X-Goog-Visitor-Id'] = tvVisitor;
+      }
+      headers['Referer'] = 'https://www.youtube.com/tv';
+      logger.info(`[NET] authRail=tv Bearer inject hasPageId=${!!pageId}`);
     }
   }
 
@@ -321,8 +328,8 @@ export class YouTubeHttpClient implements ClientVersionGet {
       headers['User-Agent'] = YouTubeHttpClient.DEFAULT_USER_AGENT;
     }
 
-    // Cookie：cookieJar 中累积的非鉴权 cookie（SOCS、CONSENT、受限模式 cookie 等）
-    if (targetUrl) {
+    // Cookie：cookieJar 中累积的非鉴权 cookie（TV OAuth 轨道禁止携带浏览器 cookie）
+    if (targetUrl && !withTvAuth) {
       const cookieHeader = this.cookieJar.getCookieHeader(targetUrl);
       if (cookieHeader) {
         headers['Cookie'] = cookieHeader;
@@ -331,8 +338,8 @@ export class YouTubeHttpClient implements ClientVersionGet {
 
     // YouTube 特定处理（严格主机匹配，避免 notyoutube.com / 路径携带 youtube.com 的 URL 命中）
     if (targetUrl && AuthSessionManager.isYoutubeHost(targetUrl)) {
-      // SOCS Cookie（隐私同意）— 仅页面请求需要
-      if (!isApiRequest) {
+      // SOCS Cookie（隐私同意）— 仅非 TV 轨道的页面请求需要
+      if (!isApiRequest && !withTvAuth) {
         if (!headers['Cookie'] || !(headers['Cookie'] as string).includes('SOCS=')) {
           const existingCookie = headers['Cookie'] ? headers['Cookie'] + '; ' : '';
           headers['Cookie'] = existingCookie + SOCS_CONSENT_COOKIE;

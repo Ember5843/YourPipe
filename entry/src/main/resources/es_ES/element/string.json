@@ -1402,7 +1402,7 @@
         },
         {
             "name": "yt_auth_notice_message",
-            "value": "Te damos la bienvenida al inicio de sesión de YouTube. Ofrecemos acceso limitado al contenido de la cuenta y podemos mitigar los casos en que el modo anónimo no está disponible en determinados entornos de red. Esto puede generar tráfico de red adicional. Tenlo en cuenta :)"
+            "value": "1. Este es un cliente de YouTube de terceros. Iniciar sesión permite obtener tus datos de YouTube, pero no realizar acciones activas como modificar datos o publicar comentarios.\n\n2. Con la sesión iniciada, puedes reproducir con tu cuenta para acceder a contenido con restricción de edad y evitar bloqueos de IP, aunque añade tiempo adicional de espera.\n\n3. Puedes activar o desactivar libremente los límites de acceso a tus datos; decide según tu experiencia si activar la reproducción con cuenta."
         },
         {
             "name": "yt_auth_continue_sign_in",
@@ -1898,7 +1898,7 @@
         },
         {
             "name": "yt_error_age_restricted_hint",
-            "value": "Necesitas iniciar sesión en una cuenta de YouTube en el navegador para ver esto"
+            "value": "Sign in with an adult account under Data & Account and enable Use sign-in for playback"
         },
         {
             "name": "yt_error_geo_restricted",
@@ -1938,7 +1938,7 @@
         },
         {
             "name": "yt_error_login_required_hint",
-            "value": "Inicia sesión en una cuenta de YouTube en el navegador"
+            "value": "Sign in under Data & Account and enable Use sign-in for playback"
         },
         {
             "name": "yt_error_account_terminated",
@@ -4519,6 +4519,178 @@
         {
             "name": "yt_exp_hm_footer",
             "value": "Usa los datos nativos de YouTube; solo funciona en vídeos que incluyan mapa de calor."
+        },
+        {
+            "name": "yt_error_bot_check",
+            "value": "YouTube flagged requests from your network for verification"
+        },
+        {
+            "name": "yt_error_bot_check_hint",
+            "value": "Sign in for account playback, or switch network / endpoint and retry"
+        },
+        {
+            "name": "yt_error_hint_incognito_off",
+            "value": "Account is saved in incognito mode; enable account playback to continue"
+        },
+        {
+            "name": "yt_error_hint_playback_auth_off",
+            "value": "Account is set to data-only; anonymous playback was blocked"
+        },
+        {
+            "name": "yt_error_hint_auth_already_on",
+            "value": "Account playback is already active; check if sign-in expired or switch network"
+        },
+        {
+            "name": "yt_error_action_sign_in",
+            "value": "Iniciar sesión"
+        },
+        {
+            "name": "yt_error_action_enable_auth_retry",
+            "value": "Activar cuenta y reintentar"
+        },
+        {
+            "name": "yt_error_action_account_settings",
+            "value": "Ajustes de cuenta"
+        },
+        {
+            "name": "yt_error_action_endpoint_settings",
+            "value": "Puntos de acceso"
+        },
+        {
+            "name": "yt_error_action_network_settings",
+            "value": "Red y proxy"
+        },
+        {
+            "name": "yt_sabr_backoff_countdown",
+            "value": "YouTube nos obliga a esperar %d segundos antes de continuar la reproducción"
+        },
+        {
+            "name": "yt_sabr_backoff_non_premium_hint",
+            "value": "Non-Premium account playback waits through ad slots"
+        },
+        {
+            "name": "yt_sabr_backoff_switch_fast",
+            "value": "Playback auth ›"
+        },
+        {
+            "name": "yt_auth_status_card_title",
+            "value": "Active Mode"
+        },
+        {
+            "name": "yt_auth_status_data_label",
+            "value": "User data"
+        },
+        {
+            "name": "yt_auth_status_playback_label",
+            "value": "Playback"
+        },
+        {
+            "name": "yt_auth_status_data_account",
+            "value": "Account active (feed / subs / playlists)"
+        },
+        {
+            "name": "yt_auth_status_data_local",
+            "value": "Local anonymous (no account data)"
+        },
+        {
+            "name": "yt_auth_status_data_incognito",
+            "value": "Incognito paused (credentials kept)"
+        },
+        {
+            "name": "yt_auth_status_play_guest",
+            "value": "Anonymous direct (%s · fast, no ad wait)"
+        },
+        {
+            "name": "yt_auth_status_play_account",
+            "value": "Account auth (%s · anti-bot, ~5s wait without Premium)"
+        },
+        {
+            "name": "yt_help_auth_master",
+            "value": "Quick Incognito Switch\nOff: Pauses account use, keeps saved login\nOn: Restores data & playback toggles below"
+        },
+        {
+            "name": "yt_help_auth_user_data",
+            "value": "Sync Feed & Subscriptions\nOn: Loads your feed & subs with zero startup delay\nLimit: Read-only; no comments or uploads"
+        },
+        {
+            "name": "yt_help_auth_playback",
+            "value": "Instant Start vs. Anti-Bot\nOff: Instant direct play, may hit bot checks\nOn: Plays restricted videos; ~5s wait without Premium"
+        },
+        {
+            "name": "yt_help_guest_endpoint",
+            "value": "Anonymous Stream Channel\nvisionos: Fastest direct play (recommended)\nmweb: Fallback if a video fails to load"
+        },
+        {
+            "name": "yt_help_auth_endpoint",
+            "value": "Signed-In Stream Channel\nmweb: Best compatibility (recommended)\ntv_downgraded: Direct fallback for QR login"
+        },
+        {
+            "name": "yt_popup_got_it",
+            "value": "Entendido"
+        },
+        {
+            "name": "yt_auth_boundary_message",
+            "value": "1. Este es un cliente de YouTube de terceros. Iniciar sesión permite obtener tus datos de YouTube, pero no realizar acciones activas como modificar datos o publicar comentarios.\n\n2. Con la sesión iniciada, puedes reproducir con tu cuenta para acceder a contenido con restricción de edad y evitar bloqueos de IP, aunque añade tiempo adicional de espera.\n\n3. Puedes activar o desactivar libremente los límites de acceso a tus datos; decide según tu experiencia si activar la reproducción con cuenta."
+        },
+        {
+            "name": "yt_download_mode_subtitle_only",
+            "value": "Solo subtítulos (.srt)"
+        },
+        {
+            "name": "yt_download_step3_subtitles",
+            "value": "Paso 3: Subtítulos (opcional)"
+        },
+        {
+            "name": "yt_download_subtitle_none",
+            "value": "Sin subtítulos"
+        },
+        {
+            "name": "yt_download_subtitle_track",
+            "value": "Pista de subtítulos"
+        },
+        {
+            "name": "yt_download_subtitle_embed",
+            "value": "Incrustar en el vídeo (.mkv)"
+        },
+        {
+            "name": "yt_download_subtitle_embed_hint",
+            "value": "Multiplexa sin pérdida en un único archivo .mkv. No se admite quemado en píxeles; elige «Solo subtítulos» arriba para guardar un .srt independiente."
+        },
+        {
+            "name": "yt_download_subtitle_sidecar_hint",
+            "value": "Guarda un archivo .srt adicional junto al vídeo."
+        },
+        {
+            "name": "yt_download_subtitle_only_hint",
+            "value": "Descarga y guarda solo un archivo .srt estándar sin vídeo ni audio."
+        },
+        {
+            "name": "yt_download_subtitle_auto",
+            "value": "Auto"
+        },
+        {
+            "name": "yt_download_subtitle_translated",
+            "value": "Traducido"
+        },
+        {
+            "name": "yt_download_export_action",
+            "value": "Exportar"
+        },
+        {
+            "name": "yt_changelog_0_7_2_1",
+            "value": "Corrección de inicio TV y restricción 18+: alineado con SmartTube mediante extracción en vivo de credenciales TV y visitorData, soporte de pageId, región US por defecto y enrutamiento TV Bearer aislado"
+        },
+        {
+            "name": "yt_changelog_0_7_2_2",
+            "value": "Mejoras de descarga y subtítulos: corregido el fallo en el bloque 2 de YouTube por HTTP 200; añadida descarga .srt independiente y multiplexado sin pérdida en .mkv"
+        },
+        {
+            "name": "yt_changelog_0_7_2_3",
+            "value": "Guía de cuenta y reproducción: aviso de inicio actualizado, globos de ayuda rediseñados, acceso directo a ajustes ante errores y cuenta atrás SABR de 5s"
+        },
+        {
+            "name": "yt_changelog_0_7_2_4",
+            "value": "Traducción y reproductor: muestra la causa concreta ante fallos de traducción y reduce aún más la carga de eventos y shaders de MPV"
         }
     ]
 }

@@ -45,6 +45,8 @@ const logger = AppLog.getInstance('OptionsSheetHost');
  */
 export class OptionsSheetActions {
   clearPath: () => void = () => {};
+  openRoute: (route: string) => void = () => {};
+  pendingRoute: string = '';
 }
 
 /** OptionsSheetHost 入参（单对象 @Prop，与 OptionsMainPageParams 同模式）。 */
@@ -106,6 +108,25 @@ export struct OptionsSheetHost {
     this.params.actions.clearPath = () => {
       this.clearOptionsPath();
     };
+    this.params.actions.openRoute = (route: string) => {
+      this.openTargetRoute(route);
+    };
+    if (this.params.actions.pendingRoute.length > 0) {
+      const initialRoute = this.params.actions.pendingRoute;
+      this.params.actions.pendingRoute = '';
+      setTimeout(() => {
+        this.openTargetRoute(initialRoute);
+      }, 0);
+    }
+  }
+
+  private openTargetRoute(route: string): void {
+    if (!route || route.length === 0) {
+      return;
+    }
+    this.optionsNavStack.clear();
+    this.optionsDepth = 0;
+    this.pushOptionsPath(route);
   }
 
   private pushOptionsPath(name: string): void {

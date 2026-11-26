@@ -1402,7 +1402,7 @@
         },
         {
             "name": "yt_auth_notice_message",
-            "value": "مرحبًا بك في تسجيل الدخول إلى YouTube. نوفر وصولًا محدودًا إلى محتوى الحساب، ويمكننا الحد بفعالية من مشكلات عدم توفر الوضع المجهول في بعض بيئات الشبكة. قد يؤدي ذلك إلى استهلاك إضافي للشبكة، لذا يُرجى أخذ ذلك في الاعتبار :)"
+            "value": "1. هذا عميل YouTube خارجي. يتيح تسجيل الدخول جلب بيانات YouTube الخاصة بك، دون إجراءات نشطة مثل التعديل أو الحذف أو كتابة التعليقات.\n\n2. أثناء تسجيل الدخول، يمكنك استخدام التشغيل بالحساب للوصول إلى المحتوى المقيد بالعمر وتجنب حظر IP، لكنه يضيف وقت انتظار إضافي.\n\n3. يمكنك التحكم بحرية في حدود الوصول إلى بيانات YouTube، وتحديد تفعيل التشغيل بالحساب حسب تجربتك."
         },
         {
             "name": "yt_auth_continue_sign_in",
@@ -1898,7 +1898,7 @@
         },
         {
             "name": "yt_error_age_restricted_hint",
-            "value": "تحتاج إلى تسجيل الدخول إلى حساب YouTube في المتصفح لمشاهدته"
+            "value": "Sign in with an adult account under Data & Account and enable Use sign-in for playback"
         },
         {
             "name": "yt_error_geo_restricted",
@@ -1938,7 +1938,7 @@
         },
         {
             "name": "yt_error_login_required_hint",
-            "value": "يرجى تسجيل الدخول إلى حساب YouTube في المتصفح"
+            "value": "Sign in under Data & Account and enable Use sign-in for playback"
         },
         {
             "name": "yt_error_account_terminated",
@@ -4519,6 +4519,178 @@
         {
             "name": "yt_exp_hm_footer",
             "value": "يستخدم بيانات YouTube الأصلية؛ يعمل فقط عند توفر بيانات خريطة التفاعل للفيديو."
+        },
+        {
+            "name": "yt_error_bot_check",
+            "value": "YouTube flagged requests from your network for verification"
+        },
+        {
+            "name": "yt_error_bot_check_hint",
+            "value": "Sign in for account playback, or switch network / endpoint and retry"
+        },
+        {
+            "name": "yt_error_hint_incognito_off",
+            "value": "Account is saved in incognito mode; enable account playback to continue"
+        },
+        {
+            "name": "yt_error_hint_playback_auth_off",
+            "value": "Account is set to data-only; anonymous playback was blocked"
+        },
+        {
+            "name": "yt_error_hint_auth_already_on",
+            "value": "Account playback is already active; check if sign-in expired or switch network"
+        },
+        {
+            "name": "yt_error_action_sign_in",
+            "value": "تسجيل الدخول"
+        },
+        {
+            "name": "yt_error_action_enable_auth_retry",
+            "value": "تفعيل تشغيل الحساب وإعادة المحاولة"
+        },
+        {
+            "name": "yt_error_action_account_settings",
+            "value": "إعدادات الحساب"
+        },
+        {
+            "name": "yt_error_action_endpoint_settings",
+            "value": "نقاط النهاية"
+        },
+        {
+            "name": "yt_error_action_network_settings",
+            "value": "الشبكة والوكيل"
+        },
+        {
+            "name": "yt_sabr_backoff_countdown",
+            "value": "يفرض YouTube الانتظار لمدة %d ثانية قبل متابعة التشغيل"
+        },
+        {
+            "name": "yt_sabr_backoff_non_premium_hint",
+            "value": "Non-Premium account playback waits through ad slots"
+        },
+        {
+            "name": "yt_sabr_backoff_switch_fast",
+            "value": "Playback auth ›"
+        },
+        {
+            "name": "yt_auth_status_card_title",
+            "value": "Active Mode"
+        },
+        {
+            "name": "yt_auth_status_data_label",
+            "value": "User data"
+        },
+        {
+            "name": "yt_auth_status_playback_label",
+            "value": "Playback"
+        },
+        {
+            "name": "yt_auth_status_data_account",
+            "value": "Account active (feed / subs / playlists)"
+        },
+        {
+            "name": "yt_auth_status_data_local",
+            "value": "Local anonymous (no account data)"
+        },
+        {
+            "name": "yt_auth_status_data_incognito",
+            "value": "Incognito paused (credentials kept)"
+        },
+        {
+            "name": "yt_auth_status_play_guest",
+            "value": "Anonymous direct (%s · fast, no ad wait)"
+        },
+        {
+            "name": "yt_auth_status_play_account",
+            "value": "Account auth (%s · anti-bot, ~5s wait without Premium)"
+        },
+        {
+            "name": "yt_help_auth_master",
+            "value": "Quick Incognito Switch\nOff: Pauses account use, keeps saved login\nOn: Restores data & playback toggles below"
+        },
+        {
+            "name": "yt_help_auth_user_data",
+            "value": "Sync Feed & Subscriptions\nOn: Loads your feed & subs with zero startup delay\nLimit: Read-only; no comments or uploads"
+        },
+        {
+            "name": "yt_help_auth_playback",
+            "value": "Instant Start vs. Anti-Bot\nOff: Instant direct play, may hit bot checks\nOn: Plays restricted videos; ~5s wait without Premium"
+        },
+        {
+            "name": "yt_help_guest_endpoint",
+            "value": "Anonymous Stream Channel\nvisionos: Fastest direct play (recommended)\nmweb: Fallback if a video fails to load"
+        },
+        {
+            "name": "yt_help_auth_endpoint",
+            "value": "Signed-In Stream Channel\nmweb: Best compatibility (recommended)\ntv_downgraded: Direct fallback for QR login"
+        },
+        {
+            "name": "yt_popup_got_it",
+            "value": "فهمت"
+        },
+        {
+            "name": "yt_auth_boundary_message",
+            "value": "1. هذا عميل YouTube خارجي. يتيح تسجيل الدخول جلب بيانات YouTube الخاصة بك، دون إجراءات نشطة مثل التعديل أو الحذف أو كتابة التعليقات.\n\n2. أثناء تسجيل الدخول، يمكنك استخدام التشغيل بالحساب للوصول إلى المحتوى المقيد بالعمر وتجنب حظر IP، لكنه يضيف وقت انتظار إضافي.\n\n3. يمكنك التحكم بحرية في حدود الوصول إلى بيانات YouTube، وتحديد تفعيل التشغيل بالحساب حسب تجربتك."
+        },
+        {
+            "name": "yt_download_mode_subtitle_only",
+            "value": "الترجمة فقط (.srt)"
+        },
+        {
+            "name": "yt_download_step3_subtitles",
+            "value": "الخطوة 3: خيارات الترجمة (اختياري)"
+        },
+        {
+            "name": "yt_download_subtitle_none",
+            "value": "بدون ترجمة"
+        },
+        {
+            "name": "yt_download_subtitle_track",
+            "value": "مسار الترجمة"
+        },
+        {
+            "name": "yt_download_subtitle_embed",
+            "value": "دمج داخل ملف الفيديو (.mkv)"
+        },
+        {
+            "name": "yt_download_subtitle_embed_hint",
+            "value": "يدمج الترجمة دون فقدان جودة في ملف .mkv واحد. لا يُدعم حرق الترجمة على الصورة؛ اختر «الترجمة فقط» أعلاه لحفظ ملف .srt منفصل."
+        },
+        {
+            "name": "yt_download_subtitle_sidecar_hint",
+            "value": "يحفظ ملف .srt منفصل بجانب الفيديو."
+        },
+        {
+            "name": "yt_download_subtitle_only_hint",
+            "value": "ينزل ملف ترجمة .srt قياسي فقط دون تحميل الفيديو أو الصوت."
+        },
+        {
+            "name": "yt_download_subtitle_auto",
+            "value": "تلقائي"
+        },
+        {
+            "name": "yt_download_subtitle_translated",
+            "value": "مترجم"
+        },
+        {
+            "name": "yt_download_export_action",
+            "value": "تصدير"
+        },
+        {
+            "name": "yt_changelog_0_7_2_1",
+            "value": "إصلاح تسجيل دخول TV والمحتوى +18: محاذاة تدفق SmartTube عبر جلب بيانات اعتماد TV وvisitorData ديناميكياً ودعم pageId وتعيين الدولة الافتراضية إلى US وعزل توجيه TV Bearer"
+        },
+        {
+            "name": "yt_changelog_0_7_2_2",
+            "value": "تحسينات التنزيل والترجمة: إصلاح فشل الجزء الثاني من تنزيل YouTube بسبب استجابة HTTP 200، وإضافة تنزيل .srt منفرد ودمج الترجمة داخل .mkv دون إعادة ترميز"
+        },
+        {
+            "name": "yt_changelog_0_7_2_3",
+            "value": "إرشادات الحساب والتشغيل: تحديث إشعار تسجيل الدخول، وتحسين فقاعات المساعدة، وإضافة روابط الإعدادات عند أخطاء التحقق مع عداد 5 ثوانٍ لـ SABR"
+        },
+        {
+            "name": "yt_changelog_0_7_2_4",
+            "value": "تحسينات الترجمة والمشغل: إظهار سبب فشل الترجمة بوضوح وتقليل عبء أحداث ومظللات MPV"
         }
     ]
 }

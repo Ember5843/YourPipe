@@ -1042,7 +1042,7 @@
         },
         {
             "name": "yt_error_age_restricted_hint",
-            "value": "需要在浏览器中登录 YouTube 账号才能观看"
+            "value": "请在「数据与账号」中登录成年账号并开启「登录态用于播放」"
         },
         {
             "name": "yt_error_geo_restricted",
@@ -1082,7 +1082,7 @@
         },
         {
             "name": "yt_error_login_required_hint",
-            "value": "请在浏览器中登录 YouTube 账号"
+            "value": "请在「数据与账号」中登录账号并开启「登录态用于播放」"
         },
         {
             "name": "yt_error_account_terminated",
@@ -1782,7 +1782,7 @@
         },
         {
             "name": "yt_auth_notice_message",
-            "value": "欢迎登录 YouTube，我们提供有限的账户内容访问，并且能够有效缓解部分网络环境下匿名模式不可用的问题。这会带来部分额外的网络开销，请知悉：）"
+            "value": "1. 这是一个第三方 YouTube 客户端，登录能获取您 YouTube 的数据，但不具备进行删改、评论等账号的主动能力。\n\n2. 登录状态下，可以使用登录状态播放，能够访问年龄限制内容和避免 IP 风控，但会有额外时间开销。\n\n3. 您可以自由开关对 YouTube 数据的访问边界，建议根据体验决定是否开启登录状态播放。"
         },
         {
             "name": "yt_auth_continue_sign_in",
@@ -4519,6 +4519,178 @@
         {
             "name": "yt_exp_hm_footer",
             "value": "基于 YouTube 原生重播热力图数据，仅在视频提供热力图时生效。"
+        },
+        {
+            "name": "yt_error_bot_check",
+            "value": "当前网络请求触发了 YouTube 风控验证"
+        },
+        {
+            "name": "yt_error_bot_check_hint",
+            "value": "可登录账号开启账号播放，或切换网络/播放端点后重试"
+        },
+        {
+            "name": "yt_error_hint_incognito_off",
+            "value": "已保存账号但当前处于无痕模式，开启账号播放即可继续"
+        },
+        {
+            "name": "yt_error_hint_playback_auth_off",
+            "value": "当前账号仅用于个人数据，视频仍走匿名通道而被拦截"
+        },
+        {
+            "name": "yt_error_hint_auth_already_on",
+            "value": "已开启账号播放仍受限，请检查登录状态是否过期或切换网络"
+        },
+        {
+            "name": "yt_error_action_sign_in",
+            "value": "去登录账号"
+        },
+        {
+            "name": "yt_error_action_enable_auth_retry",
+            "value": "开启账号播放并重试"
+        },
+        {
+            "name": "yt_error_action_account_settings",
+            "value": "账号设置"
+        },
+        {
+            "name": "yt_error_action_endpoint_settings",
+            "value": "播放端点"
+        },
+        {
+            "name": "yt_error_action_network_settings",
+            "value": "网络与代理"
+        },
+        {
+            "name": "yt_sabr_backoff_countdown",
+            "value": "YouTube 强制我们等待 %d 秒后才能继续播放"
+        },
+        {
+            "name": "yt_sabr_backoff_non_premium_hint",
+            "value": "非会员账号起播需等待广告时段"
+        },
+        {
+            "name": "yt_sabr_backoff_switch_fast",
+            "value": "管理账号播放 ›"
+        },
+        {
+            "name": "yt_auth_status_card_title",
+            "value": "当前生效模式"
+        },
+        {
+            "name": "yt_auth_status_data_label",
+            "value": "个人数据"
+        },
+        {
+            "name": "yt_auth_status_playback_label",
+            "value": "视频播放"
+        },
+        {
+            "name": "yt_auth_status_data_account",
+            "value": "已启用账号（推荐 / 订阅 / 列表）"
+        },
+        {
+            "name": "yt_auth_status_data_local",
+            "value": "本地匿名（不读取账号数据）"
+        },
+        {
+            "name": "yt_auth_status_data_incognito",
+            "value": "无痕暂停（已保留登录凭证）"
+        },
+        {
+            "name": "yt_auth_status_play_guest",
+            "value": "匿名直链（%s · 秒开无广告等待）"
+        },
+        {
+            "name": "yt_auth_status_play_account",
+            "value": "账号鉴权（%s · 抗风控，无会员起播约 5s 等待）"
+        },
+        {
+            "name": "yt_help_auth_master",
+            "value": "临时切换无痕模式\n关闭：暂停账号功能，保留已登录凭证\n开启：恢复下方数据与播放设置"
+        },
+        {
+            "name": "yt_help_auth_user_data",
+            "value": "同步推荐与订阅列表\n开启：拉取账号推荐与订阅，不拖慢起播\n边界：第三方暂不支持评论与上传"
+        },
+        {
+            "name": "yt_help_auth_playback",
+            "value": "秒开速度 vs 绕过风控\n关闭：匿名直连秒开，偶遇风控拦截\n开启：可看受限视频，非会员约等 5 秒"
+        },
+        {
+            "name": "yt_help_guest_endpoint",
+            "value": "匿名播放取流通道\nvisionos：直连秒开，推荐日常使用\nmweb：个别视频失败时可切换尝试"
+        },
+        {
+            "name": "yt_help_auth_endpoint",
+            "value": "账号播放取流通道\nmweb：兼容性最好，推荐默认使用\ntv_downgraded：扫码登录的直连备用通道"
+        },
+        {
+            "name": "yt_popup_got_it",
+            "value": "我知道了"
+        },
+        {
+            "name": "yt_auth_boundary_message",
+            "value": "1. 这是一个第三方 YouTube 客户端，登录能获取您 YouTube 的数据，但不具备进行删改、评论等账号的主动能力。\n\n2. 登录状态下，可以使用登录状态播放，能够访问年龄限制内容和避免 IP 风控，但会有额外时间开销。\n\n3. 您可以自由开关对 YouTube 数据的访问边界，建议根据体验决定是否开启登录状态播放。"
+        },
+        {
+            "name": "yt_download_mode_subtitle_only",
+            "value": "仅下载字幕 (.srt)"
+        },
+        {
+            "name": "yt_download_step3_subtitles",
+            "value": "步骤 3: 字幕选项（可选）"
+        },
+        {
+            "name": "yt_download_subtitle_none",
+            "value": "不下载字幕"
+        },
+        {
+            "name": "yt_download_subtitle_track",
+            "value": "字幕轨道"
+        },
+        {
+            "name": "yt_download_subtitle_embed",
+            "value": "内封进视频文件 (.mkv)"
+        },
+        {
+            "name": "yt_download_subtitle_embed_hint",
+            "value": "无损封装进单个视频文件，播放器打开即可显示；暂不支持硬编码烧录进画面，单独导出请在上方选“仅下载字幕”。"
+        },
+        {
+            "name": "yt_download_subtitle_sidecar_hint",
+            "value": "将随视频额外保存一个 .srt 字幕文件。"
+        },
+        {
+            "name": "yt_download_subtitle_only_hint",
+            "value": "仅下载并保存标准化 .srt 字幕文件，不下载音视频流。"
+        },
+        {
+            "name": "yt_download_subtitle_auto",
+            "value": "自动生成"
+        },
+        {
+            "name": "yt_download_subtitle_translated",
+            "value": "翻译"
+        },
+        {
+            "name": "yt_download_export_action",
+            "value": "导出"
+        },
+        {
+            "name": "yt_changelog_0_7_2_1",
+            "value": "TV 登录与 18+ 年龄限制修复：对齐 SmartTube 认证流程，动态抓取 YouTube TV 客户端凭证与 visitorData，支持品牌账号 pageId、US 默认地区回落及纯 TV OAuth 播放路由"
+        },
+        {
+            "name": "yt_changelog_0_7_2_2",
+            "value": "下载与字幕能力增强：修复 YouTube 大文件分片下载第 2 块因服务器返回 HTTP 200 导致的失败问题；下载弹窗支持单独保存 .srt 字幕或无损内封进单个 .mkv 视频文件"
+        },
+        {
+            "name": "yt_changelog_0_7_2_3",
+            "value": "账号边界与播放引导优化：重构数据/播放双轨说明与登录须知文案，在需要授权或遇到非会员 SABR 5 秒前置等待时提供倒计时提示与一键跳转设置入口"
+        },
+        {
+            "name": "yt_changelog_0_7_2_4",
+            "value": "翻译与播放器细节改进：翻译失败时直观提示具体原因，继续削减 MPV 事件与着色器额外开销，并改进帮扶气泡排版可读性"
         }
     ]
 }

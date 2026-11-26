@@ -12,6 +12,7 @@ import {
 import { UIConfig } from '../../common/AppState';
 import { PlayerSession } from '../../common/PlayerSession';
 import { PiPManager } from '../player/pip/PiPManager';
+import { AuthSessionManager } from 'youtube_core';
 
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
 /** 下载整体超时（分钟）。0 = 不超时。 */
@@ -32,6 +33,11 @@ export struct OptionsPlaybackPage {
   @StorageProp('themePrimaryColor') themePrimary: string = '#E53935';
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageLink('optionsHighlightKey') @Watch('onHighlightKeyChanged') optionsHighlightKey: string = '';
+
+  private listScroller: ListScroller = new ListScroller();
+  @State private highlightGuestEndpoint: boolean = false;
+  @State private highlightAuthEndpoint: boolean = false;
 
   @Prop params: OptionsPlaybackPageParams = {
     themeColor: '#E53935',
@@ -79,9 +85,44 @@ export struct OptionsPlaybackPage {
     PlayerSession.getInstance().setAudioDelayMs(clamped);
   }
 
+  aboutToAppear(): void {
+    this.syncEndpointHighlight();
+  }
+
+  aboutToDisappear(): void {
+    this.highlightGuestEndpoint = false;
+    this.highlightAuthEndpoint = false;
+  }
+
+  onHighlightKeyChanged(): void {
+    this.syncEndpointHighlight();
+  }
+
+  private syncEndpointHighlight(): void {
+    if (this.optionsHighlightKey !== 'endpoint_section') {
+      this.highlightGuestEndpoint = false;
+      this.highlightAuthEndpoint = false;
+      return;
+    }
+    const usePlaybackAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
+    setTimeout(() => {
+      this.listScroller.scrollToIndex(4, true);
+      this.highlightGuestEndpoint = !usePlaybackAuth;
+      this.highlightAuthEndpoint = usePlaybackAuth;
+    }, 180);
+  }
+
+  private clearEndpointHighlight(): void {
+    this.highlightGuestEndpoint = false;
+    this.highlightAuthEndpoint = false;
+    if (this.optionsHighlightKey === 'endpoint_section') {
+      this.optionsHighlightKey = '';
+    }
+  }
+
   build() {
     Column() {
-      List({ space: 6 }) {
+      List({ space: 6, scroller: this.listScroller }) {
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_section_video') })
         }
@@ -235,6 +276,11 @@ export struct OptionsPlaybackPage {
           ListItem() {
             PlaybackSelectRow({
               title: $r('app.string.yt_playback_guest_player_client'),
+              helpText: $r('app.string.yt_help_guest_endpoint'),
+              forceShowPopup: this.highlightGuestEndpoint,
+              onPopupClosed: () => {
+                this.clearEndpointHighlight();
+              },
               options: this.getGuestPlayerClientOptions(),
               selectedIndex: GUEST_PLAYER_CLIENT_LABELS.indexOf(this.playbackConfig.guestPlayerClient),
               fontColor: this.params.themeColor,
@@ -250,6 +296,11 @@ export struct OptionsPlaybackPage {
           ListItem() {
             PlaybackSelectRow({
               title: $r('app.string.yt_playback_auth_player_client'),
+              helpText: $r('app.string.yt_help_auth_endpoint'),
+              forceShowPopup: this.highlightAuthEndpoint,
+              onPopupClosed: () => {
+                this.clearEndpointHighlight();
+              },
               options: this.getAuthPlayerClientOptions(),
               selectedIndex: AUTH_PLAYER_CLIENT_LABELS.indexOf(this.playbackConfig.authPlayerClient),
               fontColor: this.params.themeColor,

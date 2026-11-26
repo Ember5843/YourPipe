@@ -51,13 +51,21 @@ export class ClientsConstants {
     "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version";
 
   // =====================
-  // TVHTML5 downgraded (PipePipe login default stream client)
+  // TVHTML5 downgraded (SmartTube v32.83 CLIENTS.TV_DOWNGRADED)
   // =====================
   static readonly TVHTML5_DOWNGRADED_CLIENT_ID: string = "7";
   static readonly TVHTML5_DOWNGRADED_CLIENT_NAME: string = "TVHTML5";
-  static readonly TVHTML5_DOWNGRADED_CLIENT_VERSION: string = "5.20260707";
+  static readonly TVHTML5_DOWNGRADED_CLIENT_VERSION: string = "5.20260901";
   static readonly TVHTML5_DOWNGRADED_USER_AGENT: string =
-    "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version";
+    "Mozilla/5.0 (DirectFB; Linux x86_64) Cobalt/4.13031-qa (unlike Gecko) Starboard/1";
+  static readonly TVHTML5_DOWNGRADED_BROWSER_NAME: string = "Cobalt";
+  static readonly TVHTML5_DOWNGRADED_BROWSER_VERSION: string = "4.13031-qa";
+
+  /** SmartTube AppService / Fire TV Cobalt 22 UA for scraping https://www.youtube.com/tv */
+  static readonly TVHTML5_FIRE_TV_USER_AGENT: string =
+    "Mozilla/5.0 (Linux armeabi-v7a; Android 7.1.2; Fire OS 6.0) Cobalt/22.lts.3.306369-gold " +
+    "(unlike Gecko) v8/8.8.278.8-jit gles Starboard/13, Amazon_ATV_mediatek8695_2019/NS6294 " +
+    "(Amazon, AFTMM, Wireless) com.amazon.firetv.youtube/22.3.r2.v66.0";
 
   // =====================
   // TVHTML5 Samsung (tv_samsung) — legacy PipePipe 5.5.0 logged-out default

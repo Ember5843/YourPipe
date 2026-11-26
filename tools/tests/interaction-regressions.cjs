@@ -53,7 +53,12 @@ function authFixture() {
     async request() { throw new Error('network offline'); }
   }
   const load = loader({ '@kit.ArkData': { preferences: { getPreferencesSync: () => storage } },
-    './SmartTubeAuthProbe': { SmartTubeAuthProbe: class {} },
+    './SmartTubeAuthProbe': { SmartTubeAuthProbe: class {
+      setDeviceId() {}
+      setPersistedClientCredentials() {}
+      getCachedTvVisitorData() { return ''; }
+      async fetchSelectedAccountPageId() { return ''; }
+    } },
     './SapisidHashUtil': { SapisidHashUtil: { generate: async () => 'test-authorization' } },
     '../network/HttpDownloader': { HttpDownloader: Downloader },
     '../network/CookieJar': { splitSetCookieHeader: (v) => [v] } });
@@ -180,7 +185,7 @@ function controllerFixture() {
   Object.assign(owner, { mediaSessionGeneration: 1, sourceSwitchGeneration: 0, transportIntentRevision: 0,
     transportIntentPlaying: true, curSource: { isLive: false }, currentLocalMediaSessionId: '',
     currentEdlAudioSessionId: '', pendingDestroySessionId: '', pendingDestroyEdlAudioSessionId: '',
-    currentHlsAudioUrl: '', stateMachine: { isOneOf: () => false } });
+    currentHlsAudioUrl: '', errorListeners: [], stateMachine: { isOneOf: () => false } });
   owner.isActive = () => true;
   owner.isMediaSessionCurrent = g => g === owner.mediaSessionGeneration;
   owner.isSeparatedDash = () => false;

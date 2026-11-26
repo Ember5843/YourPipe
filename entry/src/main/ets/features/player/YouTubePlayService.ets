@@ -100,6 +100,7 @@ export enum YouTubeErrorCode {
   MEMBERSHIP_REQUIRED = 'MEMBERSHIP_REQUIRED',
   SUBSCRIPTION_REQUIRED = 'SUBSCRIPTION_REQUIRED',
   LOGIN_REQUIRED = 'LOGIN_REQUIRED',
+  BOT_CHECK = 'BOT_CHECK',
   COPYRIGHT_RESTRICTED = 'COPYRIGHT_RESTRICTED',
   NETWORK_ERROR = 'NETWORK_ERROR',
   TIMEOUT = 'TIMEOUT',
@@ -836,7 +837,10 @@ export class YouTubePlayService {
     if (error instanceof PrivateContentException) {
       return YouTubeErrorCode.VIDEO_PRIVATE;
     }
-    if (error instanceof LoginRequiredException || error instanceof SignInConfirmNotBotException) {
+    if (error instanceof SignInConfirmNotBotException) {
+      return YouTubeErrorCode.BOT_CHECK;
+    }
+    if (error instanceof LoginRequiredException) {
       return YouTubeErrorCode.LOGIN_REQUIRED;
     }
     if (error instanceof AccountTerminatedException) {
@@ -897,8 +901,7 @@ export class YouTubePlayService {
       case YouTubeErrorCode.AGE_RESTRICTED:
         message = $r('app.string.yt_error_age_restricted');
         actionHint = $r('app.string.yt_error_age_restricted_hint');
-        isRetryable = false;
-        openInBrowserUrl = videoInfo?.videoId ? `https://www.youtube.com/watch?v=${videoInfo.videoId}` : undefined;
+        isRetryable = true;
         break;
       case YouTubeErrorCode.GEO_RESTRICTED:
         message = $r('app.string.yt_error_geo_restricted');
@@ -922,11 +925,15 @@ export class YouTubePlayService {
         actionHint = $r('app.string.yt_error_private_content_hint');
         isRetryable = false;
         break;
+      case YouTubeErrorCode.BOT_CHECK:
+        message = $r('app.string.yt_error_bot_check');
+        actionHint = $r('app.string.yt_error_bot_check_hint');
+        isRetryable = true;
+        break;
       case YouTubeErrorCode.LOGIN_REQUIRED:
         message = $r('app.string.yt_error_login_required');
         actionHint = $r('app.string.yt_error_login_required_hint');
-        isRetryable = false;
-        openInBrowserUrl = videoInfo?.videoId ? `https://www.youtube.com/watch?v=${videoInfo.videoId}` : undefined;
+        isRetryable = true;
         break;
       case YouTubeErrorCode.NETWORK_ERROR:
         message = $r('app.string.yt_error_network');
