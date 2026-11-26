@@ -13,7 +13,7 @@ export interface AppVersionInfo {
  * source of truth is AppScope/app.json5 versionName/versionCode, read at
  * runtime through bundleManager.
  */
-const FALLBACK_VERSION: AppVersionInfo = { versionName: '0.7.2', versionCode: 1000034 };
+const FALLBACK_VERSION: AppVersionInfo = { versionName: '0.7.2', versionCode: 1000035 };
 
 let cached: AppVersionInfo | null = null;
 

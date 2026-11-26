@@ -28,7 +28,7 @@
 | 專案資訊 | 說明 |
 |---|---|
 | **套件名稱** | `com.talon.yourpipe` |
-| **目前版本** | `0.7.2`（`versionCode: 1000034`） |
+| **目前版本** | `0.7.2`（`versionCode: 1000035`） |
 | **SDK / 模型** | `compatibleSdkVersion: 6.1.0(23)` · `targetSdkVersion: 26.0.0` · Stage 模型 |
 | **原生編譯器** | `BiSheng`（實機播放需 `arm64-v8a`；`x86_64` 僅供介面佔位除錯） |
 | **支援裝置** | `phone` · `tablet` · `2in1` · `tv` · `car` |

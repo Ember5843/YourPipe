@@ -28,7 +28,7 @@
 | 項目 | 内容 |
 |---|---|
 | **パッケージ名** | `com.talon.yourpipe` |
-| **バージョン** | `0.7.2`（`versionCode: 1000034`） |
+| **バージョン** | `0.7.2`（`versionCode: 1000035`） |
 | **SDK / モデル** | `compatibleSdkVersion: 6.1.0(23)` · `targetSdkVersion: 26.0.0` · Stage Model |
 | **対応 ABI** | `arm64-v8a`（実機再生用） / `x86_64`（UI 確認用スタブ） |
 | **対応デバイス** | `phone` · `tablet` · `2in1` · `tv` · `car` |

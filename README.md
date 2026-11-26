@@ -28,7 +28,7 @@
 | Property | Value |
 |---|---|
 | **Bundle Name** | `com.talon.yourpipe` |
-| **Version** | `0.7.2` (`versionCode: 1000034`) |
+| **Version** | `0.7.2` (`versionCode: 1000035`) |
 | **SDK / Model** | `compatibleSdkVersion: 6.1.0(23)` · `targetSdkVersion: 26.0.0` · Stage Model |
 | **Native Compiler** | `BiSheng` (`arm64-v8a` product ABI; `x86_64` UI/stub only) |
 | **Form Factors** | `phone` · `tablet` · `2in1` · `tv` · `car` |
