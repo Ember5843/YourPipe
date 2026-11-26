@@ -26,7 +26,7 @@ export class ClientsConstants {
    * Fallback when sw.js / results extraction fails (PipePipe WEB_HARDCODED_CLIENT_VERSION).
    * Dynamic version lives in WebClientVersionResolver.
    */
-  static readonly WEB_HARDCODED_CLIENT_VERSION: string = "2.20250122.04.00";
+  static readonly WEB_HARDCODED_CLIENT_VERSION: string = "2.20260805.01.00";
 
   // =====================
   // WEB_REMIX (YouTube Music)
@@ -55,7 +55,7 @@ export class ClientsConstants {
   // =====================
   static readonly TVHTML5_DOWNGRADED_CLIENT_ID: string = "7";
   static readonly TVHTML5_DOWNGRADED_CLIENT_NAME: string = "TVHTML5";
-  static readonly TVHTML5_DOWNGRADED_CLIENT_VERSION: string = "5.20260114";
+  static readonly TVHTML5_DOWNGRADED_CLIENT_VERSION: string = "5.20260707";
   static readonly TVHTML5_DOWNGRADED_USER_AGENT: string =
     "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version";
 
@@ -145,12 +145,12 @@ export class ClientsConstants {
   // =====================
   static readonly VISIONOS_CLIENT_ID: string = "101";
   static readonly VISIONOS_CLIENT_NAME: string = "VISIONOS";
-  static readonly VISIONOS_CLIENT_VERSION: string = "1.02";
+  static readonly VISIONOS_CLIENT_VERSION: string = "1.04";
   static readonly VISIONOS_DEVICE_MAKE: string = "Apple";
-  static readonly VISIONOS_DEVICE_MODEL: string = "RealityDevice14,1";
+  static readonly VISIONOS_DEVICE_MODEL: string = "RealityDevice17,1";
   static readonly VISIONOS_OS_NAME: string = "visionOS";
-  static readonly VISIONOS_OS_VERSION: string = "25.6.0.23O471";
-  static readonly VISIONOS_USER_AGENT_VERSION: string = "25_6_0";
+  static readonly VISIONOS_OS_VERSION: string = "26.6.0.23O770";
+  static readonly VISIONOS_USER_AGENT_VERSION: string = "26_6_0";
 
   /** PipePipe getVisionOsUserAgent — country code is the request localization's. */
   static visionOsUserAgent(countryCode: string = 'US'): string {

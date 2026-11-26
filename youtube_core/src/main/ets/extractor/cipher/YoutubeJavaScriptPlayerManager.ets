@@ -237,7 +237,9 @@ export class YoutubeJavaScriptPlayerManager {
       }
 
       const cached = YoutubeJavaScriptPlayerManager.readDiskCache();
-      if (cached && cached.playerId === playerId && cached.playerJsUrl === playerJsUrl) {
+      if (cached && cached.playerId === playerId
+        && (cached.playerJsUrl === playerJsUrl
+          || YoutubeJavaScriptPlayerManager.isTrustedPlayerJsUrl(playerId, cached.playerJsUrl))) {
         const prepared = await cipher.preparePlayer(playerId, cached.preprocessedPlayer) as NativePrepareResult;
         if (!prepared.prepared) throw new Error('native runtime rejected cached Player');
         YoutubeJavaScriptPlayerManager.prepared.add(playerId);
@@ -404,41 +406,85 @@ export class YoutubeJavaScriptPlayerManager {
     finally { YoutubeJavaScriptPlayerManager.preparing.delete(playerId); }
   }
 
+  private static isValidPlayerId(playerId: string): boolean {
+    return playerId.length > 0 && /^[a-zA-Z0-9_-]+$/.test(playerId);
+  }
+
+  private static isTrustedPlayerJsUrl(playerId: string, playerJsUrl: string): boolean {
+    if (!YoutubeJavaScriptPlayerManager.isValidPlayerId(playerId) || !playerJsUrl) {
+      return false;
+    }
+    const expected = new RegExp(
+      '^https://(?:www\\.)?youtube\\.com/s/player/' + playerId
+      + '/[^?#]+/(?:base|tv-player-ias)\\.js$'
+    );
+    return expected.test(playerJsUrl);
+  }
+
+  private static buildTvPlayerIasUrl(playerId: string): string {
+    return `https://www.youtube.com/s/player/${playerId}/tv-player-ias.vflset/tv-player-ias.js`;
+  }
+
+  private static async fetchAndPrepareVariant(
+    playerId: string,
+    variantUrl: string,
+    client: YouTubeHttpClient,
+    startedAt: number,
+    variantTag: string
+  ): Promise<void> {
+    if (!YoutubeJavaScriptPlayerManager.isTrustedPlayerJsUrl(playerId, variantUrl)) {
+      throw new Error('Rejected untrusted Player JS URL');
+    }
+    const response = await client.get(variantUrl, {
+      'Accept': 'text/javascript,application/javascript;q=0.9,*/*;q=0.1',
+      'Referer': 'https://www.youtube.com/'
+    });
+    if (response.responseCode !== 200 || typeof response.result !== 'string') {
+      throw new Error(`Player JS HTTP ${response.responseCode}`);
+    }
+    const playerJs = response.result as string;
+    if (playerJs.length < 1000 || playerJs.length > YoutubeJavaScriptPlayerManager.MAX_PLAYER_JS_BYTES) {
+      throw new Error(`Invalid Player JS size=${playerJs.length}`);
+    }
+    const preprocessRaw: string = await cipher.preprocessPlayer(playerJs);
+    const preprocessResult = JSON.parse(preprocessRaw) as EjsResult;
+    if (preprocessResult.type !== 'result' || !preprocessResult.preprocessed_player) {
+      throw new Error(`EJS preprocessing failed: ${preprocessResult.error || preprocessResult.type}`);
+    }
+    const prepared: NativePrepareResult = await cipher.preparePlayer(
+      playerId, preprocessResult.preprocessed_player);
+    if (!prepared.prepared) throw new Error('Native JSVM rejected Player scripts');
+    YoutubeJavaScriptPlayerManager.prepared.add(playerId);
+    YoutubeJavaScriptPlayerManager.setReady(playerId, 'network');
+    YoutubeJavaScriptPlayerManager.writeDiskCache(
+      playerId, variantUrl, preprocessResult.preprocessed_player);
+    logger.info(`[CipherRoute] route=LOCAL_JSVM stage=prepare variant=${variantTag} player=${playerId} hasN=${prepared.hasN} hasSig=${prepared.hasSig} elapsed=${Date.now() - startedAt}ms`);
+  }
+
   private static async prepareLocalPlayerInner(playerId: string, playerJsUrl: string,
     client: YouTubeHttpClient): Promise<boolean> {
     const startedAt = Date.now();
     try {
-      const expected = new RegExp('^https://(?:www\\.)?youtube\\.com/s/player/' + playerId
-        + '/[^?#]+/base\\.js$');
-      if (!expected.test(playerJsUrl)) throw new Error('Rejected untrusted Player JS URL');
-      const response = await client.get(playerJsUrl, {
-        'Accept': 'text/javascript,application/javascript;q=0.9,*/*;q=0.1',
-        'Referer': 'https://www.youtube.com/'
-      });
-      if (response.responseCode !== 200 || typeof response.result !== 'string') {
-        throw new Error(`Player JS HTTP ${response.responseCode}`);
-      }
-      const playerJs = response.result as string;
-      if (playerJs.length < 1000 || playerJs.length > YoutubeJavaScriptPlayerManager.MAX_PLAYER_JS_BYTES) {
-        throw new Error(`Invalid Player JS size=${playerJs.length}`);
-      }
-      const preprocessRaw: string = await cipher.preprocessPlayer(playerJs);
-      const preprocessResult = JSON.parse(preprocessRaw) as EjsResult;
-      if (preprocessResult.type !== 'result' || !preprocessResult.preprocessed_player) {
-        throw new Error(`EJS preprocessing failed: ${preprocessResult.error || preprocessResult.type}`);
-      }
-      const prepared: NativePrepareResult = await cipher.preparePlayer(
-        playerId, preprocessResult.preprocessed_player);
-      if (!prepared.prepared) throw new Error('Native JSVM rejected Player scripts');
-      YoutubeJavaScriptPlayerManager.prepared.add(playerId);
-      YoutubeJavaScriptPlayerManager.setReady(playerId, 'network');
-      YoutubeJavaScriptPlayerManager.writeDiskCache(
-        playerId, playerJsUrl, preprocessResult.preprocessed_player);
-      logger.info(`[CipherRoute] route=LOCAL_JSVM stage=prepare player=${playerId} hasN=${prepared.hasN} hasSig=${prepared.hasSig} elapsed=${Date.now() - startedAt}ms`);
+      await YoutubeJavaScriptPlayerManager.fetchAndPrepareVariant(
+        playerId, playerJsUrl, client, startedAt, 'primary');
       return true;
-    } catch (e) {
+    } catch (primaryErr) {
+      if (YoutubeJavaScriptPlayerManager.isValidPlayerId(playerId)
+        && !playerJsUrl.endsWith('/tv-player-ias.js')) {
+        const fallbackUrl = YoutubeJavaScriptPlayerManager.buildTvPlayerIasUrl(playerId);
+        logger.warn(`[CipherRoute] route=LOCAL_JSVM stage=primary_failed player=${playerId} retry=tv_ias`, primaryErr);
+        try {
+          await YoutubeJavaScriptPlayerManager.fetchAndPrepareVariant(
+            playerId, fallbackUrl, client, startedAt, 'tv_ias');
+          return true;
+        } catch (fallbackErr) {
+          YoutubeJavaScriptPlayerManager.markFailure(playerId, 'prepare');
+          logger.warn(`[CipherRoute] route=LOCAL_JSVM stage=prepare_failed player=${playerId} variant=tv_ias elapsed=${Date.now() - startedAt}ms`, fallbackErr);
+          return false;
+        }
+      }
       YoutubeJavaScriptPlayerManager.markFailure(playerId, 'prepare');
-      logger.warn(`[CipherRoute] route=LOCAL_JSVM stage=prepare_failed player=${playerId} elapsed=${Date.now() - startedAt}ms`, e);
+      logger.warn(`[CipherRoute] route=LOCAL_JSVM stage=prepare_failed player=${playerId} elapsed=${Date.now() - startedAt}ms`, primaryErr);
       return false;
     }
   }
