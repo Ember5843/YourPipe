@@ -3777,6 +3777,42 @@
             "value": "Corrigidos: vazamento de estado de login, falha na primeira troca de vídeo, PiP vazio ao voltar, arquivos de download residuais; textos em 14 idiomas completos"
         },
         {
+            "name": "yt_changelog_0_7_1_1",
+            "value": "Núcleo do player e legendas: controles de fila de reprodução, filtros de melhoria de áudio MPV sem dessincronização, barra 4-em-1 (capítulos, SponsorBlock, mapa de calor e prévia) e legendas bilíngues e json3"
+        },
+        {
+            "name": "yt_changelog_0_7_1_2",
+            "value": "Overlay e estatísticas renovados: controles em pílulas de vidro fosco, HUD central de volume/brilho, estatísticas detalhadas do stream com gráfico spline e página dedicada para o mapa de calor"
+        },
+        {
+            "name": "yt_changelog_0_7_1_3",
+            "value": "Tela cheia e selo de qualidade: transição com mola de amortecimento crítico no painel lateral para eliminar trepidações e selo de resolução/fps consultado diretamente pelo itag"
+        },
+        {
+            "name": "yt_changelog_0_7_1_4",
+            "value": "Recursos experimentais e tradução: nova página experimental com pulo SponsorBlock e desfazer com um toque, títulos/miniaturas do DeArrow, filtro/selos AiSList e provedor de tradução Azure"
+        },
+        {
+            "name": "yt_changelog_0_7_1_5",
+            "value": "Reformulação de UI e interações: novos cartões de vídeo, menus de contexto e créditos; espaçamento unificado, gestos desacoplados, animações de lista estilo FLIP, atualização da página inicial e hierarquia de cores HarmonyOS Design"
+        },
+        {
+            "name": "yt_changelog_0_7_1_6",
+            "value": "Histórico e restauração de estado: histórico expandido para 1.000 itens com gravação atômica e atualização de metadados; restauração UIAbility ativada e liberação de tarefas em segundo plano após pausa"
+        },
+        {
+            "name": "yt_changelog_0_7_1_7",
+            "value": "Atualizações no app: página dedicada e verificação silenciosa ao iniciar com alerta único por versão, além de diálogos claros na verificação manual"
+        },
+        {
+            "name": "yt_changelog_0_7_1_8",
+            "value": "Compatibilidade de streaming e extração: suporte aprimorado a SABR pós-live e WebM, constantes de versão atualizadas com fallback de decifragem tv-player-ias.js e correção de downloads no cliente TV"
+        },
+        {
+            "name": "yt_changelog_0_7_1_9",
+            "value": "Correções de estabilidade: corrigidos fallback de Shorts no visionOS, áudio DRC/dublagem/DRM, SponsorBlock, temporizador em PiP e EOF prematuro"
+        },
+        {
             "name": "yt_option_translation_service",
             "value": "Serviço de tradução"
         },

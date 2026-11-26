@@ -3777,6 +3777,42 @@
             "value": "Fixed login-state leakage, first-video switch failures, empty PiP on back, leftover download files, and completed 14-locale copy"
         },
         {
+            "name": "yt_changelog_0_7_1_1",
+            "value": "Player core & subtitles: added playback queue controls, zero-desync MPV audio enhancement filters, a 4-in-1 seekbar (chapters, SponsorBlock, heatmap, preview), and bilingual & json3 subtitle support"
+        },
+        {
+            "name": "yt_changelog_0_7_1_2",
+            "value": "Player overlay & stats refresh: modernized overlay controls with frosted glass pills, added a centered volume/brightness glass HUD, detailed stream stats with a spline chart, and a dedicated heatmap settings page"
+        },
+        {
+            "name": "yt_changelog_0_7_1_3",
+            "value": "Fullscreen & spec badge polish: switched landscape side-panel fullscreen transitions to a critically damped spring to prevent surface jank, and resolved top-bar resolution/fps badges authoritatively from itag"
+        },
+        {
+            "name": "yt_changelog_0_7_1_4",
+            "value": "Experimental features & translation: added an Experimental settings page with SponsorBlock segment skipping and one-tap undo, DeArrow crowdsourced titles/thumbnails, AiSList channel filtering/badges, and an Azure translation provider"
+        },
+        {
+            "name": "yt_changelog_0_7_1_5",
+            "value": "UI & interaction overhaul: redesigned video cards, context menus, and the credits page; unified list spacing, decoupled gesture presets, added smooth FLIP-style list CRUD animations, fresher home refresh, and HarmonyOS Design color hierarchy"
+        },
+        {
+            "name": "yt_changelog_0_7_1_6",
+            "value": "Watch history & state restore: expanded watch history capacity to 1,000 entries with atomic file storage and metadata refresh; enabled UIAbility state restore and released background continuous tasks after a pause grace period"
+        },
+        {
+            "name": "yt_changelog_0_7_1_7",
+            "value": "In-app updates: added a dedicated update page and silent startup check that prompts once per new version, plus clear dialog-based feedback for manual checks"
+        },
+        {
+            "name": "yt_changelog_0_7_1_8",
+            "value": "Streaming & extraction compatibility: improved SABR post-live and WebM support, refreshed YouTube client version constants with a tv-player-ias.js cipher fallback, and fixed TV-client downloads"
+        },
+        {
+            "name": "yt_changelog_0_7_1_9",
+            "value": "Live-path reliability fixes: fixed visionOS Shorts fallback, audio DRC/dub/DRM handling, SponsorBlock edge cases, Sleep Timer PiP behavior, premature EOF, and timer/state/material bugs"
+        },
+        {
             "name": "yt_option_translation_service",
             "value": "Translation service"
         },

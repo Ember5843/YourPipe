@@ -3777,6 +3777,42 @@
             "value": "Corregidos: fuga de estado de sesión, fallo al cambiar el primer vídeo, PiP vacío al volver, archivos de descarga residuales; textos de 14 idiomas completados"
         },
         {
+            "name": "yt_changelog_0_7_1_1",
+            "value": "Núcleo del reproductor y subtítulos: controles de cola de reproducción, filtros de mejora de audio MPV sin desincronización, barra de progreso 4 en 1 (capítulos, SponsorBlock, mapa de calor y vista previa) y subtítulos bilingües y json3"
+        },
+        {
+            "name": "yt_changelog_0_7_1_2",
+            "value": "Renovación del overlay y estadísticas: controles con cápsulas de cristal esmerilado, HUD central de volumen/brillo, estadísticas detalladas del flujo con gráfico spline y página propia de ajustes de mapa de calor"
+        },
+        {
+            "name": "yt_changelog_0_7_1_3",
+            "value": "Pantalla completa e insignia de calidad: transición con resorte de amortiguación crítica en paneles laterales para evitar saltos de imagen e insignia de resolución/fps resuelta directamente desde itag"
+        },
+        {
+            "name": "yt_changelog_0_7_1_4",
+            "value": "Funciones experimentales y traducción: nueva página experimental con omisión SponsorBlock y deshacer en un toque, títulos/miniaturas colaborativos de DeArrow, filtros/insignias AiSList y proveedor de traducción Azure"
+        },
+        {
+            "name": "yt_changelog_0_7_1_5",
+            "value": "Rediseño de interfaz e interacción: nuevas tarjetas de vídeo, menús contextuales y créditos; espaciado de listas unificado, preajustes de gestos desacoplados, animaciones de lista estilo FLIP, actualización de inicio y jerarquía de color HarmonyOS Design"
+        },
+        {
+            "name": "yt_changelog_0_7_1_6",
+            "value": "Historial y restauración de estado: historial ampliado a 1.000 entradas con guardado atómico y actualización de metadatos; restauración de UIAbility activada y liberación de tareas en segundo plano tras pausa"
+        },
+        {
+            "name": "yt_changelog_0_7_1_7",
+            "value": "Actualizaciones en la app: nueva página de actualizaciones y comprobación silenciosa al iniciar con aviso único por versión, además de diálogos claros en comprobaciones manuales"
+        },
+        {
+            "name": "yt_changelog_0_7_1_8",
+            "value": "Compatibilidad de streaming y extracción: mejoras en SABR post-directo y WebM, actualización de versiones de cliente con respaldo de descifrado tv-player-ias.js y corrección de descargas en cliente TV"
+        },
+        {
+            "name": "yt_changelog_0_7_1_9",
+            "value": "Correcciones en rutas reales: solucionados el respaldo de Shorts en visionOS, audio DRC/doblaje/DRM, SponsorBlock, temporizador en PiP y EOF prematuro"
+        },
+        {
             "name": "yt_option_translation_service",
             "value": "Servicio de traducción"
         },

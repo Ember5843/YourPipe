@@ -7,7 +7,7 @@
 
 **YouTube client for OpenHarmony / HarmonyOS**
 
-[![Version](https://img.shields.io/badge/version-0.7.0-blue?style=flat-square)](AppScope/app.json5)
+[![Version](https://img.shields.io/badge/version-0.7.1-blue?style=flat-square)](AppScope/app.json5)
 [![HarmonyOS](https://img.shields.io/badge/HarmonyOS-6.1.0(23)-black?style=flat-square)](https://developer.huawei.com/consumer/en/harmonyos/)
 [![Player](https://img.shields.io/badge/player-MPV-brightgreen?style=flat-square)](https://github.com/mpv-player/mpv)
 [![License](https://img.shields.io/badge/license-GPL--3.0-yellow?style=flat-square)](LICENSE)
@@ -25,7 +25,7 @@ YourPipe is a YouTube client for **OpenHarmony / HarmonyOS**. It extracts stream
 | | |
 |---|---|
 | **Package** | `com.talon.yourpipe` |
-| **Version** | `0.7.0` |
+| **Version** | `0.7.1` |
 | **Target SDK** | `26.0.0` (min `6.1.0(23)`) · HarmonyOS · stage model |
 | **Devices** | phone · tablet · 2in1 · tv · car |
 

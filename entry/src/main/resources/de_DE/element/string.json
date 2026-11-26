@@ -3777,6 +3777,42 @@
             "value": "Behoben: Login-Zustandsleck, Fehler beim ersten Videowechsel, leeres PiP beim Zurückgehen, zurückbleibende Download-Dateien; 14-Sprachen-Texte vervollständigt"
         },
         {
+            "name": "yt_changelog_0_7_1_1",
+            "value": "Player-Kern & Untertitel: Warteschlangen-Steuerung, synchronisationsfreie MPV-Audioverbesserungsfilter, 4-in-1-Zeitleiste (Kapitel, SponsorBlock, Heatmap, Vorschau) sowie zweisprachige und json3-Untertitel hinzugefügt"
+        },
+        {
+            "name": "yt_changelog_0_7_1_2",
+            "value": "Neues Player-Overlay & Statistikpanel: Steuerung auf Milchglas-Pills modernisiert, zentriertes Lautstärke-/Helligkeits-Glas-HUD, detaillierte Stream-Statistiken mit Spline-Diagramm und eigene Heatmap-Einstellungen ergänzt"
+        },
+        {
+            "name": "yt_changelog_0_7_1_3",
+            "value": "Vollbild & Qualitätsanzeige optimiert: Vollbildübergänge im Querformat nutzen nun eine kritisch gedämpfte Feder ohne Bildruckeln; Auflösungs-/fps-Badges werden zuverlässig direkt aus dem itag ermittelt"
+        },
+        {
+            "name": "yt_changelog_0_7_1_4",
+            "value": "Experimentelle Funktionen & Übersetzung: Neue Experimentell-Seite mit SponsorBlock-Überspringen inkl. Ein-Tipp-Rückgängig, DeArrow-Titeln/-Vorschaubildern, AiSList-Filterung/Badges sowie Azure-Übersetzungsanbieter"
+        },
+        {
+            "name": "yt_changelog_0_7_1_5",
+            "value": "UI- & Interaktions-Redesign: Videokarten, Kontextmenüs und Credits überarbeitet, Listenabstände vereinheitlicht, Gesten-Presets entkoppelt, flüssige FLIP-Listenanimationen, frischer Startseiten-Refresh und HarmonyOS-Design-Farbhierarchie"
+        },
+        {
+            "name": "yt_changelog_0_7_1_6",
+            "value": "Wiedergabeverlauf & Zustandswiederherstellung: Verlauf auf 1.000 Einträge mit atomarer Dateispeicherung und Metadaten-Aktualisierung erweitert; UIAbility-Wiederherstellung aktiviert und Hintergrundaufgaben nach Pausen-Schonfrist freigegeben"
+        },
+        {
+            "name": "yt_changelog_0_7_1_7",
+            "value": "In-App-Updates: Eigene Update-Seite und stille Prüfung beim Start mit einmaligem Dialog pro neuer Version sowie klare Dialog-Rückmeldung bei manueller Prüfung hinzugefügt"
+        },
+        {
+            "name": "yt_changelog_0_7_1_8",
+            "value": "Streaming- & Extraktionskompatibilität: SABR-Post-Live- und WebM-Unterstützung ausgebaut, Client-Versionskonstanten aktualisiert, tv-player-ias.js-Cipher-Fallback ergänzt und TV-Downloads repariert"
+        },
+        {
+            "name": "yt_changelog_0_7_1_9",
+            "value": "Stabilitäts- und Bugfixes: Probleme bei visionOS-Shorts-Fallback, Audio-DRC/Synchronisation/DRM, SponsorBlock, Sleep-Timer im PiP-Modus sowie vorzeitigem EOF behoben"
+        },
+        {
             "name": "yt_option_translation_service",
             "value": "Übersetzungsdienst"
         },

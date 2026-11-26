@@ -3777,6 +3777,42 @@
             "value": "Corrections : fuite d'état de connexion, échec du premier changement de vidéo, PiP vide au retour, fichiers de téléchargement résiduels ; textes des 14 langues complétés"
         },
         {
+            "name": "yt_changelog_0_7_1_1",
+            "value": "Cœur du lecteur et sous-titres : contrôles de file d’attente, filtres d’amélioration audio MPV sans désynchronisation, barre de progression 4-en-1 (chapitres, SponsorBlock, carte de chaleur, aperçu) et prise en charge des sous-titres bilingues et json3"
+        },
+        {
+            "name": "yt_changelog_0_7_1_2",
+            "value": "Interface du lecteur et statistiques : contrôles modernisés en pilules verre dépoli, HUD centré volume/luminosité, statistiques de flux détaillées avec graphique spline et page de réglages dédiée à la carte de chaleur"
+        },
+        {
+            "name": "yt_changelog_0_7_1_3",
+            "value": "Plein écran et badge de qualité : transition à ressort à amortissement critique en mode paysage pour éviter les saccades d’image, et badge de résolution/fps résolu de façon fiable depuis l’itag"
+        },
+        {
+            "name": "yt_changelog_0_7_1_4",
+            "value": "Fonctions expérimentales et traduction : nouvelle page expérimentale avec saut SponsorBlock et annulation en un geste, titres/miniatures DeArrow, filtrage/badges AiSList et fournisseur de traduction Azure"
+        },
+        {
+            "name": "yt_changelog_0_7_1_5",
+            "value": "Refonte UI et interactions : cartes vidéo, menus contextuels et page de crédits repensés ; espacement unifié, préréglages de gestes découplés, animations de liste fluides type FLIP, rafraîchissement d’accueil et hiérarchie chromatique HarmonyOS Design"
+        },
+        {
+            "name": "yt_changelog_0_7_1_6",
+            "value": "Historique et restauration d’état : historique porté à 1 000 entrées avec écriture atomique et actualisation des métadonnées ; restauration UIAbility activée et libération des tâches d’arrière-plan après délai de pause"
+        },
+        {
+            "name": "yt_changelog_0_7_1_7",
+            "value": "Mises à jour intégrées : page de mise à jour dédiée et vérification silencieuse au démarrage avec alerte unique par version, plus retours par boîte de dialogue lors des vérifications manuelles"
+        },
+        {
+            "name": "yt_changelog_0_7_1_8",
+            "value": "Streaming et extraction : support amélioré de SABR post-direct et WebM, mise à jour des versions client avec repli de déchiffrement tv-player-ias.js et correction des téléchargements TV"
+        },
+        {
+            "name": "yt_changelog_0_7_1_9",
+            "value": "Correctifs de fiabilité : correction du repli Shorts visionOS, de l’audio DRC/doublage/DRM, de SponsorBlock, du minuteur de veille en PiP et des EOF prématurés"
+        },
+        {
             "name": "yt_option_translation_service",
             "value": "Service de traduction"
         },
