@@ -15,7 +15,7 @@ import { taskpool, url } from '@kit.ArkTS';
 import { UIConfig } from './AppState';
 import { DownloadTaskRecord, DownloadTaskStore } from './DownloadTaskStore';
 import { formatBytes } from './utils/FormatUtils';
-import { AuthSessionManager, HttpDownloader, parseHlsMasterManifest } from 'youtube_core';
+import { AuthSessionManager, ClientsConstants, HttpDownloader, parseHlsMasterManifest } from 'youtube_core';
 
 const logger = AppLog.getInstance('DownloadManager');
 const DOWNLOAD_ROOT: string = 'downloads';
@@ -1124,7 +1124,9 @@ export class DownloadManager {
         task.videoStream.approxDurationMs || 0,
         task.audioStream.approxDurationMs || 0
       );
-      const useAuth = AuthSessionManager.getInstance()?.isAuthEnabledForPlayback() === true;
+      // SABR UMP 仅支持 Web Cookie 鉴权（绝不能对 OAuth-only TV 登录态开启 SABR auth），
+      // 避免 TV 登录与 Web 登录态串扰。
+      const useAuth = AuthSessionManager.getInstance()?.hasWebAuthForPlayback() === true;
 
       await SabrOfflineDownloader.downloadTracks({
         video: task.videoStream,
@@ -1701,6 +1703,8 @@ export class DownloadManager {
   ): Promise<void> {
     let downloaded = startFrom;
     let chunkIndex = 0;
+    let requestNumber = 0;
+    const maxChunkRetries = 3;
     while (downloaded < totalBytes) {
       if (task._cancelled) {
         return;
@@ -1711,35 +1715,68 @@ export class DownloadManager {
       const expectedSize = end - start + 1;
       const rangeSpec = `${start}-${end}`;
       chunkIndex++;
-      logger.debug(`Task ${task.id} ${type} chunk ${chunkIndex}: range=${rangeSpec}`);
 
-      const result = await this.requestStreamToFile(
-        this.buildStreamUrl(stream.url, rangeSpec),
-        this.buildStreamHeaders(stream.url, rangeSpec),
-        file,
-        task,
-        (chunkWritten: number) => {
-          task.updateProgress(start + chunkWritten, totalBytes, type);
-          this.publishDownloadNotification(task);
+      let chunkSucceeded = false;
+      let lastError: Error = new Error('Chunk download failed');
+      for (let attempt = 0; attempt <= maxChunkRetries; attempt++) {
+        if (task._cancelled) {
+          return;
         }
-      );
+        if (attempt > 0) {
+          const backoffMs = attempt === 1 ? 600 : (attempt === 2 ? 1500 : 3000);
+          logger.warn(`Task ${task.id} ${type} chunk ${chunkIndex} retry ${attempt}/${maxChunkRetries} `
+            + `after ${backoffMs}ms (reason=${lastError.message})`);
+          await new Promise<void>((resolve) => setTimeout(resolve, backoffMs));
+          if (task._cancelled) {
+            return;
+          }
+          // 回退文件写指针到本分片起点，防止上次半截写入污染后续字节。
+          fs.lseek(file.fd, start);
+        }
 
-      if (task._cancelled) {
-        return;
+        requestNumber++;
+        logger.debug(`Task ${task.id} ${type} chunk ${chunkIndex} attempt=${attempt + 1} rn=${requestNumber}: range=${rangeSpec}`);
+        try {
+          const result = await this.requestStreamToFile(
+            this.buildStreamUrl(stream.url, rangeSpec, requestNumber),
+            this.buildStreamHeaders(stream, rangeSpec),
+            file,
+            task,
+            (chunkWritten: number) => {
+              task.updateProgress(start + chunkWritten, totalBytes, type);
+              this.publishDownloadNotification(task);
+            }
+          );
+
+          if (task._cancelled) {
+            return;
+          }
+          if (result.responseCode === 200 && start > 0) {
+            // 续传时服务端无视了 Range（回 200 + 整体）：半截文件接不上，交给上层重来。
+            throw new Error(`${DOWNLOAD_RANGE_IGNORED_MARKER}: ${type} range=${rangeSpec}`);
+          }
+          if (result.responseCode !== 206 && result.responseCode !== 200) {
+            throw new Error(`Chunk request returned HTTP ${result.responseCode}`);
+          }
+          if (result.bytesWritten !== expectedSize) {
+            throw new Error(`Chunk size mismatch expected=${expectedSize} actual=${result.bytesWritten}`);
+          }
+          downloaded += result.bytesWritten;
+          task.updateProgress(downloaded, totalBytes, type);
+          this.publishDownloadNotification(task);
+          chunkSucceeded = true;
+          break;
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(`${err}`);
+          if (task._cancelled || this.isRangeIgnoredError(lastError)
+            || lastError.message.includes('HTTP 404') || lastError.message.includes('HTTP 410')) {
+            throw lastError;
+          }
+        }
       }
-      if (result.responseCode === 200 && start > 0) {
-        // 续传时服务端无视了 Range（回 200 + 整体）：半截文件接不上，交给上层重来。
-        throw new Error(`${DOWNLOAD_RANGE_IGNORED_MARKER}: ${type} range=${rangeSpec}`);
+      if (!chunkSucceeded) {
+        throw lastError;
       }
-      if (result.responseCode !== 206 && result.responseCode !== 200) {
-        throw new Error(`Chunk request returned HTTP ${result.responseCode}`);
-      }
-      if (result.bytesWritten !== expectedSize) {
-        throw new Error(`Chunk size mismatch expected=${expectedSize} actual=${result.bytesWritten}`);
-      }
-      downloaded += result.bytesWritten;
-      task.updateProgress(downloaded, totalBytes, type);
-      this.publishDownloadNotification(task);
     }
   }
 
@@ -1749,9 +1786,14 @@ export class DownloadManager {
     file: fs.File,
     type: 'video' | 'audio'
   ): Promise<void> {
+    const header: Record<string, string> = { 'Accept-Encoding': 'identity' };
+    const ua = this.resolveStreamUserAgent(stream);
+    if (ua.length > 0) {
+      header['User-Agent'] = ua;
+    }
     const result = await this.requestStreamToFile(
       stream.url,
-      { 'Accept-Encoding': 'identity' },
+      header,
       file,
       task,
       (written: number) => {
@@ -1937,19 +1979,57 @@ export class DownloadManager {
     });
   }
 
-  private buildStreamHeaders(url: string, rangeSpec: string): Record<string, string> {
+  private resolveStreamUserAgent(stream: StreamInfo): string {
+    switch (stream.sourceClient) {
+      case 'android':
+      case 'ANDROID':
+      case 'android_reel':
+        return ClientsConstants.ANDROID_USER_AGENT;
+      case 'android_vr':
+      case 'ANDROID_VR':
+        return ClientsConstants.ANDROID_USER_AGENT;
+      case 'ios':
+      case 'IOS':
+        return ClientsConstants.IOS_USER_AGENT;
+      case 'visionos':
+      case 'VISIONOS':
+        return ClientsConstants.visionOsUserAgent('GB');
+      case 'web_safari':
+      case 'safari':
+        return ClientsConstants.SAFARI_USER_AGENT;
+      case 'mweb':
+      case 'MWEB':
+        return ClientsConstants.MWEB_USER_AGENT;
+      case 'tv_samsung':
+        return ClientsConstants.TVHTML5_SAMSUNG_USER_AGENT;
+      case 'tv_downgraded':
+      case 'TVHTML5':
+        return ClientsConstants.TVHTML5_DOWNGRADED_USER_AGENT;
+      case 'tv':
+      case 'TVHTML5_SIMPLY_EMBEDDED_PLAYER':
+        return ClientsConstants.TVHTML5_SIMPLY_EMBEDDED_USER_AGENT;
+      default:
+        return ClientsConstants.WEB_USER_AGENT;
+    }
+  }
+
+  private buildStreamHeaders(stream: StreamInfo, rangeSpec: string): Record<string, string> {
     const header: Record<string, string> = { 'Accept-Encoding': 'identity' };
-    if (!this.isYoutubePlaybackUrl(url)) {
+    const ua = this.resolveStreamUserAgent(stream);
+    if (ua.length > 0) {
+      header['User-Agent'] = ua;
+    }
+    if (!this.isYoutubePlaybackUrl(stream.url)) {
       header['Range'] = `bytes=${rangeSpec}`;
     }
     return header;
   }
 
-  private buildStreamUrl(url: string, rangeSpec: string): string {
+  private buildStreamUrl(url: string, rangeSpec: string, requestNumber: number): string {
     if (!this.isYoutubePlaybackUrl(url)) {
       return url;
     }
-    return this.buildRangeUrl(url, rangeSpec);
+    return this.buildRangeUrl(url, rangeSpec, requestNumber);
   }
 
   private getRedirectLocation(headers: Record<string, string | string[] | Object>): string | null {
@@ -2154,12 +2234,12 @@ export class DownloadManager {
     }
   }
 
-  private buildRangeUrl(url: string, rangeSpec: string): string {
+  private buildRangeUrl(url: string, rangeSpec: string, requestNumber: number): string {
     if (!this.isYoutubePlaybackUrl(url)) {
       return url;
     }
     const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}range=${rangeSpec}`;
+    return `${url}${separator}range=${rangeSpec}&rn=${requestNumber}`;
   }
 
   private isYoutubePlaybackUrl(url: string): boolean {

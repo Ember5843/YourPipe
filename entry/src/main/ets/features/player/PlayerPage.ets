@@ -599,7 +599,7 @@ export struct VideoPlayerPage {
       this.videoDescriptionError = null;
       this.errorInfo = null;
       this.detailLikeCount = '0';
-      this.detailDislikeCount = '0';
+      this.detailDislikeCount = '';
       this.detailChannelId = this.video.channelId || '';
       this.detailChannelAvatarUrl = this.video.channelAvatarUrl || '';
       this.chapters = [];

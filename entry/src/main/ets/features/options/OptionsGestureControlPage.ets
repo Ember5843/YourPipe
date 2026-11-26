@@ -1,4 +1,5 @@
 import { SelectOption } from 'mediaservice';
+import { OptionItem } from '../../common/components/OptionItem';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
 import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
@@ -7,7 +8,7 @@ import { UIConfig } from '../../common/AppState';
 import {
   PlaybackConfig,
   HOLD_SPEED_VALUES, HOLD_SPEED_DELAYS, getHoldSpeedDelayDisplay,
-  GESTURE_SCHEME_LABELS, getGestureSchemeDisplay,
+  GesturePreset, GESTURE_PRESET_LABELS, getGestureSchemeDisplay,
   DOUBLE_TAP_ACTION_LABELS, getDoubleTapActionDisplay,
   DOUBLE_TAP_SEEK_SECONDS, getDoubleTapSeekDisplay,
 } from '../../common/PlaybackConfig';
@@ -17,6 +18,93 @@ interface OptionsGestureControlPageParams {
   clickEffectEnabled: ClickEffect | null;
   updatePlaybackConfig: (updater: (cfg: PlaybackConfig) => void) => void;
   updateUiConfig: (updater: (cfg: UIConfig) => void) => void;
+}
+
+@CustomDialog
+struct GesturePresetPickerDialog {
+  controller?: CustomDialogController;
+  onSelect?: (preset: GesturePreset) => void;
+
+  private presetSummary(preset: GesturePreset): string {
+    const t = (res: Resource): string => getContext().resourceManager.getStringSync(res.id);
+    const seek = t($r('app.string.yt_gesture_double_tap_seek'));
+    const playPause = t($r('app.string.yt_gesture_double_tap_playpause'));
+    const swipeH = t($r('app.string.yt_playback_gesture_seek'));
+    const brightness = t($r('app.string.yt_gesture_help_brightness'));
+    const volume = t($r('app.string.yt_gesture_help_volume'));
+    const hold = t($r('app.string.yt_playback_hold_speed'));
+    const centerBtn = t($r('app.string.yt_playback_center_play_button'));
+    if (preset === 'youtube') {
+      return `${seek} 10s · ${hold} · ${centerBtn}`;
+    }
+    if (preset === 'bilibili') {
+      return `${playPause} · ${swipeH} · ${brightness}/${volume} · ${hold}`;
+    }
+    return `${seek} 15s · ${swipeH} · ${brightness}/${volume} · ${hold}`;
+  }
+
+  build() {
+    Column() {
+      Text($r('app.string.yt_gesture_scheme_label'))
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('sys.color.font_primary'))
+        .width('100%')
+        .textAlign(TextAlign.Start)
+        .margin({ bottom: 12 })
+
+      Column({ space: 8 }) {
+        ForEach(GESTURE_PRESET_LABELS, (preset: GesturePreset) => {
+          Row({ space: 12 }) {
+            Column({ space: 4 }) {
+              Text(getGestureSchemeDisplay(preset))
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('sys.color.font_primary'))
+                .width('100%')
+              Text(this.presetSummary(preset))
+                .fontSize(12)
+                .fontColor($r('sys.color.font_secondary'))
+                .maxLines(2)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .width('100%')
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+
+            SymbolGlyph($r('sys.symbol.chevron_right'))
+              .fontSize(18)
+              .fontColor([$r('sys.color.icon_fourth')])
+          }
+          .width('100%')
+          .padding({ left: 14, right: 12, top: 12, bottom: 12 })
+          .borderRadius(12)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .onClick(() => {
+            this.onSelect?.(preset);
+            this.controller?.close();
+          })
+        }, (preset: GesturePreset) => preset)
+      }
+      .width('100%')
+
+      Button($r('app.string.yt_action_cancel'))
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .width('100%')
+        .height(40)
+        .margin({ top: 16 })
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .fontColor($r('sys.color.font_primary'))
+        .onClick(() => {
+          this.controller?.close();
+        })
+    }
+    .width('100%')
+    .padding(20)
+    .backgroundColor($r('sys.color.comp_background_list_card'))
+    .borderRadius(20)
+  }
 }
 
 @Component
@@ -32,8 +120,26 @@ export struct OptionsGestureControlPage {
     updateUiConfig: () => {}
   };
 
-  private getSchemeOptions(): SelectOption[] {
-    return GESTURE_SCHEME_LABELS.map(s => ({ value: getGestureSchemeDisplay(s) } as SelectOption));
+  private presetDialogController: CustomDialogController | null = null;
+
+  private openPresetDialog(): void {
+    this.presetDialogController = new CustomDialogController({
+      builder: GesturePresetPickerDialog({
+        onSelect: (preset: GesturePreset) => {
+          this.applyPreset(preset);
+        }
+      }),
+      autoCancel: true,
+      customStyle: false,
+      alignment: DialogAlignment.Center
+    });
+    this.presetDialogController.open();
+  }
+
+  private applyPreset(preset: GesturePreset): void {
+    this.params.updatePlaybackConfig(cfg => PlaybackConfig.applyGesturePreset(cfg, preset));
+    const showCenter = PlaybackConfig.centerPlayButtonForPreset(preset);
+    this.params.updateUiConfig(cfg => cfg.showCenterPlayButton = showCenter);
   }
 
   private getDoubleTapOptions(): SelectOption[] {
@@ -50,20 +156,6 @@ export struct OptionsGestureControlPage {
 
   private getHoldSpeedDelayOptions(): SelectOption[] {
     return HOLD_SPEED_DELAYS.map(v => ({ value: getHoldSpeedDelayDisplay(v) } as SelectOption));
-  }
-
-  /**
-   * 结构项改动（双击动作 / 滑动组 / 长按开关）：按改动后的组合回推方案——
-   * 仍与某预设一致就显示该预设，都不一致才标「自定义」。
-   * 参数项（双击步长、长按倍速与触发延迟）不走这里，改它们不改变方案选择。
-   * 预设应用时 Toggle 的 isOn 程序化变化也会触发 onChange，走"组合回推"而不是
-   * 无条件置 custom，正是为了让它保持预设、不被误改回自定义。
-   */
-  private markCustom(updater: (cfg: PlaybackConfig) => void): void {
-    this.params.updatePlaybackConfig(cfg => {
-      updater(cfg);
-      cfg.gestureScheme = PlaybackConfig.schemeForGestureConfig(cfg);
-    });
   }
 
   /** 手势说明：按当前配置动态生成（关闭项显示「已关闭」）。 */
@@ -100,7 +192,7 @@ export struct OptionsGestureControlPage {
   build() {
     Column() {
       List({ space: 6 }) {
-        // ── 交互方案（预设：增强 / 经典 YouTube / 自定义） ──
+        // ── 交互方案（一次性预设模板弹窗 + 双击动作配置，互不耦合） ──
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_gesture_scheme_title') })
         }
@@ -108,31 +200,15 @@ export struct OptionsGestureControlPage {
 
         ListItemGroup() {
           ListItem() {
-            PlaybackSelectRow({
+            OptionItem({
               title: $r('app.string.yt_gesture_scheme_label'),
-              options: this.getSchemeOptions(),
-              selectedIndex: GESTURE_SCHEME_LABELS.indexOf(this.playbackConfig.gestureScheme),
-              fontColor: this.params.themeColor,
+              showChevron: true,
               transparentBackground: true,
-              onChange: (index: number) => {
-                const scheme = GESTURE_SCHEME_LABELS[index];
-                // 程序化回显 / 重复选择：不再重复应用（避免自触发回环）
-                if (scheme === this.playbackConfig.gestureScheme) {
-                  return;
-                }
-                this.params.updatePlaybackConfig(cfg => PlaybackConfig.applyGesturePreset(cfg, scheme));
+              clickEffectEnabled: this.params.clickEffectEnabled,
+              onClickAction: () => {
+                this.openPresetDialog();
               }
             })
-          }
-
-          ListItem() {
-            Row() {
-              Text($r('app.string.yt_gesture_scheme_subtitle'))
-                .fontSize(12)
-                .fontColor($r('app.color.yourtube_text_quaternary'))
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 8, bottom: 10 })
           }
 
           ListItem() {
@@ -144,7 +220,7 @@ export struct OptionsGestureControlPage {
               transparentBackground: true,
               onChange: (index: number) => {
                 const action = DOUBLE_TAP_ACTION_LABELS[index];
-                this.markCustom(cfg => cfg.doubleTapAction = action);
+                this.params.updatePlaybackConfig(cfg => cfg.doubleTapAction = action);
               }
             })
           }
@@ -158,7 +234,6 @@ export struct OptionsGestureControlPage {
                 fontColor: this.params.themeColor,
                 transparentBackground: true,
                 onChange: (index: number) => {
-                  // 步长是方案的调节参数：改动它不改变方案选择（不标记自定义）
                   const secs = DOUBLE_TAP_SEEK_SECONDS[index];
                   this.params.updatePlaybackConfig(cfg => cfg.doubleTapSeekSeconds = secs);
                 }
@@ -171,7 +246,7 @@ export struct OptionsGestureControlPage {
         .clip(true)
         .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
 
-        // ── 分项开关（滑动组 / 长按组） ──
+        // ── 分项开关（滑动组 / 中央按钮 / 长按组） ──
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_playback_gestures') })
         }
@@ -186,7 +261,7 @@ export struct OptionsGestureControlPage {
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
-                this.markCustom(cfg => cfg.gestureSeekEnabled = val);
+                this.params.updatePlaybackConfig(cfg => cfg.gestureSeekEnabled = val);
               }
             })
           }
@@ -195,7 +270,7 @@ export struct OptionsGestureControlPage {
             PlaybackToggleRow({
               title: $r('app.string.yt_playback_center_play_button'),
               subtitle: $r('app.string.yt_playback_center_play_button_subtitle'),
-              isOn: this.uiConfig.showCenterPlayButton !== false,
+              isOn: this.uiConfig.showCenterPlayButton,
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
@@ -212,7 +287,7 @@ export struct OptionsGestureControlPage {
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
-                this.markCustom(cfg => cfg.gestureBrightnessEnabled = val);
+                this.params.updatePlaybackConfig(cfg => cfg.gestureBrightnessEnabled = val);
               }
             })
           }
@@ -225,7 +300,7 @@ export struct OptionsGestureControlPage {
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
-                this.markCustom(cfg => cfg.gestureVolumeEnabled = val);
+                this.params.updatePlaybackConfig(cfg => cfg.gestureVolumeEnabled = val);
               }
             })
           }
@@ -238,7 +313,7 @@ export struct OptionsGestureControlPage {
               themeColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (val: boolean) => {
-                this.markCustom(cfg => cfg.holdSpeedEnabled = val);
+                this.params.updatePlaybackConfig(cfg => cfg.holdSpeedEnabled = val);
               }
             })
           }
@@ -253,7 +328,6 @@ export struct OptionsGestureControlPage {
                 transparentBackground: true,
                 onChange: (index: number) => {
                   const v = HOLD_SPEED_VALUES[index];
-                  // 参数项：不参与方案判定（改它不改变方案选择）
                   this.params.updatePlaybackConfig(cfg => cfg.holdSpeedValue = v);
                 }
               })
@@ -268,7 +342,6 @@ export struct OptionsGestureControlPage {
                 transparentBackground: true,
                 onChange: (index: number) => {
                   const v = HOLD_SPEED_DELAYS[index];
-                  // 参数项：不参与方案判定
                   this.params.updatePlaybackConfig(cfg => cfg.holdSpeedDelayMs = v);
                 }
               })

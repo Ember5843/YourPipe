@@ -166,11 +166,12 @@ export class YouTubePlayService {
   private prefetchInFlight: Map<string, Promise<YouTubePlayResult>> = new Map();
   private prefetchGeneration: number = 0;
 
-  /** Effective playback-auth partition of the prefetch caches. */
+  /** Effective playback-auth partition of the prefetch caches (strictly isolates guest / web / tv). */
   private prefetchPartition(): string {
     const session = AuthSessionManager.getInstance();
     const mode = session?.isAuthEnabledForPlayback() === true ? 'auth' : 'guest';
-    return `${mode}|${session?.getCredentialRevision() ?? 0}|${YoutubePlayerClientConfig.getConfigurationKey()}`;
+    const rail = session?.preferredPlaybackRail() ?? 'none';
+    return `${mode}|r${rail}|${session?.getCredentialRevision() ?? 0}|${YoutubePlayerClientConfig.getConfigurationKey()}`;
   }
 
   private prefetchCacheKey(videoId: string): string {

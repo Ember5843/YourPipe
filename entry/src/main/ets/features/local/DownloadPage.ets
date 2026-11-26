@@ -275,7 +275,7 @@ export struct DownloadPage {
       .alignItems(HorizontalAlign.Center)
       .padding({ bottom: 60 })
     } else {
-      List({ space: 4 }) {
+      List({ space: 8 }) {
         // 一个连续列表：下载条目在前，导入条目追加在最后；不插分组标题。
         ForEach(this.tasks, (task: DownloadTask) => {
           ListItem() {

@@ -80,9 +80,9 @@ export const HOLD_SPEED_VALUES: number[] = [1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
 /** 长按触发延迟可选档位（毫秒） */
 export const HOLD_SPEED_DELAYS: number[] = [300, 500, 800, 1000];
 
-/** 手势交互方案预设：enhanced=播放器增强（默认）、youtube=YouTube 经典、bilibili=Bilibili 经典、custom=逐项自定义 */
-export type GestureScheme = 'enhanced' | 'youtube' | 'bilibili' | 'custom';
-export const GESTURE_SCHEME_LABELS: GestureScheme[] = ['enhanced', 'youtube', 'bilibili', 'custom'];
+/** 手势交互方案预设（一次性套用模板，不与下方分项开关耦合）：enhanced=播放器增强、youtube=YouTube 经典、bilibili=Bilibili 经典 */
+export type GesturePreset = 'enhanced' | 'youtube' | 'bilibili';
+export const GESTURE_PRESET_LABELS: GesturePreset[] = ['enhanced', 'youtube', 'bilibili'];
 
 /** 双击屏幕的动作（与左右快进退互斥：单选，天然避免手势冲突） */
 export type DoubleTapAction = 'seek' | 'playpause' | 'off';
@@ -91,7 +91,7 @@ export const DOUBLE_TAP_ACTION_LABELS: DoubleTapAction[] = ['seek', 'playpause',
 /** 双击快退/快进的步长（秒）——对齐 YouTube 可选范围（5–60s） */
 export const DOUBLE_TAP_SEEK_SECONDS: number[] = [5, 10, 15, 20, 30, 60];
 
-export function getGestureSchemeDisplay(value: GestureScheme): Resource {
+export function getGestureSchemeDisplay(value: GesturePreset): Resource {
   return $r(`app.string.yt_gesture_scheme_${value}`);
 }
 
@@ -264,8 +264,6 @@ export class PlaybackConfig {
   @Track holdSpeedValue: number = 2.0;
   /** 长按多久触发加速（毫秒） */
   @Track holdSpeedDelayMs: number = 500;
-  /** 手势交互方案预设（改任一分项开关后自动变为 custom） */
-  @Track gestureScheme: GestureScheme = 'enhanced';
   /** 双击屏幕的动作：左右快进退 / 播放暂停 / 关闭 */
   @Track doubleTapAction: DoubleTapAction = 'seek';
   /** 双击快进退步长（秒），仅 doubleTapAction='seek' 时生效 */
@@ -340,7 +338,6 @@ export class PlaybackConfig {
     this.holdSpeedEnabled = true;
     this.holdSpeedValue = 2.0;
     this.holdSpeedDelayMs = 500;
-    this.gestureScheme = 'enhanced';
     this.doubleTapAction = 'seek';
     this.doubleTapSeekSeconds = 15;
     this.pipOnReturn = true;
@@ -372,73 +369,38 @@ export class PlaybackConfig {
   }
 
   /**
-   * 手势方案预设：一次性写回各分项开关（双击单选 + 滑动组 + 长按组）。
-   * enhanced = 播放器增强（现状：双击 ±15s、横滑进度、左亮右音、长按 2x）；
-   * youtube  = YouTube 经典（双击 ±10s、无横滑/亮度/音量滑、长按 2x）；
-   * bilibili = Bilibili 经典（双击播放/暂停、横滑进度、左亮右音、长按加速）；
-   * custom   = 不改变任何开关，仅表示方案选择。
+   * 手势方案预设：一次性写回各分项开关（双击单选 + 滑动组 + 长按组），不与分项开关反向耦合。
+   * enhanced = 播放器增强（双击 ±15s、横滑进度、左亮右音、长按 2x、关闭中央播放按钮）；
+   * youtube  = YouTube 经典（双击 ±10s、无横滑/亮度/音量滑、长按 2x、开启中央播放按钮）；
+   * bilibili = Bilibili 经典（双击播放/暂停、横滑进度、左亮右音、长按加速、关闭中央播放按钮）。
    */
-  static applyGesturePreset(cfg: PlaybackConfig, scheme: GestureScheme): void {
-    if (scheme === 'enhanced') {
+  static applyGesturePreset(cfg: PlaybackConfig, preset: GesturePreset): void {
+    if (preset === 'enhanced') {
       cfg.doubleTapAction = 'seek';
       cfg.doubleTapSeekSeconds = 15;
       cfg.gestureSeekEnabled = true;
       cfg.gestureBrightnessEnabled = true;
       cfg.gestureVolumeEnabled = true;
       cfg.holdSpeedEnabled = true;
-    } else if (scheme === 'youtube') {
+    } else if (preset === 'youtube') {
       cfg.doubleTapAction = 'seek';
       cfg.doubleTapSeekSeconds = 10;
       cfg.gestureSeekEnabled = false;
       cfg.gestureBrightnessEnabled = false;
       cfg.gestureVolumeEnabled = false;
       cfg.holdSpeedEnabled = true;
-    } else if (scheme === 'bilibili') {
+    } else if (preset === 'bilibili') {
       cfg.doubleTapAction = 'playpause';
       cfg.gestureSeekEnabled = true;
       cfg.gestureBrightnessEnabled = true;
       cfg.gestureVolumeEnabled = true;
       cfg.holdSpeedEnabled = true;
     }
-    cfg.gestureScheme = scheme;
   }
 
-  /**
-   * 结构项（双击动作 + 三个滑动开关 + 长按开关）与某预设是否一致。
-   * 参数项（双击步长、长按倍速/触发延迟）不参与判定——它们是预设的可调参数。
-   */
-  private static matchesGesturePreset(cfg: PlaybackConfig, scheme: GestureScheme): boolean {
-    if (scheme === 'enhanced') {
-      return cfg.doubleTapAction === 'seek' && cfg.gestureSeekEnabled
-        && cfg.gestureBrightnessEnabled && cfg.gestureVolumeEnabled && cfg.holdSpeedEnabled;
-    }
-    if (scheme === 'youtube') {
-      return cfg.doubleTapAction === 'seek' && !cfg.gestureSeekEnabled
-        && !cfg.gestureBrightnessEnabled && !cfg.gestureVolumeEnabled && cfg.holdSpeedEnabled;
-    }
-    if (scheme === 'bilibili') {
-      return cfg.doubleTapAction === 'playpause' && cfg.gestureSeekEnabled
-        && cfg.gestureBrightnessEnabled && cfg.gestureVolumeEnabled && cfg.holdSpeedEnabled;
-    }
-    return false;
-  }
-
-  /**
-   * 按当前结构项回推所属方案：与某预设组合一致 → 该预设；都不一致 → custom。
-   * 用于"改动分项开关后重算方案"，程序化改写开关（预设应用时 Toggle 会触发
-   * onChange）也会走这里——组合没变就保持原预设，不会被误判成自定义。
-   */
-  static schemeForGestureConfig(cfg: PlaybackConfig): GestureScheme {
-    if (PlaybackConfig.matchesGesturePreset(cfg, 'enhanced')) {
-      return 'enhanced';
-    }
-    if (PlaybackConfig.matchesGesturePreset(cfg, 'youtube')) {
-      return 'youtube';
-    }
-    if (PlaybackConfig.matchesGesturePreset(cfg, 'bilibili')) {
-      return 'bilibili';
-    }
-    return 'custom';
+  /** 各手势预设对应的中央播放按钮开关：仅 YouTube 经典默认开启，其余关闭。 */
+  static centerPlayButtonForPreset(preset: GesturePreset): boolean {
+    return preset === 'youtube';
   }
 
   static loadFromPreferences(): PlaybackConfig {
@@ -453,11 +415,6 @@ export class PlaybackConfig {
     cfg.holdSpeedValue = HOLD_SPEED_VALUES.includes(holdSpeedValue) ? holdSpeedValue : 2.0;
     const holdSpeedDelay = Number(PreferencesStore.getString('cfg_pb_holdSpeedDelayMs', '500'));
     cfg.holdSpeedDelayMs = HOLD_SPEED_DELAYS.includes(holdSpeedDelay) ? holdSpeedDelay : 500;
-    const gestureSchemeRaw = PreferencesStore.getString('cfg_pb_gestureScheme', 'enhanced');
-    // 旧版本存过 'classic'（= 现在的 YouTube 经典），保留映射避免丢配置
-    cfg.gestureScheme = gestureSchemeRaw === 'classic' ? 'youtube'
-      : (GESTURE_SCHEME_LABELS.includes(gestureSchemeRaw as GestureScheme)
-        ? gestureSchemeRaw as GestureScheme : 'enhanced');
     const doubleTapRaw = PreferencesStore.getString('cfg_pb_doubleTapAction', 'seek');
     cfg.doubleTapAction = DOUBLE_TAP_ACTION_LABELS.includes(doubleTapRaw as DoubleTapAction)
       ? doubleTapRaw as DoubleTapAction : 'seek';
@@ -572,7 +529,6 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_holdSpeedEnabled', cfg.holdSpeedEnabled ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_holdSpeedValue', String(cfg.holdSpeedValue));
     PreferencesStore.setString('cfg_pb_holdSpeedDelayMs', String(cfg.holdSpeedDelayMs));
-    PreferencesStore.setString('cfg_pb_gestureScheme', cfg.gestureScheme);
     PreferencesStore.setString('cfg_pb_doubleTapAction', cfg.doubleTapAction);
     PreferencesStore.setString('cfg_pb_doubleTapSeekSeconds', String(cfg.doubleTapSeekSeconds));
     PreferencesStore.setString('cfg_pb_pipOnReturn', cfg.pipOnReturn ? 'true' : 'false');

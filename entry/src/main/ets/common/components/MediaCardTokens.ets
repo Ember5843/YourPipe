@@ -7,6 +7,7 @@ export const MEDIA_THUMB_RADIUS: number = 8;
 export const MEDIA_LIST_THUMB_WIDTH: number = 160;
 export const MEDIA_LIST_THUMB_HEIGHT: number = 90;
 export const MEDIA_LIST_THUMB_GAP: number = 12;
+export const MEDIA_LIST_ITEM_SPACING: number = 8;
 export const MEDIA_TITLE_SIZE: number = 14;
 export const MEDIA_TITLE_LINE_HEIGHT: number = 18;
 export const MEDIA_META_SIZE: number = 12;

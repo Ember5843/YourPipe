@@ -27,7 +27,7 @@ import {
 } from '../../../common/components/MediaCardTokens';
 
 const QUEUE_MENU_SYMBOL_SIZE: number = 16;
-const QUEUE_LIST_ITEM_SPACE_VP: number = 4;
+const QUEUE_LIST_ITEM_SPACE_VP: number = 8;
 const QUEUE_DEFAULT_ROW_HEIGHT_VP: number = MEDIA_LIST_THUMB_HEIGHT + 16;
 const DRAG_EDGE_ZONE_VP: number = 56;
 const DRAG_SCROLL_MIN_STEP_VP: number = 4;

@@ -326,13 +326,14 @@ export class SabrOfflineDownloader {
         });
       } else {
         consecutiveFetchFails++;
-        if (consecutiveFetchFails >= 6) {
+        if (consecutiveFetchFails >= 12) {
           throw new Error(
             `SABR dual-track stalled videoSeq=${nextVideoSeq} audioSeq=${nextAudioSeq} `
             + `vEnd=${videoBuf.getEndSegment()} aEnd=${audioBuf.getEndSegment()}`);
         }
-        // Brief yield so server backoff can clear without spinning.
-        await new Promise<void>((r) => setTimeout(r, 300));
+        // Stepped backoff so server protection/rate-limit windows can clear without aborting mid-download.
+        const waitMs = Math.min(2000, 300 * consecutiveFetchFails);
+        await new Promise<void>((r) => setTimeout(r, waitMs));
       }
     }
 

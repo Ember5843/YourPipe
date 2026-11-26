@@ -44,10 +44,9 @@ export class UIConfig {
    */
   @Track downloadTimeoutMinutes: number = 30;
   /**
-   * 暂停时画面中央的大播放按钮。关掉后只靠"点画面"切换播放/暂停，
-   * 画面中央保持干净（适合已经习惯点按操作的用户）。
+   * 暂停时画面中央的大播放按钮。默认关闭，仅在应用「YouTube 经典」预设或用户手动开启时启用。
    */
-  @Track showCenterPlayButton: boolean = true;
+  @Track showCenterPlayButton: boolean = false;
   /** 是否允许检查 GitHub Releases 更新（总开关）。 */
   @Track checkGithubUpdates: boolean = true;
   /** 启动时静默检查一次更新。 */
@@ -122,7 +121,7 @@ export class UIConfig {
       ? Math.max(0, Math.min(240, downloadTimeoutMinutes))
       : 30;
     config.showCenterPlayButton =
-      PreferencesStore.getString('cfg_showCenterPlayButton', 'true') !== 'false';
+      PreferencesStore.getString('cfg_showCenterPlayButton', 'false') === 'true';
     config.checkGithubUpdates =
       PreferencesStore.getString('cfg_checkGithubUpdates', 'true') !== 'false';
     config.checkUpdatesOnStartup =
@@ -174,7 +173,7 @@ export class UIConfig {
     );
     PreferencesStore.setString('cfg_maxConcurrentDownloads', `${Math.max(1, Math.min(4, Math.round(config.maxConcurrentDownloads || 1)))}`);
     PreferencesStore.setString('cfg_downloadTimeoutMinutes', `${Math.max(0, Math.min(240, Math.round(config.downloadTimeoutMinutes ?? 30)))}`);
-    PreferencesStore.setString('cfg_showCenterPlayButton', config.showCenterPlayButton !== false ? 'true' : 'false');
+    PreferencesStore.setString('cfg_showCenterPlayButton', config.showCenterPlayButton ? 'true' : 'false');
     PreferencesStore.setString('cfg_checkGithubUpdates', config.checkGithubUpdates !== false ? 'true' : 'false');
     PreferencesStore.setString('cfg_checkUpdatesOnStartup', config.checkUpdatesOnStartup !== false ? 'true' : 'false');
     PreferencesStore.setString('cfg_shortsBallEnabled', config.shortsBallEnabled !== false ? 'true' : 'false');

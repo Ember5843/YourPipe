@@ -705,7 +705,7 @@ export struct MediaVideoFeed {
 
   @Builder
   ListFeed() {
-    List({ space: 4, scroller: this.listScroller }) {
+    List({ space: 8, scroller: this.listScroller }) {
       if (this.params.hasHeader) {
         ListItem() {
           this.headerBuilder()

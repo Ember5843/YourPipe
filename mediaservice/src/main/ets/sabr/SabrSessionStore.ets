@@ -66,11 +66,13 @@ class SabrSessionStoreImpl {
     videoItag: number,
     useAuth: boolean = false
   ): string {
-    // Auth state is part of the identity: a UMP session created under one
-    // credential rail carries that rail's cookies / PoToken / identity and must
-    // never be reused by the other state (login ↔ logout, or an account switch).
+    // Auth state + active rail (none/web/tv) is part of the identity: a UMP session
+    // created under one credential rail carries that rail's cookies / PoToken / identity
+    // and must never be reused by another state (anonymous ↔ Web Cookie ↔ OAuth TV).
+    const session = AuthSessionManager.getInstance();
+    const rail = session?.preferredPlaybackRail() ?? 'none';
     return `${videoId}|p${profile}|a${audioItag}|t${audioTrackId || '-'}|v${videoItag}`
-      + `|${useAuth ? 'auth' : 'guest'}|c${AuthSessionManager.getInstance()?.getCredentialRevision() ?? 0}`;
+      + `|${useAuth ? 'auth' : 'guest'}|r${rail}|c${session?.getCredentialRevision() ?? 0}`;
   }
 
   /**

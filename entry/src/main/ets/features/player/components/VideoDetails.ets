@@ -29,6 +29,7 @@ import { StatsBarGraph } from './StatsBarGraph';
 import { StreamInfoRow } from './StreamInfoRow';
 import { DownloadManager } from '../../../common/DownloadManager';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
+import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
 import { UIConfig } from '../../../common/AppState';
 import { PlaybackConfig } from '../../../common/PlaybackConfig';
 import {
@@ -622,10 +623,11 @@ export struct VideoDetails {
     if (this.isLocalMode) {
       return false;
     }
+    // 至少等待一项主元数据（观看/日期/点赞）就绪后整行一起展示，
+    // 避免 RYD 点踩先返回或初始值占位时孤零零只亮一个点踩图标。
     return this.viewCount > 0
       || !!(this.publishDate && this.publishDate.length > 0)
-      || this.hasLikeCount()
-      || this.hasDislikeCount();
+      || this.hasLikeCount();
   }
 
   private formatFileSize(bytes: number): string {
@@ -701,8 +703,9 @@ export struct VideoDetails {
     }
     .scrollable(ScrollDirection.Horizontal)
     .scrollBar(BarState.Off)
+    .fadingEdge(true)
     .width('100%')
-    .height(36)
+    .height(38)
     .margin({ bottom: 14 })
   }
 
@@ -747,24 +750,24 @@ export struct VideoDetails {
     Button() {
       Row({ space: 6 }) {
         SymbolGlyph($r('sys.symbol.key_shield_fill'))
-          .fontSize(14)
+          .fontSize(16)
           .fontColor([this.isCurrentChannelWhitelisted()
             ? this.themePrimary
-            : $r('app.color.yourtube_text_primary')])
-          .fontWeight(this.isCurrentChannelWhitelisted() ? FontWeight.Bold : FontWeight.Normal)
+            : $r('sys.color.icon_primary')])
+          .fontWeight(this.isCurrentChannelWhitelisted() ? FontWeight.Medium : FontWeight.Normal)
         Text($r('app.string.yt_exp_sb_whitelist_channel'))
           .fontSize(13)
           .fontColor(this.isCurrentChannelWhitelisted()
             ? this.themePrimary
-            : $r('app.color.yourtube_text_primary'))
+            : $r('sys.color.font_primary'))
           .fontWeight(FontWeight.Medium)
       }
     }
-    .height(36)
+    .height(38)
     .backgroundColor(this.isCurrentChannelWhitelisted()
-      ? $r('app.color.yourtube_player_info_bg')
-      : $r('app.color.yourtube_player_control_bg'))
-    .borderRadius(18)
+      ? ThemeColorUtil.selectedBackground(this.themePrimary)
+      : $r('sys.color.comp_background_tertiary'))
+    .borderRadius(19)
     .padding({ left: 14, right: 14 })
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .onClick(() => { this.toggleCurrentChannelSponsorWhitelist(); })
@@ -775,24 +778,24 @@ export struct VideoDetails {
     Button() {
       Row({ space: 6 }) {
         SymbolGlyph($r('sys.symbol.earphone'))
-          .fontSize(14)
+          .fontSize(16)
           .fontColor([this.isAudioOnlyMode
             ? this.themePrimary
-            : $r('app.color.yourtube_text_primary')])
-          .fontWeight(this.isAudioOnlyMode ? FontWeight.Bold : FontWeight.Normal)
+            : $r('sys.color.icon_primary')])
+          .fontWeight(this.isAudioOnlyMode ? FontWeight.Medium : FontWeight.Normal)
         Text($r('app.string.yt_action_audio_only'))
           .fontSize(13)
           .fontColor(this.isAudioOnlyMode
             ? this.themePrimary
-            : $r('app.color.yourtube_text_primary'))
+            : $r('sys.color.font_primary'))
           .fontWeight(FontWeight.Medium)
       }
     }
-    .height(36)
+    .height(38)
     .backgroundColor(this.isAudioOnlyMode
-      ? $r('app.color.yourtube_player_info_bg')
-      : $r('app.color.yourtube_player_control_bg'))
-    .borderRadius(18)
+      ? ThemeColorUtil.selectedBackground(this.themePrimary)
+      : $r('sys.color.comp_background_tertiary'))
+    .borderRadius(19)
     .padding({ left: 14, right: 14 })
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .onClick(() => { this.toggleAudioOnlyMode(); })
@@ -803,26 +806,26 @@ export struct VideoDetails {
     Button() {
       Row({ space: 6 }) {
         SymbolGlyph($r('sys.symbol.timer'))
-          .fontSize(14)
+          .fontSize(16)
           .fontColor([this.sleepTimerRemainingMinutes > 0
             ? this.themePrimary
-            : $r('app.color.yourtube_text_primary')])
-          .fontWeight(this.sleepTimerRemainingMinutes > 0 ? FontWeight.Bold : FontWeight.Normal)
+            : $r('sys.color.icon_primary')])
+          .fontWeight(this.sleepTimerRemainingMinutes > 0 ? FontWeight.Medium : FontWeight.Normal)
         Text(this.sleepTimerRemainingMinutes > 0
           ? this.formatSleepTimerRemaining()
           : $r('app.string.yt_action_sleep_timer'))
           .fontSize(13)
           .fontColor(this.sleepTimerRemainingMinutes > 0
             ? this.themePrimary
-            : $r('app.color.yourtube_text_primary'))
+            : $r('sys.color.font_primary'))
           .fontWeight(FontWeight.Medium)
       }
     }
-    .height(36)
+    .height(38)
     .backgroundColor(this.sleepTimerRemainingMinutes > 0
-      ? $r('app.color.yourtube_player_info_bg')
-      : $r('app.color.yourtube_player_control_bg'))
-    .borderRadius(18)
+      ? ThemeColorUtil.selectedBackground(this.themePrimary)
+      : $r('sys.color.comp_background_tertiary'))
+    .borderRadius(19)
     .padding({ left: 14, right: 14 })
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .onClick(() => { this.openSleepTimerPicker(); })
@@ -833,17 +836,17 @@ export struct VideoDetails {
     Button() {
       Row({ space: 6 }) {
         SymbolGlyph(icon)
-          .fontSize(14)
-          .fontColor([$r('app.color.yourtube_text_primary')])
+          .fontSize(16)
+          .fontColor([$r('sys.color.icon_primary')])
         Text(label)
           .fontSize(13)
-          .fontColor($r('app.color.yourtube_text_primary'))
+          .fontColor($r('sys.color.font_primary'))
           .fontWeight(FontWeight.Medium)
       }
     }
-    .height(36)
-    .backgroundColor($r('app.color.yourtube_player_control_bg'))
-    .borderRadius(18)
+    .height(38)
+    .backgroundColor($r('sys.color.comp_background_tertiary'))
+    .borderRadius(19)
     .padding({ left: 14, right: 14 })
     .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
     .onClick(() => { action(); })

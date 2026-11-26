@@ -36,6 +36,43 @@ export struct ChannelCard {
   @StorageProp('uiConfig') uiConfig: UIConfig = new UIConfig();
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   @State isShowContextMenu: boolean = false;
+  @State metaRowWidth: number = 0;
+
+  /** 估算单行 12fp 文本宽度（vp），用于判断订阅数 + 视频数是否会与右侧按钮冲突。 */
+  private estimateMetaTextWidth(text: string): number {
+    let width = 0;
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      if (code > 0x2E7F) {
+        width += 12.6;
+      } else if (code === 0x20 || code === 0xB7) {
+        width += 4.5;
+      } else {
+        width += 7.2;
+      }
+    }
+    return width;
+  }
+
+  /**
+   * 信息退避策略：优先保证最重要的左侧信息（订阅数）完整可读；
+   * 当检测到「订阅数 · 视频数」超出可用宽度会与订阅按钮冲突时，自动退避隐藏次要的视频数。
+   */
+  private shouldShowVideoCount(): boolean {
+    const videoText = this.channel.videoCountText || '';
+    if (videoText.length === 0) {
+      return false;
+    }
+    const subText = this.channel.subscriberText || '';
+    if (subText.length === 0) {
+      return true;
+    }
+    if (this.metaRowWidth <= 0) {
+      return true;
+    }
+    const combinedWidth = this.estimateMetaTextWidth(`${subText} · ${videoText}`);
+    return combinedWidth <= this.metaRowWidth - 2;
+  }
 
   private getChannelId(): string {
     return (this.channel.channelId || '').trim();
@@ -254,20 +291,28 @@ export struct ChannelCard {
               .fontSize(MEDIA_META_SIZE)
               .fontColor($r('app.color.yourtube_text_quaternary'))
               .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis });
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .flexShrink(1);
           }
-          if (this.channel.videoCountText && this.channel.videoCountText.length > 0) {
+          if (this.shouldShowVideoCount()) {
             Text(this.channel.subscriberText && this.channel.subscriberText.length > 0
               ? ` · ${this.channel.videoCountText}`
               : this.channel.videoCountText)
               .fontSize(MEDIA_META_SIZE)
               .fontColor($r('app.color.yourtube_text_hint'))
               .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis });
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .flexShrink(1);
           }
         }
         .width('100%')
-        .alignItems(VerticalAlign.Center);
+        .alignItems(VerticalAlign.Center)
+        .onAreaChange((_oldValue: Area, newValue: Area) => {
+          const w = Number(newValue.width);
+          if (w > 0 && Math.abs(w - this.metaRowWidth) > 2) {
+            this.metaRowWidth = w;
+          }
+        });
 
         if (this.showDescription && this.channel.description && this.channel.description.length > 0) {
           Text(this.channel.description)
@@ -295,7 +340,7 @@ export struct ChannelCard {
               .fontWeight(FontWeight.Medium)
               .fontColor(this.isSubscribed() ? $r('sys.color.font_secondary') : this.themePrimary)
           }
-          .padding({ left: 10, right: 12 })
+          .padding({ left: 10, right: 10 })
           .alignItems(VerticalAlign.Center)
         }
         .backgroundColor(this.isSubscribed()
@@ -309,6 +354,7 @@ export struct ChannelCard {
       }
       .height(56)
       .justifyContent(FlexAlign.Center)
+      .flexShrink(0)
       .margin({ left: 8 });
     }
     .width('100%')

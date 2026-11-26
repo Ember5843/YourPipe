@@ -310,7 +310,7 @@ export struct FavoritesPage {
     // 顶栏避让放在外层 Column（与首页同构）：List clip(false) 让上滑内容
     // 画进避让区、透出标题栏半透明材质；scroller 绑定根标题栏滚动效果。
     Column() {
-      List({ space: 4, scroller: FavoritesScrollCoordinator.scroller }) {
+      List({ space: 8, scroller: FavoritesScrollCoordinator.scroller }) {
       this.SubscriptionFeedEntry()
 
       // 收藏的视频部分
