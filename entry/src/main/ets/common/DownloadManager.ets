@@ -106,7 +106,7 @@ export class DownloadTask {
   audioStream: StreamInfo | null;
   subtitleTrack: SubtitleTrack | null = null;
   embedSubtitleInVideo: boolean = true;
-  subtitleOnly: boolean = false;
+  @Track subtitleOnly: boolean = false;
   @Track status: DownloadStatus = DownloadStatus.PENDING;
   @Track progress: number = 0;
   @Track videoProgress: number = 0;
