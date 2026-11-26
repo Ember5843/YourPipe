@@ -13,14 +13,17 @@
  * limitations under the License.
  */
 
-import { componentUtils, LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
+import { ColorMetrics, componentUtils, curves, LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { ConfigurationConstant } from '@kit.AbilityKit';
 import { audio, AVVolumePanel } from '@kit.AudioKit';
 import { i18n } from '@kit.LocalizationKit';
+import { KeyCode } from '@kit.InputKit';
+import { hdsEffect } from '@kit.UIDesignKit';
 import { AICaptionComponent, AICaptionController, AICaptionOptions } from '@kit.SpeechKit';
 import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { Logger, CommonConstants, secondToTime } from 'mediaservice';
 import { ThemeColorUtil } from '../../../common/ThemeColorUtil';
+import { MaterialUtil } from '../../../common/utils/MaterialUtil';
 import { UIConfig } from '../../../common/AppState';
 import {
   AvPlayerController,
@@ -103,7 +106,6 @@ const OVERLAY_PILL_HEIGHT_VP: number = 42;
  *  manually so every pair fires (see onCenterTap). */
 const DOUBLE_TAP_WINDOW_MS: number = 300;
 const CONTROL_SLOT_SIZE: number = 40;
-const CONTROL_ICON_SIZE: number = 24;
 /** 中央播放按钮的可点判定半径（72vp 直径的一半 + 容差）。 */
 const CENTER_PLAY_BUTTON_HIT_RADIUS: number = 44;
 const SPEED_CONTROL_WIDTH: number = 48;
@@ -2821,16 +2823,138 @@ export struct VideoPlayer {
   private getTimeLabelWidth(): number {
     const durationText = secondToTime(Math.floor(Math.max(0, this.durationTime)));
     if (durationText.length > 8) {
-      return 80;
+      return 86;
     }
     if (durationText.length > 5) {
-      return 64;
+      return 70;
     }
-    return 48;
+    return 54;
   }
 
   private getCombinedTimeLabelWidth(): number {
-    return this.getTimeLabelWidth() * 2 + 12;
+    return this.getTimeLabelWidth() * 2 + 14;
+  }
+
+  private isTvOrLargeScreen(): boolean {
+    return deviceInfo.deviceType === 'tv' || this.containerVpWidth >= 1000;
+  }
+
+  private controlBarSlotSize(): number {
+    return this.isTvOrLargeScreen() ? 50 : 42;
+  }
+
+  private controlBarIconSize(): number {
+    return this.isTvOrLargeScreen() ? 26 : 24;
+  }
+
+  private controlBarTextSize(): number {
+    return this.isTvOrLargeScreen() ? 16 : 14;
+  }
+
+  private shouldShowTopTitleBar(): boolean {
+    return this.isFullLandscapeScreen || this.containerVpWidth >= 600;
+  }
+
+  private getTopBarTitle(): string {
+    const selectedTitle = (this.selectedVideo?.title || '').trim();
+    if (selectedTitle.length > 0) {
+      return selectedTitle;
+    }
+    if (typeof this.curSource.description === 'string') {
+      const desc = this.curSource.description.trim();
+      if (desc.length > 0) {
+        return desc;
+      }
+    }
+    return '';
+  }
+
+  private getTopBarAuthor(): string {
+    return (this.selectedVideo?.author || '').trim();
+  }
+
+  private getTopBarSpecBadge(): string {
+    if (this.curSource.isLive) {
+      return 'LIVE';
+    }
+    const h = this.vm.videoHeight;
+    let res = '';
+    if (h >= 2160) {
+      res = '4K';
+    } else if (h >= 1440) {
+      res = '2K';
+    } else if (h >= 1080) {
+      res = '1080P';
+    } else if (h >= 720) {
+      res = '720P';
+    } else if (h >= 480) {
+      res = '480P';
+    } else if (h > 0) {
+      res = `${h}P`;
+    }
+    const fps = this.vm.frameRate >= 48 ? `${Math.round(this.vm.frameRate)}fps` : '';
+    if (res && fps) {
+      return `${res} ${fps}`;
+    }
+    return res || fps;
+  }
+
+  private buildCenterPlayPointLight(): VisualEffect | undefined {
+    if (!MaterialUtil.supportsImmersive()) {
+      return undefined;
+    }
+    try {
+      return new hdsEffect.HdsEffectBuilder()
+        .pointLight({
+          sourceType: hdsEffect.PointLightSourceType.SOFT,
+          illuminatedType: hdsEffect.PointLightIlluminatedType.BORDER_CONTENT,
+          options: {
+            color: '#4DFFFFFF',
+            intensity: 0.65,
+            height: 48,
+            bloom: 0.25
+          }
+        })
+        .buildEffect();
+    } catch (_e) {
+      return undefined;
+    }
+  }
+
+  private handlePlayerKeyEvent(event: KeyEvent): void {
+    if (event.type !== KeyType.Down) {
+      return;
+    }
+    const code = event.keyCode;
+    if (code === KeyCode.KEYCODE_SPACE
+      || code === KeyCode.KEYCODE_ENTER
+      || code === KeyCode.KEYCODE_DPAD_CENTER
+      || code === KeyCode.KEYCODE_MEDIA_PLAY_PAUSE) {
+      this.registerControlActivity();
+      this.togglePlayback();
+      return;
+    }
+    if (code === KeyCode.KEYCODE_DPAD_LEFT || code === KeyCode.KEYCODE_DPAD_RIGHT) {
+      if (!this.showControls && !this.curSource.isLive && this.durationTime > 0) {
+        const step = Math.max(5, this.playbackConfig.doubleTapSeekSeconds || 15);
+        const delta = code === KeyCode.KEYCODE_DPAD_RIGHT ? step : -step;
+        const target = Math.max(0, Math.min(this.durationTime, this.currentTime + delta));
+        this.controller.syncSeekFast(target * 1000);
+      }
+      this.registerControlActivity();
+      return;
+    }
+    if (code === KeyCode.KEYCODE_DPAD_UP || code === KeyCode.KEYCODE_DPAD_DOWN) {
+      this.registerControlActivity();
+      return;
+    }
+    if (code === KeyCode.KEYCODE_ESCAPE) {
+      if (this.showControls) {
+        this.showControls = false;
+      } else if (this.isFullLandscapeScreen && this.onFullScreenClick) {
+        this.onFullScreenClick(false);
+      }
+    }
   }
 
   /**
@@ -3352,6 +3476,45 @@ export struct VideoPlayer {
       // the hint stays visible while taps always reach the gesture layer.
       .zIndex(CommonConstants.Z_INDEX_BASE + 2.1)
 
+      // 2.4 独立 4 段非线性缓动羽化阴影（Scrim）：位于手势层之下且全树 HitTestMode.None，
+      // 绝不拦截点击/双击/滑动手势，消除旧版单行 Row 硬黑边截断。
+      Column() {
+        Row()
+          .width('100%')
+          .height(this.isTvOrLargeScreen() ? 160 : 120)
+          .hitTestBehavior(HitTestMode.None)
+          .linearGradient({
+            direction: GradientDirection.Bottom,
+            colors: [
+              ['#B8000000', 0.0],
+              ['#73000000', 0.35],
+              ['#2B000000', 0.7],
+              ['#00000000', 1.0]
+            ]
+          })
+        Blank().layoutWeight(1).hitTestBehavior(HitTestMode.None)
+        Row()
+          .width('100%')
+          .height(this.isTvOrLargeScreen() ? 170 : 136)
+          .hitTestBehavior(HitTestMode.None)
+          .linearGradient({
+            direction: GradientDirection.Bottom,
+            colors: [
+              ['#00000000', 0.0],
+              ['#22000000', 0.3],
+              ['#66000000', 0.65],
+              ['#A6000000', 1.0]
+            ]
+          })
+      }
+      .width('100%')
+      .height('100%')
+      .opacity(this.showControls ? 1 : 0)
+      .animation(this.uiConfig.isAnimation
+        ? { duration: 220, curve: Curve.FastOutSlowIn }
+        : { duration: 0 })
+      .hitTestBehavior(HitTestMode.None)
+
       // 2.6 手势层：透明全屏，承载画面手势（单击/双击/滑动/长按）
       //
       // **必须独立成层、且位于播控层之下。** 之前手势挂在容器上（播控层的
@@ -3361,23 +3524,30 @@ export struct VideoPlayer {
       // 泄漏从根上消失；画面空白处仍然命中本层，手势照常。
       this.GestureLayer()
 
-      // 2.5 中央播放按钮（暂停时）：点击恢复播放（ended 时 = 从头重播）
+      // 2.5 中央播放按钮（暂停时）：毛玻璃 + 点光源质感 + 弹簧入出场动效
       if (this.showCenterPlayButton()) {
         Stack({ alignContent: Alignment.Center }) {
           Stack({ alignContent: Alignment.Center }) {
             // 播放结束用"重播"图标，避免和"继续播放"混淆。
-            // arrow_clockwise 是项目内已验证存在的系统符号（重试用同一枚）。
             SymbolGlyph(this.vm.isEnded
               ? $r('sys.symbol.arrow_clockwise')
               : $r('sys.symbol.play_fill'))
-              .fontSize(34)
+              .fontSize(this.isTvOrLargeScreen() ? 40 : 34)
               .fontColor([Color.White])
           }
-          .width(72)
-          .height(72)
-          .borderRadius(36)
-          .backgroundColor('#66000000')
-          .border({ width: 1, color: '#33FFFFFF' })
+          .width(this.isTvOrLargeScreen() ? 84 : 72)
+          .height(this.isTvOrLargeScreen() ? 84 : 72)
+          .borderRadius(this.isTvOrLargeScreen() ? 42 : 36)
+          .backgroundBlurStyle(BlurStyle.BACKGROUND_THIN)
+          .backgroundColor('#33000000')
+          .border({ width: 1, color: '#40FFFFFF' })
+          .visualEffect(this.buildCenterPlayPointLight())
+          .focusable(true)
+          .focusBox({
+            margin: LengthMetrics.vp(3),
+            strokeColor: ColorMetrics.resourceColor(this.themePrimary),
+            strokeWidth: LengthMetrics.vp(2.5)
+          })
           .onClick(() => {
             this.togglePlayback();
           })
@@ -3386,6 +3556,11 @@ export struct VideoPlayer {
         .height('100%')
         // Transparent：空白处仍可命中下层（单击显隐控件/手势组），按钮自身优先响应
         .hitTestBehavior(HitTestMode.Transparent)
+        .transition(this.uiConfig.isAnimation
+          ? TransitionEffect.OPACITY
+            .combine(TransitionEffect.scale({ x: 0.85, y: 0.85 }))
+            .animation({ curve: curves.springMotion(0.35, 0.8) })
+          : TransitionEffect.IDENTITY)
         .zIndex(CommonConstants.Z_INDEX_MAX)
       }
 
@@ -3400,21 +3575,23 @@ export struct VideoPlayer {
       }
       .width('100%').height('100%')
       .opacity(this.showControls ? 1 : 0)
+      .animation(this.uiConfig.isAnimation
+        ? { duration: 220, curve: Curve.FastOutSlowIn }
+        : { duration: 0 })
       // 隐藏时用 BLOCK_DESCENDANTS：HitTestMode.None 只禁用 Column 自身，
       // 后代按钮（顶栏/进度条/菜单）不可见但仍可点到；BLOCK_DESCENDANTS 整棵子树禁用
       .hitTestBehavior(this.showControls ? HitTestMode.Transparent : HitTestMode.BLOCK_DESCENDANTS)
       .zIndex(CommonConstants.Z_INDEX_MAX)
-
-      // 4. 详细统计信息悬浮层（Stats for Nerds HUD：独立于控制层显隐与横竖屏，仅按钮可点）
-      if (this.showStatsOverlay) {
-        this.StatsForNerdsOverlay()
-      }
     }
     .width(CommonConstants.WIDTH_FULL_PERCENT)
     .height(CommonConstants.HEIGHT_FULL_PERCENT)
     .id('PlayerContainer')
     .backgroundColor(Color.Black)
     .clip(true)
+    .focusable(true)
+    .onKeyEvent((event: KeyEvent) => {
+      this.handlePlayerKeyEvent(event);
+    })
     .onSizeChange((_old: SizeOptions, newSize: SizeOptions) => {
       const w = newSize.width as number;
       const h = newSize.height as number;
@@ -3931,18 +4108,6 @@ export struct VideoPlayer {
         .contentFont({ size: 14 })
         .labelFont({ size: 14, weight: FontWeight.Medium })
         .labelFontColor($r('sys.color.font_primary'))
-      MenuItem({
-        symbolStartIcon: this.menuSymbol($r('sys.symbol.info_circle')),
-        content: $r('app.string.yt_player_stats_for_nerds'),
-        endIcon: this.showStatsOverlay ? $r('sys.symbol.checkmark') : ''
-      })
-        .contentFontColor($r('sys.color.font_primary'))
-        .contentFont({ size: 14 })
-        .backgroundColor(this.showStatsOverlay
-          ? this.getSelectedMenuBackground() : Color.Transparent)
-        .onClick(() => {
-          this.setStatsOverlayVisible(!this.showStatsOverlay);
-        })
       // 显式停止：后台播放时通知栏只有「暂停」，用户真正想要的是彻底停掉。
       MenuItem({
         symbolStartIcon: this.menuSymbol($r('sys.symbol.xmark_circle')),
@@ -3969,18 +4134,6 @@ export struct VideoPlayer {
   @Builder
   MoreMenu() {
     Menu() {
-      MenuItem({
-        symbolStartIcon: this.menuSymbol($r('sys.symbol.info_circle')),
-        content: $r('app.string.yt_player_stats_for_nerds'),
-        endIcon: this.showStatsOverlay ? $r('sys.symbol.checkmark') : ''
-      })
-        .contentFontColor($r('sys.color.font_primary'))
-        .contentFont({ size: 14 })
-        .backgroundColor(this.showStatsOverlay
-          ? this.getSelectedMenuBackground() : Color.Transparent)
-        .onClick(() => {
-          this.setStatsOverlayVisible(!this.showStatsOverlay);
-        })
       if (this.canToggleChannelWhitelist()) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.key_shield_fill')),
@@ -4017,16 +4170,16 @@ export struct VideoPlayer {
 
   @Builder
   TopToolsExpandedRow() {
-    Row({ space: this.getControlItemGap() }) {
+    Row({ space: 2 }) {
       // 全屏/分屏/挤压铺满态：信息面板 sheet 入口
       if (this.isFullLandscapeScreen && this.onShowInfoPanel) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.info_circle'))
-            .fontSize(CONTROL_ICON_SIZE)
+            .fontSize(this.controlBarIconSize())
             .fontColor([Color.White])
         }
-          .width(SPEED_CONTROL_WIDTH)
-          .height(CONTROL_SLOT_SIZE)
+          .width(this.controlBarSlotSize())
+          .height(this.controlBarSlotSize())
           .accessibilityText($r('app.string.yt_player_info_panel'))
           .onClick(() => this.onShowInfoPanel?.())
       }
@@ -4034,11 +4187,11 @@ export struct VideoPlayer {
       if (this.hasChaptersOrSegments()) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.list_bullet_square'))
-            .fontSize(CONTROL_ICON_SIZE)
+            .fontSize(this.controlBarIconSize())
             .fontColor([Color.White])
         }
-          .width(SPEED_CONTROL_WIDTH)
-          .height(CONTROL_SLOT_SIZE)
+          .width(this.controlBarSlotSize())
+          .height(this.controlBarSlotSize())
           .accessibilityText(this.chaptersSheetTitle())
           .onClick(() => {
             this.registerControlActivity();
@@ -4049,11 +4202,11 @@ export struct VideoPlayer {
       if (!this.curSource.isLive && !this.isLocalMode) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.AI_subtitles'))
-            .fontSize(CONTROL_ICON_SIZE)
+            .fontSize(this.controlBarIconSize())
             .fontColor([this.vm.currentSubtitleUrl.length > 0 ? this.themePrimary : Color.White])
         }
-          .width(SPEED_CONTROL_WIDTH)
-          .height(CONTROL_SLOT_SIZE)
+          .width(this.controlBarSlotSize())
+          .height(this.controlBarSlotSize())
           .accessibilityText($r('app.string.yt_player_subtitles'))
           .onClick(() => {
             this.registerControlActivity();
@@ -4075,11 +4228,11 @@ export struct VideoPlayer {
       if (this.hasMultipleAudioTracks()) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.speaker_wave_2'))
-            .fontSize(CONTROL_ICON_SIZE)
+            .fontSize(this.controlBarIconSize())
             .fontColor([Color.White])
         }
-          .width(SPEED_CONTROL_WIDTH)
-          .height(CONTROL_SLOT_SIZE)
+          .width(this.controlBarSlotSize())
+          .height(this.controlBarSlotSize())
           .accessibilityText($r('app.string.yt_player_audio_track'))
           .bindMenu(this.AudioMenu())
       }
@@ -4088,21 +4241,22 @@ export struct VideoPlayer {
       && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.resolution_video'))
-            .fontSize(CONTROL_ICON_SIZE)
+            .fontSize(this.controlBarIconSize())
             .fontColor([Color.White])
         }
-          .width(SPEED_CONTROL_WIDTH)
-          .height(CONTROL_SLOT_SIZE)
+          .width(this.controlBarSlotSize())
+          .height(this.controlBarSlotSize())
           .bindMenu(this.VideoMenu())
       }
 
       if (!this.curSource.isLive) {
         Text(this.vm.playbackSpeed + 'x')
-          .fontSize(16)
+          .fontSize(this.controlBarTextSize())
           .fontColor(Color.White)
           .fontWeight(FontWeight.Medium)
-          .width(SPEED_CONTROL_WIDTH)
-          .height(CONTROL_SLOT_SIZE)
+          .fontFeature('"tnum" 1')
+          .height(this.controlBarSlotSize())
+          .padding({ left: 10, right: 10 })
           .maxLines(1)
           .textAlign(TextAlign.Center)
           .bindMenu(this.SpeedMenu())
@@ -4110,25 +4264,31 @@ export struct VideoPlayer {
 
       // 画面比例：下拉菜单选择（与其他选项一致的交互），菜单打开期间 UI 保活
       Text(this.aspectModeLabel())
-        .fontSize(13)
+        .fontSize(this.controlBarTextSize())
         .fontColor(Color.White)
         .fontWeight(FontWeight.Medium)
-        .height(CONTROL_SLOT_SIZE)
-        .padding({ left: 8, right: 8 })
+        .height(this.controlBarSlotSize())
+        .padding({ left: 10, right: 10 })
         .textAlign(TextAlign.Center)
         .accessibilityText($r('app.string.yt_player_aspect_mode'))
         .bindMenu(this.AspectMenu())
 
       Stack({ alignContent: Alignment.Center }) {
         SymbolGlyph($r('sys.symbol.line_3_horizontal'))
-          .fontSize(CONTROL_ICON_SIZE)
+          .fontSize(this.controlBarIconSize())
           .fontColor([Color.White])
       }
-        .width(CONTROL_SLOT_SIZE)
-        .height(CONTROL_SLOT_SIZE)
+        .width(this.controlBarSlotSize())
+        .height(this.controlBarSlotSize())
         .accessibilityText($r('app.string.yt_player_more_tools'))
         .bindMenu(this.MoreMenu())
     }
+    .height(this.controlBarSlotSize())
+    .padding({ left: 4, right: 4 })
+    .borderRadius(this.controlBarSlotSize() / 2)
+    .backgroundBlurStyle(BlurStyle.BACKGROUND_THIN)
+    .backgroundColor('#47000000')
+    .border({ width: 1, color: '#33FFFFFF' })
     .alignItems(VerticalAlign.Center)
   }
 
@@ -4137,12 +4297,22 @@ export struct VideoPlayer {
     Row() {
       Stack({ alignContent: Alignment.Center }) {
         SymbolGlyph($r('sys.symbol.xmark'))
-          .fontSize(CONTROL_ICON_SIZE)
+          .fontSize(this.controlBarIconSize())
           .fontWeight(FontWeight.Medium)
           .fontColor([Color.White])
       }
-        .width(CONTROL_SLOT_SIZE)
-        .height(CONTROL_SLOT_SIZE)
+        .width(this.controlBarSlotSize())
+        .height(this.controlBarSlotSize())
+        .borderRadius(this.controlBarSlotSize() / 2)
+        .backgroundBlurStyle(BlurStyle.BACKGROUND_THIN)
+        .backgroundColor('#47000000')
+        .border({ width: 1, color: '#33FFFFFF' })
+        .focusable(true)
+        .focusBox({
+          margin: LengthMetrics.vp(3),
+          strokeColor: ColorMetrics.resourceColor(this.themePrimary),
+          strokeWidth: LengthMetrics.vp(2.5)
+        })
         .onClick(() => {
           // Explicit close button: force teardown so the page pop never leaves
           // an invisible dangling playback session behind.
@@ -4150,18 +4320,68 @@ export struct VideoPlayer {
           this.actionHub.closePage();
         })
 
-      Blank()
+      if (this.shouldShowTopTitleBar() && this.getTopBarTitle().length > 0) {
+        Column({ space: 2 }) {
+          Text(this.getTopBarTitle())
+            .fontSize(this.isTvOrLargeScreen() ? 20 : 16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Color.White)
+            .textOverflow({ overflow: TextOverflow.MARQUEE })
+            .marqueeOptions({
+              start: this.showControls && this.uiConfig.isAnimation,
+              fromStart: true,
+              step: 4,
+              loop: -1,
+              delay: 1200,
+              fadeout: true,
+              spacing: LengthMetrics.vp(48)
+            })
+            .textShadow({ radius: 6, color: '#99000000', offsetY: 1 })
+            .width('100%')
+
+          if (this.getTopBarAuthor().length > 0 || this.getTopBarSpecBadge().length > 0) {
+            Row({ space: 8 }) {
+              if (this.getTopBarAuthor().length > 0) {
+                Text(this.getTopBarAuthor())
+                  .fontSize(this.isTvOrLargeScreen() ? 13 : 12)
+                  .fontColor('#E6FFFFFF')
+                  .textShadow({ radius: 4, color: '#80000000', offsetY: 1 })
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .flexShrink(1)
+              }
+              if (this.getTopBarSpecBadge().length > 0) {
+                Text(this.getTopBarSpecBadge())
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Color.White)
+                  .padding({ left: 6, right: 6, top: 1, bottom: 1 })
+                  .borderRadius(4)
+                  .backgroundColor(this.curSource.isLive ? this.themePrimary : '#59000000')
+                  .border({ width: 0.5, color: '#33FFFFFF' })
+              }
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+          }
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        .margin({ left: 10, right: 12 })
+      } else {
+        Blank()
+      }
 
       if (this.shouldCollapseTopTools()) {
-        Row({ space: 4 }) {
+        Row({ space: 2 }) {
           if (!this.curSource.isLive && !this.isLocalMode && this.vm.subtitleTracks.length > 0) {
             Stack({ alignContent: Alignment.Center }) {
               SymbolGlyph($r('sys.symbol.AI_subtitles'))
-                .fontSize(CONTROL_ICON_SIZE)
+                .fontSize(this.controlBarIconSize())
                 .fontColor([this.vm.currentSubtitleUrl.length > 0 ? this.themePrimary : Color.White])
             }
-              .width(CONTROL_SLOT_SIZE)
-              .height(CONTROL_SLOT_SIZE)
+              .width(this.controlBarSlotSize())
+              .height(this.controlBarSlotSize())
               .accessibilityText($r('app.string.yt_player_subtitles'))
               .onClick(() => {
                 this.onQuickToggleSubtitle();
@@ -4182,14 +4402,20 @@ export struct VideoPlayer {
 
           Stack({ alignContent: Alignment.Center }) {
             SymbolGlyph($r('sys.symbol.line_3_horizontal'))
-              .fontSize(CONTROL_ICON_SIZE)
+              .fontSize(this.controlBarIconSize())
               .fontColor([Color.White])
           }
-            .width(CONTROL_SLOT_SIZE)
-            .height(CONTROL_SLOT_SIZE)
+            .width(this.controlBarSlotSize())
+            .height(this.controlBarSlotSize())
             .accessibilityText($r('app.string.yt_player_more_tools'))
             .bindMenu(this.TopToolsCollapsedMenu())
         }
+        .height(this.controlBarSlotSize())
+        .padding({ left: 4, right: 4 })
+        .borderRadius(this.controlBarSlotSize() / 2)
+        .backgroundBlurStyle(BlurStyle.BACKGROUND_THIN)
+        .backgroundColor('#47000000')
+        .border({ width: 1, color: '#33FFFFFF' })
         .alignItems(VerticalAlign.Center)
       } else {
         this.TopToolsExpandedRow()
@@ -4205,29 +4431,34 @@ export struct VideoPlayer {
       top: this.getControlTopPad(),
       bottom: CONTROL_VERTICAL_INSET
     })
-    .linearGradient({
-      direction: GradientDirection.Bottom,
-      colors: [
-        ['#66000000', 0.0],
-        ['#00000000', 1.0]
-      ]
-    })
+    .translate({ y: this.showControls ? 0 : -12 })
+    .animation(this.uiConfig.isAnimation
+      ? { duration: 220, curve: Curve.FastOutSlowIn }
+      : { duration: 0 })
   }
 
   @Builder
   PlayControl() {
-    Row({ space: this.getControlItemGap() }) {
-      // 播放/暂停按鈕：正在播放或缓冲中时显示暂停图标，其他状态显示播放图标
-      Stack({ alignContent: Alignment.Center }) {
-        SymbolGlyph(this.vm.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
-          .fontSize(CONTROL_ICON_SIZE)
-          .fontColor([Color.White])
-      }
-        .width(CONTROL_SLOT_SIZE)
-        .height(CONTROL_SLOT_SIZE)
-        .opacity(this.vm.isReady && this.hasStreams ? 1 : 0.4)
-        // 缓冲中也要能暂停：缓冲是网络侧的问题，不该把用户的停止手段也锁掉。
-        .enabled(this.vm.isReady && this.hasStreams)
+    Row() {
+      Row({ space: this.getControlItemGap() }) {
+        // 播放/暂停按鈕：正在播放或缓冲中时显示暂停图标，其他状态显示播放图标
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph(this.vm.isPlaying ? $r('sys.symbol.pause') : $r('sys.symbol.play_fill'))
+            .fontSize(this.controlBarIconSize())
+            .fontColor([Color.White])
+        }
+          .width(this.controlBarSlotSize())
+          .height(this.controlBarSlotSize())
+          .borderRadius(this.controlBarSlotSize() / 2)
+          .focusable(true)
+          .focusBox({
+            margin: LengthMetrics.vp(3),
+            strokeColor: ColorMetrics.resourceColor(this.themePrimary),
+            strokeWidth: LengthMetrics.vp(2.5)
+          })
+          .opacity(this.vm.isReady && this.hasStreams ? 1 : 0.4)
+          // 缓冲中也要能暂停：缓冲是网络侧的问题，不该把用户的停止手段也锁掉。
+          .enabled(this.vm.isReady && this.hasStreams)
         .onClick(() => this.togglePlayback())
 
       if (this.curSource.isLive) {
@@ -4272,6 +4503,7 @@ export struct VideoPlayer {
             .width('100%').height(CONTROL_SLOT_SIZE)
             .trackColor(Color.Transparent).selectedColor(Color.White)
             .trackThickness(this.trackThicknessSize).enabled(!!(this.vm.isReady && this.hasStreams))
+            .animation(this.uiConfig.isAnimation ? { duration: 150, curve: Curve.EaseOut } : { duration: 0 })
             .onTouch((event: TouchEvent) => this.onSliderTouch(event))
             .onChange((value: number, mode: SliderChangeMode) => this.sliderOnchange(value, mode))
 
@@ -4301,30 +4533,48 @@ export struct VideoPlayer {
             : this.isGestureSeek ? this.gestureSeekTime
             : this.currentTime
         ))} / ${secondToTime(Math.floor(this.durationTime))}`)
-          .fontColor('#DDFFFFFF')
-          .fontSize(13)
+          .fontColor('#F2FFFFFF')
+          .fontSize(this.controlBarTextSize())
+          .fontWeight(FontWeight.Medium)
+          .fontFeature('"tnum" 1')
           .width(this.getCombinedTimeLabelWidth())
-          .height(CONTROL_SLOT_SIZE)
+          .height(this.controlBarSlotSize())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Clip })
           .textAlign(TextAlign.Center)
           .flexShrink(0)
       }
 
-      // 全屏按鈕 — fontSize 统一用 vp，移除冲突的 height(24)限制；强制全屏态（分屏/挤压铺满）隐藏
+      // 全屏按鈕 — 统一槽位与图标尺寸
       if (this.showFullscreenButton) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph(this.isFullLandscapeScreen ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') : $r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-            .fontSize(CONTROL_ICON_SIZE)
+            .fontSize(this.controlBarIconSize())
             .fontColor([Color.White])
         }
-          .width(CONTROL_SLOT_SIZE)
-          .height(CONTROL_SLOT_SIZE)
+          .width(this.controlBarSlotSize())
+          .height(this.controlBarSlotSize())
+          .borderRadius(this.controlBarSlotSize() / 2)
+          .focusable(true)
+          .focusBox({
+            margin: LengthMetrics.vp(3),
+            strokeColor: ColorMetrics.resourceColor(this.themePrimary),
+            strokeWidth: LengthMetrics.vp(2.5)
+          })
           .onClick(() => {
             this.registerControlActivity();
             this.onFullScreenClick?.(!this.isFullLandscapeScreen);
           })
       }
+      }
+      .width('100%')
+      .height(this.controlBarSlotSize() + 6)
+      .padding({ left: 6, right: 6 })
+      .borderRadius((this.controlBarSlotSize() + 6) / 2)
+      .backgroundBlurStyle(BlurStyle.BACKGROUND_THIN)
+      .backgroundColor('#4D000000')
+      .border({ width: 1, color: '#2EFFFFFF' })
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
@@ -4334,7 +4584,10 @@ export struct VideoPlayer {
       right: this.getControlRightPad(),
       bottom: this.getControlBottomPad()
     })
-    .linearGradient({ direction: GradientDirection.Bottom, colors: [['#00000000', 0.0], ['#66000000', 1.0]] })
+    .translate({ y: this.showControls ? 0 : 12 })
+    .animation(this.uiConfig.isAnimation
+      ? { duration: 220, curve: Curve.FastOutSlowIn }
+      : { duration: 0 })
     // 实测控制条高度喂给字幕上浮计算（隐藏时仅 opacity=0，仍在树上持续上报）
     .onAreaChange((_oldArea: Area, newArea: Area) => {
       this.bottomControlBarVpH = Number(newArea.height);

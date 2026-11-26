@@ -942,12 +942,13 @@ export struct VideoDetails {
     .bindSheet($$this.sheetVisible, this.ActiveSheetBuilder(), {
       detents: [SheetSize.MEDIUM, SheetSize.LARGE],
       dragBar: true,
-      backgroundColor: $r('app.color.yourtube_bg_page'),
+      backgroundColor: $r('sys.color.background_secondary'),
       // CENTER：宽窗（≥600vp，平板/2in1/横屏）下呈居中卡片，避免底部 sheet 拉满
       // 全宽导致信息稀疏；窄窗（<600vp，手机竖屏）系统自动回退为底部样式，与
       // PlayerPage 视频信息 sheet / Index 选项 sheet 同一范式。
       preferType: SheetType.CENTER,
       showClose: false,
+      scrollSizeMode: ScrollSizeMode.CONTINUOUS,
       onWillDisappear: () => {
         this.activeSheet = 0;
         this.showSavePlaylistSheet = false;
@@ -1079,7 +1080,7 @@ export struct VideoDetails {
           .height(28)
           .padding({ left: 10, right: 10 })
           .borderRadius(14)
-          .backgroundColor($r('app.color.yourtube_player_control_bg'))
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
           .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
           .onClick(() => { this.copyStreamDiagnostics(); })
         }
@@ -1206,9 +1207,12 @@ export struct VideoDetails {
       }
       .width('100%')
       .alignItems(HorizontalAlign.Start)
-      .padding({ left: 16, right: 16, top: 16, bottom: 24 })
+      .padding({ left: 16, right: 16, top: 16, bottom: 32 })
     }
     .width('100%')
+    .height('100%')
+    .align(Alignment.Top)
+    .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
     .edgeEffect(EdgeEffect.Spring)
     .scrollBar(BarState.Off)
   }
