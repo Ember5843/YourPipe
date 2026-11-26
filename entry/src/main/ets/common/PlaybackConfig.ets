@@ -121,7 +121,7 @@ export const SUBTITLE_FONT_COLOR_VALUES: Record<SubtitleFontColor, string> = {
   'cyan': '#00E5FF',
 };
 
-/** 覆盖层字幕背景样式 */
+/** 覆盖层字幕背景样式（历史 3 档键，保留供迁移与旧设置项兼容） */
 export type SubtitleBackground = 'semi' | 'solid' | 'none';
 export const SUBTITLE_BACKGROUND_LABELS: SubtitleBackground[] = ['semi', 'solid', 'none'];
 export const SUBTITLE_BACKGROUND_VALUES: Record<SubtitleBackground, string> = {
@@ -130,14 +130,86 @@ export const SUBTITLE_BACKGROUND_VALUES: Record<SubtitleBackground, string> = {
   'none': '#00000000',
 };
 
-/** 字幕延迟档位（毫秒，正值 = 字幕延后显示，mpv sub-delay 语义） */
+/** 覆盖层字幕边缘样式：描边+阴影 / 纯描边 / 仅阴影 / 无 */
+export type SubtitleEdgeStyle = 'outline_shadow' | 'outline' | 'shadow' | 'none';
+export const SUBTITLE_EDGE_STYLE_LABELS: SubtitleEdgeStyle[] = ['outline_shadow', 'outline', 'shadow', 'none'];
+
+/** 覆盖层字幕背景不透明度离散档位（0=无背景 .. 1.0=纯黑不透明） */
+export const SUBTITLE_BG_OPACITY_VALUES: number[] = [0, 0.35, 0.6, 0.85, 1.0];
+
+export function normalizeSubtitleBgOpacity(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0.6;
+  }
+  let closest: number = SUBTITLE_BG_OPACITY_VALUES[0];
+  let bestDiff: number = Math.abs(value - closest);
+  for (let i = 1; i < SUBTITLE_BG_OPACITY_VALUES.length; i++) {
+    const candidate = SUBTITLE_BG_OPACITY_VALUES[i];
+    const diff = Math.abs(value - candidate);
+    if (diff < bestDiff) {
+      closest = candidate;
+      bestDiff = diff;
+    }
+  }
+  return closest;
+}
+
+/** 字幕延迟范围与预设档位（毫秒，正值 = 字幕延后显示，mpv sub-delay 语义） */
+export const SUBTITLE_OFFSET_MIN_MS: number = -5000;
+export const SUBTITLE_OFFSET_MAX_MS: number = 5000;
 export const SUBTITLE_OFFSET_VALUES: number[] = [-1000, -500, -250, 0, 250, 500, 1000];
 
+export function clampSubtitleOffsetMs(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const rounded = Math.round(value);
+  if (rounded < SUBTITLE_OFFSET_MIN_MS) {
+    return SUBTITLE_OFFSET_MIN_MS;
+  }
+  if (rounded > SUBTITLE_OFFSET_MAX_MS) {
+    return SUBTITLE_OFFSET_MAX_MS;
+  }
+  return rounded === 0 ? 0 : rounded;
+}
+
 export function getSubtitleOffsetDisplay(value: number): string {
-  if (value === 0) return '0s';
-  const sign = value > 0 ? '+' : '-';
-  const abs = Math.abs(value);
-  return `${sign}${abs >= 1000 ? `${abs / 1000}` : `0.${abs / 10}`}s`;
+  const clamped = clampSubtitleOffsetMs(value);
+  if (clamped === 0) return '0s';
+  const sign = clamped > 0 ? '+' : '-';
+  const abs = Math.abs(clamped);
+  if (abs % 1000 === 0) {
+    return `${sign}${abs / 1000}s`;
+  }
+  const formatted = (abs / 1000).toFixed(2).replace(/0$/, '');
+  return `${sign}${formatted}s`;
+}
+
+/** MPV 原生音画延迟范围与步长（毫秒） */
+export const AUDIO_DELAY_MIN_MS: number = -1000;
+export const AUDIO_DELAY_MAX_MS: number = 1000;
+export const AUDIO_DELAY_STEP_MS: number = 50;
+
+export function clampAudioDelayMs(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const rounded = Math.round(value);
+  if (rounded < AUDIO_DELAY_MIN_MS) {
+    return AUDIO_DELAY_MIN_MS;
+  }
+  if (rounded > AUDIO_DELAY_MAX_MS) {
+    return AUDIO_DELAY_MAX_MS;
+  }
+  return rounded === 0 ? 0 : rounded;
+}
+
+export function getAudioDelayDisplay(valueMs: number): string {
+  const clamped = clampAudioDelayMs(valueMs);
+  if (clamped === 0) {
+    return '0ms';
+  }
+  return `${clamped > 0 ? '+' : ''}${clamped}ms`;
 }
 
 export function getSubtitleFontColorDisplay(value: SubtitleFontColor): Resource {
@@ -225,22 +297,82 @@ export class PlaybackConfig {
   @Track guestPlayerClient: GuestPlayerClient = 'visionos';
   /** 登录（且启用播放鉴权）时的 YouTube 播放端点 */
   @Track authPlayerClient: AuthPlayerClient = 'mweb';
+  /** 字幕总开关（与 subtitlePreferredTrack 解耦：关闭时保留偏好语言，一键 CC 可恢复） */
+  @Track subtitleEnabled: boolean = false;
+  /** 字幕偏好轨道键：'' | 'original' | 'lang|manual' | 'lang|auto' */
+  @Track subtitlePreferredTrack: string = '';
+  /** 双语副字幕偏好轨道键：''（关闭）| 'lang|manual' | 'lang|auto' */
+  @Track secondarySubtitleTrack: string = '';
   /** 覆盖层字幕字号倍率 */
   @Track subtitleFontScale: SubtitleFontScale = '1';
   /** 覆盖层字幕底部间距（vp） */
   @Track subtitleBottomMarginVp: SubtitleBottomMargin = '48';
   /** 覆盖层字幕字体颜色 */
   @Track subtitleFontColor: SubtitleFontColor = 'white';
-  /** 覆盖层字幕背景样式 */
+  /** 覆盖层字幕背景样式（历史字段，保留兼容） */
   @Track subtitleBackground: SubtitleBackground = 'semi';
+  /** 覆盖层字幕边缘样式：'outline_shadow' | 'outline' | 'shadow' | 'none' */
+  @Track subtitleEdgeStyle: SubtitleEdgeStyle = 'outline_shadow';
+  /** 覆盖层字幕粗体开关 */
+  @Track subtitleBold: boolean = false;
+  /** 覆盖层字幕背景不透明度（离散档位 0 / 0.35 / 0.6 / 0.85 / 1.0） */
+  @Track subtitleBgOpacity: number = 0.6;
   /** 字幕延迟（毫秒，正值 = 延后显示） */
   @Track subtitleOffsetMs: number = 0;
   /** 系统 AI 字幕（Speech Kit AICaptionComponent 自动捕获应用音频；仅支持的机型/地区生效） */
   @Track systemAiCaption: boolean = false;
   /** 系统 AI 字幕源语言（'zh'|'en'；英文源输出中英双语） */
   @Track systemAiCaptionSource: string = 'en';
+  /** MPV 原生响度均衡（dynaudnorm） */
+  @Track audioNormalizeEnabled: boolean = false;
+  /** MPV 原生跳过静音（silenceremove，直播流自动旁路） */
+  @Track skipSilenceEnabled: boolean = false;
+  /** MPV 原生音画延迟（毫秒，范围 -1000..1000） */
+  @Track audioDelayMs: number = 0;
 
   constructor() {}
+
+  /** 就地复位全部播放配置到默认值（遵循 ArkUI V1 @Observed/@Track 就地修改规范）。 */
+  resetToDefaults(): void {
+    this.defaultQuality = '480p';
+    this.mobileQuality = '480p';
+    this.gestureSeekEnabled = true;
+    this.gestureBrightnessEnabled = true;
+    this.gestureVolumeEnabled = true;
+    this.holdSpeedEnabled = true;
+    this.holdSpeedValue = 2.0;
+    this.holdSpeedDelayMs = 500;
+    this.gestureScheme = 'enhanced';
+    this.doubleTapAction = 'seek';
+    this.doubleTapSeekSeconds = 15;
+    this.pipOnReturn = true;
+    this.backgroundAudioOnly = true;
+    this.backgroundVideoOffDelaySec = '15';
+    this.autoPlayNext = true;
+    this.hwdecEnabled = true;
+    this.cacheSecs = '10';
+    this.demuxerReadaheadSecs = '8';
+    this.demuxerMaxBytes = '20';
+    this.gpuApi = 'auto';
+    this.guestPlayerClient = 'visionos';
+    this.authPlayerClient = 'mweb';
+    this.subtitleEnabled = false;
+    this.subtitlePreferredTrack = '';
+    this.secondarySubtitleTrack = '';
+    this.subtitleFontScale = '1';
+    this.subtitleBottomMarginVp = '48';
+    this.subtitleFontColor = 'white';
+    this.subtitleBackground = 'semi';
+    this.subtitleEdgeStyle = 'outline_shadow';
+    this.subtitleBold = false;
+    this.subtitleBgOpacity = 0.6;
+    this.subtitleOffsetMs = 0;
+    this.systemAiCaption = false;
+    this.systemAiCaptionSource = 'en';
+    this.audioNormalizeEnabled = false;
+    this.skipSilenceEnabled = false;
+    this.audioDelayMs = 0;
+  }
 
   /**
    * 手势方案预设：一次性写回各分项开关（双击单选 + 滑动组 + 长按组）。
@@ -364,6 +496,34 @@ export class PlaybackConfig {
     const authClient = PreferencesStore.getString('cfg_pb_authPlayerClient', 'mweb');
     cfg.authPlayerClient = AUTH_PLAYER_CLIENT_LABELS.includes(authClient as AuthPlayerClient)
       ? authClient as AuthPlayerClient : 'mweb';
+    const MISSING_PREF = '__yp_missing__';
+    const subEnabledRaw = PreferencesStore.getString('cfg_pb_subtitleEnabled', MISSING_PREF);
+    const subPrefTrackRaw = PreferencesStore.getString('cfg_pb_subtitlePreferredTrack', MISSING_PREF);
+    if (subEnabledRaw === MISSING_PREF && subPrefTrackRaw === MISSING_PREF) {
+      // 从旧单键 cfg_subtitle_preferred_lang 平滑迁移到「开关 + 偏好轨道」解耦模型
+      const legacyLang = PreferencesStore.getString('cfg_subtitle_preferred_lang', '').trim();
+      if (legacyLang.length > 0) {
+        if (legacyLang.startsWith('ai:')) {
+          const target = legacyLang.substring(3).trim();
+          cfg.subtitleEnabled = target.length > 0;
+          cfg.subtitlePreferredTrack = target.length > 0 ? `${target}|manual` : '';
+        } else {
+          cfg.subtitleEnabled = true;
+          cfg.subtitlePreferredTrack = (legacyLang.includes('|') || legacyLang === 'original')
+            ? legacyLang : `${legacyLang}|manual`;
+        }
+        PreferencesStore.setString('cfg_pb_subtitleEnabled', cfg.subtitleEnabled ? 'true' : 'false');
+        PreferencesStore.setString('cfg_pb_subtitlePreferredTrack', cfg.subtitlePreferredTrack);
+        logger.info(`subtitle pref migrated ${legacyLang} -> enabled=${cfg.subtitleEnabled} track=${cfg.subtitlePreferredTrack}`);
+      } else {
+        cfg.subtitleEnabled = false;
+        cfg.subtitlePreferredTrack = '';
+      }
+    } else {
+      cfg.subtitleEnabled = subEnabledRaw === 'true';
+      cfg.subtitlePreferredTrack = subPrefTrackRaw === MISSING_PREF ? '' : subPrefTrackRaw.trim();
+    }
+    cfg.secondarySubtitleTrack = PreferencesStore.getString('cfg_pb_secondarySubtitleTrack', '').trim();
     const subScale = PreferencesStore.getString('cfg_pb_subtitleFontScale', '1');
     cfg.subtitleFontScale = SUBTITLE_FONT_SCALE_LABELS.includes(subScale as SubtitleFontScale)
       ? subScale as SubtitleFontScale : '1';
@@ -376,11 +536,32 @@ export class PlaybackConfig {
     const subBg = PreferencesStore.getString('cfg_pb_subtitleBackground', 'semi');
     cfg.subtitleBackground = SUBTITLE_BACKGROUND_LABELS.includes(subBg as SubtitleBackground)
       ? subBg as SubtitleBackground : 'semi';
+    const subEdgeRaw = PreferencesStore.getString('cfg_pb_subtitleEdgeStyle', 'outline_shadow');
+    cfg.subtitleEdgeStyle = SUBTITLE_EDGE_STYLE_LABELS.includes(subEdgeRaw as SubtitleEdgeStyle)
+      ? subEdgeRaw as SubtitleEdgeStyle : 'outline_shadow';
+    cfg.subtitleBold = PreferencesStore.getString('cfg_pb_subtitleBold', 'false') === 'true';
+    const subBgOpacityRaw = PreferencesStore.getString('cfg_pb_subtitleBgOpacity', MISSING_PREF);
+    if (subBgOpacityRaw === MISSING_PREF) {
+      // 新键缺失时从旧 subtitleBackground 迁移默认透明度
+      if (cfg.subtitleBackground === 'none') {
+        cfg.subtitleBgOpacity = 0;
+      } else if (cfg.subtitleBackground === 'solid') {
+        cfg.subtitleBgOpacity = 0.85;
+      } else {
+        cfg.subtitleBgOpacity = 0.6;
+      }
+    } else {
+      cfg.subtitleBgOpacity = normalizeSubtitleBgOpacity(Number(subBgOpacityRaw));
+    }
     const subOffset = Number(PreferencesStore.getString('cfg_pb_subtitleOffsetMs', '0'));
-    cfg.subtitleOffsetMs = SUBTITLE_OFFSET_VALUES.includes(subOffset) ? subOffset : 0;
+    cfg.subtitleOffsetMs = clampSubtitleOffsetMs(subOffset);
     cfg.systemAiCaption = PreferencesStore.getString('cfg_pb_systemAiCaption', 'false') === 'true';
     const aiCaptionSrc = PreferencesStore.getString('cfg_pb_systemAiCaptionSource', 'en');
     cfg.systemAiCaptionSource = (aiCaptionSrc === 'zh' || aiCaptionSrc === 'en') ? aiCaptionSrc : 'en';
+    cfg.audioNormalizeEnabled = PreferencesStore.getString('cfg_pb_audioNormalizeEnabled', 'false') === 'true';
+    cfg.skipSilenceEnabled = PreferencesStore.getString('cfg_pb_skipSilenceEnabled', 'false') === 'true';
+    const audioDelayRaw = Number(PreferencesStore.getString('cfg_pb_audioDelayMs', '0'));
+    cfg.audioDelayMs = clampAudioDelayMs(audioDelayRaw);
 
     logger.info(`Loaded PlaybackConfig: ${JSON.stringify(cfg)}`);
     return cfg;
@@ -411,13 +592,22 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_gpuApi', cfg.gpuApi);
     PreferencesStore.setString('cfg_pb_guestPlayerClient', cfg.guestPlayerClient);
     PreferencesStore.setString('cfg_pb_authPlayerClient', cfg.authPlayerClient);
+    PreferencesStore.setString('cfg_pb_subtitleEnabled', cfg.subtitleEnabled ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_subtitlePreferredTrack', cfg.subtitlePreferredTrack);
+    PreferencesStore.setString('cfg_pb_secondarySubtitleTrack', cfg.secondarySubtitleTrack);
     PreferencesStore.setString('cfg_pb_subtitleFontScale', cfg.subtitleFontScale);
     PreferencesStore.setString('cfg_pb_subtitleBottomMarginVp', cfg.subtitleBottomMarginVp);
     PreferencesStore.setString('cfg_pb_subtitleFontColor', cfg.subtitleFontColor);
     PreferencesStore.setString('cfg_pb_subtitleBackground', cfg.subtitleBackground);
-    PreferencesStore.setString('cfg_pb_subtitleOffsetMs', String(cfg.subtitleOffsetMs));
+    PreferencesStore.setString('cfg_pb_subtitleEdgeStyle', cfg.subtitleEdgeStyle);
+    PreferencesStore.setString('cfg_pb_subtitleBold', cfg.subtitleBold ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_subtitleBgOpacity', String(normalizeSubtitleBgOpacity(cfg.subtitleBgOpacity)));
+    PreferencesStore.setString('cfg_pb_subtitleOffsetMs', String(clampSubtitleOffsetMs(cfg.subtitleOffsetMs)));
     PreferencesStore.setString('cfg_pb_systemAiCaption', cfg.systemAiCaption ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_systemAiCaptionSource', cfg.systemAiCaptionSource);
+    PreferencesStore.setString('cfg_pb_audioNormalizeEnabled', cfg.audioNormalizeEnabled ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_skipSilenceEnabled', cfg.skipSilenceEnabled ? 'true' : 'false');
+    PreferencesStore.setString('cfg_pb_audioDelayMs', String(clampAudioDelayMs(cfg.audioDelayMs)));
 
     logger.info('Saved PlaybackConfig');
   }

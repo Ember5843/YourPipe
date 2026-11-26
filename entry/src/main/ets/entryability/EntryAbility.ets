@@ -64,6 +64,9 @@ export default class EntryAbility extends UIAbility {
           defaultQuality: pb.defaultQuality,
           mobileQuality: pb.mobileQuality,
           subtitleOffsetMs: pb.subtitleOffsetMs,
+          audioNormalizeEnabled: pb.audioNormalizeEnabled,
+          skipSilenceEnabled: pb.skipSilenceEnabled,
+          audioDelayMs: pb.audioDelayMs,
         };
         return snapshot;
       });
@@ -83,6 +86,22 @@ export default class EntryAbility extends UIAbility {
           }
         }
         return authHeaders;
+      });
+      // 注入字幕 PoToken 提供者：仅命中 exp=xpe/xpv 或首次 0-cue 时按需复用 SabrWebViewPoTokenProvider，不阻塞常规播放。
+      AvPlayerController.setSubtitlePoTokenProvider(async (videoId: string): Promise<string | undefined> => {
+        if (!videoId || videoId.length === 0) {
+          return undefined;
+        }
+        const visitorData = YoutubeJavaScriptPlayerManager.getSessionVisitorData() || '';
+        if (visitorData.length === 0) {
+          return undefined;
+        }
+        try {
+          return await SabrWebViewPoTokenProvider.getInstance().getDashPoToken(visitorData, videoId);
+        } catch (e) {
+          logger.warn(`subtitle PoToken provider failed video=${videoId}: ${(e as Error).message || e}`);
+          return undefined;
+        }
       });
       // 注入 MPV 引擎配置提供者
       AvPlayerController.setEngineConfigProvider(() => {

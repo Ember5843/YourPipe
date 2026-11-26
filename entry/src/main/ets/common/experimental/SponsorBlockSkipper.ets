@@ -64,6 +64,7 @@ export class SponsorBlockSkipper {
   private lastSkipAtMs: number = 0;
   private generation: number = 0;
   private noticeListener: ((notice: SponsorSkipNotice | null) => void) | null = null;
+  private segmentsListeners: Set<(segments: SponsorSegment[]) => void> = new Set();
 
   private progressListener = (currentTime: number, durationTime: number): void => {
     this.onProgress(currentTime, durationTime);
@@ -74,6 +75,25 @@ export class SponsorBlockSkipper {
       SponsorBlockSkipper.instance = new SponsorBlockSkipper();
     }
     return SponsorBlockSkipper.instance;
+  }
+
+  /** 返回当前视频已加载的 SponsorBlock 片段副本（无片段或停用时为空数组）。 */
+  getSegments(): SponsorSegment[] {
+    return this.segments.slice();
+  }
+
+  /** 订阅当前视频的 SponsorBlock 片段变化；注册时立即同步当前快照。 */
+  subscribeSegments(listener: (segments: SponsorSegment[]) => void): void {
+    this.segmentsListeners.add(listener);
+    try {
+      listener(this.segments.slice());
+    } catch (e) {
+      logger.warn(`segments listener initial sync failed: ${(e as Error).message}`);
+    }
+  }
+
+  unsubscribeSegments(listener: (segments: SponsorSegment[]) => void): void {
+    this.segmentsListeners.delete(listener);
   }
 
   /** 播放页注册提示层；页面销毁时传 null。 */
@@ -107,6 +127,7 @@ export class SponsorBlockSkipper {
           return;
         }
         this.segments = segments;
+        this.emitSegments();
         logger.info(`segments ready video=${videoId} count=${segments.length}`);
         // 片段回来时可能已经播进片段内（从历史进度续播），立刻评估一次。
         const state = this.controller ? this.controller.getPlaybackState() : null;
@@ -234,7 +255,19 @@ export class SponsorBlockSkipper {
     this.poiSegment = null;
     this.poiHandled = false;
     this.lastSkipAtMs = 0;
+    this.emitSegments();
     this.emitNotice(null);
+  }
+
+  private emitSegments(): void {
+    const snapshot = this.segments.slice();
+    for (const listener of this.segmentsListeners) {
+      try {
+        listener(snapshot);
+      } catch (e) {
+        logger.warn(`segments listener failed: ${(e as Error).message}`);
+      }
+    }
   }
 
   private emitNotice(notice: SponsorSkipNotice | null): void {

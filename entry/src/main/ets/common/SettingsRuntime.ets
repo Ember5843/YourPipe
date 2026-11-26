@@ -10,6 +10,7 @@ import { TranslationService } from './TranslationService';
 import { ThemeManager } from './ThemeManager';
 import { LanguageManager } from './LanguageManager';
 import { ColorModeManager } from './ColorModeManager';
+import { PlayerSession } from './PlayerSession';
 
 /** Shared completion boundary for defaults and restored settings. */
 export class SettingsRuntime {
@@ -27,7 +28,11 @@ export class SettingsRuntime {
     ThemeManager.initFromConfig(ui.colorPreset);
     LanguageManager.applyPersistedLanguage();
     const context = AppStorage.get<common.UIAbilityContext>('context');
-    if (context) ColorModeManager.applyPersistedMode(context);
+    if (context) {
+      ColorModeManager.applyPersistedMode(context);
+      PlayerSession.getInstance().controller.applyAudioPreferences();
+      PlayerSession.getInstance().refreshSubtitleOverlay();
+    }
     AuthStateHelper.refresh();
     const proxy = NetworkProxyConfig.load();
     AppStorage.setOrCreate('networkProxyConfig', proxy);

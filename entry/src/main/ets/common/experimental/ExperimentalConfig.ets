@@ -203,6 +203,55 @@ export class ExperimentalConfig {
     return this.sponsorWhitelist.split(',').map((item: string) => item.trim()).indexOf(id) >= 0;
   }
 
+  whitelistedChannels(): string[] {
+    if (this.sponsorWhitelist.length === 0) {
+      return [];
+    }
+    const result: string[] = [];
+    const items = this.sponsorWhitelist.split(',');
+    for (const raw of items) {
+      const id = raw.trim();
+      if (id.length > 0 && result.indexOf(id) < 0) {
+        result.push(id);
+      }
+    }
+    return result;
+  }
+
+  /** 切换频道白名单状态（就地改字段，返回切换后是否处于白名单）。 */
+  toggleChannelWhitelist(channelId: string): boolean {
+    const id = (channelId || '').trim();
+    if (id.length === 0) {
+      return false;
+    }
+    const list = this.whitelistedChannels();
+    const index = list.indexOf(id);
+    if (index >= 0) {
+      list.splice(index, 1);
+      this.sponsorWhitelist = list.join(',');
+      return false;
+    }
+    list.push(id);
+    this.sponsorWhitelist = list.join(',');
+    return true;
+  }
+
+  /** 从白名单移除指定频道（就地改字段，返回是否发生变更）。 */
+  removeChannelWhitelist(channelId: string): boolean {
+    const id = (channelId || '').trim();
+    if (id.length === 0) {
+      return false;
+    }
+    const list = this.whitelistedChannels();
+    const index = list.indexOf(id);
+    if (index < 0) {
+      return false;
+    }
+    list.splice(index, 1);
+    this.sponsorWhitelist = list.join(',');
+    return true;
+  }
+
   private categoryList(): string[] {
     if (this.sponsorCategories.length === 0) {
       return [];

@@ -1,5 +1,6 @@
 import { YTCoreLogger } from '../common/YTCoreLogger';
 import {
+  fixThumbnailUrl,
   pickHighestThumbnailUrl,
   getTextFromObject,
   getNestedValue,
@@ -11,8 +12,40 @@ import { YouTubeHttpClient } from '../network/YouTubeHttpClient';
 import { AuthSessionManager } from '../auth/AuthSessionManager';
 import { http } from '@kit.NetworkKit';
 
-import { VideoInfo, ThumbnailInfo, ChapterInfo, SubtitleTrack, RelatedVideoInfo } from './VideoInfo';
-import { PlayerResponse, VideoDetails, PlayerMicroformatRenderer, ThumbnailItem, Chapter, TextRuns, StreamingData, Format, AudioTrackInfo, PlayabilityStatus, CaptionTrack, NextResponse, CompactVideoRenderer, VideoSecondaryInfoRenderer, VideoPrimaryInfoRenderer, LockupViewModel, NextResponseText } from './PlayerResponseTypes';
+import {
+  VideoInfo,
+  ThumbnailInfo,
+  ChapterInfo,
+  SubtitleTrack,
+  RelatedVideoInfo,
+  StoryboardInfo,
+  HeatmapPoint,
+  parseStoryboardSpec,
+  downsampleHeatmap
+} from './VideoInfo';
+import {
+  PlayerResponse,
+  VideoDetails,
+  PlayerMicroformatRenderer,
+  ThumbnailItem,
+  Chapter,
+  TextRuns,
+  StreamingData,
+  Format,
+  AudioTrackInfo,
+  PlayabilityStatus,
+  CaptionTrack,
+  NextResponse,
+  NextResponseThumbnailItem,
+  EngagementPanel,
+  PlayerOverlays,
+  PlayerBarMarkerMapItem,
+  CompactVideoRenderer,
+  VideoSecondaryInfoRenderer,
+  VideoPrimaryInfoRenderer,
+  LockupViewModel,
+  NextResponseText
+} from './PlayerResponseTypes';
 import { ClientsConstants } from '../model/ClientsConstants';
 import { StreamInfo, containSimilarStream } from './StreamInfo';
 import { DeliveryMethod } from '../model/DeliveryType';
@@ -93,6 +126,11 @@ export class ExtractorStageError {
 interface ManifestNDecodeResult {
   original: string;
   decoded: string;
+}
+
+interface StoryboardExtractResult {
+  spec?: string;
+  info?: StoryboardInfo;
 }
 
 interface PlaybackEnrichmentTask {
@@ -499,13 +537,15 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     const tags = micro.tags || vd.keywords || [];
     videoInfo.tags = Array.isArray(tags) ? tags : [];
 
-    const sb = playerResponse.storyboards?.playerStoryboardSpecRenderer || {};
-    videoInfo.storyboardSpec = sb.spec || undefined;
+    const sbResult = this.extractStoryboardFromPlayerResponse(playerResponse, videoInfo.lengthSeconds ?? 0);
+    videoInfo.storyboardSpec = sbResult.spec;
+    videoInfo.storyboard = sbResult.info;
 
     const chapters = playerResponse.chapters || [];
-    videoInfo.chapters = chapters.map((c: Chapter) => new ChapterInfo(
+    videoInfo.chapters = chapters.map((c: Chapter): ChapterInfo => new ChapterInfo(
       this.extractTextFromRuns(c.title),
-      (c.timeRangeStartMillis || 0) / 1000
+      (c.timeRangeStartMillis || 0) / 1000,
+      this.pickChapterThumbnailUrl(c.thumbnail?.thumbnails)
     ));
 
     // 字幕轨道不在此处提取——watch HTML 的 ytInitialPlayerResponse.captions 经常被裁剪/baseUrl 为空。
@@ -517,15 +557,48 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
   }
 
   /**
+   * 从 playerCaptionsTracklistRenderer.audioTracks 解析默认字幕轨在 captionTracks 中的原始索引。
+   */
+  private resolveDefaultCaptionTrackRawIndex(playerResponse: PlayerResponse | undefined): number | undefined {
+    const tracklist = playerResponse?.captions?.playerCaptionsTracklistRenderer;
+    const audioTracks = tracklist?.audioTracks;
+    if (!audioTracks || audioTracks.length === 0) {
+      return undefined;
+    }
+    const defaultAudioIdx = tracklist?.defaultAudioTrackIndex ?? 0;
+    if (defaultAudioIdx >= 0 && defaultAudioIdx < audioTracks.length) {
+      const idx = audioTracks[defaultAudioIdx]?.defaultCaptionTrackIndex;
+      if (typeof idx === 'number' && Number.isFinite(idx) && idx >= 0) {
+        return idx;
+      }
+    }
+    for (let i = 0; i < audioTracks.length; i++) {
+      const audioTrack = audioTracks[i];
+      if (audioTrack.hasDefaultTrack && typeof audioTrack.defaultCaptionTrackIndex === 'number'
+        && Number.isFinite(audioTrack.defaultCaptionTrackIndex) && audioTrack.defaultCaptionTrackIndex >= 0) {
+        return audioTrack.defaultCaptionTrackIndex;
+      }
+    }
+    for (let i = 0; i < audioTracks.length; i++) {
+      const idx = audioTracks[i]?.defaultCaptionTrackIndex;
+      if (typeof idx === 'number' && Number.isFinite(idx) && idx >= 0) {
+        return idx;
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * 从指定 PlayerResponse 提取字幕轨道列表。
-   * 与 PipePipe YoutubeStreamExtractor.getSubtitles 等价：跳过无 baseUrl 的 track，去除已有 fmt/tlang，
-   * 再追加 &fmt=vtt（PipePipe 默认 TTML，这里保留 VTT 以匹配下游解码器）。
+   * 跳过无 baseUrl 的 track，去除已有 fmt/tlang/xosf（yt-dlp#13654: xosf=1 会污染定位与文本结构），
+   * 再追加 &fmt=vtt（下游控制器可按需切换 fmt=json3 优先并回退 vtt）。
    */
   private extractSubtitleTracks(playerResponse: PlayerResponse | undefined): SubtitleTrack[] {
     const tracklist = playerResponse?.captions?.playerCaptionsTracklistRenderer;
     if (!tracklist?.captionTracks?.length) {
       return [];
     }
+    const defaultRawIndex = this.resolveDefaultCaptionTrackRawIndex(playerResponse);
     const subtitleTracks: SubtitleTrack[] = [];
     for (let i = 0; i < tracklist.captionTracks.length; i++) {
       const track = tracklist.captionTracks[i];
@@ -542,8 +615,9 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       const cleanUrl = absoluteBaseUrl
         .replace(/([?&])fmt=[^&]*/g, '$1')
         .replace(/([?&])tlang=[^&]*/g, '$1')
+        .replace(/([?&])xosf=[^&]*/g, '$1')
+        .replace(/&&+/g, '&')
         .replace(/\?&/, '?')
-        .replace(/&&/g, '&')
         .replace(/&$/, '')
         .replace(/\?$/, '');
       const vttUrl = cleanUrl.includes('?') ? `${cleanUrl}&fmt=vtt` : `${cleanUrl}?fmt=vtt`;
@@ -559,7 +633,12 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       logger.info(`[SUBTITLE_EXTRACT]   baseUrl lang=${langMatch?.[1] || '(none)'} tlang=${tlangMatch?.[1] || '(none)'} name=${nameMatch?.[1] || '(none)'} kind=${kindMatch?.[1] || '(none)'}`);
       logger.info(`[SUBTITLE_EXTRACT]   vttUrl=${vttUrl}`);
 
-      subtitleTracks.push(new SubtitleTrack(vttUrl, track.languageCode || '', name, track.kind, isAutoGenerated, track.isTranslatable));
+      const subTrack = new SubtitleTrack(vttUrl, track.languageCode || '', name, track.kind, isAutoGenerated, track.isTranslatable);
+      subTrack.vssId = track.vssId;
+      if (defaultRawIndex !== undefined && i === defaultRawIndex) {
+        subTrack.isDefault = true;
+      }
+      subtitleTracks.push(subTrack);
     }
     return subtitleTracks;
   }
@@ -1443,7 +1522,18 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       videoInfo.subtitleTracks = this.extractSubtitleTracks(metaBase);
     }
     videoInfo.playerResponse = captionsSource;
-    logger.info(`[SUBTITLE_EXTRACT] final tracks=${videoInfo.subtitleTracks.length}`);
+    if (!videoInfo.storyboard && captionsSource !== metaBase) {
+      const sbFromBest = this.extractStoryboardFromPlayerResponse(captionsSource, videoInfo.lengthSeconds ?? 0);
+      if (sbFromBest.spec && !videoInfo.storyboardSpec) {
+        videoInfo.storyboardSpec = sbFromBest.spec;
+      }
+      if (sbFromBest.info) {
+        videoInfo.storyboard = sbFromBest.info;
+      }
+    }
+    const defaultIdx = videoInfo.subtitleTracks.findIndex((t: SubtitleTrack): boolean => t.isDefault);
+    videoInfo.defaultCaptionTrackIndex = defaultIdx >= 0 ? defaultIdx : undefined;
+    logger.info(`[SUBTITLE_EXTRACT] final tracks=${videoInfo.subtitleTracks.length} defaultIdx=${videoInfo.defaultCaptionTrackIndex ?? -1}`);
 
     const hlsRaw = this.getHlsManifestUrlFromStreamingData();
     if (hlsRaw) {
@@ -1540,6 +1630,23 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       ? settled[2].value as number : -1;
     const baseInfo = webMeta ? this.extractMetadata(videoId, webMeta) : new VideoInfo(videoId);
     baseInfo.playerResponse = webMeta ?? playerResponse;
+    const fallbackDurationSec = baseInfo.lengthSeconds
+      ?? this.parseIntSafe(playerResponse?.videoDetails?.lengthSeconds)
+      ?? this.parseIntSafe(playerResponse?.microformat?.playerMicroformatRenderer?.lengthSeconds)
+      ?? 0;
+    if (!baseInfo.storyboard) {
+      if (baseInfo.storyboardSpec && fallbackDurationSec > 0) {
+        const isLiveSb = !webMeta?.storyboards?.playerStoryboardSpecRenderer?.spec
+          && !!webMeta?.storyboards?.playerLiveStoryboardSpecRenderer?.spec;
+        baseInfo.storyboard = parseStoryboardSpec(baseInfo.storyboardSpec, fallbackDurationSec, isLiveSb);
+      } else if (playerResponse?.storyboards) {
+        const sbFromFallback = this.extractStoryboardFromPlayerResponse(playerResponse, fallbackDurationSec);
+        if (sbFromFallback.spec && !baseInfo.storyboardSpec) {
+          baseInfo.storyboardSpec = sbFromFallback.spec;
+        }
+        baseInfo.storyboard = sbFromFallback.info;
+      }
+    }
     if (dislikeCount >= 0) {
       baseInfo.dislikeCount = dislikeCount;
     }
@@ -2163,6 +2270,11 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       videoInfo.chapters = chapters;
     }
 
+    const heatmap = this.extractHeatmapFromNextResponse(nextResponse);
+    if (heatmap.length > 0) {
+      videoInfo.heatmap = heatmap;
+    }
+
     const twoCol = nextResponse.contents?.twoColumnWatchNextResults;
     const contents = twoCol?.results?.results?.contents || [];
 
@@ -2198,7 +2310,174 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
       }
     }
     videoInfo.relatedItems = related;
-    logger.info(`enrichFromNextResponse: likeCount=${videoInfo.likeCount}, uploaderUrl=${videoInfo.uploaderUrl}, related=${related.length}, chapters=${videoInfo.chapters.length}`);
+    logger.info(`enrichFromNextResponse: likeCount=${videoInfo.likeCount}, uploaderUrl=${videoInfo.uploaderUrl}, related=${related.length}, chapters=${videoInfo.chapters.length}, heatmap=${videoInfo.heatmap?.length ?? 0}`);
+  }
+
+  private extractStoryboardFromPlayerResponse(
+    playerResponse: PlayerResponse | undefined,
+    durationSec: number
+  ): StoryboardExtractResult {
+    const vodSpec = playerResponse?.storyboards?.playerStoryboardSpecRenderer?.spec;
+    const liveSpec = playerResponse?.storyboards?.playerLiveStoryboardSpecRenderer?.spec;
+    const spec = vodSpec && vodSpec.length > 0 ? vodSpec : (liveSpec && liveSpec.length > 0 ? liveSpec : undefined);
+    if (!spec) {
+      return {};
+    }
+    const isLiveStoryboard = !(vodSpec && vodSpec.length > 0) && !!(liveSpec && liveSpec.length > 0);
+    return {
+      spec: spec,
+      info: parseStoryboardSpec(spec, durationSec, isLiveStoryboard)
+    };
+  }
+
+  private parseNumberSafe(value: string | number | undefined): number | undefined {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : undefined;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length === 0) {
+        return undefined;
+      }
+      const parsed = parseFloat(trimmed);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  }
+
+  /**
+   * 选取最适合章节列表/预览的缩略图（目标宽度 ~160-320px）。
+   * 不改写 URL 路径（与 pickHighestThumbnailUrl 区分，避免把章节帧缩略图误替换为视频主封面）。
+   */
+  private pickChapterThumbnailUrl(
+    thumbnails?: Array<ThumbnailItem | NextResponseThumbnailItem>
+  ): string | undefined {
+    if (!thumbnails || thumbnails.length === 0) {
+      return undefined;
+    }
+    let inRangeUrl = '';
+    let inRangeDist = Number.MAX_SAFE_INTEGER;
+    let fallbackUrl = '';
+    let fallbackDist = Number.MAX_SAFE_INTEGER;
+    let firstValidUrl = '';
+
+    for (let i = 0; i < thumbnails.length; i++) {
+      const item = thumbnails[i];
+      const url = fixThumbnailUrl(item?.url);
+      if (url.length === 0) {
+        continue;
+      }
+      if (firstValidUrl.length === 0) {
+        firstValidUrl = url;
+      }
+      const width = item?.width ?? 0;
+      if (width <= 0) {
+        continue;
+      }
+      const dist = Math.abs(width - 240);
+      if (width >= 160 && width <= 320) {
+        if (dist < inRangeDist) {
+          inRangeDist = dist;
+          inRangeUrl = url;
+        }
+      } else if (dist < fallbackDist) {
+        fallbackDist = dist;
+        fallbackUrl = url;
+      }
+    }
+
+    if (inRangeUrl.length > 0) {
+      return inRangeUrl;
+    }
+    if (fallbackUrl.length > 0) {
+      return fallbackUrl;
+    }
+    return firstValidUrl.length > 0 ? firstValidUrl : undefined;
+  }
+
+  private getPlayerBarMarkersMap(playerOverlays?: PlayerOverlays): PlayerBarMarkerMapItem[] {
+    const decorated = playerOverlays?.playerOverlayRenderer?.decoratedPlayerBarRenderer;
+    if (!decorated) {
+      return [];
+    }
+    const bar = decorated.playerBar ?? decorated.decoratedPlayerBarRenderer?.playerBar;
+    return bar?.multiMarkersPlayerBarRenderer?.markersMap ?? [];
+  }
+
+  /**
+   * 从 /next 响应解析 Most Replayed 热力图：
+   * 1) 主路径：frameworkUpdates.entityBatchUpdate.mutations[*].payload.macroMarkersListEntity (MARKER_TYPE_HEATMAP)
+   * 2) 回退路径：playerOverlays.playerOverlayRenderer.decoratedPlayerBarRenderer...markersMap (heatmapRenderer.heatMarkers)
+   * 强度归一化并夹紧在 0..1，超出 100 点时按桶保留峰值降采样。
+   */
+  private extractHeatmapFromNextResponse(nextResponse: NextResponse): HeatmapPoint[] {
+    const rawPoints: HeatmapPoint[] = [];
+
+    // Path 1: frameworkUpdates.entityBatchUpdate.mutations
+    const mutations = nextResponse.frameworkUpdates?.entityBatchUpdate?.mutations || [];
+    for (let i = 0; i < mutations.length; i++) {
+      const markersList = mutations[i]?.payload?.macroMarkersListEntity?.markersList;
+      if (markersList?.markerType !== 'MARKER_TYPE_HEATMAP') {
+        continue;
+      }
+      const markers = markersList.markers || [];
+      for (let j = 0; j < markers.length; j++) {
+        const marker = markers[j];
+        const durationMs = this.parseNumberSafe(marker?.durationMillis) ?? 0;
+        const parsedStartMs = this.parseNumberSafe(marker?.startMillis);
+        const startMs = parsedStartMs !== undefined ? parsedStartMs : (j === 0 && durationMs > 0 ? 0 : undefined);
+        const intensity = this.parseNumberSafe(marker?.intensityScoreNormalized) ?? 0;
+        if (startMs === undefined) {
+          continue;
+        }
+        rawPoints.push({
+          startSec: Math.max(0, startMs / 1000),
+          durationSec: durationMs > 0 ? durationMs / 1000 : 0,
+          intensity: Math.max(0, Math.min(1, intensity))
+        });
+      }
+      if (rawPoints.length > 0) {
+        break;
+      }
+    }
+
+    // Path 2: fallback playerOverlays -> multiMarkersPlayerBarRenderer.markersMap
+    if (rawPoints.length === 0) {
+      const markersMap = this.getPlayerBarMarkersMap(nextResponse.playerOverlays);
+      for (let i = 0; i < markersMap.length; i++) {
+        const heatMarkers = markersMap[i]?.value?.heatmap?.heatmapRenderer?.heatMarkers;
+        if (!heatMarkers || heatMarkers.length === 0) {
+          continue;
+        }
+        for (let j = 0; j < heatMarkers.length; j++) {
+          const renderer = heatMarkers[j]?.heatMarkerRenderer;
+          const durationMs = this.parseNumberSafe(renderer?.markerDurationMillis) ?? 0;
+          const parsedStartMs = this.parseNumberSafe(renderer?.timeRangeStartMillis);
+          const startMs = parsedStartMs !== undefined ? parsedStartMs : (j === 0 && durationMs > 0 ? 0 : undefined);
+          const intensity = this.parseNumberSafe(renderer?.heatMarkerIntensityScoreNormalized) ?? 0;
+          if (startMs === undefined) {
+            continue;
+          }
+          rawPoints.push({
+            startSec: Math.max(0, startMs / 1000),
+            durationSec: durationMs > 0 ? durationMs / 1000 : 0,
+            intensity: Math.max(0, Math.min(1, intensity))
+          });
+        }
+        if (rawPoints.length > 0) {
+          break;
+        }
+      }
+    }
+
+    if (rawPoints.length === 0) {
+      return [];
+    }
+
+    rawPoints.sort((a: HeatmapPoint, b: HeatmapPoint): number => a.startSec - b.startSec);
+    const result = downsampleHeatmap(rawPoints, 100);
+    logger.info(`[HEATMAP] raw=${rawPoints.length} final=${result.length}`);
+    return result;
   }
 
   private extractChaptersFromNextResponse(
@@ -2206,17 +2485,21 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
     durationSeconds?: number
   ): ChapterInfo[] {
     const panels = nextResponse.engagementPanels || [];
-    const chapterPanel = panels.find((panel) =>
+    const chapterPanel = panels.find((panel: EngagementPanel): boolean =>
       panel.engagementPanelSectionListRenderer?.panelIdentifier
-        === 'engagement-panel-macro-markers-description-chapters');
+        === 'engagement-panel-macro-markers-description-chapters')
+      ?? panels.find((panel: EngagementPanel): boolean =>
+        panel.engagementPanelSectionListRenderer?.panelIdentifier
+          === 'engagement-panel-macro-markers-auto-chapters');
     const contents = chapterPanel?.engagementPanelSectionListRenderer
       ?.content?.macroMarkersListRenderer?.contents || [];
-    const unique: Map<number, ChapterInfo> = new Map();
+    const unique: Map<number, ChapterInfo> = new Map<number, ChapterInfo>();
     let invalidCount = 0;
 
     for (const item of contents) {
       const renderer = item.macroMarkersListItemRenderer;
-      const rawStart = renderer?.onTap?.watchEndpoint?.startTimeSeconds;
+      const rawStart = renderer?.onTap?.watchEndpoint?.startTimeSeconds
+        ?? renderer?.onTap?.innertubeCommand?.watchEndpoint?.startTimeSeconds;
       const title = this.extractNextText(renderer?.title).trim();
       if (rawStart === undefined || !Number.isFinite(rawStart) || rawStart < 0 || title.length === 0) {
         invalidCount++;
@@ -2229,7 +2512,45 @@ export class YouTubeExtractor implements CommentsBackend, LiveChatBackend {
         continue;
       }
       if (!unique.has(startTimeSeconds)) {
-        unique.set(startTimeSeconds, new ChapterInfo(title, startTimeSeconds));
+        const thumbUrl = this.pickChapterThumbnailUrl(renderer?.thumbnail?.thumbnails);
+        unique.set(startTimeSeconds, new ChapterInfo(title, startTimeSeconds, thumbUrl));
+      }
+    }
+
+    // Fallback / thumbnail backfill from playerOverlays multiMarkersPlayerBarRenderer.
+    // Only add new chapters when engagementPanels yielded none; otherwise only backfill
+    // missing thumbnailUrls for matching timestamps so auto-chapters never mix with creator chapters.
+    const hadPanelChapters = unique.size > 0;
+    const markersMap = this.getPlayerBarMarkersMap(nextResponse.playerOverlays);
+    for (let i = 0; i < markersMap.length; i++) {
+      const chapterItems = markersMap[i]?.value?.chapters;
+      if (!chapterItems || chapterItems.length === 0) {
+        continue;
+      }
+      for (let j = 0; j < chapterItems.length; j++) {
+        const cr = chapterItems[j]?.chapterRenderer;
+        const startMs = this.parseNumberSafe(cr?.timeRangeStartMillis);
+        const title = this.extractNextText(cr?.title).trim();
+        if (startMs === undefined || startMs < 0 || title.length === 0) {
+          continue;
+        }
+        const startTimeSeconds = Math.floor(startMs / 1000);
+        if (durationSeconds !== undefined && durationSeconds > 0
+          && startTimeSeconds > durationSeconds) {
+          continue;
+        }
+        const thumbUrl = this.pickChapterThumbnailUrl(cr?.thumbnail?.thumbnails);
+        const existing = unique.get(startTimeSeconds);
+        if (existing) {
+          if (!existing.thumbnailUrl && thumbUrl) {
+            existing.thumbnailUrl = thumbUrl;
+          }
+        } else if (!hadPanelChapters) {
+          unique.set(startTimeSeconds, new ChapterInfo(title, startTimeSeconds, thumbUrl));
+        }
+      }
+      if (!hadPanelChapters && unique.size > 0) {
+        break;
       }
     }
 

@@ -12,6 +12,7 @@ import {
   EXP_UNSKIP_SECONDS_VALUES
 } from '../../common/experimental/ExperimentalConfig';
 import { SponsorBlockClient } from '../../common/experimental/SponsorBlockClient';
+import { SubscriptionUser } from '../../common/SubscriptionModel';
 import { AppLog } from '../../common/AppLog';
 
 const logger = AppLog.getInstance('OptionsSponsorBlockPage');
@@ -68,6 +69,17 @@ export struct OptionsSponsorBlockPage {
   private unskipIndex(): number {
     const index = EXP_UNSKIP_SECONDS_VALUES.indexOf(this.cfg.sponsorUnskipSeconds);
     return index >= 0 ? index : 1;
+  }
+
+  private resolveChannelTitle(channelId: string): string {
+    const subs = AppStorage.get<SubscriptionUser[]>('subscriptions');
+    if (subs) {
+      const matched = subs.find((sub: SubscriptionUser): boolean => sub.channelId === channelId);
+      if (matched && matched.displayName && matched.displayName.trim().length > 0) {
+        return matched.displayName.trim();
+      }
+    }
+    return channelId;
   }
 
   private clearCache(): void {
@@ -200,6 +212,72 @@ export struct OptionsSponsorBlockPage {
                 });
               }
             })
+          }
+          .width('100%')
+          .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+          .borderRadius(SECTION_CARD_RADIUS)
+          .clip(true)
+        }
+        .padding({ left: 16, right: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_exp_sb_whitelist') })
+        }
+        .padding({ left: 16, right: 16, top: 8 })
+
+        ListItem() {
+          Column() {
+            if (this.cfg.whitelistedChannels().length === 0) {
+              Text($r('app.string.yt_exp_sb_whitelist_empty'))
+                .fontSize(13)
+                .fontColor($r('app.color.yourtube_text_quaternary'))
+                .width('100%')
+                .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+            } else {
+              ForEach(this.cfg.whitelistedChannels(), (channelId: string, index: number) => {
+                if (index > 0) {
+                  Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
+                }
+                Row({ space: 12 }) {
+                  Column({ space: 2 }) {
+                    Text(this.resolveChannelTitle(channelId))
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor($r('app.color.yourtube_text_primary'))
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    if (this.resolveChannelTitle(channelId) !== channelId) {
+                      Text(channelId)
+                        .fontSize(11)
+                        .fontColor($r('app.color.yourtube_text_quaternary'))
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    }
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
+
+                  Button() {
+                    SymbolGlyph($r('sys.symbol.trash'))
+                      .fontSize(16)
+                      .fontColor([$r('app.color.yourtube_text_secondary')])
+                  }
+                  .width(34)
+                  .height(34)
+                  .backgroundColor(Color.Transparent)
+                  .accessibilityText($r('app.string.yt_exp_sb_whitelist_remove'))
+                  .onClick(() => {
+                    this.params.updateConfig((cfg: ExperimentalConfig) => {
+                      cfg.removeChannelWhitelist(channelId);
+                    });
+                    logger.info(`whitelist channel removed id=${channelId}`);
+                  })
+                }
+                .width('100%')
+                .padding({ left: 16, right: 12, top: 10, bottom: 10 })
+                .alignItems(VerticalAlign.Center)
+              }, (channelId: string) => channelId)
+            }
           }
           .width('100%')
           .backgroundColor($r('app.color.yourtube_bg_surface_muted'))

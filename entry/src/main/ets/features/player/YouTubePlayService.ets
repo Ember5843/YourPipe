@@ -26,7 +26,14 @@ import {
   SessionIdentityManager,
   YoutubePlayerClientConfig
 } from 'youtube_core';
-import { StreamInfo, SubtitleTrack, sabrSessionStore, LocalMediaProxy } from 'mediaservice';
+import {
+  StreamInfo,
+  SubtitleTrack,
+  StoryboardInfo,
+  HeatmapPoint,
+  sabrSessionStore,
+  LocalMediaProxy
+} from 'mediaservice';
 import { buildAutoTranslatedTrack, AuthSessionManager } from 'youtube_core';
 import { TranslationService } from '../../common/TranslationService';
 import { SearchLocaleManager } from '../../common/SearchLocaleManager';
@@ -42,6 +49,8 @@ export interface YouTubePlayResult {
   videoInfo?: VideoInfo;
   playerStreams?: StreamInfo[];
   subtitleTracks?: SubtitleTrack[];
+  storyboard?: StoryboardInfo;
+  heatmap?: HeatmapPoint[];
   mediaSource?: media.MediaSource;
   error?: ErrorInfo;
   errorCode?: YouTubeErrorCode;
@@ -452,7 +461,9 @@ export class YouTubePlayService {
     if (!this.extractor) await this.initialize();
     this.syncExtractorLocale();
     try {
-      return await this.extractor!.fetchPlaybackExtras(videoId);
+      const extras = await this.extractor!.fetchPlaybackExtras(videoId);
+      logger.info(`${TAG} fetchPlaybackExtras done video=${videoId} storyboard=${!!extras.storyboard} heatmap=${extras.heatmap?.length ?? 0} chapters=${extras.chapters.length}`);
+      return extras;
     } catch (e) {
       logger.warn(`${TAG} fetchPlaybackExtras failed: ${(e as Error).message || e}`);
       return null;
@@ -463,7 +474,18 @@ export class YouTubePlayService {
     if (!this.extractor) await this.initialize();
     this.syncExtractorLocale();
     try {
-      return await this.extractor!.fetchPlaybackExtras(videoInfo.videoId, videoInfo.playerResponse);
+      const extras = await this.extractor!.fetchPlaybackExtras(videoInfo.videoId, videoInfo.playerResponse);
+      if (!extras.storyboard && videoInfo.storyboard) {
+        extras.storyboard = videoInfo.storyboard;
+      }
+      if (!extras.storyboardSpec && videoInfo.storyboardSpec) {
+        extras.storyboardSpec = videoInfo.storyboardSpec;
+      }
+      if ((!extras.heatmap || extras.heatmap.length === 0) && videoInfo.heatmap && videoInfo.heatmap.length > 0) {
+        extras.heatmap = videoInfo.heatmap;
+      }
+      logger.info(`${TAG} fetchPlaybackExtrasFor done video=${videoInfo.videoId} storyboard=${!!extras.storyboard} heatmap=${extras.heatmap?.length ?? 0} chapters=${extras.chapters.length}`);
+      return extras;
     } catch (e) {
       logger.warn(`${TAG} fetchPlaybackExtrasFor failed: ${(e as Error).message || e}`);
       return null;
@@ -561,7 +583,9 @@ export class YouTubePlayService {
         success: true,
         videoInfo: videoInfo,
         playerStreams: playerStreams,
-        subtitleTracks: this.withAutoTranslatedTrack(videoInfo)
+        subtitleTracks: this.withAutoTranslatedTrack(videoInfo),
+        storyboard: videoInfo.storyboard,
+        heatmap: videoInfo.heatmap
       };
     } catch (e) {
       const errorCode = this.analyzeErrorCode(e as Error);

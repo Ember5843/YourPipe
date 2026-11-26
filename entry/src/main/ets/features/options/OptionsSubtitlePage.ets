@@ -1,15 +1,23 @@
 import { SelectOption } from 'mediaservice';
 import { PlaybackSectionTitle } from '../../common/components/PlaybackSectionTitle';
 import { PlaybackSelectRow } from '../../common/components/PlaybackSelectRow';
+import { PlaybackToggleRow } from '../../common/components/PlaybackToggleRow';
 import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 import { UIConfig } from '../../common/AppState';
+import { PlayerSession } from '../../common/PlayerSession';
 import {
   PlaybackConfig,
+  SubtitleFontScale, SubtitleBottomMargin, SubtitleFontColor, SubtitleEdgeStyle,
   SUBTITLE_FONT_SCALE_LABELS, SUBTITLE_BOTTOM_MARGIN_LABELS,
-  SUBTITLE_FONT_COLOR_LABELS, SUBTITLE_BACKGROUND_LABELS, SUBTITLE_OFFSET_VALUES,
-  getSubtitleFontColorDisplay, getSubtitleBackgroundDisplay, getSubtitleOffsetDisplay,
+  SUBTITLE_FONT_COLOR_LABELS, SUBTITLE_FONT_COLOR_VALUES,
+  SUBTITLE_EDGE_STYLE_LABELS, SUBTITLE_BG_OPACITY_VALUES,
+  SUBTITLE_OFFSET_MIN_MS, SUBTITLE_OFFSET_MAX_MS,
+  clampSubtitleOffsetMs, normalizeSubtitleBgOpacity,
+  getSubtitleFontColorDisplay, getSubtitleOffsetDisplay,
 } from '../../common/PlaybackConfig';
 import { LanguagePickerItem, buildExtendedLanguageItems } from '../../common/components/LanguagePickerDialog';
+
+const SUBTITLE_OFFSET_STEP_MS: number = 100;
 
 interface OptionsSubtitlePageParams {
   themeColor: ResourceColor;
@@ -35,23 +43,48 @@ export struct OptionsSubtitlePage {
   };
 
   private getSubtitleFontScaleOptions(): SelectOption[] {
-    return SUBTITLE_FONT_SCALE_LABELS.map(v => ({ value: `${v}x` } as SelectOption));
+    return SUBTITLE_FONT_SCALE_LABELS.map((v: SubtitleFontScale): SelectOption => ({ value: `${v}x` }));
   }
 
   private getSubtitleBottomMarginOptions(): SelectOption[] {
-    return SUBTITLE_BOTTOM_MARGIN_LABELS.map(v => ({ value: v } as SelectOption));
+    return SUBTITLE_BOTTOM_MARGIN_LABELS.map((v: SubtitleBottomMargin): SelectOption => ({ value: v }));
   }
 
   private getSubtitleFontColorOptions(): SelectOption[] {
-    return SUBTITLE_FONT_COLOR_LABELS.map(v => ({ value: getSubtitleFontColorDisplay(v) } as SelectOption));
+    return SUBTITLE_FONT_COLOR_LABELS.map((v: SubtitleFontColor): SelectOption => ({ value: getSubtitleFontColorDisplay(v) }));
   }
 
-  private getSubtitleBackgroundOptions(): SelectOption[] {
-    return SUBTITLE_BACKGROUND_LABELS.map(v => ({ value: getSubtitleBackgroundDisplay(v) } as SelectOption));
+  private getSubtitleEdgeStyleDisplay(style: SubtitleEdgeStyle): Resource {
+    if (style === 'outline') {
+      return $r('app.string.yt_subtitle_edge_outline');
+    }
+    if (style === 'shadow') {
+      return $r('app.string.yt_subtitle_edge_shadow');
+    }
+    if (style === 'none') {
+      return $r('app.string.yt_subtitle_edge_none');
+    }
+    return $r('app.string.yt_subtitle_edge_outline_shadow');
   }
 
-  private getSubtitleOffsetOptions(): SelectOption[] {
-    return SUBTITLE_OFFSET_VALUES.map(v => ({ value: getSubtitleOffsetDisplay(v) } as SelectOption));
+  private getSubtitleEdgeStyleOptions(): SelectOption[] {
+    return SUBTITLE_EDGE_STYLE_LABELS.map((s: SubtitleEdgeStyle): SelectOption => ({
+      value: this.getSubtitleEdgeStyleDisplay(s)
+    }));
+  }
+
+  private getSubtitleBgOpacityOptions(): SelectOption[] {
+    return SUBTITLE_BG_OPACITY_VALUES.map((v: number): SelectOption => ({
+      value: `${Math.round(v * 100)}%`
+    }));
+  }
+
+  private applySubtitleOffset(nextMs: number): void {
+    const clamped = clampSubtitleOffsetMs(nextMs);
+    this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+      cfg.subtitleOffsetMs = clamped;
+    });
+    PlayerSession.getInstance().refreshSubtitleOverlay();
   }
 
   /** tlang 自动翻译字幕目标语言：'default' 项显示为「跟随翻译语言」 */
@@ -61,9 +94,133 @@ export struct OptionsSubtitlePage {
     return buildExtendedLanguageItems(this.params.appLangItems, followTranslation);
   }
 
+  private getPreviewPrimaryFontSize(): number {
+    return 14 * Number(this.playbackConfig.subtitleFontScale);
+  }
+
+  private getPreviewSecondaryFontSize(): number {
+    return Math.max(10, Math.round(this.getPreviewPrimaryFontSize() * 0.82 * 10) / 10);
+  }
+
+  private getPreviewPrimaryColor(): string {
+    return SUBTITLE_FONT_COLOR_VALUES[this.playbackConfig.subtitleFontColor] || '#FFFFFF';
+  }
+
+  private getPreviewSecondaryColor(): string {
+    const key = this.playbackConfig.subtitleFontColor;
+    if (key === 'yellow') {
+      return '#FFF59D';
+    }
+    if (key === 'green') {
+      return '#A5D6A7';
+    }
+    if (key === 'cyan') {
+      return '#B2EBF2';
+    }
+    return '#E8E8E8';
+  }
+
+  private getPreviewPillBackground(): string {
+    const opacity = normalizeSubtitleBgOpacity(this.playbackConfig.subtitleBgOpacity);
+    if (opacity <= 0) {
+      return 'rgba(0, 0, 0, 0)';
+    }
+    return `rgba(0, 0, 0, ${opacity})`;
+  }
+
+  private getPreviewLineHeight(fontSize: number): number {
+    return Math.round(fontSize * 1.32);
+  }
+
+  private getPreviewPillPadding(fontSize: number): Padding {
+    const h = Math.max(8, Math.round(fontSize * 0.55));
+    const v = Math.max(2, Math.round(fontSize * 0.18));
+    return { left: h, right: h, top: v, bottom: v };
+  }
+
+  private getPreviewPillRadius(fontSize: number): number {
+    return Math.max(4, Math.round(fontSize * 0.28));
+  }
+
+  private getPreviewTextShadow(): ShadowOptions | ShadowOptions[] {
+    const style: SubtitleEdgeStyle = this.playbackConfig.subtitleEdgeStyle;
+    if (style === 'none') {
+      return { radius: 0, color: Color.Transparent, offsetX: 0, offsetY: 0 };
+    }
+    if (style === 'shadow') {
+      return [{ radius: 4, color: '#CC000000', offsetX: 0, offsetY: 1.5 }];
+    }
+    if (style === 'outline') {
+      return [
+        { radius: 1.5, color: '#E6000000', offsetX: -1.2, offsetY: -1.2 },
+        { radius: 1.5, color: '#E6000000', offsetX: 1.2, offsetY: -1.2 },
+        { radius: 1.5, color: '#E6000000', offsetX: -1.2, offsetY: 1.2 },
+        { radius: 1.5, color: '#E6000000', offsetX: 1.2, offsetY: 1.2 }
+      ];
+    }
+    return [
+      { radius: 1.5, color: '#E6000000', offsetX: -1.2, offsetY: -1.2 },
+      { radius: 1.5, color: '#E6000000', offsetX: 1.2, offsetY: -1.2 },
+      { radius: 1.5, color: '#E6000000', offsetX: -1.2, offsetY: 1.2 },
+      { radius: 1.5, color: '#E6000000', offsetX: 1.2, offsetY: 1.2 },
+      { radius: 4, color: '#B3000000', offsetX: 0, offsetY: 1.5 }
+    ];
+  }
+
+  @Builder
+  SubtitlePreviewCard() {
+    Stack({ alignContent: Alignment.Bottom }) {
+      Column({ space: 4 }) {
+        Text($r('app.string.yt_subtitle_preview_primary'))
+          .fontColor(this.getPreviewPrimaryColor())
+          .fontSize(this.getPreviewPrimaryFontSize())
+          .lineHeight(this.getPreviewLineHeight(this.getPreviewPrimaryFontSize()))
+          .fontWeight(this.playbackConfig.subtitleBold ? FontWeight.Bold : FontWeight.Medium)
+          .textAlign(TextAlign.Center)
+          .constraintSize({ maxWidth: '94%' })
+          .textShadow(this.getPreviewTextShadow())
+          .padding(this.getPreviewPillPadding(this.getPreviewPrimaryFontSize()))
+          .backgroundColor(this.getPreviewPillBackground())
+          .borderRadius(this.getPreviewPillRadius(this.getPreviewPrimaryFontSize()))
+
+        Text($r('app.string.yt_subtitle_preview_secondary'))
+          .fontColor(this.getPreviewSecondaryColor())
+          .fontSize(this.getPreviewSecondaryFontSize())
+          .lineHeight(this.getPreviewLineHeight(this.getPreviewSecondaryFontSize()))
+          .fontWeight(this.playbackConfig.subtitleBold ? FontWeight.Bold : FontWeight.Medium)
+          .textAlign(TextAlign.Center)
+          .constraintSize({ maxWidth: '94%' })
+          .textShadow(this.getPreviewTextShadow())
+          .padding(this.getPreviewPillPadding(this.getPreviewSecondaryFontSize()))
+          .backgroundColor(this.getPreviewPillBackground())
+          .borderRadius(this.getPreviewPillRadius(this.getPreviewSecondaryFontSize()))
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Center)
+      .padding({ left: 12, right: 12, top: 20, bottom: 16 })
+    }
+    .width('100%')
+    .constraintSize({ minHeight: 126 })
+    .borderRadius(SECTION_CARD_RADIUS)
+    .clip(true)
+    .linearGradient({
+      angle: 135,
+      colors: [
+        ['#1F2A38', 0.0],
+        ['#3B4C63', 0.48],
+        ['#1A212C', 1.0]
+      ]
+    })
+  }
+
   build() {
     Column() {
       List({ space: 6 }) {
+        ListItem() {
+          this.SubtitlePreviewCard()
+        }
+        .padding({ top: 6, bottom: 4 })
+
         ListItem() {
           PlaybackSectionTitle({ title: $r('app.string.yt_player_subtitles') })
         }
@@ -74,12 +231,14 @@ export struct OptionsSubtitlePage {
             PlaybackSelectRow({
               title: $r('app.string.yt_setting_subtitle_size'),
               options: this.getSubtitleFontScaleOptions(),
-              selectedIndex: SUBTITLE_FONT_SCALE_LABELS.indexOf(this.playbackConfig.subtitleFontScale),
+              selectedIndex: Math.max(0, SUBTITLE_FONT_SCALE_LABELS.indexOf(this.playbackConfig.subtitleFontScale)),
               fontColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (index: number) => {
                 const v = SUBTITLE_FONT_SCALE_LABELS[index];
-                this.params.updatePlaybackConfig(cfg => cfg.subtitleFontScale = v);
+                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+                  cfg.subtitleFontScale = v;
+                });
               }
             })
           }
@@ -88,12 +247,14 @@ export struct OptionsSubtitlePage {
             PlaybackSelectRow({
               title: $r('app.string.yt_setting_subtitle_bottom_margin'),
               options: this.getSubtitleBottomMarginOptions(),
-              selectedIndex: SUBTITLE_BOTTOM_MARGIN_LABELS.indexOf(this.playbackConfig.subtitleBottomMarginVp),
+              selectedIndex: Math.max(0, SUBTITLE_BOTTOM_MARGIN_LABELS.indexOf(this.playbackConfig.subtitleBottomMarginVp)),
               fontColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (index: number) => {
                 const v = SUBTITLE_BOTTOM_MARGIN_LABELS[index];
-                this.params.updatePlaybackConfig(cfg => cfg.subtitleBottomMarginVp = v);
+                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+                  cfg.subtitleBottomMarginVp = v;
+                });
               }
             })
           }
@@ -102,55 +263,161 @@ export struct OptionsSubtitlePage {
             PlaybackSelectRow({
               title: $r('app.string.yt_setting_subtitle_color'),
               options: this.getSubtitleFontColorOptions(),
-              selectedIndex: SUBTITLE_FONT_COLOR_LABELS.indexOf(this.playbackConfig.subtitleFontColor),
+              selectedIndex: Math.max(0, SUBTITLE_FONT_COLOR_LABELS.indexOf(this.playbackConfig.subtitleFontColor)),
               fontColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (index: number) => {
                 const v = SUBTITLE_FONT_COLOR_LABELS[index];
-                this.params.updatePlaybackConfig(cfg => cfg.subtitleFontColor = v);
+                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+                  cfg.subtitleFontColor = v;
+                });
               }
             })
           }
 
           ListItem() {
             PlaybackSelectRow({
-              title: $r('app.string.yt_setting_subtitle_background'),
-              options: this.getSubtitleBackgroundOptions(),
-              selectedIndex: SUBTITLE_BACKGROUND_LABELS.indexOf(this.playbackConfig.subtitleBackground),
+              title: $r('app.string.yt_setting_subtitle_edge_style'),
+              options: this.getSubtitleEdgeStyleOptions(),
+              selectedIndex: Math.max(0, SUBTITLE_EDGE_STYLE_LABELS.indexOf(this.playbackConfig.subtitleEdgeStyle)),
               fontColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (index: number) => {
-                const v = SUBTITLE_BACKGROUND_LABELS[index];
-                this.params.updatePlaybackConfig(cfg => cfg.subtitleBackground = v);
+                const v = SUBTITLE_EDGE_STYLE_LABELS[index];
+                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+                  cfg.subtitleEdgeStyle = v;
+                });
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_setting_subtitle_bold'),
+              subtitle: $r('app.string.yt_setting_subtitle_bold_subtitle'),
+              isOn: this.playbackConfig.subtitleBold,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+                  cfg.subtitleBold = val;
+                });
               }
             })
           }
 
           ListItem() {
             PlaybackSelectRow({
-              title: $r('app.string.yt_setting_subtitle_offset'),
-              options: this.getSubtitleOffsetOptions(),
-              selectedIndex: SUBTITLE_OFFSET_VALUES.indexOf(this.playbackConfig.subtitleOffsetMs),
+              title: $r('app.string.yt_setting_subtitle_bg_opacity'),
+              options: this.getSubtitleBgOpacityOptions(),
+              selectedIndex: Math.max(0, SUBTITLE_BG_OPACITY_VALUES.indexOf(
+                normalizeSubtitleBgOpacity(this.playbackConfig.subtitleBgOpacity))),
               fontColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (index: number) => {
-                const v = SUBTITLE_OFFSET_VALUES[index];
-                this.params.updatePlaybackConfig(cfg => cfg.subtitleOffsetMs = v);
+                const v = SUBTITLE_BG_OPACITY_VALUES[index];
+                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+                  cfg.subtitleBgOpacity = v;
+                  cfg.subtitleBackground = v <= 0 ? 'none' : (v >= 0.85 ? 'solid' : 'semi');
+                });
               }
             })
+          }
+
+          ListItem() {
+            Column({ space: 10 }) {
+              Row({ space: 12 }) {
+                Column() {
+                  Text($r('app.string.yt_setting_subtitle_offset'))
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor($r('app.color.yourtube_text_primary'))
+                  Text($r('app.string.yt_setting_subtitle_offset_subtitle'))
+                    .fontSize(12)
+                    .fontColor($r('app.color.yourtube_text_quaternary'))
+                    .margin({ top: 3 })
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1)
+
+                Text(getSubtitleOffsetDisplay(this.playbackConfig.subtitleOffsetMs))
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(this.playbackConfig.subtitleOffsetMs !== 0
+                    ? this.params.themeColor
+                    : $r('app.color.yourtube_text_secondary'))
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+
+              Row({ space: 8 }) {
+                Button() {
+                  SymbolGlyph($r('sys.symbol.minus'))
+                    .fontSize(16)
+                    .fontColor([$r('app.color.yourtube_text_primary')])
+                }
+                .width(40)
+                .height(34)
+                .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                .borderRadius(17)
+                .enabled(this.playbackConfig.subtitleOffsetMs > SUBTITLE_OFFSET_MIN_MS)
+                .opacity(this.playbackConfig.subtitleOffsetMs > SUBTITLE_OFFSET_MIN_MS ? 1 : 0.4)
+                .onClick(() => {
+                  this.applySubtitleOffset(this.playbackConfig.subtitleOffsetMs - SUBTITLE_OFFSET_STEP_MS);
+                })
+
+                Button() {
+                  SymbolGlyph($r('sys.symbol.plus'))
+                    .fontSize(16)
+                    .fontColor([$r('app.color.yourtube_text_primary')])
+                }
+                .width(40)
+                .height(34)
+                .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                .borderRadius(17)
+                .enabled(this.playbackConfig.subtitleOffsetMs < SUBTITLE_OFFSET_MAX_MS)
+                .opacity(this.playbackConfig.subtitleOffsetMs < SUBTITLE_OFFSET_MAX_MS ? 1 : 0.4)
+                .onClick(() => {
+                  this.applySubtitleOffset(this.playbackConfig.subtitleOffsetMs + SUBTITLE_OFFSET_STEP_MS);
+                })
+
+                Blank()
+
+                if (this.playbackConfig.subtitleOffsetMs !== 0) {
+                  Button($r('app.string.yt_setting_subtitle_offset_reset'))
+                    .height(34)
+                    .padding({ left: 14, right: 14 })
+                    .fontSize(13)
+                    .fontColor(this.params.themeColor)
+                    .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                    .borderRadius(17)
+                    .onClick(() => {
+                      this.applySubtitleOffset(0);
+                    })
+                }
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
           }
 
           ListItem() {
             PlaybackSelectRow({
               title: $r('app.string.yt_setting_subtitle_translate_language'),
-              options: this.getSubtitleTranslateLangItems().map(item => ({ value: item.localizedName } as SelectOption)),
+              options: this.getSubtitleTranslateLangItems().map((item: LanguagePickerItem): SelectOption => ({
+                value: item.localizedName
+              })),
               selectedIndex: Math.max(0, this.getSubtitleTranslateLangItems()
-                .findIndex(it => it.code === this.uiConfig.subtitleTranslateLanguage)),
+                .findIndex((it: LanguagePickerItem): boolean => it.code === this.uiConfig.subtitleTranslateLanguage)),
               fontColor: this.params.themeColor,
               transparentBackground: true,
               onChange: (index: number) => {
                 const code = this.getSubtitleTranslateLangItems()[index].code;
-                this.params.updateUiConfig(cfg => cfg.subtitleTranslateLanguage = code);
+                this.params.updateUiConfig((cfg: UIConfig) => {
+                  cfg.subtitleTranslateLanguage = code;
+                });
               }
             })
           }

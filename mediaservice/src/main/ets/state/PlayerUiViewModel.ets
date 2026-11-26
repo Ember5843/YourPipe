@@ -33,6 +33,9 @@ export class PlayerUiViewModel {
   @Track subtitleTracks: SubtitleTrack[] = [];
   @Track currentSubtitleUrl: string = '';
   @Track subtitleText: string = '';
+  @Track secondarySubtitleIndex: number = -1;
+  @Track secondarySubtitleUrl: string = '';
+  @Track secondarySubtitleText: string = '';
   // 当前实际播放流的实时信息（由 mpv getMediaInfo 提供）
   @Track mediaTitle: string = '';
   @Track containerFormat: string = '';
@@ -67,6 +70,9 @@ export class PlayerUiViewModel {
     this.subtitleTracks = [];
     this.currentSubtitleUrl = '';
     this.subtitleText = '';
+    this.secondarySubtitleIndex = -1;
+    this.secondarySubtitleUrl = '';
+    this.secondarySubtitleText = '';
     this.mediaTitle = '';
     this.containerFormat = '';
     this.videoWidth = 0;

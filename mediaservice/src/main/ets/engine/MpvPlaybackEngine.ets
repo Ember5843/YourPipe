@@ -80,6 +80,22 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private videoOutputOn: boolean = true;
   /** Shorts 单条循环：loop-file=inf。跨 load 保持，进入/退出 Shorts 时切换。 */
   private fileLoopEnabled: boolean = false;
+  /** MPV 原生音频滤镜意图（跨 load 保持，单入口 applyAudioFilters 组合 af）。 */
+  private audioNormalizeEnabled: boolean = false;
+  private skipSilenceEnabled: boolean = false;
+  /** 当前媒体源是否为直播（直播流强制旁路 @skipsilence）。 */
+  private audioFilterIsLive: boolean = false;
+  /** MPV 原生音画延迟（毫秒，范围 -1000..1000）。 */
+  private audioDelayMs: number = 0;
+  private lastAppliedAf: string | null = null;
+  private lastAppliedAudioDelaySec: string | null = null;
+
+  private static readonly AF_NORMALIZE: string =
+    'lavfi=[acompressor=threshold=-20dB:ratio=3:attack=15:release=250:makeup=2.5,alimiter=limit=0.95:attack=3:release=50]';
+  private static readonly AF_SILENCEDETECT: string =
+    '@skipsilence:lavfi=[silencedetect=noise=-32dB:d=0.45]';
+  private static readonly AUDIO_DELAY_MIN_MS: number = -1000;
+  private static readonly AUDIO_DELAY_MAX_MS: number = 1000;
   /** MediaInfo 快照的节流刷新时间戳（0 = 立即刷新） */
   private lastMediaInfoAtMs: number = 0;
   /** getMediaInfo 派生字段的缓存快照；见 buildState 的 2s 节流 */
@@ -163,6 +179,14 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setProperty('demuxer-lavf-o', 'reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5');
       this.controller = ctrl;
       this.initialized = true;
+      this.lastAppliedAf = null;
+      this.lastAppliedAudioDelaySec = null;
+      if (this.audioNormalizeEnabled || this.skipSilenceEnabled) {
+        this.applyAudioFilters(true);
+      }
+      if (this.audioDelayMs !== 0) {
+        this.applyAudioDelay(true);
+      }
       if (this.surfaceId.length > 0) {
         this.bindSurface(ctrl, this.surfaceId);
       }
@@ -179,6 +203,8 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.destroyed = true;
     this.initialized = false;
     this.acceptsNativeTimeline = false;
+    this.lastAppliedAf = null;
+    this.lastAppliedAudioDelaySec = null;
     this.loadGeneration++;
     const ctrl: MpvPlayerController | null = this.controller;
     this.controller = null;
@@ -319,13 +345,14 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (!this.applyNetworkProxy(this.sourceUrl)) this.controller?.pause();
   }
 
-  load(source: string, startPos: number, audioUrl: string = ''): boolean {
+  load(source: string, startPos: number, audioUrl: string = '', isLiveHint?: boolean): boolean {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return false;
 
     const generation = ++this.loadGeneration;
     this.sourceUrl = this.normalizeSourceUrl(source);
     this.isLive = this.looksLive(this.sourceUrl);
+    this.audioFilterIsLive = isLiveHint !== undefined ? (isLiveHint || this.isLive) : this.isLive;
     this.playWhenReady = false;
     this.loaded = false;
     this.preparing = false;
@@ -440,6 +467,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       const directStartMs = isEdl ? 0 : this.pendingStartMs;
       // Shorts 单条循环：引擎重建后属性会丢，load 前按当前意图重写。
       ctrl.setProperty('loop-file', this.fileLoopEnabled ? 'inf' : 'no');
+      // 每次切源前统一重放音频滤镜链（含最新 isLive 旁路）与音画延迟。
+      this.applyAudioFilters(true);
+      this.applyAudioDelay(true);
       ctrl.setMedia(this.sourceUrl, directStartMs);
       if (!isEdl) {
         // mpv's per-file start option performs the initial demuxer seek before the first frame.
@@ -550,6 +580,91 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       ctrl.setProperty('loop-file', enabled ? 'inf' : 'no');
     }
     Logger.info(TAG, `loop-file=${enabled ? 'inf' : 'no'}`);
+  }
+
+  /**
+   * 组合并应用 MPV 原生音频滤镜链（单入口，避免多处互覆）。
+   * 直播流强制旁路 @skipsilence，防止实时流时钟失步。
+   */
+  setAudioFilters(normalize: boolean, skipSilence: boolean, isLive: boolean): void {
+    this.audioNormalizeEnabled = Boolean(normalize);
+    this.skipSilenceEnabled = Boolean(skipSilence);
+    this.audioFilterIsLive = Boolean(isLive);
+    this.applyAudioFilters(false);
+  }
+
+  /** 设置 MPV 原生音画延迟（毫秒，自动钳制到 -1000..1000）。 */
+  setAudioDelayMs(delayMs: number): void {
+    let clamped = 0;
+    if (Number.isFinite(delayMs)) {
+      const rounded = Math.round(delayMs);
+      clamped = Math.max(
+        MpvPlaybackEngine.AUDIO_DELAY_MIN_MS,
+        Math.min(MpvPlaybackEngine.AUDIO_DELAY_MAX_MS, rounded)
+      );
+      if (clamped === 0) {
+        clamped = 0;
+      }
+    }
+    this.audioDelayMs = clamped;
+    this.applyAudioDelay(false);
+  }
+
+  private applyAudioFilters(force: boolean = false): void {
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl === null || this.destroyed) {
+      return;
+    }
+    const parts: string[] = [];
+    if (this.audioNormalizeEnabled) {
+      parts.push(MpvPlaybackEngine.AF_NORMALIZE);
+    }
+    if (this.skipSilenceEnabled && !this.audioFilterIsLive) {
+      parts.push(MpvPlaybackEngine.AF_SILENCEDETECT);
+    }
+    const afValue: string = parts.join(',');
+    const prevAf: string | null = this.lastAppliedAf;
+    if (afValue.length === 0 && (prevAf === null || prevAf.length === 0)) {
+      return;
+    }
+    if (!force && prevAf === afValue) {
+      return;
+    }
+    const hadSkipSilence: boolean = prevAf !== null && prevAf.indexOf('@skipsilence') >= 0;
+    const hasSkipSilence: boolean = afValue.indexOf('@skipsilence') >= 0;
+    try {
+      ctrl.setProperty('af', afValue);
+      this.lastAppliedAf = afValue;
+      if (hadSkipSilence && !hasSkipSilence) {
+        ctrl.setPlaybackRate(this.playbackSpeed);
+      }
+      Logger.info(TAG, `audio filters applied: normalize=${this.audioNormalizeEnabled} `
+        + `skipSilence=${this.skipSilenceEnabled} isLive=${this.audioFilterIsLive} af="${afValue}"`);
+    } catch (err) {
+      Logger.warn(TAG, `applyAudioFilters failed: ${this.describeError(err)}`);
+    }
+  }
+
+  private applyAudioDelay(force: boolean = false): void {
+    const ctrl: MpvPlayerController | null = this.controller;
+    if (ctrl === null || this.destroyed) {
+      return;
+    }
+    const delaySec: string = (this.audioDelayMs / 1000).toFixed(3);
+    const prevDelay: string | null = this.lastAppliedAudioDelaySec;
+    if (delaySec === '0.000' && (prevDelay === null || prevDelay === '0.000')) {
+      return;
+    }
+    if (!force && prevDelay === delaySec) {
+      return;
+    }
+    try {
+      ctrl.setProperty('audio-delay', delaySec);
+      this.lastAppliedAudioDelaySec = delaySec;
+      Logger.info(TAG, `audio delay applied: ${this.audioDelayMs}ms (audio-delay=${delaySec})`);
+    } catch (err) {
+      Logger.warn(TAG, `applyAudioDelay failed: ${this.describeError(err)}`);
+    }
   }
 
   setVolume(volume: number): void {

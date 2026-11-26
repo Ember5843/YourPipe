@@ -204,7 +204,10 @@ export class PlayerSession {
   private createSessionConfigFromSettings(audioOnly: boolean): SessionPlaybackConfig {
     const pb = AppStorage.get<PlaybackConfig>('playbackConfig');
     const autoPlayNext = pb ? pb.autoPlayNext : (PreferencesStore.getString('cfg_pb_autoPlayNext', 'true') === 'true');
-    const subtitlePreferredLang = PreferencesStore.getString('cfg_subtitle_preferred_lang', '');
+    const subtitlePreferredLang = pb
+      ? pb.subtitlePreferredTrack
+      : PreferencesStore.getString('cfg_pb_subtitlePreferredTrack',
+        PreferencesStore.getString('cfg_subtitle_preferred_lang', ''));
     return {
       autoPlayNext: autoPlayNext,
       vodPlaybackSpeed: 1.0,
@@ -253,6 +256,16 @@ export class PlayerSession {
       this._sessionConfig.vodPlaybackSpeed = speed;
     }
     this._controller.setPlaybackSpeed(speed);
+  }
+
+  /** Hot-apply MPV native audio filters (loudness normalization / skip silence) without restart. */
+  applyAudioFilters(normalize: boolean, skipSilence: boolean): void {
+    this._controller.setAudioFilters(normalize, skipSilence);
+  }
+
+  /** Hot-apply MPV audio delay (ms, clamped -1000..1000) without restart. */
+  setAudioDelayMs(delayMs: number): void {
+    this._controller.setAudioDelayMs(delayMs);
   }
 
   /** Retry the current video in-place while preserving this session's ID, queue, and config. */
@@ -708,7 +721,7 @@ export class PlayerSession {
         return;
       }
       const next = PlayQueueManager.getInstance().peekNext();
-      if (next?.videoId && next.videoId !== currentVideoId) {
+      if (next?.videoId && !next.localMediaPath && next.videoId !== currentVideoId) {
         logger.info(`${TAG} queue prefetch kick next=${next.videoId}`);
         YouTubePlayService.getInstance(this._context).prefetch(next.videoId);
       }
@@ -738,6 +751,13 @@ export class PlayerSession {
   }
 
   private _lastAutoAdvanceFromVideoId: string = '';
+  private _lastLoopOneReplayAtMs: number = 0;
+
+  private replayCurrentFromStart(): void {
+    this._lastAutoAdvanceFromVideoId = '';
+    this._controller.syncSeek(0);
+    this._controller.syncPlay();
+  }
 
   private onPlaybackEnded = (): void => {
     // 无当前视频 = 会话已被 release/forceReset 拆除（或中止加载后的迟到事件）：
@@ -764,17 +784,32 @@ export class PlayerSession {
       this.retryCurrentWithFreshStreams(state.currentTime);
       return;
     }
-    const autoPlay = this._sessionConfig.autoPlayNext;
-    if (!autoPlay) {
+
+    const queueManager = PlayQueueManager.getInstance();
+    const loopMode = queueManager.loopMode;
+    if (loopMode === 'one') {
+      const now = Date.now();
+      if (now - this._lastLoopOneReplayAtMs < 500) {
+        logger.warn(`${TAG} loop-one replay suppressed: duplicate ended for ${endingVideoId || 'unknown'}`);
+        return;
+      }
+      this._lastLoopOneReplayAtMs = now;
+      logger.info(`${TAG} playback ended, loopMode=one replaying ${endingVideoId || 'unknown'} from 0`);
+      this.replayCurrentFromStart();
       return;
     }
+
+    if (loopMode === 'none' && !this._sessionConfig.autoPlayNext) {
+      return;
+    }
+
     const fromVideoId = this._currentVideo?.videoId || '';
     if (fromVideoId.length > 0 && fromVideoId === this._lastAutoAdvanceFromVideoId) {
       logger.warn(`${TAG} auto-advance suppressed: duplicate ended for ${fromVideoId}`);
       return;
     }
     this._lastAutoAdvanceFromVideoId = fromVideoId;
-    logger.info(`${TAG} playback ended, auto-advancing from ${fromVideoId || 'unknown'}`);
+    logger.info(`${TAG} playback ended, auto-advancing (loopMode=${loopMode}) from ${fromVideoId || 'unknown'}`);
     this.playNextFromQueue().catch((e: Error) => {
       logger.warn(`${TAG} auto-advance failed: ${e.message || e}`);
     });
@@ -865,21 +900,57 @@ export class PlayerSession {
 
   canPlayNextFromQueue(): boolean {
     const queueManager = PlayQueueManager.getInstance();
-    return queueManager.hasNext() || queueManager.hasMorePages;
+    if (queueManager.hasNext() || queueManager.hasMorePages) {
+      return true;
+    }
+    return queueManager.loopMode === 'all' && queueManager.queue.length > 0;
   }
 
   canPlayPreviousFromQueue(): boolean {
-    return PlayQueueManager.getInstance().hasPrev();
+    const queueManager = PlayQueueManager.getInstance();
+    if (queueManager.hasPrev()) {
+      return true;
+    }
+    return queueManager.loopMode === 'all' && queueManager.queue.length > 0;
   }
 
   async playNextFromQueue(): Promise<boolean> {
-    const video = await PlayQueueManager.getInstance().nextOrLoadMore();
-    return video !== null;
+    const queueManager = PlayQueueManager.getInstance();
+    const video = await queueManager.nextOrLoadMore();
+    if (video !== null) {
+      return true;
+    }
+    if (queueManager.loopMode === 'all' && queueManager.queue.length > 0) {
+      const first = queueManager.queue[0];
+      if (first && this._currentVideo && first.videoId === this._currentVideo.videoId && queueManager.queue.length === 1) {
+        logger.info(`${TAG} playNextFromQueue: loopMode=all single-item replay ${first.videoId}`);
+        this.replayCurrentFromStart();
+        return true;
+      }
+      logger.info(`${TAG} playNextFromQueue: loopMode=all wrapping to index 0`);
+      return queueManager.moveTo(0) !== null;
+    }
+    return false;
   }
 
   async playPreviousFromQueue(): Promise<boolean> {
-    const video = PlayQueueManager.getInstance().prev();
-    return video !== null;
+    const queueManager = PlayQueueManager.getInstance();
+    const video = queueManager.prev();
+    if (video !== null) {
+      return true;
+    }
+    if (queueManager.loopMode === 'all' && queueManager.queue.length > 0) {
+      const lastIdx = queueManager.queue.length - 1;
+      const last = queueManager.queue[lastIdx];
+      if (last && this._currentVideo && last.videoId === this._currentVideo.videoId && queueManager.queue.length === 1) {
+        logger.info(`${TAG} playPreviousFromQueue: loopMode=all single-item replay ${last.videoId}`);
+        this.replayCurrentFromStart();
+        return true;
+      }
+      logger.info(`${TAG} playPreviousFromQueue: loopMode=all wrapping to index ${lastIdx}`);
+      return queueManager.moveTo(lastIdx) !== null;
+    }
+    return false;
   }
 
   async play(video: VideoItem, force: boolean = false): Promise<VideoData | null> {
@@ -1086,6 +1157,8 @@ export class PlayerSession {
       }],
       subtitleTracks: [],
       chapters: [],
+      storyboard: undefined,
+      heatmap: [],
       isLive: false,
       thumbnailUrl: video.thumbnailUrl || '',
       videoId: videoId,
@@ -1115,6 +1188,7 @@ export class PlayerSession {
     }
     this._controller.setPlaybackSpeed(this._sessionConfig.vodPlaybackSpeed);
     this._submittedVideoId = videoId;
+    this._lastAutoAdvanceFromVideoId = '';
     this._cachedVideoSource = videoSource;
     this.notifyPlaybackSourceChanged(videoSource, 'local-source-ready');
     this.startWatchSaveTimer();
@@ -1214,7 +1288,10 @@ export class PlayerSession {
           error: undefined,
           streams: result.playerStreams ?? [],
           subtitleTracks: result.subtitleTracks ?? [],
+          defaultCaptionTrackIndex: result.videoInfo.defaultCaptionTrackIndex,
           chapters: result.videoInfo.chapters || [],
+          storyboard: result.storyboard,
+          heatmap: result.heatmap ? result.heatmap.slice() : [],
           isLive: result.videoInfo.isLive || false, isLiveReplay: result.videoInfo.isLiveReplay || false,
           hlsUrl: result.videoInfo.hlsUrl,
           dashMpdUrl: result.videoInfo.dashMpdUrl,
@@ -1291,38 +1368,336 @@ export class PlayerSession {
     }
   }
 
+  /** 将轨道编码为持久化偏好键：`lang|manual` / `lang|auto`。 */
+  static formatSubtitleTrackKey(track: SubtitleTrack): string {
+    const code = (track.languageCode || '').trim();
+    if (code.length === 0) {
+      return '';
+    }
+    return `${code}|${track.isAutoGenerated ? 'auto' : 'manual'}`;
+  }
+
+  private getPlaybackConfig(): PlaybackConfig {
+    const existing = AppStorage.get<PlaybackConfig>('playbackConfig');
+    if (existing) {
+      return existing;
+    }
+    const loaded = PlaybackConfig.loadFromPreferences();
+    AppStorage.setOrCreate('playbackConfig', loaded);
+    return loaded;
+  }
+
+  /** 将语言码折叠到规范形式（合并 zh-CN/zh-Hans 与 zh-TW/zh-HK/zh-Hant）。 */
+  private normalizeSubtitleLangExact(code: string): string {
+    const lower = code.trim().toLowerCase().replace(/_/g, '-');
+    if (lower.length === 0) {
+      return '';
+    }
+    if (lower === 'zh-cn' || lower === 'zh-sg' || lower === 'zh-hans' || lower.startsWith('zh-hans-')) {
+      return 'zh-hans';
+    }
+    if (lower === 'zh-tw' || lower === 'zh-hk' || lower === 'zh-mo' || lower === 'zh-hant' || lower.startsWith('zh-hant-')) {
+      return 'zh-hant';
+    }
+    return lower;
+  }
+
+  /** 取语言码主标签（如 zh-Hans -> zh、en-US -> en），用于前缀降级匹配。 */
+  private subtitleLangPrimary(code: string): string {
+    const norm = this.normalizeSubtitleLangExact(code);
+    if (norm.length === 0) {
+      return '';
+    }
+    const dash = norm.indexOf('-');
+    return dash > 0 ? norm.substring(0, dash) : norm;
+  }
+
+  private isSubtitleLangExactMatch(trackCode: string, targetCode: string): boolean {
+    const a = this.normalizeSubtitleLangExact(trackCode);
+    const b = this.normalizeSubtitleLangExact(targetCode);
+    return a.length > 0 && b.length > 0 && a === b;
+  }
+
+  private isSubtitleLangPrefixMatch(trackCode: string, targetCode: string): boolean {
+    const a = this.subtitleLangPrimary(trackCode);
+    const b = this.subtitleLangPrimary(targetCode);
+    return a.length > 0 && b.length > 0 && a === b;
+  }
+
+  /** 解析视频原声语言（优先原声音轨 audioLanguage，其次默认字幕轨，其次 a.* ASR 原轨）。 */
+  private resolveOriginalLanguageCode(source: VideoData, tracks: SubtitleTrack[]): string {
+    const streams = source.streams;
+    if (streams && streams.length > 0) {
+      for (let i = 0; i < streams.length; i++) {
+        const s = streams[i];
+        if (s.audioTrackType === 'original' && s.audioLanguage && s.audioLanguage.trim().length > 0) {
+          return s.audioLanguage.trim();
+        }
+      }
+      for (let i = 0; i < streams.length; i++) {
+        const s = streams[i];
+        if (s.hasAudio && s.audioLanguage && s.audioLanguage.trim().length > 0) {
+          return s.audioLanguage.trim();
+        }
+      }
+    }
+    if (source.defaultCaptionTrackIndex !== undefined
+      && source.defaultCaptionTrackIndex >= 0
+      && source.defaultCaptionTrackIndex < tracks.length) {
+      const defLang = (tracks[source.defaultCaptionTrackIndex].languageCode || '').trim();
+      if (defLang.length > 0) {
+        return defLang;
+      }
+    }
+    for (let i = 0; i < tracks.length; i++) {
+      const t = tracks[i];
+      if (t.isDefault && t.languageCode.trim().length > 0) {
+        return t.languageCode.trim();
+      }
+    }
+    for (let i = 0; i < tracks.length; i++) {
+      const t = tracks[i];
+      if ((t.vssId?.startsWith('a.') || t.isAutoGenerated) && !t.isAutoTranslated && t.languageCode.trim().length > 0) {
+        return t.languageCode.trim();
+      }
+    }
+    return '';
+  }
+
   /**
-   * 字幕语言偏好自动选轨（NewPipe 行为）：用户在字幕菜单的选择会持久化到
-   * cfg_subtitle_preferred_lang；新视频带字幕轨且偏好非空时自动开对应语言。
-   * 偏好为空串表示用户显式关闭过字幕，不自动开启。
-   * 偏好为 "ai:" 前缀（用户上次选择了 AI 翻译）时：有目标语言原生轨则选原生轨，
-   * 否则异步触发 AI 翻译（gtx 通道，磁盘/内存缓存命中时瞬时完成）。
+   * 4 级智能字幕匹配（修复 languageCode === '' 误命中 bug，支持 zh-Hans/zh-Hant 折叠与 original 模式）：
+   * - manual 模式（默认）：manual exact → manual prefix → ASR exact → ASR prefix（→ autoTranslated 兜底）
+   * - auto 模式：ASR exact → ASR prefix → manual exact → manual prefix（→ autoTranslated 兜底）
+   * - original 模式：原声音轨语言 / defaultCaptionTrackIndex / a.* 原轨。
+   */
+  private findBestSubtitleTrackIndex(
+    tracks: SubtitleTrack[],
+    preferredRaw: string,
+    source: VideoData,
+    excludeIndex: number
+  ): number {
+    if (!tracks || tracks.length === 0) {
+      return -1;
+    }
+    const preferred = preferredRaw.trim();
+    if (preferred.length === 0) {
+      return -1;
+    }
+    if (preferred === 'original') {
+      const originalLang = this.resolveOriginalLanguageCode(source, tracks);
+      if (originalLang.length > 0) {
+        const langIdx = this.matchTrackFourTier(tracks, originalLang, false, excludeIndex);
+        if (langIdx >= 0) {
+          return langIdx;
+        }
+      }
+      if (source.defaultCaptionTrackIndex !== undefined
+        && source.defaultCaptionTrackIndex >= 0
+        && source.defaultCaptionTrackIndex < tracks.length
+        && source.defaultCaptionTrackIndex !== excludeIndex) {
+        return source.defaultCaptionTrackIndex;
+      }
+      for (let i = 0; i < tracks.length; i++) {
+        if (i === excludeIndex) continue;
+        if (tracks[i].isDefault) return i;
+      }
+      for (let i = 0; i < tracks.length; i++) {
+        if (i === excludeIndex) continue;
+        if (tracks[i].vssId?.startsWith('a.') || tracks[i].isAutoGenerated) return i;
+      }
+      for (let i = 0; i < tracks.length; i++) {
+        if (i === excludeIndex) continue;
+        if (!tracks[i].isAutoTranslated) return i;
+      }
+      return -1;
+    }
+
+    let targetLang = preferred;
+    let preferAuto = false;
+    const pipeIdx = preferred.indexOf('|');
+    if (pipeIdx > 0) {
+      targetLang = preferred.substring(0, pipeIdx).trim();
+      const mode = preferred.substring(pipeIdx + 1).trim().toLowerCase();
+      preferAuto = mode === 'auto';
+    } else if (preferred.startsWith('ai:')) {
+      targetLang = preferred.substring(3).trim();
+    }
+    if (targetLang.length === 0) {
+      return -1;
+    }
+    return this.matchTrackFourTier(tracks, targetLang, preferAuto, excludeIndex);
+  }
+
+  private matchTrackFourTier(
+    tracks: SubtitleTrack[],
+    targetLang: string,
+    preferAuto: boolean,
+    excludeIndex: number
+  ): number {
+    const findTier = (wantAuto: boolean, exactOnly: boolean, allowTranslated: boolean): number => {
+      for (let i = 0; i < tracks.length; i++) {
+        if (i === excludeIndex) continue;
+        const t = tracks[i];
+        const code = (t.languageCode || '').trim();
+        if (code.length === 0) continue;
+        if (!allowTranslated && t.isAutoTranslated) continue;
+        if (allowTranslated && !t.isAutoTranslated) continue;
+        if (!allowTranslated && t.isAutoGenerated !== wantAuto) continue;
+        const matched = exactOnly
+          ? this.isSubtitleLangExactMatch(code, targetLang)
+          : this.isSubtitleLangPrefixMatch(code, targetLang);
+        if (matched) {
+          return i;
+        }
+      }
+      return -1;
+    };
+
+    const primaryAuto = preferAuto;
+    const secondaryAuto = !preferAuto;
+    let idx = findTier(primaryAuto, true, false);
+    if (idx >= 0) return idx;
+    idx = findTier(primaryAuto, false, false);
+    if (idx >= 0) return idx;
+    idx = findTier(secondaryAuto, true, false);
+    if (idx >= 0) return idx;
+    idx = findTier(secondaryAuto, false, false);
+    if (idx >= 0) return idx;
+    idx = findTier(false, true, true);
+    if (idx >= 0) return idx;
+    return findTier(false, false, true);
+  }
+
+  /**
+   * 字幕智能自动选轨（解耦开关 + 偏好轨道）：
+   * - subtitleEnabled === false 时保持关闭，绝不擦除 subtitlePreferredTrack；
+   * - subtitleEnabled === true 时按 4 级匹配选中主轨，并按需恢复双语副轨。
    */
   private autoSelectPreferredSubtitle(source: VideoData): void {
     const tracks = source.subtitleTracks;
     if (!tracks || tracks.length === 0) return;
-    const preferred = PreferencesStore.getString('cfg_subtitle_preferred_lang', '');
-    if (preferred.length === 0) return;
-    if (preferred.startsWith('ai:')) {
-      // [DISABLED] P2 gtx 自动触发已随菜单项注释关闭（产品只保留 tlang 官方自动翻译）；
-      // ai: 偏好只保留"有原生轨选原生轨"的语义，不再后台触发 gtx 翻译。
-      const target = TranslationService.targetLanguage();
-      const nativeMatch = tracks.find((t: SubtitleTrack) => !t.isAutoTranslated
-        && (t.languageCode === target || t.languageCode.startsWith(target)
-          || (t.languageCode.length > 0 && target.startsWith(t.languageCode))));
-      if (nativeMatch) {
-        logger.info(`${TAG} auto-select native subtitle lang=${nativeMatch.languageCode} (ai preferred=${preferred}) video=${source.videoId}`);
-        this._controller.switchSubtitle(nativeMatch.url);
-      }
+    const pb = this.getPlaybackConfig();
+    if (!pb.subtitleEnabled) {
       return;
     }
-    const match = tracks.find((t: SubtitleTrack) => t.languageCode === preferred)
-      || tracks.find((t: SubtitleTrack) => t.languageCode.startsWith(preferred))
-      || tracks.find((t: SubtitleTrack) => preferred.startsWith(t.languageCode));
-    if (match) {
-      logger.info(`${TAG} auto-select subtitle lang=${match.languageCode} (preferred=${preferred}) video=${source.videoId}`);
-      this._controller.switchSubtitle(match.url);
+    const preferred = pb.subtitlePreferredTrack.trim().length > 0
+      ? pb.subtitlePreferredTrack
+      : 'original';
+    let primaryIdx = this.findBestSubtitleTrackIndex(tracks, preferred, source, -1);
+    if (primaryIdx < 0 && preferred !== 'original') {
+      primaryIdx = this.findBestSubtitleTrackIndex(tracks, 'original', source, -1);
     }
+    if (primaryIdx >= 0) {
+      const match = tracks[primaryIdx];
+      logger.info(`${TAG} auto-select subtitle idx=${primaryIdx} lang=${match.languageCode} auto=${match.isAutoGenerated} (preferred=${preferred}) video=${source.videoId}`);
+      this._controller.switchSubtitle(match.url);
+      this.autoSelectSecondarySubtitle(source, primaryIdx);
+    }
+  }
+
+  /** 自动恢复双语副字幕（要求 secondarySubtitleTrack 非空且与主轨不同）。 */
+  autoSelectSecondarySubtitle(source: VideoData, primaryIndex?: number): void {
+    const tracks = source.subtitleTracks;
+    if (!tracks || tracks.length < 2) return;
+    const pb = this.getPlaybackConfig();
+    if (!pb.subtitleEnabled || pb.secondarySubtitleTrack.trim().length === 0) {
+      return;
+    }
+    const resolvedPrimaryIdx = primaryIndex !== undefined
+      ? primaryIndex
+      : tracks.findIndex((t: SubtitleTrack): boolean => t.url === this._controller.vm.currentSubtitleUrl);
+    const secIdx = this.findBestSubtitleTrackIndex(tracks, pb.secondarySubtitleTrack, source, resolvedPrimaryIdx);
+    if (secIdx >= 0 && secIdx !== resolvedPrimaryIdx) {
+      logger.info(`${TAG} auto-select secondary subtitle idx=${secIdx} lang=${tracks[secIdx].languageCode} (pref=${pb.secondarySubtitleTrack}) video=${source.videoId}`);
+      this._controller.selectSecondarySubtitle(secIdx);
+    }
+  }
+
+  /**
+   * 菜单选择主字幕（index < 0 表示关闭，保留 subtitlePreferredTrack 供一键 CC 恢复）。
+   */
+  selectPrimarySubtitle(index: number): void {
+    const pb = this.getPlaybackConfig();
+    const tracks = this._controller.vm.subtitleTracks;
+    if (index < 0 || index >= tracks.length) {
+      this._controller.switchSubtitle('');
+      this._controller.selectSecondarySubtitle(-1);
+      pb.subtitleEnabled = false;
+      PlaybackConfig.saveToPreferences(pb);
+      return;
+    }
+    const track = tracks[index];
+    this._controller.switchSubtitle(track.url);
+    pb.subtitleEnabled = true;
+    const key = PlayerSession.formatSubtitleTrackKey(track);
+    if (key.length > 0) {
+      pb.subtitlePreferredTrack = key;
+    }
+    if (this._controller.getSecondarySubtitleIndex() === index) {
+      this._controller.selectSecondarySubtitle(-1);
+    }
+    PlaybackConfig.saveToPreferences(pb);
+    this._sessionConfig.subtitlePreferredLang = pb.subtitlePreferredTrack;
+  }
+
+  /**
+   * 一键 CC 开关：关闭时保留 subtitlePreferredTrack（不擦除偏好）；
+   * 开启时恢复上次偏好语言（或按 4 级匹配 / 系统翻译语言 / original 选最佳轨）并按需恢复副轨。
+   * 返回切换后的开关态（true = 已开启，false = 已关闭）。
+   */
+  toggleSubtitleEnabled(): boolean {
+    const pb = this.getPlaybackConfig();
+    const currentlyActive = this._controller.vm.currentSubtitleUrl.length > 0;
+    if (currentlyActive) {
+      this._controller.switchSubtitle('');
+      this._controller.selectSecondarySubtitle(-1);
+      pb.subtitleEnabled = false;
+      PlaybackConfig.saveToPreferences(pb);
+      return false;
+    }
+    const tracks = this._controller.vm.subtitleTracks;
+    pb.subtitleEnabled = true;
+    PlaybackConfig.saveToPreferences(pb);
+    if (tracks.length === 0) {
+      return true;
+    }
+    let idx = this.findBestSubtitleTrackIndex(tracks, pb.subtitlePreferredTrack, this._defaultSource, -1);
+    if (idx < 0) {
+      const targetLang = TranslationService.subtitleTargetLanguage();
+      if (targetLang.length > 0) {
+        idx = this.findBestSubtitleTrackIndex(tracks, `${targetLang}|manual`, this._defaultSource, -1);
+      }
+    }
+    if (idx < 0) {
+      idx = this.findBestSubtitleTrackIndex(tracks, 'original', this._defaultSource, -1);
+    }
+    if (idx < 0) {
+      idx = 0;
+    }
+    this._controller.switchSubtitle(tracks[idx].url);
+    this.autoSelectSecondarySubtitle(this._defaultSource, idx);
+    return true;
+  }
+
+  /** 选择或关闭双语副字幕（index < 0 = 关闭并清空持久化副轨偏好）。 */
+  selectSecondarySubtitle(index: number): void {
+    const pb = this.getPlaybackConfig();
+    const tracks = this._controller.vm.subtitleTracks;
+    if (index < 0 || index >= tracks.length) {
+      this._controller.selectSecondarySubtitle(-1);
+      pb.secondarySubtitleTrack = '';
+      PlaybackConfig.saveToPreferences(pb);
+      return;
+    }
+    this._controller.selectSecondarySubtitle(index);
+    const key = PlayerSession.formatSubtitleTrackKey(tracks[index]);
+    pb.secondarySubtitleTrack = key;
+    PlaybackConfig.saveToPreferences(pb);
+  }
+
+  /** 立即按当前播放位置与最新偏移量重绘覆盖层主/副字幕（暂停态也即时生效）。 */
+  refreshSubtitleOverlay(): void {
+    this._controller.refreshSubtitleOverlay();
   }
 
   private formatStatCount(count: number | undefined): string {
@@ -1376,6 +1751,12 @@ export class PlayerSession {
       if (extras.tags && extras.tags.length > 0) this._defaultSource.tags = extras.tags;
       if (extras.chapters && extras.chapters.length > 0) {
         this._defaultSource.chapters = extras.chapters.slice();
+      }
+      if (extras.storyboard) {
+        this._defaultSource.storyboard = extras.storyboard;
+      }
+      if (extras.heatmap && extras.heatmap.length > 0) {
+        this._defaultSource.heatmap = extras.heatmap.slice();
       }
 
       if (this._currentVideo?.videoId === videoId) {
@@ -1606,6 +1987,7 @@ export class PlayerSession {
     }
     this._submittedVideoId = '';
     this._lastAutoAdvanceFromVideoId = '';
+    this._lastLoopOneReplayAtMs = 0;
     this._failureRetryCount = 0;
     this._failureRetryInFlight = false;
     this._failureRetryVideoId = '';

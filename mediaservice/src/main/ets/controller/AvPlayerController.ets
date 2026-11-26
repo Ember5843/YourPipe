@@ -26,7 +26,28 @@ import Logger from '../utils/Logger';
 import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { HttpDownloader, parseHlsMasterManifest, StreamInfo as ParsedHlsStreamInfo } from 'youtube_core';
-import { SubtitleCue, parseVttSubtitles, findActiveSubtitleText } from '../subtitle/VttSubtitleParser';
+import { SubtitleCue, parseVttSubtitles, parseJson3Subtitles, findActiveSubtitleText } from '../subtitle/VttSubtitleParser';
+
+export type SubtitleErrorKind = 'rate_limited' | 'unavailable';
+export type SubtitleErrorListener = (kind: SubtitleErrorKind) => void;
+export type SubtitlePoTokenProvider = (videoId: string) => Promise<string | undefined>;
+
+interface TextFetchResult {
+  statusCode: number;
+  body: string;
+}
+
+interface SubtitleFormatAttempt {
+  cues: SubtitleCue[];
+  statusCode: number;
+  networkError: boolean;
+}
+
+interface SubtitleTrackFetchResult {
+  cues: SubtitleCue[];
+  rateLimited: boolean;
+  networkError: boolean;
+}
 
 /** Live/post-live HLS track pair: video variant playlist + audio rendition playlist. */
 interface HlsTrackPair {
@@ -64,6 +85,8 @@ export class AvPlayerController {
   private static engineConfigProvider: (() => EngineConfig) | null = null;
   /** 字幕认证头提供者：用于 tlang 自动翻译等需要登录态风控的轨道。 */
   private static subtitleAuthHeaderProvider: (() => Promise<Record<string, string>>) | null = null;
+  /** 字幕 PoToken 提供者：仅命中 exp=xpe/xpv 或首次 0-cue 时按需调用，不阻塞常规播放。 */
+  private static subtitlePoTokenProvider: SubtitlePoTokenProvider | undefined = undefined;
 
   public static setEngineConfigProvider(provider: () => EngineConfig): void {
     AvPlayerController.engineConfigProvider = provider;
@@ -73,16 +96,31 @@ export class AvPlayerController {
     AvPlayerController.subtitleAuthHeaderProvider = provider;
   }
 
+  public static setSubtitlePoTokenProvider(fn: SubtitlePoTokenProvider | undefined): void {
+    AvPlayerController.subtitlePoTokenProvider = fn;
+  }
+
   private curIndex: number = 0;
   private curSource: VideoData;
   /** External audio (HLS audio rendition playlist) for the current source, '' when none. */
   private currentHlsAudioUrl: string = '';
   /** itag of the live HLS variant currently playing; used to highlight the merged quality menu. */
   private livePlayingVariantItag: number | undefined = undefined;
-  /** Parsed cues of the currently selected subtitle track (ArkUI overlay, not mpv-burned). */
+  /** Parsed cues of the currently selected primary subtitle track (ArkUI overlay, not mpv-burned). */
   private subtitleCues: SubtitleCue[] = [];
-  /** Guards async subtitle loads against stale completions (track switch / new source). */
+  /** Guards async primary subtitle loads against stale completions (track switch / new source). */
   private subtitleLoadSeq: number = 0;
+  /** Parsed cues of the currently selected secondary (bilingual) subtitle track. */
+  private secondarySubtitleCues: SubtitleCue[] = [];
+  /** Active secondary subtitle track index in vm.subtitleTracks (-1 = off). */
+  private secondarySubtitleIndex: number = -1;
+  /** Guards async secondary subtitle loads against stale completions. */
+  private secondarySubtitleLoadSeq: number = 0;
+  /** 8-entry in-memory LRU cache of parsed cues keyed by canonical track URL. */
+  private static readonly SUBTITLE_CACHE_MAX_ENTRIES: number = 8;
+  private subtitleCueCache: Map<string, SubtitleCue[]> = new Map<string, SubtitleCue[]>();
+  /** Non-blocking subtitle load failure listener (429 rate-limit vs unavailable). */
+  private subtitleErrorListener: SubtitleErrorListener | undefined = undefined;
   private mpvEngine: MpvPlaybackEngine = new MpvPlaybackEngine();
   private playbackEngine: PlaybackEngine = this.mpvEngine;
   private surfaceWidthPx: number = 0;
@@ -610,6 +648,9 @@ export class AvPlayerController {
     this.livePlayingVariantItag = undefined;
     this.subtitleCues = [];
     this.subtitleLoadSeq++;
+    this.secondarySubtitleCues = [];
+    this.secondarySubtitleIndex = -1;
+    this.secondarySubtitleLoadSeq++;
     this.curSource = newSource;
     this.curIndex = newSource.index;
     // 直播禁用倍速：上一个点播残留的倍速不带入直播。mpv speed 跨 loadfile
@@ -651,6 +692,8 @@ export class AvPlayerController {
     Logger.info(TAG, `[TTFF] engine_ready elapsed=${Date.now() - submitStartedAt}ms`);
     if (!this.isMediaSessionCurrent(generation)
       || this.stateMachine.isOneOf(PlayerState.RELEASED, PlayerState.IDLE)) return;
+
+    this.applyAudioPreferences();
 
     if (!this.stateMachine.transition(PlayerState.LOADING)) {
       // 极端情况：转换被拒绝（例如 ERROR 之外的非法源状态），强制对齐到 LOADING
@@ -708,6 +751,12 @@ export class AvPlayerController {
     this.updateAvSessionMetadata(false);
     this.vm.isBuffering = true;
     this.vm.currentSubtitleUrl = '';
+    this.vm.secondarySubtitleIndex = -1;
+    this.vm.secondarySubtitleUrl = '';
+    this.vm.secondarySubtitleText = '';
+    this.secondarySubtitleIndex = -1;
+    this.secondarySubtitleCues = [];
+    this.secondarySubtitleLoadSeq++;
     const startPos = this.pendingStartFromSec;
     this.pendingStartFromSec = 0;
     Logger.info(TAG,
@@ -835,6 +884,38 @@ export class AvPlayerController {
 
   public isMuted(): boolean {
     return this.muted;
+  }
+
+  private isCurrentSourceLive(): boolean {
+    return this.curSource?.isLive === true;
+  }
+
+  /**
+   * 从 PlaybackPreferences.snapshot() 同步全部音频增强参数（响度均衡、跳静音、音画延迟）到引擎。
+   * 可在播放过程中安全热更新，无需重启播放；直播流自动旁路跳静音。
+   */
+  public applyAudioPreferences(): void {
+    if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
+    const prefs = PlaybackPreferences.snapshot();
+    const isLive = this.isCurrentSourceLive();
+    this.playbackEngine.setAudioFilters(prefs.audioNormalizeEnabled, prefs.skipSilenceEnabled, isLive);
+    this.playbackEngine.setAudioDelayMs(prefs.audioDelayMs);
+  }
+
+  /**
+   * 运行时热切换 MPV 音频滤镜（响度均衡 + 跳静音）；直播流自动旁路跳静音。
+   */
+  public setAudioFilters(normalize: boolean, skipSilence: boolean): void {
+    if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
+    this.playbackEngine.setAudioFilters(normalize, skipSilence, this.isCurrentSourceLive());
+  }
+
+  /**
+   * 运行时热调整 MPV 音画延迟（毫秒，自动钳制到 -1000..1000）。
+   */
+  public setAudioDelayMs(delayMs: number): void {
+    if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
+    this.playbackEngine.setAudioDelayMs(delayMs);
   }
 
   public resizeSurface(widthPx: number, heightPx: number): void {
@@ -1185,13 +1266,32 @@ export class AvPlayerController {
     this.errorListeners.clear();
     this.waitingForBufferListeners.clear();
     this.seekableRangesListeners.clear();
+    this.subtitleErrorListener = undefined;
+    this.subtitleCueCache.clear();
+  }
+
+  public setSubtitleErrorListener(fn: SubtitleErrorListener | undefined): void {
+    this.subtitleErrorListener = fn;
+  }
+
+  private notifySubtitleError(kind: SubtitleErrorKind): void {
+    const listener = this.subtitleErrorListener;
+    if (!listener) {
+      return;
+    }
+    try {
+      listener(kind);
+    } catch (e) {
+      Logger.warn(TAG, `subtitle error listener failed: ${(e as Error).message || e}`);
+    }
   }
 
   /**
    * Subtitle selection renders through the ArkUI overlay (vm.subtitleText),
-   * not mpv's burned-in libass path: the VTT text is fetched and parsed
-   * app-side so position/size stay configurable and rendering never touches
-   * the video pipeline.
+   * not mpv's burned-in libass path: timedtext is fetched and parsed app-side
+   * (preferring fmt=json3 with automatic fmt=vtt fallback + 8-entry LRU cache
+   * + on-demand subtitle PoToken fallback) so position/size stay configurable
+   * and rendering never touches the video pipeline.
    */
   public switchSubtitle(url: string): void {
     if (url === this.vm.currentSubtitleUrl) return;
@@ -1200,31 +1300,299 @@ export class AvPlayerController {
     this.subtitleLoadSeq++;
     this.vm.subtitleText = '';
     if (url.length === 0) return;
+    const cacheKey = this.canonicalizeSubtitleUrl(url);
+    const cached = this.getCachedSubtitleCues(cacheKey);
+    if (cached) {
+      this.subtitleCues = cached;
+      this.updateSubtitleOverlayText(this.vm.currentTime);
+      Logger.info(TAG, `subtitle overlay cache hit: cues=${cached.length} url=${url.substring(0, 60)}`);
+      return;
+    }
     this.loadSubtitleOverlay(url, this.subtitleLoadSeq, false);
   }
 
-  /** VTT fetch + parse with one bounded retry; stale completions are dropped by seq/url. */
+  /**
+   * Select secondary (bilingual) subtitle track by index in vm.subtitleTracks.
+   * Pass index < 0 (or out of bounds) to disable the secondary subtitle track.
+   */
+  public selectSecondarySubtitle(index: number): void {
+    if (index < 0 || index >= this.vm.subtitleTracks.length) {
+      this.clearSecondarySubtitleState();
+      return;
+    }
+    const track = this.vm.subtitleTracks[index];
+    const url = track?.url || '';
+    if (url.length === 0) {
+      this.clearSecondarySubtitleState();
+      return;
+    }
+    if (index === this.secondarySubtitleIndex && url === this.vm.secondarySubtitleUrl
+      && this.secondarySubtitleCues.length > 0) {
+      return;
+    }
+    this.secondarySubtitleIndex = index;
+    this.vm.secondarySubtitleIndex = index;
+    this.vm.secondarySubtitleUrl = url;
+    this.secondarySubtitleCues = [];
+    this.secondarySubtitleLoadSeq++;
+    this.vm.secondarySubtitleText = '';
+    const cacheKey = this.canonicalizeSubtitleUrl(url);
+    const cached = this.getCachedSubtitleCues(cacheKey);
+    if (cached) {
+      this.secondarySubtitleCues = cached;
+      this.updateSubtitleOverlayText(this.vm.currentTime);
+      Logger.info(TAG, `secondary subtitle cache hit: idx=${index} cues=${cached.length} url=${url.substring(0, 60)}`);
+      return;
+    }
+    this.loadSecondarySubtitleOverlay(url, index, this.secondarySubtitleLoadSeq, false);
+  }
+
+  public getSecondarySubtitleIndex(): number {
+    return this.secondarySubtitleIndex;
+  }
+
+  /** Immediately recompute primary and secondary subtitle text at currentTime (works when paused). */
+  public refreshSubtitleOverlay(): void {
+    this.updateSubtitleOverlayText(this.vm.currentTime);
+  }
+
+  private clearSecondarySubtitleState(): void {
+    this.secondarySubtitleIndex = -1;
+    this.secondarySubtitleCues = [];
+    this.secondarySubtitleLoadSeq++;
+    this.vm.secondarySubtitleIndex = -1;
+    this.vm.secondarySubtitleUrl = '';
+    this.vm.secondarySubtitleText = '';
+  }
+
+  private canonicalizeSubtitleUrl(url: string): string {
+    return url
+      .replace(/([?&])fmt=[^&]*/g, '$1')
+      .replace(/([?&])xosf=[^&]*/g, '$1')
+      .replace(/([?&])pot=[^&]*/g, '$1')
+      .replace(/([?&])potc=[^&]*/g, '$1')
+      .replace(/&&+/g, '&')
+      .replace(/\?&/, '?')
+      .replace(/&$/, '')
+      .replace(/\?$/, '');
+  }
+
+  private setQueryParam(url: string, key: string, value: string): string {
+    const encoded = encodeURIComponent(value);
+    const re = new RegExp(`([?&])${key}=[^&]*`, 'g');
+    if (re.test(url)) {
+      return url.replace(re, `$1${key}=${encoded}`);
+    }
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}${key}=${encoded}`;
+  }
+
+  private buildSubtitleFormatUrl(url: string, fmt: 'json3' | 'vtt'): string {
+    const cleaned = url
+      .replace(/([?&])xosf=[^&]*/g, '$1')
+      .replace(/&&+/g, '&')
+      .replace(/\?&/, '?')
+      .replace(/&$/, '')
+      .replace(/\?$/, '');
+    return this.setQueryParam(cleaned, 'fmt', fmt);
+  }
+
+  private needsSubtitlePoToken(url: string): boolean {
+    return /[?&]exp=[^&]*(?:xpe|xpv)/i.test(url);
+  }
+
+  private appendSubtitlePoToken(url: string, token: string): string {
+    let out = this.setQueryParam(url, 'pot', token);
+    out = this.setQueryParam(out, 'potc', '1');
+    out = this.setQueryParam(out, 'c', 'WEB');
+    return out;
+  }
+
+  private getCachedSubtitleCues(cacheKey: string): SubtitleCue[] | undefined {
+    const cached = this.subtitleCueCache.get(cacheKey);
+    if (!cached) {
+      return undefined;
+    }
+    // Refresh recency for LRU eviction.
+    this.subtitleCueCache.delete(cacheKey);
+    this.subtitleCueCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  private putCachedSubtitleCues(cacheKey: string, cues: SubtitleCue[]): void {
+    if (cues.length === 0) {
+      return;
+    }
+    if (this.subtitleCueCache.has(cacheKey)) {
+      this.subtitleCueCache.delete(cacheKey);
+    }
+    this.subtitleCueCache.set(cacheKey, cues);
+    while (this.subtitleCueCache.size > AvPlayerController.SUBTITLE_CACHE_MAX_ENTRIES) {
+      const oldest = this.subtitleCueCache.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      this.subtitleCueCache.delete(oldest.value);
+    }
+  }
+
+  private async tryFetchSubtitleFormat(url: string, fmt: 'json3' | 'vtt'): Promise<SubtitleFormatAttempt> {
+    const targetUrl = this.buildSubtitleFormatUrl(url, fmt);
+    try {
+      const res = await this.fetchTextWithStatus(targetUrl);
+      if (res.statusCode === 429) {
+        return { cues: [], statusCode: 429, networkError: false };
+      }
+      if (res.statusCode !== 200 || res.body.trim().length === 0) {
+        return { cues: [], statusCode: res.statusCode, networkError: false };
+      }
+      const cues = fmt === 'json3' ? parseJson3Subtitles(res.body) : parseVttSubtitles(res.body);
+      return { cues: cues, statusCode: 200, networkError: false };
+    } catch {
+      return { cues: [], statusCode: 0, networkError: true };
+    }
+  }
+
+  private async tryFetchJson3ThenVtt(url: string): Promise<SubtitleTrackFetchResult> {
+    const json3Res = await this.tryFetchSubtitleFormat(url, 'json3');
+    if (json3Res.cues.length > 0) {
+      return { cues: json3Res.cues, rateLimited: false, networkError: false };
+    }
+    if (json3Res.statusCode === 429) {
+      return { cues: [], rateLimited: true, networkError: false };
+    }
+    Logger.debug(TAG, `subtitle json3 yielded 0 cues (status=${json3Res.statusCode}), falling back to vtt`);
+    const vttRes = await this.tryFetchSubtitleFormat(url, 'vtt');
+    if (vttRes.cues.length > 0) {
+      return { cues: vttRes.cues, rateLimited: false, networkError: false };
+    }
+    return {
+      cues: [],
+      rateLimited: vttRes.statusCode === 429,
+      networkError: vttRes.networkError || json3Res.networkError
+    };
+  }
+
+  private async fetchAndParseSubtitleTrack(trackUrl: string): Promise<SubtitleTrackFetchResult> {
+    const cacheKey = this.canonicalizeSubtitleUrl(trackUrl);
+    const cached = this.getCachedSubtitleCues(cacheKey);
+    if (cached) {
+      return { cues: cached, rateLimited: false, networkError: false };
+    }
+
+    const potProvider = AvPlayerController.subtitlePoTokenProvider;
+    const videoId = this.curSource.videoId || '';
+    let attemptedPot = false;
+    let workingUrl = trackUrl;
+
+    if (this.needsSubtitlePoToken(trackUrl) && potProvider && videoId.length > 0) {
+      attemptedPot = true;
+      try {
+        const token = await potProvider(videoId);
+        if (token && token.length > 0) {
+          workingUrl = this.appendSubtitlePoToken(trackUrl, token);
+          Logger.info(TAG, `subtitle PoToken attached proactively (exp=xpe/xpv) video=${videoId}`);
+        }
+      } catch (e) {
+        Logger.warn(TAG, `subtitle proactive PoToken mint failed: ${(e as Error).message || e}`);
+      }
+    }
+
+    let result = await this.tryFetchJson3ThenVtt(workingUrl);
+
+    if (result.cues.length === 0 && !result.rateLimited && !result.networkError
+      && !attemptedPot && potProvider && videoId.length > 0) {
+      attemptedPot = true;
+      try {
+        const token = await potProvider(videoId);
+        if (token && token.length > 0) {
+          Logger.info(TAG, `subtitle 0-cue fallback: retrying once with PoToken video=${videoId}`);
+          const potUrl = this.appendSubtitlePoToken(trackUrl, token);
+          result = await this.tryFetchJson3ThenVtt(potUrl);
+        }
+      } catch (e) {
+        Logger.warn(TAG, `subtitle fallback PoToken mint failed: ${(e as Error).message || e}`);
+      }
+    }
+
+    if (result.cues.length > 0) {
+      this.putCachedSubtitleCues(cacheKey, result.cues);
+    }
+    return result;
+  }
+
+  /** Primary subtitle fetch + parse with one bounded retry on transient network error; stale completions are dropped by seq/url. */
   private loadSubtitleOverlay(url: string, seq: number, isRetry: boolean): void {
-    this.fetchText(url).then((text: string) => {
+    this.fetchAndParseSubtitleTrack(url).then((res: SubtitleTrackFetchResult) => {
       if (seq !== this.subtitleLoadSeq || url !== this.vm.currentSubtitleUrl) return;
-      this.subtitleCues = parseVttSubtitles(text);
-      if (this.subtitleCues.length === 0) {
-        // 200 但零 cue（空 VTT 也是失败形态）：复位选中态，允许再次点选
-        Logger.warn(TAG, `subtitle overlay parsed 0 cues, resetting selection: retry=${isRetry} url=${url.substring(0, 60)}`);
-        this.resetFailedSubtitleSelection(url);
+      if (res.cues.length > 0) {
+        this.subtitleCues = res.cues;
+        this.updateSubtitleOverlayText(this.vm.currentTime);
+        Logger.info(TAG, `subtitle overlay loaded: cues=${this.subtitleCues.length} retry=${isRetry} url=${url.substring(0, 60)}`);
         return;
       }
-      Logger.info(TAG, `subtitle overlay loaded: cues=${this.subtitleCues.length} retry=${isRetry} url=${url.substring(0, 60)}`);
+      if (res.networkError && !res.rateLimited && !isRetry) {
+        Logger.warn(TAG, `subtitle overlay network failure, retrying once: url=${url.substring(0, 60)}`);
+        setTimeout(() => {
+          if (seq !== this.subtitleLoadSeq || url !== this.vm.currentSubtitleUrl) return;
+          this.loadSubtitleOverlay(url, seq, true);
+        }, 2000);
+        return;
+      }
+      const kind: SubtitleErrorKind = res.rateLimited ? 'rate_limited' : 'unavailable';
+      Logger.warn(TAG, `subtitle overlay failed (${kind}), resetting selection: retry=${isRetry} url=${url.substring(0, 60)}`);
+      this.resetFailedSubtitleSelection(url);
+      this.notifySubtitleError(kind);
     }).catch((e: Error) => {
       if (seq !== this.subtitleLoadSeq || url !== this.vm.currentSubtitleUrl) return;
       if (!isRetry) {
         Logger.warn(TAG, `subtitle overlay load failed, retrying once: ${e.message || e}`);
-        setTimeout(() => this.loadSubtitleOverlay(url, seq, true), 2000);
+        setTimeout(() => {
+          if (seq !== this.subtitleLoadSeq || url !== this.vm.currentSubtitleUrl) return;
+          this.loadSubtitleOverlay(url, seq, true);
+        }, 2000);
       } else {
         Logger.error(TAG, `subtitle overlay load failed after retry: ${e.message || e}`);
-        // 失败必须复位选中态：currentSubtitleUrl 已占住该轨时，switchSubtitle 的
-        // 同 URL 早退会让用户再也无法通过点选触发重试（表现为"选了没反应"）
         this.resetFailedSubtitleSelection(url);
+        this.notifySubtitleError('unavailable');
+      }
+    });
+  }
+
+  /** Secondary subtitle fetch + parse with independent seq guard and shared LRU/json3/vtt/PoToken pipeline. */
+  private loadSecondarySubtitleOverlay(url: string, index: number, seq: number, isRetry: boolean): void {
+    this.fetchAndParseSubtitleTrack(url).then((res: SubtitleTrackFetchResult) => {
+      if (seq !== this.secondarySubtitleLoadSeq || url !== this.vm.secondarySubtitleUrl) return;
+      if (res.cues.length > 0) {
+        this.secondarySubtitleCues = res.cues;
+        this.updateSubtitleOverlayText(this.vm.currentTime);
+        Logger.info(TAG, `secondary subtitle loaded: idx=${index} cues=${this.secondarySubtitleCues.length} retry=${isRetry} url=${url.substring(0, 60)}`);
+        return;
+      }
+      if (res.networkError && !res.rateLimited && !isRetry) {
+        Logger.warn(TAG, `secondary subtitle network failure, retrying once: idx=${index} url=${url.substring(0, 60)}`);
+        setTimeout(() => {
+          if (seq !== this.secondarySubtitleLoadSeq || url !== this.vm.secondarySubtitleUrl) return;
+          this.loadSecondarySubtitleOverlay(url, index, seq, true);
+        }, 2000);
+        return;
+      }
+      const kind: SubtitleErrorKind = res.rateLimited ? 'rate_limited' : 'unavailable';
+      Logger.warn(TAG, `secondary subtitle failed (${kind}), resetting selection: idx=${index} retry=${isRetry}`);
+      this.resetFailedSecondarySubtitleSelection(url);
+      this.notifySubtitleError(kind);
+    }).catch((e: Error) => {
+      if (seq !== this.secondarySubtitleLoadSeq || url !== this.vm.secondarySubtitleUrl) return;
+      if (!isRetry) {
+        Logger.warn(TAG, `secondary subtitle load failed, retrying once: ${e.message || e}`);
+        setTimeout(() => {
+          if (seq !== this.secondarySubtitleLoadSeq || url !== this.vm.secondarySubtitleUrl) return;
+          this.loadSecondarySubtitleOverlay(url, index, seq, true);
+        }, 2000);
+      } else {
+        Logger.error(TAG, `secondary subtitle load failed after retry: ${e.message || e}`);
+        this.resetFailedSecondarySubtitleSelection(url);
+        this.notifySubtitleError('unavailable');
       }
     });
   }
@@ -1235,6 +1603,17 @@ export class AvPlayerController {
       this.vm.currentSubtitleUrl = '';
       this.subtitleCues = [];
       this.vm.subtitleText = '';
+    }
+  }
+
+  /** 副字幕加载失败后复位选中态（仅当失败 URL 仍是当前副轨时）。 */
+  private resetFailedSecondarySubtitleSelection(url: string): void {
+    if (url === this.vm.secondarySubtitleUrl) {
+      this.secondarySubtitleIndex = -1;
+      this.secondarySubtitleCues = [];
+      this.vm.secondarySubtitleIndex = -1;
+      this.vm.secondarySubtitleUrl = '';
+      this.vm.secondarySubtitleText = '';
     }
   }
 
@@ -1257,6 +1636,7 @@ export class AvPlayerController {
     }
     if (trackKey.length === 0 || vttText.length === 0) return;
     this.subtitleCues = parseVttSubtitles(vttText);
+    this.updateSubtitleOverlayText(this.vm.currentTime);
     Logger.info(TAG, `subtitle overlay (generated) loaded: cues=${this.subtitleCues.length} key=${trackKey.substring(0, 60)}`);
   }
 
@@ -1266,14 +1646,26 @@ export class AvPlayerController {
    * 透传方法。重新启用 P3 需要先恢复 libmpv_napi 的 tap 支持。
    */
 
-  /** Driven by engine time-pos updates (~100ms); cheap enough per tick. */
+  /** Driven by engine time-pos updates (~100ms) or refreshSubtitleOverlay(); cheap enough per tick. */
   private updateSubtitleOverlayText(positionSec: number): void {
-    if (this.vm.currentSubtitleUrl.length === 0) return;
     // 正值延迟 = 字幕延后显示 → 用更早的播放位置查找（mpv sub-delay 语义）
     const offsetMs = PlaybackPreferences.snapshot().subtitleOffsetMs;
-    const text = findActiveSubtitleText(this.subtitleCues, Math.round(positionSec * 1000) - offsetMs);
-    if (text !== this.vm.subtitleText) {
-      this.vm.subtitleText = text;
+    const lookupMs = Math.round(positionSec * 1000) - offsetMs;
+    if (this.vm.currentSubtitleUrl.length > 0) {
+      const text = findActiveSubtitleText(this.subtitleCues, lookupMs);
+      if (text !== this.vm.subtitleText) {
+        this.vm.subtitleText = text;
+      }
+    } else if (this.vm.subtitleText.length > 0) {
+      this.vm.subtitleText = '';
+    }
+    if (this.secondarySubtitleIndex >= 0 && this.vm.secondarySubtitleUrl.length > 0) {
+      const secondaryText = findActiveSubtitleText(this.secondarySubtitleCues, lookupMs);
+      if (secondaryText !== this.vm.secondarySubtitleText) {
+        this.vm.secondarySubtitleText = secondaryText;
+      }
+    } else if (this.vm.secondarySubtitleText.length > 0) {
+      this.vm.secondarySubtitleText = '';
     }
   }
 
@@ -1538,7 +1930,7 @@ export class AvPlayerController {
     this.mpvEngine.notifyNetworkChanged();
   }
 
-  private async fetchText(url: string): Promise<string> {
+  private async fetchTextWithStatus(url: string): Promise<TextFetchResult> {
     const request = http.createHttp();
     try {
       const headers: Record<string, string> = {
@@ -1573,17 +1965,22 @@ export class AvPlayerController {
       HttpDownloader.applyProxyToOptions(options, url);
       const response = await request.request(url, options);
       const body = typeof response.result === 'string' ? response.result : '';
-      if (response.responseCode !== 200) {
-        throw new Error(`HTTP ${response.responseCode} len=${body.length}`);
-      }
       Logger.info(TAG, `manifest fetchText: code=${response.responseCode} len=${body.length}`);
-      return body;
+      return { statusCode: response.responseCode, body: body };
     } catch (e) {
       Logger.warn(TAG, `manifest fetchText error: ${e}`);
       throw e as Error;
     } finally {
       request.destroy();
     }
+  }
+
+  private async fetchText(url: string): Promise<string> {
+    const res = await this.fetchTextWithStatus(url);
+    if (res.statusCode !== 200) {
+      throw new Error(`HTTP ${res.statusCode} len=${res.body.length}`);
+    }
+    return res.body;
   }
 
   private async createPlaybackUrl(video?: StreamInfo, audio?: StreamInfo,
@@ -2003,7 +2400,7 @@ export class AvPlayerController {
       : (this.vm.playerModel.getCurrentStreams().video?.bitrate ?? 0);
     this.playbackEngine.setTargetVideoBitrate(videoBitrate);
     const loaded = this.playbackEngine.load(playbackUrl, startPosSec,
-      candidate ? candidate.hlsAudioUrl : this.currentHlsAudioUrl);
+      candidate ? candidate.hlsAudioUrl : this.currentHlsAudioUrl, this.isCurrentSourceLive());
     if (loaded) {
       this.playbackLoadSeq++;
     }
@@ -2577,6 +2974,11 @@ export class AvPlayerController {
   }
 
   private resetPlaybackState(): void {
+    this.subtitleCues = [];
+    this.subtitleLoadSeq++;
+    this.secondarySubtitleCues = [];
+    this.secondarySubtitleIndex = -1;
+    this.secondarySubtitleLoadSeq++;
     this.vm.reset();
     this.seekableRangesListeners.forEach(listener => listener());
     // Keep videoOutputEnabled: session audio-only must survive source switch.

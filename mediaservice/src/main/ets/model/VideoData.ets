@@ -14,7 +14,7 @@
  */
 
 import { media } from '@kit.MediaKit';
-import { ChapterInfo, SubtitleTrack, YoutubeSabrInfo } from 'youtube_core';
+import { ChapterInfo, HeatmapPoint, StoryboardInfo, SubtitleTrack, YoutubeSabrInfo } from 'youtube_core';
 
 export interface StreamInfo {
   url: string;
@@ -83,7 +83,10 @@ export interface VideoData {
   error?: string;
   streams?: StreamInfo[];
   subtitleTracks?: SubtitleTrack[];
+  defaultCaptionTrackIndex?: number;
   chapters?: ChapterInfo[];
+  storyboard?: StoryboardInfo;
+  heatmap?: HeatmapPoint[];
   isLive?: boolean;
   /** 直播回放（非正在直播）：播放页显示聊天回放 Tab。 */
   isLiveReplay?: boolean;

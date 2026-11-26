@@ -82,8 +82,10 @@ export interface PlaybackEngine {
    * Load a source. audioUrl (optional) is an external audio track for split
    * HLS live/post-live playback (audio rendition playlist), mapped to mpv
    * audio-files; empty/omitted clears any previous external audio.
+   * isLiveHint (optional) conveys controller-known live status so audio filters
+   * such as silenceremove bypass live streams reliably.
    */
-  load(source: string, startPos: number, audioUrl?: string): boolean;
+  load(source: string, startPos: number, audioUrl?: string, isLiveHint?: boolean): boolean;
   play(): void;
   pause(): void;
   stop(): void;
@@ -91,6 +93,10 @@ export interface PlaybackEngine {
   setPlaybackSpeed(speed: number): void;
   /** 单文件循环（Shorts 单条循环）：loop-file=inf/no，跨 load 保持。 */
   setFileLoop(enabled: boolean): void;
+  /** 设置 MPV 原生音频滤镜链（响度均衡 + 跳静音，直播流自动旁路跳静音）。 */
+  setAudioFilters(normalize: boolean, skipSilence: boolean, isLive: boolean): void;
+  /** 设置 MPV 原生音画延迟（毫秒，自动钳制到 -1000..1000）。 */
+  setAudioDelayMs(delayMs: number): void;
   setVolume(volume: number): void;
   getVolume(): number;
 

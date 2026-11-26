@@ -38,6 +38,7 @@ import { PlayerSession, CachedChannelProfile } from '../../../common/PlayerSessi
 import { systemShare } from '@kit.ShareKit';
 import { AppLog } from '../../../common/AppLog';
 import { ExperimentalConfig } from '../../../common/experimental/ExperimentalConfig';
+import { SponsorBlockSkipper } from '../../../common/experimental/SponsorBlockSkipper';
 import { DeArrowClient, DeArrowBranding } from '../../../common/experimental/DeArrowClient';
 import { AiListStore } from '../../../common/experimental/AiListStore';
 import { sharePlainText } from '../../../common/utils/ShareUtil';
@@ -84,6 +85,7 @@ export struct VideoDetails {
         )
   @State channelInfoError: ResourceStr | null = null;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageLink('experimentalConfig') experimentalConfig: ExperimentalConfig = new ExperimentalConfig();
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
   onRetryDescription?: () => void = undefined;
@@ -598,6 +600,9 @@ export struct VideoDetails {
             $r('app.string.yt_action_save_to_playlist'), () => { this.openSheet(1); })
         }
         this.AudioOnlyActionButton()
+        if (this.canShowSponsorWhitelistAction()) {
+          this.SponsorWhitelistActionButton()
+        }
         if (!this.isLocalMode) {
           this.ActionButton($r('sys.symbol.share'),
             $r('app.string.yt_action_share'), () => { this.shareVideo(); })
@@ -609,6 +614,70 @@ export struct VideoDetails {
     .width('100%')
     .height(36)
     .margin({ bottom: 14 })
+  }
+
+  private effectiveSponsorChannelId(): string {
+    return (this.channelId || this.item?.channelId || '').trim();
+  }
+
+  private canShowSponsorWhitelistAction(): boolean {
+    return !this.isLocalMode && !this.isCurrentlyLive()
+      && this.experimentalConfig.sponsorBlockEnabled
+      && this.effectiveSponsorChannelId().length > 0;
+  }
+
+  private isCurrentChannelWhitelisted(): boolean {
+    return this.experimentalConfig.isChannelWhitelisted(this.effectiveSponsorChannelId());
+  }
+
+  private toggleCurrentChannelSponsorWhitelist(): void {
+    const id = this.effectiveSponsorChannelId();
+    if (id.length === 0) {
+      return;
+    }
+    const whitelisted = this.experimentalConfig.toggleChannelWhitelist(id);
+    this.experimentalConfig.saveToPreferences();
+    const session = PlayerSession.getInstance();
+    const skipper = SponsorBlockSkipper.getInstance();
+    if (session.currentVideo && session.controller.isActive()) {
+      skipper.reconnect(session.controller, session.currentVideo);
+    } else {
+      skipper.onPlaybackStopped();
+    }
+    this.getUIContext().getPromptAction().showToast({
+      message: whitelisted
+        ? $r('app.string.yt_exp_sb_channel_whitelisted')
+        : $r('app.string.yt_exp_sb_channel_unwhitelisted'),
+      duration: 2000
+    });
+  }
+
+  @Builder
+  SponsorWhitelistActionButton() {
+    Button() {
+      Row({ space: 6 }) {
+        SymbolGlyph($r('sys.symbol.key_shield_fill'))
+          .fontSize(14)
+          .fontColor([this.isCurrentChannelWhitelisted()
+            ? this.themePrimary
+            : $r('app.color.yourtube_text_primary')])
+          .fontWeight(this.isCurrentChannelWhitelisted() ? FontWeight.Bold : FontWeight.Normal)
+        Text($r('app.string.yt_exp_sb_whitelist_channel'))
+          .fontSize(13)
+          .fontColor(this.isCurrentChannelWhitelisted()
+            ? this.themePrimary
+            : $r('app.color.yourtube_text_primary'))
+          .fontWeight(FontWeight.Medium)
+      }
+    }
+    .height(36)
+    .backgroundColor(this.isCurrentChannelWhitelisted()
+      ? $r('app.color.yourtube_player_info_bg')
+      : $r('app.color.yourtube_player_control_bg'))
+    .borderRadius(18)
+    .padding({ left: 14, right: 14 })
+    .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+    .onClick(() => { this.toggleCurrentChannelSponsorWhitelist(); })
   }
 
   @Builder

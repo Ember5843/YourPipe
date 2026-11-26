@@ -14,6 +14,14 @@ export enum QueueSourceType {
   ADHOC = 'adhoc',     // Single video or manually constructed
 }
 
+export type QueueLoopMode = 'none' | 'all' | 'one';
+
+export interface RemovedQueueItem {
+  item: VideoItem;
+  index: number;
+  wasCurrent: boolean;
+}
+
 /** Hints passed from the caller to pre-configure the play queue before opening the player. */
 export interface PlayQueueSourceHint {
   /**
@@ -57,6 +65,11 @@ export class PlayQueueManager {
 
   private readonly QUEUE_BATCH_SIZE: number = 12;
   private pendingQueueItems: VideoItem[] = [];
+
+  // Loop & shuffle state
+  private _loopMode: QueueLoopMode = 'none';
+  private _isShuffled: boolean = false;
+  private originalOrder: VideoItem[] = [];
 
   // Remote pagination
   private nextPageToken: string | null = null;
@@ -129,8 +142,137 @@ export class PlayQueueManager {
     this.queueGeneration++;
     this.isLoadingMore = false;
     this.autoQueueCandidates = [];
-    this.autoQueueUsedUrls = new Set();
+    this.autoQueueUsedUrls = new Set<string>();
     this.autoQueueLocked = false;
+    this.resetShuffleState();
+  }
+
+  private resetShuffleState(): void {
+    this._isShuffled = false;
+    this.originalOrder = [];
+  }
+
+  // ---- Loop & shuffle controls ----
+
+  get loopMode(): QueueLoopMode {
+    return this._loopMode;
+  }
+
+  setLoopMode(mode: QueueLoopMode): void {
+    if (this._loopMode === mode) {
+      return;
+    }
+    this._loopMode = mode;
+    logger.info(`setLoopMode: ${mode}`);
+    this.notifyQueueChanged();
+  }
+
+  cycleLoopMode(): QueueLoopMode {
+    const nextMode: QueueLoopMode = this._loopMode === 'none'
+      ? 'all'
+      : (this._loopMode === 'all' ? 'one' : 'none');
+    this.setLoopMode(nextMode);
+    return nextMode;
+  }
+
+  get isShuffled(): boolean {
+    return this._isShuffled;
+  }
+
+  get totalLoadedCount(): number {
+    return this.queue.length + this.pendingQueueItems.length;
+  }
+
+  isLocalFileOnlyQueue(): boolean {
+    const total = this.queue.length + this.pendingQueueItems.length;
+    if (total === 0) {
+      return false;
+    }
+    const allShownLocal = this.queue.every((v: VideoItem): boolean => !!v.localMediaPath);
+    const allPendingLocal = this.pendingQueueItems.every((v: VideoItem): boolean => !!v.localMediaPath);
+    return allShownLocal && allPendingLocal;
+  }
+
+  private shuffleInPlace(items: VideoItem[]): void {
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = items[i];
+      items[i] = items[j];
+      items[j] = tmp;
+    }
+  }
+
+  setShuffle(enabled: boolean): void {
+    if (this._isShuffled === enabled) {
+      return;
+    }
+    if (enabled) {
+      const allItems: VideoItem[] = this.queue.concat(this.pendingQueueItems);
+      this.originalOrder = allItems.slice();
+      const hasCurrent = this.currentIndex >= 0 && this.currentIndex < this.queue.length;
+      const prefix: VideoItem[] = hasCurrent ? this.queue.slice(0, this.currentIndex + 1) : [];
+      const tailShown: VideoItem[] = hasCurrent ? this.queue.slice(this.currentIndex + 1) : this.queue.slice();
+      const tailAll: VideoItem[] = tailShown.concat(this.pendingQueueItems);
+      if (tailAll.length > 1) {
+        this.shuffleInPlace(tailAll);
+      }
+      const shownTailCount = tailShown.length;
+      this.queue = prefix.concat(tailAll.slice(0, shownTailCount));
+      this.pendingQueueItems = tailAll.slice(shownTailCount);
+      this._isShuffled = true;
+      logger.info(`setShuffle: ON fixed=${prefix.length} shuffled=${tailAll.length}`);
+      this.notifyQueueChanged();
+      return;
+    }
+
+    // Restore originalOrder cleanly while preserving removals and newly added items.
+    const currentVideo = this.getCurrent();
+    const prevShownCount = this.queue.length;
+    const allCurrent: VideoItem[] = this.queue.concat(this.pendingQueueItems);
+    const remainingSet: Set<VideoItem> = new Set<VideoItem>(allCurrent);
+    const restored: VideoItem[] = [];
+    const seenInRestored: Set<VideoItem> = new Set<VideoItem>();
+    for (const orig of this.originalOrder) {
+      if (remainingSet.has(orig) && !seenInRestored.has(orig)) {
+        restored.push(orig);
+        seenInRestored.add(orig);
+      }
+    }
+    for (const cur of allCurrent) {
+      if (!seenInRestored.has(cur)) {
+        restored.push(cur);
+        seenInRestored.add(cur);
+      }
+    }
+
+    let newIndex = currentVideo ? restored.indexOf(currentVideo) : -1;
+    if (newIndex < 0 && currentVideo && currentVideo.videoId) {
+      newIndex = restored.findIndex((v: VideoItem): boolean => v.videoId === currentVideo.videoId);
+    }
+    if (restored.length === 0) {
+      this.queue = [];
+      this.pendingQueueItems = [];
+      this.currentIndex = -1;
+    } else {
+      const safeIndex = newIndex >= 0 && newIndex < restored.length ? newIndex : 0;
+      const visibleCount = Math.min(
+        restored.length,
+        Math.max(this.QUEUE_BATCH_SIZE, prevShownCount, safeIndex + 1)
+      );
+      this.queue = restored.slice(0, visibleCount);
+      this.pendingQueueItems = restored.slice(visibleCount);
+      this.currentIndex = safeIndex;
+    }
+    this._isShuffled = false;
+    this.originalOrder = [];
+    logger.info(`setShuffle: OFF restored=${restored.length} idx=${this.currentIndex}`);
+    this.notifyQueueChanged();
+    this.notifyCurrentIndexChanged(this.currentIndex);
+  }
+
+  toggleShuffle(): boolean {
+    this.setShuffle(!this._isShuffled);
+    return this._isShuffled;
   }
 
   private applyLazyQueue(items: VideoItem[], startIndex: number): void {
@@ -198,8 +340,10 @@ export class PlayQueueManager {
     const prevVisitor: string = this.visitorData;
     const prevPending: VideoItem[] = this.pendingQueueItems.slice();
     const prevAutoCandidates: VideoItem[] = this.autoQueueCandidates.slice();
-    const prevAutoUsedUrls: Set<string> = new Set(this.autoQueueUsedUrls);
+    const prevAutoUsedUrls: Set<string> = new Set<string>(this.autoQueueUsedUrls);
     const prevAutoLocked: boolean = this.autoQueueLocked;
+    const prevIsShuffled: boolean = this._isShuffled;
+    const prevOriginalOrder: VideoItem[] = this.originalOrder.slice();
 
     // Optimistically set remote state
     this.sourceType = QueueSourceType.REMOTE;
@@ -278,6 +422,8 @@ export class PlayQueueManager {
       this.autoQueueCandidates = prevAutoCandidates;
       this.autoQueueUsedUrls = prevAutoUsedUrls;
       this.autoQueueLocked = prevAutoLocked;
+      this._isShuffled = prevIsShuffled;
+      this.originalOrder = prevOriginalOrder;
     }
 
     this.notifyQueueChanged();
@@ -394,10 +540,13 @@ export class PlayQueueManager {
 
   /** Peek the next queue item without consuming it (used by playback prefetch). */
   peekNext(): VideoItem | null {
-    if (!this.hasNext()) {
-      return null;
+    if (this.hasNext()) {
+      return this.queue[this.currentIndex + 1];
     }
-    return this.queue[this.currentIndex + 1];
+    if (this._loopMode === 'all' && !this.hasMorePages && this.queue.length > 1) {
+      return this.queue[0];
+    }
+    return null;
   }
 
   /** Whether there is a previous item available */
@@ -444,6 +593,9 @@ export class PlayQueueManager {
       if (result.items && result.items.length > 0) {
         const oldLen = this.queue.length;
         this.queue = this.queue.concat(result.items);
+        if (this._isShuffled) {
+          this.originalOrder = this.originalOrder.concat(result.items);
+        }
         logger.info(`loadMore: +${result.items.length} items (${oldLen} → ${this.queue.length})`);
       }
 
@@ -487,25 +639,124 @@ export class PlayQueueManager {
 
   // ---- Mutation ----
 
-  /** Add a single video to the end of the queue */
-  addToQueue(video: VideoItem): void {
-    // Dedup
-    if (this.queue.some(v => v.videoId === video.videoId)) {
-      return;
+  /**
+   * Add a single video to the end of the queue.
+   * Deduplicates across both visible `queue` and `pendingQueueItems`, and records
+   * the videoId in `autoQueueUsedUrls` so ad-hoc autoplay never re-adds it.
+   * Returns true if added, false if invalid or already present.
+   */
+  addToQueue(video: VideoItem): boolean {
+    const vid = (video?.videoId || '').trim();
+    if (!vid) {
+      return false;
     }
-    this.queue.push(video);
+    this.autoQueueUsedUrls.add(vid);
+    const inQueue = this.queue.some((v: VideoItem): boolean => v.videoId === vid);
+    const inPending = this.pendingQueueItems.some((v: VideoItem): boolean => v.videoId === vid);
+    if (inQueue || inPending) {
+      return false;
+    }
+    if (this.pendingQueueItems.length > 0) {
+      this.pendingQueueItems.push(video);
+    } else {
+      this.queue.push(video);
+    }
+    if (this._isShuffled) {
+      this.originalOrder.push(video);
+    }
+    if (this.sourceType === QueueSourceType.NONE) {
+      this.sourceType = QueueSourceType.ADHOC;
+    }
+    if (this.currentIndex < 0 && this.queue.length > 0) {
+      this.currentIndex = 0;
+      this.notifyCurrentIndexChanged(this.currentIndex);
+    }
+    logger.info(`addToQueue: videoId=${vid} shown=${this.queue.length} pending=${this.pendingQueueItems.length}`);
     this.notifyQueueChanged();
+    return true;
   }
 
-  /** Remove video at index. Adjust currentIndex if needed. */
-  removeAt(index: number): void {
-    if (index < 0 || index >= this.queue.length) {
-      return;
+  /**
+   * Insert a video immediately after `currentIndex`.
+   * If already present elsewhere in `queue` or `pendingQueueItems`, moves it to
+   * `currentIndex + 1`. Returns false if invalid or if it is already playing.
+   */
+  insertNext(video: VideoItem): boolean {
+    const vid = (video?.videoId || '').trim();
+    if (!vid) {
+      return false;
     }
-    this.queue.splice(index, 1);
+    this.autoQueueUsedUrls.add(vid);
+
+    if (this.queue.length === 0) {
+      this.queue.push(video);
+      this.currentIndex = 0;
+      if (this.sourceType === QueueSourceType.NONE) {
+        this.sourceType = QueueSourceType.ADHOC;
+      }
+      if (this._isShuffled) {
+        this.originalOrder.push(video);
+      }
+      logger.info(`insertNext (empty): videoId=${vid}`);
+      this.notifyQueueChanged();
+      this.notifyCurrentIndexChanged(this.currentIndex);
+      return true;
+    }
+
+    const existingQueueIdx = this.queue.findIndex((v: VideoItem): boolean => v.videoId === vid);
+    if (existingQueueIdx >= 0) {
+      if (existingQueueIdx === this.currentIndex) {
+        return false;
+      }
+      const nextSlot = Math.max(0, Math.min(this.queue.length, this.currentIndex + 1));
+      if (existingQueueIdx === nextSlot) {
+        return true;
+      }
+      const moved: VideoItem = this.queue.splice(existingQueueIdx, 1)[0];
+      let indexChanged = false;
+      if (existingQueueIdx < this.currentIndex) {
+        this.currentIndex--;
+        indexChanged = true;
+      }
+      const targetIdx = Math.max(0, Math.min(this.queue.length, this.currentIndex + 1));
+      this.queue.splice(targetIdx, 0, moved);
+      logger.info(`insertNext (moved from queue[${existingQueueIdx}]): videoId=${vid} -> ${targetIdx}`);
+      this.notifyQueueChanged();
+      if (indexChanged) {
+        this.notifyCurrentIndexChanged(this.currentIndex);
+      }
+      return true;
+    }
+
+    const existingPendingIdx = this.pendingQueueItems.findIndex((v: VideoItem): boolean => v.videoId === vid);
+    const targetIdx = Math.max(0, Math.min(this.queue.length, this.currentIndex + 1));
+    if (existingPendingIdx >= 0) {
+      const moved: VideoItem = this.pendingQueueItems.splice(existingPendingIdx, 1)[0];
+      this.queue.splice(targetIdx, 0, moved);
+      logger.info(`insertNext (moved from pending[${existingPendingIdx}]): videoId=${vid} -> ${targetIdx}`);
+      this.notifyQueueChanged();
+      return true;
+    }
+
+    this.queue.splice(targetIdx, 0, video);
+    if (this._isShuffled) {
+      this.originalOrder.push(video);
+    }
+    logger.info(`insertNext (inserted): videoId=${vid} -> ${targetIdx}`);
+    this.notifyQueueChanged();
+    return true;
+  }
+
+  /** Remove video at index. Adjust currentIndex if needed. Returns removed item, original index, and whether it was current for Undo. */
+  removeAt(index: number): RemovedQueueItem | null {
+    if (index < 0 || index >= this.queue.length) {
+      return null;
+    }
+    const wasCurrent = index === this.currentIndex;
+    const removed: VideoItem = this.queue.splice(index, 1)[0];
     if (index < this.currentIndex) {
       this.currentIndex--;
-    } else if (index === this.currentIndex) {
+    } else if (wasCurrent) {
       // Current video removed — clamp
       if (this.currentIndex >= this.queue.length) {
         this.currentIndex = this.queue.length - 1;
@@ -513,11 +764,47 @@ export class PlayQueueManager {
       this.notifyCurrentIndexChanged(this.currentIndex);
     }
     this.notifyQueueChanged();
+    return { item: removed, index: index, wasCurrent: wasCurrent };
+  }
+
+  /** Insert a video at a specific index (used for Undo restore). */
+  insertAt(index: number, item: VideoItem, restoreAsCurrent: boolean = false): boolean {
+    if (!item) {
+      return false;
+    }
+    const vid = (item.videoId || '').trim();
+    if (vid.length > 0) {
+      if (this.queue.some((v: VideoItem): boolean => v.videoId === vid)
+        || this.pendingQueueItems.some((v: VideoItem): boolean => v.videoId === vid)) {
+        return false;
+      }
+      this.autoQueueUsedUrls.add(vid);
+    }
+    const prevCurrentIndex = this.currentIndex;
+    const targetIdx = Math.max(0, Math.min(this.queue.length, index));
+    this.queue.splice(targetIdx, 0, item);
+    if (restoreAsCurrent) {
+      this.currentIndex = targetIdx;
+    } else if (this.currentIndex < 0) {
+      this.currentIndex = 0;
+    } else if (targetIdx <= this.currentIndex) {
+      this.currentIndex++;
+    }
+    if (this._isShuffled && !this.originalOrder.includes(item)) {
+      this.originalOrder.push(item);
+    }
+    logger.info(`insertAt: idx=${targetIdx} videoId=${vid} restoreAsCurrent=${restoreAsCurrent} cur=${this.currentIndex}`);
+    this.notifyQueueChanged();
+    if (this.currentIndex !== prevCurrentIndex) {
+      this.notifyCurrentIndexChanged(this.currentIndex);
+    }
+    return true;
   }
 
   /** Reorder: move item from fromIndex to toIndex */
   reorder(fromIndex: number, toIndex: number): void {
-    if (fromIndex < 0 || fromIndex >= this.queue.length ||
+    if (fromIndex === toIndex ||
+        fromIndex < 0 || fromIndex >= this.queue.length ||
         toIndex < 0 || toIndex >= this.queue.length) {
       return;
     }
@@ -525,6 +812,7 @@ export class PlayQueueManager {
     this.queue.splice(toIndex, 0, item);
 
     // Adjust currentIndex
+    const prevCurrentIndex = this.currentIndex;
     if (fromIndex === this.currentIndex) {
       this.currentIndex = toIndex;
     } else if (fromIndex < this.currentIndex && toIndex >= this.currentIndex) {
@@ -534,7 +822,9 @@ export class PlayQueueManager {
     }
 
     this.notifyQueueChanged();
-    this.notifyCurrentIndexChanged(this.currentIndex);
+    if (this.currentIndex !== prevCurrentIndex) {
+      this.notifyCurrentIndexChanged(this.currentIndex);
+    }
   }
 
   /** Clear the queue */
@@ -547,6 +837,7 @@ export class PlayQueueManager {
     this.pendingQueueItems = [];
     this.nextPageToken = null;
     this.visitorData = '';
+    this._loopMode = 'none';
     this.resetAutoQueueState();
     this.notifyQueueChanged();
     this.notifyCurrentIndexChanged(-1);
@@ -581,8 +872,13 @@ export class PlayQueueManager {
     logger.info(`setAutoQueueCandidates: items=${items.length}`);
     this.autoQueueCandidates = items;
     this.autoQueueUsedUrls = new Set();
-    // Mark existing queue items as already used
+    // Mark existing queue and pending items as already used
     for (const item of this.queue) {
+      if (item.videoId) {
+        this.autoQueueUsedUrls.add(item.videoId);
+      }
+    }
+    for (const item of this.pendingQueueItems) {
       if (item.videoId) {
         this.autoQueueUsedUrls.add(item.videoId);
       }
@@ -628,7 +924,7 @@ export class PlayQueueManager {
 
   /**
    * Save current queue as a local playlist.
-   * Only saves loaded items (not entire remote playlist).
+   * Combines loaded `queue` and `pendingQueueItems` so queues >12 items aren't truncated.
    */
   saveAsLocal(name: string): StoredLocalQueue {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -639,7 +935,7 @@ export class PlayQueueManager {
     return {
       id: id,
       name: name,
-      videos: this.queue.slice(),
+      videos: this.queue.concat(this.pendingQueueItems),
       createdAt: Date.now(),
     };
   }
@@ -647,7 +943,7 @@ export class PlayQueueManager {
   exportSnapshot(maxItems: number = 50): PlayQueueSnapshot {
     const limit = maxItems > 0 ? maxItems : 50;
     return {
-      items: this.queue.slice(0, limit),
+      items: this.queue.concat(this.pendingQueueItems).slice(0, limit),
       currentIndex: this.currentIndex,
       sourceType: this.sourceType,
       sourceId: this.sourceId,

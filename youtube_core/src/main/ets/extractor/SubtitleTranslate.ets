@@ -66,8 +66,15 @@ export function buildAutoTranslatedTrack(tracks: SubtitleTrack[], targetLang: st
   if (!source) {
     return null;
   }
-  const sep = source.url.includes('?') ? '&' : '?';
-  const url = `${source.url}${sep}tlang=${encodeURIComponent(tlang)}`;
+  const cleanedBase = source.url
+    .replace(/([?&])xosf=[^&]*/g, '$1')
+    .replace(/([?&])tlang=[^&]*/g, '$1')
+    .replace(/&&+/g, '&')
+    .replace(/\?&/, '?')
+    .replace(/&$/, '')
+    .replace(/\?$/, '');
+  const sep = cleanedBase.includes('?') ? '&' : '?';
+  const url = `${cleanedBase}${sep}tlang=${encodeURIComponent(tlang)}`;
   const track = new SubtitleTrack(url, tlang, '', undefined, false, false);
   track.isAutoTranslated = true;
   return track;

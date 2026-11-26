@@ -95,11 +95,12 @@ export interface LiveBroadcastDetails {
 
 /**
  * 故事板
- * 对应: player_response["storyboards"]["playerStoryboardSpecRenderer"]
+ * 对应: player_response["storyboards"]["playerStoryboardSpecRenderer"] / ["playerLiveStoryboardSpecRenderer"]
  */
 export interface PlayerStoryboardSpecRenderer {
   spec?: string;
   url?: string;
+  recommendedLevel?: number;
 }
 
 /**
@@ -376,6 +377,7 @@ export interface CaptionsContainer {
  */
 export interface StoryboardsContainer {
   playerStoryboardSpecRenderer?: PlayerStoryboardSpecRenderer;
+  playerLiveStoryboardSpecRenderer?: PlayerStoryboardSpecRenderer;
 }
 
 /**
@@ -523,8 +525,25 @@ export interface Mutation {
   payload?: Payload;
 }
 
+export interface MacroMarkerItem {
+  startMillis?: string | number;
+  durationMillis?: string | number;
+  intensityScoreNormalized?: string | number;
+}
+
+export interface MacroMarkersList {
+  markerType?: string;
+  markers?: MacroMarkerItem[];
+}
+
+export interface MacroMarkersListEntity {
+  key?: string;
+  markersList?: MacroMarkersList;
+}
+
 export interface Payload {
   offlineabilityEntity?: OfflineabilityEntity;
+  macroMarkersListEntity?: MacroMarkersListEntity;
 }
 
 export interface OfflineabilityEntity {
@@ -745,6 +764,8 @@ export interface Contents {
 export interface MacroMarkersListItemRenderer {
   title?: NextResponseText;
   onTap?: OnTap;
+  thumbnail?: ThumbnailDataWrapper;
+  timeDescription?: NextResponseText;
 }
 
 export interface MacroMarkersListContent {
@@ -822,8 +843,69 @@ export interface VideoPrimaryInfoRenderer {
   dateText?: NextResponseText;
 }
 
+export interface HeatMarkerRenderer {
+  timeRangeStartMillis?: string | number;
+  markerDurationMillis?: string | number;
+  heatMarkerIntensityScoreNormalized?: string | number;
+}
+
+export interface HeatMarkerItem {
+  heatMarkerRenderer?: HeatMarkerRenderer;
+}
+
+export interface HeatmapRenderer {
+  heatMarkers?: HeatMarkerItem[];
+}
+
+export interface HeatmapContainer {
+  heatmapRenderer?: HeatmapRenderer;
+}
+
+export interface ChapterRenderer {
+  title?: NextResponseText;
+  timeRangeStartMillis?: string | number;
+  thumbnail?: ThumbnailDataWrapper;
+}
+
+export interface ChapterRendererItem {
+  chapterRenderer?: ChapterRenderer;
+}
+
+export interface PlayerBarMarkerMapValue {
+  heatmap?: HeatmapContainer;
+  chapters?: ChapterRendererItem[];
+}
+
+export interface PlayerBarMarkerMapItem {
+  key?: string;
+  value?: PlayerBarMarkerMapValue;
+}
+
+export interface MultiMarkersPlayerBarRenderer {
+  markersMap?: PlayerBarMarkerMapItem[];
+}
+
+export interface PlayerBarContainer {
+  multiMarkersPlayerBarRenderer?: MultiMarkersPlayerBarRenderer;
+}
+
+export interface DecoratedPlayerBarRenderer {
+  playerBar?: PlayerBarContainer;
+  decoratedPlayerBarRenderer?: DecoratedPlayerBarRenderer;
+}
+
+export interface PlayerOverlayRenderer {
+  decoratedPlayerBarRenderer?: DecoratedPlayerBarRenderer;
+}
+
+export interface PlayerOverlays {
+  playerOverlayRenderer?: PlayerOverlayRenderer;
+}
+
 /** nextResponse 최상위 구조 */
 export interface NextResponse {
   contents?: Contents;
   engagementPanels?: EngagementPanel[];
+  frameworkUpdates?: FrameworkUpdates;
+  playerOverlays?: PlayerOverlays;
 }

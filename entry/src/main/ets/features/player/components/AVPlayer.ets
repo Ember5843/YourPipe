@@ -31,19 +31,35 @@ import {
   StateChangeListener,
   VideoEntry,
   ChapterInfo,
-  SubtitleTrack
+  SubtitleTrack,
+  SubtitleErrorKind,
+  HeatmapPoint,
+  StoryboardInfo
 } from 'mediaservice';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
 import { SponsorBlockSkipper, SponsorSkipNotice } from '../../../common/experimental/SponsorBlockSkipper';
+import { SponsorSegment } from '../../../common/experimental/SponsorBlockClient';
 import { ExperimentalConfig } from '../../../common/experimental/ExperimentalConfig';
 import { PlayerPresentation } from '../../../common/PlayerPresentation';
 import { PiPManager } from '../pip/PiPManager';
 import { PlayerUiViewModel } from 'mediaservice';
 import { MediaThumb } from '../../../common/components/MediaThumb';
 import { VideoItem } from 'youtube_core';
-import { PlaybackConfig, SUBTITLE_FONT_COLOR_VALUES, SUBTITLE_BACKGROUND_VALUES } from '../../../common/PlaybackConfig';
+import {
+  PlaybackConfig,
+  SubtitleEdgeStyle,
+  SUBTITLE_FONT_COLOR_VALUES,
+  normalizeSubtitleBgOpacity
+} from '../../../common/PlaybackConfig';
+import { LanguageManager } from '../../../common/LanguageManager';
+import {
+  SeekBarTrackOverlay,
+  SeekPreviewBubble,
+  getSponsorCategoryColor,
+  findNextJumpAheadPeak
+} from './SeekBarOverlay';
 import { PreferencesStore } from '../../../common/PreferencesStore';
 import { LlmTranslateConfig } from '../../../common/LlmTranslateConfig';
 import { TranslationService } from '../../../common/TranslationService';
@@ -61,6 +77,8 @@ const CONTROLS_HIDE_DELAY: number = 3000;
 const SIDE_HINT_HIDE_DELAY: number = 800;
 const SEEK_HINT_HIDE_DELAY: number = 200;
 const DOUBLE_TAP_HINT_HIDE_DELAY: number = 800;
+const JUMP_AHEAD_HIDE_DELAY_MS: number = 5000;
+const OVERLAY_PILL_HEIGHT_VP: number = 42;
 /** Max gap between two taps that still counts as one double-tap. TapGesture's
  *  fixed count cannot express "2nd, 4th, 6th …"; we count a single-tap stream
  *  manually so every pair fires (see onCenterTap). */
@@ -115,6 +133,13 @@ interface VideoScaleXY {
   sy: number;
 }
 
+/** 排序后的字幕菜单条目，保留在 vm.subtitleTracks 中的原始索引 */
+interface SubtitleTrackMenuEntry {
+  originalIndex: number;
+  track: SubtitleTrack;
+  label: string;
+}
+
 enum PlayerGestureMode {
   IDLE = 'idle',
   PENDING = 'pending',
@@ -160,10 +185,18 @@ export struct VideoPlayer {
   /** 本地文件模式：隐藏在线字幕 / 章节 / 音轨 / 画质等 YouTube 专属入口。 */
   @StorageLink('isLocalMode') isLocalMode: boolean = false;
   @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
+  @StorageLink('experimentalConfig') experimentalConfig: ExperimentalConfig = new ExperimentalConfig();
   @StorageProp('selectedVideo') selectedVideo: VideoItem | null = null;
   @Prop index: number = 0;
   @Link @Watch('onSourceChange') curSource: VideoData;
   @Prop chapters: ChapterInfo[] = [];
+  @State storyboard: StoryboardInfo | undefined = undefined;
+  @State heatmap: HeatmapPoint[] = [];
+  @State sponsorSegments: SponsorSegment[] = [];
+  @State jumpAheadTargetSec: number | null = null;
+  private jumpAheadTimerId: number = -1;
+  @State showChaptersSheet: boolean = false;
+  private lastSourceVideoId: string = '';
   @Prop @Watch('onIndexChange') curIndex: number = CommonConstants.CURINDEX_DEFAULT_NUM;
   @State surfaceWidth: number = CommonConstants.SURFACE_WIDTH;
   @State surfaceHeight: number = CommonConstants.SURFACE_HEIGHT;
@@ -216,11 +249,131 @@ export struct VideoPlayer {
     }
   };
 
+  private playbackExtrasListener = (source: VideoData): void => {
+    if (!source) {
+      return;
+    }
+    const curId = this.curSource.videoId || '';
+    if (curId.length > 0 && source.videoId && source.videoId !== curId) {
+      return;
+    }
+    this.storyboard = source.storyboard;
+    this.heatmap = source.heatmap ? source.heatmap.slice() : [];
+  };
+
+  private sponsorSegmentsListener = (segments: SponsorSegment[]): void => {
+    this.sponsorSegments = segments.slice();
+  };
+
+  private syncSeekbarMetadataFromSession(): void {
+    const curId = this.curSource.videoId || '';
+    const sessionSource = PlayerSession.getInstance().currentVideoSource;
+    const sessionMatches = !!sessionSource && (curId.length === 0 || sessionSource.videoId === curId);
+    const nextStoryboard = this.curSource.storyboard
+      ?? (sessionMatches ? sessionSource.storyboard : undefined);
+    const curHeatmap = this.curSource.heatmap && this.curSource.heatmap.length > 0
+      ? this.curSource.heatmap : undefined;
+    const sessionHeatmap = sessionMatches && sessionSource.heatmap && sessionSource.heatmap.length > 0
+      ? sessionSource.heatmap : undefined;
+    const nextHeatmap = curHeatmap ?? sessionHeatmap;
+    this.storyboard = nextStoryboard;
+    this.heatmap = nextHeatmap ? nextHeatmap.slice() : [];
+  }
+
+  private clearJumpAheadPill(): void {
+    if (this.jumpAheadTimerId >= 0) {
+      clearTimeout(this.jumpAheadTimerId);
+      this.jumpAheadTimerId = -1;
+    }
+    this.jumpAheadTargetSec = null;
+  }
+
+  private maybeShowJumpAhead(referenceSec: number): void {
+    if (this.curSource.isLive || this.isLocalMode || this.skipNotice !== null || this.heatmap.length === 0) {
+      this.clearJumpAheadPill();
+      return;
+    }
+    const peakSec = findNextJumpAheadPeak(this.heatmap, referenceSec, this.durationTime);
+    if (peakSec === null) {
+      this.clearJumpAheadPill();
+      return;
+    }
+    if (this.jumpAheadTimerId >= 0) {
+      clearTimeout(this.jumpAheadTimerId);
+      this.jumpAheadTimerId = -1;
+    }
+    this.jumpAheadTargetSec = peakSec;
+    this.jumpAheadTimerId = setTimeout(() => {
+      this.jumpAheadTimerId = -1;
+      this.jumpAheadTargetSec = null;
+    }, JUMP_AHEAD_HIDE_DELAY_MS);
+  }
+
+  private jumpAheadToPeak(): void {
+    const target = this.jumpAheadTargetSec;
+    this.clearJumpAheadPill();
+    if (target === null) {
+      return;
+    }
+    Logger.info(TAG, `Jump ahead to heatmap peak target=${target.toFixed(1)}s`);
+    this.controller.syncSeek(target * 1000);
+  }
+
+  private currentChannelId(): string {
+    return (this.curSource.channelId || this.selectedVideo?.channelId || '').trim();
+  }
+
+  private canToggleChannelWhitelist(): boolean {
+    return !this.isLocalMode && !this.curSource.isLive
+      && this.experimentalConfig.sponsorBlockEnabled
+      && this.currentChannelId().length > 0;
+  }
+
+  private toggleCurrentChannelWhitelist(): void {
+    const channelId = this.currentChannelId();
+    if (channelId.length === 0) {
+      return;
+    }
+    const whitelisted = this.experimentalConfig.toggleChannelWhitelist(channelId);
+    this.experimentalConfig.saveToPreferences();
+    const session = PlayerSession.getInstance();
+    const skipper = SponsorBlockSkipper.getInstance();
+    if (session.currentVideo && session.controller.isActive()) {
+      skipper.reconnect(session.controller, session.currentVideo);
+    } else {
+      skipper.onPlaybackStopped();
+    }
+    this.getUIContext().getPromptAction().showToast({
+      message: whitelisted
+        ? $r('app.string.yt_exp_sb_channel_whitelisted')
+        : $r('app.string.yt_exp_sb_channel_unwhitelisted'),
+      duration: 2000
+    });
+    Logger.info(TAG, `SponsorBlock channel whitelist toggled channel=${channelId} whitelisted=${whitelisted}`);
+  }
+
+  private overlayPillBottomVp(): number {
+    if (this.showControls) {
+      return Math.max(this.bottomControlBarVpH + 12, 72);
+    }
+    return Math.min(84, Math.max(20, Math.round(this.containerVpHeight * 0.14)));
+  }
+
+  private previewBubbleBottomVp(): number {
+    if (this.showControls) {
+      return Math.max(this.bottomControlBarVpH + 10, 62);
+    }
+    return Math.max(24, Math.round(this.containerVpHeight * 0.34));
+  }
+
   /** SponsorBlock 提示层：toast（可撤销）、manual（手动跳过）、poi（跳转精彩片段）。 */
   private skipNoticeListener = (notice: SponsorSkipNotice | null): void => {
     if (this.skipNoticeTimerId >= 0) {
       clearTimeout(this.skipNoticeTimerId);
       this.skipNoticeTimerId = -1;
+    }
+    if (notice !== null) {
+      this.clearJumpAheadPill();
     }
     this.skipNotice = notice;
     if (!notice) {
@@ -409,6 +562,29 @@ export struct VideoPlayer {
     Logger.debug(TAG, `Waiting for dual buffer: ${isWaiting}`);
     this.isWaitingForDualBuffer = isWaiting;
   };
+  private lastSubtitleErrorToastAtMs: number = 0;
+  private lastSubtitleErrorKind: string = '';
+  private subtitleErrorListener = (kind: SubtitleErrorKind): void => {
+    const now = Date.now();
+    if (kind === this.lastSubtitleErrorKind && now - this.lastSubtitleErrorToastAtMs < 1500) {
+      return;
+    }
+    this.lastSubtitleErrorKind = kind;
+    this.lastSubtitleErrorToastAtMs = now;
+    Logger.warn(TAG, `Subtitle load error kind=${kind}`);
+    try {
+      this.getUIContext().getPromptAction().showToast({
+        message: kind === 'rate_limited'
+          ? $r('app.string.yt_player_subtitle_error_rate_limited')
+          : $r('app.string.yt_player_subtitle_error_unavailable'),
+        duration: 2800
+      });
+    } catch (e) {
+      Logger.warn(TAG, `Subtitle error toast failed: ${e}`);
+    }
+  };
+  @State showSubtitleMenu: boolean = false;
+  @State showCollapsedSubtitleMenu: boolean = false;
   @State sliderStyle: SliderStyle = SliderStyle.NONE;
   @State isSliderDragging: boolean = false;
   @State sliderDragValue: number = 0;   // 拖动时的本地同步值，避免依赖异步的 currentTime
@@ -442,6 +618,9 @@ export struct VideoPlayer {
   private pinchStartScale: number = 1;
   /** 实测底部控制条高度（vp，onAreaChange 持续更新；含导航条/全屏内边距），隐藏时也在树上 */
   @State bottomControlBarVpH: number = 0;
+  /** 实测进度条轨道相对播放容器的水平位置与宽度（vp），供 SeekPreviewBubble 1:1 跟随指尖 */
+  @State sliderTrackLeftVp: number = 0;
+  @State sliderTrackWidthVp: number = 0;
   // horizontal seek gesture
   @State isGestureSeek: boolean = false;
   @State gestureSeekTime: number = 0;
@@ -505,6 +684,12 @@ export struct VideoPlayer {
     // controller.updateVideoSource(). This watcher only mirrors UI state.
     this.hasStreams = !!(this.curSource.streams && this.curSource.streams.length > 0);
     this.playbackStarted = false;
+    const nextVideoId = this.curSource.videoId || '';
+    if (nextVideoId !== this.lastSourceVideoId) {
+      this.lastSourceVideoId = nextVideoId;
+      this.showChaptersSheet = false;
+    }
+    this.syncSeekbarMetadataFromSession();
 
     // When a reused PlayerPage starts a fresh session after detachSurface(),
     // re-bind its live XComponent surfaceId so native pendingLoad can fire immediately.
@@ -538,6 +723,7 @@ export struct VideoPlayer {
       this.lastController.removeErrorListener(this.errorListener);
       this.lastController.removeWaitingForBufferListener(this.waitingForBufferListener);
       this.lastController.removeSeekableRangesListener(this.seekableRangesListener);
+      this.lastController.setSubtitleErrorListener(undefined);
     }
 
     // 2. 向新 controller 注册监听器
@@ -547,6 +733,7 @@ export struct VideoPlayer {
       this.controller.addErrorListener(this.errorListener);
       this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
       this.controller.addSeekableRangesListener(this.seekableRangesListener);
+      this.controller.setSubtitleErrorListener(this.subtitleErrorListener);
 
       // 3. 立即同步 UI 状态
       this.currentTime = this.vm.currentTime;
@@ -661,11 +848,16 @@ export struct VideoPlayer {
     // 注册进度监听（节流后的 currentTime/durationTime）
     this.controller.subscribeProgress(this.progressListener);
     SponsorBlockSkipper.getInstance().setNoticeListener(this.skipNoticeListener);
+    SponsorBlockSkipper.getInstance().subscribeSegments(this.sponsorSegmentsListener);
+    PlayerSession.getInstance().subscribePlaybackExtras(this.playbackExtrasListener);
+    this.lastSourceVideoId = this.curSource.videoId || '';
+    this.syncSeekbarMetadataFromSession();
     this.controller.subscribePlaybackState(this.playbackStateListener);
     // 错误与特殊状态监听
     this.controller.addErrorListener(this.errorListener);
     this.controller.addWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.addSeekableRangesListener(this.seekableRangesListener);
+    this.controller.setSubtitleErrorListener(this.subtitleErrorListener);
     // AI 字幕翻译进度（字幕菜单内展示 x/y）
     SubtitleTranslationService.getInstance().addProgressListener(this.aiTranslateProgressListener);
     // [DISABLED] P3 ASR：进度/失败监听随菜单项一起禁用
@@ -865,12 +1057,14 @@ export struct VideoPlayer {
     const x: number = event.fingerList[0]?.localX ?? 0;
     if (x > this.containerVpWidth / 2) {
       Logger.info(TAG, `Double-tap forward +${step}s`);
-      this.controller.syncSeek(Math.min(this.currentTime + step, this.durationTime) * 1000);
+      const targetSec = Math.min(this.currentTime + step, this.durationTime);
+      this.controller.syncSeek(targetSec * 1000);
       this.showForwardHint = true;
       this.forwardHintTimerId = setTimeout(() => {
         this.forwardHintTimerId = -1;
         this.showForwardHint = false;
       }, DOUBLE_TAP_HINT_HIDE_DELAY);
+      this.maybeShowJumpAhead(targetSec);
     } else {
       Logger.info(TAG, `Double-tap backward -${step}s`);
       this.controller.syncSeek(Math.max(this.currentTime - step, 0) * 1000);
@@ -954,8 +1148,11 @@ export struct VideoPlayer {
     this.showForwardHint = false;
     this.showBackwardHint = false;
     this.isSliderDragging = false;
+    this.clearJumpAheadPill();
     // 拖动中途的全屏切换/换源/页面隐藏必须复位，否则标志卡住会永久门禁根手势
     this.subtitleDragging = false;
+    this.showSubtitleMenu = false;
+    this.showCollapsedSubtitleMenu = false;
     this.trackThicknessSize = CommonConstants.TRACK_SIZE_MIN;
     this.sliderStyle = SliderStyle.NONE;
     this.showControls = true;
@@ -998,14 +1195,25 @@ export struct VideoPlayer {
       Math.max(SUBTITLE_MARGIN_MIN_VP, layout.videoHVp * SUBTITLE_VIDEO_MARGIN_RATIO),
       Number(this.playbackConfig.subtitleBottomMarginVp));
     const rest = layout.letterboxVp + marginInVideo;
-    // 用户显式拖动过的位置优先于控制条避让；未拖动时才按需上浮
+    // 用户显式拖动过的位置优先于控制条/提示胶囊避让；未拖动时才按需上浮
     const hasDrag = this.subtitleDragLiftRatio !== 0 || this.subtitleDragOffsetXRatio !== 0;
-    const clearance = (!hasDrag && this.showControls) ? this.bottomControlBarVpH + SUBTITLE_BAR_GAP_VP : 0;
+    let clearance = 0;
+    if (!hasDrag) {
+      if (this.showControls) {
+        const barH = this.bottomControlBarVpH > 0 ? this.bottomControlBarVpH : 60;
+        clearance = Math.max(clearance, barH + SUBTITLE_BAR_GAP_VP);
+      }
+      if (this.skipNotice !== null || this.jumpAheadTargetSec !== null) {
+        clearance = Math.max(clearance, this.overlayPillBottomVp() + OVERLAY_PILL_HEIGHT_VP + SUBTITLE_BAR_GAP_VP);
+      }
+    }
     const lifted = Math.max(rest, clearance);
     // 拖动值按比例存储，乘回当前视频显示高度——大小屏/折叠切换位置观感不变
+    const maxDragTop = layout.letterboxVp + layout.videoHVp * SUBTITLE_DRAG_MAX_RATIO;
+    const upperBound = Math.min(Math.max(maxDragTop, lifted), Math.max(24, this.containerVpHeight - 44));
     return Math.min(
       Math.max(lifted + this.subtitleDragLiftRatio * layout.videoHVp, layout.letterboxVp + 8),
-      layout.letterboxVp + layout.videoHVp * SUBTITLE_DRAG_MAX_RATIO);
+      upperBound);
   }
 
   /**
@@ -1352,6 +1560,9 @@ export struct VideoPlayer {
     if (!canceled && mode === PlayerGestureMode.SEEK) {
       this.controller.syncSeek(this.panEndTime * 1000);
       Logger.debug(TAG, `Player pan seek committed positionMs=${Math.round(this.panEndTime * 1000)}`);
+      if (this.panEndTime > this.gestureSeekStartTime + 3) {
+        this.maybeShowJumpAhead(this.panEndTime);
+      }
     } else if (canceled && mode !== PlayerGestureMode.IDLE) {
       Logger.debug(TAG, `Player pan canceled mode=${mode}`);
     }
@@ -1625,38 +1836,87 @@ export struct VideoPlayer {
     .width(180)
   }
 
+  private closeSubtitleMenus(): void {
+    this.showSubtitleMenu = false;
+    this.showCollapsedSubtitleMenu = false;
+  }
+
   @Builder
   SubtitleMenu() {
     Menu() {
-      MenuItem({
-        content: $r('app.string.yt_player_subtitle_off'),
-        endIcon: this.vm.currentSubtitleUrl === '' ? $r('sys.symbol.checkmark') : ''
-      })
-        .contentFontColor($r('sys.color.font_primary'))
-        .contentFont({ size: 14 })
-        .backgroundColor(this.vm.currentSubtitleUrl === ''
-          ? this.getSelectedMenuBackground() : Color.Transparent)
-        .onClick(() => {
-          // [DISABLED] P3 ASR 已禁用，关闭字幕无需停识别：AsrLiveCaptionService.getInstance().stop();
-          this.controller.switchSubtitle('');
-          // 记忆字幕偏好：显式关闭记为空串，后续新视频不再自动开字幕
-          PreferencesStore.setString('cfg_subtitle_preferred_lang', '');
-        })
-      ForEach(this.vm.subtitleTracks, (track: SubtitleTrack) => {
+      MenuItemGroup({ header: $r('app.string.yt_player_subtitle_primary') }) {
+        if (this.vm.currentSubtitleUrl === '' && this.playbackConfig.subtitlePreferredTrack.length > 0
+          && this.vm.subtitleTracks.length > 0) {
+          MenuItem({
+            content: $r('app.string.yt_player_subtitle_quick_on')
+          })
+            .contentFontColor(this.themePrimary)
+            .contentFont({ size: 14, weight: FontWeight.Medium })
+            .onClick(() => {
+              this.closeSubtitleMenus();
+              this.onQuickToggleSubtitle();
+            })
+        }
         MenuItem({
-          content: this.getSubtitleLabel(track),
-          endIcon: this.vm.currentSubtitleUrl === track.url ? $r('sys.symbol.checkmark') : ''
+          content: $r('app.string.yt_player_subtitle_off'),
+          endIcon: this.vm.currentSubtitleUrl === '' ? $r('sys.symbol.checkmark') : ''
         })
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
-          .backgroundColor(this.vm.currentSubtitleUrl === track.url
+          .backgroundColor(this.vm.currentSubtitleUrl === ''
             ? this.getSelectedMenuBackground() : Color.Transparent)
           .onClick(() => {
-            // [DISABLED] P3 ASR 已禁用：AsrLiveCaptionService.getInstance().stop();
-            this.controller.switchSubtitle(track.url);
-            PreferencesStore.setString('cfg_subtitle_preferred_lang', track.languageCode || '');
+            // [DISABLED] P3 ASR 已禁用，关闭字幕无需停识别：AsrLiveCaptionService.getInstance().stop();
+            this.closeSubtitleMenus();
+            PlayerSession.getInstance().selectPrimarySubtitle(-1);
           })
-      }, (track: SubtitleTrack) => track.url)
+        ForEach(this.getSortedSubtitleEntries(), (entry: SubtitleTrackMenuEntry) => {
+          MenuItem({
+            content: entry.label,
+            endIcon: this.vm.currentSubtitleUrl === entry.track.url ? $r('sys.symbol.checkmark') : ''
+          })
+            .contentFontColor($r('sys.color.font_primary'))
+            .contentFont({ size: 14 })
+            .backgroundColor(this.vm.currentSubtitleUrl === entry.track.url
+              ? this.getSelectedMenuBackground() : Color.Transparent)
+            .onClick(() => {
+              // [DISABLED] P3 ASR 已禁用：AsrLiveCaptionService.getInstance().stop();
+              this.closeSubtitleMenus();
+              PlayerSession.getInstance().selectPrimarySubtitle(entry.originalIndex);
+            })
+        }, (entry: SubtitleTrackMenuEntry) => `pri_${entry.originalIndex}_${entry.track.url}`)
+      }
+
+      if (this.vm.subtitleTracks.length >= 2) {
+        MenuItemGroup({ header: $r('app.string.yt_player_subtitle_secondary') }) {
+          MenuItem({
+            content: $r('app.string.yt_player_subtitle_secondary_off'),
+            endIcon: this.vm.secondarySubtitleIndex < 0 ? $r('sys.symbol.checkmark') : ''
+          })
+            .contentFontColor($r('sys.color.font_primary'))
+            .contentFont({ size: 14 })
+            .backgroundColor(this.vm.secondarySubtitleIndex < 0
+              ? this.getSelectedMenuBackground() : Color.Transparent)
+            .onClick(() => {
+              this.closeSubtitleMenus();
+              PlayerSession.getInstance().selectSecondarySubtitle(-1);
+            })
+          ForEach(this.getSecondarySubtitleEntries(), (entry: SubtitleTrackMenuEntry) => {
+            MenuItem({
+              content: entry.label,
+              endIcon: this.vm.secondarySubtitleIndex === entry.originalIndex ? $r('sys.symbol.checkmark') : ''
+            })
+              .contentFontColor($r('sys.color.font_primary'))
+              .contentFont({ size: 14 })
+              .backgroundColor(this.vm.secondarySubtitleIndex === entry.originalIndex
+                ? this.getSelectedMenuBackground() : Color.Transparent)
+              .onClick(() => {
+                this.closeSubtitleMenus();
+                PlayerSession.getInstance().selectSecondarySubtitle(entry.originalIndex);
+              })
+          }, (entry: SubtitleTrackMenuEntry) => `sec_${entry.originalIndex}_${entry.track.url}`)
+        }
+      }
       // [DISABLED] AI 整轨字幕翻译（P2：gtx/LLM）——产品决定只保留 YouTube tlang
       // 官方自动翻译轨（本块上方 ForEach 已含），gtx 客户端翻译入口注释，代码保留。
       // if (this.vm.subtitleTracks.length > 0) {
@@ -1691,33 +1951,204 @@ export struct VideoPlayer {
     .backgroundColor($r('app.color.yourtube_bg_surface'))
     .borderRadius(12)
     .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
-    .width(220)
+    .width(240)
+  }
+
+  private hasChaptersOrSegments(): boolean {
+    return !this.isLocalMode && (this.chapters.length > 0 || this.sponsorSegments.length > 0);
+  }
+
+  private hasMultipleAudioTracks(): boolean {
+    return !this.curSource.isLive && !this.isLocalMode && this.controller.getAudioStreamList().length > 1;
+  }
+
+  private chaptersSheetTitle(): Resource {
+    if (this.chapters.length > 0 && this.sponsorSegments.length > 0) {
+      return $r('app.string.yt_player_chapters_and_segments');
+    }
+    if (this.chapters.length > 0) {
+      return $r('app.string.yt_player_chapters');
+    }
+    return $r('app.string.yt_exp_sb_segments_title');
+  }
+
+  private formatSponsorSegmentRange(seg: SponsorSegment): string {
+    const startText = secondToTime(Math.floor(Math.max(0, seg.startSec)));
+    if (seg.actionType === 'poi' || seg.category === 'poi_highlight') {
+      return startText;
+    }
+    const endText = secondToTime(Math.floor(Math.max(seg.startSec, seg.endSec)));
+    return `${startText} - ${endText}`;
+  }
+
+  private jumpToSponsorSegment(seg: SponsorSegment): void {
+    const targetSec = (seg.actionType === 'poi' || seg.category === 'poi_highlight')
+      ? seg.startSec
+      : (this.durationTime > 0 ? Math.min(seg.endSec, Math.max(0, this.durationTime - 0.2)) : seg.endSec);
+    Logger.info(TAG, `SponsorBlock sheet jump category=${seg.category} action=${seg.actionType} target=${targetSec.toFixed(1)}s`);
+    this.controller.syncSeek(targetSec * 1000);
+    this.showChaptersSheet = false;
   }
 
   @Builder
-  ChapterMenu() {
-    Menu() {
-      ForEach(this.chapters, (chapter: ChapterInfo, index: number) => {
-        MenuItem({
-          content: `${secondToTime(Math.floor(chapter.startTimeSeconds))} · ${chapter.title}`,
-          endIcon: this.getCurrentChapterIndex() === index ? $r('sys.symbol.checkmark') : ''
-        })
-          .contentFontColor($r('sys.color.font_primary'))
-          .contentFont({ size: 14 })
-          .backgroundColor(this.getCurrentChapterIndex() === index
-            ? this.getSelectedMenuBackground() : Color.Transparent)
-          .onClick(() => {
-            Logger.info(TAG, `Chapter seek: index=${index} start=${chapter.startTimeSeconds}s`);
-            this.controller.syncSeek(chapter.startTimeSeconds * 1000);
-          })
-      }, (chapter: ChapterInfo, index: number) => `${chapter.startTimeSeconds}_${index}`)
+  ChaptersAndSegmentsSheet() {
+    Column({ space: 0 }) {
+      Row({ space: 10 }) {
+        Text(this.chaptersSheetTitle())
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.yourtube_text_primary'))
+          .layoutWeight(1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        if (this.canToggleChannelWhitelist()) {
+          Button() {
+            Row({ space: 4 }) {
+              SymbolGlyph($r('sys.symbol.key_shield_fill'))
+                .fontSize(13)
+                .fontColor([this.experimentalConfig.isChannelWhitelisted(this.currentChannelId())
+                  ? this.themePrimary
+                  : $r('app.color.yourtube_text_secondary')])
+              Text($r('app.string.yt_exp_sb_whitelist_channel'))
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.experimentalConfig.isChannelWhitelisted(this.currentChannelId())
+                  ? this.themePrimary
+                  : $r('app.color.yourtube_text_primary'))
+            }
+          }
+          .height(30)
+          .padding({ left: 10, right: 10 })
+          .borderRadius(15)
+          .backgroundColor($r('app.color.yourtube_player_control_bg'))
+          .onClick(() => this.toggleCurrentChannelWhitelist())
+        }
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .padding({ left: 16, right: 16, top: 14, bottom: 10 })
+
+      List({ space: 6 }) {
+        if (this.chapters.length > 0) {
+          ForEach(this.chapters, (chapter: ChapterInfo, index: number) => {
+            ListItem() {
+              Row({ space: 12 }) {
+                if (chapter.thumbnailUrl && chapter.thumbnailUrl.length > 0) {
+                  MediaThumb({
+                    imageUrl: chapter.thumbnailUrl,
+                    placeholderColor: '#222222',
+                    widthVp: 88,
+                    heightVp: 50,
+                    fillParent: false,
+                    useAspectRatio: false,
+                    borderRadiusVp: 6
+                  })
+                    .flexShrink(0)
+                }
+
+                Column({ space: 4 }) {
+                  Text(chapter.title)
+                    .fontSize(14)
+                    .fontWeight(this.getCurrentChapterIndex() === index ? FontWeight.Bold : FontWeight.Medium)
+                    .fontColor(this.getCurrentChapterIndex() === index
+                      ? this.themePrimary
+                      : $r('app.color.yourtube_text_primary'))
+                    .maxLines(2)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+                  Text(secondToTime(Math.floor(Math.max(0, chapter.startTimeSeconds))))
+                    .fontSize(12)
+                    .fontColor(this.getCurrentChapterIndex() === index
+                      ? this.themePrimary
+                      : $r('app.color.yourtube_text_secondary'))
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1)
+
+                if (this.getCurrentChapterIndex() === index) {
+                  SymbolGlyph($r('sys.symbol.checkmark'))
+                    .fontSize(16)
+                    .fontColor([this.themePrimary])
+                }
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+              .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+              .borderRadius(10)
+              .backgroundColor(this.getCurrentChapterIndex() === index
+                ? this.getSelectedMenuBackground()
+                : $r('app.color.yourtube_bg_surface_muted'))
+              .onClick(() => {
+                Logger.info(TAG, `Chapter seek: index=${index} start=${chapter.startTimeSeconds}s`);
+                this.controller.syncSeek(chapter.startTimeSeconds * 1000);
+                this.showChaptersSheet = false;
+              })
+            }
+          }, (chapter: ChapterInfo, index: number) => `ch_${chapter.startTimeSeconds}_${index}`)
+        }
+
+        if (this.sponsorSegments.length > 0) {
+          ListItem() {
+            Text($r('app.string.yt_exp_sb_segments_title'))
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.yourtube_text_secondary'))
+              .width('100%')
+              .padding({ left: 4, top: this.chapters.length > 0 ? 12 : 2, bottom: 4 })
+          }
+
+          ForEach(this.sponsorSegments, (seg: SponsorSegment, segIdx: number) => {
+            ListItem() {
+              Row({ space: 10 }) {
+                Circle({ width: 10, height: 10 })
+                  .fill(getSponsorCategoryColor(seg.category))
+                  .flexShrink(0)
+
+                Column({ space: 2 }) {
+                  Text(this.skipCategoryLabel(seg.category))
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor($r('app.color.yourtube_text_primary'))
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(this.formatSponsorSegmentRange(seg))
+                    .fontSize(12)
+                    .fontColor($r('app.color.yourtube_text_secondary'))
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1)
+
+                Button((seg.actionType === 'poi' || seg.category === 'poi_highlight')
+                  ? $r('app.string.yt_exp_sb_jump_highlight')
+                  : $r('app.string.yt_exp_sb_jump_to_end'))
+                  .height(30)
+                  .padding({ left: 10, right: 10 })
+                  .fontSize(12)
+                  .fontColor(this.themePrimary)
+                  .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                  .borderRadius(15)
+                  .onClick(() => this.jumpToSponsorSegment(seg))
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+              .borderRadius(10)
+              .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+              .onClick(() => this.jumpToSponsorSegment(seg))
+            }
+          }, (seg: SponsorSegment, segIdx: number) => `sb_${seg.category}_${seg.startSec}_${seg.endSec}_${segIdx}`)
+        }
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 16, right: 16, bottom: 20 })
+      .edgeEffect(EdgeEffect.Spring)
+      .scrollBar(BarState.Off)
     }
-    .onAppear(() => this.onControlMenuAppear())
-    .onDisAppear(() => this.onControlMenuDisappear())
-    .backgroundColor($r('app.color.yourtube_bg_surface'))
-    .borderRadius(12)
-    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
-    .width(280)
+    .width('100%')
+    .height('100%')
+    .backgroundColor($r('app.color.yourtube_bg_page'))
   }
 
   @Builder
@@ -1743,7 +2174,7 @@ export struct VideoPlayer {
     .backgroundColor($r('app.color.yourtube_bg_surface'))
     .borderRadius(12)
     .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
-    .width(220)
+    .width(240)
   }
 
   @Builder
@@ -1779,21 +2210,327 @@ export struct VideoPlayer {
     return idx >= 0 ? idx : 0;
   }
 
-  private getSubtitleLabel(track: SubtitleTrack): string {
-    if (track.isAutoTranslated) {
-      // 虚拟自动翻译轨（tlang）：显示目标语言的原生名称 + 本地化标记
-      let langName = track.languageCode;
-      try {
-        langName = i18n.System.getDisplayLanguage(track.languageCode, track.languageCode);
-      } catch (_e) {
-        // 系统无法展示该语言码时回退为原始码
-      }
-      const marker = getContext().resourceManager.getStringSync($r('app.string.yt_player_subtitle_auto_translated').id);
-      return `${langName} · ${marker}`;
+  private normalizeSubtitleLangTag(code: string): string {
+    const raw = (code || '').trim().toLowerCase().replace(/_/g, '-');
+    if (raw.length === 0) {
+      return '';
     }
-    return [track.name, track.languageCode, track.kind]
-      .filter((value: string | undefined): boolean => !!value && value.trim().length > 0)
-      .join(' · ');
+    if (raw === 'zh-cn' || raw === 'zh-sg' || raw.startsWith('zh-hans')) {
+      return 'zh-hans';
+    }
+    if (raw === 'zh-tw' || raw === 'zh-hk' || raw === 'zh-mo' || raw.startsWith('zh-hant')) {
+      return 'zh-hant';
+    }
+    return raw;
+  }
+
+  private subtitlePrimaryLangTag(code: string): string {
+    const norm = this.normalizeSubtitleLangTag(code);
+    const dash = norm.indexOf('-');
+    return dash > 0 ? norm.substring(0, dash) : norm;
+  }
+
+  private toDisplayLocaleCode(code: string): string {
+    const norm = this.normalizeSubtitleLangTag(code);
+    if (norm === 'zh-hans') {
+      return 'zh-Hans';
+    }
+    if (norm === 'zh-hant') {
+      return 'zh-Hant';
+    }
+    return (code || '').trim();
+  }
+
+  private stripSubtitleNoise(rawName: string): string {
+    return rawName
+      .replace(/\s*[（(][^()（）]*(?:auto[- ]?generated|自动生成|自動生成|自動產生|自動翻訳|自动翻译|自動翻譯|auto[- ]?translated|자동\s*생성|автосоздание|automatisch|généré|generado|generato|gerado|تلقائي)[^()（）]*[）)]\s*/gi, '')
+      .replace(/\s*[-·]\s*(?:asr|auto[- ]?generated)\s*$/i, '')
+      .trim();
+  }
+
+  private getSubtitleBaseName(track: SubtitleTrack, displayLocale: string): string {
+    const code = (track.languageCode || '').trim();
+    if (code.length > 0) {
+      const queryCode = this.toDisplayLocaleCode(code);
+      try {
+        const localized = i18n.System.getDisplayLanguage(queryCode, displayLocale);
+        if (localized && localized.trim().length > 0 && localized.toLowerCase() !== queryCode.toLowerCase()) {
+          return localized.trim();
+        }
+      } catch (_e) {
+        // Fallback to cleaned track.name below
+      }
+    }
+    const cleaned = this.stripSubtitleNoise(track.name || '');
+    if (cleaned.length > 0) {
+      return cleaned;
+    }
+    return code || 'CC';
+  }
+
+  private getSubtitleLabel(track: SubtitleTrack): string {
+    const displayLocale = LanguageManager.resolveAppliedLanguage(this.uiConfig);
+    const baseName = this.getSubtitleBaseName(track, displayLocale);
+    const rm = this.getUIContext().getHostContext()?.resourceManager ?? getContext().resourceManager;
+    if (track.isAutoTranslated) {
+      try {
+        return rm.getStringSync($r('app.string.yt_player_subtitle_label_auto_translated').id, baseName);
+      } catch (_e) {
+        return baseName;
+      }
+    }
+    if (track.isAutoGenerated || track.kind === 'asr') {
+      try {
+        return rm.getStringSync($r('app.string.yt_player_subtitle_label_auto_generated').id, baseName);
+      } catch (_e) {
+        return baseName;
+      }
+    }
+    return baseName;
+  }
+
+  private getSubtitleTrackKindRank(track: SubtitleTrack): number {
+    if (track.isAutoTranslated) {
+      return 2;
+    }
+    if (track.isAutoGenerated || track.kind === 'asr') {
+      return 1;
+    }
+    return 0;
+  }
+
+  private getSubtitleTrackLangRank(track: SubtitleTrack, preferredLangs: string[]): number {
+    const trackNorm = this.normalizeSubtitleLangTag(track.languageCode);
+    const trackPrimary = this.subtitlePrimaryLangTag(track.languageCode);
+    if (trackNorm.length > 0) {
+      for (let i = 0; i < preferredLangs.length; i++) {
+        const prefNorm = this.normalizeSubtitleLangTag(preferredLangs[i]);
+        if (prefNorm.length > 0 && prefNorm === trackNorm) {
+          return 0;
+        }
+      }
+      for (let i = 0; i < preferredLangs.length; i++) {
+        const prefPrimary = this.subtitlePrimaryLangTag(preferredLangs[i]);
+        if (prefPrimary.length > 0 && prefPrimary === trackPrimary) {
+          return 1;
+        }
+      }
+    }
+    if (track.isDefault) {
+      return 2;
+    }
+    return 3;
+  }
+
+  private getSortedSubtitleEntries(): SubtitleTrackMenuEntry[] {
+    const tracks = this.vm.subtitleTracks;
+    if (!tracks || tracks.length === 0) {
+      return [];
+    }
+    const preferredLangs: string[] = [];
+    const prefRaw = this.playbackConfig.subtitlePreferredTrack.trim();
+    if (prefRaw.length > 0 && prefRaw !== 'original') {
+      const pipeIdx = prefRaw.indexOf('|');
+      const prefCode = pipeIdx > 0 ? prefRaw.substring(0, pipeIdx).trim() : prefRaw;
+      if (prefCode.length > 0) {
+        preferredLangs.push(prefCode);
+      }
+    }
+    const subTarget = TranslationService.subtitleTargetLanguage();
+    if (subTarget.length > 0) {
+      preferredLangs.push(subTarget);
+    }
+    const appLang = LanguageManager.resolveAppliedLanguage(this.uiConfig);
+    if (appLang.length > 0) {
+      preferredLangs.push(appLang);
+    }
+
+    const entries: SubtitleTrackMenuEntry[] = [];
+    const labelCounts: Map<string, number> = new Map<string, number>();
+    for (let i = 0; i < tracks.length; i++) {
+      const t = tracks[i];
+      const lbl = this.getSubtitleLabel(t);
+      labelCounts.set(lbl, (labelCounts.get(lbl) ?? 0) + 1);
+      entries.push({ originalIndex: i, track: t, label: lbl });
+    }
+
+    // Disambiguate colliding concise labels (e.g. en-US vs en-GB) without adding raw noise
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if ((labelCounts.get(entry.label) ?? 0) > 1) {
+        const cleaned = this.stripSubtitleNoise(entry.track.name || '');
+        if (cleaned.length > 0 && cleaned !== entry.label) {
+          entry.label = cleaned;
+        } else if (entry.track.languageCode.trim().length > 0) {
+          entry.label = `${entry.label} (${entry.track.languageCode.trim()})`;
+        }
+      }
+    }
+
+    entries.sort((a: SubtitleTrackMenuEntry, b: SubtitleTrackMenuEntry): number => {
+      const langDiff = this.getSubtitleTrackLangRank(a.track, preferredLangs)
+        - this.getSubtitleTrackLangRank(b.track, preferredLangs);
+      if (langDiff !== 0) {
+        return langDiff;
+      }
+      const kindDiff = this.getSubtitleTrackKindRank(a.track) - this.getSubtitleTrackKindRank(b.track);
+      if (kindDiff !== 0) {
+        return kindDiff;
+      }
+      const nameDiff = a.label.localeCompare(b.label);
+      if (nameDiff !== 0) {
+        return nameDiff;
+      }
+      return a.originalIndex - b.originalIndex;
+    });
+    return entries;
+  }
+
+  private getSecondarySubtitleEntries(): SubtitleTrackMenuEntry[] {
+    const primaryUrl = this.vm.currentSubtitleUrl;
+    return this.getSortedSubtitleEntries().filter(
+      (entry: SubtitleTrackMenuEntry): boolean => entry.track.url !== primaryUrl
+    );
+  }
+
+  private getCurrentSubtitleSummaryLabel(): ResourceStr {
+    if (this.vm.currentSubtitleUrl.length === 0) {
+      return $r('app.string.yt_player_subtitle_off');
+    }
+    const active = this.vm.subtitleTracks.find(
+      (t: SubtitleTrack): boolean => t.url === this.vm.currentSubtitleUrl
+    );
+    if (!active) {
+      return $r('app.string.yt_player_subtitle_off');
+    }
+    return this.getSubtitleLabel(active);
+  }
+
+  private onQuickToggleSubtitle(): void {
+    this.registerControlActivity();
+    const enabled = PlayerSession.getInstance().toggleSubtitleEnabled();
+    try {
+      if (enabled) {
+        const active = this.vm.subtitleTracks.find(
+          (t: SubtitleTrack): boolean => t.url === this.vm.currentSubtitleUrl
+        );
+        if (active) {
+          this.getUIContext().getPromptAction().showToast({
+            message: this.getSubtitleLabel(active),
+            duration: 1500
+          });
+        }
+      } else {
+        this.getUIContext().getPromptAction().showToast({
+          message: $r('app.string.yt_player_subtitle_off'),
+          duration: 1500
+        });
+      }
+    } catch (_e) {
+      // Non-blocking toast
+    }
+  }
+
+  private splitSubtitleLines(text: string): string[] {
+    if (!text || text.length === 0) {
+      return [];
+    }
+    const raw = text.split('\n');
+    const lines: string[] = [];
+    for (let i = 0; i < raw.length; i++) {
+      const trimmed = raw[i].trim();
+      if (trimmed.length > 0) {
+        lines.push(trimmed);
+      }
+    }
+    return lines;
+  }
+
+  private getPrimarySubtitleLines(): string[] {
+    if (this.vm.currentSubtitleUrl.length === 0 || this.vm.subtitleText.length === 0) {
+      return [];
+    }
+    return this.splitSubtitleLines(this.vm.subtitleText);
+  }
+
+  private getSecondarySubtitleLines(): string[] {
+    if (this.vm.secondarySubtitleUrl.length === 0 || this.vm.secondarySubtitleText.length === 0) {
+      return [];
+    }
+    return this.splitSubtitleLines(this.vm.secondarySubtitleText);
+  }
+
+  private getPrimarySubtitleFontSize(): number {
+    return (this.isFullLandscapeScreen ? 18 : 14) * Number(this.playbackConfig.subtitleFontScale);
+  }
+
+  private getSecondarySubtitleFontSize(): number {
+    return Math.max(10, Math.round(this.getPrimarySubtitleFontSize() * 0.82 * 10) / 10);
+  }
+
+  private getPrimarySubtitleColor(): string {
+    return SUBTITLE_FONT_COLOR_VALUES[this.playbackConfig.subtitleFontColor] || '#FFFFFF';
+  }
+
+  private getSecondarySubtitleColor(): string {
+    const colorKey = this.playbackConfig.subtitleFontColor;
+    if (colorKey === 'yellow') {
+      return '#FFF59D';
+    }
+    if (colorKey === 'green') {
+      return '#A5D6A7';
+    }
+    if (colorKey === 'cyan') {
+      return '#B2EBF2';
+    }
+    return '#E8E8E8';
+  }
+
+  private getSubtitlePillBackground(): string {
+    const opacity = normalizeSubtitleBgOpacity(this.playbackConfig.subtitleBgOpacity);
+    if (opacity <= 0) {
+      return 'rgba(0, 0, 0, 0)';
+    }
+    return `rgba(0, 0, 0, ${opacity})`;
+  }
+
+  private getSubtitleLineHeight(fontSize: number): number {
+    return Math.round(fontSize * 1.32);
+  }
+
+  private getSubtitlePillPadding(fontSize: number): Padding {
+    const h = Math.max(8, Math.round(fontSize * 0.55));
+    const v = Math.max(2, Math.round(fontSize * 0.18));
+    return { left: h, right: h, top: v, bottom: v };
+  }
+
+  private getSubtitlePillRadius(fontSize: number): number {
+    return Math.max(4, Math.round(fontSize * 0.28));
+  }
+
+  private getSubtitleTextShadow(): ShadowOptions | ShadowOptions[] {
+    const style: SubtitleEdgeStyle = this.playbackConfig.subtitleEdgeStyle;
+    if (style === 'none') {
+      return { radius: 0, color: Color.Transparent, offsetX: 0, offsetY: 0 };
+    }
+    if (style === 'shadow') {
+      return [{ radius: 4, color: '#CC000000', offsetX: 0, offsetY: 1.5 }];
+    }
+    if (style === 'outline') {
+      return [
+        { radius: 1.5, color: '#E6000000', offsetX: -1.2, offsetY: -1.2 },
+        { radius: 1.5, color: '#E6000000', offsetX: 1.2, offsetY: -1.2 },
+        { radius: 1.5, color: '#E6000000', offsetX: -1.2, offsetY: 1.2 },
+        { radius: 1.5, color: '#E6000000', offsetX: 1.2, offsetY: 1.2 }
+      ];
+    }
+    return [
+      { radius: 1.5, color: '#E6000000', offsetX: -1.2, offsetY: -1.2 },
+      { radius: 1.5, color: '#E6000000', offsetX: 1.2, offsetY: -1.2 },
+      { radius: 1.5, color: '#E6000000', offsetX: -1.2, offsetY: 1.2 },
+      { radius: 1.5, color: '#E6000000', offsetX: 1.2, offsetY: 1.2 },
+      { radius: 4, color: '#B3000000', offsetX: 0, offsetY: 1.5 }
+    ];
   }
 
   // ── AI 字幕翻译（P2）──
@@ -2006,7 +2743,7 @@ export struct VideoPlayer {
   /** 章节 / 字幕 / 音轨 / 画质 / 倍速 是否作为顶部独立图标展示 */
   private getTopToolCount(): number {
     let count = this.curSource.isLive ? 0 : 1; // 倍速点播常驻，直播禁用
-    if (!this.isLocalMode && this.chapters.length > 0) {
+    if (this.hasChaptersOrSegments()) {
       count++;
     }
     // 字幕菜单对 VOD 常驻：无原生轨时仍有 AI 翻译（P2）/ AI 生成字幕（P3）入口
@@ -2014,7 +2751,7 @@ export struct VideoPlayer {
     if (!this.curSource.isLive && !this.isLocalMode) {
       count++;
     }
-    if (!this.curSource.isLive && !this.isLocalMode && this.controller.getAudioStreamList().length > 1) {
+    if (this.hasMultipleAudioTracks()) {
       count++;
     }
     if (!this.isLocalMode && this.controller.getMergedVideoList().length > 0
@@ -2170,9 +2907,60 @@ export struct VideoPlayer {
       .height('100%')
       .justifyContent(FlexAlign.End)
       .alignItems(HorizontalAlign.Center)
-      .padding({ bottom: 110 })
+      .padding({ bottom: this.overlayPillBottomVp() })
       .hitTestBehavior(HitTestMode.Transparent)
       .zIndex(CommonConstants.Z_INDEX_MAX + 1)
+    }
+  }
+
+  @Builder
+  JumpAheadLayer() {
+    if (this.jumpAheadTargetSec !== null && !this.skipNotice && !this.curSource.isLive && !this.hasError) {
+      Column() {
+        Row({ space: 4 }) {
+          Row({ space: 6 }) {
+            SymbolGlyph($r('sys.symbol.forward_end_fill'))
+              .fontSize(14)
+              .fontColor([this.themePrimary])
+            Text($r('app.string.yt_player_jump_ahead'))
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Color.White)
+              .maxLines(1)
+            Text(secondToTime(Math.floor(this.jumpAheadTargetSec!)))
+              .fontSize(12)
+              .fontColor('#CCFFFFFF')
+              .maxLines(1)
+          }
+          .padding({ left: 14, right: 8, top: 8, bottom: 8 })
+          .hitTestBehavior(HitTestMode.Block)
+          .onClick(() => this.jumpAheadToPeak())
+
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.xmark'))
+              .fontSize(13)
+              .fontColor(['#CCFFFFFF'])
+          }
+          .width(30)
+          .height(30)
+          .margin({ right: 4 })
+          .hitTestBehavior(HitTestMode.Block)
+          .onClick(() => this.clearJumpAheadPill())
+        }
+        .backgroundColor('#E6000000')
+        .borderRadius(18)
+        .border({ width: 0.5, color: '#33FFFFFF' })
+        .alignItems(VerticalAlign.Center)
+        .hitTestBehavior(HitTestMode.Default)
+        .onClick(() => {})
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.End)
+      .alignItems(HorizontalAlign.Center)
+      .padding({ bottom: this.overlayPillBottomVp() })
+      .hitTestBehavior(HitTestMode.Transparent)
+      .zIndex(CommonConstants.Z_INDEX_MAX + 0.8)
     }
   }
 
@@ -2265,6 +3053,25 @@ export struct VideoPlayer {
       // SponsorBlock 跳过提示（toast 模式，可撤销）
       this.SponsorSkipNoticeLayer()
 
+      // Most Replayed 热力图 Jump Ahead 胶囊（仅在无 SponsorBlock 提示时显示，绝不重叠）
+      this.JumpAheadLayer()
+
+      // 拖动进度条 / 横滑 Seek 预览气泡（故事板雪碧图 + 目标时间 + 实时章节名）
+      if ((this.isSliderDragging || this.isGestureSeek) && !this.curSource.isLive && this.durationTime > 0) {
+        SeekPreviewBubble({
+          storyboard: this.storyboard,
+          chapters: this.chapters,
+          previewSec: this.isSliderDragging ? this.sliderDragValue : this.gestureSeekTime,
+          durationSec: this.durationTime,
+          containerWidthVp: this.containerVpWidth,
+          trackLeftVp: this.sliderTrackLeftVp,
+          trackWidthVp: this.sliderTrackWidthVp,
+          isGestureMode: !this.isSliderDragging && this.isGestureSeek
+        })
+          .position({ bottom: this.previewBubbleBottomVp() })
+          .zIndex(CommonConstants.Z_INDEX_MAX + 0.5)
+      }
+
       // 错误提示层（任一播放器出错都会显示）
       if (this.curSource.error || this.hasError) {
         Column({ space: 16 }) {
@@ -2326,29 +3133,61 @@ export struct VideoPlayer {
           .hitTestBehavior(HitTestMode.None)
       }
 
-      // 字幕显示层（ArkUI 覆盖层字幕：VTT 由 mediaservice 解析成 vm.subtitleText；
-      // 字号/颜色/背景/底部间距跟随设置项，控制栏显示时按需上浮；
-      // 拖动仅在控制层显示时允许，全向自由移动（比例化存储），拖动期间控制层保活，
-      // 拖回底部/中线附近自动吸附回默认，mpv 不再烧录字幕进画面）
-      if (this.vm.currentSubtitleUrl.length > 0 && this.vm.subtitleText.length > 0) {
+      // 字幕显示层（ArkUI 覆盖层字幕：json3/VTT 由 mediaservice 解析成 vm.subtitleText / vm.secondarySubtitleText；
+      // 按行紧贴圆角胶囊渲染 + 多方向真描边 + 粗体/透明度 + 双语副字幕；
+      // 拖动仅在控制层显示时允许，全向自由移动（比例化存储），拖动期间控制层保活，mpv 不再烧录字幕进画面）
+      if ((this.vm.currentSubtitleUrl.length > 0 && this.vm.subtitleText.length > 0)
+        || (this.vm.secondarySubtitleUrl.length > 0 && this.vm.secondarySubtitleText.length > 0)) {
         Column() {
-          Text(this.vm.subtitleText)
-            .fontColor(SUBTITLE_FONT_COLOR_VALUES[this.playbackConfig.subtitleFontColor])
-            .fontSize((this.isFullLandscapeScreen ? 18 : 14) * Number(this.playbackConfig.subtitleFontScale))
-            .textAlign(TextAlign.Center)
-            .constraintSize({ maxWidth: '90%' })
-            .textShadow({ radius: 4, color: Color.Black })
-            .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-            .backgroundColor(this.subtitleDragging
-              ? '#B3000000'
-              : SUBTITLE_BACKGROUND_VALUES[this.playbackConfig.subtitleBackground])
-            .borderRadius(this.subtitleDragging ? 12 : 4)
-            .border({
-              width: this.subtitleDragging ? 1.5 : 0,
-              color: this.subtitleDragging ? this.themePrimary : Color.Transparent,
-              radius: 12
-            })
-            .scale({ x: this.subtitleDragging ? 1.03 : 1, y: this.subtitleDragging ? 1.03 : 1 })
+          Column({ space: 4 }) {
+            if (this.vm.currentSubtitleUrl.length > 0 && this.vm.subtitleText.length > 0) {
+              Column({ space: 3 }) {
+                ForEach(this.getPrimarySubtitleLines(), (line: string, lineIdx: number) => {
+                  Text(line)
+                    .fontColor(this.getPrimarySubtitleColor())
+                    .fontSize(this.getPrimarySubtitleFontSize())
+                    .lineHeight(this.getSubtitleLineHeight(this.getPrimarySubtitleFontSize()))
+                    .fontWeight(this.playbackConfig.subtitleBold ? FontWeight.Bold : FontWeight.Medium)
+                    .textAlign(TextAlign.Center)
+                    .constraintSize({ maxWidth: '90%' })
+                    .textShadow(this.getSubtitleTextShadow())
+                    .padding(this.getSubtitlePillPadding(this.getPrimarySubtitleFontSize()))
+                    .backgroundColor(this.getSubtitlePillBackground())
+                    .borderRadius(this.getSubtitlePillRadius(this.getPrimarySubtitleFontSize()))
+                }, (line: string, lineIdx: number) => `p_${lineIdx}_${line}`)
+              }
+              .alignItems(HorizontalAlign.Center)
+            }
+
+            if (this.vm.secondarySubtitleUrl.length > 0 && this.vm.secondarySubtitleText.length > 0) {
+              Column({ space: 3 }) {
+                ForEach(this.getSecondarySubtitleLines(), (secLine: string, secIdx: number) => {
+                  Text(secLine)
+                    .fontColor(this.getSecondarySubtitleColor())
+                    .fontSize(this.getSecondarySubtitleFontSize())
+                    .lineHeight(this.getSubtitleLineHeight(this.getSecondarySubtitleFontSize()))
+                    .fontWeight(this.playbackConfig.subtitleBold ? FontWeight.Bold : FontWeight.Medium)
+                    .textAlign(TextAlign.Center)
+                    .constraintSize({ maxWidth: '90%' })
+                    .textShadow(this.getSubtitleTextShadow())
+                    .padding(this.getSubtitlePillPadding(this.getSecondarySubtitleFontSize()))
+                    .backgroundColor(this.getSubtitlePillBackground())
+                    .borderRadius(this.getSubtitlePillRadius(this.getSecondarySubtitleFontSize()))
+                }, (secLine: string, secIdx: number) => `s_${secIdx}_${secLine}`)
+              }
+              .alignItems(HorizontalAlign.Center)
+            }
+          }
+          .alignItems(HorizontalAlign.Center)
+          .padding(this.subtitleDragging ? 6 : 0)
+          .backgroundColor(this.subtitleDragging ? '#66000000' : Color.Transparent)
+          .borderRadius(this.subtitleDragging ? 12 : 0)
+          .border({
+            width: this.subtitleDragging ? 1.5 : 0,
+            color: this.subtitleDragging ? this.themePrimary : Color.Transparent,
+            radius: 12
+          })
+          .scale({ x: this.subtitleDragging ? 1.03 : 1, y: this.subtitleDragging ? 1.03 : 1 })
         }
         .width('100%')
         .alignItems(HorizontalAlign.Center)
@@ -2412,7 +3251,7 @@ export struct VideoPlayer {
 
       // 2. 手势提示层
       RelativeContainer() {
-        if (this.isGestureSeek) {
+        if (this.isGestureSeek && (this.curSource.isLive || this.durationTime <= 0)) {
           Text(`${secondToTime(Math.floor(this.gestureSeekTime))} / ${secondToTime(Math.floor(this.durationTime))}`)
             .fontColor(Color.White).fontSize(26).fontWeight(FontWeight.Medium)
             .textShadow({ radius: 8, color: Color.Black })
@@ -2556,6 +3395,15 @@ export struct VideoPlayer {
 
     // 双指缩放在触摸层处理（PinchGesture 在 Exclusive 组内会被单指 pan 竞争掉）
     .onTouch((event: TouchEvent) => this.onPinchTouch(event))
+    .bindSheet($$this.showChaptersSheet, this.ChaptersAndSegmentsSheet(), {
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+      dragBar: true,
+      backgroundColor: $r('app.color.yourtube_bg_page'),
+      preferType: SheetType.CENTER,
+      showClose: false,
+      onAppear: () => this.onControlMenuAppear(),
+      onWillDisappear: () => this.onControlMenuDisappear()
+    })
   }
 
   /**
@@ -2637,29 +3485,33 @@ export struct VideoPlayer {
           .contentFont({ size: 14 })
           .onClick(() => this.onShowInfoPanel?.())
       }
-      if (!this.isLocalMode && this.chapters.length > 0) {
+      if (this.hasChaptersOrSegments()) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.list_bullet_square')),
-          content: $r('app.string.yt_player_chapters'),
-          builder: (): void => {
-            this.ChapterMenu()
-          }
+          content: this.chaptersSheetTitle()
         })
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
+          .onClick(() => {
+            this.showChaptersSheet = true;
+          })
       }
       if (!this.curSource.isLive && !this.isLocalMode) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.AI_subtitles')),
           content: $r('app.string.yt_player_subtitles'),
+          labelInfo: this.getCurrentSubtitleSummaryLabel(),
           builder: (): void => {
             this.SubtitleMenu()
           }
         })
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
+          .labelFont({ size: 13 })
+          .labelFontColor(this.vm.currentSubtitleUrl.length > 0
+            ? this.themePrimary : $r('sys.color.font_secondary'))
       }
-      if (!this.curSource.isLive && !this.isLocalMode && this.controller.getAudioStreamList().length > 1) {
+      if (this.hasMultipleAudioTracks()) {
         MenuItem({
           symbolStartIcon: this.menuSymbol($r('sys.symbol.speaker_wave_2')),
           content: $r('app.string.yt_player_audio_track'),
@@ -2669,6 +3521,21 @@ export struct VideoPlayer {
         })
           .contentFontColor($r('sys.color.font_primary'))
           .contentFont({ size: 14 })
+      }
+      if (this.canToggleChannelWhitelist()) {
+        MenuItem({
+          symbolStartIcon: this.menuSymbol($r('sys.symbol.key_shield_fill')),
+          content: $r('app.string.yt_exp_sb_whitelist_channel'),
+          endIcon: this.experimentalConfig.isChannelWhitelisted(this.currentChannelId())
+            ? $r('sys.symbol.checkmark') : ''
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .backgroundColor(this.experimentalConfig.isChannelWhitelisted(this.currentChannelId())
+            ? this.getSelectedMenuBackground() : Color.Transparent)
+          .onClick(() => {
+            this.toggleCurrentChannelWhitelist();
+          })
       }
       if (!this.isLocalMode && this.controller.getMergedVideoList().length > 0
       && (!this.curSource.isLive || this.vm.playerModel.liveQualityReady)) {
@@ -2747,7 +3614,7 @@ export struct VideoPlayer {
           .onClick(() => this.onShowInfoPanel?.())
       }
 
-      if (!this.isLocalMode && this.chapters.length > 0) {
+      if (this.hasChaptersOrSegments()) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.list_bullet_square'))
             .fontSize(CONTROL_ICON_SIZE)
@@ -2755,22 +3622,40 @@ export struct VideoPlayer {
         }
           .width(SPEED_CONTROL_WIDTH)
           .height(CONTROL_SLOT_SIZE)
-          .accessibilityText($r('app.string.yt_player_chapters'))
-          .bindMenu(this.ChapterMenu())
+          .accessibilityText(this.chaptersSheetTitle())
+          .onClick(() => {
+            this.registerControlActivity();
+            this.showChaptersSheet = true;
+          })
       }
 
       if (!this.curSource.isLive && !this.isLocalMode) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.AI_subtitles'))
             .fontSize(CONTROL_ICON_SIZE)
-            .fontColor([Color.White])
+            .fontColor([this.vm.currentSubtitleUrl.length > 0 ? this.themePrimary : Color.White])
         }
           .width(SPEED_CONTROL_WIDTH)
           .height(CONTROL_SLOT_SIZE)
-          .bindMenu(this.SubtitleMenu())
+          .accessibilityText($r('app.string.yt_player_subtitles'))
+          .onClick(() => {
+            this.registerControlActivity();
+            this.showSubtitleMenu = true;
+          })
+          .gesture(
+            LongPressGesture({ fingers: 1, duration: 400, repeat: false })
+              .onAction(() => {
+                this.onQuickToggleSubtitle();
+              })
+          )
+          .bindMenu(this.showSubtitleMenu, this.SubtitleMenu(), {
+            onDisappear: () => {
+              this.showSubtitleMenu = false;
+            }
+          })
       }
 
-      if (!this.curSource.isLive && !this.isLocalMode && this.controller.getAudioStreamList().length > 1) {
+      if (this.hasMultipleAudioTracks()) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.speaker_wave_2'))
             .fontSize(CONTROL_ICON_SIZE)
@@ -2778,6 +3663,7 @@ export struct VideoPlayer {
         }
           .width(SPEED_CONTROL_WIDTH)
           .height(CONTROL_SLOT_SIZE)
+          .accessibilityText($r('app.string.yt_player_audio_track'))
           .bindMenu(this.AudioMenu())
       }
 
@@ -2840,15 +3726,44 @@ export struct VideoPlayer {
       Blank()
 
       if (this.shouldCollapseTopTools()) {
-        Stack({ alignContent: Alignment.Center }) {
-          SymbolGlyph($r('sys.symbol.line_3_horizontal'))
-            .fontSize(CONTROL_ICON_SIZE)
-            .fontColor([Color.White])
+        Row({ space: 4 }) {
+          if (!this.curSource.isLive && !this.isLocalMode && this.vm.subtitleTracks.length > 0) {
+            Stack({ alignContent: Alignment.Center }) {
+              SymbolGlyph($r('sys.symbol.AI_subtitles'))
+                .fontSize(CONTROL_ICON_SIZE)
+                .fontColor([this.vm.currentSubtitleUrl.length > 0 ? this.themePrimary : Color.White])
+            }
+              .width(CONTROL_SLOT_SIZE)
+              .height(CONTROL_SLOT_SIZE)
+              .accessibilityText($r('app.string.yt_player_subtitles'))
+              .onClick(() => {
+                this.onQuickToggleSubtitle();
+              })
+              .gesture(
+                LongPressGesture({ fingers: 1, duration: 400, repeat: false })
+                  .onAction(() => {
+                    this.registerControlActivity();
+                    this.showCollapsedSubtitleMenu = true;
+                  })
+              )
+              .bindMenu(this.showCollapsedSubtitleMenu, this.SubtitleMenu(), {
+                onDisappear: () => {
+                  this.showCollapsedSubtitleMenu = false;
+                }
+              })
+          }
+
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.line_3_horizontal'))
+              .fontSize(CONTROL_ICON_SIZE)
+              .fontColor([Color.White])
+          }
+            .width(CONTROL_SLOT_SIZE)
+            .height(CONTROL_SLOT_SIZE)
+            .accessibilityText($r('app.string.yt_player_more_tools'))
+            .bindMenu(this.TopToolsCollapsedMenu())
         }
-          .width(CONTROL_SLOT_SIZE)
-          .height(CONTROL_SLOT_SIZE)
-          .accessibilityText($r('app.string.yt_player_more_tools'))
-          .bindMenu(this.TopToolsCollapsedMenu())
+        .alignItems(VerticalAlign.Center)
       } else {
         this.TopToolsExpandedRow()
       }
@@ -2919,7 +3834,7 @@ export struct VideoPlayer {
               this.drawCacheRanges();
             })
 
-          // 已播放进度（顶层）
+          // 已播放进度（顶层交互 Slider）
           Slider({
               value: this.isSliderDragging ? this.sliderDragValue
                    : this.isGestureSeek    ? this.gestureSeekTime
@@ -2932,10 +3847,24 @@ export struct VideoPlayer {
             .trackThickness(this.trackThicknessSize).enabled(!!(this.vm.isReady && this.hasStreams))
             .onTouch((event: TouchEvent) => this.onSliderTouch(event))
             .onChange((value: number, mode: SliderChangeMode) => this.sliderOnchange(value, mode))
+
+          // 四合一进度条叠加层（热力图曲线 + SponsorBlock 彩色片段 + 章节刻度线；HitTestMode.None 不拦截拖动）
+          SeekBarTrackOverlay({
+            heatmap: this.heatmap,
+            segments: this.sponsorSegments,
+            chapters: this.chapters,
+            durationSec: this.durationTime,
+            trackThicknessVp: this.trackThicknessSize,
+            isLive: false
+          })
         }
         .layoutWeight(1)
         .height(CONTROL_SLOT_SIZE)
         .constraintSize({ minWidth: PROGRESS_MIN_WIDTH })
+        .onAreaChange((_oldArea: Area, newArea: Area) => {
+          this.sliderTrackLeftVp = Number(newArea.position.x);
+          this.sliderTrackWidthVp = Number(newArea.width);
+        })
       }
 
       if (this.shouldShowTimelineText()) {
@@ -2991,7 +3920,7 @@ export struct VideoPlayer {
         this.gestureMode = PlayerGestureMode.IGNORED;
         this.beginInteraction(PlayerInteractionKind.SLIDER);
         this.isSliderDragging = true;
-        this.sliderDragValue = this.currentTime; // 初始化为当前位置
+        this.sliderDragValue = Number.isFinite(value) ? value : this.currentTime;
         this.trackThicknessSize = CommonConstants.TRACK_SIZE_MAX;
         this.sliderStyle = SliderStyle.InSet;
         break;
@@ -3005,7 +3934,11 @@ export struct VideoPlayer {
       case SliderChangeMode.End:
         // 使用快速seek模式（keyframe）提升响应速度
         if (!this.sliderTouchCanceled) {
+          const prevSec = this.currentTime;
           this.controller.syncSeekFast(value * 1000);
+          if (value > prevSec + 3) {
+            this.maybeShowJumpAhead(value);
+          }
         } else {
           Logger.debug(TAG, 'Slider seek canceled; final value not committed');
         }
@@ -3044,6 +3977,9 @@ export struct VideoPlayer {
     this.envService.release();
     this.controller.unsubscribeProgress(this.progressListener);
     SponsorBlockSkipper.getInstance().setNoticeListener(null);
+    SponsorBlockSkipper.getInstance().unsubscribeSegments(this.sponsorSegmentsListener);
+    PlayerSession.getInstance().unsubscribePlaybackExtras(this.playbackExtrasListener);
+    this.clearJumpAheadPill();
     if (this.skipNoticeTimerId >= 0) {
       clearTimeout(this.skipNoticeTimerId);
       this.skipNoticeTimerId = -1;
@@ -3053,6 +3989,7 @@ export struct VideoPlayer {
     this.controller.removeErrorListener(this.errorListener);
     this.controller.removeWaitingForBufferListener(this.waitingForBufferListener);
     this.controller.removeSeekableRangesListener(this.seekableRangesListener);
+    this.controller.setSubtitleErrorListener(undefined);
     SubtitleTranslationService.getInstance().removeProgressListener(this.aiTranslateProgressListener);
     // [DISABLED] P3 ASR：监听器注销随注册一起禁用
     // AsrLiveCaptionService.getInstance().removeProgressListener(this.asrLiveProgressListener);

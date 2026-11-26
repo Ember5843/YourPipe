@@ -6,8 +6,11 @@ import { SECTION_CARD_RADIUS } from '../../common/components/MediaCardTokens';
 import {
   PlaybackConfig, VideoQualityCap, VIDEO_QUALITY_CAP_LABELS,
   GUEST_PLAYER_CLIENT_LABELS, AUTH_PLAYER_CLIENT_LABELS, getPlayerClientDisplay,
+  AUDIO_DELAY_MIN_MS, AUDIO_DELAY_MAX_MS, AUDIO_DELAY_STEP_MS,
+  clampAudioDelayMs, getAudioDelayDisplay,
 } from '../../common/PlaybackConfig';
 import { UIConfig } from '../../common/AppState';
+import { PlayerSession } from '../../common/PlayerSession';
 import { PiPManager } from '../player/pip/PiPManager';
 
 const DOWNLOAD_CONCURRENCY_VALUES: number[] = [1, 2, 3, 4];
@@ -68,6 +71,14 @@ export struct OptionsPlaybackPage {
     } as SelectOption));
   }
 
+  private applyAudioDelay(nextMs: number): void {
+    const clamped = clampAudioDelayMs(nextMs);
+    this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+      cfg.audioDelayMs = clamped;
+    });
+    PlayerSession.getInstance().setAudioDelayMs(clamped);
+  }
+
   build() {
     Column() {
       List({ space: 6 }) {
@@ -102,6 +113,128 @@ export struct OptionsPlaybackPage {
                 this.params.updatePlaybackConfig(cfg => cfg.autoPlayNext = val);
               }
             })
+          }
+        }
+        .backgroundColor($r('app.color.yourtube_bg_surface_muted'))
+        .borderRadius(SECTION_CARD_RADIUS)
+        .clip(true)
+        .divider({ strokeWidth: 1, color: $r('app.color.yourtube_divider'), startMargin: 16, endMargin: 16 })
+
+        ListItem() {
+          PlaybackSectionTitle({ title: $r('app.string.yt_section_audio_enhance') })
+        }
+        .padding({ left: 0, right: 0 })
+
+        ListItemGroup() {
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_playback_audio_normalize'),
+              subtitle: $r('app.string.yt_playback_audio_normalize_subtitle'),
+              isOn: this.playbackConfig.audioNormalizeEnabled,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+                  cfg.audioNormalizeEnabled = val;
+                });
+                PlayerSession.getInstance().applyAudioFilters(val, this.playbackConfig.skipSilenceEnabled);
+              }
+            })
+          }
+
+          ListItem() {
+            PlaybackToggleRow({
+              title: $r('app.string.yt_playback_skip_silence'),
+              subtitle: $r('app.string.yt_playback_skip_silence_subtitle'),
+              isOn: this.playbackConfig.skipSilenceEnabled,
+              themeColor: this.params.themeColor,
+              transparentBackground: true,
+              onChange: (val: boolean) => {
+                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
+                  cfg.skipSilenceEnabled = val;
+                });
+                PlayerSession.getInstance().applyAudioFilters(this.playbackConfig.audioNormalizeEnabled, val);
+              }
+            })
+          }
+
+          ListItem() {
+            Column({ space: 10 }) {
+              Row({ space: 12 }) {
+                Column() {
+                  Text($r('app.string.yt_playback_audio_delay'))
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor($r('app.color.yourtube_text_primary'))
+                  Text($r('app.string.yt_playback_audio_delay_subtitle'))
+                    .fontSize(12)
+                    .fontColor($r('app.color.yourtube_text_quaternary'))
+                    .margin({ top: 3 })
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1)
+
+                Text(getAudioDelayDisplay(this.playbackConfig.audioDelayMs))
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(this.playbackConfig.audioDelayMs !== 0
+                    ? this.params.themeColor
+                    : $r('app.color.yourtube_text_secondary'))
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+
+              Row({ space: 8 }) {
+                Button() {
+                  SymbolGlyph($r('sys.symbol.minus'))
+                    .fontSize(16)
+                    .fontColor([$r('app.color.yourtube_text_primary')])
+                }
+                .width(40)
+                .height(34)
+                .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                .borderRadius(17)
+                .enabled(this.playbackConfig.audioDelayMs > AUDIO_DELAY_MIN_MS)
+                .opacity(this.playbackConfig.audioDelayMs > AUDIO_DELAY_MIN_MS ? 1 : 0.4)
+                .onClick(() => {
+                  this.applyAudioDelay(this.playbackConfig.audioDelayMs - AUDIO_DELAY_STEP_MS);
+                })
+
+                Button() {
+                  SymbolGlyph($r('sys.symbol.plus'))
+                    .fontSize(16)
+                    .fontColor([$r('app.color.yourtube_text_primary')])
+                }
+                .width(40)
+                .height(34)
+                .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                .borderRadius(17)
+                .enabled(this.playbackConfig.audioDelayMs < AUDIO_DELAY_MAX_MS)
+                .opacity(this.playbackConfig.audioDelayMs < AUDIO_DELAY_MAX_MS ? 1 : 0.4)
+                .onClick(() => {
+                  this.applyAudioDelay(this.playbackConfig.audioDelayMs + AUDIO_DELAY_STEP_MS);
+                })
+
+                Blank()
+
+                if (this.playbackConfig.audioDelayMs !== 0) {
+                  Button($r('app.string.yt_playback_audio_delay_reset'))
+                    .height(34)
+                    .padding({ left: 14, right: 14 })
+                    .fontSize(13)
+                    .fontColor(this.params.themeColor)
+                    .backgroundColor($r('app.color.yourtube_player_control_bg'))
+                    .borderRadius(17)
+                    .onClick(() => {
+                      this.applyAudioDelay(0);
+                    })
+                }
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
           }
         }
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))

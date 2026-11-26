@@ -18,6 +18,12 @@ export interface PlaybackPreferencesSnapshot {
   mobileQuality: string;
   /** 字幕延迟（毫秒，正值 = 延后显示）；覆盖层字幕查找时从播放位置中减去。 */
   subtitleOffsetMs: number;
+  /** MPV 原生响度均衡（dynaudnorm）。 */
+  audioNormalizeEnabled: boolean;
+  /** MPV 原生跳过静音（silenceremove，直播流自动旁路）。 */
+  skipSilenceEnabled: boolean;
+  /** MPV 原生音画延迟（毫秒，范围 -1000..1000）。 */
+  audioDelayMs: number;
 }
 
 export type PlaybackPreferencesProvider = () => PlaybackPreferencesSnapshot;
@@ -27,6 +33,9 @@ const DEFAULT_SNAPSHOT: PlaybackPreferencesSnapshot = {
   defaultQuality: 'best',
   mobileQuality: '480p',
   subtitleOffsetMs: 0,
+  audioNormalizeEnabled: false,
+  skipSilenceEnabled: false,
+  audioDelayMs: 0,
 };
 
 export class PlaybackPreferences {

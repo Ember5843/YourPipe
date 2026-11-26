@@ -25,11 +25,13 @@ extern "C" {
 #include <libavutil/avutil.h>
 }
 
+#include <algorithm>
 #include <cmath>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <dlfcn.h>
 #include <iterator>
 #include <condition_variable>
@@ -187,6 +189,8 @@ struct PlayerContext {
     atomic_bool seeking {false};
     atomic_bool eofReached {false};
     atomic_bool paused {true};
+    atomic<double> userPlaybackRate {1.0};
+    atomic_bool inSilenceBoost {false};
     int32_t surfaceWidth = 0;
     int32_t surfaceHeight = 0;
     napi_threadsafe_function tsfn = nullptr;
@@ -443,7 +447,118 @@ void UpdateStatusFromObservedProperties(PlayerContext& ctx)
     ctx.mediaStatus.store(status);
 }
 
+constexpr uint64_t kSilenceMetaReplyId = 900;
 constexpr uint64_t kInfoPropReplyBase = 1000;
+
+void SetMpvDoubleProperty(PlayerContext& ctx, const char* property, double value, const char* action);
+
+void HandleSilenceMetadata(PlayerContext& ctx, mpv_event_property* prop)
+{
+    if (!prop) {
+        return;
+    }
+    if (prop->format == MPV_FORMAT_NONE || !prop->data) {
+        if (ctx.inSilenceBoost.exchange(false)) {
+            const double restore = ctx.userPlaybackRate.load();
+            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                         "skipsilence restore (metadata cleared): speed=%.2f", restore);
+            SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence restore");
+        }
+        return;
+    }
+    if (prop->format != MPV_FORMAT_NODE) {
+        return;
+    }
+    const auto* node = static_cast<const mpv_node*>(prop->data);
+    if (!node || node->format != MPV_FORMAT_NODE_MAP || !node->u.list) {
+        if (ctx.inSilenceBoost.exchange(false)) {
+            const double restore = ctx.userPlaybackRate.load();
+            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                         "skipsilence restore (non-map metadata): speed=%.2f", restore);
+            SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence restore");
+        }
+        return;
+    }
+
+    auto endsWith = [](const string& str, const char* suffix) -> bool {
+        const size_t suffixLen = std::strlen(suffix);
+        return str.size() >= suffixLen && str.compare(str.size() - suffixLen, suffixLen, suffix) == 0;
+    };
+    auto parseNodeDouble = [](const mpv_node& val, double& out) -> bool {
+        if (val.format == MPV_FORMAT_DOUBLE) {
+            if (std::isfinite(val.u.double_)) {
+                out = val.u.double_;
+                return true;
+            }
+            return false;
+        }
+        if (val.format == MPV_FORMAT_STRING && val.u.string && val.u.string[0] != '\0') {
+            char* endPtr = nullptr;
+            const double parsed = std::strtod(val.u.string, &endPtr);
+            if (endPtr != val.u.string && std::isfinite(parsed)) {
+                out = parsed;
+                return true;
+            }
+        }
+        return false;
+    };
+
+    bool hasStart = false;
+    bool hasEnd = false;
+    double startVal = 0.0;
+    double endVal = 0.0;
+    const mpv_node_list* list = node->u.list;
+    for (int i = 0; i < list->num; ++i) {
+        if (!list->keys || !list->keys[i]) {
+            continue;
+        }
+        const string key(list->keys[i]);
+        double parsed = 0.0;
+        if (endsWith(key, "silence_start")) {
+            if (parseNodeDouble(list->values[i], parsed)) {
+                if (!hasStart || parsed > startVal) {
+                    startVal = parsed;
+                    hasStart = true;
+                }
+            }
+        } else if (endsWith(key, "silence_end")) {
+            if (parseNodeDouble(list->values[i], parsed)) {
+                if (!hasEnd || parsed > endVal) {
+                    endVal = parsed;
+                    hasEnd = true;
+                }
+            }
+        }
+    }
+
+    bool inSilence = false;
+    if (hasEnd && (!hasStart || endVal >= startVal)) {
+        inSilence = false;
+    } else if (hasStart && (!hasEnd || startVal > endVal)) {
+        inSilence = true;
+    } else {
+        return;
+    }
+
+    if (inSilence) {
+        if (!ctx.paused.load() && !ctx.seeking.load() && !ctx.eofReached.load()) {
+            if (!ctx.inSilenceBoost.exchange(true)) {
+                const double base = ctx.userPlaybackRate.load();
+                const double boost = std::min(std::max(base * 2.5, 2.5), 4.0);
+                OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                             "skipsilence boost: base=%.2f -> speed=%.2f", base, boost);
+                SetMpvDoubleProperty(ctx, "speed", boost, "skipsilence boost");
+            }
+        }
+    } else {
+        if (ctx.inSilenceBoost.exchange(false)) {
+            const double restore = ctx.userPlaybackRate.load();
+            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                         "skipsilence restore: speed=%.2f", restore);
+            SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence restore");
+        }
+    }
+}
 
 bool IsCachedInfoProp(const string& name)
 {
@@ -515,8 +630,20 @@ void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property, ui
             ctx.seeking.store(value);
         } else if (name == "eof-reached") {
             ctx.eofReached.store(value);
+            if (value && ctx.inSilenceBoost.exchange(false)) {
+                const double restore = ctx.userPlaybackRate.load();
+                OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                             "skipsilence eof-restore: speed=%.2f", restore);
+                SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence eof-restore");
+            }
         } else if (name == "pause") {
             ctx.paused.store(value);
+            if (value && ctx.inSilenceBoost.exchange(false)) {
+                const double restore = ctx.userPlaybackRate.load();
+                OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                             "skipsilence pause-restore: speed=%.2f", restore);
+                SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence pause-restore");
+            }
         }
     } else if (property->format == MPV_FORMAT_NODE && name == "demuxer-cache-state") {
         const string rangesJson = SerializeSeekableRanges(static_cast<mpv_node*>(property->data));
@@ -554,6 +681,9 @@ void ObservePlaybackProperties(PlayerContext& ctx)
     for (const auto& property : properties) {
         LogMpvError(property.name, Mpv().observe_property(ctx.mpv, replyId++, property.name, property.format));
     }
+
+    LogMpvError("af-metadata/skipsilence",
+                Mpv().observe_property(ctx.mpv, kSilenceMetaReplyId, "af-metadata/skipsilence", MPV_FORMAT_NODE));
 
     // Observe media info & live stats asynchronously so GetMediaInfo()/GetProperty()
     // read from cachedProps without blocking the UI thread on mpv_get_property_string.
@@ -613,6 +743,12 @@ void StartEventLoop(PlayerContext& ctx)
                 break;
             }
             if (event->event_id == MPV_EVENT_START_FILE) {
+                if (ctx.inSilenceBoost.exchange(false)) {
+                    const double restore = ctx.userPlaybackRate.load();
+                    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                                 "skipsilence reset (start-file): speed=%.2f", restore);
+                    SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence reset");
+                }
                 ResetObservedPlaybackState(ctx);
                 SetMediaStatus(ctx, kStatusLoading, "start-file");
                 PushEvent(ctx, 2, ctx.mediaStatus.load());
@@ -620,6 +756,12 @@ void StartEventLoop(PlayerContext& ctx)
                 SetMediaStatus(ctx, kStatusLoaded | kStatusPrepared, "file-loaded");
                 PushEvent(ctx, 2, ctx.mediaStatus.load());
             } else if (event->event_id == MPV_EVENT_SEEK) {
+                if (ctx.inSilenceBoost.exchange(false)) {
+                    const double restore = ctx.userPlaybackRate.load();
+                    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                                 "skipsilence reset (seek): speed=%.2f", restore);
+                    SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence reset");
+                }
                 int32_t status = ctx.mediaStatus.load();
                 status |= kStatusSeeking | kStatusBuffering | kStatusStalled;
                 status &= ~kStatusBuffered;
@@ -632,6 +774,10 @@ void StartEventLoop(PlayerContext& ctx)
                 PushEvent(ctx, 2, ctx.mediaStatus.load());
             } else if (event->event_id == MPV_EVENT_PROPERTY_CHANGE && event->data) {
                 auto* prop = static_cast<mpv_event_property*>(event->data);
+                if (event->reply_userdata == kSilenceMetaReplyId) {
+                    HandleSilenceMetadata(ctx, prop);
+                    continue;
+                }
                 if (event->reply_userdata >= kInfoPropReplyBase) {
                     HandleObservedProperty(ctx, prop, event->reply_userdata);
                     continue;
@@ -648,6 +794,12 @@ void StartEventLoop(PlayerContext& ctx)
                     PushEvent(ctx, 2, ctx.mediaStatus.load());
                 }
             } else if (event->event_id == MPV_EVENT_END_FILE && event->data) {
+                if (ctx.inSilenceBoost.exchange(false)) {
+                    const double restore = ctx.userPlaybackRate.load();
+                    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
+                                 "skipsilence reset (end-file): speed=%.2f", restore);
+                    SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence reset");
+                }
                 auto* end = static_cast<mpv_event_end_file*>(event->data);
                 if (end->reason == MPV_END_FILE_REASON_EOF) {
                     SetMediaStatus(ctx, kStatusLoaded | kStatusBuffered | kStatusEnd, "end-file-eof");
@@ -1015,6 +1167,7 @@ void DestroyMpv(PlayerContext& ctx)
     ctx.mpv = nullptr;
     ctx.initialized = false;
     ctx.window = nullptr;
+    ctx.inSilenceBoost.store(false);
     ctx.state.store(kStateStopped);
     SetMediaStatus(ctx, kStatusNoMedia, "destroy");
 }
@@ -1433,7 +1586,12 @@ napi_value SetPlaybackRate(napi_env env, napi_callback_info info)
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     double rate = 1.0;
     napi_get_value_double(env, args[1], &rate);
+    if (!std::isfinite(rate) || rate <= 0.0) {
+        return Undefined(env);
+    }
     lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
+        ctx.userPlaybackRate.store(rate);
+        ctx.inSilenceBoost.store(false);
         PostCommand(ctx, [rate](PlayerContext& workerCtx) {
             if (!EnsureMpv(workerCtx)) {
                 return;
