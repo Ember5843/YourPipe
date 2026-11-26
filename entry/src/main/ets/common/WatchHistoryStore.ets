@@ -1,3 +1,5 @@
+import { common } from '@kit.AbilityKit';
+import { fileIo as fs } from '@kit.CoreFileKit';
 import { AppLog } from './AppLog';
 import { PreferencesStore } from './PreferencesStore';
 
@@ -24,10 +26,13 @@ export interface WatchHistoryItem {
 }
 
 export class WatchHistoryStore {
+  /** 旧版 PreferencesStore key（用于首次启动自动迁移至 filesDir/watch_history.json）。 */
   private static readonly KEY: string = 'watch_history';
+  private static readonly FILE_NAME: string = 'watch_history.json';
   /** 观看历史记录开关（PreferencesStore）：'false' = 停止写入新的观看历史（既有记录保留）。 */
   private static readonly RECORD_ENABLED_KEY: string = 'cfg_record_history';
-  private static readonly MAX_COUNT: number = 100;
+  private static readonly MAX_COUNT: number = 1000;
+  private static filePath: string = '';
   /** 播放列表来源的历史条目：videoId 以此前缀编码（playlist:<playlistId>） */
   static readonly PLAYLIST_KEY_PREFIX: string = 'playlist:';
   /** 进度超过这个比例时视为完播，下次从头播放 */
@@ -162,9 +167,16 @@ export class WatchHistoryStore {
     WatchHistoryStore.syncToAppStorage();
   }
 
-  /** 清空所有记录 */
+  /** 清空所有记录（同步删除磁盘历史文件与旧 Preferences key）。 */
   static clear(): void {
-    WatchHistoryStore.save([]);
+    if (WatchHistoryStore.flushTimerId >= 0) {
+      clearTimeout(WatchHistoryStore.flushTimerId);
+      WatchHistoryStore.flushTimerId = -1;
+    }
+    WatchHistoryStore.cache = [];
+    WatchHistoryStore.dirty = false;
+    WatchHistoryStore.removeHistoryFiles();
+    PreferencesStore.setString(WatchHistoryStore.KEY, '');
     WatchHistoryStore.syncToAppStorage();
   }
 
@@ -341,7 +353,83 @@ export class WatchHistoryStore {
     WatchHistoryStore.replaceAll(merged);
   }
 
-  /** 从 Preferences 加载并同步到 AppStorage（用于应用启动时初始化），返回加载结果 */
+  /** 绑定应用 filesDir（EntryAbility.onCreate 调用）。 */
+  static init(filesDir: string): void {
+    const trimmed = (filesDir || '').trim();
+    if (trimmed.length > 0) {
+      WatchHistoryStore.filePath = `${trimmed}/${WatchHistoryStore.FILE_NAME}`;
+    }
+  }
+
+  private static resolveFilePath(): string {
+    if (WatchHistoryStore.filePath.length > 0) {
+      return WatchHistoryStore.filePath;
+    }
+    const ctx = AppStorage.get<common.UIAbilityContext>('context');
+    if (ctx && ctx.filesDir && ctx.filesDir.length > 0) {
+      WatchHistoryStore.filePath = `${ctx.filesDir}/${WatchHistoryStore.FILE_NAME}`;
+      return WatchHistoryStore.filePath;
+    }
+    return '';
+  }
+
+  private static readFromDiskFile(path: string): WatchHistoryItem[] | null {
+    try {
+      if (!fs.accessSync(path)) {
+        return null;
+      }
+      const raw = fs.readTextSync(path);
+      if (!raw || raw.trim().length === 0) {
+        return [];
+      }
+      const parsed = JSON.parse(raw) as WatchHistoryItem[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      logger.error('Failed to read watch history file:', JSON.stringify(err));
+      return null;
+    }
+  }
+
+  private static writeToDiskFile(path: string, items: WatchHistoryItem[]): boolean {
+    const tmpPath = `${path}.tmp`;
+    try {
+      const file = fs.openSync(tmpPath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+      try {
+        fs.writeSync(file.fd, JSON.stringify(items));
+      } finally {
+        fs.closeSync(file);
+      }
+      fs.renameSync(tmpPath, path);
+      return true;
+    } catch (err) {
+      logger.error('Failed to write watch history file:', JSON.stringify(err));
+      try {
+        if (fs.accessSync(tmpPath)) {
+          fs.unlinkSync(tmpPath);
+        }
+      } catch (_) {}
+      return false;
+    }
+  }
+
+  private static removeHistoryFiles(): void {
+    const path = WatchHistoryStore.resolveFilePath();
+    if (!path) {
+      return;
+    }
+    const targets: string[] = [path, `${path}.tmp`];
+    for (let i = 0; i < targets.length; i++) {
+      try {
+        if (fs.accessSync(targets[i])) {
+          fs.unlinkSync(targets[i]);
+        }
+      } catch (err) {
+        logger.warn(`Failed to unlink ${targets[i]}:`, JSON.stringify(err));
+      }
+    }
+  }
+
+  /** 从存储加载并同步到 AppStorage（用于应用启动时初始化），返回加载结果 */
   static loadToAppStorage(): WatchHistoryItem[] {
     const all = WatchHistoryStore.getAll();
     AppStorage.setOrCreate(APP_STORAGE_KEY, [...all]);
@@ -354,12 +442,34 @@ export class WatchHistoryStore {
 
   private static getItems(): WatchHistoryItem[] {
     if (WatchHistoryStore.cache === null) {
-      const json = PreferencesStore.getString(WatchHistoryStore.KEY, '[]');
-      try {
-        WatchHistoryStore.cache = JSON.parse(json) as WatchHistoryItem[];
-      } catch (err) {
-        logger.error('Failed to parse watch history:', JSON.stringify(err));
-        WatchHistoryStore.cache = [];
+      const path = WatchHistoryStore.resolveFilePath();
+      if (path) {
+        const fromFile = WatchHistoryStore.readFromDiskFile(path);
+        if (fromFile !== null) {
+          WatchHistoryStore.cache = fromFile.slice(0, WatchHistoryStore.MAX_COUNT);
+          return WatchHistoryStore.cache;
+        }
+      }
+      // 首次迁移或无 filesDir 降级：从旧 PreferencesStore 读取
+      const legacyJson = PreferencesStore.getString(WatchHistoryStore.KEY, '');
+      let migrated: WatchHistoryItem[] = [];
+      if (legacyJson && legacyJson.trim().length > 0) {
+        try {
+          const parsed = JSON.parse(legacyJson) as WatchHistoryItem[];
+          if (Array.isArray(parsed)) {
+            migrated = parsed.slice(0, WatchHistoryStore.MAX_COUNT);
+          }
+        } catch (err) {
+          logger.error('Failed to parse legacy watch history:', JSON.stringify(err));
+          migrated = [];
+        }
+      }
+      WatchHistoryStore.cache = migrated;
+      if (path && migrated.length > 0) {
+        if (WatchHistoryStore.writeToDiskFile(path, migrated)) {
+          PreferencesStore.setString(WatchHistoryStore.KEY, '');
+          logger.info(`Migrated ${migrated.length} watch history items to file storage`);
+        }
       }
     }
     return WatchHistoryStore.cache;
@@ -401,6 +511,15 @@ export class WatchHistoryStore {
       return;
     }
     WatchHistoryStore.dirty = false;
-    PreferencesStore.setString(WatchHistoryStore.KEY, JSON.stringify(WatchHistoryStore.getItems()));
+    const items = WatchHistoryStore.getItems();
+    const path = WatchHistoryStore.resolveFilePath();
+    if (path) {
+      if (!WatchHistoryStore.writeToDiskFile(path, items)) {
+        // 写文件失败时恢复 dirty 标记，待下次重试
+        WatchHistoryStore.dirty = true;
+      }
+      return;
+    }
+    PreferencesStore.setString(WatchHistoryStore.KEY, JSON.stringify(items));
   }
 }

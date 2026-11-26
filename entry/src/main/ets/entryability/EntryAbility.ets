@@ -44,6 +44,7 @@ export default class EntryAbility extends UIAbility {
       logger.info(`System Language: ${systemLanguage}, Region: ${systemRegion}`);
 
       PreferencesStore.init(this.context);
+      WatchHistoryStore.init(this.context.filesDir);
       AppState.init();
       AiListStore.getInstance().init(this.context);
       // 把 UIAbilityContext 读取注入 mediaservice（惰性 getter），
