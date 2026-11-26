@@ -179,6 +179,15 @@ const AI_PROVIDER_ITEMS: AiProviderItem[] = [
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.2', date: '2026-11-26',
+    changes: [
+      $r('app.string.yt_changelog_0_7_2_1'),
+      $r('app.string.yt_changelog_0_7_2_2'),
+      $r('app.string.yt_changelog_0_7_2_3'),
+      $r('app.string.yt_changelog_0_7_2_4'),
+    ],
+  },
+  {
     version: '0.7.1', date: '2026-11-26',
     changes: [
       $r('app.string.yt_changelog_0_7_1_1'),
