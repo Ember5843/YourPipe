@@ -47,11 +47,21 @@ export class PlayerUiViewModel {
   @Track videoCodec: string = '';
   @Track videoBitRate: number = 0;
   @Track frameRate: number = 0;
+  @Track hwdec: string = '';
+  @Track pixelFormat: string = '';
+  @Track colorSpace: string = '';
+  @Track colorPrimaries: string = '';
+  @Track colorGamma: string = '';
   @Track audioCodec: string = '';
   @Track audioBitRate: number = 0;
   @Track audioChannels: number = 0;
   @Track audioSampleRate: number = 0;
+  @Track audioFormat: string = '';
+  @Track audioChannelLayout: string = '';
   @Track fileSize: number = 0;
+  @Track currentVideoItag: number = 0;
+  @Track currentAudioItag: number = 0;
+  @Track currentStreamEndpoint: string = '';
 
   public reset(): void {
     this.isPlaying = false;
@@ -83,10 +93,20 @@ export class PlayerUiViewModel {
     this.videoCodec = '';
     this.videoBitRate = 0;
     this.frameRate = 0;
+    this.hwdec = '';
+    this.pixelFormat = '';
+    this.colorSpace = '';
+    this.colorPrimaries = '';
+    this.colorGamma = '';
     this.audioCodec = '';
     this.audioBitRate = 0;
     this.audioChannels = 0;
     this.audioSampleRate = 0;
+    this.audioFormat = '';
+    this.audioChannelLayout = '';
     this.fileSize = 0;
+    this.currentVideoItag = 0;
+    this.currentAudioItag = 0;
+    this.currentStreamEndpoint = '';
   }
 }

@@ -23,21 +23,25 @@
 export struct StreamInfoRow {
   label: ResourceStr = '';
   @Prop value: string = '';
+  @Prop valueColor: ResourceColor = $r('app.color.yourtube_text_primary');
 
   build() {
     Row() {
       Text(this.label)
         .fontSize(13)
         .fontColor($r('app.color.yourtube_text_secondary'))
-        .width(80)
+        .width(96)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
       Text(this.value)
         .fontSize(13)
-        .fontColor($r('app.color.yourtube_text_primary'))
+        .fontColor(this.valueColor)
         .layoutWeight(1)
-        .maxLines(1)
+        .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .width('100%')
+    .alignItems(VerticalAlign.Top)
     .padding({ top: 3, bottom: 3 })
   }
 }

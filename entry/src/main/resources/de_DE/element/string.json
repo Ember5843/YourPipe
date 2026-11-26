@@ -1044,154 +1044,154 @@
             "name": "yt_player_subtitle_off",
             "value": "Untertitel aus"
         },
-{
-    "name": "yt_player_subtitle_auto_translated",
-    "value": "Automatisch übersetzt"
-},
-{
-    "name": "yt_option_ai_translate",
-    "value": "KI-Untertitelübersetzung"
-},
-{
-    "name": "yt_option_ai_subtitle",
-    "value": "KI-Untertitel"
-},
-{
-    "name": "yt_ai_translate_engine",
-    "value": "Übersetzungs-Engine"
-},
-{
-    "name": "yt_ai_translate_engine_gtx",
-    "value": "Google Übersetzer (kostenlos)"
-},
-{
-    "name": "yt_ai_translate_engine_llm",
-    "value": "Benutzerdefiniertes LLM (OpenAI-kompatibel)"
-},
-{
-    "name": "yt_ai_translate_llm_section",
-    "value": "LLM-Einstellungen"
-},
-{
-    "name": "yt_ai_translate_base_url",
-    "value": "Basis-URL"
-},
-{
-    "name": "yt_ai_translate_model",
-    "value": "Modellname"
-},
-{
-    "name": "yt_ai_translate_api_key",
-    "value": "API Key"
-},
-{
-    "name": "yt_ai_translate_test",
-    "value": "Verbindung testen"
-},
-{
-    "name": "yt_ai_translate_testing",
-    "value": "Wird getestet…"
-},
-{
-    "name": "yt_ai_translate_test_ok",
-    "value": "Verbindung erfolgreich"
-},
-{
-    "name": "yt_ai_translate_test_fail",
-    "value": "Verbindung fehlgeschlagen; Einstellungen prüfen"
-},
-{
-    "name": "yt_ai_translate_display_section",
-    "value": "Anzeige"
-},
-{
-    "name": "yt_ai_translate_bilingual",
-    "value": "Zweisprachig"
-},
-{
-    "name": "yt_ai_translate_bilingual_subtitle",
-    "value": "Original und Übersetzung zusammen anzeigen"
-},
-{
-    "name": "yt_ai_translate_note",
-    "value": "Untertiteltext wird an den gewählten Übersetzungsdienst gesendet. Die Zielsprache folgt „Sprache für Inhaltsübersetzung“."
-},
-{
-    "name": "yt_ai_translate_menu",
-    "value": "KI-Übersetzung"
-},
-{
-    "name": "yt_ai_translate_llm_not_configured",
-    "value": "Bitte zuerst das LLM in den Einstellungen konfigurieren"
-},
-{
-    "name": "yt_ai_translate_partial_fail",
-    "value": "Einige Zeilen konnten nicht übersetzt werden; Original beibehalten"
-},
-{
-    "name": "yt_ai_translate_failed",
-    "value": "Übersetzung fehlgeschlagen; später erneut versuchen"
-},
-{
-    "name": "yt_setting_system_ai_caption",
-    "value": "System-KI-Untertitel"
-},
-{
-    "name": "yt_setting_system_ai_caption_subtitle",
-    "value": "System transkribiert die Wiedergabe in Echtzeit (nur unterstützte Geräte, Chinesisch/Englisch)"
-},
-{
-    "name": "yt_setting_system_ai_caption_source",
-    "value": "Quellsprache der KI-Untertitel"
-},
-{
-    "name": "yt_setting_system_ai_caption_source_zh",
-    "value": "Chinesisch"
-},
-{
-    "name": "yt_asr_menu",
-    "value": "KI-Untertitel erzeugen"
-},
-{
-    "name": "yt_asr_phase_model",
-    "value": "Modell wird geladen"
-},
-{
-    "name": "yt_asr_live_progress",
-    "value": "Live-Erkennung läuft…"
-},
-{
-    "name": "yt_asr_failed",
-    "value": "KI-Untertitel fehlgeschlagen; später erneut versuchen"
-},
-{
-    "name": "yt_asr_model_section",
-    "value": "On-Device-Erkennungsmodell"
-},
-{
-    "name": "yt_asr_model_status_ready",
-    "value": "Bereit (Streaming-Erkennung zh/en)"
-},
-{
-    "name": "yt_asr_model_status_none",
-    "value": "Nicht heruntergeladen (~190 MB, WLAN empfohlen)"
-},
-{
-    "name": "yt_asr_model_downloading",
-    "value": "Wird heruntergeladen"
-},
-{
-    "name": "yt_asr_model_download",
-    "value": "Modell herunterladen"
-},
-{
-    "name": "yt_asr_model_delete",
-    "value": "Modell löschen"
-},
-{
-    "name": "yt_ai_action_cancel",
-    "value": "Abbrechen"
-},
+        {
+            "name": "yt_player_subtitle_auto_translated",
+            "value": "Automatisch übersetzt"
+        },
+        {
+            "name": "yt_option_ai_translate",
+            "value": "KI-Untertitelübersetzung"
+        },
+        {
+            "name": "yt_option_ai_subtitle",
+            "value": "KI-Untertitel"
+        },
+        {
+            "name": "yt_ai_translate_engine",
+            "value": "Übersetzungs-Engine"
+        },
+        {
+            "name": "yt_ai_translate_engine_gtx",
+            "value": "Google Übersetzer (kostenlos)"
+        },
+        {
+            "name": "yt_ai_translate_engine_llm",
+            "value": "Benutzerdefiniertes LLM (OpenAI-kompatibel)"
+        },
+        {
+            "name": "yt_ai_translate_llm_section",
+            "value": "LLM-Einstellungen"
+        },
+        {
+            "name": "yt_ai_translate_base_url",
+            "value": "Basis-URL"
+        },
+        {
+            "name": "yt_ai_translate_model",
+            "value": "Modellname"
+        },
+        {
+            "name": "yt_ai_translate_api_key",
+            "value": "API Key"
+        },
+        {
+            "name": "yt_ai_translate_test",
+            "value": "Verbindung testen"
+        },
+        {
+            "name": "yt_ai_translate_testing",
+            "value": "Wird getestet…"
+        },
+        {
+            "name": "yt_ai_translate_test_ok",
+            "value": "Verbindung erfolgreich"
+        },
+        {
+            "name": "yt_ai_translate_test_fail",
+            "value": "Verbindung fehlgeschlagen; Einstellungen prüfen"
+        },
+        {
+            "name": "yt_ai_translate_display_section",
+            "value": "Anzeige"
+        },
+        {
+            "name": "yt_ai_translate_bilingual",
+            "value": "Zweisprachig"
+        },
+        {
+            "name": "yt_ai_translate_bilingual_subtitle",
+            "value": "Original und Übersetzung zusammen anzeigen"
+        },
+        {
+            "name": "yt_ai_translate_note",
+            "value": "Untertiteltext wird an den gewählten Übersetzungsdienst gesendet. Die Zielsprache folgt „Sprache für Inhaltsübersetzung“."
+        },
+        {
+            "name": "yt_ai_translate_menu",
+            "value": "KI-Übersetzung"
+        },
+        {
+            "name": "yt_ai_translate_llm_not_configured",
+            "value": "Bitte zuerst das LLM in den Einstellungen konfigurieren"
+        },
+        {
+            "name": "yt_ai_translate_partial_fail",
+            "value": "Einige Zeilen konnten nicht übersetzt werden; Original beibehalten"
+        },
+        {
+            "name": "yt_ai_translate_failed",
+            "value": "Übersetzung fehlgeschlagen; später erneut versuchen"
+        },
+        {
+            "name": "yt_setting_system_ai_caption",
+            "value": "System-KI-Untertitel"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_subtitle",
+            "value": "System transkribiert die Wiedergabe in Echtzeit (nur unterstützte Geräte, Chinesisch/Englisch)"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source",
+            "value": "Quellsprache der KI-Untertitel"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source_zh",
+            "value": "Chinesisch"
+        },
+        {
+            "name": "yt_asr_menu",
+            "value": "KI-Untertitel erzeugen"
+        },
+        {
+            "name": "yt_asr_phase_model",
+            "value": "Modell wird geladen"
+        },
+        {
+            "name": "yt_asr_live_progress",
+            "value": "Live-Erkennung läuft…"
+        },
+        {
+            "name": "yt_asr_failed",
+            "value": "KI-Untertitel fehlgeschlagen; später erneut versuchen"
+        },
+        {
+            "name": "yt_asr_model_section",
+            "value": "On-Device-Erkennungsmodell"
+        },
+        {
+            "name": "yt_asr_model_status_ready",
+            "value": "Bereit (Streaming-Erkennung zh/en)"
+        },
+        {
+            "name": "yt_asr_model_status_none",
+            "value": "Nicht heruntergeladen (~190 MB, WLAN empfohlen)"
+        },
+        {
+            "name": "yt_asr_model_downloading",
+            "value": "Wird heruntergeladen"
+        },
+        {
+            "name": "yt_asr_model_download",
+            "value": "Modell herunterladen"
+        },
+        {
+            "name": "yt_asr_model_delete",
+            "value": "Modell löschen"
+        },
+        {
+            "name": "yt_ai_action_cancel",
+            "value": "Abbrechen"
+        },
         {
             "name": "yt_setting_home_layout",
             "value": "Startseiten-Layout"
@@ -3488,7 +3488,6 @@
             "name": "yt_option_clear_history_subtitle",
             "value": "Löscht den gesamten lokalen Verlauf und Fortschritt"
         },
-
         {
             "name": "yt_toast_history_cleared",
             "value": "Verlauf gelöscht"
@@ -3604,8 +3603,7 @@
         {
             "name": "yt_home_mode_long",
             "value": "Lange Videos"
-        }
-    ,
+        },
         {
             "name": "yt_download_pause",
             "value": "Pausieren"
@@ -3845,8 +3843,7 @@
         {
             "name": "yt_translation_region",
             "value": "Region"
-        }
-,
+        },
         {
             "name": "yt_exp_title",
             "value": "Experimentelle Funktionen"
@@ -4147,73 +4144,345 @@
             "name": "yt_update_later",
             "value": "Später"
         },
-        {"name": "yt_cookie_verify_success", "value": "Cookie bestätigt."},
-        {"name": "yt_local_import_partial", "value": "%1$d Datei(en) importiert; %2$d fehlgeschlagen."},
-        {"name": "yt_recovery_failed", "value": "Der Vorgang konnte nicht abgeschlossen werden. Bitte erneut versuchen."},
-        {"name": "yt_proxy_applying", "value": "Proxy wird angewendet…"},
-        {"name": "yt_exp_sb_skip_manual", "value": "%s überspringen"},
-        {"name": "yt_exp_sb_jump_highlight", "value": "Zum Highlight springen"},
-        {"name": "yt_action_sleep_timer_off", "value": "Timer aus"},
-        {"name": "yt_action_play_next", "value": "Als Nächstes"},
-        {"name": "yt_action_add_to_queue", "value": "Zur Warteschlange"},
-        {"name": "yt_action_undo", "value": "Rückgängig"},
-        {"name": "yt_action_save", "value": "Speichern"},
-        {"name": "yt_queue_loop_none", "value": "Kein Loop"},
-        {"name": "yt_queue_loop_all", "value": "Alle wiederholen"},
-        {"name": "yt_queue_loop_one", "value": "Einzeln wiederholen"},
-        {"name": "yt_queue_shuffle", "value": "Zufall"},
-        {"name": "yt_queue_shuffle_on", "value": "Zufallswiedergabe aktiviert"},
-        {"name": "yt_queue_shuffle_off", "value": "Zufallswiedergabe deaktiviert"},
-        {"name": "yt_queue_save_as_playlist", "value": "Als Playlist"},
-        {"name": "yt_queue_save_sheet_title", "value": "Warteschlange als lokale Playlist speichern"},
-        {"name": "yt_queue_saved_toast", "value": "Als lokale Playlist gespeichert"},
-        {"name": "yt_queue_removed_item", "value": "Aus Warteschlange entfernt"},
-        {"name": "yt_toast_play_next_added", "value": "Wird als Nächstes abgespielt"},
-        {"name": "yt_toast_added_to_queue", "value": "Zur Warteschlange hinzugefügt"},
-        {"name": "yt_toast_already_in_queue", "value": "Bereits in der Warteschlange"},
-        {"name": "yt_toast_already_playing", "value": "Dieses Video wird bereits abgespielt"},
-        {"name": "yt_queue_local_mode_incompatible", "value": "Lokale und Online-Videos können nicht gemischt werden"},
-        {"name": "yt_queue_local_playlist", "value": "Lokale Playlist"},
-        {"name": "yt_queue_current_video", "value": "Aktuelles Video"},
-        {"name": "yt_queue_video_count", "value": "%d Videos in der Warteschlange"},
-        {"name": "yt_section_audio_enhance", "value": "Audioverbesserung"},
-        {"name": "yt_playback_audio_normalize", "value": "Lautheitsnormalisierung"},
-        {"name": "yt_playback_audio_normalize_subtitle", "value": "Lautstärke während der Wiedergabe automatisch ausgleichen"},
-        {"name": "yt_playback_skip_silence", "value": "Stille überspringen"},
-        {"name": "yt_playback_skip_silence_subtitle", "value": "Stille Passagen automatisch überspringen (bei Livestreams deaktiviert)"},
-        {"name": "yt_playback_audio_delay", "value": "Audioverzögerung"},
-        {"name": "yt_playback_audio_delay_subtitle", "value": "Audio-Video-Sync für Bluetooth oder Lautsprecher anpassen (-1000 bis +1000ms)"},
-        {"name": "yt_playback_audio_delay_reset", "value": "Zurücksetzen"},
-        {"name": "yt_player_audio_settings", "value": "Audioeinstellungen"},
-        {"name": "yt_player_jump_ahead", "value": "Vorspringen"},
-        {"name": "yt_player_chapters_and_segments", "value": "Kapitel & Segmente"},
-        {"name": "yt_exp_sb_segments_title", "value": "SponsorBlock-Segmente"},
-        {"name": "yt_exp_sb_jump_to_end", "value": "Zum Ende"},
-        {"name": "yt_exp_sb_whitelist", "value": "Freigegebene Kanäle"},
-        {"name": "yt_exp_sb_whitelist_empty", "value": "Noch keine Kanäle freigegeben. Im Player-Menü aktivierbar."},
-        {"name": "yt_exp_sb_whitelist_channel", "value": "Diesen Kanal nicht überspringen"},
-        {"name": "yt_exp_sb_channel_whitelisted", "value": "Kanal zur SponsorBlock-Whitelist hinzugefügt"},
-        {"name": "yt_exp_sb_channel_unwhitelisted", "value": "Kanal von der SponsorBlock-Whitelist entfernt"},
-        {"name": "yt_exp_sb_whitelist_remove", "value": "Entfernen"},
-        {"name": "yt_player_subtitle_primary", "value": "Primäre Untertitel"},
-        {"name": "yt_player_subtitle_secondary", "value": "Zweite Untertitel (zweisprachig)"},
-        {"name": "yt_player_subtitle_secondary_off", "value": "Zweite Untertitel aus"},
-        {"name": "yt_player_subtitle_quick_on", "value": "Untertitel einschalten"},
-        {"name": "yt_player_subtitle_label_auto_generated", "value": "%s (Automatisch erzeugt)"},
-        {"name": "yt_player_subtitle_label_auto_translated", "value": "%s (Automatisch übersetzt)"},
-        {"name": "yt_player_subtitle_error_rate_limited", "value": "Zu viele Untertitelanfragen, bitte später erneut versuchen"},
-        {"name": "yt_player_subtitle_error_unavailable", "value": "Untertitel sind derzeit nicht verfügbar"},
-        {"name": "yt_setting_subtitle_edge_style", "value": "Untertitel-Konturstil"},
-        {"name": "yt_subtitle_edge_outline_shadow", "value": "Kontur & Schatten"},
-        {"name": "yt_subtitle_edge_outline", "value": "Kontur"},
-        {"name": "yt_subtitle_edge_shadow", "value": "Schatten"},
-        {"name": "yt_subtitle_edge_none", "value": "Keine"},
-        {"name": "yt_setting_subtitle_bold", "value": "Fette Untertitel"},
-        {"name": "yt_setting_subtitle_bold_subtitle", "value": "Verbessert die Lesbarkeit in hellen Szenen"},
-        {"name": "yt_setting_subtitle_bg_opacity", "value": "Hintergrund-Deckkraft"},
-        {"name": "yt_setting_subtitle_offset_subtitle", "value": "Untertitel-Synchronisation feinjustieren (-5s bis +5s)"},
-        {"name": "yt_setting_subtitle_offset_reset", "value": "Zurücksetzen"},
-        {"name": "yt_subtitle_preview_primary", "value": "Dies ist eine Vorschau des Untertitelstils"},
-        {"name": "yt_subtitle_preview_secondary", "value": "Bilingual secondary subtitle preview"}
+        {
+            "name": "yt_cookie_verify_success",
+            "value": "Cookie bestätigt."
+        },
+        {
+            "name": "yt_local_import_partial",
+            "value": "%1$d Datei(en) importiert; %2$d fehlgeschlagen."
+        },
+        {
+            "name": "yt_recovery_failed",
+            "value": "Der Vorgang konnte nicht abgeschlossen werden. Bitte erneut versuchen."
+        },
+        {
+            "name": "yt_proxy_applying",
+            "value": "Proxy wird angewendet…"
+        },
+        {
+            "name": "yt_exp_sb_skip_manual",
+            "value": "%s überspringen"
+        },
+        {
+            "name": "yt_exp_sb_jump_highlight",
+            "value": "Zum Highlight springen"
+        },
+        {
+            "name": "yt_action_sleep_timer_off",
+            "value": "Timer aus"
+        },
+        {
+            "name": "yt_action_play_next",
+            "value": "Als Nächstes"
+        },
+        {
+            "name": "yt_action_add_to_queue",
+            "value": "Zur Warteschlange"
+        },
+        {
+            "name": "yt_action_undo",
+            "value": "Rückgängig"
+        },
+        {
+            "name": "yt_action_save",
+            "value": "Speichern"
+        },
+        {
+            "name": "yt_queue_loop_none",
+            "value": "Kein Loop"
+        },
+        {
+            "name": "yt_queue_loop_all",
+            "value": "Alle wiederholen"
+        },
+        {
+            "name": "yt_queue_loop_one",
+            "value": "Einzeln wiederholen"
+        },
+        {
+            "name": "yt_queue_shuffle",
+            "value": "Zufall"
+        },
+        {
+            "name": "yt_queue_shuffle_on",
+            "value": "Zufallswiedergabe aktiviert"
+        },
+        {
+            "name": "yt_queue_shuffle_off",
+            "value": "Zufallswiedergabe deaktiviert"
+        },
+        {
+            "name": "yt_queue_save_as_playlist",
+            "value": "Als Playlist"
+        },
+        {
+            "name": "yt_queue_save_sheet_title",
+            "value": "Warteschlange als lokale Playlist speichern"
+        },
+        {
+            "name": "yt_queue_saved_toast",
+            "value": "Als lokale Playlist gespeichert"
+        },
+        {
+            "name": "yt_queue_removed_item",
+            "value": "Aus Warteschlange entfernt"
+        },
+        {
+            "name": "yt_toast_play_next_added",
+            "value": "Wird als Nächstes abgespielt"
+        },
+        {
+            "name": "yt_toast_added_to_queue",
+            "value": "Zur Warteschlange hinzugefügt"
+        },
+        {
+            "name": "yt_toast_already_in_queue",
+            "value": "Bereits in der Warteschlange"
+        },
+        {
+            "name": "yt_toast_already_playing",
+            "value": "Dieses Video wird bereits abgespielt"
+        },
+        {
+            "name": "yt_queue_local_mode_incompatible",
+            "value": "Lokale und Online-Videos können nicht gemischt werden"
+        },
+        {
+            "name": "yt_queue_local_playlist",
+            "value": "Lokale Playlist"
+        },
+        {
+            "name": "yt_queue_current_video",
+            "value": "Aktuelles Video"
+        },
+        {
+            "name": "yt_queue_video_count",
+            "value": "%d Videos in der Warteschlange"
+        },
+        {
+            "name": "yt_section_audio_enhance",
+            "value": "Audioverbesserung"
+        },
+        {
+            "name": "yt_playback_audio_normalize",
+            "value": "Lautheitsnormalisierung"
+        },
+        {
+            "name": "yt_playback_audio_normalize_subtitle",
+            "value": "Lautstärke während der Wiedergabe automatisch ausgleichen"
+        },
+        {
+            "name": "yt_playback_audio_delay",
+            "value": "Audioverzögerung"
+        },
+        {
+            "name": "yt_playback_audio_delay_subtitle",
+            "value": "Audio-Video-Sync für Bluetooth oder Lautsprecher anpassen (-1000 bis +1000ms)"
+        },
+        {
+            "name": "yt_playback_audio_delay_reset",
+            "value": "Zurücksetzen"
+        },
+        {
+            "name": "yt_player_audio_settings",
+            "value": "Audioeinstellungen"
+        },
+        {
+            "name": "yt_player_jump_ahead",
+            "value": "Vorspringen"
+        },
+        {
+            "name": "yt_player_chapters_and_segments",
+            "value": "Kapitel & Segmente"
+        },
+        {
+            "name": "yt_exp_sb_segments_title",
+            "value": "SponsorBlock-Segmente"
+        },
+        {
+            "name": "yt_exp_sb_jump_to_end",
+            "value": "Zum Ende"
+        },
+        {
+            "name": "yt_exp_sb_whitelist",
+            "value": "Freigegebene Kanäle"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_empty",
+            "value": "Noch keine Kanäle freigegeben. Im Player-Menü aktivierbar."
+        },
+        {
+            "name": "yt_exp_sb_whitelist_channel",
+            "value": "Diesen Kanal nicht überspringen"
+        },
+        {
+            "name": "yt_exp_sb_channel_whitelisted",
+            "value": "Kanal zur SponsorBlock-Whitelist hinzugefügt"
+        },
+        {
+            "name": "yt_exp_sb_channel_unwhitelisted",
+            "value": "Kanal von der SponsorBlock-Whitelist entfernt"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_remove",
+            "value": "Entfernen"
+        },
+        {
+            "name": "yt_player_subtitle_primary",
+            "value": "Primäre Untertitel"
+        },
+        {
+            "name": "yt_player_subtitle_secondary",
+            "value": "Zweite Untertitel (zweisprachig)"
+        },
+        {
+            "name": "yt_player_subtitle_secondary_off",
+            "value": "Zweite Untertitel aus"
+        },
+        {
+            "name": "yt_player_subtitle_quick_on",
+            "value": "Untertitel einschalten"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_generated",
+            "value": "%s (Automatisch erzeugt)"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_translated",
+            "value": "%s (Automatisch übersetzt)"
+        },
+        {
+            "name": "yt_player_subtitle_error_rate_limited",
+            "value": "Zu viele Untertitelanfragen, bitte später erneut versuchen"
+        },
+        {
+            "name": "yt_player_subtitle_error_unavailable",
+            "value": "Untertitel sind derzeit nicht verfügbar"
+        },
+        {
+            "name": "yt_setting_subtitle_edge_style",
+            "value": "Untertitel-Konturstil"
+        },
+        {
+            "name": "yt_subtitle_edge_outline_shadow",
+            "value": "Kontur & Schatten"
+        },
+        {
+            "name": "yt_subtitle_edge_outline",
+            "value": "Kontur"
+        },
+        {
+            "name": "yt_subtitle_edge_shadow",
+            "value": "Schatten"
+        },
+        {
+            "name": "yt_subtitle_edge_none",
+            "value": "Keine"
+        },
+        {
+            "name": "yt_setting_subtitle_bold",
+            "value": "Fette Untertitel"
+        },
+        {
+            "name": "yt_setting_subtitle_bold_subtitle",
+            "value": "Verbessert die Lesbarkeit in hellen Szenen"
+        },
+        {
+            "name": "yt_setting_subtitle_bg_opacity",
+            "value": "Hintergrund-Deckkraft"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_subtitle",
+            "value": "Untertitel-Synchronisation feinjustieren (-5s bis +5s)"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_reset",
+            "value": "Zurücksetzen"
+        },
+        {
+            "name": "yt_subtitle_preview_primary",
+            "value": "Dies ist eine Vorschau des Untertitelstils"
+        },
+        {
+            "name": "yt_subtitle_preview_secondary",
+            "value": "Bilingual secondary subtitle preview"
+        },
+        {
+            "name": "yt_player_stats_for_nerds",
+            "value": "Statistiken für Nerds"
+        },
+        {
+            "name": "yt_action_copy",
+            "value": "Kopieren"
+        },
+        {
+            "name": "yt_stats_transport",
+            "value": "Übertragung"
+        },
+        {
+            "name": "yt_stats_hwdec",
+            "value": "Hardware-Dekodierung"
+        },
+        {
+            "name": "yt_stats_sw_decode",
+            "value": "Software"
+        },
+        {
+            "name": "yt_stats_color",
+            "value": "Farbe / Pixel"
+        },
+        {
+            "name": "yt_stats_av_sync",
+            "value": "A/V-Sync"
+        },
+        {
+            "name": "yt_stats_audio_format",
+            "value": "Audioformat"
+        },
+        {
+            "name": "yt_stats_audio_fx",
+            "value": "Audio-FX"
+        },
+        {
+            "name": "yt_stats_none",
+            "value": "Keine"
+        },
+        {
+            "name": "yt_stats_transport_direct",
+            "value": "Direkt"
+        },
+        {
+            "name": "yt_stats_transport_local",
+            "value": "Lokal"
+        },
+        {
+            "name": "yt_exp_hm_title",
+            "value": "Heatmap & Zu Highlight springen"
+        },
+        {
+            "name": "yt_exp_hm_desc",
+            "value": "Zeigt die Meistgespielt-Kurve über der Fortschrittsleiste und schlägt nach dem Vorspulen den nächsten Höhepunkt vor."
+        },
+        {
+            "name": "yt_exp_hm_show_graph",
+            "value": "Fortschrittsleisten-Heatmap"
+        },
+        {
+            "name": "yt_exp_hm_show_graph_desc",
+            "value": "Meistgespielt-Kurve über der Zeitleiste anzeigen"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead",
+            "value": "Sprung-Hinweis beim Vorspulen"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead_desc",
+            "value": "Nach dem Vorspulen einen Sprung zum nächsten Höhepunkt vorschlagen"
+        },
+        {
+            "name": "yt_exp_hm_footer",
+            "value": "Nutzt YouTubes native Meistgespielt-Daten; nur aktiv, wenn das Video Heatmap-Daten bereitstellt."
+        }
     ]
 }

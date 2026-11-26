@@ -137,23 +137,7 @@ export struct OptionsPlaybackPage {
                 this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
                   cfg.audioNormalizeEnabled = val;
                 });
-                PlayerSession.getInstance().applyAudioFilters(val, this.playbackConfig.skipSilenceEnabled);
-              }
-            })
-          }
-
-          ListItem() {
-            PlaybackToggleRow({
-              title: $r('app.string.yt_playback_skip_silence'),
-              subtitle: $r('app.string.yt_playback_skip_silence_subtitle'),
-              isOn: this.playbackConfig.skipSilenceEnabled,
-              themeColor: this.params.themeColor,
-              transparentBackground: true,
-              onChange: (val: boolean) => {
-                this.params.updatePlaybackConfig((cfg: PlaybackConfig) => {
-                  cfg.skipSilenceEnabled = val;
-                });
-                PlayerSession.getInstance().applyAudioFilters(this.playbackConfig.audioNormalizeEnabled, val);
+                PlayerSession.getInstance().applyAudioFilters(val);
               }
             })
           }

@@ -34,8 +34,27 @@ import {
   SubtitleTrack,
   SubtitleErrorKind,
   HeatmapPoint,
-  StoryboardInfo
+  StoryboardInfo,
+  PlaybackStats
 } from 'mediaservice';
+import {
+  StreamStatsLabels,
+  resolveStreamStatsLabels,
+  formatTransportSummary,
+  formatHwdec,
+  formatColorInfo,
+  formatFrameRateSummary,
+  formatAvSync,
+  getAvSyncSeverity,
+  formatDroppedFrames,
+  formatBufferSummary,
+  formatSpeedBps,
+  formatBitrateBps,
+  formatAudioChannelsShort,
+  formatAudioFxSummary,
+  buildDiagnosticReport,
+  copyDiagnosticsToClipboard
+} from '../StreamStatsFormatter';
 import { PlayerEnvironmentService } from '../PlayerEnvironmentService';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerSession } from '../../../common/PlayerSession';
@@ -196,6 +215,10 @@ export struct VideoPlayer {
   @State jumpAheadTargetSec: number | null = null;
   private jumpAheadTimerId: number = -1;
   @State showChaptersSheet: boolean = false;
+  /** In-player "Stats for Nerds" floating HUD overlay (persists across auto-hide & orientation). */
+  @State showStatsOverlay: boolean = false;
+  @State overlayStats: PlaybackStats | null = null;
+  private statsOverlayTimerId: number = -1;
   private lastSourceVideoId: string = '';
   @Prop @Watch('onIndexChange') curIndex: number = CommonConstants.CURINDEX_DEFAULT_NUM;
   @State surfaceWidth: number = CommonConstants.SURFACE_WIDTH;
@@ -289,7 +312,8 @@ export struct VideoPlayer {
   }
 
   private maybeShowJumpAhead(referenceSec: number): void {
-    if (this.curSource.isLive || this.isLocalMode || this.skipNotice !== null || this.heatmap.length === 0) {
+    const jumpEnabled = this.experimentalConfig.heatmapPluginEnabled && this.experimentalConfig.heatmapJumpAhead;
+    if (!jumpEnabled || this.curSource.isLive || this.isLocalMode || this.skipNotice !== null || this.heatmap.length === 0) {
       this.clearJumpAheadPill();
       return;
     }
@@ -770,8 +794,13 @@ export struct VideoPlayer {
     PlayerPresentation.onPlayerPageVisibility(isVisible);
 
     if (!isVisible) {
+      this.stopStatsOverlayPolling();
       this.resetTransientUi('page-hidden');
       return;
+    }
+
+    if (this.showStatsOverlay) {
+      this.startStatsOverlayPolling();
     }
 
     if (session.playerState === PlayerState.RELEASED) {
@@ -1203,7 +1232,9 @@ export struct VideoPlayer {
         const barH = this.bottomControlBarVpH > 0 ? this.bottomControlBarVpH : 60;
         clearance = Math.max(clearance, barH + SUBTITLE_BAR_GAP_VP);
       }
-      if (this.skipNotice !== null || this.jumpAheadTargetSec !== null) {
+      if (this.skipNotice !== null
+        || (this.experimentalConfig.heatmapPluginEnabled && this.experimentalConfig.heatmapJumpAhead
+          && this.jumpAheadTargetSec !== null)) {
         clearance = Math.max(clearance, this.overlayPillBottomVp() + OVERLAY_PILL_HEIGHT_VP + SUBTITLE_BAR_GAP_VP);
       }
     }
@@ -2759,6 +2790,7 @@ export struct VideoPlayer {
       count++;
     }
     count++; // 画面比例按钮常驻
+    count++; // 更多菜单（详细统计信息 / 停止播放）常驻
     return count;
   }
 
@@ -2915,7 +2947,8 @@ export struct VideoPlayer {
 
   @Builder
   JumpAheadLayer() {
-    if (this.jumpAheadTargetSec !== null && !this.skipNotice && !this.curSource.isLive && !this.hasError) {
+    if (this.experimentalConfig.heatmapPluginEnabled && this.experimentalConfig.heatmapJumpAhead
+      && this.jumpAheadTargetSec !== null && !this.skipNotice && !this.curSource.isLive && !this.hasError) {
       Column() {
         Row({ space: 4 }) {
           Row({ space: 6 }) {
@@ -3371,6 +3404,11 @@ export struct VideoPlayer {
       // 后代按钮（顶栏/进度条/菜单）不可见但仍可点到；BLOCK_DESCENDANTS 整棵子树禁用
       .hitTestBehavior(this.showControls ? HitTestMode.Transparent : HitTestMode.BLOCK_DESCENDANTS)
       .zIndex(CommonConstants.Z_INDEX_MAX)
+
+      // 4. 详细统计信息悬浮层（Stats for Nerds HUD：独立于控制层显隐与横竖屏，仅按钮可点）
+      if (this.showStatsOverlay) {
+        this.StatsForNerdsOverlay()
+      }
     }
     .width(CommonConstants.WIDTH_FULL_PERCENT)
     .height(CommonConstants.HEIGHT_FULL_PERCENT)
@@ -3465,6 +3503,324 @@ export struct VideoPlayer {
             })
         )
       )
+  }
+
+  private setStatsOverlayVisible(visible: boolean): void {
+    this.showStatsOverlay = visible;
+    if (visible) {
+      this.startStatsOverlayPolling();
+    } else {
+      this.stopStatsOverlayPolling();
+      this.overlayStats = null;
+    }
+    Logger.info(TAG, `Stats for Nerds overlay toggled visible=${visible}`);
+  }
+
+  private startStatsOverlayPolling(): void {
+    this.stopStatsOverlayPolling();
+    this.pollStatsOverlay();
+    this.statsOverlayTimerId = setInterval(() => {
+      this.pollStatsOverlay();
+    }, 500);
+  }
+
+  private stopStatsOverlayPolling(): void {
+    if (this.statsOverlayTimerId >= 0) {
+      clearInterval(this.statsOverlayTimerId);
+      this.statsOverlayTimerId = -1;
+    }
+  }
+
+  private pollStatsOverlay(): void {
+    if (!this.controller) {
+      return;
+    }
+    this.overlayStats = this.controller.getPlaybackStats();
+  }
+
+  private statsOverlayTopVp(): number {
+    if (this.showControls) {
+      return this.getControlTopPad() + CONTROL_SLOT_SIZE + 4;
+    }
+    return this.isFullLandscapeScreen
+      ? Math.max(12, this.playerControlAvoidTop + CONTROL_SAFE_GAP)
+      : 8;
+  }
+
+  private statsOverlayLeftVp(): number {
+    return this.isFullLandscapeScreen
+      ? Math.max(12, this.playerControlAvoidLeft + CONTROL_SAFE_GAP)
+      : 8;
+  }
+
+  private getStatsOverlayLabels(): StreamStatsLabels {
+    return resolveStreamStatsLabels(this.getUIContext().getHostContext()?.resourceManager);
+  }
+
+  private getOverlayVideoId(): string {
+    return (this.curSource.videoId || this.selectedVideo?.videoId || '').trim();
+  }
+
+  private hudIdTransportLine(): string {
+    const parts: string[] = [];
+    const vid: string = this.getOverlayVideoId();
+    if (vid.length > 0) {
+      parts.push(vid);
+    }
+    const transport: string = formatTransportSummary(
+      this.overlayStats ? this.overlayStats.transportKind : '',
+      this.vm.currentStreamEndpoint,
+      this.vm.currentVideoItag,
+      this.vm.currentAudioItag,
+      this.getStatsOverlayLabels()
+    );
+    if (transport.length > 0) {
+      parts.push(transport);
+    }
+    return parts.length > 0 ? parts.join(' · ') : '--';
+  }
+
+  private hudResFpsLine(): string {
+    const fpsStr: string = formatFrameRateSummary(
+      this.vm.frameRate,
+      this.overlayStats ? this.overlayStats.measuredFps : 0
+    );
+    if (this.vm.videoWidth > 0 && this.vm.videoHeight > 0) {
+      return fpsStr.length > 0
+        ? `${this.vm.videoWidth}×${this.vm.videoHeight} @ ${fpsStr}`
+        : `${this.vm.videoWidth}×${this.vm.videoHeight}`;
+    }
+    return fpsStr.length > 0 ? fpsStr : '--';
+  }
+
+  private hudVideoLine(): string {
+    const parts: string[] = [];
+    if (this.vm.videoCodec.length > 0) {
+      const br: string = formatBitrateBps(this.vm.videoBitRate);
+      parts.push(br.length > 0 ? `${this.vm.videoCodec} (${br})` : this.vm.videoCodec);
+    }
+    const hw: string = formatHwdec(this.vm.hwdec, this.getStatsOverlayLabels().softwareDecode);
+    if (hw.length > 0) {
+      parts.push(hw);
+    }
+    const color: string = formatColorInfo(
+      this.vm.pixelFormat,
+      this.vm.colorSpace,
+      this.vm.colorPrimaries,
+      this.vm.colorGamma
+    );
+    if (color.length > 0) {
+      parts.push(color);
+    }
+    return parts.length > 0 ? parts.join(' · ') : '--';
+  }
+
+  private hudAudioLine(): string {
+    const parts: string[] = [];
+    if (this.vm.audioCodec.length > 0) {
+      const br: string = formatBitrateBps(this.vm.audioBitRate);
+      parts.push(br.length > 0 ? `${this.vm.audioCodec} (${br})` : this.vm.audioCodec);
+    }
+    if (this.vm.audioSampleRate > 0) {
+      parts.push(`${(this.vm.audioSampleRate / 1000).toFixed(1)} kHz`);
+    }
+    const ch: string = formatAudioChannelsShort(this.vm.audioChannels, this.vm.audioChannelLayout);
+    if (ch.length > 0) {
+      parts.push(ch);
+    }
+    return parts.length > 0 ? parts.join(' · ') : '--';
+  }
+
+  private hudAvSyncText(): string {
+    return formatAvSync(this.overlayStats ? this.overlayStats.avSyncMs : undefined);
+  }
+
+  private hudAvSyncColor(): ResourceColor {
+    const severity = getAvSyncSeverity(this.overlayStats ? this.overlayStats.avSyncMs : undefined);
+    if (severity === 'bad') {
+      return '#FF5252';
+    }
+    if (severity === 'warn') {
+      return '#FFA726';
+    }
+    return '#E6FFFFFF';
+  }
+
+  private hudDroppedText(): string {
+    if (!this.overlayStats) {
+      return '0';
+    }
+    return formatDroppedFrames(
+      this.overlayStats.droppedFrames,
+      this.overlayStats.decoderDroppedFrames,
+      this.overlayStats.totalFrames
+    );
+  }
+
+  private hudBufferSpeedLine(): string {
+    const buf: string = this.overlayStats
+      ? formatBufferSummary(this.overlayStats.demuxerCacheDurationSec, this.overlayStats.bufferedBytes)
+      : '0.0 s';
+    const spd: string = formatSpeedBps(this.overlayStats ? (this.overlayStats.networkSpeedBps ?? 0) : 0);
+    return `${buf} · ${spd}`;
+  }
+
+  private hudAudioFxLine(): string {
+    return formatAudioFxSummary(
+      this.overlayStats ? this.overlayStats.activeAudioFilters : '',
+      this.playbackConfig.audioDelayMs,
+      this.getStatsOverlayLabels()
+    );
+  }
+
+  private copyOverlayDiagnostics(): void {
+    const liveStats: PlaybackStats = this.controller ? this.controller.getPlaybackStats() : {
+      cacheSpeedBps: 0,
+      networkSpeedBps: 0,
+      demuxerCacheDurationSec: 0,
+      droppedFrames: 0,
+      decoderDroppedFrames: 0,
+      totalFrames: 0,
+      avSyncMs: undefined,
+      measuredFps: 0,
+      bufferedBytes: 0,
+      activeAudioFilters: '',
+      transportKind: ''
+    };
+    const report: string = buildDiagnosticReport({
+      videoId: this.getOverlayVideoId(),
+      vm: this.vm,
+      stats: liveStats,
+      audioDelayMs: this.playbackConfig.audioDelayMs,
+      labels: this.getStatsOverlayLabels()
+    });
+    copyDiagnosticsToClipboard(this.getUIContext(), report, 'AVPlayer');
+  }
+
+  @Builder
+  StatsForNerdsOverlay() {
+    Column({ space: 2 }) {
+      // Header row: title + Copy button + Close button (buttons capture taps; card body passes through)
+      Row({ space: 4 }) {
+        Text($r('app.string.yt_player_stats_for_nerds'))
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+          .hitTestBehavior(HitTestMode.None)
+
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph($r('sys.symbol.doc_plaintext'))
+            .fontSize(13)
+            .fontColor(['#E6FFFFFF'])
+        }
+          .width(24)
+          .height(24)
+          .borderRadius(12)
+          .backgroundColor('#33FFFFFF')
+          .accessibilityText($r('app.string.yt_action_copy'))
+          .onClick(() => {
+            this.copyOverlayDiagnostics();
+          })
+
+        Stack({ alignContent: Alignment.Center }) {
+          SymbolGlyph($r('sys.symbol.xmark'))
+            .fontSize(13)
+            .fontColor(['#E6FFFFFF'])
+        }
+          .width(24)
+          .height(24)
+          .borderRadius(12)
+          .backgroundColor('#33FFFFFF')
+          .accessibilityText($r('app.string.yt_action_close'))
+          .onClick(() => {
+            this.setStatsOverlayVisible(false);
+          })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .margin({ bottom: 2 })
+      .hitTestBehavior(HitTestMode.None)
+
+      // Crisp 11fp stats rows (non-blocking body so video gestures keep working)
+      Column({ space: 2 }) {
+        Text(this.hudIdTransportLine())
+          .fontSize(11)
+          .lineHeight(14)
+          .fontColor('#E6FFFFFF')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        if (this.vm.videoWidth > 0 || (this.overlayStats !== null && this.overlayStats.measuredFps > 0.5)) {
+          Text(`Res ${this.hudResFpsLine()}`)
+            .fontSize(11)
+            .lineHeight(14)
+            .fontColor('#E6FFFFFF')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+          Text(`Vid ${this.hudVideoLine()}`)
+            .fontSize(11)
+            .lineHeight(14)
+            .fontColor('#E6FFFFFF')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+
+        if (this.vm.audioCodec.length > 0 || this.vm.audioSampleRate > 0) {
+          Text(`Aud ${this.hudAudioLine()}`)
+            .fontSize(11)
+            .lineHeight(14)
+            .fontColor('#E6FFFFFF')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+
+        Text() {
+          Span('A/V ')
+            .fontColor('#B3FFFFFF')
+          Span(this.hudAvSyncText())
+            .fontColor(this.hudAvSyncColor())
+            .fontWeight(getAvSyncSeverity(this.overlayStats ? this.overlayStats.avSyncMs : undefined) !== 'normal'
+              ? FontWeight.Bold : FontWeight.Normal)
+          Span(` · Drop ${this.hudDroppedText()}`)
+            .fontColor('#E6FFFFFF')
+        }
+          .fontSize(11)
+          .lineHeight(14)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        Text(`Buf ${this.hudBufferSpeedLine()}`)
+          .fontSize(11)
+          .lineHeight(14)
+          .fontColor('#E6FFFFFF')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        if (this.hudAudioFxLine().length > 0) {
+          Text(`FX ${this.hudAudioFxLine()}`)
+            .fontSize(11)
+            .lineHeight(14)
+            .fontColor('#CCFFFFFF')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      .hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
+    }
+    .alignItems(HorizontalAlign.Start)
+    .constraintSize({ maxWidth: 270 })
+    .padding(10)
+    .borderRadius(10)
+    .backgroundColor('#B8000000')
+    .position({ x: this.statsOverlayLeftVp(), y: this.statsOverlayTopVp() })
+    .hitTestBehavior(HitTestMode.None)
+    .zIndex(CommonConstants.Z_INDEX_MAX + 0.2)
   }
 
   private menuSymbol(icon: Resource): SymbolGlyphModifier {
@@ -3575,6 +3931,18 @@ export struct VideoPlayer {
         .contentFont({ size: 14 })
         .labelFont({ size: 14, weight: FontWeight.Medium })
         .labelFontColor($r('sys.color.font_primary'))
+      MenuItem({
+        symbolStartIcon: this.menuSymbol($r('sys.symbol.info_circle')),
+        content: $r('app.string.yt_player_stats_for_nerds'),
+        endIcon: this.showStatsOverlay ? $r('sys.symbol.checkmark') : ''
+      })
+        .contentFontColor($r('sys.color.font_primary'))
+        .contentFont({ size: 14 })
+        .backgroundColor(this.showStatsOverlay
+          ? this.getSelectedMenuBackground() : Color.Transparent)
+        .onClick(() => {
+          this.setStatsOverlayVisible(!this.showStatsOverlay);
+        })
       // 显式停止：后台播放时通知栏只有「暂停」，用户真正想要的是彻底停掉。
       MenuItem({
         symbolStartIcon: this.menuSymbol($r('sys.symbol.xmark_circle')),
@@ -3596,6 +3964,55 @@ export struct VideoPlayer {
     // 嵌套展开：二级嵌在一级里，不侧滑另开层，避免立刻消失
     .subMenuExpandingMode(SubMenuExpandingMode.EMBEDDED_EXPAND)
     .width(260)
+  }
+
+  @Builder
+  MoreMenu() {
+    Menu() {
+      MenuItem({
+        symbolStartIcon: this.menuSymbol($r('sys.symbol.info_circle')),
+        content: $r('app.string.yt_player_stats_for_nerds'),
+        endIcon: this.showStatsOverlay ? $r('sys.symbol.checkmark') : ''
+      })
+        .contentFontColor($r('sys.color.font_primary'))
+        .contentFont({ size: 14 })
+        .backgroundColor(this.showStatsOverlay
+          ? this.getSelectedMenuBackground() : Color.Transparent)
+        .onClick(() => {
+          this.setStatsOverlayVisible(!this.showStatsOverlay);
+        })
+      if (this.canToggleChannelWhitelist()) {
+        MenuItem({
+          symbolStartIcon: this.menuSymbol($r('sys.symbol.key_shield_fill')),
+          content: $r('app.string.yt_exp_sb_whitelist_channel'),
+          endIcon: this.experimentalConfig.isChannelWhitelisted(this.currentChannelId())
+            ? $r('sys.symbol.checkmark') : ''
+        })
+          .contentFontColor($r('sys.color.font_primary'))
+          .contentFont({ size: 14 })
+          .backgroundColor(this.experimentalConfig.isChannelWhitelisted(this.currentChannelId())
+            ? this.getSelectedMenuBackground() : Color.Transparent)
+          .onClick(() => {
+            this.toggleCurrentChannelWhitelist();
+          })
+      }
+      MenuItem({
+        symbolStartIcon: this.menuSymbol($r('sys.symbol.xmark_circle')),
+        content: $r('app.string.yt_player_stop_playback')
+      })
+        .contentFontColor($r('sys.color.font_primary'))
+        .contentFont({ size: 14 })
+        .onClick(() => {
+          PlayerSession.getInstance().stopPlayback();
+          this.actionHub.closePage();
+        })
+    }
+    .onAppear(() => this.onControlMenuAppear())
+    .onDisAppear(() => this.onControlMenuDisappear())
+    .backgroundColor($r('app.color.yourtube_bg_surface'))
+    .borderRadius(12)
+    .menuItemDivider({ strokeWidth: LengthMetrics.vp(0.5), color: $r('sys.color.comp_divider') })
+    .width(240)
   }
 
   @Builder
@@ -3701,6 +4118,16 @@ export struct VideoPlayer {
         .textAlign(TextAlign.Center)
         .accessibilityText($r('app.string.yt_player_aspect_mode'))
         .bindMenu(this.AspectMenu())
+
+      Stack({ alignContent: Alignment.Center }) {
+        SymbolGlyph($r('sys.symbol.line_3_horizontal'))
+          .fontSize(CONTROL_ICON_SIZE)
+          .fontColor([Color.White])
+      }
+        .width(CONTROL_SLOT_SIZE)
+        .height(CONTROL_SLOT_SIZE)
+        .accessibilityText($r('app.string.yt_player_more_tools'))
+        .bindMenu(this.MoreMenu())
     }
     .alignItems(VerticalAlign.Center)
   }
@@ -3850,7 +4277,8 @@ export struct VideoPlayer {
 
           // 四合一进度条叠加层（热力图曲线 + SponsorBlock 彩色片段 + 章节刻度线；HitTestMode.None 不拦截拖动）
           SeekBarTrackOverlay({
-            heatmap: this.heatmap,
+            heatmap: (this.experimentalConfig.heatmapPluginEnabled && this.experimentalConfig.heatmapShowGraph)
+              ? this.heatmap : [],
             segments: this.sponsorSegments,
             chapters: this.chapters,
             durationSec: this.durationTime,
@@ -3972,6 +4400,7 @@ export struct VideoPlayer {
   }
 
   aboutToDisappear(): void {
+    this.stopStatsOverlayPolling();
     this.resetTransientUi('component-disappear');
     this.controller.removeStateListener(this.keepScreenListener);
     this.envService.release();

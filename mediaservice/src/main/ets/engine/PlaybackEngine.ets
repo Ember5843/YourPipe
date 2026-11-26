@@ -30,10 +30,17 @@ export interface PlaybackState {
   videoCodec: string;
   videoBitRate: number;
   frameRate: number;
+  hwdec: string;
+  pixelFormat: string;
+  colorSpace: string;
+  colorPrimaries: string;
+  colorGamma: string;
   audioCodec: string;
   audioBitRate: number;
   audioChannels: number;
   audioSampleRate: number;
+  audioFormat: string;
+  audioChannelLayout: string;
   fileSize: number;
   errorMsg: string;
   errorCategory?: PlaybackErrorCategory;
@@ -58,6 +65,18 @@ export interface PlaybackStats {
   droppedFrames: number;
   /** Frames dropped by the decoder. */
   decoderDroppedFrames: number;
+  /** Estimated total video frame number from MPV (`estimated-frame-number`). */
+  totalFrames: number;
+  /** Last A/V sync delta in milliseconds (`avsync` * 1000), or undefined when unavailable. */
+  avSyncMs: number | undefined;
+  /** Measured video filter output FPS (`estimated-vf-fps`). */
+  measuredFps: number;
+  /** Forward buffered bytes in MPV demuxer cache (`demuxer-cache-state/fw-bytes`). */
+  bufferedBytes: number;
+  /** Active MPV audio filter chain (`af`). */
+  activeAudioFilters: string;
+  /** Inferred transport protocol (`sabr` | `ypstream` | `hls` | `local` | `http` | ``). */
+  transportKind: string;
 }
 
 export interface EngineConfig {
@@ -82,10 +101,8 @@ export interface PlaybackEngine {
    * Load a source. audioUrl (optional) is an external audio track for split
    * HLS live/post-live playback (audio rendition playlist), mapped to mpv
    * audio-files; empty/omitted clears any previous external audio.
-   * isLiveHint (optional) conveys controller-known live status so audio filters
-   * such as silenceremove bypass live streams reliably.
    */
-  load(source: string, startPos: number, audioUrl?: string, isLiveHint?: boolean): boolean;
+  load(source: string, startPos: number, audioUrl?: string): boolean;
   play(): void;
   pause(): void;
   stop(): void;
@@ -93,8 +110,8 @@ export interface PlaybackEngine {
   setPlaybackSpeed(speed: number): void;
   /** 单文件循环（Shorts 单条循环）：loop-file=inf/no，跨 load 保持。 */
   setFileLoop(enabled: boolean): void;
-  /** 设置 MPV 原生音频滤镜链（响度均衡 + 跳静音，直播流自动旁路跳静音）。 */
-  setAudioFilters(normalize: boolean, skipSilence: boolean, isLive: boolean): void;
+  /** 设置 MPV 原生音频滤镜链（响度均衡）。 */
+  setAudioFilters(normalize: boolean): void;
   /** 设置 MPV 原生音画延迟（毫秒，自动钳制到 -1000..1000）。 */
   setAudioDelayMs(delayMs: number): void;
   setVolume(volume: number): void;

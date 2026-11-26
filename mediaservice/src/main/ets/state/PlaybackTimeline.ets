@@ -14,9 +14,13 @@ export function normalizePlaybackTimeline(state: PlaybackState, position: number
     containerFormat: state.containerFormat, videoWidth: state.videoWidth, videoHeight: state.videoHeight,
     videoStreamCount: state.videoStreamCount, audioStreamCount: state.audioStreamCount,
     subtitleStreamCount: state.subtitleStreamCount, videoCodec: state.videoCodec,
-    videoBitRate: state.videoBitRate, frameRate: state.frameRate, audioCodec: state.audioCodec,
-    audioBitRate: state.audioBitRate, audioChannels: state.audioChannels,
-    audioSampleRate: state.audioSampleRate, fileSize: state.fileSize, errorMsg: state.errorMsg,
+    videoBitRate: state.videoBitRate, frameRate: state.frameRate,
+    hwdec: state.hwdec, pixelFormat: state.pixelFormat, colorSpace: state.colorSpace,
+    colorPrimaries: state.colorPrimaries, colorGamma: state.colorGamma,
+    audioCodec: state.audioCodec, audioBitRate: state.audioBitRate,
+    audioChannels: state.audioChannels, audioSampleRate: state.audioSampleRate,
+    audioFormat: state.audioFormat, audioChannelLayout: state.audioChannelLayout,
+    fileSize: state.fileSize, errorMsg: state.errorMsg,
     errorCategory: state.errorCategory, errorCode: state.errorCode
   };
 }

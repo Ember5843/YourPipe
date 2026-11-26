@@ -1060,154 +1060,154 @@
             "name": "yt_player_subtitle_off",
             "value": "إيقاف الترجمة"
         },
-{
-    "name": "yt_player_subtitle_auto_translated",
-    "value": "ترجمة تلقائية"
-},
-{
-    "name": "yt_option_ai_translate",
-    "value": "ترجمة الترجمة بالذكاء الاصطناعي"
-},
-{
-    "name": "yt_option_ai_subtitle",
-    "value": "الترجمة بالذكاء الاصطناعي"
-},
-{
-    "name": "yt_ai_translate_engine",
-    "value": "محرك الترجمة"
-},
-{
-    "name": "yt_ai_translate_engine_gtx",
-    "value": "ترجمة Google المجانية"
-},
-{
-    "name": "yt_ai_translate_engine_llm",
-    "value": "نموذج LLM مخصص (متوافق مع OpenAI)"
-},
-{
-    "name": "yt_ai_translate_llm_section",
-    "value": "إعدادات LLM"
-},
-{
-    "name": "yt_ai_translate_base_url",
-    "value": "عنوان الواجهة (Base URL)"
-},
-{
-    "name": "yt_ai_translate_model",
-    "value": "اسم النموذج"
-},
-{
-    "name": "yt_ai_translate_api_key",
-    "value": "API Key"
-},
-{
-    "name": "yt_ai_translate_test",
-    "value": "اختبار الاتصال"
-},
-{
-    "name": "yt_ai_translate_testing",
-    "value": "جارٍ الاختبار…"
-},
-{
-    "name": "yt_ai_translate_test_ok",
-    "value": "تم الاتصال بنجاح"
-},
-{
-    "name": "yt_ai_translate_test_fail",
-    "value": "فشل الاتصال؛ تحقق من الإعدادات"
-},
-{
-    "name": "yt_ai_translate_display_section",
-    "value": "العرض"
-},
-{
-    "name": "yt_ai_translate_bilingual",
-    "value": "ثنائي اللغة"
-},
-{
-    "name": "yt_ai_translate_bilingual_subtitle",
-    "value": "إظهار النص الأصلي والترجمة معًا"
-},
-{
-    "name": "yt_ai_translate_note",
-    "value": "يُرسَل نص الترجمة إلى خدمة الترجمة المحددة. تتبع اللغة المستهدفة \"لغة ترجمة المحتوى\"."
-},
-{
-    "name": "yt_ai_translate_menu",
-    "value": "ترجمة ذكية"
-},
-{
-    "name": "yt_ai_translate_llm_not_configured",
-    "value": "يرجى إعداد LLM في الإعدادات أولًا"
-},
-{
-    "name": "yt_ai_translate_partial_fail",
-    "value": "فشلت ترجمة بعض الأسطر؛ تم الاحتفاظ بالنص الأصلي"
-},
-{
-    "name": "yt_ai_translate_failed",
-    "value": "فشلت ترجمة الترجمة؛ حاول لاحقًا"
-},
-{
-    "name": "yt_setting_system_ai_caption",
-    "value": "الترجمة الذكية للنظام"
-},
-{
-    "name": "yt_setting_system_ai_caption_subtitle",
-    "value": "يتعرف النظام على الصوت الجاري تشغيله في الوقت الفعلي (أجهزة مدعومة فقط، صيني/إنجليزي)"
-},
-{
-    "name": "yt_setting_system_ai_caption_source",
-    "value": "لغة مصدر الترجمة الذكية"
-},
-{
-    "name": "yt_setting_system_ai_caption_source_zh",
-    "value": "الصينية"
-},
-{
-    "name": "yt_asr_menu",
-    "value": "توليد الترجمة بالذكاء الاصطناعي"
-},
-{
-    "name": "yt_asr_phase_model",
-    "value": "تنزيل النموذج"
-},
-{
-    "name": "yt_asr_live_progress",
-    "value": "جارٍ التعرف المباشر…"
-},
-{
-    "name": "yt_asr_failed",
-    "value": "فشل توليد الترجمة؛ حاول لاحقًا"
-},
-{
-    "name": "yt_asr_model_section",
-    "value": "نموذج التعرف على الجهاز"
-},
-{
-    "name": "yt_asr_model_status_ready",
-    "value": "جاهز (تعرف فوري zh/en)"
-},
-{
-    "name": "yt_asr_model_status_none",
-    "value": "لم يتم التنزيل (حوالي 190MB، يُفضل Wi-Fi)"
-},
-{
-    "name": "yt_asr_model_downloading",
-    "value": "جارٍ التنزيل"
-},
-{
-    "name": "yt_asr_model_download",
-    "value": "تنزيل النموذج"
-},
-{
-    "name": "yt_asr_model_delete",
-    "value": "حذف النموذج"
-},
-{
-    "name": "yt_ai_action_cancel",
-    "value": "إلغاء"
-},
+        {
+            "name": "yt_player_subtitle_auto_translated",
+            "value": "ترجمة تلقائية"
+        },
+        {
+            "name": "yt_option_ai_translate",
+            "value": "ترجمة الترجمة بالذكاء الاصطناعي"
+        },
+        {
+            "name": "yt_option_ai_subtitle",
+            "value": "الترجمة بالذكاء الاصطناعي"
+        },
+        {
+            "name": "yt_ai_translate_engine",
+            "value": "محرك الترجمة"
+        },
+        {
+            "name": "yt_ai_translate_engine_gtx",
+            "value": "ترجمة Google المجانية"
+        },
+        {
+            "name": "yt_ai_translate_engine_llm",
+            "value": "نموذج LLM مخصص (متوافق مع OpenAI)"
+        },
+        {
+            "name": "yt_ai_translate_llm_section",
+            "value": "إعدادات LLM"
+        },
+        {
+            "name": "yt_ai_translate_base_url",
+            "value": "عنوان الواجهة (Base URL)"
+        },
+        {
+            "name": "yt_ai_translate_model",
+            "value": "اسم النموذج"
+        },
+        {
+            "name": "yt_ai_translate_api_key",
+            "value": "API Key"
+        },
+        {
+            "name": "yt_ai_translate_test",
+            "value": "اختبار الاتصال"
+        },
+        {
+            "name": "yt_ai_translate_testing",
+            "value": "جارٍ الاختبار…"
+        },
+        {
+            "name": "yt_ai_translate_test_ok",
+            "value": "تم الاتصال بنجاح"
+        },
+        {
+            "name": "yt_ai_translate_test_fail",
+            "value": "فشل الاتصال؛ تحقق من الإعدادات"
+        },
+        {
+            "name": "yt_ai_translate_display_section",
+            "value": "العرض"
+        },
+        {
+            "name": "yt_ai_translate_bilingual",
+            "value": "ثنائي اللغة"
+        },
+        {
+            "name": "yt_ai_translate_bilingual_subtitle",
+            "value": "إظهار النص الأصلي والترجمة معًا"
+        },
+        {
+            "name": "yt_ai_translate_note",
+            "value": "يُرسَل نص الترجمة إلى خدمة الترجمة المحددة. تتبع اللغة المستهدفة \"لغة ترجمة المحتوى\"."
+        },
+        {
+            "name": "yt_ai_translate_menu",
+            "value": "ترجمة ذكية"
+        },
+        {
+            "name": "yt_ai_translate_llm_not_configured",
+            "value": "يرجى إعداد LLM في الإعدادات أولًا"
+        },
+        {
+            "name": "yt_ai_translate_partial_fail",
+            "value": "فشلت ترجمة بعض الأسطر؛ تم الاحتفاظ بالنص الأصلي"
+        },
+        {
+            "name": "yt_ai_translate_failed",
+            "value": "فشلت ترجمة الترجمة؛ حاول لاحقًا"
+        },
+        {
+            "name": "yt_setting_system_ai_caption",
+            "value": "الترجمة الذكية للنظام"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_subtitle",
+            "value": "يتعرف النظام على الصوت الجاري تشغيله في الوقت الفعلي (أجهزة مدعومة فقط، صيني/إنجليزي)"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source",
+            "value": "لغة مصدر الترجمة الذكية"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source_zh",
+            "value": "الصينية"
+        },
+        {
+            "name": "yt_asr_menu",
+            "value": "توليد الترجمة بالذكاء الاصطناعي"
+        },
+        {
+            "name": "yt_asr_phase_model",
+            "value": "تنزيل النموذج"
+        },
+        {
+            "name": "yt_asr_live_progress",
+            "value": "جارٍ التعرف المباشر…"
+        },
+        {
+            "name": "yt_asr_failed",
+            "value": "فشل توليد الترجمة؛ حاول لاحقًا"
+        },
+        {
+            "name": "yt_asr_model_section",
+            "value": "نموذج التعرف على الجهاز"
+        },
+        {
+            "name": "yt_asr_model_status_ready",
+            "value": "جاهز (تعرف فوري zh/en)"
+        },
+        {
+            "name": "yt_asr_model_status_none",
+            "value": "لم يتم التنزيل (حوالي 190MB، يُفضل Wi-Fi)"
+        },
+        {
+            "name": "yt_asr_model_downloading",
+            "value": "جارٍ التنزيل"
+        },
+        {
+            "name": "yt_asr_model_download",
+            "value": "تنزيل النموذج"
+        },
+        {
+            "name": "yt_asr_model_delete",
+            "value": "حذف النموذج"
+        },
+        {
+            "name": "yt_ai_action_cancel",
+            "value": "إلغاء"
+        },
         {
             "name": "yt_player_chapters",
             "value": "الفصول"
@@ -3488,7 +3488,6 @@
             "name": "yt_option_clear_history_subtitle",
             "value": "حذف كل سجل المشاهدة المحلي والتقدّم"
         },
-
         {
             "name": "yt_toast_history_cleared",
             "value": "تم مسح سجل المشاهدة"
@@ -3604,8 +3603,7 @@
         {
             "name": "yt_home_mode_long",
             "value": "مقاطع طويلة"
-        }
-    ,
+        },
         {
             "name": "yt_download_pause",
             "value": "إيقاف مؤقت"
@@ -3845,8 +3843,7 @@
         {
             "name": "yt_translation_region",
             "value": "المنطقة"
-        }
-,
+        },
         {
             "name": "yt_exp_title",
             "value": "ميزات تجريبية"
@@ -4147,73 +4144,345 @@
             "name": "yt_update_later",
             "value": "لاحقًا"
         },
-        {"name": "yt_cookie_verify_success", "value": "تم التحقق من ملف تعريف الارتباط."},
-        {"name": "yt_local_import_partial", "value": "تم استيراد %1$d ملف؛ فشل %2$d."},
-        {"name": "yt_recovery_failed", "value": "تعذر إكمال العملية. يرجى المحاولة مجددًا."},
-        {"name": "yt_proxy_applying", "value": "جارٍ تطبيق الوكيل…"},
-        {"name": "yt_exp_sb_skip_manual", "value": "تخطي %s"},
-        {"name": "yt_exp_sb_jump_highlight", "value": "الانتقال إلى اللحظة المميزة"},
-        {"name": "yt_action_sleep_timer_off", "value": "إيقاف المؤقت"},
-        {"name": "yt_action_play_next", "value": "التشغيل تالياً"},
-        {"name": "yt_action_add_to_queue", "value": "إضافة إلى قائمة الانتظار"},
-        {"name": "yt_action_undo", "value": "تراجع"},
-        {"name": "yt_action_save", "value": "حفظ"},
-        {"name": "yt_queue_loop_none", "value": "بلا تكرار"},
-        {"name": "yt_queue_loop_all", "value": "تكرار القائمة"},
-        {"name": "yt_queue_loop_one", "value": "تكرار الفيديو"},
-        {"name": "yt_queue_shuffle", "value": "تبديل عشوائي"},
-        {"name": "yt_queue_shuffle_on", "value": "تم تفعيل التشغيل العشوائي"},
-        {"name": "yt_queue_shuffle_off", "value": "تم إيقاف التشغيل العشوائي"},
-        {"name": "yt_queue_save_as_playlist", "value": "حفظ كقائمة"},
-        {"name": "yt_queue_save_sheet_title", "value": "حفظ قائمة الانتظار كقائمة محلية"},
-        {"name": "yt_queue_saved_toast", "value": "تم الحفظ كقائمة محلية"},
-        {"name": "yt_queue_removed_item", "value": "تمت الإزالة من قائمة الانتظار"},
-        {"name": "yt_toast_play_next_added", "value": "سيتم التشغيل تالياً"},
-        {"name": "yt_toast_added_to_queue", "value": "تمت الإضافة إلى قائمة الانتظار"},
-        {"name": "yt_toast_already_in_queue", "value": "موجود بالفعل في قائمة الانتظار"},
-        {"name": "yt_toast_already_playing", "value": "هذا الفيديو قيد التشغيل حالياً"},
-        {"name": "yt_queue_local_mode_incompatible", "value": "لا يمكن خلط الفيديوهات المحلية وعبر الإنترنت"},
-        {"name": "yt_queue_local_playlist", "value": "قائمة تشغيل محلية"},
-        {"name": "yt_queue_current_video", "value": "الفيديو الحالي"},
-        {"name": "yt_queue_video_count", "value": "%d فيديو في قائمة الانتظار"},
-        {"name": "yt_section_audio_enhance", "value": "تحسين الصوت"},
-        {"name": "yt_playback_audio_normalize", "value": "موازنة مستوى الصوت"},
-        {"name": "yt_playback_audio_normalize_subtitle", "value": "موازنة مستوى الصوت تلقائياً أثناء التشغيل"},
-        {"name": "yt_playback_skip_silence", "value": "تخطي الصمت"},
-        {"name": "yt_playback_skip_silence_subtitle", "value": "تخطي فترات الصمت تلقائياً (معطّل في البث المباشر)"},
-        {"name": "yt_playback_audio_delay", "value": "تأخير الصوت"},
-        {"name": "yt_playback_audio_delay_subtitle", "value": "ضبط مزامنة الصوت والصورة للبلوتوث أو السماعات (-1000 إلى +1000 مللي ثانية)"},
-        {"name": "yt_playback_audio_delay_reset", "value": "إعادة ضبط"},
-        {"name": "yt_player_audio_settings", "value": "إعدادات الصوت"},
-        {"name": "yt_player_jump_ahead", "value": "القفز للأمام"},
-        {"name": "yt_player_chapters_and_segments", "value": "الفصول والمقاطع"},
-        {"name": "yt_exp_sb_segments_title", "value": "مقاطع SponsorBlock"},
-        {"name": "yt_exp_sb_jump_to_end", "value": "الانتقال للنهاية"},
-        {"name": "yt_exp_sb_whitelist", "value": "القنوات المستثناة"},
-        {"name": "yt_exp_sb_whitelist_empty", "value": "لا توجد قنوات مستثناة بعد. يمكنك إضافتها من قائمة المشغّل."},
-        {"name": "yt_exp_sb_whitelist_channel", "value": "عدم التخطي في هذه القناة"},
-        {"name": "yt_exp_sb_channel_whitelisted", "value": "تمت إضافة القناة إلى القائمة البيضاء لـ SponsorBlock"},
-        {"name": "yt_exp_sb_channel_unwhitelisted", "value": "تمت إزالة القناة من القائمة البيضاء لـ SponsorBlock"},
-        {"name": "yt_exp_sb_whitelist_remove", "value": "إزالة"},
-        {"name": "yt_player_subtitle_primary", "value": "الترجمة الأساسية"},
-        {"name": "yt_player_subtitle_secondary", "value": "ترجمة ثانوية (ثنائية اللغة)"},
-        {"name": "yt_player_subtitle_secondary_off", "value": "إيقاف الثانوية"},
-        {"name": "yt_player_subtitle_quick_on", "value": "تشغيل الترجمة"},
-        {"name": "yt_player_subtitle_label_auto_generated", "value": "%s (تلقائية)"},
-        {"name": "yt_player_subtitle_label_auto_translated", "value": "%s (مترجمة تلقائياً)"},
-        {"name": "yt_player_subtitle_error_rate_limited", "value": "تم تجاوز حد طلبات الترجمة، يرجى المحاولة لاحقاً"},
-        {"name": "yt_player_subtitle_error_unavailable", "value": "الترجمة غير متوفرة حالياً"},
-        {"name": "yt_setting_subtitle_edge_style", "value": "نمط حواف الترجمة"},
-        {"name": "yt_subtitle_edge_outline_shadow", "value": "حدود وظل"},
-        {"name": "yt_subtitle_edge_outline", "value": "حدود فقط"},
-        {"name": "yt_subtitle_edge_shadow", "value": "ظل فقط"},
-        {"name": "yt_subtitle_edge_none", "value": "بدون"},
-        {"name": "yt_setting_subtitle_bold", "value": "خط ترجمة عريض"},
-        {"name": "yt_setting_subtitle_bold_subtitle", "value": "تحسين وضوح الترجمة في المشاهد الساطعة"},
-        {"name": "yt_setting_subtitle_bg_opacity", "value": "عتامة خلفية الترجمة"},
-        {"name": "yt_setting_subtitle_offset_subtitle", "value": "ضبط مزامنة الترجمة بدقة (-5s إلى +5s)"},
-        {"name": "yt_setting_subtitle_offset_reset", "value": "إعادة ضبط"},
-        {"name": "yt_subtitle_preview_primary", "value": "معاينة نمط الترجمة"},
-        {"name": "yt_subtitle_preview_secondary", "value": "Bilingual secondary subtitle preview"}
+        {
+            "name": "yt_cookie_verify_success",
+            "value": "تم التحقق من ملف تعريف الارتباط."
+        },
+        {
+            "name": "yt_local_import_partial",
+            "value": "تم استيراد %1$d ملف؛ فشل %2$d."
+        },
+        {
+            "name": "yt_recovery_failed",
+            "value": "تعذر إكمال العملية. يرجى المحاولة مجددًا."
+        },
+        {
+            "name": "yt_proxy_applying",
+            "value": "جارٍ تطبيق الوكيل…"
+        },
+        {
+            "name": "yt_exp_sb_skip_manual",
+            "value": "تخطي %s"
+        },
+        {
+            "name": "yt_exp_sb_jump_highlight",
+            "value": "الانتقال إلى اللحظة المميزة"
+        },
+        {
+            "name": "yt_action_sleep_timer_off",
+            "value": "إيقاف المؤقت"
+        },
+        {
+            "name": "yt_action_play_next",
+            "value": "التشغيل تالياً"
+        },
+        {
+            "name": "yt_action_add_to_queue",
+            "value": "إضافة إلى قائمة الانتظار"
+        },
+        {
+            "name": "yt_action_undo",
+            "value": "تراجع"
+        },
+        {
+            "name": "yt_action_save",
+            "value": "حفظ"
+        },
+        {
+            "name": "yt_queue_loop_none",
+            "value": "بلا تكرار"
+        },
+        {
+            "name": "yt_queue_loop_all",
+            "value": "تكرار القائمة"
+        },
+        {
+            "name": "yt_queue_loop_one",
+            "value": "تكرار الفيديو"
+        },
+        {
+            "name": "yt_queue_shuffle",
+            "value": "تبديل عشوائي"
+        },
+        {
+            "name": "yt_queue_shuffle_on",
+            "value": "تم تفعيل التشغيل العشوائي"
+        },
+        {
+            "name": "yt_queue_shuffle_off",
+            "value": "تم إيقاف التشغيل العشوائي"
+        },
+        {
+            "name": "yt_queue_save_as_playlist",
+            "value": "حفظ كقائمة"
+        },
+        {
+            "name": "yt_queue_save_sheet_title",
+            "value": "حفظ قائمة الانتظار كقائمة محلية"
+        },
+        {
+            "name": "yt_queue_saved_toast",
+            "value": "تم الحفظ كقائمة محلية"
+        },
+        {
+            "name": "yt_queue_removed_item",
+            "value": "تمت الإزالة من قائمة الانتظار"
+        },
+        {
+            "name": "yt_toast_play_next_added",
+            "value": "سيتم التشغيل تالياً"
+        },
+        {
+            "name": "yt_toast_added_to_queue",
+            "value": "تمت الإضافة إلى قائمة الانتظار"
+        },
+        {
+            "name": "yt_toast_already_in_queue",
+            "value": "موجود بالفعل في قائمة الانتظار"
+        },
+        {
+            "name": "yt_toast_already_playing",
+            "value": "هذا الفيديو قيد التشغيل حالياً"
+        },
+        {
+            "name": "yt_queue_local_mode_incompatible",
+            "value": "لا يمكن خلط الفيديوهات المحلية وعبر الإنترنت"
+        },
+        {
+            "name": "yt_queue_local_playlist",
+            "value": "قائمة تشغيل محلية"
+        },
+        {
+            "name": "yt_queue_current_video",
+            "value": "الفيديو الحالي"
+        },
+        {
+            "name": "yt_queue_video_count",
+            "value": "%d فيديو في قائمة الانتظار"
+        },
+        {
+            "name": "yt_section_audio_enhance",
+            "value": "تحسين الصوت"
+        },
+        {
+            "name": "yt_playback_audio_normalize",
+            "value": "موازنة مستوى الصوت"
+        },
+        {
+            "name": "yt_playback_audio_normalize_subtitle",
+            "value": "موازنة مستوى الصوت تلقائياً أثناء التشغيل"
+        },
+        {
+            "name": "yt_playback_audio_delay",
+            "value": "تأخير الصوت"
+        },
+        {
+            "name": "yt_playback_audio_delay_subtitle",
+            "value": "ضبط مزامنة الصوت والصورة للبلوتوث أو السماعات (-1000 إلى +1000 مللي ثانية)"
+        },
+        {
+            "name": "yt_playback_audio_delay_reset",
+            "value": "إعادة ضبط"
+        },
+        {
+            "name": "yt_player_audio_settings",
+            "value": "إعدادات الصوت"
+        },
+        {
+            "name": "yt_player_jump_ahead",
+            "value": "القفز للأمام"
+        },
+        {
+            "name": "yt_player_chapters_and_segments",
+            "value": "الفصول والمقاطع"
+        },
+        {
+            "name": "yt_exp_sb_segments_title",
+            "value": "مقاطع SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_jump_to_end",
+            "value": "الانتقال للنهاية"
+        },
+        {
+            "name": "yt_exp_sb_whitelist",
+            "value": "القنوات المستثناة"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_empty",
+            "value": "لا توجد قنوات مستثناة بعد. يمكنك إضافتها من قائمة المشغّل."
+        },
+        {
+            "name": "yt_exp_sb_whitelist_channel",
+            "value": "عدم التخطي في هذه القناة"
+        },
+        {
+            "name": "yt_exp_sb_channel_whitelisted",
+            "value": "تمت إضافة القناة إلى القائمة البيضاء لـ SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_channel_unwhitelisted",
+            "value": "تمت إزالة القناة من القائمة البيضاء لـ SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_remove",
+            "value": "إزالة"
+        },
+        {
+            "name": "yt_player_subtitle_primary",
+            "value": "الترجمة الأساسية"
+        },
+        {
+            "name": "yt_player_subtitle_secondary",
+            "value": "ترجمة ثانوية (ثنائية اللغة)"
+        },
+        {
+            "name": "yt_player_subtitle_secondary_off",
+            "value": "إيقاف الثانوية"
+        },
+        {
+            "name": "yt_player_subtitle_quick_on",
+            "value": "تشغيل الترجمة"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_generated",
+            "value": "%s (تلقائية)"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_translated",
+            "value": "%s (مترجمة تلقائياً)"
+        },
+        {
+            "name": "yt_player_subtitle_error_rate_limited",
+            "value": "تم تجاوز حد طلبات الترجمة، يرجى المحاولة لاحقاً"
+        },
+        {
+            "name": "yt_player_subtitle_error_unavailable",
+            "value": "الترجمة غير متوفرة حالياً"
+        },
+        {
+            "name": "yt_setting_subtitle_edge_style",
+            "value": "نمط حواف الترجمة"
+        },
+        {
+            "name": "yt_subtitle_edge_outline_shadow",
+            "value": "حدود وظل"
+        },
+        {
+            "name": "yt_subtitle_edge_outline",
+            "value": "حدود فقط"
+        },
+        {
+            "name": "yt_subtitle_edge_shadow",
+            "value": "ظل فقط"
+        },
+        {
+            "name": "yt_subtitle_edge_none",
+            "value": "بدون"
+        },
+        {
+            "name": "yt_setting_subtitle_bold",
+            "value": "خط ترجمة عريض"
+        },
+        {
+            "name": "yt_setting_subtitle_bold_subtitle",
+            "value": "تحسين وضوح الترجمة في المشاهد الساطعة"
+        },
+        {
+            "name": "yt_setting_subtitle_bg_opacity",
+            "value": "عتامة خلفية الترجمة"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_subtitle",
+            "value": "ضبط مزامنة الترجمة بدقة (-5s إلى +5s)"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_reset",
+            "value": "إعادة ضبط"
+        },
+        {
+            "name": "yt_subtitle_preview_primary",
+            "value": "معاينة نمط الترجمة"
+        },
+        {
+            "name": "yt_subtitle_preview_secondary",
+            "value": "Bilingual secondary subtitle preview"
+        },
+        {
+            "name": "yt_player_stats_for_nerds",
+            "value": "إحصاءات مفصلة"
+        },
+        {
+            "name": "yt_action_copy",
+            "value": "نسخ"
+        },
+        {
+            "name": "yt_stats_transport",
+            "value": "النقل"
+        },
+        {
+            "name": "yt_stats_hwdec",
+            "value": "فك التشفير بالعتاد"
+        },
+        {
+            "name": "yt_stats_sw_decode",
+            "value": "برمجي"
+        },
+        {
+            "name": "yt_stats_color",
+            "value": "الألوان / البكسل"
+        },
+        {
+            "name": "yt_stats_av_sync",
+            "value": "مزامنة الصوت والصورة"
+        },
+        {
+            "name": "yt_stats_audio_format",
+            "value": "تنسيق الصوت"
+        },
+        {
+            "name": "yt_stats_audio_fx",
+            "value": "مؤثرات الصوت"
+        },
+        {
+            "name": "yt_stats_none",
+            "value": "لا شيء"
+        },
+        {
+            "name": "yt_stats_transport_direct",
+            "value": "مباشر"
+        },
+        {
+            "name": "yt_stats_transport_local",
+            "value": "محلي"
+        },
+        {
+            "name": "yt_exp_hm_title",
+            "value": "خريطة التفاعل والقفز لأهم اللحظات"
+        },
+        {
+            "name": "yt_exp_hm_desc",
+            "value": "عرض منحنى المقاطع الأكثر إعادة فوق شريط التقدم واقتراح القفز إلى الذروة التالية بعد التقديم."
+        },
+        {
+            "name": "yt_exp_hm_show_graph",
+            "value": "خريطة التفاعل على شريط التقدم"
+        },
+        {
+            "name": "yt_exp_hm_show_graph_desc",
+            "value": "رسم منحنى المقاطع الأكثر إعادة فوق شريط التقدم"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead",
+            "value": "اقتراح القفز بعد التقديم"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead_desc",
+            "value": "اقتراح الانتقال إلى الذروة التالية بعد التقديم السريع"
+        },
+        {
+            "name": "yt_exp_hm_footer",
+            "value": "يستخدم بيانات YouTube الأصلية؛ يعمل فقط عند توفر بيانات خريطة التفاعل للفيديو."
+        }
     ]
 }

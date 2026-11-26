@@ -65,7 +65,6 @@ export default class EntryAbility extends UIAbility {
           mobileQuality: pb.mobileQuality,
           subtitleOffsetMs: pb.subtitleOffsetMs,
           audioNormalizeEnabled: pb.audioNormalizeEnabled,
-          skipSilenceEnabled: pb.skipSilenceEnabled,
           audioDelayMs: pb.audioDelayMs,
         };
         return snapshot;

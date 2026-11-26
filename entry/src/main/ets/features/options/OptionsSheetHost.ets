@@ -22,6 +22,7 @@ import { OptionsExperimentalPage } from './OptionsExperimentalPage';
 import { OptionsSponsorBlockPage } from './OptionsSponsorBlockPage';
 import { OptionsDeArrowPage } from './OptionsDeArrowPage';
 import { OptionsAiListPage } from './OptionsAiListPage';
+import { OptionsHeatmapPage } from './OptionsHeatmapPage';
 import { OptionsUpdatePage } from './OptionsUpdatePage';
 import { OptionsNetworkPage } from './OptionsNetworkPage';
 // [DISABLED] P3：import { OptionsAiTranslatePage } from './OptionsAiTranslatePage';
@@ -441,6 +442,17 @@ export struct OptionsSheetHost {
         onBack: () => { this.popOptionsPath(); }
       }) {
         OptionsAiListPage({
+          params: {
+            updateConfig: this.params.updateExperimentalConfig
+          }
+        })
+      }
+    } else if (name === 'experimental_heatmap') {
+      OptionsNavScaffold({
+        title: $r('app.string.yt_exp_hm_title'),
+        onBack: () => { this.popOptionsPath(); }
+      }) {
+        OptionsHeatmapPage({
           params: {
             updateConfig: this.params.updateExperimentalConfig
           }

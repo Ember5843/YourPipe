@@ -127,6 +127,20 @@ export struct OptionsExperimentalPage {
             },
             () => this.params.onNavigate('experimental_ailist')
           )
+          Divider().color($r('app.color.yourtube_divider')).margin({ left: 16, right: 16 })
+          this.PluginRow(
+            $r('sys.symbol.waveform'),
+            $r('app.string.yt_exp_hm_title'),
+            this.simpleStateSubtitle(this.cfg.heatmapPluginEnabled),
+            this.cfg.heatmapPluginEnabled,
+            (value: boolean) => {
+              logger.info(`heatmap plugin toggle enabled=${value}`);
+              this.params.updateConfig((cfg: ExperimentalConfig) => {
+                cfg.heatmapPluginEnabled = value;
+              });
+            },
+            () => this.params.onNavigate('experimental_heatmap')
+          )
         }
         .width('100%')
         .backgroundColor($r('app.color.yourtube_bg_surface_muted'))

@@ -30,6 +30,26 @@ import { StreamInfoRow } from './StreamInfoRow';
 import { DownloadManager } from '../../../common/DownloadManager';
 import { customAnimationUtil } from '../../../common/AnimationUtil';
 import { UIConfig } from '../../../common/AppState';
+import { PlaybackConfig } from '../../../common/PlaybackConfig';
+import {
+  StreamStatsLabels,
+  resolveStreamStatsLabels,
+  formatTransportSummary,
+  formatHwdec,
+  formatColorInfo,
+  formatFrameRateSummary,
+  formatAvSync,
+  getAvSyncSeverity,
+  formatDroppedFrames,
+  formatBufferSummary,
+  formatSpeedBps,
+  formatBitrateBps,
+  formatAudioFormatLine,
+  formatAudioChannelsShort,
+  formatAudioFxSummary,
+  buildDiagnosticReport,
+  copyDiagnosticsToClipboard
+} from '../StreamStatsFormatter';
 import { LanguageManager } from '../../../common/LanguageManager';
 import { ActionHub } from '../../../common/ActionHub';
 import { PlayerPresentation } from '../../../common/PlayerPresentation';
@@ -85,6 +105,7 @@ export struct VideoDetails {
         )
   @State channelInfoError: ResourceStr | null = null;
   @StorageLink('uiConfig') uiConfig: UIConfig = new UIConfig();
+  @StorageLink('playbackConfig') playbackConfig: PlaybackConfig = new PlaybackConfig();
   @StorageLink('experimentalConfig') experimentalConfig: ExperimentalConfig = new ExperimentalConfig();
   @StorageLink('subscriptions') subscriptions: SubscriptionUser[] = [];
   @Consume('actionHub') actionHub: ActionHub = new ActionHub();
@@ -100,6 +121,12 @@ export struct VideoDetails {
   @State statsBufferSamples: number[] = [];
   @State statsDropped: number = 0;
   @State statsDecoderDropped: number = 0;
+  @State statsTotalFrames: number = 0;
+  @State statsAvSyncMs: number | undefined = undefined;
+  @State statsMeasuredFps: number = 0;
+  @State statsBufferedBytes: number = 0;
+  @State statsActiveAf: string = '';
+  @State statsTransportKind: string = '';
   @State descSkeletonOpacity: number = 0.3;
   @State sleepTimerRemainingMinutes: number = 0;
   @State showSavePlaylistSheet: boolean = false;
@@ -281,12 +308,22 @@ export struct VideoDetails {
     this.sleepTimerRemainingMinutes = PlayerSession.getInstance().sleepTimerRemainingMinutes;
   }
 
-  private startStreamStatsPolling(): void {
-    this.stopStreamStatsPolling();
+  private resetStreamStatsState(): void {
     this.statsSpeedSamples = [];
     this.statsBufferSamples = [];
     this.statsDropped = 0;
     this.statsDecoderDropped = 0;
+    this.statsTotalFrames = 0;
+    this.statsAvSyncMs = undefined;
+    this.statsMeasuredFps = 0;
+    this.statsBufferedBytes = 0;
+    this.statsActiveAf = '';
+    this.statsTransportKind = '';
+  }
+
+  private startStreamStatsPolling(): void {
+    this.stopStreamStatsPolling();
+    this.resetStreamStatsState();
     logger.debug(`stream stats polling started videoId=${this.item.videoId}`);
     this.pollStreamStats();
     this.statsTimer = setInterval(() => { this.pollStreamStats(); }, 500);
@@ -303,18 +340,24 @@ export struct VideoDetails {
   private pollStreamStats(): void {
     const stats: PlaybackStats = PlayerSession.getInstance().controller.getPlaybackStats();
     // 连接速度用代理层实测网络吞吐；MPV cache-speed 在 loopback 代理下缓存一满即归零，不具参考性。
-    const speedSamples: number[] = [...this.statsSpeedSamples, stats.networkSpeedBps ?? 0];
+    const speedSamples: number[] = this.statsSpeedSamples.concat([stats.networkSpeedBps ?? 0]);
     if (speedSamples.length > 60) {
       speedSamples.shift();
     }
     this.statsSpeedSamples = speedSamples;
-    const bufferSamples: number[] = [...this.statsBufferSamples, stats.demuxerCacheDurationSec];
+    const bufferSamples: number[] = this.statsBufferSamples.concat([stats.demuxerCacheDurationSec]);
     if (bufferSamples.length > 60) {
       bufferSamples.shift();
     }
     this.statsBufferSamples = bufferSamples;
     this.statsDropped = stats.droppedFrames;
     this.statsDecoderDropped = stats.decoderDroppedFrames;
+    this.statsTotalFrames = stats.totalFrames;
+    this.statsAvSyncMs = stats.avSyncMs;
+    this.statsMeasuredFps = stats.measuredFps;
+    this.statsBufferedBytes = stats.bufferedBytes;
+    this.statsActiveAf = stats.activeAudioFilters;
+    this.statsTransportKind = stats.transportKind;
   }
 
   private currentStatsSpeed(): number {
@@ -325,15 +368,68 @@ export struct VideoDetails {
     return this.statsBufferSamples.length > 0 ? this.statsBufferSamples[this.statsBufferSamples.length - 1] : 0;
   }
 
-  private formatSpeed(bps: number): string {
-    if (bps >= 1024 * 1024) {
-      return `${(bps / (1024 * 1024)).toFixed(2)} MB/s`;
-    }
-    return `${(bps / 1024).toFixed(2)} KB/s`;
+  private getStatsLabels(): StreamStatsLabels {
+    return resolveStreamStatsLabels(this.getUIContext().getHostContext()?.resourceManager);
   }
 
-  private formatBufferSec(sec: number): string {
-    return `${sec.toFixed(1)} s`;
+  private getStreamTransportSummary(): string {
+    return formatTransportSummary(
+      this.statsTransportKind,
+      this.vm.currentStreamEndpoint,
+      this.vm.currentVideoItag,
+      this.vm.currentAudioItag,
+      this.getStatsLabels()
+    );
+  }
+
+  private getStreamHwdecSummary(): string {
+    return formatHwdec(this.vm.hwdec, this.getStatsLabels().softwareDecode);
+  }
+
+  private getStreamColorSummary(): string {
+    return formatColorInfo(
+      this.vm.pixelFormat,
+      this.vm.colorSpace,
+      this.vm.colorPrimaries,
+      this.vm.colorGamma
+    );
+  }
+
+  private getStreamFrameRateSummary(): string {
+    return formatFrameRateSummary(this.vm.frameRate, this.statsMeasuredFps);
+  }
+
+  private getStreamAudioFormatSummary(): string {
+    return formatAudioFormatLine(this.vm.audioFormat, this.vm.audioChannelLayout, this.vm.audioChannels);
+  }
+
+  private getStreamAvSyncColor(): ResourceColor {
+    const severity = getAvSyncSeverity(this.statsAvSyncMs);
+    if (severity === 'bad') {
+      return '#E53935';
+    }
+    if (severity === 'warn') {
+      return '#F59E0B';
+    }
+    return $r('app.color.yourtube_text_primary');
+  }
+
+  private getStreamAudioFxSummary(): string {
+    const labels: StreamStatsLabels = this.getStatsLabels();
+    const summary: string = formatAudioFxSummary(this.statsActiveAf, this.playbackConfig.audioDelayMs, labels);
+    return summary.length > 0 ? summary : labels.fxNone;
+  }
+
+  private copyStreamDiagnostics(): void {
+    const liveStats: PlaybackStats = PlayerSession.getInstance().controller.getPlaybackStats();
+    const report: string = buildDiagnosticReport({
+      videoId: this.item.videoId,
+      vm: this.vm,
+      stats: liveStats,
+      audioDelayMs: this.playbackConfig.audioDelayMs,
+      labels: this.getStatsLabels()
+    });
+    copyDiagnosticsToClipboard(this.getUIContext(), report, 'VideoDetails');
   }
 
   private formatSleepTimerRemaining(): string {
@@ -349,10 +445,7 @@ export struct VideoDetails {
     this.refreshAiListFlag();
     this.classifyStreamsForDownload();
     // 自动连播切到下一集时清掉旧视频的统计曲线，避免新旧样本混在同一图表里。
-    this.statsSpeedSamples = [];
-    this.statsBufferSamples = [];
-    this.statsDropped = 0;
-    this.statsDecoderDropped = 0;
+    this.resetStreamStatsState();
   }
 
   private onChannelIdentityChanged(): void {
@@ -520,22 +613,8 @@ export struct VideoDetails {
       || this.hasDislikeCount();
   }
 
-  private formatBitrate(bps: number): string {
-    if (bps >= 1000000) return `${(bps / 1000000).toFixed(2)} Mbps`;
-    if (bps >= 1000) return `${(bps / 1000).toFixed(0)} kbps`;
-    return `${bps} bps`;
-  }
-
   private formatFileSize(bytes: number): string {
     return formatBytes(bytes);
-  }
-
-  private formatChannels(ch: number): string {
-    if (ch === 1) return 'Mono (1.0)';
-    if (ch === 2) return 'Stereo (2.0)';
-    if (ch === 6) return '5.1';
-    if (ch === 8) return '7.1';
-    return `${ch} channels`;
   }
 
   @Builder
@@ -964,117 +1043,165 @@ export struct VideoDetails {
   /** 流信息内容（弹窗） */
   @Builder
   StreamInfoContent() {
-    Column({ space: 0 }) {
-      // ── 标题行 ──
-      Row() {
-        SymbolGlyph($r('sys.symbol.info_circle'))
-          .fontSize(16)
-          .fontColor([$r('app.color.yourtube_text_secondary')])
-        Text($r('app.string.yt_stream_info_title'))
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.yourtube_text_primary'))
-          .margin({ left: 6 })
+    Scroll() {
+      Column({ space: 0 }) {
+        // ── 标题行 ──
+        Row() {
+          SymbolGlyph($r('sys.symbol.info_circle'))
+            .fontSize(16)
+            .fontColor([$r('app.color.yourtube_text_secondary')])
+          Text($r('app.string.yt_stream_info_title'))
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.yourtube_text_primary'))
+            .margin({ left: 6 })
+          Blank()
+          Button() {
+            Row({ space: 4 }) {
+              SymbolGlyph($r('sys.symbol.doc_plaintext'))
+                .fontSize(13)
+                .fontColor([$r('app.color.yourtube_text_primary')])
+              Text($r('app.string.yt_action_copy'))
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.yourtube_text_primary'))
+            }
+          }
+          .height(28)
+          .padding({ left: 10, right: 10 })
+          .borderRadius(14)
+          .backgroundColor($r('app.color.yourtube_player_control_bg'))
+          .clickEffect(customAnimationUtil.isClickEffect(this.uiConfig))
+          .onClick(() => { this.copyStreamDiagnostics(); })
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .margin({ bottom: 10 })
+
+        // ── 容器与传输信息 ──
+        if (this.item.videoId.length > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stats_video_id'), value: this.item.videoId })
+        }
+        if (this.getStreamTransportSummary().length > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stats_transport'), value: this.getStreamTransportSummary() })
+        }
+        if (this.vm.containerFormat.length > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_container'), value: this.vm.containerFormat.toUpperCase() })
+        }
+        if (this.vm.mediaTitle.length > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_media_title'), value: this.vm.mediaTitle })
+        }
+        if (this.vm.durationTime > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_duration'), value: formatDurationHms(this.vm.durationTime) })
+        }
+        if (this.vm.fileSize > 0) {
+          StreamInfoRow({ label: $r('app.string.yt_stream_file_size'), value: this.formatFileSize(this.vm.fileSize) })
+        }
+
+        // ── 视频流 ──
+        if (this.vm.videoWidth > 0) {
+          Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
+          Text($r('app.string.yt_stream_video'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.yourtube_text_secondary'))
+            .margin({ bottom: 6 })
+          StreamInfoRow({ label: $r('app.string.yt_stream_resolution'), value: `${this.vm.videoWidth} × ${this.vm.videoHeight}` })
+          if (this.vm.videoCodec.length > 0) {
+            StreamInfoRow({ label: $r('app.string.yt_stream_codec'), value: this.vm.videoCodec })
+          }
+          StreamInfoRow({ label: $r('app.string.yt_stats_hwdec'), value: this.getStreamHwdecSummary() })
+          if (this.getStreamColorSummary().length > 0) {
+            StreamInfoRow({ label: $r('app.string.yt_stats_color'), value: this.getStreamColorSummary() })
+          }
+          if (this.vm.videoBitRate > 0) {
+            StreamInfoRow({ label: $r('app.string.yt_stream_bitrate'), value: formatBitrateBps(this.vm.videoBitRate) })
+          }
+          if (this.getStreamFrameRateSummary().length > 0) {
+            StreamInfoRow({ label: $r('app.string.yt_stream_frame_rate'), value: this.getStreamFrameRateSummary() })
+          }
+        }
+
+        // ── 音频流 ──
+        if (this.vm.audioCodec.length > 0 || this.vm.audioSampleRate > 0) {
+          Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
+          Text($r('app.string.yt_stream_audio'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.yourtube_text_secondary'))
+            .margin({ bottom: 6 })
+          if (this.vm.audioCodec.length > 0) {
+            StreamInfoRow({ label: $r('app.string.yt_stream_codec'), value: this.vm.audioCodec })
+          }
+          if (this.getStreamAudioFormatSummary().length > 0) {
+            StreamInfoRow({ label: $r('app.string.yt_stats_audio_format'), value: this.getStreamAudioFormatSummary() })
+          }
+          if (this.vm.audioBitRate > 0) {
+            StreamInfoRow({ label: $r('app.string.yt_stream_bitrate'), value: formatBitrateBps(this.vm.audioBitRate) })
+          }
+          if (this.vm.audioChannels > 0) {
+            StreamInfoRow({
+              label: $r('app.string.yt_stream_channels'),
+              value: formatAudioChannelsShort(this.vm.audioChannels, this.vm.audioChannelLayout)
+            })
+          }
+          if (this.vm.audioSampleRate > 0) {
+            StreamInfoRow({ label: $r('app.string.yt_stream_sample_rate'), value: `${(this.vm.audioSampleRate / 1000).toFixed(1)} kHz` })
+          }
+        }
+
+        // ── 播放统计（Stats for Nerds 风格实时数据）──
+        Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
+        Text($r('app.string.yt_stream_stats_title'))
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.yourtube_text_secondary'))
+          .margin({ bottom: 6 })
+        StreamInfoRow({ label: $r('app.string.yt_stats_conn_speed'), value: formatSpeedBps(this.currentStatsSpeed()) })
+        StatsBarGraph({
+          samples: this.statsSpeedSamples,
+          kind: 'speed',
+          referenceBps: this.vm.videoBitRate + this.vm.audioBitRate
+        })
+          .margin({ top: 4, bottom: 8 })
+        StreamInfoRow({
+          label: $r('app.string.yt_stats_buffer'),
+          value: formatBufferSummary(this.currentStatsBuffer(), this.statsBufferedBytes)
+        })
+        StatsBarGraph({
+          samples: this.statsBufferSamples,
+          kind: 'buffer'
+        })
+          .margin({ top: 4, bottom: 8 })
+        StreamInfoRow({
+          label: $r('app.string.yt_stats_av_sync'),
+          value: formatAvSync(this.statsAvSyncMs),
+          valueColor: this.getStreamAvSyncColor()
+        })
+        StreamInfoRow({
+          label: $r('app.string.yt_stats_dropped'),
+          value: formatDroppedFrames(this.statsDropped, this.statsDecoderDropped, this.statsTotalFrames)
+        })
+        StreamInfoRow({
+          label: $r('app.string.yt_stats_audio_fx'),
+          value: this.getStreamAudioFxSummary()
+        })
+
+        // ── 无数据占位 ──
+        if (this.vm.videoWidth === 0 && this.vm.audioCodec.length === 0 && this.vm.containerFormat.length === 0) {
+          Text($r('app.string.yt_stream_loading'))
+            .fontSize(13)
+            .fontColor($r('app.color.yourtube_text_hint'))
+            .margin({ top: 8 })
+        }
       }
       .width('100%')
-      .margin({ bottom: 10 })
-
-      // ── 容器信息 ──
-      if (this.item.videoId.length > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stats_video_id'), value: this.item.videoId })
-      }
-      if (this.vm.containerFormat.length > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stream_container'), value: this.vm.containerFormat.toUpperCase() })
-      }
-      if (this.vm.mediaTitle.length > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stream_media_title'), value: this.vm.mediaTitle })
-      }
-      if (this.vm.durationTime > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stream_duration'), value: formatDurationHms(this.vm.durationTime) })
-      }
-      if (this.vm.fileSize > 0) {
-        StreamInfoRow({ label: $r('app.string.yt_stream_file_size'), value: this.formatFileSize(this.vm.fileSize) })
-      }
-
-      // ── 视频流 ──
-      if (this.vm.videoWidth > 0) {
-        Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
-        Text($r('app.string.yt_stream_video'))
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.yourtube_text_secondary'))
-          .margin({ bottom: 6 })
-        StreamInfoRow({ label: $r('app.string.yt_stream_resolution'), value: `${this.vm.videoWidth} × ${this.vm.videoHeight}` })
-        if (this.vm.videoCodec.length > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_codec'), value: this.vm.videoCodec })
-        }
-        if (this.vm.videoBitRate > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_bitrate'), value: this.formatBitrate(this.vm.videoBitRate) })
-        }
-        if (this.vm.frameRate > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_frame_rate'), value: `${this.vm.frameRate.toFixed(2)} fps` })
-        }
-      }
-
-      // ── 音频流 ──
-      if (this.vm.audioCodec.length > 0 || this.vm.audioSampleRate > 0) {
-        Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
-        Text($r('app.string.yt_stream_audio'))
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.yourtube_text_secondary'))
-          .margin({ bottom: 6 })
-        if (this.vm.audioCodec.length > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_codec'), value: this.vm.audioCodec })
-        }
-        if (this.vm.audioBitRate > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_bitrate'), value: this.formatBitrate(this.vm.audioBitRate) })
-        }
-        if (this.vm.audioChannels > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_channels'), value: this.formatChannels(this.vm.audioChannels) })
-        }
-        if (this.vm.audioSampleRate > 0) {
-          StreamInfoRow({ label: $r('app.string.yt_stream_sample_rate'), value: `${(this.vm.audioSampleRate / 1000).toFixed(1)} kHz` })
-        }
-      }
-
-      // ── 播放统计（Stats for Nerds 风格实时数据）──
-      Divider().color($r('app.color.yourtube_divider')).margin({ top: 8, bottom: 8 })
-      Text($r('app.string.yt_stream_stats_title'))
-        .fontSize(13)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.yourtube_text_secondary'))
-        .margin({ bottom: 6 })
-      StreamInfoRow({ label: $r('app.string.yt_stats_conn_speed'), value: this.formatSpeed(this.currentStatsSpeed()) })
-      StatsBarGraph({
-        samples: this.statsSpeedSamples,
-        kind: 'speed',
-        referenceBps: this.vm.videoBitRate + this.vm.audioBitRate
-      })
-        .margin({ top: 4, bottom: 8 })
-      StreamInfoRow({ label: $r('app.string.yt_stats_buffer'), value: this.formatBufferSec(this.currentStatsBuffer()) })
-      StatsBarGraph({
-        samples: this.statsBufferSamples,
-        kind: 'buffer'
-      })
-        .margin({ top: 4, bottom: 8 })
-      StreamInfoRow({
-        label: $r('app.string.yt_stats_dropped'),
-        value: this.statsDropped === 0 && this.statsDecoderDropped === 0
-          ? '0'
-          : `${this.statsDropped} / ${this.statsDecoderDropped}`
-      })
-
-      // ── 无数据占位 ──
-      if (this.vm.videoWidth === 0 && this.vm.audioCodec.length === 0 && this.vm.containerFormat.length === 0) {
-        Text($r('app.string.yt_stream_loading'))
-          .fontSize(13)
-          .fontColor($r('app.color.yourtube_text_hint'))
-          .margin({ top: 8 })
-      }
+      .alignItems(HorizontalAlign.Start)
+      .padding({ left: 16, right: 16, top: 16, bottom: 24 })
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 16, bottom: 12 })
+    .edgeEffect(EdgeEffect.Spring)
+    .scrollBar(BarState.Off)
   }
 
   @Builder

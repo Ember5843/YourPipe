@@ -1060,154 +1060,154 @@
             "name": "yt_player_subtitle_off",
             "value": "關閉字幕"
         },
-{
-    "name": "yt_player_subtitle_auto_translated",
-    "value": "自動翻譯"
-},
-{
-    "name": "yt_option_ai_translate",
-    "value": "AI 字幕翻譯"
-},
-{
-    "name": "yt_option_ai_subtitle",
-    "value": "AI 字幕"
-},
-{
-    "name": "yt_ai_translate_engine",
-    "value": "翻譯引擎"
-},
-{
-    "name": "yt_ai_translate_engine_gtx",
-    "value": "Google 免費翻譯"
-},
-{
-    "name": "yt_ai_translate_engine_llm",
-    "value": "自訂 LLM（OpenAI 相容）"
-},
-{
-    "name": "yt_ai_translate_llm_section",
-    "value": "LLM 設定"
-},
-{
-    "name": "yt_ai_translate_base_url",
-    "value": "介面地址（Base URL）"
-},
-{
-    "name": "yt_ai_translate_model",
-    "value": "模型名稱"
-},
-{
-    "name": "yt_ai_translate_api_key",
-    "value": "API Key"
-},
-{
-    "name": "yt_ai_translate_test",
-    "value": "測試連線"
-},
-{
-    "name": "yt_ai_translate_testing",
-    "value": "測試中…"
-},
-{
-    "name": "yt_ai_translate_test_ok",
-    "value": "連線成功"
-},
-{
-    "name": "yt_ai_translate_test_fail",
-    "value": "連線失敗，請檢查設定"
-},
-{
-    "name": "yt_ai_translate_display_section",
-    "value": "顯示"
-},
-{
-    "name": "yt_ai_translate_bilingual",
-    "value": "雙語對照"
-},
-{
-    "name": "yt_ai_translate_bilingual_subtitle",
-    "value": "同時顯示原文與譯文"
-},
-{
-    "name": "yt_ai_translate_note",
-    "value": "字幕文本將傳送到所選翻譯服務。目標語言與「內容翻譯語言」一致。"
-},
-{
-    "name": "yt_ai_translate_menu",
-    "value": "AI 翻譯"
-},
-{
-    "name": "yt_ai_translate_llm_not_configured",
-    "value": "請先在設定中完成 LLM 設定"
-},
-{
-    "name": "yt_ai_translate_partial_fail",
-    "value": "部分字幕翻譯失敗，已保留原文"
-},
-{
-    "name": "yt_ai_translate_failed",
-    "value": "字幕翻譯失敗，請稍後重試"
-},
-{
-    "name": "yt_setting_system_ai_caption",
-    "value": "系統 AI 字幕"
-},
-{
-    "name": "yt_setting_system_ai_caption_subtitle",
-    "value": "由系統即時識別播放中的音訊（部分機型支援，中/英文）"
-},
-{
-    "name": "yt_setting_system_ai_caption_source",
-    "value": "AI 字幕源語言"
-},
-{
-    "name": "yt_setting_system_ai_caption_source_zh",
-    "value": "中文"
-},
-{
-    "name": "yt_asr_menu",
-    "value": "AI 生成字幕"
-},
-{
-    "name": "yt_asr_phase_model",
-    "value": "下載模型"
-},
-{
-    "name": "yt_asr_live_progress",
-    "value": "即時識別中…"
-},
-{
-    "name": "yt_asr_failed",
-    "value": "AI 生成字幕失敗，請稍後重試"
-},
-{
-    "name": "yt_asr_model_section",
-    "value": "端側識別模型"
-},
-{
-    "name": "yt_asr_model_status_ready",
-    "value": "已就緒（中英雙語串流識別）"
-},
-{
-    "name": "yt_asr_model_status_none",
-    "value": "未下載（約 190MB，建議 Wi-Fi 網絡）"
-},
-{
-    "name": "yt_asr_model_downloading",
-    "value": "下載中"
-},
-{
-    "name": "yt_asr_model_download",
-    "value": "下載模型"
-},
-{
-    "name": "yt_asr_model_delete",
-    "value": "刪除模型"
-},
-{
-    "name": "yt_ai_action_cancel",
-    "value": "取消"
-},
+        {
+            "name": "yt_player_subtitle_auto_translated",
+            "value": "自動翻譯"
+        },
+        {
+            "name": "yt_option_ai_translate",
+            "value": "AI 字幕翻譯"
+        },
+        {
+            "name": "yt_option_ai_subtitle",
+            "value": "AI 字幕"
+        },
+        {
+            "name": "yt_ai_translate_engine",
+            "value": "翻譯引擎"
+        },
+        {
+            "name": "yt_ai_translate_engine_gtx",
+            "value": "Google 免費翻譯"
+        },
+        {
+            "name": "yt_ai_translate_engine_llm",
+            "value": "自訂 LLM（OpenAI 相容）"
+        },
+        {
+            "name": "yt_ai_translate_llm_section",
+            "value": "LLM 設定"
+        },
+        {
+            "name": "yt_ai_translate_base_url",
+            "value": "介面地址（Base URL）"
+        },
+        {
+            "name": "yt_ai_translate_model",
+            "value": "模型名稱"
+        },
+        {
+            "name": "yt_ai_translate_api_key",
+            "value": "API Key"
+        },
+        {
+            "name": "yt_ai_translate_test",
+            "value": "測試連線"
+        },
+        {
+            "name": "yt_ai_translate_testing",
+            "value": "測試中…"
+        },
+        {
+            "name": "yt_ai_translate_test_ok",
+            "value": "連線成功"
+        },
+        {
+            "name": "yt_ai_translate_test_fail",
+            "value": "連線失敗，請檢查設定"
+        },
+        {
+            "name": "yt_ai_translate_display_section",
+            "value": "顯示"
+        },
+        {
+            "name": "yt_ai_translate_bilingual",
+            "value": "雙語對照"
+        },
+        {
+            "name": "yt_ai_translate_bilingual_subtitle",
+            "value": "同時顯示原文與譯文"
+        },
+        {
+            "name": "yt_ai_translate_note",
+            "value": "字幕文本將傳送到所選翻譯服務。目標語言與「內容翻譯語言」一致。"
+        },
+        {
+            "name": "yt_ai_translate_menu",
+            "value": "AI 翻譯"
+        },
+        {
+            "name": "yt_ai_translate_llm_not_configured",
+            "value": "請先在設定中完成 LLM 設定"
+        },
+        {
+            "name": "yt_ai_translate_partial_fail",
+            "value": "部分字幕翻譯失敗，已保留原文"
+        },
+        {
+            "name": "yt_ai_translate_failed",
+            "value": "字幕翻譯失敗，請稍後重試"
+        },
+        {
+            "name": "yt_setting_system_ai_caption",
+            "value": "系統 AI 字幕"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_subtitle",
+            "value": "由系統即時識別播放中的音訊（部分機型支援，中/英文）"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source",
+            "value": "AI 字幕源語言"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source_zh",
+            "value": "中文"
+        },
+        {
+            "name": "yt_asr_menu",
+            "value": "AI 生成字幕"
+        },
+        {
+            "name": "yt_asr_phase_model",
+            "value": "下載模型"
+        },
+        {
+            "name": "yt_asr_live_progress",
+            "value": "即時識別中…"
+        },
+        {
+            "name": "yt_asr_failed",
+            "value": "AI 生成字幕失敗，請稍後重試"
+        },
+        {
+            "name": "yt_asr_model_section",
+            "value": "端側識別模型"
+        },
+        {
+            "name": "yt_asr_model_status_ready",
+            "value": "已就緒（中英雙語串流識別）"
+        },
+        {
+            "name": "yt_asr_model_status_none",
+            "value": "未下載（約 190MB，建議 Wi-Fi 網絡）"
+        },
+        {
+            "name": "yt_asr_model_downloading",
+            "value": "下載中"
+        },
+        {
+            "name": "yt_asr_model_download",
+            "value": "下載模型"
+        },
+        {
+            "name": "yt_asr_model_delete",
+            "value": "刪除模型"
+        },
+        {
+            "name": "yt_ai_action_cancel",
+            "value": "取消"
+        },
         {
             "name": "yt_setting_home_layout",
             "value": "首頁佈局"
@@ -3488,7 +3488,6 @@
             "name": "yt_option_clear_history_subtitle",
             "value": "刪除全部本機觀看記錄與播放進度"
         },
-
         {
             "name": "yt_toast_history_cleared",
             "value": "觀看記錄已清除"
@@ -3604,8 +3603,7 @@
         {
             "name": "yt_home_mode_long",
             "value": "長影片"
-        }
-    ,
+        },
         {
             "name": "yt_download_pause",
             "value": "暫停"
@@ -3845,8 +3843,7 @@
         {
             "name": "yt_translation_region",
             "value": "區域（Region）"
-        }
-,
+        },
         {
             "name": "yt_exp_title",
             "value": "實驗性功能"
@@ -4147,73 +4144,345 @@
             "name": "yt_update_later",
             "value": "稍後"
         },
-        {"name": "yt_cookie_verify_success", "value": "Cookie 驗證成功"},
-        {"name": "yt_local_import_partial", "value": "已匯入 %1$d 個檔案，%2$d 個失敗"},
-        {"name": "yt_recovery_failed", "value": "操作未能全部完成，請重試"},
-        {"name": "yt_proxy_applying", "value": "正在套用代理…"},
-        {"name": "yt_exp_sb_skip_manual", "value": "跳過 %s"},
-        {"name": "yt_exp_sb_jump_highlight", "value": "跳至精彩處"},
-        {"name": "yt_action_sleep_timer_off", "value": "關閉定時"},
-        {"name": "yt_action_play_next", "value": "下一首播放"},
-        {"name": "yt_action_add_to_queue", "value": "加入播放佇列"},
-        {"name": "yt_action_undo", "value": "復原"},
-        {"name": "yt_action_save", "value": "儲存"},
-        {"name": "yt_queue_loop_none", "value": "不循環"},
-        {"name": "yt_queue_loop_all", "value": "清單循環"},
-        {"name": "yt_queue_loop_one", "value": "單曲循環"},
-        {"name": "yt_queue_shuffle", "value": "隨機播放"},
-        {"name": "yt_queue_shuffle_on", "value": "已開啟隨機播放"},
-        {"name": "yt_queue_shuffle_off", "value": "已關閉隨機播放"},
-        {"name": "yt_queue_save_as_playlist", "value": "存為清單"},
-        {"name": "yt_queue_save_sheet_title", "value": "另存為本地播放清單"},
-        {"name": "yt_queue_saved_toast", "value": "已儲存為本地播放清單"},
-        {"name": "yt_queue_removed_item", "value": "已從佇列移除"},
-        {"name": "yt_toast_play_next_added", "value": "已設為下一首播放"},
-        {"name": "yt_toast_added_to_queue", "value": "已加入播放佇列"},
-        {"name": "yt_toast_already_in_queue", "value": "已在播放佇列中"},
-        {"name": "yt_toast_already_playing", "value": "目前正在播放此影片"},
-        {"name": "yt_queue_local_mode_incompatible", "value": "本地播放佇列與線上影片不相容"},
-        {"name": "yt_queue_local_playlist", "value": "本地播放清單"},
-        {"name": "yt_queue_current_video", "value": "目前影片"},
-        {"name": "yt_queue_video_count", "value": "佇列中 %d 部影片"},
-        {"name": "yt_section_audio_enhance", "value": "音訊增強"},
-        {"name": "yt_playback_audio_normalize", "value": "響度均衡"},
-        {"name": "yt_playback_audio_normalize_subtitle", "value": "自動平衡播放音量，減少忽大忽小"},
-        {"name": "yt_playback_skip_silence", "value": "略過靜音"},
-        {"name": "yt_playback_skip_silence_subtitle", "value": "自動略過空白靜音片段（直播不生效）"},
-        {"name": "yt_playback_audio_delay", "value": "音畫延遲"},
-        {"name": "yt_playback_audio_delay_subtitle", "value": "調整藍牙耳機或喇叭的音畫同步（-1000 至 +1000ms）"},
-        {"name": "yt_playback_audio_delay_reset", "value": "重設"},
-        {"name": "yt_player_audio_settings", "value": "音訊設定"},
-        {"name": "yt_player_jump_ahead", "value": "跳至高能處"},
-        {"name": "yt_player_chapters_and_segments", "value": "章節與片段"},
-        {"name": "yt_exp_sb_segments_title", "value": "SponsorBlock 片段"},
-        {"name": "yt_exp_sb_jump_to_end", "value": "跳至結尾"},
-        {"name": "yt_exp_sb_whitelist", "value": "頻道白名單"},
-        {"name": "yt_exp_sb_whitelist_empty", "value": "尚無白名單頻道，可在播放頁選單中為目前頻道開啟免略過"},
-        {"name": "yt_exp_sb_whitelist_channel", "value": "本頻道免略過"},
-        {"name": "yt_exp_sb_channel_whitelisted", "value": "已將本頻道加入 SponsorBlock 白名單"},
-        {"name": "yt_exp_sb_channel_unwhitelisted", "value": "已將本頻道移出 SponsorBlock 白名單"},
-        {"name": "yt_exp_sb_whitelist_remove", "value": "移除"},
-        {"name": "yt_player_subtitle_primary", "value": "主字幕"},
-        {"name": "yt_player_subtitle_secondary", "value": "雙語副字幕"},
-        {"name": "yt_player_subtitle_secondary_off", "value": "關閉副字幕"},
-        {"name": "yt_player_subtitle_quick_on", "value": "開啟字幕"},
-        {"name": "yt_player_subtitle_label_auto_generated", "value": "%s（自動產生）"},
-        {"name": "yt_player_subtitle_label_auto_translated", "value": "%s（自動翻譯）"},
-        {"name": "yt_player_subtitle_error_rate_limited", "value": "字幕請求過於頻繁，請稍後再試"},
-        {"name": "yt_player_subtitle_error_unavailable", "value": "目前字幕暫時無法使用"},
-        {"name": "yt_setting_subtitle_edge_style", "value": "字幕邊緣樣式"},
-        {"name": "yt_subtitle_edge_outline_shadow", "value": "外框與陰影"},
-        {"name": "yt_subtitle_edge_outline", "value": "僅外框"},
-        {"name": "yt_subtitle_edge_shadow", "value": "僅陰影"},
-        {"name": "yt_subtitle_edge_none", "value": "無"},
-        {"name": "yt_setting_subtitle_bold", "value": "字幕粗體"},
-        {"name": "yt_setting_subtitle_bold_subtitle", "value": "提升明亮畫面下的字幕清晰度"},
-        {"name": "yt_setting_subtitle_bg_opacity", "value": "字幕背景不透明度"},
-        {"name": "yt_setting_subtitle_offset_subtitle", "value": "微調字幕與音訊同步（-5s 至 +5s）"},
-        {"name": "yt_setting_subtitle_offset_reset", "value": "重設"},
-        {"name": "yt_subtitle_preview_primary", "value": "這是一段字幕樣式預覽"},
-        {"name": "yt_subtitle_preview_secondary", "value": "Bilingual secondary subtitle preview"}
+        {
+            "name": "yt_cookie_verify_success",
+            "value": "Cookie 驗證成功"
+        },
+        {
+            "name": "yt_local_import_partial",
+            "value": "已匯入 %1$d 個檔案，%2$d 個失敗"
+        },
+        {
+            "name": "yt_recovery_failed",
+            "value": "操作未能全部完成，請重試"
+        },
+        {
+            "name": "yt_proxy_applying",
+            "value": "正在套用代理…"
+        },
+        {
+            "name": "yt_exp_sb_skip_manual",
+            "value": "跳過 %s"
+        },
+        {
+            "name": "yt_exp_sb_jump_highlight",
+            "value": "跳至精彩處"
+        },
+        {
+            "name": "yt_action_sleep_timer_off",
+            "value": "關閉定時"
+        },
+        {
+            "name": "yt_action_play_next",
+            "value": "下一首播放"
+        },
+        {
+            "name": "yt_action_add_to_queue",
+            "value": "加入播放佇列"
+        },
+        {
+            "name": "yt_action_undo",
+            "value": "復原"
+        },
+        {
+            "name": "yt_action_save",
+            "value": "儲存"
+        },
+        {
+            "name": "yt_queue_loop_none",
+            "value": "不循環"
+        },
+        {
+            "name": "yt_queue_loop_all",
+            "value": "清單循環"
+        },
+        {
+            "name": "yt_queue_loop_one",
+            "value": "單曲循環"
+        },
+        {
+            "name": "yt_queue_shuffle",
+            "value": "隨機播放"
+        },
+        {
+            "name": "yt_queue_shuffle_on",
+            "value": "已開啟隨機播放"
+        },
+        {
+            "name": "yt_queue_shuffle_off",
+            "value": "已關閉隨機播放"
+        },
+        {
+            "name": "yt_queue_save_as_playlist",
+            "value": "存為清單"
+        },
+        {
+            "name": "yt_queue_save_sheet_title",
+            "value": "另存為本地播放清單"
+        },
+        {
+            "name": "yt_queue_saved_toast",
+            "value": "已儲存為本地播放清單"
+        },
+        {
+            "name": "yt_queue_removed_item",
+            "value": "已從佇列移除"
+        },
+        {
+            "name": "yt_toast_play_next_added",
+            "value": "已設為下一首播放"
+        },
+        {
+            "name": "yt_toast_added_to_queue",
+            "value": "已加入播放佇列"
+        },
+        {
+            "name": "yt_toast_already_in_queue",
+            "value": "已在播放佇列中"
+        },
+        {
+            "name": "yt_toast_already_playing",
+            "value": "目前正在播放此影片"
+        },
+        {
+            "name": "yt_queue_local_mode_incompatible",
+            "value": "本地播放佇列與線上影片不相容"
+        },
+        {
+            "name": "yt_queue_local_playlist",
+            "value": "本地播放清單"
+        },
+        {
+            "name": "yt_queue_current_video",
+            "value": "目前影片"
+        },
+        {
+            "name": "yt_queue_video_count",
+            "value": "佇列中 %d 部影片"
+        },
+        {
+            "name": "yt_section_audio_enhance",
+            "value": "音訊增強"
+        },
+        {
+            "name": "yt_playback_audio_normalize",
+            "value": "響度均衡"
+        },
+        {
+            "name": "yt_playback_audio_normalize_subtitle",
+            "value": "自動平衡播放音量，減少忽大忽小"
+        },
+        {
+            "name": "yt_playback_audio_delay",
+            "value": "音畫延遲"
+        },
+        {
+            "name": "yt_playback_audio_delay_subtitle",
+            "value": "調整藍牙耳機或喇叭的音畫同步（-1000 至 +1000ms）"
+        },
+        {
+            "name": "yt_playback_audio_delay_reset",
+            "value": "重設"
+        },
+        {
+            "name": "yt_player_audio_settings",
+            "value": "音訊設定"
+        },
+        {
+            "name": "yt_player_jump_ahead",
+            "value": "跳至高能處"
+        },
+        {
+            "name": "yt_player_chapters_and_segments",
+            "value": "章節與片段"
+        },
+        {
+            "name": "yt_exp_sb_segments_title",
+            "value": "SponsorBlock 片段"
+        },
+        {
+            "name": "yt_exp_sb_jump_to_end",
+            "value": "跳至結尾"
+        },
+        {
+            "name": "yt_exp_sb_whitelist",
+            "value": "頻道白名單"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_empty",
+            "value": "尚無白名單頻道，可在播放頁選單中為目前頻道開啟免略過"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_channel",
+            "value": "本頻道免略過"
+        },
+        {
+            "name": "yt_exp_sb_channel_whitelisted",
+            "value": "已將本頻道加入 SponsorBlock 白名單"
+        },
+        {
+            "name": "yt_exp_sb_channel_unwhitelisted",
+            "value": "已將本頻道移出 SponsorBlock 白名單"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_remove",
+            "value": "移除"
+        },
+        {
+            "name": "yt_player_subtitle_primary",
+            "value": "主字幕"
+        },
+        {
+            "name": "yt_player_subtitle_secondary",
+            "value": "雙語副字幕"
+        },
+        {
+            "name": "yt_player_subtitle_secondary_off",
+            "value": "關閉副字幕"
+        },
+        {
+            "name": "yt_player_subtitle_quick_on",
+            "value": "開啟字幕"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_generated",
+            "value": "%s（自動產生）"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_translated",
+            "value": "%s（自動翻譯）"
+        },
+        {
+            "name": "yt_player_subtitle_error_rate_limited",
+            "value": "字幕請求過於頻繁，請稍後再試"
+        },
+        {
+            "name": "yt_player_subtitle_error_unavailable",
+            "value": "目前字幕暫時無法使用"
+        },
+        {
+            "name": "yt_setting_subtitle_edge_style",
+            "value": "字幕邊緣樣式"
+        },
+        {
+            "name": "yt_subtitle_edge_outline_shadow",
+            "value": "外框與陰影"
+        },
+        {
+            "name": "yt_subtitle_edge_outline",
+            "value": "僅外框"
+        },
+        {
+            "name": "yt_subtitle_edge_shadow",
+            "value": "僅陰影"
+        },
+        {
+            "name": "yt_subtitle_edge_none",
+            "value": "無"
+        },
+        {
+            "name": "yt_setting_subtitle_bold",
+            "value": "字幕粗體"
+        },
+        {
+            "name": "yt_setting_subtitle_bold_subtitle",
+            "value": "提升明亮畫面下的字幕清晰度"
+        },
+        {
+            "name": "yt_setting_subtitle_bg_opacity",
+            "value": "字幕背景不透明度"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_subtitle",
+            "value": "微調字幕與音訊同步（-5s 至 +5s）"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_reset",
+            "value": "重設"
+        },
+        {
+            "name": "yt_subtitle_preview_primary",
+            "value": "這是一段字幕樣式預覽"
+        },
+        {
+            "name": "yt_subtitle_preview_secondary",
+            "value": "Bilingual secondary subtitle preview"
+        },
+        {
+            "name": "yt_player_stats_for_nerds",
+            "value": "詳細統計資訊"
+        },
+        {
+            "name": "yt_action_copy",
+            "value": "複製"
+        },
+        {
+            "name": "yt_stats_transport",
+            "value": "傳輸協定"
+        },
+        {
+            "name": "yt_stats_hwdec",
+            "value": "硬體解碼"
+        },
+        {
+            "name": "yt_stats_sw_decode",
+            "value": "軟體解碼"
+        },
+        {
+            "name": "yt_stats_color",
+            "value": "色彩格式"
+        },
+        {
+            "name": "yt_stats_av_sync",
+            "value": "音畫同步"
+        },
+        {
+            "name": "yt_stats_audio_format",
+            "value": "音訊格式"
+        },
+        {
+            "name": "yt_stats_audio_fx",
+            "value": "音訊效果"
+        },
+        {
+            "name": "yt_stats_none",
+            "value": "無"
+        },
+        {
+            "name": "yt_stats_transport_direct",
+            "value": "直連"
+        },
+        {
+            "name": "yt_stats_transport_local",
+            "value": "本機"
+        },
+        {
+            "name": "yt_exp_hm_title",
+            "value": "熱力圖與跳至高能"
+        },
+        {
+            "name": "yt_exp_hm_desc",
+            "value": "在進度條上方顯示影片重播熱力圖，並在快進後提示一鍵跳至下一個熱門高能片段。"
+        },
+        {
+            "name": "yt_exp_hm_show_graph",
+            "value": "進度條熱力條"
+        },
+        {
+            "name": "yt_exp_hm_show_graph_desc",
+            "value": "在進度條上方繪製重播熱度曲線"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead",
+            "value": "快進提示跳至高能"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead_desc",
+            "value": "雙擊或拖動快進後，提示一鍵跳到下一個熱門高潮點"
+        },
+        {
+            "name": "yt_exp_hm_footer",
+            "value": "基於 YouTube 原生重播熱力圖資料，僅在影片提供熱力圖時生效。"
+        }
     ]
 }

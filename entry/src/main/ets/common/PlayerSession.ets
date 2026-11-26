@@ -258,9 +258,9 @@ export class PlayerSession {
     this._controller.setPlaybackSpeed(speed);
   }
 
-  /** Hot-apply MPV native audio filters (loudness normalization / skip silence) without restart. */
-  applyAudioFilters(normalize: boolean, skipSilence: boolean): void {
-    this._controller.setAudioFilters(normalize, skipSilence);
+  /** Hot-apply MPV native audio filter (loudness normalization) without restart. */
+  applyAudioFilters(normalize: boolean): void {
+    this._controller.setAudioFilters(normalize);
   }
 
   /** Hot-apply MPV audio delay (ms, clamped -1000..1000) without restart. */

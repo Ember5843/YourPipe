@@ -189,8 +189,13 @@ struct PlayerContext {
     atomic_bool seeking {false};
     atomic_bool eofReached {false};
     atomic_bool paused {true};
-    atomic<double> userPlaybackRate {1.0};
-    atomic_bool inSilenceBoost {false};
+    atomic_int64_t frameDropCount {0};
+    atomic_int64_t decoderFrameDropCount {0};
+    atomic_int64_t estimatedFrameNumber {0};
+    atomic_int64_t lastCacheFwBytes {0};
+    atomic<double> lastAvSyncSec {0.0};
+    atomic_bool hasAvSync {false};
+    atomic<double> lastEstimatedVfFps {0.0};
     int32_t surfaceWidth = 0;
     int32_t surfaceHeight = 0;
     napi_threadsafe_function tsfn = nullptr;
@@ -317,6 +322,13 @@ void ResetObservedPlaybackState(PlayerContext& ctx)
     ctx.pausedForCache.store(false);
     ctx.seeking.store(false);
     ctx.eofReached.store(false);
+    ctx.frameDropCount.store(0);
+    ctx.decoderFrameDropCount.store(0);
+    ctx.estimatedFrameNumber.store(0);
+    ctx.lastCacheFwBytes.store(0);
+    ctx.lastAvSyncSec.store(0.0);
+    ctx.hasAvSync.store(false);
+    ctx.lastEstimatedVfFps.store(0.0);
     {
         const scoped_lock lock(ctx.cacheRangesMutex);
         ctx.seekableRangesJson = "[]";
@@ -447,118 +459,12 @@ void UpdateStatusFromObservedProperties(PlayerContext& ctx)
     ctx.mediaStatus.store(status);
 }
 
-constexpr uint64_t kSilenceMetaReplyId = 900;
+constexpr uint64_t kFrameDropReplyId = 910;
+constexpr uint64_t kDecoderFrameDropReplyId = 911;
+constexpr uint64_t kEstFrameNumReplyId = 912;
+constexpr uint64_t kAvSyncReplyId = 913;
+constexpr uint64_t kEstVfFpsReplyId = 914;
 constexpr uint64_t kInfoPropReplyBase = 1000;
-
-void SetMpvDoubleProperty(PlayerContext& ctx, const char* property, double value, const char* action);
-
-void HandleSilenceMetadata(PlayerContext& ctx, mpv_event_property* prop)
-{
-    if (!prop) {
-        return;
-    }
-    if (prop->format == MPV_FORMAT_NONE || !prop->data) {
-        if (ctx.inSilenceBoost.exchange(false)) {
-            const double restore = ctx.userPlaybackRate.load();
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                         "skipsilence restore (metadata cleared): speed=%.2f", restore);
-            SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence restore");
-        }
-        return;
-    }
-    if (prop->format != MPV_FORMAT_NODE) {
-        return;
-    }
-    const auto* node = static_cast<const mpv_node*>(prop->data);
-    if (!node || node->format != MPV_FORMAT_NODE_MAP || !node->u.list) {
-        if (ctx.inSilenceBoost.exchange(false)) {
-            const double restore = ctx.userPlaybackRate.load();
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                         "skipsilence restore (non-map metadata): speed=%.2f", restore);
-            SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence restore");
-        }
-        return;
-    }
-
-    auto endsWith = [](const string& str, const char* suffix) -> bool {
-        const size_t suffixLen = std::strlen(suffix);
-        return str.size() >= suffixLen && str.compare(str.size() - suffixLen, suffixLen, suffix) == 0;
-    };
-    auto parseNodeDouble = [](const mpv_node& val, double& out) -> bool {
-        if (val.format == MPV_FORMAT_DOUBLE) {
-            if (std::isfinite(val.u.double_)) {
-                out = val.u.double_;
-                return true;
-            }
-            return false;
-        }
-        if (val.format == MPV_FORMAT_STRING && val.u.string && val.u.string[0] != '\0') {
-            char* endPtr = nullptr;
-            const double parsed = std::strtod(val.u.string, &endPtr);
-            if (endPtr != val.u.string && std::isfinite(parsed)) {
-                out = parsed;
-                return true;
-            }
-        }
-        return false;
-    };
-
-    bool hasStart = false;
-    bool hasEnd = false;
-    double startVal = 0.0;
-    double endVal = 0.0;
-    const mpv_node_list* list = node->u.list;
-    for (int i = 0; i < list->num; ++i) {
-        if (!list->keys || !list->keys[i]) {
-            continue;
-        }
-        const string key(list->keys[i]);
-        double parsed = 0.0;
-        if (endsWith(key, "silence_start")) {
-            if (parseNodeDouble(list->values[i], parsed)) {
-                if (!hasStart || parsed > startVal) {
-                    startVal = parsed;
-                    hasStart = true;
-                }
-            }
-        } else if (endsWith(key, "silence_end")) {
-            if (parseNodeDouble(list->values[i], parsed)) {
-                if (!hasEnd || parsed > endVal) {
-                    endVal = parsed;
-                    hasEnd = true;
-                }
-            }
-        }
-    }
-
-    bool inSilence = false;
-    if (hasEnd && (!hasStart || endVal >= startVal)) {
-        inSilence = false;
-    } else if (hasStart && (!hasEnd || startVal > endVal)) {
-        inSilence = true;
-    } else {
-        return;
-    }
-
-    if (inSilence) {
-        if (!ctx.paused.load() && !ctx.seeking.load() && !ctx.eofReached.load()) {
-            if (!ctx.inSilenceBoost.exchange(true)) {
-                const double base = ctx.userPlaybackRate.load();
-                const double boost = std::min(std::max(base * 2.5, 2.5), 4.0);
-                OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                             "skipsilence boost: base=%.2f -> speed=%.2f", base, boost);
-                SetMpvDoubleProperty(ctx, "speed", boost, "skipsilence boost");
-            }
-        }
-    } else {
-        if (ctx.inSilenceBoost.exchange(false)) {
-            const double restore = ctx.userPlaybackRate.load();
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                         "skipsilence restore: speed=%.2f", restore);
-            SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence restore");
-        }
-    }
-}
 
 bool IsCachedInfoProp(const string& name)
 {
@@ -569,8 +475,7 @@ bool IsCachedInfoProp(const string& name)
         "audio-codec-name", "audio-codec", "audio-bitrate", "audio-params/channel-count",
         "audio-params/samplerate", "audio-params/format", "audio-params/hr-channels", "aid",
         "file-format", "media-title", "track-list/count", "file-size",
-        "cache-speed", "demuxer-cache-duration", "dropped-frame-count",
-        "decoder-dropped-frame-count", "volume"
+        "cache-speed", "demuxer-cache-duration", "af", "volume"
     };
     return kInfoProps.find(name) != kInfoProps.end();
 }
@@ -630,23 +535,24 @@ void HandleObservedProperty(PlayerContext& ctx, mpv_event_property* property, ui
             ctx.seeking.store(value);
         } else if (name == "eof-reached") {
             ctx.eofReached.store(value);
-            if (value && ctx.inSilenceBoost.exchange(false)) {
-                const double restore = ctx.userPlaybackRate.load();
-                OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                             "skipsilence eof-restore: speed=%.2f", restore);
-                SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence eof-restore");
-            }
         } else if (name == "pause") {
             ctx.paused.store(value);
-            if (value && ctx.inSilenceBoost.exchange(false)) {
-                const double restore = ctx.userPlaybackRate.load();
-                OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                             "skipsilence pause-restore: speed=%.2f", restore);
-                SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence pause-restore");
-            }
         }
     } else if (property->format == MPV_FORMAT_NODE && name == "demuxer-cache-state") {
-        const string rangesJson = SerializeSeekableRanges(static_cast<mpv_node*>(property->data));
+        const auto* cacheNode = static_cast<const mpv_node*>(property->data);
+        if (cacheNode && cacheNode->format == MPV_FORMAT_NODE_MAP && cacheNode->u.list) {
+            const mpv_node_list* map = cacheNode->u.list;
+            for (int i = 0; i < map->num; ++i) {
+                if (map->keys && map->keys[i] && std::strcmp(map->keys[i], "fw-bytes") == 0) {
+                    const mpv_node& val = map->values[i];
+                    if (val.format == MPV_FORMAT_INT64) {
+                        ctx.lastCacheFwBytes.store(val.u.int64 > 0 ? val.u.int64 : 0);
+                    }
+                    break;
+                }
+            }
+        }
+        const string rangesJson = SerializeSeekableRanges(cacheNode);
         const scoped_lock lock(ctx.cacheRangesMutex);
         ctx.seekableRangesJson = rangesJson;
     }
@@ -682,8 +588,16 @@ void ObservePlaybackProperties(PlayerContext& ctx)
         LogMpvError(property.name, Mpv().observe_property(ctx.mpv, replyId++, property.name, property.format));
     }
 
-    LogMpvError("af-metadata/skipsilence",
-                Mpv().observe_property(ctx.mpv, kSilenceMetaReplyId, "af-metadata/skipsilence", MPV_FORMAT_NODE));
+    LogMpvError("frame-drop-count",
+                Mpv().observe_property(ctx.mpv, kFrameDropReplyId, "frame-drop-count", MPV_FORMAT_INT64));
+    LogMpvError("decoder-frame-drop-count",
+                Mpv().observe_property(ctx.mpv, kDecoderFrameDropReplyId, "decoder-frame-drop-count", MPV_FORMAT_INT64));
+    LogMpvError("estimated-frame-number",
+                Mpv().observe_property(ctx.mpv, kEstFrameNumReplyId, "estimated-frame-number", MPV_FORMAT_INT64));
+    LogMpvError("avsync",
+                Mpv().observe_property(ctx.mpv, kAvSyncReplyId, "avsync", MPV_FORMAT_DOUBLE));
+    LogMpvError("estimated-vf-fps",
+                Mpv().observe_property(ctx.mpv, kEstVfFpsReplyId, "estimated-vf-fps", MPV_FORMAT_DOUBLE));
 
     // Observe media info & live stats asynchronously so GetMediaInfo()/GetProperty()
     // read from cachedProps without blocking the UI thread on mpv_get_property_string.
@@ -694,7 +608,7 @@ void ObservePlaybackProperties(PlayerContext& ctx)
         "audio-codec-name", "audio-codec", "audio-bitrate", "audio-params/channel-count",
         "audio-params/samplerate", "audio-params/format", "audio-params/hr-channels", "aid",
         "file-format", "media-title", "track-list/count", "file-size",
-        "cache-speed", "dropped-frame-count", "decoder-dropped-frame-count", "volume"
+        "cache-speed", "af", "volume"
     };
     uint64_t infoReplyId = kInfoPropReplyBase;
     for (const char* propName : kInfoStringProps) {
@@ -743,12 +657,6 @@ void StartEventLoop(PlayerContext& ctx)
                 break;
             }
             if (event->event_id == MPV_EVENT_START_FILE) {
-                if (ctx.inSilenceBoost.exchange(false)) {
-                    const double restore = ctx.userPlaybackRate.load();
-                    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                                 "skipsilence reset (start-file): speed=%.2f", restore);
-                    SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence reset");
-                }
                 ResetObservedPlaybackState(ctx);
                 SetMediaStatus(ctx, kStatusLoading, "start-file");
                 PushEvent(ctx, 2, ctx.mediaStatus.load());
@@ -756,12 +664,6 @@ void StartEventLoop(PlayerContext& ctx)
                 SetMediaStatus(ctx, kStatusLoaded | kStatusPrepared, "file-loaded");
                 PushEvent(ctx, 2, ctx.mediaStatus.load());
             } else if (event->event_id == MPV_EVENT_SEEK) {
-                if (ctx.inSilenceBoost.exchange(false)) {
-                    const double restore = ctx.userPlaybackRate.load();
-                    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                                 "skipsilence reset (seek): speed=%.2f", restore);
-                    SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence reset");
-                }
                 int32_t status = ctx.mediaStatus.load();
                 status |= kStatusSeeking | kStatusBuffering | kStatusStalled;
                 status &= ~kStatusBuffered;
@@ -774,8 +676,51 @@ void StartEventLoop(PlayerContext& ctx)
                 PushEvent(ctx, 2, ctx.mediaStatus.load());
             } else if (event->event_id == MPV_EVENT_PROPERTY_CHANGE && event->data) {
                 auto* prop = static_cast<mpv_event_property*>(event->data);
-                if (event->reply_userdata == kSilenceMetaReplyId) {
-                    HandleSilenceMetadata(ctx, prop);
+                if (event->reply_userdata == kFrameDropReplyId) {
+                    if (prop->format == MPV_FORMAT_INT64 && prop->data) {
+                        ctx.frameDropCount.store(*static_cast<int64_t*>(prop->data));
+                    } else if (prop->format == MPV_FORMAT_NONE) {
+                        ctx.frameDropCount.store(0);
+                    }
+                    continue;
+                }
+                if (event->reply_userdata == kDecoderFrameDropReplyId) {
+                    if (prop->format == MPV_FORMAT_INT64 && prop->data) {
+                        ctx.decoderFrameDropCount.store(*static_cast<int64_t*>(prop->data));
+                    } else if (prop->format == MPV_FORMAT_NONE) {
+                        ctx.decoderFrameDropCount.store(0);
+                    }
+                    continue;
+                }
+                if (event->reply_userdata == kEstFrameNumReplyId) {
+                    if (prop->format == MPV_FORMAT_INT64 && prop->data) {
+                        ctx.estimatedFrameNumber.store(*static_cast<int64_t*>(prop->data));
+                    } else if (prop->format == MPV_FORMAT_NONE) {
+                        ctx.estimatedFrameNumber.store(0);
+                    }
+                    continue;
+                }
+                if (event->reply_userdata == kAvSyncReplyId) {
+                    if (prop->format == MPV_FORMAT_DOUBLE && prop->data) {
+                        const double val = *static_cast<double*>(prop->data);
+                        if (std::isfinite(val)) {
+                            ctx.lastAvSyncSec.store(val);
+                            ctx.hasAvSync.store(true);
+                        } else {
+                            ctx.hasAvSync.store(false);
+                        }
+                    } else if (prop->format == MPV_FORMAT_NONE) {
+                        ctx.hasAvSync.store(false);
+                    }
+                    continue;
+                }
+                if (event->reply_userdata == kEstVfFpsReplyId) {
+                    if (prop->format == MPV_FORMAT_DOUBLE && prop->data) {
+                        const double val = *static_cast<double*>(prop->data);
+                        ctx.lastEstimatedVfFps.store(std::isfinite(val) && val > 0.0 ? val : 0.0);
+                    } else if (prop->format == MPV_FORMAT_NONE) {
+                        ctx.lastEstimatedVfFps.store(0.0);
+                    }
                     continue;
                 }
                 if (event->reply_userdata >= kInfoPropReplyBase) {
@@ -794,12 +739,6 @@ void StartEventLoop(PlayerContext& ctx)
                     PushEvent(ctx, 2, ctx.mediaStatus.load());
                 }
             } else if (event->event_id == MPV_EVENT_END_FILE && event->data) {
-                if (ctx.inSilenceBoost.exchange(false)) {
-                    const double restore = ctx.userPlaybackRate.load();
-                    OH_LOG_Print(LOG_APP, LOG_INFO, 0xFF00, "mpv",
-                                 "skipsilence reset (end-file): speed=%.2f", restore);
-                    SetMpvDoubleProperty(ctx, "speed", restore, "skipsilence reset");
-                }
                 auto* end = static_cast<mpv_event_end_file*>(event->data);
                 if (end->reason == MPV_END_FILE_REASON_EOF) {
                     SetMediaStatus(ctx, kStatusLoaded | kStatusBuffered | kStatusEnd, "end-file-eof");
@@ -1017,6 +956,7 @@ bool EnsureMpv(PlayerContext& ctx)
         SetOptionString(ctx.mpv, "gpu-api", "vulkan");
         SetOptionString(ctx.mpv, "gpu-context", "ohosvk");
         SetOptionString(ctx.mpv, "ao", "ohaudio");
+        SetOptionString(ctx.mpv, "audio-buffer", "0.4");
         SetOptionString(ctx.mpv, "hwdec", "ohcodec-copy");
         // Prefer OHCodec; lavc falls back to software when HW is missing.
         SetOptionString(ctx.mpv, "vd-lavc-software-fallback", "yes");
@@ -1167,7 +1107,6 @@ void DestroyMpv(PlayerContext& ctx)
     ctx.mpv = nullptr;
     ctx.initialized = false;
     ctx.window = nullptr;
-    ctx.inSilenceBoost.store(false);
     ctx.state.store(kStateStopped);
     SetMediaStatus(ctx, kStatusNoMedia, "destroy");
 }
@@ -1590,8 +1529,6 @@ napi_value SetPlaybackRate(napi_env env, napi_callback_info info)
         return Undefined(env);
     }
     lockFor(ToString(env, args[0]), [=](PlayerContext& ctx) {
-        ctx.userPlaybackRate.store(rate);
-        ctx.inSilenceBoost.store(false);
         PostCommand(ctx, [rate](PlayerContext& workerCtx) {
             if (!EnsureMpv(workerCtx)) {
                 return;
@@ -1638,6 +1575,31 @@ napi_value GetProperty(napi_env env, napi_callback_info info)
     const auto value = lockFor(ToString(env, args[0]), [&](PlayerContext& ctx) -> string {
         if (key.empty()) {
             return {};
+        }
+        if (key == "frame-drop-count" || key == "dropped-frame-count") {
+            return std::to_string(ctx.frameDropCount.load());
+        }
+        if (key == "decoder-frame-drop-count" || key == "decoder-dropped-frame-count") {
+            return std::to_string(ctx.decoderFrameDropCount.load());
+        }
+        if (key == "estimated-frame-number") {
+            return std::to_string(ctx.estimatedFrameNumber.load());
+        }
+        if (key == "demuxer-cache-fw-bytes") {
+            return std::to_string(ctx.lastCacheFwBytes.load());
+        }
+        if (key == "avsync") {
+            if (!ctx.hasAvSync.load()) {
+                return {};
+            }
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%.6f", ctx.lastAvSyncSec.load());
+            return buf;
+        }
+        if (key == "estimated-vf-fps") {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%.3f", ctx.lastEstimatedVfFps.load());
+            return buf;
         }
         if (IsCachedInfoProp(key)) {
             const scoped_lock lock(ctx.cachedPropsMutex);

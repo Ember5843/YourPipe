@@ -1440,154 +1440,154 @@
             "name": "yt_player_subtitle_off",
             "value": "字幕をオフ"
         },
-{
-    "name": "yt_player_subtitle_auto_translated",
-    "value": "自動翻訳"
-},
-{
-    "name": "yt_option_ai_translate",
-    "value": "AI 字幕翻訳"
-},
-{
-    "name": "yt_option_ai_subtitle",
-    "value": "AI 字幕"
-},
-{
-    "name": "yt_ai_translate_engine",
-    "value": "翻訳エンジン"
-},
-{
-    "name": "yt_ai_translate_engine_gtx",
-    "value": "Google 翻訳（無料）"
-},
-{
-    "name": "yt_ai_translate_engine_llm",
-    "value": "カスタム LLM（OpenAI 互換）"
-},
-{
-    "name": "yt_ai_translate_llm_section",
-    "value": "LLM 設定"
-},
-{
-    "name": "yt_ai_translate_base_url",
-    "value": "ベース URL"
-},
-{
-    "name": "yt_ai_translate_model",
-    "value": "モデル名"
-},
-{
-    "name": "yt_ai_translate_api_key",
-    "value": "API Key"
-},
-{
-    "name": "yt_ai_translate_test",
-    "value": "接続テスト"
-},
-{
-    "name": "yt_ai_translate_testing",
-    "value": "テスト中…"
-},
-{
-    "name": "yt_ai_translate_test_ok",
-    "value": "接続に成功しました"
-},
-{
-    "name": "yt_ai_translate_test_fail",
-    "value": "接続に失敗しました。設定を確認してください"
-},
-{
-    "name": "yt_ai_translate_display_section",
-    "value": "表示"
-},
-{
-    "name": "yt_ai_translate_bilingual",
-    "value": "バイリンガル"
-},
-{
-    "name": "yt_ai_translate_bilingual_subtitle",
-    "value": "原文と訳文を同時表示"
-},
-{
-    "name": "yt_ai_translate_note",
-    "value": "字幕テキストは選択した翻訳サービスに送信されます。対象言語は「コンテンツ翻訳言語」に従います。"
-},
-{
-    "name": "yt_ai_translate_menu",
-    "value": "AI 翻訳"
-},
-{
-    "name": "yt_ai_translate_llm_not_configured",
-    "value": "先に設定で LLM を構成してください"
-},
-{
-    "name": "yt_ai_translate_partial_fail",
-    "value": "一部の字幕を翻訳できませんでした（原文を表示）"
-},
-{
-    "name": "yt_ai_translate_failed",
-    "value": "字幕翻訳に失敗しました。後で再試行してください"
-},
-{
-    "name": "yt_setting_system_ai_caption",
-    "value": "システム AI 字幕"
-},
-{
-    "name": "yt_setting_system_ai_caption_subtitle",
-    "value": "再生中の音声をシステムがリアルタイム認識（対応機種のみ、中国語/英語）"
-},
-{
-    "name": "yt_setting_system_ai_caption_source",
-    "value": "AI 字幕のソース言語"
-},
-{
-    "name": "yt_setting_system_ai_caption_source_zh",
-    "value": "中国語"
-},
-{
-    "name": "yt_asr_menu",
-    "value": "AI 字幕を生成"
-},
-{
-    "name": "yt_asr_phase_model",
-    "value": "モデルをダウンロード中"
-},
-{
-    "name": "yt_asr_live_progress",
-    "value": "リアルタイム認識中…"
-},
-{
-    "name": "yt_asr_failed",
-    "value": "AI 字幕生成に失敗しました。後で再試行してください"
-},
-{
-    "name": "yt_asr_model_section",
-    "value": "オンデバイス認識モデル"
-},
-{
-    "name": "yt_asr_model_status_ready",
-    "value": "準備完了（中英バイリンガル・ストリーミング認識）"
-},
-{
-    "name": "yt_asr_model_status_none",
-    "value": "未ダウンロード（約 190MB、Wi-Fi 推奨）"
-},
-{
-    "name": "yt_asr_model_downloading",
-    "value": "ダウンロード中"
-},
-{
-    "name": "yt_asr_model_download",
-    "value": "モデルをダウンロード"
-},
-{
-    "name": "yt_asr_model_delete",
-    "value": "モデルを削除"
-},
-{
-    "name": "yt_ai_action_cancel",
-    "value": "キャンセル"
-},
+        {
+            "name": "yt_player_subtitle_auto_translated",
+            "value": "自動翻訳"
+        },
+        {
+            "name": "yt_option_ai_translate",
+            "value": "AI 字幕翻訳"
+        },
+        {
+            "name": "yt_option_ai_subtitle",
+            "value": "AI 字幕"
+        },
+        {
+            "name": "yt_ai_translate_engine",
+            "value": "翻訳エンジン"
+        },
+        {
+            "name": "yt_ai_translate_engine_gtx",
+            "value": "Google 翻訳（無料）"
+        },
+        {
+            "name": "yt_ai_translate_engine_llm",
+            "value": "カスタム LLM（OpenAI 互換）"
+        },
+        {
+            "name": "yt_ai_translate_llm_section",
+            "value": "LLM 設定"
+        },
+        {
+            "name": "yt_ai_translate_base_url",
+            "value": "ベース URL"
+        },
+        {
+            "name": "yt_ai_translate_model",
+            "value": "モデル名"
+        },
+        {
+            "name": "yt_ai_translate_api_key",
+            "value": "API Key"
+        },
+        {
+            "name": "yt_ai_translate_test",
+            "value": "接続テスト"
+        },
+        {
+            "name": "yt_ai_translate_testing",
+            "value": "テスト中…"
+        },
+        {
+            "name": "yt_ai_translate_test_ok",
+            "value": "接続に成功しました"
+        },
+        {
+            "name": "yt_ai_translate_test_fail",
+            "value": "接続に失敗しました。設定を確認してください"
+        },
+        {
+            "name": "yt_ai_translate_display_section",
+            "value": "表示"
+        },
+        {
+            "name": "yt_ai_translate_bilingual",
+            "value": "バイリンガル"
+        },
+        {
+            "name": "yt_ai_translate_bilingual_subtitle",
+            "value": "原文と訳文を同時表示"
+        },
+        {
+            "name": "yt_ai_translate_note",
+            "value": "字幕テキストは選択した翻訳サービスに送信されます。対象言語は「コンテンツ翻訳言語」に従います。"
+        },
+        {
+            "name": "yt_ai_translate_menu",
+            "value": "AI 翻訳"
+        },
+        {
+            "name": "yt_ai_translate_llm_not_configured",
+            "value": "先に設定で LLM を構成してください"
+        },
+        {
+            "name": "yt_ai_translate_partial_fail",
+            "value": "一部の字幕を翻訳できませんでした（原文を表示）"
+        },
+        {
+            "name": "yt_ai_translate_failed",
+            "value": "字幕翻訳に失敗しました。後で再試行してください"
+        },
+        {
+            "name": "yt_setting_system_ai_caption",
+            "value": "システム AI 字幕"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_subtitle",
+            "value": "再生中の音声をシステムがリアルタイム認識（対応機種のみ、中国語/英語）"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source",
+            "value": "AI 字幕のソース言語"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source_zh",
+            "value": "中国語"
+        },
+        {
+            "name": "yt_asr_menu",
+            "value": "AI 字幕を生成"
+        },
+        {
+            "name": "yt_asr_phase_model",
+            "value": "モデルをダウンロード中"
+        },
+        {
+            "name": "yt_asr_live_progress",
+            "value": "リアルタイム認識中…"
+        },
+        {
+            "name": "yt_asr_failed",
+            "value": "AI 字幕生成に失敗しました。後で再試行してください"
+        },
+        {
+            "name": "yt_asr_model_section",
+            "value": "オンデバイス認識モデル"
+        },
+        {
+            "name": "yt_asr_model_status_ready",
+            "value": "準備完了（中英バイリンガル・ストリーミング認識）"
+        },
+        {
+            "name": "yt_asr_model_status_none",
+            "value": "未ダウンロード（約 190MB、Wi-Fi 推奨）"
+        },
+        {
+            "name": "yt_asr_model_downloading",
+            "value": "ダウンロード中"
+        },
+        {
+            "name": "yt_asr_model_download",
+            "value": "モデルをダウンロード"
+        },
+        {
+            "name": "yt_asr_model_delete",
+            "value": "モデルを削除"
+        },
+        {
+            "name": "yt_ai_action_cancel",
+            "value": "キャンセル"
+        },
         {
             "name": "yt_player_chapters",
             "value": "チャプター"
@@ -3488,7 +3488,6 @@
             "name": "yt_option_clear_history_subtitle",
             "value": "ローカルの視聴履歴と再生位置をすべて削除します"
         },
-
         {
             "name": "yt_toast_history_cleared",
             "value": "視聴履歴を削除しました"
@@ -3604,8 +3603,7 @@
         {
             "name": "yt_home_mode_long",
             "value": "通常の動画"
-        }
-    ,
+        },
         {
             "name": "yt_download_pause",
             "value": "一時停止"
@@ -3845,8 +3843,7 @@
         {
             "name": "yt_translation_region",
             "value": "リージョン"
-        }
-,
+        },
         {
             "name": "yt_exp_title",
             "value": "実験的な機能"
@@ -4147,73 +4144,345 @@
             "name": "yt_update_later",
             "value": "あとで"
         },
-        {"name": "yt_cookie_verify_success", "value": "Cookie の確認に成功しました"},
-        {"name": "yt_local_import_partial", "value": "%1$d 件をインポート、%2$d 件に失敗しました"},
-        {"name": "yt_recovery_failed", "value": "操作を完了できませんでした。再試行してください。"},
-        {"name": "yt_proxy_applying", "value": "プロキシを適用中…"},
-        {"name": "yt_exp_sb_skip_manual", "value": "%sをスキップ"},
-        {"name": "yt_exp_sb_jump_highlight", "value": "ハイライトへ移動"},
-        {"name": "yt_action_sleep_timer_off", "value": "タイマーをオフ"},
-        {"name": "yt_action_play_next", "value": "次に再生"},
-        {"name": "yt_action_add_to_queue", "value": "キューに追加"},
-        {"name": "yt_action_undo", "value": "元に戻す"},
-        {"name": "yt_action_save", "value": "保存"},
-        {"name": "yt_queue_loop_none", "value": "ループなし"},
-        {"name": "yt_queue_loop_all", "value": "全曲ループ"},
-        {"name": "yt_queue_loop_one", "value": "1曲ループ"},
-        {"name": "yt_queue_shuffle", "value": "シャッフル"},
-        {"name": "yt_queue_shuffle_on", "value": "シャッフルをオンにしました"},
-        {"name": "yt_queue_shuffle_off", "value": "シャッフルをオフにしました"},
-        {"name": "yt_queue_save_as_playlist", "value": "リスト保存"},
-        {"name": "yt_queue_save_sheet_title", "value": "キューをローカル再生リストに保存"},
-        {"name": "yt_queue_saved_toast", "value": "ローカル再生リストに保存しました"},
-        {"name": "yt_queue_removed_item", "value": "キューから削除しました"},
-        {"name": "yt_toast_play_next_added", "value": "次に再生するように設定しました"},
-        {"name": "yt_toast_added_to_queue", "value": "再生キューに追加しました"},
-        {"name": "yt_toast_already_in_queue", "value": "すでに再生キューにあります"},
-        {"name": "yt_toast_already_playing", "value": "この動画は現在再生中です"},
-        {"name": "yt_queue_local_mode_incompatible", "value": "ローカル動画とオンライン動画は混在できません"},
-        {"name": "yt_queue_local_playlist", "value": "ローカル再生リスト"},
-        {"name": "yt_queue_current_video", "value": "現在の動画"},
-        {"name": "yt_queue_video_count", "value": "キュー内 %d 件の動画"},
-        {"name": "yt_section_audio_enhance", "value": "オーディオ強化"},
-        {"name": "yt_playback_audio_normalize", "value": "ラウドネス正規化"},
-        {"name": "yt_playback_audio_normalize_subtitle", "value": "再生音量を自動的に均一化します"},
-        {"name": "yt_playback_skip_silence", "value": "無音スキップ"},
-        {"name": "yt_playback_skip_silence_subtitle", "value": "無音部分を自動的にスキップ（ライブ配信は無効）"},
-        {"name": "yt_playback_audio_delay", "value": "音声遅延"},
-        {"name": "yt_playback_audio_delay_subtitle", "value": "Bluetooth などの音ズレを調整（-1000 ～ +1000ms）"},
-        {"name": "yt_playback_audio_delay_reset", "value": "リセット"},
-        {"name": "yt_player_audio_settings", "value": "オーディオ設定"},
-        {"name": "yt_player_jump_ahead", "value": "見どころへジャンプ"},
-        {"name": "yt_player_chapters_and_segments", "value": "チャプターとセグメント"},
-        {"name": "yt_exp_sb_segments_title", "value": "SponsorBlock セグメント"},
-        {"name": "yt_exp_sb_jump_to_end", "value": "終了位置へ"},
-        {"name": "yt_exp_sb_whitelist", "value": "ホワイトリストチャンネル"},
-        {"name": "yt_exp_sb_whitelist_empty", "value": "ホワイトリストは空です。再生メニューから追加できます。"},
-        {"name": "yt_exp_sb_whitelist_channel", "value": "このチャンネルをスキップしない"},
-        {"name": "yt_exp_sb_channel_whitelisted", "value": "このチャンネルをホワイトリストに追加しました"},
-        {"name": "yt_exp_sb_channel_unwhitelisted", "value": "このチャンネルをホワイトリストから削除しました"},
-        {"name": "yt_exp_sb_whitelist_remove", "value": "削除"},
-        {"name": "yt_player_subtitle_primary", "value": "メイン字幕"},
-        {"name": "yt_player_subtitle_secondary", "value": "サブ字幕（2言語）"},
-        {"name": "yt_player_subtitle_secondary_off", "value": "サブ字幕をオフ"},
-        {"name": "yt_player_subtitle_quick_on", "value": "字幕をオンにする"},
-        {"name": "yt_player_subtitle_label_auto_generated", "value": "%s（自動生成）"},
-        {"name": "yt_player_subtitle_label_auto_translated", "value": "%s（自動翻訳）"},
-        {"name": "yt_player_subtitle_error_rate_limited", "value": "字幕のリクエスト制限に達しました。しばらくしてから再試行してください"},
-        {"name": "yt_player_subtitle_error_unavailable", "value": "この字幕は現在利用できません"},
-        {"name": "yt_setting_subtitle_edge_style", "value": "字幕の縁取り"},
-        {"name": "yt_subtitle_edge_outline_shadow", "value": "縁取りと影"},
-        {"name": "yt_subtitle_edge_outline", "value": "縁取りのみ"},
-        {"name": "yt_subtitle_edge_shadow", "value": "影のみ"},
-        {"name": "yt_subtitle_edge_none", "value": "なし"},
-        {"name": "yt_setting_subtitle_bold", "value": "字幕を太字にする"},
-        {"name": "yt_setting_subtitle_bold_subtitle", "value": "明るいシーンでの視認性を高めます"},
-        {"name": "yt_setting_subtitle_bg_opacity", "value": "字幕の背景不透明度"},
-        {"name": "yt_setting_subtitle_offset_subtitle", "value": "字幕と音声のタイミングを微調整（-5s 〜 +5s）"},
-        {"name": "yt_setting_subtitle_offset_reset", "value": "リセット"},
-        {"name": "yt_subtitle_preview_primary", "value": "字幕スタイルのプレビューです"},
-        {"name": "yt_subtitle_preview_secondary", "value": "Bilingual secondary subtitle preview"}
+        {
+            "name": "yt_cookie_verify_success",
+            "value": "Cookie の確認に成功しました"
+        },
+        {
+            "name": "yt_local_import_partial",
+            "value": "%1$d 件をインポート、%2$d 件に失敗しました"
+        },
+        {
+            "name": "yt_recovery_failed",
+            "value": "操作を完了できませんでした。再試行してください。"
+        },
+        {
+            "name": "yt_proxy_applying",
+            "value": "プロキシを適用中…"
+        },
+        {
+            "name": "yt_exp_sb_skip_manual",
+            "value": "%sをスキップ"
+        },
+        {
+            "name": "yt_exp_sb_jump_highlight",
+            "value": "ハイライトへ移動"
+        },
+        {
+            "name": "yt_action_sleep_timer_off",
+            "value": "タイマーをオフ"
+        },
+        {
+            "name": "yt_action_play_next",
+            "value": "次に再生"
+        },
+        {
+            "name": "yt_action_add_to_queue",
+            "value": "キューに追加"
+        },
+        {
+            "name": "yt_action_undo",
+            "value": "元に戻す"
+        },
+        {
+            "name": "yt_action_save",
+            "value": "保存"
+        },
+        {
+            "name": "yt_queue_loop_none",
+            "value": "ループなし"
+        },
+        {
+            "name": "yt_queue_loop_all",
+            "value": "全曲ループ"
+        },
+        {
+            "name": "yt_queue_loop_one",
+            "value": "1曲ループ"
+        },
+        {
+            "name": "yt_queue_shuffle",
+            "value": "シャッフル"
+        },
+        {
+            "name": "yt_queue_shuffle_on",
+            "value": "シャッフルをオンにしました"
+        },
+        {
+            "name": "yt_queue_shuffle_off",
+            "value": "シャッフルをオフにしました"
+        },
+        {
+            "name": "yt_queue_save_as_playlist",
+            "value": "リスト保存"
+        },
+        {
+            "name": "yt_queue_save_sheet_title",
+            "value": "キューをローカル再生リストに保存"
+        },
+        {
+            "name": "yt_queue_saved_toast",
+            "value": "ローカル再生リストに保存しました"
+        },
+        {
+            "name": "yt_queue_removed_item",
+            "value": "キューから削除しました"
+        },
+        {
+            "name": "yt_toast_play_next_added",
+            "value": "次に再生するように設定しました"
+        },
+        {
+            "name": "yt_toast_added_to_queue",
+            "value": "再生キューに追加しました"
+        },
+        {
+            "name": "yt_toast_already_in_queue",
+            "value": "すでに再生キューにあります"
+        },
+        {
+            "name": "yt_toast_already_playing",
+            "value": "この動画は現在再生中です"
+        },
+        {
+            "name": "yt_queue_local_mode_incompatible",
+            "value": "ローカル動画とオンライン動画は混在できません"
+        },
+        {
+            "name": "yt_queue_local_playlist",
+            "value": "ローカル再生リスト"
+        },
+        {
+            "name": "yt_queue_current_video",
+            "value": "現在の動画"
+        },
+        {
+            "name": "yt_queue_video_count",
+            "value": "キュー内 %d 件の動画"
+        },
+        {
+            "name": "yt_section_audio_enhance",
+            "value": "オーディオ強化"
+        },
+        {
+            "name": "yt_playback_audio_normalize",
+            "value": "ラウドネス正規化"
+        },
+        {
+            "name": "yt_playback_audio_normalize_subtitle",
+            "value": "再生音量を自動的に均一化します"
+        },
+        {
+            "name": "yt_playback_audio_delay",
+            "value": "音声遅延"
+        },
+        {
+            "name": "yt_playback_audio_delay_subtitle",
+            "value": "Bluetooth などの音ズレを調整（-1000 ～ +1000ms）"
+        },
+        {
+            "name": "yt_playback_audio_delay_reset",
+            "value": "リセット"
+        },
+        {
+            "name": "yt_player_audio_settings",
+            "value": "オーディオ設定"
+        },
+        {
+            "name": "yt_player_jump_ahead",
+            "value": "見どころへジャンプ"
+        },
+        {
+            "name": "yt_player_chapters_and_segments",
+            "value": "チャプターとセグメント"
+        },
+        {
+            "name": "yt_exp_sb_segments_title",
+            "value": "SponsorBlock セグメント"
+        },
+        {
+            "name": "yt_exp_sb_jump_to_end",
+            "value": "終了位置へ"
+        },
+        {
+            "name": "yt_exp_sb_whitelist",
+            "value": "ホワイトリストチャンネル"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_empty",
+            "value": "ホワイトリストは空です。再生メニューから追加できます。"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_channel",
+            "value": "このチャンネルをスキップしない"
+        },
+        {
+            "name": "yt_exp_sb_channel_whitelisted",
+            "value": "このチャンネルをホワイトリストに追加しました"
+        },
+        {
+            "name": "yt_exp_sb_channel_unwhitelisted",
+            "value": "このチャンネルをホワイトリストから削除しました"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_remove",
+            "value": "削除"
+        },
+        {
+            "name": "yt_player_subtitle_primary",
+            "value": "メイン字幕"
+        },
+        {
+            "name": "yt_player_subtitle_secondary",
+            "value": "サブ字幕（2言語）"
+        },
+        {
+            "name": "yt_player_subtitle_secondary_off",
+            "value": "サブ字幕をオフ"
+        },
+        {
+            "name": "yt_player_subtitle_quick_on",
+            "value": "字幕をオンにする"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_generated",
+            "value": "%s（自動生成）"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_translated",
+            "value": "%s（自動翻訳）"
+        },
+        {
+            "name": "yt_player_subtitle_error_rate_limited",
+            "value": "字幕のリクエスト制限に達しました。しばらくしてから再試行してください"
+        },
+        {
+            "name": "yt_player_subtitle_error_unavailable",
+            "value": "この字幕は現在利用できません"
+        },
+        {
+            "name": "yt_setting_subtitle_edge_style",
+            "value": "字幕の縁取り"
+        },
+        {
+            "name": "yt_subtitle_edge_outline_shadow",
+            "value": "縁取りと影"
+        },
+        {
+            "name": "yt_subtitle_edge_outline",
+            "value": "縁取りのみ"
+        },
+        {
+            "name": "yt_subtitle_edge_shadow",
+            "value": "影のみ"
+        },
+        {
+            "name": "yt_subtitle_edge_none",
+            "value": "なし"
+        },
+        {
+            "name": "yt_setting_subtitle_bold",
+            "value": "字幕を太字にする"
+        },
+        {
+            "name": "yt_setting_subtitle_bold_subtitle",
+            "value": "明るいシーンでの視認性を高めます"
+        },
+        {
+            "name": "yt_setting_subtitle_bg_opacity",
+            "value": "字幕の背景不透明度"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_subtitle",
+            "value": "字幕と音声のタイミングを微調整（-5s 〜 +5s）"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_reset",
+            "value": "リセット"
+        },
+        {
+            "name": "yt_subtitle_preview_primary",
+            "value": "字幕スタイルのプレビューです"
+        },
+        {
+            "name": "yt_subtitle_preview_secondary",
+            "value": "Bilingual secondary subtitle preview"
+        },
+        {
+            "name": "yt_player_stats_for_nerds",
+            "value": "詳細統計情報"
+        },
+        {
+            "name": "yt_action_copy",
+            "value": "コピー"
+        },
+        {
+            "name": "yt_stats_transport",
+            "value": "転送方式"
+        },
+        {
+            "name": "yt_stats_hwdec",
+            "value": "ハードウェアデコード"
+        },
+        {
+            "name": "yt_stats_sw_decode",
+            "value": "ソフトウェア"
+        },
+        {
+            "name": "yt_stats_color",
+            "value": "色空間 / ピクセル"
+        },
+        {
+            "name": "yt_stats_av_sync",
+            "value": "A/V 同期"
+        },
+        {
+            "name": "yt_stats_audio_format",
+            "value": "音声形式"
+        },
+        {
+            "name": "yt_stats_audio_fx",
+            "value": "音声エフェクト"
+        },
+        {
+            "name": "yt_stats_none",
+            "value": "なし"
+        },
+        {
+            "name": "yt_stats_transport_direct",
+            "value": "直接"
+        },
+        {
+            "name": "yt_stats_transport_local",
+            "value": "ローカル"
+        },
+        {
+            "name": "yt_exp_hm_title",
+            "value": "ヒートマップとハイライトへスキップ"
+        },
+        {
+            "name": "yt_exp_hm_desc",
+            "value": "シークバー上にリプレイ回数の多い部分のヒートマップを表示し、早送り後に次のピークへのスキップを提案します。"
+        },
+        {
+            "name": "yt_exp_hm_show_graph",
+            "value": "シークバーのヒートマップ"
+        },
+        {
+            "name": "yt_exp_hm_show_graph_desc",
+            "value": "進行バーの上にリプレイ頻度グラフを描画"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead",
+            "value": "早送り後にハイライトを提案"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead_desc",
+            "value": "早送り後に次の最もリプレイされた箇所へ移動するボタンを表示"
+        },
+        {
+            "name": "yt_exp_hm_footer",
+            "value": "YouTube 標準のリプレイデータを使用します。データがある動画でのみ有効です。"
+        }
     ]
 }

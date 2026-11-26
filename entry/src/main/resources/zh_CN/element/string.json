@@ -1440,154 +1440,154 @@
             "name": "yt_player_subtitle_off",
             "value": "关闭字幕"
         },
-{
-    "name": "yt_player_subtitle_auto_translated",
-    "value": "自动翻译"
-},
-{
-    "name": "yt_option_ai_translate",
-    "value": "AI 字幕翻译"
-},
-{
-    "name": "yt_option_ai_subtitle",
-    "value": "AI 字幕"
-},
-{
-    "name": "yt_ai_translate_engine",
-    "value": "翻译引擎"
-},
-{
-    "name": "yt_ai_translate_engine_gtx",
-    "value": "Google 免费翻译"
-},
-{
-    "name": "yt_ai_translate_engine_llm",
-    "value": "自定义 LLM（OpenAI 兼容）"
-},
-{
-    "name": "yt_ai_translate_llm_section",
-    "value": "LLM 配置"
-},
-{
-    "name": "yt_ai_translate_base_url",
-    "value": "接口地址（Base URL）"
-},
-{
-    "name": "yt_ai_translate_model",
-    "value": "模型名称"
-},
-{
-    "name": "yt_ai_translate_api_key",
-    "value": "API Key"
-},
-{
-    "name": "yt_ai_translate_test",
-    "value": "测试连接"
-},
-{
-    "name": "yt_ai_translate_testing",
-    "value": "测试中…"
-},
-{
-    "name": "yt_ai_translate_test_ok",
-    "value": "连接成功"
-},
-{
-    "name": "yt_ai_translate_test_fail",
-    "value": "连接失败，请检查配置"
-},
-{
-    "name": "yt_ai_translate_display_section",
-    "value": "显示"
-},
-{
-    "name": "yt_ai_translate_bilingual",
-    "value": "双语对照"
-},
-{
-    "name": "yt_ai_translate_bilingual_subtitle",
-    "value": "同时显示原文与译文"
-},
-{
-    "name": "yt_ai_translate_note",
-    "value": "字幕文本将发送到所选翻译服务。目标语言与「内容翻译语言」一致。"
-},
-{
-    "name": "yt_ai_translate_menu",
-    "value": "AI 翻译"
-},
-{
-    "name": "yt_ai_translate_llm_not_configured",
-    "value": "请先在设置中完成 LLM 配置"
-},
-{
-    "name": "yt_ai_translate_partial_fail",
-    "value": "部分字幕翻译失败，已保留原文"
-},
-{
-    "name": "yt_ai_translate_failed",
-    "value": "字幕翻译失败，请稍后重试"
-},
-{
-    "name": "yt_setting_system_ai_caption",
-    "value": "系统 AI 字幕"
-},
-{
-    "name": "yt_setting_system_ai_caption_subtitle",
-    "value": "由系统实时识别播放中的音频（部分机型支持，中/英文）"
-},
-{
-    "name": "yt_setting_system_ai_caption_source",
-    "value": "AI 字幕源语言"
-},
-{
-    "name": "yt_setting_system_ai_caption_source_zh",
-    "value": "中文"
-},
-{
-    "name": "yt_asr_menu",
-    "value": "AI 生成字幕"
-},
-{
-    "name": "yt_asr_phase_model",
-    "value": "下载模型"
-},
-{
-    "name": "yt_asr_live_progress",
-    "value": "实时识别中…"
-},
-{
-    "name": "yt_asr_failed",
-    "value": "AI 生成字幕失败，请稍后重试"
-},
-{
-    "name": "yt_asr_model_section",
-    "value": "端侧识别模型"
-},
-{
-    "name": "yt_asr_model_status_ready",
-    "value": "已就绪（中英双语流式识别）"
-},
-{
-    "name": "yt_asr_model_status_none",
-    "value": "未下载（约 190MB，建议 Wi-Fi 网络）"
-},
-{
-    "name": "yt_asr_model_downloading",
-    "value": "下载中"
-},
-{
-    "name": "yt_asr_model_download",
-    "value": "下载模型"
-},
-{
-    "name": "yt_asr_model_delete",
-    "value": "删除模型"
-},
-{
-    "name": "yt_ai_action_cancel",
-    "value": "取消"
-},
+        {
+            "name": "yt_player_subtitle_auto_translated",
+            "value": "自动翻译"
+        },
+        {
+            "name": "yt_option_ai_translate",
+            "value": "AI 字幕翻译"
+        },
+        {
+            "name": "yt_option_ai_subtitle",
+            "value": "AI 字幕"
+        },
+        {
+            "name": "yt_ai_translate_engine",
+            "value": "翻译引擎"
+        },
+        {
+            "name": "yt_ai_translate_engine_gtx",
+            "value": "Google 免费翻译"
+        },
+        {
+            "name": "yt_ai_translate_engine_llm",
+            "value": "自定义 LLM（OpenAI 兼容）"
+        },
+        {
+            "name": "yt_ai_translate_llm_section",
+            "value": "LLM 配置"
+        },
+        {
+            "name": "yt_ai_translate_base_url",
+            "value": "接口地址（Base URL）"
+        },
+        {
+            "name": "yt_ai_translate_model",
+            "value": "模型名称"
+        },
+        {
+            "name": "yt_ai_translate_api_key",
+            "value": "API Key"
+        },
+        {
+            "name": "yt_ai_translate_test",
+            "value": "测试连接"
+        },
+        {
+            "name": "yt_ai_translate_testing",
+            "value": "测试中…"
+        },
+        {
+            "name": "yt_ai_translate_test_ok",
+            "value": "连接成功"
+        },
+        {
+            "name": "yt_ai_translate_test_fail",
+            "value": "连接失败，请检查配置"
+        },
+        {
+            "name": "yt_ai_translate_display_section",
+            "value": "显示"
+        },
+        {
+            "name": "yt_ai_translate_bilingual",
+            "value": "双语对照"
+        },
+        {
+            "name": "yt_ai_translate_bilingual_subtitle",
+            "value": "同时显示原文与译文"
+        },
+        {
+            "name": "yt_ai_translate_note",
+            "value": "字幕文本将发送到所选翻译服务。目标语言与「内容翻译语言」一致。"
+        },
+        {
+            "name": "yt_ai_translate_menu",
+            "value": "AI 翻译"
+        },
+        {
+            "name": "yt_ai_translate_llm_not_configured",
+            "value": "请先在设置中完成 LLM 配置"
+        },
+        {
+            "name": "yt_ai_translate_partial_fail",
+            "value": "部分字幕翻译失败，已保留原文"
+        },
+        {
+            "name": "yt_ai_translate_failed",
+            "value": "字幕翻译失败，请稍后重试"
+        },
+        {
+            "name": "yt_setting_system_ai_caption",
+            "value": "系统 AI 字幕"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_subtitle",
+            "value": "由系统实时识别播放中的音频（部分机型支持，中/英文）"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source",
+            "value": "AI 字幕源语言"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source_zh",
+            "value": "中文"
+        },
+        {
+            "name": "yt_asr_menu",
+            "value": "AI 生成字幕"
+        },
+        {
+            "name": "yt_asr_phase_model",
+            "value": "下载模型"
+        },
+        {
+            "name": "yt_asr_live_progress",
+            "value": "实时识别中…"
+        },
+        {
+            "name": "yt_asr_failed",
+            "value": "AI 生成字幕失败，请稍后重试"
+        },
+        {
+            "name": "yt_asr_model_section",
+            "value": "端侧识别模型"
+        },
+        {
+            "name": "yt_asr_model_status_ready",
+            "value": "已就绪（中英双语流式识别）"
+        },
+        {
+            "name": "yt_asr_model_status_none",
+            "value": "未下载（约 190MB，建议 Wi-Fi 网络）"
+        },
+        {
+            "name": "yt_asr_model_downloading",
+            "value": "下载中"
+        },
+        {
+            "name": "yt_asr_model_download",
+            "value": "下载模型"
+        },
+        {
+            "name": "yt_asr_model_delete",
+            "value": "删除模型"
+        },
+        {
+            "name": "yt_ai_action_cancel",
+            "value": "取消"
+        },
         {
             "name": "yt_player_chapters",
             "value": "章节"
@@ -3488,7 +3488,6 @@
             "name": "yt_option_clear_history_subtitle",
             "value": "删除全部本地观看历史与播放进度"
         },
-
         {
             "name": "yt_toast_history_cleared",
             "value": "观看历史已清除"
@@ -3604,8 +3603,7 @@
         {
             "name": "yt_home_mode_long",
             "value": "长视频"
-        }
-    ,
+        },
         {
             "name": "yt_download_pause",
             "value": "暂停"
@@ -3845,8 +3843,7 @@
         {
             "name": "yt_translation_region",
             "value": "区域（Region）"
-        }
-,
+        },
         {
             "name": "yt_exp_title",
             "value": "实验性功能"
@@ -4147,73 +4144,345 @@
             "name": "yt_update_later",
             "value": "稍后"
         },
-        {"name": "yt_cookie_verify_success", "value": "Cookie 验证成功"},
-        {"name": "yt_local_import_partial", "value": "已导入 %1$d 个文件，%2$d 个失败"},
-        {"name": "yt_recovery_failed", "value": "操作未能全部完成，请重试"},
-        {"name": "yt_proxy_applying", "value": "正在应用代理…"},
-        {"name": "yt_exp_sb_skip_manual", "value": "跳过 %s"},
-        {"name": "yt_exp_sb_jump_highlight", "value": "跳至精彩处"},
-        {"name": "yt_action_sleep_timer_off", "value": "关闭定时"},
-        {"name": "yt_action_play_next", "value": "下一首播放"},
-        {"name": "yt_action_add_to_queue", "value": "加入队列"},
-        {"name": "yt_action_undo", "value": "撤销"},
-        {"name": "yt_action_save", "value": "保存"},
-        {"name": "yt_queue_loop_none", "value": "不循环"},
-        {"name": "yt_queue_loop_all", "value": "列表循环"},
-        {"name": "yt_queue_loop_one", "value": "单曲循环"},
-        {"name": "yt_queue_shuffle", "value": "随机播放"},
-        {"name": "yt_queue_shuffle_on", "value": "已开启随机播放"},
-        {"name": "yt_queue_shuffle_off", "value": "已关闭随机播放"},
-        {"name": "yt_queue_save_as_playlist", "value": "存为歌单"},
-        {"name": "yt_queue_save_sheet_title", "value": "另存为本地播放列表"},
-        {"name": "yt_queue_saved_toast", "value": "已保存为本地播放列表"},
-        {"name": "yt_queue_removed_item", "value": "已从队列移除"},
-        {"name": "yt_toast_play_next_added", "value": "已设为下一首播放"},
-        {"name": "yt_toast_added_to_queue", "value": "已加入播放队列"},
-        {"name": "yt_toast_already_in_queue", "value": "已在播放队列中"},
-        {"name": "yt_toast_already_playing", "value": "当前正在播放此视频"},
-        {"name": "yt_queue_local_mode_incompatible", "value": "本地播放队列与在线视频不兼容"},
-        {"name": "yt_queue_local_playlist", "value": "本地播放列表"},
-        {"name": "yt_queue_current_video", "value": "当前视频"},
-        {"name": "yt_queue_video_count", "value": "队列中 %d 个视频"},
-        {"name": "yt_section_audio_enhance", "value": "音频增强"},
-        {"name": "yt_playback_audio_normalize", "value": "响度均衡"},
-        {"name": "yt_playback_audio_normalize_subtitle", "value": "自动平衡播放音量，减少忽大忽小"},
-        {"name": "yt_playback_skip_silence", "value": "跳过静音"},
-        {"name": "yt_playback_skip_silence_subtitle", "value": "自动跳过空白静音片段（直播不生效）"},
-        {"name": "yt_playback_audio_delay", "value": "音画延迟"},
-        {"name": "yt_playback_audio_delay_subtitle", "value": "调节蓝牙耳机或外放的音画同步（-1000 至 +1000ms）"},
-        {"name": "yt_playback_audio_delay_reset", "value": "重置"},
-        {"name": "yt_player_audio_settings", "value": "音频设置"},
-        {"name": "yt_player_jump_ahead", "value": "跳至高能处"},
-        {"name": "yt_player_chapters_and_segments", "value": "章节与片段"},
-        {"name": "yt_exp_sb_segments_title", "value": "SponsorBlock 片段"},
-        {"name": "yt_exp_sb_jump_to_end", "value": "跳至结尾"},
-        {"name": "yt_exp_sb_whitelist", "value": "频道白名单"},
-        {"name": "yt_exp_sb_whitelist_empty", "value": "暂无白名单频道，可在播放页菜单中为当前频道开启免跳过"},
-        {"name": "yt_exp_sb_whitelist_channel", "value": "本频道免跳过"},
-        {"name": "yt_exp_sb_channel_whitelisted", "value": "已将本频道加入 SponsorBlock 白名单"},
-        {"name": "yt_exp_sb_channel_unwhitelisted", "value": "已将本频道移出 SponsorBlock 白名单"},
-        {"name": "yt_exp_sb_whitelist_remove", "value": "移除"},
-        {"name": "yt_player_subtitle_primary", "value": "主字幕"},
-        {"name": "yt_player_subtitle_secondary", "value": "双语副字幕"},
-        {"name": "yt_player_subtitle_secondary_off", "value": "关闭副字幕"},
-        {"name": "yt_player_subtitle_quick_on", "value": "开启字幕"},
-        {"name": "yt_player_subtitle_label_auto_generated", "value": "%s（自动生成）"},
-        {"name": "yt_player_subtitle_label_auto_translated", "value": "%s（自动翻译）"},
-        {"name": "yt_player_subtitle_error_rate_limited", "value": "字幕请求过于频繁，请稍后重试"},
-        {"name": "yt_player_subtitle_error_unavailable", "value": "当前字幕暂不可用"},
-        {"name": "yt_setting_subtitle_edge_style", "value": "字幕边缘样式"},
-        {"name": "yt_subtitle_edge_outline_shadow", "value": "描边与阴影"},
-        {"name": "yt_subtitle_edge_outline", "value": "仅描边"},
-        {"name": "yt_subtitle_edge_shadow", "value": "仅阴影"},
-        {"name": "yt_subtitle_edge_none", "value": "无"},
-        {"name": "yt_setting_subtitle_bold", "value": "字幕粗体"},
-        {"name": "yt_setting_subtitle_bold_subtitle", "value": "增强明亮画面下的字幕可读性"},
-        {"name": "yt_setting_subtitle_bg_opacity", "value": "字幕背景不透明度"},
-        {"name": "yt_setting_subtitle_offset_subtitle", "value": "微调字幕与音频同步（-5s 至 +5s）"},
-        {"name": "yt_setting_subtitle_offset_reset", "value": "重置"},
-        {"name": "yt_subtitle_preview_primary", "value": "这是一条字幕样式预览"},
-        {"name": "yt_subtitle_preview_secondary", "value": "Bilingual secondary subtitle preview"}
+        {
+            "name": "yt_cookie_verify_success",
+            "value": "Cookie 验证成功"
+        },
+        {
+            "name": "yt_local_import_partial",
+            "value": "已导入 %1$d 个文件，%2$d 个失败"
+        },
+        {
+            "name": "yt_recovery_failed",
+            "value": "操作未能全部完成，请重试"
+        },
+        {
+            "name": "yt_proxy_applying",
+            "value": "正在应用代理…"
+        },
+        {
+            "name": "yt_exp_sb_skip_manual",
+            "value": "跳过 %s"
+        },
+        {
+            "name": "yt_exp_sb_jump_highlight",
+            "value": "跳至精彩处"
+        },
+        {
+            "name": "yt_action_sleep_timer_off",
+            "value": "关闭定时"
+        },
+        {
+            "name": "yt_action_play_next",
+            "value": "下一首播放"
+        },
+        {
+            "name": "yt_action_add_to_queue",
+            "value": "加入队列"
+        },
+        {
+            "name": "yt_action_undo",
+            "value": "撤销"
+        },
+        {
+            "name": "yt_action_save",
+            "value": "保存"
+        },
+        {
+            "name": "yt_queue_loop_none",
+            "value": "不循环"
+        },
+        {
+            "name": "yt_queue_loop_all",
+            "value": "列表循环"
+        },
+        {
+            "name": "yt_queue_loop_one",
+            "value": "单曲循环"
+        },
+        {
+            "name": "yt_queue_shuffle",
+            "value": "随机播放"
+        },
+        {
+            "name": "yt_queue_shuffle_on",
+            "value": "已开启随机播放"
+        },
+        {
+            "name": "yt_queue_shuffle_off",
+            "value": "已关闭随机播放"
+        },
+        {
+            "name": "yt_queue_save_as_playlist",
+            "value": "存为歌单"
+        },
+        {
+            "name": "yt_queue_save_sheet_title",
+            "value": "另存为本地播放列表"
+        },
+        {
+            "name": "yt_queue_saved_toast",
+            "value": "已保存为本地播放列表"
+        },
+        {
+            "name": "yt_queue_removed_item",
+            "value": "已从队列移除"
+        },
+        {
+            "name": "yt_toast_play_next_added",
+            "value": "已设为下一首播放"
+        },
+        {
+            "name": "yt_toast_added_to_queue",
+            "value": "已加入播放队列"
+        },
+        {
+            "name": "yt_toast_already_in_queue",
+            "value": "已在播放队列中"
+        },
+        {
+            "name": "yt_toast_already_playing",
+            "value": "当前正在播放此视频"
+        },
+        {
+            "name": "yt_queue_local_mode_incompatible",
+            "value": "本地播放队列与在线视频不兼容"
+        },
+        {
+            "name": "yt_queue_local_playlist",
+            "value": "本地播放列表"
+        },
+        {
+            "name": "yt_queue_current_video",
+            "value": "当前视频"
+        },
+        {
+            "name": "yt_queue_video_count",
+            "value": "队列中 %d 个视频"
+        },
+        {
+            "name": "yt_section_audio_enhance",
+            "value": "音频增强"
+        },
+        {
+            "name": "yt_playback_audio_normalize",
+            "value": "响度均衡"
+        },
+        {
+            "name": "yt_playback_audio_normalize_subtitle",
+            "value": "自动平衡播放音量，减少忽大忽小"
+        },
+        {
+            "name": "yt_playback_audio_delay",
+            "value": "音画延迟"
+        },
+        {
+            "name": "yt_playback_audio_delay_subtitle",
+            "value": "调节蓝牙耳机或外放的音画同步（-1000 至 +1000ms）"
+        },
+        {
+            "name": "yt_playback_audio_delay_reset",
+            "value": "重置"
+        },
+        {
+            "name": "yt_player_audio_settings",
+            "value": "音频设置"
+        },
+        {
+            "name": "yt_player_jump_ahead",
+            "value": "跳至高能处"
+        },
+        {
+            "name": "yt_player_chapters_and_segments",
+            "value": "章节与片段"
+        },
+        {
+            "name": "yt_exp_sb_segments_title",
+            "value": "SponsorBlock 片段"
+        },
+        {
+            "name": "yt_exp_sb_jump_to_end",
+            "value": "跳至结尾"
+        },
+        {
+            "name": "yt_exp_sb_whitelist",
+            "value": "频道白名单"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_empty",
+            "value": "暂无白名单频道，可在播放页菜单中为当前频道开启免跳过"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_channel",
+            "value": "本频道免跳过"
+        },
+        {
+            "name": "yt_exp_sb_channel_whitelisted",
+            "value": "已将本频道加入 SponsorBlock 白名单"
+        },
+        {
+            "name": "yt_exp_sb_channel_unwhitelisted",
+            "value": "已将本频道移出 SponsorBlock 白名单"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_remove",
+            "value": "移除"
+        },
+        {
+            "name": "yt_player_subtitle_primary",
+            "value": "主字幕"
+        },
+        {
+            "name": "yt_player_subtitle_secondary",
+            "value": "双语副字幕"
+        },
+        {
+            "name": "yt_player_subtitle_secondary_off",
+            "value": "关闭副字幕"
+        },
+        {
+            "name": "yt_player_subtitle_quick_on",
+            "value": "开启字幕"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_generated",
+            "value": "%s（自动生成）"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_translated",
+            "value": "%s（自动翻译）"
+        },
+        {
+            "name": "yt_player_subtitle_error_rate_limited",
+            "value": "字幕请求过于频繁，请稍后重试"
+        },
+        {
+            "name": "yt_player_subtitle_error_unavailable",
+            "value": "当前字幕暂不可用"
+        },
+        {
+            "name": "yt_setting_subtitle_edge_style",
+            "value": "字幕边缘样式"
+        },
+        {
+            "name": "yt_subtitle_edge_outline_shadow",
+            "value": "描边与阴影"
+        },
+        {
+            "name": "yt_subtitle_edge_outline",
+            "value": "仅描边"
+        },
+        {
+            "name": "yt_subtitle_edge_shadow",
+            "value": "仅阴影"
+        },
+        {
+            "name": "yt_subtitle_edge_none",
+            "value": "无"
+        },
+        {
+            "name": "yt_setting_subtitle_bold",
+            "value": "字幕粗体"
+        },
+        {
+            "name": "yt_setting_subtitle_bold_subtitle",
+            "value": "增强明亮画面下的字幕可读性"
+        },
+        {
+            "name": "yt_setting_subtitle_bg_opacity",
+            "value": "字幕背景不透明度"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_subtitle",
+            "value": "微调字幕与音频同步（-5s 至 +5s）"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_reset",
+            "value": "重置"
+        },
+        {
+            "name": "yt_subtitle_preview_primary",
+            "value": "这是一条字幕样式预览"
+        },
+        {
+            "name": "yt_subtitle_preview_secondary",
+            "value": "Bilingual secondary subtitle preview"
+        },
+        {
+            "name": "yt_player_stats_for_nerds",
+            "value": "详细统计信息"
+        },
+        {
+            "name": "yt_action_copy",
+            "value": "复制"
+        },
+        {
+            "name": "yt_stats_transport",
+            "value": "传输协议"
+        },
+        {
+            "name": "yt_stats_hwdec",
+            "value": "硬件解码"
+        },
+        {
+            "name": "yt_stats_sw_decode",
+            "value": "软件解码"
+        },
+        {
+            "name": "yt_stats_color",
+            "value": "色彩格式"
+        },
+        {
+            "name": "yt_stats_av_sync",
+            "value": "音画同步"
+        },
+        {
+            "name": "yt_stats_audio_format",
+            "value": "音频格式"
+        },
+        {
+            "name": "yt_stats_audio_fx",
+            "value": "音频效果"
+        },
+        {
+            "name": "yt_stats_none",
+            "value": "无"
+        },
+        {
+            "name": "yt_stats_transport_direct",
+            "value": "直连"
+        },
+        {
+            "name": "yt_stats_transport_local",
+            "value": "本地"
+        },
+        {
+            "name": "yt_exp_hm_title",
+            "value": "热力图与跳至高能"
+        },
+        {
+            "name": "yt_exp_hm_desc",
+            "value": "在进度条上方展示视频重播热力图，并在快进后提示一键跳至下一个热门高能点。"
+        },
+        {
+            "name": "yt_exp_hm_show_graph",
+            "value": "进度条热力条"
+        },
+        {
+            "name": "yt_exp_hm_show_graph_desc",
+            "value": "在进度条上方绘制重播热度曲线"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead",
+            "value": "快进提示跳至高能"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead_desc",
+            "value": "双击或拖动快进后，提示一键跳到下一个热门高潮点"
+        },
+        {
+            "name": "yt_exp_hm_footer",
+            "value": "基于 YouTube 原生重播热力图数据，仅在视频提供热力图时生效。"
+        }
     ]
 }

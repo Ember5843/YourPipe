@@ -66,6 +66,9 @@ interface ExperimentalConfigData {
   aiListWarnList?: boolean;
   aiListSyncDays?: number;
   aiListLastSyncMs?: number;
+  heatmapPluginEnabled?: boolean;
+  heatmapShowGraph?: boolean;
+  heatmapJumpAhead?: boolean;
 }
 
 /**
@@ -97,6 +100,10 @@ export class ExperimentalConfig {
   @Track aiListSyncDays: number = 1;
   @Track aiListLastSyncMs: number = 0;
 
+  @Track heatmapPluginEnabled: boolean = false;
+  @Track heatmapShowGraph: boolean = true;
+  @Track heatmapJumpAhead: boolean = true;
+
   static loadFromPreferences(): ExperimentalConfig {
     const config = new ExperimentalConfig();
     const raw = PreferencesStore.getString(PREF_KEY, '');
@@ -123,11 +130,15 @@ export class ExperimentalConfig {
       config.aiListWarnList = data.aiListWarnList !== false;
       config.aiListSyncDays = ExperimentalConfig.normalizeNumber(data.aiListSyncDays, EXP_AILIST_SYNC_DAYS_VALUES, 1);
       config.aiListLastSyncMs = typeof data.aiListLastSyncMs === 'number' ? data.aiListLastSyncMs : 0;
+      config.heatmapPluginEnabled = data.heatmapPluginEnabled === true;
+      config.heatmapShowGraph = data.heatmapShowGraph !== false;
+      config.heatmapJumpAhead = data.heatmapJumpAhead !== false;
     } catch (e) {
       logger.error(`load experimental config failed: ${(e as Error).message}`);
     }
     logger.info(`experimental config loaded sb=${config.sponsorBlockEnabled} `
-      + `categories=${config.sponsorCategories} dearow=${config.deArrowEnabled} ailist=${config.aiListEnabled}`);
+      + `categories=${config.sponsorCategories} dearow=${config.deArrowEnabled} `
+      + `ailist=${config.aiListEnabled} heatmap=${config.heatmapPluginEnabled}`);
     return config;
   }
 
@@ -149,11 +160,14 @@ export class ExperimentalConfig {
       aiListMode: this.aiListMode,
       aiListWarnList: this.aiListWarnList,
       aiListSyncDays: this.aiListSyncDays,
-      aiListLastSyncMs: this.aiListLastSyncMs
+      aiListLastSyncMs: this.aiListLastSyncMs,
+      heatmapPluginEnabled: this.heatmapPluginEnabled,
+      heatmapShowGraph: this.heatmapShowGraph,
+      heatmapJumpAhead: this.heatmapJumpAhead
     };
     PreferencesStore.setString(PREF_KEY, JSON.stringify(data));
     logger.info(`experimental config saved sb=${this.sponsorBlockEnabled} dearow=${this.deArrowEnabled} `
-      + `ailist=${this.aiListEnabled}`);
+      + `ailist=${this.aiListEnabled} heatmap=${this.heatmapPluginEnabled}`);
   }
 
   /** 恢复默认：关闭全部实验性功能。 */
@@ -176,6 +190,9 @@ export class ExperimentalConfig {
     this.aiListWarnList = defaults.aiListWarnList;
     this.aiListSyncDays = defaults.aiListSyncDays;
     this.aiListLastSyncMs = defaults.aiListLastSyncMs;
+    this.heatmapPluginEnabled = defaults.heatmapPluginEnabled;
+    this.heatmapShowGraph = defaults.heatmapShowGraph;
+    this.heatmapJumpAhead = defaults.heatmapJumpAhead;
     this.saveToPreferences();
   }
 

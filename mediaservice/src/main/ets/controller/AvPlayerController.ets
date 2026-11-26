@@ -253,6 +253,12 @@ export class AvPlayerController {
         demuxerCacheDurationSec: 0,
         droppedFrames: 0,
         decoderDroppedFrames: 0,
+        totalFrames: 0,
+        avSyncMs: undefined,
+        measuredFps: 0,
+        bufferedBytes: 0,
+        activeAudioFilters: '',
+        transportKind: '',
         networkSpeedBps: 0
       };
     }
@@ -317,8 +323,14 @@ export class AvPlayerController {
 
   public getStreamCategories(): StreamCategories { return this.vm.playerModel.getStreamCategories(); }
   public getCurrentStreams(): CurrentStreams { return this.vm.playerModel.getCurrentStreams(); }
-  public updateVideoStream(stream: StreamInfo): void { this.vm.playerModel.updateVideoStream(stream); }
-  public updateAudioStream(stream: StreamInfo | undefined): void { this.vm.playerModel.updateAudioStream(stream); }
+  public updateVideoStream(stream: StreamInfo): void {
+    this.vm.playerModel.updateVideoStream(stream);
+    this.syncCurrentStreamMeta();
+  }
+  public updateAudioStream(stream: StreamInfo | undefined): void {
+    this.vm.playerModel.updateAudioStream(stream);
+    this.syncCurrentStreamMeta();
+  }
   public setCurIndex(curIndex: number): void { this.curIndex = curIndex; }
   public setIsPlaying(isPlaying: boolean): void { this.vm.isPlaying = isPlaying; }
 
@@ -383,6 +395,7 @@ export class AvPlayerController {
         e.stream.itag !== undefined && e.stream.itag === this.livePlayingVariantItag);
       if (playing) {
         this.vm.playerModel.updateVideoStream(playing.stream);
+        this.syncCurrentStreamMeta();
       }
     }
     Logger.info(TAG, `live HLS variants merged count=${variants.length} playingItag=${this.livePlayingVariantItag ?? '-'}`);
@@ -832,6 +845,7 @@ export class AvPlayerController {
     }
     this.vm.playerModel.updateVideoStream(videoStream);
     this.vm.playerModel.updateAudioStream(effectiveAudio);
+    this.syncCurrentStreamMeta();
     if (intentRevision === this.transportIntentRevision ? wasPlaying : this.transportIntentPlaying) {
       this.playbackEngine.play();
     }
@@ -886,28 +900,23 @@ export class AvPlayerController {
     return this.muted;
   }
 
-  private isCurrentSourceLive(): boolean {
-    return this.curSource?.isLive === true;
-  }
-
   /**
-   * 从 PlaybackPreferences.snapshot() 同步全部音频增强参数（响度均衡、跳静音、音画延迟）到引擎。
-   * 可在播放过程中安全热更新，无需重启播放；直播流自动旁路跳静音。
+   * 从 PlaybackPreferences.snapshot() 同步全部音频增强参数（响度均衡、音画延迟）到引擎。
+   * 可在播放过程中安全热更新，无需重启播放。
    */
   public applyAudioPreferences(): void {
     if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
     const prefs = PlaybackPreferences.snapshot();
-    const isLive = this.isCurrentSourceLive();
-    this.playbackEngine.setAudioFilters(prefs.audioNormalizeEnabled, prefs.skipSilenceEnabled, isLive);
+    this.playbackEngine.setAudioFilters(prefs.audioNormalizeEnabled);
     this.playbackEngine.setAudioDelayMs(prefs.audioDelayMs);
   }
 
   /**
-   * 运行时热切换 MPV 音频滤镜（响度均衡 + 跳静音）；直播流自动旁路跳静音。
+   * 运行时热切换 MPV 音频滤镜（响度均衡）。
    */
-  public setAudioFilters(normalize: boolean, skipSilence: boolean): void {
+  public setAudioFilters(normalize: boolean): void {
     if (this.stateMachine.isOneOf(PlayerState.RELEASED)) return;
-    this.playbackEngine.setAudioFilters(normalize, skipSilence, this.isCurrentSourceLive());
+    this.playbackEngine.setAudioFilters(normalize);
   }
 
   /**
@@ -1676,6 +1685,7 @@ export class AvPlayerController {
       if (manifest) {
         this.vm.playerModel.updateVideoStream(manifest);
         this.vm.playerModel.updateAudioStream(undefined);
+        this.syncCurrentStreamMeta();
         Logger.info(TAG, `Selected live manifest: ${this.describePlaybackUrl(manifest.url)}`);
         return true;
       }
@@ -1688,6 +1698,7 @@ export class AvPlayerController {
       if (manifest) {
         this.vm.playerModel.updateVideoStream(manifest);
         this.vm.playerModel.updateAudioStream(undefined);
+        this.syncCurrentStreamMeta();
         Logger.info(TAG, `Selected fallback manifest: ${this.describePlaybackUrl(manifest.url)}`);
         return true;
       }
@@ -1700,6 +1711,7 @@ export class AvPlayerController {
     }
     this.vm.playerModel.updateVideoStream(video.stream);
     this.vm.playerModel.updateAudioStream(audio);
+    this.syncCurrentStreamMeta();
 
     const label = `${video.stream.quality || '-'} [${video.stream.itag}]`;
     const delivery = (video.stream.deliveryMethod || '').toUpperCase();
@@ -2400,12 +2412,13 @@ export class AvPlayerController {
       : (this.vm.playerModel.getCurrentStreams().video?.bitrate ?? 0);
     this.playbackEngine.setTargetVideoBitrate(videoBitrate);
     const loaded = this.playbackEngine.load(playbackUrl, startPosSec,
-      candidate ? candidate.hlsAudioUrl : this.currentHlsAudioUrl, this.isCurrentSourceLive());
+      candidate ? candidate.hlsAudioUrl : this.currentHlsAudioUrl);
     if (loaded) {
       this.playbackLoadSeq++;
     }
     if (loaded && candidate) {
       this.commitPreparedSource(candidate);
+      this.syncCurrentStreamMeta();
       this.localTimelineAwaitingReady = sessionId.length > 0;
       this.localTimelineExpectedStartMs = expectedStartMs;
     }
@@ -2727,10 +2740,17 @@ export class AvPlayerController {
       videoCodec: state.videoCodec,
       videoBitRate: state.videoBitRate,
       frameRate: state.frameRate,
+      hwdec: state.hwdec,
+      pixelFormat: state.pixelFormat,
+      colorSpace: state.colorSpace,
+      colorPrimaries: state.colorPrimaries,
+      colorGamma: state.colorGamma,
       audioCodec: state.audioCodec,
       audioBitRate: state.audioBitRate,
       audioChannels: state.audioChannels,
       audioSampleRate: state.audioSampleRate,
+      audioFormat: state.audioFormat,
+      audioChannelLayout: state.audioChannelLayout,
       fileSize: state.fileSize,
       errorMsg: errorMsg,
       errorCategory: category,
@@ -2872,10 +2892,17 @@ export class AvPlayerController {
     this.vm.videoCodec = state.videoCodec;
     this.vm.videoBitRate = state.videoBitRate;
     this.vm.frameRate = state.frameRate;
+    this.vm.hwdec = state.hwdec;
+    this.vm.pixelFormat = state.pixelFormat;
+    this.vm.colorSpace = state.colorSpace;
+    this.vm.colorPrimaries = state.colorPrimaries;
+    this.vm.colorGamma = state.colorGamma;
     this.vm.audioCodec = state.audioCodec;
     this.vm.audioBitRate = state.audioBitRate;
     this.vm.audioChannels = state.audioChannels;
     this.vm.audioSampleRate = state.audioSampleRate;
+    this.vm.audioFormat = state.audioFormat;
+    this.vm.audioChannelLayout = state.audioChannelLayout;
     this.vm.fileSize = state.fileSize;
     if (seekableRangesChanged || prevDuration !== state.duration) {
       this.seekableRangesListeners.forEach(listener => listener());
@@ -3226,6 +3253,7 @@ export class AvPlayerController {
       if (playbackUrl) {
         this.vm.playerModel.updateVideoStream(progressive);
         this.vm.playerModel.updateAudioStream(undefined);
+        this.syncCurrentStreamMeta();
         this.loadPlaybackSource(playbackUrl, resumePos, generation);
         if (this.vm.isPlaying) {
           this.playbackEngine.play();
@@ -3235,6 +3263,26 @@ export class AvPlayerController {
     }
     // If no progressive available, retry current source
     this.retryPlayback(resumePos);
+  }
+
+  /** Sync active stream itags and extractor endpoint onto PlayerUiViewModel for Stats UI. */
+  private syncCurrentStreamMeta(): void {
+    const cur: CurrentStreams = this.vm.playerModel.getCurrentStreams();
+    const videoItag: number = cur.video?.itag ?? this.livePlayingVariantItag ?? 0;
+    const audioItag: number = cur.audio?.itag ?? 0;
+    const endpoint: string = cur.video?.sourceClient
+      || cur.audio?.sourceClient
+      || this.curSource?.streams?.[0]?.sourceClient
+      || '';
+    if (this.vm.currentVideoItag !== videoItag) {
+      this.vm.currentVideoItag = videoItag;
+    }
+    if (this.vm.currentAudioItag !== audioItag) {
+      this.vm.currentAudioItag = audioItag;
+    }
+    if (this.vm.currentStreamEndpoint !== endpoint) {
+      this.vm.currentStreamEndpoint = endpoint;
+    }
   }
 
   private sleep(ms: number): Promise<void> {

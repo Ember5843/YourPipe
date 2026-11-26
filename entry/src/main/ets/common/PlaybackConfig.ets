@@ -323,10 +323,8 @@ export class PlaybackConfig {
   @Track systemAiCaption: boolean = false;
   /** 系统 AI 字幕源语言（'zh'|'en'；英文源输出中英双语） */
   @Track systemAiCaptionSource: string = 'en';
-  /** MPV 原生响度均衡（dynaudnorm） */
+  /** MPV 原生响度均衡（acompressor + alimiter） */
   @Track audioNormalizeEnabled: boolean = false;
-  /** MPV 原生跳过静音（silenceremove，直播流自动旁路） */
-  @Track skipSilenceEnabled: boolean = false;
   /** MPV 原生音画延迟（毫秒，范围 -1000..1000） */
   @Track audioDelayMs: number = 0;
 
@@ -370,7 +368,6 @@ export class PlaybackConfig {
     this.systemAiCaption = false;
     this.systemAiCaptionSource = 'en';
     this.audioNormalizeEnabled = false;
-    this.skipSilenceEnabled = false;
     this.audioDelayMs = 0;
   }
 
@@ -559,7 +556,6 @@ export class PlaybackConfig {
     const aiCaptionSrc = PreferencesStore.getString('cfg_pb_systemAiCaptionSource', 'en');
     cfg.systemAiCaptionSource = (aiCaptionSrc === 'zh' || aiCaptionSrc === 'en') ? aiCaptionSrc : 'en';
     cfg.audioNormalizeEnabled = PreferencesStore.getString('cfg_pb_audioNormalizeEnabled', 'false') === 'true';
-    cfg.skipSilenceEnabled = PreferencesStore.getString('cfg_pb_skipSilenceEnabled', 'false') === 'true';
     const audioDelayRaw = Number(PreferencesStore.getString('cfg_pb_audioDelayMs', '0'));
     cfg.audioDelayMs = clampAudioDelayMs(audioDelayRaw);
 
@@ -606,7 +602,6 @@ export class PlaybackConfig {
     PreferencesStore.setString('cfg_pb_systemAiCaption', cfg.systemAiCaption ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_systemAiCaptionSource', cfg.systemAiCaptionSource);
     PreferencesStore.setString('cfg_pb_audioNormalizeEnabled', cfg.audioNormalizeEnabled ? 'true' : 'false');
-    PreferencesStore.setString('cfg_pb_skipSilenceEnabled', cfg.skipSilenceEnabled ? 'true' : 'false');
     PreferencesStore.setString('cfg_pb_audioDelayMs', String(clampAudioDelayMs(cfg.audioDelayMs)));
 
     logger.info('Saved PlaybackConfig');

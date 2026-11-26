@@ -1060,154 +1060,154 @@
             "name": "yt_player_subtitle_off",
             "value": "Субтитры выключены"
         },
-{
-    "name": "yt_player_subtitle_auto_translated",
-    "value": "Автоперевод"
-},
-{
-    "name": "yt_option_ai_translate",
-    "value": "Перевод субтитров с ИИ"
-},
-{
-    "name": "yt_option_ai_subtitle",
-    "value": "ИИ-субтитры"
-},
-{
-    "name": "yt_ai_translate_engine",
-    "value": "Движок перевода"
-},
-{
-    "name": "yt_ai_translate_engine_gtx",
-    "value": "Google Переводчик (бесплатно)"
-},
-{
-    "name": "yt_ai_translate_engine_llm",
-    "value": "Своя LLM (совместимая с OpenAI)"
-},
-{
-    "name": "yt_ai_translate_llm_section",
-    "value": "Настройки LLM"
-},
-{
-    "name": "yt_ai_translate_base_url",
-    "value": "Базовый URL"
-},
-{
-    "name": "yt_ai_translate_model",
-    "value": "Название модели"
-},
-{
-    "name": "yt_ai_translate_api_key",
-    "value": "API Key"
-},
-{
-    "name": "yt_ai_translate_test",
-    "value": "Проверить подключение"
-},
-{
-    "name": "yt_ai_translate_testing",
-    "value": "Проверка…"
-},
-{
-    "name": "yt_ai_translate_test_ok",
-    "value": "Подключение успешно"
-},
-{
-    "name": "yt_ai_translate_test_fail",
-    "value": "Ошибка подключения; проверьте настройки"
-},
-{
-    "name": "yt_ai_translate_display_section",
-    "value": "Отображение"
-},
-{
-    "name": "yt_ai_translate_bilingual",
-    "value": "Двуязычный режим"
-},
-{
-    "name": "yt_ai_translate_bilingual_subtitle",
-    "value": "Показывать оригинал и перевод"
-},
-{
-    "name": "yt_ai_translate_note",
-    "value": "Текст субтитров отправляется выбранному сервису перевода. Целевой язык совпадает с «Языком перевода контента»."
-},
-{
-    "name": "yt_ai_translate_menu",
-    "value": "ИИ-перевод"
-},
-{
-    "name": "yt_ai_translate_llm_not_configured",
-    "value": "Сначала настройте LLM в настройках"
-},
-{
-    "name": "yt_ai_translate_partial_fail",
-    "value": "Некоторые строки не переведены, показан оригинал"
-},
-{
-    "name": "yt_ai_translate_failed",
-    "value": "Ошибка перевода субтитров; повторите позже"
-},
-{
-    "name": "yt_setting_system_ai_caption",
-    "value": "Системные ИИ-субтитры"
-},
-{
-    "name": "yt_setting_system_ai_caption_subtitle",
-    "value": "Система распознаёт воспроизводимый звук в реальном времени (только поддерживаемые устройства, китайский/английский)"
-},
-{
-    "name": "yt_setting_system_ai_caption_source",
-    "value": "Язык источника ИИ-субтитров"
-},
-{
-    "name": "yt_setting_system_ai_caption_source_zh",
-    "value": "Китайский"
-},
-{
-    "name": "yt_asr_menu",
-    "value": "Создать субтитры (ИИ)"
-},
-{
-    "name": "yt_asr_phase_model",
-    "value": "Загрузка модели"
-},
-{
-    "name": "yt_asr_live_progress",
-    "value": "Идёт распознавание…"
-},
-{
-    "name": "yt_asr_failed",
-    "value": "Ошибка генерации субтитров; повторите позже"
-},
-{
-    "name": "yt_asr_model_section",
-    "value": "Модель распознавания на устройстве"
-},
-{
-    "name": "yt_asr_model_status_ready",
-    "value": "Готово (потоковое распознавание zh/en)"
-},
-{
-    "name": "yt_asr_model_status_none",
-    "value": "Не загружено (~190 МБ, рекомендуется Wi-Fi)"
-},
-{
-    "name": "yt_asr_model_downloading",
-    "value": "Загрузка"
-},
-{
-    "name": "yt_asr_model_download",
-    "value": "Скачать модель"
-},
-{
-    "name": "yt_asr_model_delete",
-    "value": "Удалить модель"
-},
-{
-    "name": "yt_ai_action_cancel",
-    "value": "Отмена"
-},
+        {
+            "name": "yt_player_subtitle_auto_translated",
+            "value": "Автоперевод"
+        },
+        {
+            "name": "yt_option_ai_translate",
+            "value": "Перевод субтитров с ИИ"
+        },
+        {
+            "name": "yt_option_ai_subtitle",
+            "value": "ИИ-субтитры"
+        },
+        {
+            "name": "yt_ai_translate_engine",
+            "value": "Движок перевода"
+        },
+        {
+            "name": "yt_ai_translate_engine_gtx",
+            "value": "Google Переводчик (бесплатно)"
+        },
+        {
+            "name": "yt_ai_translate_engine_llm",
+            "value": "Своя LLM (совместимая с OpenAI)"
+        },
+        {
+            "name": "yt_ai_translate_llm_section",
+            "value": "Настройки LLM"
+        },
+        {
+            "name": "yt_ai_translate_base_url",
+            "value": "Базовый URL"
+        },
+        {
+            "name": "yt_ai_translate_model",
+            "value": "Название модели"
+        },
+        {
+            "name": "yt_ai_translate_api_key",
+            "value": "API Key"
+        },
+        {
+            "name": "yt_ai_translate_test",
+            "value": "Проверить подключение"
+        },
+        {
+            "name": "yt_ai_translate_testing",
+            "value": "Проверка…"
+        },
+        {
+            "name": "yt_ai_translate_test_ok",
+            "value": "Подключение успешно"
+        },
+        {
+            "name": "yt_ai_translate_test_fail",
+            "value": "Ошибка подключения; проверьте настройки"
+        },
+        {
+            "name": "yt_ai_translate_display_section",
+            "value": "Отображение"
+        },
+        {
+            "name": "yt_ai_translate_bilingual",
+            "value": "Двуязычный режим"
+        },
+        {
+            "name": "yt_ai_translate_bilingual_subtitle",
+            "value": "Показывать оригинал и перевод"
+        },
+        {
+            "name": "yt_ai_translate_note",
+            "value": "Текст субтитров отправляется выбранному сервису перевода. Целевой язык совпадает с «Языком перевода контента»."
+        },
+        {
+            "name": "yt_ai_translate_menu",
+            "value": "ИИ-перевод"
+        },
+        {
+            "name": "yt_ai_translate_llm_not_configured",
+            "value": "Сначала настройте LLM в настройках"
+        },
+        {
+            "name": "yt_ai_translate_partial_fail",
+            "value": "Некоторые строки не переведены, показан оригинал"
+        },
+        {
+            "name": "yt_ai_translate_failed",
+            "value": "Ошибка перевода субтитров; повторите позже"
+        },
+        {
+            "name": "yt_setting_system_ai_caption",
+            "value": "Системные ИИ-субтитры"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_subtitle",
+            "value": "Система распознаёт воспроизводимый звук в реальном времени (только поддерживаемые устройства, китайский/английский)"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source",
+            "value": "Язык источника ИИ-субтитров"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source_zh",
+            "value": "Китайский"
+        },
+        {
+            "name": "yt_asr_menu",
+            "value": "Создать субтитры (ИИ)"
+        },
+        {
+            "name": "yt_asr_phase_model",
+            "value": "Загрузка модели"
+        },
+        {
+            "name": "yt_asr_live_progress",
+            "value": "Идёт распознавание…"
+        },
+        {
+            "name": "yt_asr_failed",
+            "value": "Ошибка генерации субтитров; повторите позже"
+        },
+        {
+            "name": "yt_asr_model_section",
+            "value": "Модель распознавания на устройстве"
+        },
+        {
+            "name": "yt_asr_model_status_ready",
+            "value": "Готово (потоковое распознавание zh/en)"
+        },
+        {
+            "name": "yt_asr_model_status_none",
+            "value": "Не загружено (~190 МБ, рекомендуется Wi-Fi)"
+        },
+        {
+            "name": "yt_asr_model_downloading",
+            "value": "Загрузка"
+        },
+        {
+            "name": "yt_asr_model_download",
+            "value": "Скачать модель"
+        },
+        {
+            "name": "yt_asr_model_delete",
+            "value": "Удалить модель"
+        },
+        {
+            "name": "yt_ai_action_cancel",
+            "value": "Отмена"
+        },
         {
             "name": "yt_player_chapters",
             "value": "Главы"
@@ -3488,7 +3488,6 @@
             "name": "yt_option_clear_history_subtitle",
             "value": "Удалить всю локальную историю и прогресс"
         },
-
         {
             "name": "yt_toast_history_cleared",
             "value": "История очищена"
@@ -3604,8 +3603,7 @@
         {
             "name": "yt_home_mode_long",
             "value": "Длинные видео"
-        }
-    ,
+        },
         {
             "name": "yt_download_pause",
             "value": "Пауза"
@@ -3845,8 +3843,7 @@
         {
             "name": "yt_translation_region",
             "value": "Регион"
-        }
-,
+        },
         {
             "name": "yt_exp_title",
             "value": "Экспериментальные функции"
@@ -4147,73 +4144,345 @@
             "name": "yt_update_later",
             "value": "Позже"
         },
-        {"name": "yt_cookie_verify_success", "value": "Cookie проверен."},
-        {"name": "yt_local_import_partial", "value": "Импортировано файлов: %1$d; ошибок: %2$d."},
-        {"name": "yt_recovery_failed", "value": "Не удалось завершить операцию. Повторите попытку."},
-        {"name": "yt_proxy_applying", "value": "Применение прокси…"},
-        {"name": "yt_exp_sb_skip_manual", "value": "Пропустить: %s"},
-        {"name": "yt_exp_sb_jump_highlight", "value": "Перейти к важному моменту"},
-        {"name": "yt_action_sleep_timer_off", "value": "Выключить"},
-        {"name": "yt_action_play_next", "value": "Воспроизвести следующим"},
-        {"name": "yt_action_add_to_queue", "value": "Добавить в очередь"},
-        {"name": "yt_action_undo", "value": "Отменить"},
-        {"name": "yt_action_save", "value": "Сохранить"},
-        {"name": "yt_queue_loop_none", "value": "Без повтора"},
-        {"name": "yt_queue_loop_all", "value": "Повтор списка"},
-        {"name": "yt_queue_loop_one", "value": "Повтор видео"},
-        {"name": "yt_queue_shuffle", "value": "Перемешать"},
-        {"name": "yt_queue_shuffle_on", "value": "Перемешивание включено"},
-        {"name": "yt_queue_shuffle_off", "value": "Перемешивание выключено"},
-        {"name": "yt_queue_save_as_playlist", "value": "Сохранить"},
-        {"name": "yt_queue_save_sheet_title", "value": "Сохранить очередь как локальный плейлист"},
-        {"name": "yt_queue_saved_toast", "value": "Сохранено как локальный плейлист"},
-        {"name": "yt_queue_removed_item", "value": "Удалено из очереди"},
-        {"name": "yt_toast_play_next_added", "value": "Будет воспроизведено следующим"},
-        {"name": "yt_toast_added_to_queue", "value": "Добавлено в очередь"},
-        {"name": "yt_toast_already_in_queue", "value": "Уже в очереди"},
-        {"name": "yt_toast_already_playing", "value": "Это видео уже воспроизводится"},
-        {"name": "yt_queue_local_mode_incompatible", "value": "Нельзя смешивать локальные и онлайн-видео"},
-        {"name": "yt_queue_local_playlist", "value": "Локальный плейлист"},
-        {"name": "yt_queue_current_video", "value": "Текущее видео"},
-        {"name": "yt_queue_video_count", "value": "В очереди: %d видео"},
-        {"name": "yt_section_audio_enhance", "value": "Улучшение звука"},
-        {"name": "yt_playback_audio_normalize", "value": "Нормализация громкости"},
-        {"name": "yt_playback_audio_normalize_subtitle", "value": "Автоматически выравнивает уровень громкости"},
-        {"name": "yt_playback_skip_silence", "value": "Пропуск тишины"},
-        {"name": "yt_playback_skip_silence_subtitle", "value": "Автоматически пропускает паузы тишины (отключено в эфире)"},
-        {"name": "yt_playback_audio_delay", "value": "Задержка звука"},
-        {"name": "yt_playback_audio_delay_subtitle", "value": "Настройка синхронизации для Bluetooth и динамиков (от -1000 до +1000 мс)"},
-        {"name": "yt_playback_audio_delay_reset", "value": "Сбросить"},
-        {"name": "yt_player_audio_settings", "value": "Настройки звука"},
-        {"name": "yt_player_jump_ahead", "value": "К яркому моменту"},
-        {"name": "yt_player_chapters_and_segments", "value": "Главы и фрагменты"},
-        {"name": "yt_exp_sb_segments_title", "value": "Фрагменты SponsorBlock"},
-        {"name": "yt_exp_sb_jump_to_end", "value": "В конец"},
-        {"name": "yt_exp_sb_whitelist", "value": "Белый список каналов"},
-        {"name": "yt_exp_sb_whitelist_empty", "value": "Белый список пуст. Добавьте канал из меню плеера."},
-        {"name": "yt_exp_sb_whitelist_channel", "value": "Не пропускать на этом канале"},
-        {"name": "yt_exp_sb_channel_whitelisted", "value": "Канал добавлен в белый список SponsorBlock"},
-        {"name": "yt_exp_sb_channel_unwhitelisted", "value": "Канал удалён из белого списка SponsorBlock"},
-        {"name": "yt_exp_sb_whitelist_remove", "value": "Удалить"},
-        {"name": "yt_player_subtitle_primary", "value": "Основные субтитры"},
-        {"name": "yt_player_subtitle_secondary", "value": "Вторые субтитры (двуязычные)"},
-        {"name": "yt_player_subtitle_secondary_off", "value": "Отключить вторые"},
-        {"name": "yt_player_subtitle_quick_on", "value": "Включить субтитры"},
-        {"name": "yt_player_subtitle_label_auto_generated", "value": "%s (Автосоздание)"},
-        {"name": "yt_player_subtitle_label_auto_translated", "value": "%s (Автоперевод)"},
-        {"name": "yt_player_subtitle_error_rate_limited", "value": "Слишком много запросов субтитров, повторите позже"},
-        {"name": "yt_player_subtitle_error_unavailable", "value": "Субтитры сейчас недоступны"},
-        {"name": "yt_setting_subtitle_edge_style", "value": "Стиль контура субтитров"},
-        {"name": "yt_subtitle_edge_outline_shadow", "value": "Контур и тень"},
-        {"name": "yt_subtitle_edge_outline", "value": "Только контур"},
-        {"name": "yt_subtitle_edge_shadow", "value": "Только тень"},
-        {"name": "yt_subtitle_edge_none", "value": "Нет"},
-        {"name": "yt_setting_subtitle_bold", "value": "Жирный шрифт субтитров"},
-        {"name": "yt_setting_subtitle_bold_subtitle", "value": "Улучшает читаемость на светлых сценах"},
-        {"name": "yt_setting_subtitle_bg_opacity", "value": "Непрозрачность фона субтитров"},
-        {"name": "yt_setting_subtitle_offset_subtitle", "value": "Точная синхронизация субтитров (-5s до +5s)"},
-        {"name": "yt_setting_subtitle_offset_reset", "value": "Сброс"},
-        {"name": "yt_subtitle_preview_primary", "value": "Предпросмотр стиля субтитров"},
-        {"name": "yt_subtitle_preview_secondary", "value": "Bilingual secondary subtitle preview"}
+        {
+            "name": "yt_cookie_verify_success",
+            "value": "Cookie проверен."
+        },
+        {
+            "name": "yt_local_import_partial",
+            "value": "Импортировано файлов: %1$d; ошибок: %2$d."
+        },
+        {
+            "name": "yt_recovery_failed",
+            "value": "Не удалось завершить операцию. Повторите попытку."
+        },
+        {
+            "name": "yt_proxy_applying",
+            "value": "Применение прокси…"
+        },
+        {
+            "name": "yt_exp_sb_skip_manual",
+            "value": "Пропустить: %s"
+        },
+        {
+            "name": "yt_exp_sb_jump_highlight",
+            "value": "Перейти к важному моменту"
+        },
+        {
+            "name": "yt_action_sleep_timer_off",
+            "value": "Выключить"
+        },
+        {
+            "name": "yt_action_play_next",
+            "value": "Воспроизвести следующим"
+        },
+        {
+            "name": "yt_action_add_to_queue",
+            "value": "Добавить в очередь"
+        },
+        {
+            "name": "yt_action_undo",
+            "value": "Отменить"
+        },
+        {
+            "name": "yt_action_save",
+            "value": "Сохранить"
+        },
+        {
+            "name": "yt_queue_loop_none",
+            "value": "Без повтора"
+        },
+        {
+            "name": "yt_queue_loop_all",
+            "value": "Повтор списка"
+        },
+        {
+            "name": "yt_queue_loop_one",
+            "value": "Повтор видео"
+        },
+        {
+            "name": "yt_queue_shuffle",
+            "value": "Перемешать"
+        },
+        {
+            "name": "yt_queue_shuffle_on",
+            "value": "Перемешивание включено"
+        },
+        {
+            "name": "yt_queue_shuffle_off",
+            "value": "Перемешивание выключено"
+        },
+        {
+            "name": "yt_queue_save_as_playlist",
+            "value": "Сохранить"
+        },
+        {
+            "name": "yt_queue_save_sheet_title",
+            "value": "Сохранить очередь как локальный плейлист"
+        },
+        {
+            "name": "yt_queue_saved_toast",
+            "value": "Сохранено как локальный плейлист"
+        },
+        {
+            "name": "yt_queue_removed_item",
+            "value": "Удалено из очереди"
+        },
+        {
+            "name": "yt_toast_play_next_added",
+            "value": "Будет воспроизведено следующим"
+        },
+        {
+            "name": "yt_toast_added_to_queue",
+            "value": "Добавлено в очередь"
+        },
+        {
+            "name": "yt_toast_already_in_queue",
+            "value": "Уже в очереди"
+        },
+        {
+            "name": "yt_toast_already_playing",
+            "value": "Это видео уже воспроизводится"
+        },
+        {
+            "name": "yt_queue_local_mode_incompatible",
+            "value": "Нельзя смешивать локальные и онлайн-видео"
+        },
+        {
+            "name": "yt_queue_local_playlist",
+            "value": "Локальный плейлист"
+        },
+        {
+            "name": "yt_queue_current_video",
+            "value": "Текущее видео"
+        },
+        {
+            "name": "yt_queue_video_count",
+            "value": "В очереди: %d видео"
+        },
+        {
+            "name": "yt_section_audio_enhance",
+            "value": "Улучшение звука"
+        },
+        {
+            "name": "yt_playback_audio_normalize",
+            "value": "Нормализация громкости"
+        },
+        {
+            "name": "yt_playback_audio_normalize_subtitle",
+            "value": "Автоматически выравнивает уровень громкости"
+        },
+        {
+            "name": "yt_playback_audio_delay",
+            "value": "Задержка звука"
+        },
+        {
+            "name": "yt_playback_audio_delay_subtitle",
+            "value": "Настройка синхронизации для Bluetooth и динамиков (от -1000 до +1000 мс)"
+        },
+        {
+            "name": "yt_playback_audio_delay_reset",
+            "value": "Сбросить"
+        },
+        {
+            "name": "yt_player_audio_settings",
+            "value": "Настройки звука"
+        },
+        {
+            "name": "yt_player_jump_ahead",
+            "value": "К яркому моменту"
+        },
+        {
+            "name": "yt_player_chapters_and_segments",
+            "value": "Главы и фрагменты"
+        },
+        {
+            "name": "yt_exp_sb_segments_title",
+            "value": "Фрагменты SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_jump_to_end",
+            "value": "В конец"
+        },
+        {
+            "name": "yt_exp_sb_whitelist",
+            "value": "Белый список каналов"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_empty",
+            "value": "Белый список пуст. Добавьте канал из меню плеера."
+        },
+        {
+            "name": "yt_exp_sb_whitelist_channel",
+            "value": "Не пропускать на этом канале"
+        },
+        {
+            "name": "yt_exp_sb_channel_whitelisted",
+            "value": "Канал добавлен в белый список SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_channel_unwhitelisted",
+            "value": "Канал удалён из белого списка SponsorBlock"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_remove",
+            "value": "Удалить"
+        },
+        {
+            "name": "yt_player_subtitle_primary",
+            "value": "Основные субтитры"
+        },
+        {
+            "name": "yt_player_subtitle_secondary",
+            "value": "Вторые субтитры (двуязычные)"
+        },
+        {
+            "name": "yt_player_subtitle_secondary_off",
+            "value": "Отключить вторые"
+        },
+        {
+            "name": "yt_player_subtitle_quick_on",
+            "value": "Включить субтитры"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_generated",
+            "value": "%s (Автосоздание)"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_translated",
+            "value": "%s (Автоперевод)"
+        },
+        {
+            "name": "yt_player_subtitle_error_rate_limited",
+            "value": "Слишком много запросов субтитров, повторите позже"
+        },
+        {
+            "name": "yt_player_subtitle_error_unavailable",
+            "value": "Субтитры сейчас недоступны"
+        },
+        {
+            "name": "yt_setting_subtitle_edge_style",
+            "value": "Стиль контура субтитров"
+        },
+        {
+            "name": "yt_subtitle_edge_outline_shadow",
+            "value": "Контур и тень"
+        },
+        {
+            "name": "yt_subtitle_edge_outline",
+            "value": "Только контур"
+        },
+        {
+            "name": "yt_subtitle_edge_shadow",
+            "value": "Только тень"
+        },
+        {
+            "name": "yt_subtitle_edge_none",
+            "value": "Нет"
+        },
+        {
+            "name": "yt_setting_subtitle_bold",
+            "value": "Жирный шрифт субтитров"
+        },
+        {
+            "name": "yt_setting_subtitle_bold_subtitle",
+            "value": "Улучшает читаемость на светлых сценах"
+        },
+        {
+            "name": "yt_setting_subtitle_bg_opacity",
+            "value": "Непрозрачность фона субтитров"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_subtitle",
+            "value": "Точная синхронизация субтитров (-5s до +5s)"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_reset",
+            "value": "Сброс"
+        },
+        {
+            "name": "yt_subtitle_preview_primary",
+            "value": "Предпросмотр стиля субтитров"
+        },
+        {
+            "name": "yt_subtitle_preview_secondary",
+            "value": "Bilingual secondary subtitle preview"
+        },
+        {
+            "name": "yt_player_stats_for_nerds",
+            "value": "Статистика для сисадминов"
+        },
+        {
+            "name": "yt_action_copy",
+            "value": "Копировать"
+        },
+        {
+            "name": "yt_stats_transport",
+            "value": "Транспорт"
+        },
+        {
+            "name": "yt_stats_hwdec",
+            "value": "Аппаратное декодирование"
+        },
+        {
+            "name": "yt_stats_sw_decode",
+            "value": "Программное"
+        },
+        {
+            "name": "yt_stats_color",
+            "value": "Цвет / Пиксель"
+        },
+        {
+            "name": "yt_stats_av_sync",
+            "value": "Синхронизация A/V"
+        },
+        {
+            "name": "yt_stats_audio_format",
+            "value": "Формат аудио"
+        },
+        {
+            "name": "yt_stats_audio_fx",
+            "value": "Аудиоэффекты"
+        },
+        {
+            "name": "yt_stats_none",
+            "value": "Нет"
+        },
+        {
+            "name": "yt_stats_transport_direct",
+            "value": "Прямой"
+        },
+        {
+            "name": "yt_stats_transport_local",
+            "value": "Локальный"
+        },
+        {
+            "name": "yt_exp_hm_title",
+            "value": "Тепловая карта и переход к ярким моментам"
+        },
+        {
+            "name": "yt_exp_hm_desc",
+            "value": "Показывает график самых популярных моментов над полосой прокрутки и предлагает перейти к следующему пику после перемотки вперёд."
+        },
+        {
+            "name": "yt_exp_hm_show_graph",
+            "value": "Тепловая карта на полосе прокрутки"
+        },
+        {
+            "name": "yt_exp_hm_show_graph_desc",
+            "value": "Отображать кривую популярности моментов над шкалой времени"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead",
+            "value": "Подсказка перехода при перемотке"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead_desc",
+            "value": "Предлагать переход к следующему популярному пику после перемотки вперёд"
+        },
+        {
+            "name": "yt_exp_hm_footer",
+            "value": "Использует встроенные данные YouTube; работает только для видео с тепловой картой."
+        }
     ]
 }

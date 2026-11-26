@@ -1144,154 +1144,154 @@
             "name": "yt_player_subtitle_off",
             "value": "Subtitles off"
         },
-{
-    "name": "yt_player_subtitle_auto_translated",
-    "value": "Auto-translated"
-},
-{
-    "name": "yt_option_ai_translate",
-    "value": "AI Subtitle Translation"
-},
-{
-    "name": "yt_option_ai_subtitle",
-    "value": "AI Subtitles"
-},
-{
-    "name": "yt_ai_translate_engine",
-    "value": "Translation engine"
-},
-{
-    "name": "yt_ai_translate_engine_gtx",
-    "value": "Google Translate (free)"
-},
-{
-    "name": "yt_ai_translate_engine_llm",
-    "value": "Custom LLM (OpenAI-compatible)"
-},
-{
-    "name": "yt_ai_translate_llm_section",
-    "value": "LLM settings"
-},
-{
-    "name": "yt_ai_translate_base_url",
-    "value": "Base URL"
-},
-{
-    "name": "yt_ai_translate_model",
-    "value": "Model name"
-},
-{
-    "name": "yt_ai_translate_api_key",
-    "value": "API Key"
-},
-{
-    "name": "yt_ai_translate_test",
-    "value": "Test connection"
-},
-{
-    "name": "yt_ai_translate_testing",
-    "value": "Testing…"
-},
-{
-    "name": "yt_ai_translate_test_ok",
-    "value": "Connection successful"
-},
-{
-    "name": "yt_ai_translate_test_fail",
-    "value": "Connection failed; check your settings"
-},
-{
-    "name": "yt_ai_translate_display_section",
-    "value": "Display"
-},
-{
-    "name": "yt_ai_translate_bilingual",
-    "value": "Bilingual"
-},
-{
-    "name": "yt_ai_translate_bilingual_subtitle",
-    "value": "Show original and translation together"
-},
-{
-    "name": "yt_ai_translate_note",
-    "value": "Subtitle text is sent to the selected translation service. The target language follows \"Content translation language\"."
-},
-{
-    "name": "yt_ai_translate_menu",
-    "value": "AI Translate"
-},
-{
-    "name": "yt_ai_translate_llm_not_configured",
-    "value": "Configure the LLM in Settings first"
-},
-{
-    "name": "yt_ai_translate_partial_fail",
-    "value": "Some lines failed to translate; originals kept"
-},
-{
-    "name": "yt_ai_translate_failed",
-    "value": "Subtitle translation failed; try again later"
-},
-{
-    "name": "yt_setting_system_ai_caption",
-    "value": "System AI captions"
-},
-{
-    "name": "yt_setting_system_ai_caption_subtitle",
-    "value": "System transcribes playing audio in real time (supported devices only, Chinese/English)"
-},
-{
-    "name": "yt_setting_system_ai_caption_source",
-    "value": "AI caption source language"
-},
-{
-    "name": "yt_setting_system_ai_caption_source_zh",
-    "value": "Chinese"
-},
-{
-    "name": "yt_asr_menu",
-    "value": "AI-generated subtitles"
-},
-{
-    "name": "yt_asr_phase_model",
-    "value": "Downloading model"
-},
-{
-    "name": "yt_asr_live_progress",
-    "value": "Recognizing live…"
-},
-{
-    "name": "yt_asr_failed",
-    "value": "AI subtitle generation failed; try again later"
-},
-{
-    "name": "yt_asr_model_section",
-    "value": "On-device recognition model"
-},
-{
-    "name": "yt_asr_model_status_ready",
-    "value": "Ready (streaming zh/en recognition)"
-},
-{
-    "name": "yt_asr_model_status_none",
-    "value": "Not downloaded (~190 MB; Wi-Fi recommended)"
-},
-{
-    "name": "yt_asr_model_downloading",
-    "value": "Downloading"
-},
-{
-    "name": "yt_asr_model_download",
-    "value": "Download model"
-},
-{
-    "name": "yt_asr_model_delete",
-    "value": "Delete model"
-},
-{
-    "name": "yt_ai_action_cancel",
-    "value": "Cancel"
-},
+        {
+            "name": "yt_player_subtitle_auto_translated",
+            "value": "Auto-translated"
+        },
+        {
+            "name": "yt_option_ai_translate",
+            "value": "AI Subtitle Translation"
+        },
+        {
+            "name": "yt_option_ai_subtitle",
+            "value": "AI Subtitles"
+        },
+        {
+            "name": "yt_ai_translate_engine",
+            "value": "Translation engine"
+        },
+        {
+            "name": "yt_ai_translate_engine_gtx",
+            "value": "Google Translate (free)"
+        },
+        {
+            "name": "yt_ai_translate_engine_llm",
+            "value": "Custom LLM (OpenAI-compatible)"
+        },
+        {
+            "name": "yt_ai_translate_llm_section",
+            "value": "LLM settings"
+        },
+        {
+            "name": "yt_ai_translate_base_url",
+            "value": "Base URL"
+        },
+        {
+            "name": "yt_ai_translate_model",
+            "value": "Model name"
+        },
+        {
+            "name": "yt_ai_translate_api_key",
+            "value": "API Key"
+        },
+        {
+            "name": "yt_ai_translate_test",
+            "value": "Test connection"
+        },
+        {
+            "name": "yt_ai_translate_testing",
+            "value": "Testing…"
+        },
+        {
+            "name": "yt_ai_translate_test_ok",
+            "value": "Connection successful"
+        },
+        {
+            "name": "yt_ai_translate_test_fail",
+            "value": "Connection failed; check your settings"
+        },
+        {
+            "name": "yt_ai_translate_display_section",
+            "value": "Display"
+        },
+        {
+            "name": "yt_ai_translate_bilingual",
+            "value": "Bilingual"
+        },
+        {
+            "name": "yt_ai_translate_bilingual_subtitle",
+            "value": "Show original and translation together"
+        },
+        {
+            "name": "yt_ai_translate_note",
+            "value": "Subtitle text is sent to the selected translation service. The target language follows \"Content translation language\"."
+        },
+        {
+            "name": "yt_ai_translate_menu",
+            "value": "AI Translate"
+        },
+        {
+            "name": "yt_ai_translate_llm_not_configured",
+            "value": "Configure the LLM in Settings first"
+        },
+        {
+            "name": "yt_ai_translate_partial_fail",
+            "value": "Some lines failed to translate; originals kept"
+        },
+        {
+            "name": "yt_ai_translate_failed",
+            "value": "Subtitle translation failed; try again later"
+        },
+        {
+            "name": "yt_setting_system_ai_caption",
+            "value": "System AI captions"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_subtitle",
+            "value": "System transcribes playing audio in real time (supported devices only, Chinese/English)"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source",
+            "value": "AI caption source language"
+        },
+        {
+            "name": "yt_setting_system_ai_caption_source_zh",
+            "value": "Chinese"
+        },
+        {
+            "name": "yt_asr_menu",
+            "value": "AI-generated subtitles"
+        },
+        {
+            "name": "yt_asr_phase_model",
+            "value": "Downloading model"
+        },
+        {
+            "name": "yt_asr_live_progress",
+            "value": "Recognizing live…"
+        },
+        {
+            "name": "yt_asr_failed",
+            "value": "AI subtitle generation failed; try again later"
+        },
+        {
+            "name": "yt_asr_model_section",
+            "value": "On-device recognition model"
+        },
+        {
+            "name": "yt_asr_model_status_ready",
+            "value": "Ready (streaming zh/en recognition)"
+        },
+        {
+            "name": "yt_asr_model_status_none",
+            "value": "Not downloaded (~190 MB; Wi-Fi recommended)"
+        },
+        {
+            "name": "yt_asr_model_downloading",
+            "value": "Downloading"
+        },
+        {
+            "name": "yt_asr_model_download",
+            "value": "Download model"
+        },
+        {
+            "name": "yt_asr_model_delete",
+            "value": "Delete model"
+        },
+        {
+            "name": "yt_ai_action_cancel",
+            "value": "Cancel"
+        },
         {
             "name": "yt_player_chapters",
             "value": "Chapters"
@@ -3488,7 +3488,6 @@
             "name": "yt_option_clear_history_subtitle",
             "value": "Delete all local watch history and playback progress"
         },
-
         {
             "name": "yt_toast_history_cleared",
             "value": "Watch history cleared"
@@ -3604,8 +3603,7 @@
         {
             "name": "yt_home_mode_long",
             "value": "Long videos"
-        }
-    ,
+        },
         {
             "name": "yt_download_pause",
             "value": "Pause"
@@ -3845,8 +3843,7 @@
         {
             "name": "yt_translation_region",
             "value": "Region"
-        }
-,
+        },
         {
             "name": "yt_exp_title",
             "value": "Experimental features"
@@ -4147,73 +4144,345 @@
             "name": "yt_update_later",
             "value": "Later"
         },
-        {"name": "yt_cookie_verify_success", "value": "Cookie verified."},
-        {"name": "yt_local_import_partial", "value": "Imported %1$d file(s); %2$d failed."},
-        {"name": "yt_recovery_failed", "value": "The operation could not be completed. Please retry."},
-        {"name": "yt_proxy_applying", "value": "Applying proxy…"},
-        {"name": "yt_exp_sb_skip_manual", "value": "Skip %s"},
-        {"name": "yt_exp_sb_jump_highlight", "value": "Jump to highlight"},
-        {"name": "yt_action_sleep_timer_off", "value": "Turn off"},
-        {"name": "yt_action_play_next", "value": "Play next"},
-        {"name": "yt_action_add_to_queue", "value": "Add to queue"},
-        {"name": "yt_action_undo", "value": "Undo"},
-        {"name": "yt_action_save", "value": "Save"},
-        {"name": "yt_queue_loop_none", "value": "No loop"},
-        {"name": "yt_queue_loop_all", "value": "Loop all"},
-        {"name": "yt_queue_loop_one", "value": "Loop one"},
-        {"name": "yt_queue_shuffle", "value": "Shuffle"},
-        {"name": "yt_queue_shuffle_on", "value": "Shuffle enabled"},
-        {"name": "yt_queue_shuffle_off", "value": "Shuffle disabled"},
-        {"name": "yt_queue_save_as_playlist", "value": "Save playlist"},
-        {"name": "yt_queue_save_sheet_title", "value": "Save queue as local playlist"},
-        {"name": "yt_queue_saved_toast", "value": "Saved as local playlist"},
-        {"name": "yt_queue_removed_item", "value": "Removed from queue"},
-        {"name": "yt_toast_play_next_added", "value": "Will play next"},
-        {"name": "yt_toast_added_to_queue", "value": "Added to queue"},
-        {"name": "yt_toast_already_in_queue", "value": "Already in queue"},
-        {"name": "yt_toast_already_playing", "value": "Already playing this video"},
-        {"name": "yt_queue_local_mode_incompatible", "value": "Cannot mix local and online videos in queue"},
-        {"name": "yt_queue_local_playlist", "value": "Local Playlist"},
-        {"name": "yt_queue_current_video", "value": "Current Video"},
-        {"name": "yt_queue_video_count", "value": "%d videos in queue"},
-        {"name": "yt_section_audio_enhance", "value": "Audio enhancement"},
-        {"name": "yt_playback_audio_normalize", "value": "Loudness normalization"},
-        {"name": "yt_playback_audio_normalize_subtitle", "value": "Automatically balance volume levels during playback"},
-        {"name": "yt_playback_skip_silence", "value": "Skip silence"},
-        {"name": "yt_playback_skip_silence_subtitle", "value": "Automatically skip silent gaps (disabled for live)"},
-        {"name": "yt_playback_audio_delay", "value": "Audio delay"},
-        {"name": "yt_playback_audio_delay_subtitle", "value": "Adjust audio-video sync for Bluetooth or speakers (-1000 to +1000ms)"},
-        {"name": "yt_playback_audio_delay_reset", "value": "Reset"},
-        {"name": "yt_player_audio_settings", "value": "Audio settings"},
-        {"name": "yt_player_jump_ahead", "value": "Jump ahead"},
-        {"name": "yt_player_chapters_and_segments", "value": "Chapters & segments"},
-        {"name": "yt_exp_sb_segments_title", "value": "SponsorBlock segments"},
-        {"name": "yt_exp_sb_jump_to_end", "value": "Jump to end"},
-        {"name": "yt_exp_sb_whitelist", "value": "Whitelisted channels"},
-        {"name": "yt_exp_sb_whitelist_empty", "value": "No whitelisted channels yet. Toggle from the player menu while watching."},
-        {"name": "yt_exp_sb_whitelist_channel", "value": "Don't skip this channel"},
-        {"name": "yt_exp_sb_channel_whitelisted", "value": "Channel added to SponsorBlock whitelist"},
-        {"name": "yt_exp_sb_channel_unwhitelisted", "value": "Channel removed from SponsorBlock whitelist"},
-        {"name": "yt_exp_sb_whitelist_remove", "value": "Remove"},
-        {"name": "yt_player_subtitle_primary", "value": "Primary subtitle"},
-        {"name": "yt_player_subtitle_secondary", "value": "Secondary subtitle"},
-        {"name": "yt_player_subtitle_secondary_off", "value": "Secondary off"},
-        {"name": "yt_player_subtitle_quick_on", "value": "Turn on subtitles"},
-        {"name": "yt_player_subtitle_label_auto_generated", "value": "%s (Auto-generated)"},
-        {"name": "yt_player_subtitle_label_auto_translated", "value": "%s (Auto-translated)"},
-        {"name": "yt_player_subtitle_error_rate_limited", "value": "Subtitles rate-limited by YouTube, please try again later"},
-        {"name": "yt_player_subtitle_error_unavailable", "value": "Subtitles are currently unavailable"},
-        {"name": "yt_setting_subtitle_edge_style", "value": "Subtitle edge style"},
-        {"name": "yt_subtitle_edge_outline_shadow", "value": "Outline & shadow"},
-        {"name": "yt_subtitle_edge_outline", "value": "Outline"},
-        {"name": "yt_subtitle_edge_shadow", "value": "Drop shadow"},
-        {"name": "yt_subtitle_edge_none", "value": "None"},
-        {"name": "yt_setting_subtitle_bold", "value": "Bold subtitles"},
-        {"name": "yt_setting_subtitle_bold_subtitle", "value": "Improve legibility on bright scenes"},
-        {"name": "yt_setting_subtitle_bg_opacity", "value": "Subtitle background opacity"},
-        {"name": "yt_setting_subtitle_offset_subtitle", "value": "Fine-tune subtitle sync (-5s to +5s)"},
-        {"name": "yt_setting_subtitle_offset_reset", "value": "Reset"},
-        {"name": "yt_subtitle_preview_primary", "value": "This is a subtitle style preview"},
-        {"name": "yt_subtitle_preview_secondary", "value": "双语副字幕预览效果"}
+        {
+            "name": "yt_cookie_verify_success",
+            "value": "Cookie verified."
+        },
+        {
+            "name": "yt_local_import_partial",
+            "value": "Imported %1$d file(s); %2$d failed."
+        },
+        {
+            "name": "yt_recovery_failed",
+            "value": "The operation could not be completed. Please retry."
+        },
+        {
+            "name": "yt_proxy_applying",
+            "value": "Applying proxy…"
+        },
+        {
+            "name": "yt_exp_sb_skip_manual",
+            "value": "Skip %s"
+        },
+        {
+            "name": "yt_exp_sb_jump_highlight",
+            "value": "Jump to highlight"
+        },
+        {
+            "name": "yt_action_sleep_timer_off",
+            "value": "Turn off"
+        },
+        {
+            "name": "yt_action_play_next",
+            "value": "Play next"
+        },
+        {
+            "name": "yt_action_add_to_queue",
+            "value": "Add to queue"
+        },
+        {
+            "name": "yt_action_undo",
+            "value": "Undo"
+        },
+        {
+            "name": "yt_action_save",
+            "value": "Save"
+        },
+        {
+            "name": "yt_queue_loop_none",
+            "value": "No loop"
+        },
+        {
+            "name": "yt_queue_loop_all",
+            "value": "Loop all"
+        },
+        {
+            "name": "yt_queue_loop_one",
+            "value": "Loop one"
+        },
+        {
+            "name": "yt_queue_shuffle",
+            "value": "Shuffle"
+        },
+        {
+            "name": "yt_queue_shuffle_on",
+            "value": "Shuffle enabled"
+        },
+        {
+            "name": "yt_queue_shuffle_off",
+            "value": "Shuffle disabled"
+        },
+        {
+            "name": "yt_queue_save_as_playlist",
+            "value": "Save playlist"
+        },
+        {
+            "name": "yt_queue_save_sheet_title",
+            "value": "Save queue as local playlist"
+        },
+        {
+            "name": "yt_queue_saved_toast",
+            "value": "Saved as local playlist"
+        },
+        {
+            "name": "yt_queue_removed_item",
+            "value": "Removed from queue"
+        },
+        {
+            "name": "yt_toast_play_next_added",
+            "value": "Will play next"
+        },
+        {
+            "name": "yt_toast_added_to_queue",
+            "value": "Added to queue"
+        },
+        {
+            "name": "yt_toast_already_in_queue",
+            "value": "Already in queue"
+        },
+        {
+            "name": "yt_toast_already_playing",
+            "value": "Already playing this video"
+        },
+        {
+            "name": "yt_queue_local_mode_incompatible",
+            "value": "Cannot mix local and online videos in queue"
+        },
+        {
+            "name": "yt_queue_local_playlist",
+            "value": "Local Playlist"
+        },
+        {
+            "name": "yt_queue_current_video",
+            "value": "Current Video"
+        },
+        {
+            "name": "yt_queue_video_count",
+            "value": "%d videos in queue"
+        },
+        {
+            "name": "yt_section_audio_enhance",
+            "value": "Audio enhancement"
+        },
+        {
+            "name": "yt_playback_audio_normalize",
+            "value": "Loudness normalization"
+        },
+        {
+            "name": "yt_playback_audio_normalize_subtitle",
+            "value": "Automatically balance volume levels during playback"
+        },
+        {
+            "name": "yt_playback_audio_delay",
+            "value": "Audio delay"
+        },
+        {
+            "name": "yt_playback_audio_delay_subtitle",
+            "value": "Adjust audio-video sync for Bluetooth or speakers (-1000 to +1000ms)"
+        },
+        {
+            "name": "yt_playback_audio_delay_reset",
+            "value": "Reset"
+        },
+        {
+            "name": "yt_player_audio_settings",
+            "value": "Audio settings"
+        },
+        {
+            "name": "yt_player_jump_ahead",
+            "value": "Jump ahead"
+        },
+        {
+            "name": "yt_player_chapters_and_segments",
+            "value": "Chapters & segments"
+        },
+        {
+            "name": "yt_exp_sb_segments_title",
+            "value": "SponsorBlock segments"
+        },
+        {
+            "name": "yt_exp_sb_jump_to_end",
+            "value": "Jump to end"
+        },
+        {
+            "name": "yt_exp_sb_whitelist",
+            "value": "Whitelisted channels"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_empty",
+            "value": "No whitelisted channels yet. Toggle from the player menu while watching."
+        },
+        {
+            "name": "yt_exp_sb_whitelist_channel",
+            "value": "Don't skip this channel"
+        },
+        {
+            "name": "yt_exp_sb_channel_whitelisted",
+            "value": "Channel added to SponsorBlock whitelist"
+        },
+        {
+            "name": "yt_exp_sb_channel_unwhitelisted",
+            "value": "Channel removed from SponsorBlock whitelist"
+        },
+        {
+            "name": "yt_exp_sb_whitelist_remove",
+            "value": "Remove"
+        },
+        {
+            "name": "yt_player_subtitle_primary",
+            "value": "Primary subtitle"
+        },
+        {
+            "name": "yt_player_subtitle_secondary",
+            "value": "Secondary subtitle"
+        },
+        {
+            "name": "yt_player_subtitle_secondary_off",
+            "value": "Secondary off"
+        },
+        {
+            "name": "yt_player_subtitle_quick_on",
+            "value": "Turn on subtitles"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_generated",
+            "value": "%s (Auto-generated)"
+        },
+        {
+            "name": "yt_player_subtitle_label_auto_translated",
+            "value": "%s (Auto-translated)"
+        },
+        {
+            "name": "yt_player_subtitle_error_rate_limited",
+            "value": "Subtitles rate-limited by YouTube, please try again later"
+        },
+        {
+            "name": "yt_player_subtitle_error_unavailable",
+            "value": "Subtitles are currently unavailable"
+        },
+        {
+            "name": "yt_setting_subtitle_edge_style",
+            "value": "Subtitle edge style"
+        },
+        {
+            "name": "yt_subtitle_edge_outline_shadow",
+            "value": "Outline & shadow"
+        },
+        {
+            "name": "yt_subtitle_edge_outline",
+            "value": "Outline"
+        },
+        {
+            "name": "yt_subtitle_edge_shadow",
+            "value": "Drop shadow"
+        },
+        {
+            "name": "yt_subtitle_edge_none",
+            "value": "None"
+        },
+        {
+            "name": "yt_setting_subtitle_bold",
+            "value": "Bold subtitles"
+        },
+        {
+            "name": "yt_setting_subtitle_bold_subtitle",
+            "value": "Improve legibility on bright scenes"
+        },
+        {
+            "name": "yt_setting_subtitle_bg_opacity",
+            "value": "Subtitle background opacity"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_subtitle",
+            "value": "Fine-tune subtitle sync (-5s to +5s)"
+        },
+        {
+            "name": "yt_setting_subtitle_offset_reset",
+            "value": "Reset"
+        },
+        {
+            "name": "yt_subtitle_preview_primary",
+            "value": "This is a subtitle style preview"
+        },
+        {
+            "name": "yt_subtitle_preview_secondary",
+            "value": "双语副字幕预览效果"
+        },
+        {
+            "name": "yt_player_stats_for_nerds",
+            "value": "Stats for Nerds"
+        },
+        {
+            "name": "yt_action_copy",
+            "value": "Copy"
+        },
+        {
+            "name": "yt_stats_transport",
+            "value": "Transport"
+        },
+        {
+            "name": "yt_stats_hwdec",
+            "value": "Hardware decoding"
+        },
+        {
+            "name": "yt_stats_sw_decode",
+            "value": "Software"
+        },
+        {
+            "name": "yt_stats_color",
+            "value": "Color / Pixel"
+        },
+        {
+            "name": "yt_stats_av_sync",
+            "value": "A/V sync"
+        },
+        {
+            "name": "yt_stats_audio_format",
+            "value": "Audio format"
+        },
+        {
+            "name": "yt_stats_audio_fx",
+            "value": "Audio FX"
+        },
+        {
+            "name": "yt_stats_none",
+            "value": "None"
+        },
+        {
+            "name": "yt_stats_transport_direct",
+            "value": "Direct"
+        },
+        {
+            "name": "yt_stats_transport_local",
+            "value": "Local"
+        },
+        {
+            "name": "yt_exp_hm_title",
+            "value": "Heatmap & Jump Ahead"
+        },
+        {
+            "name": "yt_exp_hm_desc",
+            "value": "Show the Most Replayed heatmap above the seek bar and suggest jumping to the next peak after seeking forward."
+        },
+        {
+            "name": "yt_exp_hm_show_graph",
+            "value": "Seek bar heatmap"
+        },
+        {
+            "name": "yt_exp_hm_show_graph_desc",
+            "value": "Draw the Most Replayed curve above the progress bar"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead",
+            "value": "Jump ahead prompt"
+        },
+        {
+            "name": "yt_exp_hm_jump_ahead_desc",
+            "value": "Suggest jumping to the next most-replayed peak after seeking forward"
+        },
+        {
+            "name": "yt_exp_hm_footer",
+            "value": "Uses YouTube native Most Replayed data; only active on videos that include heatmap data."
+        }
     ]
 }

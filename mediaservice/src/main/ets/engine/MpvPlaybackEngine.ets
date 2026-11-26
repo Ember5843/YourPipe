@@ -21,10 +21,17 @@ interface MediaInfoSnapshot {
   videoCodec: string;
   videoBitRate: number;
   frameRate: number;
+  hwdec: string;
+  pixelFormat: string;
+  colorSpace: string;
+  colorPrimaries: string;
+  colorGamma: string;
   audioCodec: string;
   audioBitRate: number;
   audioChannels: number;
   audioSampleRate: number;
+  audioFormat: string;
+  audioChannelLayout: string;
   fileSize: number;
 }
 
@@ -82,18 +89,13 @@ export class MpvPlaybackEngine implements PlaybackEngine {
   private fileLoopEnabled: boolean = false;
   /** MPV 原生音频滤镜意图（跨 load 保持，单入口 applyAudioFilters 组合 af）。 */
   private audioNormalizeEnabled: boolean = false;
-  private skipSilenceEnabled: boolean = false;
-  /** 当前媒体源是否为直播（直播流强制旁路 @skipsilence）。 */
-  private audioFilterIsLive: boolean = false;
   /** MPV 原生音画延迟（毫秒，范围 -1000..1000）。 */
   private audioDelayMs: number = 0;
   private lastAppliedAf: string | null = null;
   private lastAppliedAudioDelaySec: string | null = null;
 
   private static readonly AF_NORMALIZE: string =
-    'lavfi=[acompressor=threshold=-20dB:ratio=3:attack=15:release=250:makeup=2.5,alimiter=limit=0.95:attack=3:release=50]';
-  private static readonly AF_SILENCEDETECT: string =
-    '@skipsilence:lavfi=[silencedetect=noise=-32dB:d=0.45]';
+    'lavfi=[acompressor=threshold=-20dB:ratio=3:attack=15:release=250:makeup=2.5,alimiter=limit=0.95:attack=3:release=50,aformat=sample_fmts=fltp]';
   private static readonly AUDIO_DELAY_MIN_MS: number = -1000;
   private static readonly AUDIO_DELAY_MAX_MS: number = 1000;
   /** MediaInfo 快照的节流刷新时间戳（0 = 立即刷新） */
@@ -110,10 +112,17 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     videoCodec: '',
     videoBitRate: 0,
     frameRate: 0,
+    hwdec: '',
+    pixelFormat: '',
+    colorSpace: '',
+    colorPrimaries: '',
+    colorGamma: '',
     audioCodec: '',
     audioBitRate: 0,
     audioChannels: 0,
     audioSampleRate: 0,
+    audioFormat: '',
+    audioChannelLayout: '',
     fileSize: 0
   };
 
@@ -181,7 +190,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       this.initialized = true;
       this.lastAppliedAf = null;
       this.lastAppliedAudioDelaySec = null;
-      if (this.audioNormalizeEnabled || this.skipSilenceEnabled) {
+      if (this.audioNormalizeEnabled) {
         this.applyAudioFilters(true);
       }
       if (this.audioDelayMs !== 0) {
@@ -345,14 +354,13 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (!this.applyNetworkProxy(this.sourceUrl)) this.controller?.pause();
   }
 
-  load(source: string, startPos: number, audioUrl: string = '', isLiveHint?: boolean): boolean {
+  load(source: string, startPos: number, audioUrl: string = ''): boolean {
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) return false;
 
     const generation = ++this.loadGeneration;
     this.sourceUrl = this.normalizeSourceUrl(source);
     this.isLive = this.looksLive(this.sourceUrl);
-    this.audioFilterIsLive = isLiveHint !== undefined ? (isLiveHint || this.isLive) : this.isLive;
     this.playWhenReady = false;
     this.loaded = false;
     this.preparing = false;
@@ -375,7 +383,14 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.mediaSnapshot.videoWidth = 0;
     this.mediaSnapshot.videoHeight = 0;
     this.mediaSnapshot.videoCodec = '';
+    this.mediaSnapshot.hwdec = '';
+    this.mediaSnapshot.pixelFormat = '';
+    this.mediaSnapshot.colorSpace = '';
+    this.mediaSnapshot.colorPrimaries = '';
+    this.mediaSnapshot.colorGamma = '';
     this.mediaSnapshot.audioCodec = '';
+    this.mediaSnapshot.audioFormat = '';
+    this.mediaSnapshot.audioChannelLayout = '';
     this.emitCurrentState();
 
     Logger.info(TAG, `load: startPos=${startPos.toFixed(2)}s isLive=${this.isLive} url=${this.sourceUrl.substring(0, 120)}`);
@@ -467,7 +482,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       const directStartMs = isEdl ? 0 : this.pendingStartMs;
       // Shorts 单条循环：引擎重建后属性会丢，load 前按当前意图重写。
       ctrl.setProperty('loop-file', this.fileLoopEnabled ? 'inf' : 'no');
-      // 每次切源前统一重放音频滤镜链（含最新 isLive 旁路）与音画延迟。
+      // 每次切源前统一重放音频滤镜链与音画延迟。
       this.applyAudioFilters(true);
       this.applyAudioDelay(true);
       ctrl.setMedia(this.sourceUrl, directStartMs);
@@ -584,12 +599,9 @@ export class MpvPlaybackEngine implements PlaybackEngine {
 
   /**
    * 组合并应用 MPV 原生音频滤镜链（单入口，避免多处互覆）。
-   * 直播流强制旁路 @skipsilence，防止实时流时钟失步。
    */
-  setAudioFilters(normalize: boolean, skipSilence: boolean, isLive: boolean): void {
+  setAudioFilters(normalize: boolean): void {
     this.audioNormalizeEnabled = Boolean(normalize);
-    this.skipSilenceEnabled = Boolean(skipSilence);
-    this.audioFilterIsLive = Boolean(isLive);
     this.applyAudioFilters(false);
   }
 
@@ -615,14 +627,7 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (ctrl === null || this.destroyed) {
       return;
     }
-    const parts: string[] = [];
-    if (this.audioNormalizeEnabled) {
-      parts.push(MpvPlaybackEngine.AF_NORMALIZE);
-    }
-    if (this.skipSilenceEnabled && !this.audioFilterIsLive) {
-      parts.push(MpvPlaybackEngine.AF_SILENCEDETECT);
-    }
-    const afValue: string = parts.join(',');
+    const afValue: string = this.audioNormalizeEnabled ? MpvPlaybackEngine.AF_NORMALIZE : '';
     const prevAf: string | null = this.lastAppliedAf;
     if (afValue.length === 0 && (prevAf === null || prevAf.length === 0)) {
       return;
@@ -630,16 +635,10 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     if (!force && prevAf === afValue) {
       return;
     }
-    const hadSkipSilence: boolean = prevAf !== null && prevAf.indexOf('@skipsilence') >= 0;
-    const hasSkipSilence: boolean = afValue.indexOf('@skipsilence') >= 0;
     try {
       ctrl.setProperty('af', afValue);
       this.lastAppliedAf = afValue;
-      if (hadSkipSilence && !hasSkipSilence) {
-        ctrl.setPlaybackRate(this.playbackSpeed);
-      }
-      Logger.info(TAG, `audio filters applied: normalize=${this.audioNormalizeEnabled} `
-        + `skipSilence=${this.skipSilenceEnabled} isLive=${this.audioFilterIsLive} af="${afValue}"`);
+      Logger.info(TAG, `audio filters applied: normalize=${this.audioNormalizeEnabled} af="${afValue}"`);
     } catch (err) {
       Logger.warn(TAG, `applyAudioFilters failed: ${this.describeError(err)}`);
     }
@@ -727,7 +726,13 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       cacheSpeedBps: 0,
       demuxerCacheDurationSec: 0,
       droppedFrames: 0,
-      decoderDroppedFrames: 0
+      decoderDroppedFrames: 0,
+      totalFrames: 0,
+      avSyncMs: undefined,
+      measuredFps: 0,
+      bufferedBytes: 0,
+      activeAudioFilters: '',
+      transportKind: ''
     };
     const ctrl: MpvPlayerController | null = this.controller;
     if (ctrl === null || this.destroyed) {
@@ -736,13 +741,58 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const isCustomStream = this.sourceUrl.includes('ypstream://');
     const mpvSpeed = this.parseStatsNumber(ctrl.getProperty('cache-speed'));
     const nativeSpeed = isCustomStream ? getStreamMetrics().networkSpeedBps : 0;
+    const rawAvSync: string = ctrl.getProperty('avsync').trim();
+    let avSyncMs: number | undefined = undefined;
+    if (rawAvSync.length > 0) {
+      const parsedAvSync: number = Number(rawAvSync);
+      if (Number.isFinite(parsedAvSync)) {
+        avSyncMs = parsedAvSync * 1000;
+      }
+    }
     return {
       cacheSpeedBps: isCustomStream ? nativeSpeed : mpvSpeed,
       networkSpeedBps: isCustomStream ? nativeSpeed : undefined,
       demuxerCacheDurationSec: this.parseStatsNumber(ctrl.getProperty('demuxer-cache-duration')),
-      droppedFrames: this.parseStatsNumber(ctrl.getProperty('dropped-frame-count')),
-      decoderDroppedFrames: this.parseStatsNumber(ctrl.getProperty('decoder-dropped-frame-count'))
+      droppedFrames: this.parseStatsNumber(ctrl.getProperty('frame-drop-count')),
+      decoderDroppedFrames: this.parseStatsNumber(ctrl.getProperty('decoder-frame-drop-count')),
+      totalFrames: this.parseStatsNumber(ctrl.getProperty('estimated-frame-number')),
+      avSyncMs: avSyncMs,
+      measuredFps: this.parseStatsNumber(ctrl.getProperty('estimated-vf-fps')),
+      bufferedBytes: this.parseStatsNumber(ctrl.getProperty('demuxer-cache-fw-bytes')),
+      activeAudioFilters: ctrl.getProperty('af'),
+      transportKind: this.inferTransportKind()
     };
+  }
+
+  private inferTransportKind(): string {
+    const url: string = this.sourceUrl;
+    if (url.length === 0) {
+      return '';
+    }
+    const lower: string = url.toLowerCase();
+    if (lower.startsWith('file://') || lower.startsWith('/')) {
+      return 'local';
+    }
+    if (lower.includes('ypstream://yp_h_')) {
+      return 'hls';
+    }
+    if (lower.includes('ypstream://')) {
+      return 'ypstream';
+    }
+    if ((lower.startsWith('http://127.0.0.1:') || lower.startsWith('http://localhost:'))
+      && (lower.includes('/manifest.mpd') || lower.includes('/sabr/'))) {
+      return 'sabr';
+    }
+    if (lower.includes('sabr')) {
+      return 'sabr';
+    }
+    if (this.looksHls(url) || this.isLive) {
+      return 'hls';
+    }
+    if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('edl://')) {
+      return 'http';
+    }
+    return '';
   }
 
   isDirectNetworkSource(): boolean {
@@ -1021,8 +1071,22 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         snap.videoCodec = v.codec?.codec ?? '';
         snap.videoBitRate = v.codec?.bitRate ?? 0;
         snap.frameRate = v.codec?.frameRate ?? info.frameRate ?? 0;
+        snap.hwdec = v.codec?.hwdec ?? '';
+        snap.pixelFormat = v.codec?.pixelFormat ?? '';
+        snap.colorSpace = v.codec?.colorSpace ?? '';
+        snap.colorPrimaries = v.codec?.primaries ?? '';
+        snap.colorGamma = v.codec?.gamma ?? '';
+      } else {
+        snap.hwdec = '';
+        snap.pixelFormat = '';
+        snap.colorSpace = '';
+        snap.colorPrimaries = '';
+        snap.colorGamma = '';
       }
       const hwdec = ctrl.getProperty('hwdec-current');
+      if (snap.hwdec.length === 0 && hwdec.length > 0) {
+        snap.hwdec = hwdec;
+      }
       if (hwdec.length > 0 && hwdec !== this.lastLoggedHwdec) {
         this.lastLoggedHwdec = hwdec;
         const soft = hwdec === 'no' || hwdec.indexOf('ohcodec') < 0;
@@ -1036,6 +1100,11 @@ export class MpvPlaybackEngine implements PlaybackEngine {
         snap.audioBitRate = a.codec?.bitRate ?? 0;
         snap.audioChannels = a.codec?.channels ?? 0;
         snap.audioSampleRate = a.codec?.sampleRate ?? 0;
+        snap.audioFormat = a.codec?.format ?? '';
+        snap.audioChannelLayout = a.codec?.channelLayout ?? '';
+      } else {
+        snap.audioFormat = '';
+        snap.audioChannelLayout = '';
       }
       snap.videoStreamCount = info.video.length;
       snap.audioStreamCount = info.audio.length;
@@ -1100,10 +1169,17 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     const videoCodec: string = snap.videoCodec;
     const videoBitRate: number = snap.videoBitRate;
     const frameRate: number = snap.frameRate;
+    const hwdec: string = snap.hwdec;
+    const pixelFormat: string = snap.pixelFormat;
+    const colorSpace: string = snap.colorSpace;
+    const colorPrimaries: string = snap.colorPrimaries;
+    const colorGamma: string = snap.colorGamma;
     const audioCodec: string = snap.audioCodec;
     const audioBitRate: number = snap.audioBitRate;
     const audioChannels: number = snap.audioChannels;
     const audioSampleRate: number = snap.audioSampleRate;
+    const audioFormat: string = snap.audioFormat;
+    const audioChannelLayout: string = snap.audioChannelLayout;
     const fileSize: number = snap.fileSize;
 
     return {
@@ -1132,10 +1208,17 @@ export class MpvPlaybackEngine implements PlaybackEngine {
       videoCodec: videoCodec,
       videoBitRate: videoBitRate,
       frameRate: frameRate,
+      hwdec: hwdec,
+      pixelFormat: pixelFormat,
+      colorSpace: colorSpace,
+      colorPrimaries: colorPrimaries,
+      colorGamma: colorGamma,
       audioCodec: audioCodec,
       audioBitRate: audioBitRate,
       audioChannels: audioChannels,
       audioSampleRate: audioSampleRate,
+      audioFormat: audioFormat,
+      audioChannelLayout: audioChannelLayout,
       fileSize: fileSize,
       errorMsg: this.errorMsg,
       errorCategory: this.hasError ? this.lastErrorCategory : undefined,
@@ -1225,6 +1308,29 @@ export class MpvPlaybackEngine implements PlaybackEngine {
     this.lastTimeEmitMs = 0;
     this.acceptsNativeTimeline = false;
     this.isLive = false;
+    this.lastMediaInfoAtMs = 0;
+    this.mediaSnapshot.mediaTitle = '';
+    this.mediaSnapshot.containerFormat = '';
+    this.mediaSnapshot.videoWidth = 0;
+    this.mediaSnapshot.videoHeight = 0;
+    this.mediaSnapshot.videoStreamCount = 0;
+    this.mediaSnapshot.audioStreamCount = 0;
+    this.mediaSnapshot.subtitleStreamCount = 0;
+    this.mediaSnapshot.videoCodec = '';
+    this.mediaSnapshot.videoBitRate = 0;
+    this.mediaSnapshot.frameRate = 0;
+    this.mediaSnapshot.hwdec = '';
+    this.mediaSnapshot.pixelFormat = '';
+    this.mediaSnapshot.colorSpace = '';
+    this.mediaSnapshot.colorPrimaries = '';
+    this.mediaSnapshot.colorGamma = '';
+    this.mediaSnapshot.audioCodec = '';
+    this.mediaSnapshot.audioBitRate = 0;
+    this.mediaSnapshot.audioChannels = 0;
+    this.mediaSnapshot.audioSampleRate = 0;
+    this.mediaSnapshot.audioFormat = '';
+    this.mediaSnapshot.audioChannelLayout = '';
+    this.mediaSnapshot.fileSize = 0;
   }
 
   private describeError(err: Object): string {
