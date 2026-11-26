@@ -3448,22 +3448,74 @@ export struct VideoPlayer {
               top: { anchor: '__container__', align: VerticalAlign.Top } })
         }
         if (this.showBrightnessHint) {
-          Stack({ alignContent: Alignment.Bottom }) {
-            Slider({ value: this.gestureBrightnessValue, max: 1, min: 0, reverse: true, style: SliderStyle.NONE, direction: Axis.Vertical })
-              .trackThickness(40).selectedColor(Color.White).height(160).width(40)
-            SymbolGlyph(this.gestureBrightnessIcon).fontColor([Color.Gray]).margin({ bottom: 8 }).fontSize(22)
+          Row({ space: 10 }) {
+            SymbolGlyph(this.gestureBrightnessIcon)
+              .fontSize(20)
+              .fontColor([Color.White])
+            Progress({
+              value: Math.round(Math.max(0, Math.min(1, this.gestureBrightnessValue)) * 100),
+              total: 100,
+              type: ProgressType.Linear
+            })
+              .width(116)
+              .color(Color.White)
+              .backgroundColor('#4DFFFFFF')
+              .style({ strokeWidth: 5, enableSmoothEffect: false })
+            Text(`${Math.round(Math.max(0, Math.min(1, this.gestureBrightnessValue)) * 100)}%`)
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Color.White)
+              .fontFeature('"tnum" 1')
+              .width(36)
+              .textAlign(TextAlign.End)
           }
-          .width('auto').height('auto')
-          .alignRules({ center: { anchor: '__container__', align: VerticalAlign.Center }, start: { anchor: '__container__', align: HorizontalAlign.Start }, end: { anchor: '__container__', align: HorizontalAlign.Center } })
+          .height(44)
+          .padding({ left: 16, right: 16 })
+          .borderRadius(22)
+          .backgroundBlurStyle(BlurStyle.BACKGROUND_THIN)
+          .backgroundColor('#4D000000')
+          .border({ width: 1, color: '#33FFFFFF' })
+          .alignItems(VerticalAlign.Center)
+          .hitTestBehavior(HitTestMode.None)
+          .alignRules({
+            middle: { anchor: '__container__', align: HorizontalAlign.Center },
+            center: { anchor: '__container__', align: VerticalAlign.Center }
+          })
         }
         if (this.showVolumeHint) {
-          Stack({ alignContent: Alignment.Bottom }) {
-            Slider({ value: this.gestureVolumeValue, max: 1, min: 0, reverse: true, style: SliderStyle.NONE, direction: Axis.Vertical })
-              .trackThickness(40).selectedColor(Color.White).height(160).width(40)
-            SymbolGlyph(this.gestureVolumeIcon).fontColor([Color.Gray]).margin({ bottom: 8 }).fontSize(22)
+          Row({ space: 10 }) {
+            SymbolGlyph(this.gestureVolumeIcon)
+              .fontSize(20)
+              .fontColor([Color.White])
+            Progress({
+              value: Math.round(Math.max(0, Math.min(1, this.gestureVolumeValue)) * 100),
+              total: 100,
+              type: ProgressType.Linear
+            })
+              .width(116)
+              .color(Color.White)
+              .backgroundColor('#4DFFFFFF')
+              .style({ strokeWidth: 5, enableSmoothEffect: false })
+            Text(`${Math.round(Math.max(0, Math.min(1, this.gestureVolumeValue)) * 100)}%`)
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Color.White)
+              .fontFeature('"tnum" 1')
+              .width(36)
+              .textAlign(TextAlign.End)
           }
-          .width('auto').height('auto')
-          .alignRules({ center: { anchor: '__container__', align: VerticalAlign.Center }, start: { anchor: '__container__', align: HorizontalAlign.Center }, end: { anchor: '__container__', align: HorizontalAlign.End } })
+          .height(44)
+          .padding({ left: 16, right: 16 })
+          .borderRadius(22)
+          .backgroundBlurStyle(BlurStyle.BACKGROUND_THIN)
+          .backgroundColor('#4D000000')
+          .border({ width: 1, color: '#33FFFFFF' })
+          .alignItems(VerticalAlign.Center)
+          .hitTestBehavior(HitTestMode.None)
+          .alignRules({
+            middle: { anchor: '__container__', align: HorizontalAlign.Center },
+            center: { anchor: '__container__', align: VerticalAlign.Center }
+          })
         }
       }
       .width('100%').height('100%')

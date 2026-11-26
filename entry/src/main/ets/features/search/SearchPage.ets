@@ -295,7 +295,9 @@ export struct SearchPage {
           fontColor: this.themePrimary,
           action: () => {
             SearchHistoryStore.deleteSearchHistory(query);
-            this.loadSearchHistory();
+            customAnimationUtil.animateListMutation(this.uiConfig, () => {
+              this.loadSearchHistory();
+            }, this.getUIContext());
           }
         }
       ],
@@ -394,6 +396,7 @@ export struct SearchPage {
                 .padding({ left: 16, right: 16, top: 12, bottom: 12 })
                 .alignItems(VerticalAlign.Center)
               }
+              .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
               .onClick(() => {
                 this.isProgrammaticUpdate = true;
                 this.query = item.query;

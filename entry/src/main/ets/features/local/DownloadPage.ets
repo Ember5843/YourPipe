@@ -212,7 +212,9 @@ export struct DownloadPage {
         value: $r('app.string.yt_action_delete'),
         fontColor: this.themePrimary,
         action: () => {
-          LocalMediaStore.delete(item);
+          customAnimationUtil.animateListMutation(this.uiConfig, () => {
+            LocalMediaStore.delete(item);
+          }, this.getUIContext());
         }
       },
       secondaryButton: {
@@ -284,7 +286,7 @@ export struct DownloadPage {
               onPlayTask: (t: DownloadTask) => { this.playFromLocalQueue(`local:${t.id}`); }
             })
           }
-          .transition(customAnimationUtil.isScaleTran(task.id, this.uiConfig))
+          .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
         }, (task: DownloadTask) => task.id)
 
         ForEach(this.localItems, (item: LocalMediaItem) => {
@@ -296,6 +298,7 @@ export struct DownloadPage {
               onDelete: (it: LocalMediaItem) => { this.confirmDeleteLocal(it); }
             })
           }
+          .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
         }, (item: LocalMediaItem) => item.id)
 
         // 导入入口放在列表最下方；导入后新条目出现在它上面。

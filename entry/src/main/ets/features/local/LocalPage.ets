@@ -287,7 +287,9 @@ struct HistoryCard {
   }
 
   private deleteItem(): void {
-    WatchHistoryStore.remove(this.item.videoId);
+    customAnimationUtil.animateListMutation(this.uiConfig, () => {
+      WatchHistoryStore.remove(this.item.videoId);
+    }, this.getUIContext());
     this.isShowContextMenu = false;
   }
 
@@ -659,7 +661,7 @@ export struct LocalPage {
                         onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
                       })
                     }
-                    .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
+                    .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
                   }, (item: WatchHistoryItem) => item.videoId)
                 }
                 .width('100%')
@@ -672,7 +674,7 @@ export struct LocalPage {
                     onOpen: (it: WatchHistoryItem) => { this.openVideo(it); }
                   })
                 }
-                .transition(customAnimationUtil.isScaleTran(item.videoId, this.uiConfig))
+                .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
               }, (item: WatchHistoryItem) => item.videoId)
             }
           }

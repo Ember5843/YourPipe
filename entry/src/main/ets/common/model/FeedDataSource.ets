@@ -1,15 +1,14 @@
 /**
- * 信息流 LazyForEach 数据源。
- * 范式同 youtube_core/common/VideoModel.ets 的 VideoDataSource（IDataSource +
- * DataChangeListener），但元素类型放开为 Object，供 VideoItem / SearchInfoItem /
- * SubscriptionFeedItem / SearchPlaylistItem 等各类信息流复用。
+ * 信息流 LazyForEach 数据源（API 12+ onDatasetChange 原子差量通知）。
  *
- * 页面仍持有自己的强类型数组（唯一事实来源），数组每次整体重赋值后调用
- * setData 同步本数据源；提供 keyOf 时做前缀比对：旧数据是新数据的严格前缀
- * （翻页 append）→ 逐项 onDataAdd 增量通知；key 序列完全一致（同长度同序，
- * 含内容未变的重复同步）→ 不触发全量重载，仅对引用变化的条目逐项
- * onDataChange 原地刷新（不重建节点、不重播条目转场）；其余情况
- * onDataReloaded 全量刷新（替代原先靠 key 里嵌 epoch 强刷重建的 hack）。
+ * 页面仍持有自己的强类型数组（唯一事实来源），数组每次变更后调用
+ * setData 同步本数据源；提供 keyOf 时做差量分析：
+ * 1. 严格前缀追加（翻页 append）→ DataOperationType.ADD；
+ * 2. 同长度同序（原地刷新内容）→ 仅对引用变化的索引发 DataOperationType.CHANGE；
+ * 3. 纯删除子序列（如隐藏/移除若干条目）→ 倒序发精确 DataOperationType.DELETE；
+ * 4. 其余全量变更（刷新/换源）→ DataOperationType.RELOAD。
+ *
+ * 严格只使用 onDatasetChange，不混用旧的 onDataAdd/onDataDelete/onDataReloaded。
  */
 import { IDataSourcePrefetching } from '@kit.ArkUI';
 import { FeedThumbUrlOf, ThumbPrefetcher } from './ThumbPrefetcher';
@@ -44,35 +43,64 @@ export class FeedDataSource implements IDataSourcePrefetching {
     const nextData: Object[] = source.slice();
     if (keyOf) {
       const nextKeys: string[] = nextData.map((item: Object, index: number) => keyOf(item, index));
+      const oldKeys: string[] = this.keys;
+      const oldData: Object[] = this.dataArray;
       let prefix: number = 0;
-      const limit: number = Math.min(this.keys.length, nextKeys.length);
-      while (prefix < limit && this.keys[prefix] === nextKeys[prefix]) {
+      const limit: number = Math.min(oldKeys.length, nextKeys.length);
+      while (prefix < limit && oldKeys[prefix] === nextKeys[prefix]) {
         prefix++;
       }
-      const isPureAppend: boolean = this.keys.length > 0
-        && prefix === this.keys.length
-        && nextKeys.length > this.keys.length;
-      // key 序列完全一致（同长度同序）
-      const isSameKeys: boolean = prefix === nextKeys.length && this.keys.length === nextKeys.length;
-      const oldData: Object[] = this.dataArray;
+      const isPureAppend: boolean = oldKeys.length > 0
+        && prefix === oldKeys.length
+        && nextKeys.length > oldKeys.length;
+      const isSameKeys: boolean = prefix === nextKeys.length && oldKeys.length === nextKeys.length;
+
       this.dataArray = nextData;
       this.keys = nextKeys;
+
       if (isPureAppend) {
-        for (let i = prefix; i < nextKeys.length; i++) {
-          this.notifyDataAdd(i);
-        }
+        this.notifyDatasetChange([{
+          type: DataOperationType.ADD,
+          index: prefix,
+          count: nextKeys.length - prefix
+        }]);
         return;
       }
-      // 不触发全量重载——避免订阅合并/原位更新/重复同步把可见条目重建重播入场动画。
-      // 仅对引用变化的条目逐项 notifyDataChange（原地刷新内容，不重建节点、不重播转场）。
+
       if (isSameKeys) {
+        const ops: DataOperation[] = [];
         for (let i = 0; i < nextKeys.length; i++) {
           if (oldData[i] !== nextData[i]) {
-            this.notifyDataChange(i);
+            ops.push({ type: DataOperationType.CHANGE, index: i });
           }
+        }
+        if (ops.length > 0) {
+          this.notifyDatasetChange(ops);
         }
         return;
       }
+
+      // 纯删除检测：nextKeys 是 oldKeys 的严格保序子序列 → 发精确 DELETE 差量，避免整列重建闪烁。
+      if (oldKeys.length > 0 && nextKeys.length > 0 && nextKeys.length < oldKeys.length) {
+        const deletedIndices: number[] = [];
+        let ni: number = 0;
+        for (let oi = 0; oi < oldKeys.length; oi++) {
+          if (ni < nextKeys.length && oldKeys[oi] === nextKeys[ni]) {
+            ni++;
+          } else {
+            deletedIndices.push(oi);
+          }
+        }
+        if (ni === nextKeys.length && deletedIndices.length > 0) {
+          const ops: DataOperation[] = [];
+          for (let k = deletedIndices.length - 1; k >= 0; k--) {
+            ops.push({ type: DataOperationType.DELETE, index: deletedIndices[k], count: 1 });
+          }
+          this.notifyDatasetChange(ops);
+          return;
+        }
+      }
+
       this.notifyDataReload();
       return;
     }
@@ -121,33 +149,32 @@ export class FeedDataSource implements IDataSourcePrefetching {
     }
   }
 
-  notifyDataReload(): void {
+  notifyDatasetChange(operations: DataOperation[]): void {
+    if (operations.length === 0) {
+      return;
+    }
     this.listeners.forEach((listener: DataChangeListener) => {
-      listener.onDataReloaded();
-    })
+      listener.onDatasetChange(operations);
+    });
+  }
+
+  notifyDataReload(): void {
+    this.notifyDatasetChange([{ type: DataOperationType.RELOAD }]);
   }
 
   notifyDataAdd(index: number): void {
-    this.listeners.forEach((listener: DataChangeListener) => {
-      listener.onDataAdd(index);
-    })
+    this.notifyDatasetChange([{ type: DataOperationType.ADD, index: index, count: 1 }]);
   }
 
   notifyDataDelete(index: number): void {
-    this.listeners.forEach((listener: DataChangeListener) => {
-      listener.onDataDelete(index);
-    })
+    this.notifyDatasetChange([{ type: DataOperationType.DELETE, index: index, count: 1 }]);
   }
 
   notifyDataChange(index: number): void {
-    this.listeners.forEach((listener: DataChangeListener) => {
-      listener.onDataChange(index);
-    })
+    this.notifyDatasetChange([{ type: DataOperationType.CHANGE, index: index }]);
   }
 
   notifyDataMove(from: number, to: number): void {
-    this.listeners.forEach((listener: DataChangeListener) => {
-      listener.onDataMove(from, to);
-    })
+    this.notifyDatasetChange([{ type: DataOperationType.MOVE, index: { from: from, to: to } }]);
   }
 }

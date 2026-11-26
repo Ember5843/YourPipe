@@ -215,6 +215,7 @@ export struct PlaylistCard {
               .contentFont({ size: 15, weight: FontWeight.Medium })
               .contentFontColor(item.contentColor ?? $r('sys.color.font_primary'))
               .onClick(() => {
+                this.isShowContextMenu = false;
                 item.callback();
               });
           }, (_item: ContextMenuItem, idx: number) => `pl_menu_${idx}`);

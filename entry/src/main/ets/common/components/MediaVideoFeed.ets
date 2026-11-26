@@ -170,7 +170,10 @@ export struct MediaVideoFeed {
     onDataMoved: (_from: number, _to: number) => {
       this.onFeedDataChanged();
     },
-    onDatasetChange: (_operations: DataOperation[]) => {
+    onDatasetChange: (operations: DataOperation[]) => {
+      if (operations.some((op: DataOperation) => op.type === DataOperationType.RELOAD)) {
+        this.armEntryAnim();
+      }
       this.onFeedDataChanged();
     }
   };
@@ -243,7 +246,7 @@ export struct MediaVideoFeed {
       return null;
     }
     this.entryAnimDone.add(key);
-    return customAnimationUtil.isScaleTranEnter(key, this.uiConfig);
+    return customAnimationUtil.listItemEnterOrdered(index, this.uiConfig);
   }
 
   private onFeedDataChanged(): void {

@@ -1,4 +1,5 @@
 import { AppLog } from '../common/AppLog';
+import { customAnimationUtil } from '../common/AnimationUtil';
 import window from '@ohos.window';
 import common from '@ohos.app.ability.common';
 import { i18n } from '@kit.LocalizationKit';
@@ -845,7 +846,9 @@ struct Index {
 
   /** Delete a locally saved queue by id */
   private deleteLocalQueue(id: string): void {
-    this.setLocalQueues(this.getLocalQueues().filter((q: StoredLocalQueue) => q.id !== id));
+    customAnimationUtil.animateListMutation(this.uiConfig, () => {
+      this.setLocalQueues(this.getLocalQueues().filter((q: StoredLocalQueue) => q.id !== id));
+    }, this.getUIContext());
     LocalStore.persistLocalQueues();
   }
 
@@ -1030,7 +1033,9 @@ struct Index {
     if (!trimmed) {
       return;
     }
-    this.setSubscriptions(this.getSubscriptions().filter((item: SubscriptionUser) => item.channelId !== trimmed));
+    customAnimationUtil.animateListMutation(this.uiConfig, () => {
+      this.setSubscriptions(this.getSubscriptions().filter((item: SubscriptionUser) => item.channelId !== trimmed));
+    }, this.getUIContext());
     LocalStore.persistSubscriptions();
   }
 
@@ -1256,12 +1261,16 @@ struct Index {
     if (exists) {
       return;
     }
-    this.setFavorites([...current, video]);
+    customAnimationUtil.animateListMutation(this.uiConfig, () => {
+      this.setFavorites([...current, video]);
+    }, this.getUIContext());
     LocalStore.persistFavorites();
   }
 
   private removeFavorite(videoId: string): void {
-    this.setFavorites(this.getFavorites().filter((item: VideoItem) => item.videoId !== videoId));
+    customAnimationUtil.animateListMutation(this.uiConfig, () => {
+      this.setFavorites(this.getFavorites().filter((item: VideoItem) => item.videoId !== videoId));
+    }, this.getUIContext());
     LocalStore.persistFavorites();
   }
 
@@ -1280,7 +1289,9 @@ struct Index {
       playlist.name || playlistId,
       playlist.coverUrl || ''
     );
-    this.setPlaylists([...current, next]);
+    customAnimationUtil.animateListMutation(this.uiConfig, () => {
+      this.setPlaylists([...current, next]);
+    }, this.getUIContext());
     LocalStore.persistPlaylists();
   }
 
@@ -1289,7 +1300,9 @@ struct Index {
     if (!trimmed) {
       return;
     }
-    this.setPlaylists(this.getPlaylists().filter((item: PlaylistItem) => item.playlistId !== trimmed));
+    customAnimationUtil.animateListMutation(this.uiConfig, () => {
+      this.setPlaylists(this.getPlaylists().filter((item: PlaylistItem) => item.playlistId !== trimmed));
+    }, this.getUIContext());
     LocalStore.persistPlaylists();
   }
 

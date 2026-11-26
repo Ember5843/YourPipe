@@ -180,6 +180,27 @@ export struct HomeTabContent {
    * （登录态/内容源切换与启动加载并发时，旧的 kiosk 响应会把推荐列表顶掉）。
    */
   private homeLoadGeneration: number = 0;
+  /** 本会话下拉刷新已曝光过的视频 ID 集合，用于下拉刷新优先推送全新视频（真换一批）。 */
+  private seenRefreshIds: Set<string> = new Set<string>();
+
+  private recordSeenRefreshItems(items: VideoItem[]): void {
+    const cap = Math.min(items.length, 30);
+    for (let i = 0; i < cap; i++) {
+      const vid = (items[i].videoId || '').trim();
+      if (vid.length > 0) {
+        this.seenRefreshIds.add(vid);
+      }
+    }
+    if (this.seenRefreshIds.size > 400) {
+      this.seenRefreshIds.clear();
+      for (let i = 0; i < cap; i++) {
+        const vid = (items[i].videoId || '').trim();
+        if (vid.length > 0) {
+          this.seenRefreshIds.add(vid);
+        }
+      }
+    }
+  }
 
   aboutToAppear() {
     this.controller.registerReset((clearList: boolean, reload: boolean) => {
@@ -224,6 +245,7 @@ export struct HomeTabContent {
     this.activeChipSearchMode = false;
     this.selectedChipIndex = 0;
     this.myCategoriesFetched = false;
+    this.seenRefreshIds.clear();
     if (clearList) {
       this.longList = [];
       this.shortList = [];
@@ -544,13 +566,13 @@ export struct HomeTabContent {
   }
 
   /** 记录在飞的 feed 请求：短视频补收要串行等它结束再要下一页。 */
-  private loadLiveVideos(reset: boolean = false): Promise<void> {
-    const task = this.doLoadLiveVideos(reset);
+  private loadLiveVideos(reset: boolean = false, preferFreshOnRefresh: boolean = false): Promise<void> {
+    const task = this.doLoadLiveVideos(reset, preferFreshOnRefresh);
     this.feedLoadInFlight = task;
     return task;
   }
 
-  private async doLoadLiveVideos(reset: boolean = false) {
+  private async doLoadLiveVideos(reset: boolean = false, preferFreshOnRefresh: boolean = false) {
     if (reset) {
       this.homeLoadGeneration += 1;
       this.isLoadingMore = false;
@@ -612,27 +634,115 @@ export struct HomeTabContent {
           return;
         }
         if (reset) {
-          const split = this.splitByType(kioskResult.items);
+          let effectiveItems: VideoItem[] = kioskResult.items;
+          let effectiveNextToken: string | null = kioskResult.nextPageToken;
+          let effectiveVisitor: string = kioskResult.visitorData || '';
+          const effectiveSource: string = kioskResult.source || 'kiosk';
+
+          if (preferFreshOnRefresh && this.seenRefreshIds.size > 0) {
+            const unseen: VideoItem[] = [];
+            const seenFallback: VideoItem[] = [];
+            const pickedIds: Set<string> = new Set<string>();
+            const isShortTarget = this.isShortMode();
+            const countTargetMatches = (arr: VideoItem[]): number => {
+              let n = 0;
+              for (let i = 0; i < arr.length; i++) {
+                if ((arr[i].isShort === true) === isShortTarget) {
+                  n++;
+                }
+              }
+              return n;
+            };
+            for (let i = 0; i < effectiveItems.length; i++) {
+              const it = effectiveItems[i];
+              const vid = (it.videoId || '').trim();
+              if (vid.length > 0 && pickedIds.has(vid)) {
+                continue;
+              }
+              if (vid.length > 0) {
+                pickedIds.add(vid);
+              }
+              if (vid.length > 0 && this.seenRefreshIds.has(vid)) {
+                seenFallback.push(it);
+              } else {
+                unseen.push(it);
+              }
+            }
+
+            // 若 YouTube 首屏强缓存导致全新视频不足一屏，自动顺着 continuation 多拉 1-2 页补齐新内容。
+            const useAuthForExtra = effectiveSource.indexOf('recommended') === 0;
+            for (let extra = 0; extra < 2 && countTargetMatches(unseen) < 12 && effectiveNextToken && effectiveNextToken.length > 0; extra++) {
+              try {
+                const extraRes = await homeService.fetchHomeKioskNext(
+                  effectiveNextToken,
+                  effectiveVisitor,
+                  startId + unseen.length + seenFallback.length + 1,
+                  useAuthForExtra,
+                  effectiveSource
+                );
+                if (generation !== this.homeLoadGeneration) {
+                  return;
+                }
+                effectiveNextToken = extraRes.nextPageToken;
+                if (extraRes.visitorData && extraRes.visitorData.length > 0) {
+                  effectiveVisitor = extraRes.visitorData;
+                }
+                for (let k = 0; k < extraRes.items.length; k++) {
+                  const it = extraRes.items[k];
+                  const vid = (it.videoId || '').trim();
+                  if (vid.length > 0 && pickedIds.has(vid)) {
+                    continue;
+                  }
+                  if (vid.length > 0) {
+                    pickedIds.add(vid);
+                  }
+                  if (vid.length > 0 && this.seenRefreshIds.has(vid)) {
+                    seenFallback.push(it);
+                  } else {
+                    unseen.push(it);
+                  }
+                }
+              } catch (extraErr) {
+                logger.warn(`[HomeRefresh] extra page ${extra + 1} failed: ${this.describeThrowable(extraErr)}`);
+                break;
+              }
+            }
+
+            if (countTargetMatches(unseen) > 0) {
+              // 全新视频排在最前；若不足 6 条才在末尾补老视频，避免首屏空白。
+              effectiveItems = countTargetMatches(unseen) >= 6 ? unseen : unseen.concat(seenFallback);
+            } else {
+              // 连续刷新把当前推荐池刷完：清空已看记录自然回卷。
+              this.seenRefreshIds.clear();
+            }
+          }
+
+          const split = this.splitByType(effectiveItems);
           this.longList = split.long;
           this.shortList = split.short;
-          this.homeFeedSource = kioskResult.source || 'kiosk';
+          this.homeFeedSource = effectiveSource;
           this.homeFeedEpoch += 1;
           this.serverSections = kioskResult.sections ?? [];
           this.myCategoriesFetched = false;
           this.myCategorySections = [];
-          this.chips = this.buildMergedChips(kioskResult.chips ?? [], kioskResult.items);
+          this.chips = this.buildMergedChips(kioskResult.chips ?? [], effectiveItems);
           this.selectedChipIndex = 0;
+          this.kioskNextPageToken = effectiveNextToken;
+          if (effectiveVisitor.length > 0) {
+            this.kioskVisitorData = effectiveVisitor;
+          }
+          this.recordSeenRefreshItems(this.activeList());
           this.scrollHomeFeedToTop();
         } else {
           const split = this.splitByType(kioskResult.items);
           this.longList = this.longList.concat(split.long);
           this.shortList = this.shortList.concat(split.short);
+          this.kioskNextPageToken = kioskResult.nextPageToken;
+          if (kioskResult.visitorData && kioskResult.visitorData.length > 0) {
+            this.kioskVisitorData = kioskResult.visitorData;
+          }
         }
         this.syncHomeFeedDataSource();
-        this.kioskNextPageToken = kioskResult.nextPageToken;
-        if (kioskResult.visitorData && kioskResult.visitorData.length > 0) {
-          this.kioskVisitorData = kioskResult.visitorData;
-        }
         this.homeErrorMessage = '';
         this.homeModeNoticeMessage = '';
         if (reset && kioskResult.source === 'kiosk' && feedStyle === 'recommended') {
@@ -710,6 +820,7 @@ export struct HomeTabContent {
       ? (this.activeList()[0].videoId || this.activeList()[0].id.toString())
       : '';
     try {
+      this.recordSeenRefreshItems(this.activeList());
       this.kioskNextPageToken = null;
       this.kioskVisitorData = '';
       if (this.isMyCategoriesSelected()) {
@@ -722,7 +833,7 @@ export struct HomeTabContent {
       } else if (this.selectedChipIndex > 0 && this.selectedChipIndex < this.chips.length) {
         await this.doLoadChipVideos(this.chips[this.selectedChipIndex]);
       } else {
-        await this.loadLiveVideos(true);
+        await this.loadLiveVideos(true, true);
       }
       const nextHead = this.activeList().length > 0
         ? (this.activeList()[0].videoId || this.activeList()[0].id.toString())

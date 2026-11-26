@@ -13,6 +13,7 @@ import { notificationManager } from '@kit.NotificationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { taskpool, url } from '@kit.ArkTS';
 import { UIConfig } from './AppState';
+import { customAnimationUtil } from './AnimationUtil';
 import { DownloadTaskRecord, DownloadTaskStore } from './DownloadTaskStore';
 import { formatBytes } from './utils/FormatUtils';
 import { AuthSessionManager, ClientsConstants, HttpDownloader, parseHlsMasterManifest } from 'youtube_core';
@@ -486,7 +487,10 @@ export class DownloadManager {
     }
     logger.info(`Task ${task.id} queued: video=${task.videoId} title="${task.title}" videoStream=${this.getStreamLogLabel(task.videoStream)} audioStream=${task.audioStream ? this.getStreamLogLabel(task.audioStream) : 'none'}`);
     this.tasks.unshift(task);
-    this.notifyTasksChanged();
+    const uiConfig = AppStorage.get<UIConfig>('uiConfig');
+    customAnimationUtil.animateListMutation(uiConfig, () => {
+      this.notifyTasksChanged();
+    });
     this.processQueue();
   }
 
@@ -673,7 +677,10 @@ export class DownloadManager {
       else this.cleanupTaskFiles(task, true);
     }
     this.tasks = this.tasks.filter((item: DownloadTask) => item.id !== taskId);
-    this.notifyTasksChanged();
+    const uiConfig = AppStorage.get<UIConfig>('uiConfig');
+    customAnimationUtil.animateListMutation(uiConfig, () => {
+      this.notifyTasksChanged();
+    });
     this.processQueue();
   }
 
@@ -753,7 +760,10 @@ export class DownloadManager {
       }
     });
     this.tasks = retainedTasks;
-    this.notifyTasksChanged();
+    const uiConfig = AppStorage.get<UIConfig>('uiConfig');
+    customAnimationUtil.animateListMutation(uiConfig, () => {
+      this.notifyTasksChanged();
+    });
     this.processQueue();
   }
 

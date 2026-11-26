@@ -24,8 +24,6 @@ export struct SubscriptionManagePage {
   @State channelMap: Record<string, SearchChannelItem> = {};
   @State isRefreshing: boolean = false;
   @State syncMessage: string = '';
-  /** Bumps after profile load so ChannelCard ForEach keys change and cards rebuild. */
-  @State profileEpoch: number = 0;
   private channelInfoService: ChannelInfoService = new ChannelInfoService();
 
   private tr(res: Resource): string {
@@ -40,14 +38,14 @@ export struct SubscriptionManagePage {
     return AuthSessionManager.getInstance()?.hasAuthForUserData() === true;
   }
 
-  private buildPlaceholder(item: SubscriptionUser, index: number): SearchChannelItem {
+  private buildPlaceholder(item: SubscriptionUser, colorSeed: number = 0): SearchChannelItem {
     const channelId = (item.channelId || '').trim();
     const name = item.displayName && item.displayName.length > 0 ? item.displayName : (channelId || 'Unknown');
     const placeholder = item.thumbnailColor && item.thumbnailColor.length > 0
       ? item.thumbnailColor
-      : ThumbnailPlaceholder.pickColor(channelId || name, index);
+      : ThumbnailPlaceholder.pickColor(channelId || name, colorSeed);
     return new SearchChannelItem(
-      index,
+      colorSeed,
       channelId,
       name,
       item.subscriberText || '',
@@ -184,7 +182,6 @@ export struct SubscriptionManagePage {
     });
     await Promise.all(tasks);
     this.channelMap = nextMap;
-    this.profileEpoch += 1;
     // 批量合并 + 单次持久化；原先每个频道一次全量 map + JSON 序列化 + 写盘。
     this.applyProfilesToSubscriptions(profiles, names);
   }
@@ -252,7 +249,7 @@ export struct SubscriptionManagePage {
     // List clip(false) 让上滑的卡片画进避让区、透出标题栏半透明材质。
     Column() {
       Refresh({ refreshing: $$this.isRefreshing }) {
-        List({ scroller: SubscriptionScrollCoordinator.scroller, space: 4 }) {
+        List({ scroller: SubscriptionScrollCoordinator.scroller, space: 8 }) {
           ListItem() {
             Column() {
               if (this.syncMessage.length > 0) {
@@ -292,19 +289,21 @@ export struct SubscriptionManagePage {
               .padding({ bottom: 24 })
             }
           } else {
-            ForEach(this.subscriptions, (item: SubscriptionUser, index: number) => {
+            // 关键：ForEach itemGenerator 绝不能声明第二参数 index，否则 ArkUI 会自动把
+            // index 拼进内部键值导致删除某条后下方所有条目键值变化、全部销毁重建。
+            ForEach(this.subscriptions, (item: SubscriptionUser) => {
               ListItem() {
                 ChannelCard({
                   channel: this.channelMap[item.channelId]
                     ? this.channelMap[item.channelId]
-                    : this.buildPlaceholder(item, index),
+                    : this.buildPlaceholder(item),
                   typeLabel: $r('app.string.yt_label_user'),
                   showDescription: true,
                   forceActionLabel: $r('app.string.yt_action_unsubscribe')
                 })
               }
-              .transition(customAnimationUtil.isScaleTran(`${this.profileEpoch}_${item.channelId}`, this.uiConfig))
-            }, (item: SubscriptionUser) => `${this.profileEpoch}_${item.channelId}`)
+              .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
+            }, (item: SubscriptionUser) => item.channelId)
           }
         }
         .width('100%')

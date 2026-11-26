@@ -354,7 +354,7 @@ export struct FavoritesPage {
                     showLiveTag: false
                   })
                 }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
+                .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
               }, (item: VideoItem) => item.videoId || item.id.toString())
             }
             .width('100%')
@@ -375,7 +375,7 @@ export struct FavoritesPage {
                     showLiveTag: false
                   })
                 }
-                .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
+                .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
               }, (item: VideoItem) => item.videoId || item.id.toString())
             }
             .width('100%')
@@ -391,7 +391,7 @@ export struct FavoritesPage {
                 showLiveTag: false
               })
             }
-            .transition(customAnimationUtil.isScaleTran(item.videoId || item.id.toString(), this.uiConfig))
+            .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
           }, (item: VideoItem) => item.videoId || item.id.toString())
         }
       }
@@ -435,7 +435,7 @@ export struct FavoritesPage {
               typeLabel: entry.typeLabel
             })
           }
-          .transition(customAnimationUtil.isScaleTran(entry.item.playlistId, this.uiConfig))
+          .transition(customAnimationUtil.listItemCrudTransition(this.uiConfig))
         }, (entry: MergedPlaylistEntry) => entry.item.playlistId)
       }
       }
